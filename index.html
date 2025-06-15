@@ -1,82 +1,100 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <meta charset="UTF-8">
-    <title>Electron API Client</title>
-    <link rel="stylesheet" href="./style.css">
-</head>
-<body>
-<h1>API Client</h1>
+    <head>
+        <meta charset="UTF-8">
+        <title>Electron API Client</title>
+        <link rel="stylesheet" href="src/style.css">
+    </head>
+    <body>
+        <h1>API Client</h1>
 
-<div class="request-container">
-    <select id="method-select">
-        <option value="GET">GET</option>
-        <option value="POST">POST</option>
-        <option value="PUT">PUT</option>
-        <option value="DELETE">DELETE</option>
-        <option value="PATCH">PATCH</option>
-    </select>
-    <input type="text" id="url-input" placeholder="Enter API URL" value="https://jsonplaceholder.typicode.com/posts">
-    <button id="send-request-btn">Send Request</button>
-</div>
-
-<div class="tab-container">
-    <div class="tab-buttons request-tabs"> <button class="tab-button active" data-tab="query-params">Query Params</button>
-        <button class="tab-button" data-tab="headers">Headers</button>
-        <button class="tab-button" data-tab="body">Body</button>
-    </div>
-
-    <div class="tab-content-wrapper">
-        <div id="query-params" class="tab-content active">
-            <h3>Query Parameters</h3>
-            <div id="query-params-list" class="key-value-list">
-                <div class="key-value-row">
-                    <input type="text" class="key-input" placeholder="Key">
-                    <input type="text" class="value-input" placeholder="Value">
-                    <button class="remove-row-btn">Remove</button>
+        <div class="main-layout">
+            <div class="request-history-sidebar">
+                <h2>Requests</h2>
+                <div id="request-list">
+                    <p style="text-align: center; color: #666; margin-top: 20px;">No requests saved yet.</p>
                 </div>
             </div>
-            <button id="add-query-param-btn">Add Query Param</button>
-        </div>
 
-        <div id="headers" class="tab-content">
-            <h3>Headers</h3>
-            <div id="headers-list" class="key-value-list">
-                <div class="key-value-row">
-                    <input type="text" class="key-input" placeholder="Key" value="Content-Type">
-                    <input type="text" class="value-input" placeholder="Value" value="application/json">
-                    <button class="remove-row-btn">Remove</button>
+            <div class="main-content-area">
+                <div class="request-container">
+                    <select id="method-select">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="PATCH">PATCH</option>
+                    </select>
+                    <input type="text" id="url-input" placeholder="Enter API URL" value="https://jsonplaceholder.typicode.com/posts">
+                    <button id="send-request-btn">Send Request</button>
+                </div>
+
+                <div class="tab-container">
+                    <div class="tab-buttons request-tabs">
+                        <button class="tab-button active" data-tab="query-params">Query Params</button>
+                        <button class="tab-button" data-tab="headers">Headers</button>
+                        <button class="tab-button" data-tab="body">Body</button>
+                    </div>
+
+                    <div class="tab-content-wrapper">
+                        <div id="query-params" class="tab-content active">
+                            <h3>Query Parameters</h3>
+                            <div id="query-params-list" class="key-value-list">
+                                <div class="key-value-row">
+                                    <input type="text" class="key-input" placeholder="Key">
+                                    <input type="text" class="value-input" placeholder="Value">
+                                    <button class="remove-row-btn">Remove</button>
+                                </div>
+                            </div>
+                            <button id="add-query-param-btn">Add Query Param</button>
+                        </div>
+
+                        <div id="headers" class="tab-content">
+                            <h3>Headers</h3>
+                            <div id="headers-list" class="key-value-list">
+                                <div class="key-value-row">
+                                    <input type="text" class="key-input" placeholder="Key" value="Content-Type">
+                                    <input type="text" class="value-input" placeholder="Value" value="application/json">
+                                    <button class="remove-row-btn">Remove</button>
+                                </div>
+                            </div>
+                            <button id="add-header-btn">Add Header</button>
+                        </div>
+
+                        <div id="body" class="tab-content">
+                            <h3>Request Body (for POST/PUT/PATCH)</h3>
+                            <textarea id="body-input" placeholder='{"title": "foo", "body": "bar", "userId": 1}' rows="8" cols="50"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="response-container">
+                    <div class="response-header">
+                        <h3>Response</h3>
+                        <p id="status-display"></p>
+                    </div>
+
+                    <div class="tab-container response-tabs-container">
+                        <div class="tab-buttons response-tabs">
+                            <button class="tab-button active" data-tab="response-body">Body</button>
+                            <button class="tab-button" data-tab="response-headers">Headers</button>
+                        </div>
+
+                        <div class="tab-content-wrapper response-content-wrapper">
+                            <div id="response-body" class="tab-content active">
+                                <pre id="response-display"></pre>
+                            </div>
+
+                            <div id="response-headers" class="tab-content">
+                                <pre id="response-headers-display"></pre>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
-            <button id="add-header-btn">Add Header</button>
         </div>
 
-        <div id="body" class="tab-content">
-            <h3>Request Body (for POST/PUT/PATCH)</h3>
-            <textarea id="body-input" placeholder='{"title": "foo", "body": "bar", "userId": 1}' rows="8" cols="50"></textarea>
-        </div>
-    </div>
-</div>
-
-<div class="response-container">
-    <div class="response-header">
-        <h3>Response</h3>
-        <p id="status-display"></p>
-    </div>
-
-    <div class="tab-container response-tabs-container"> <div class="tab-buttons response-tabs"> <button class="tab-button active" data-tab="response-body">Body</button>
-        <button class="tab-button" data-tab="response-headers">Headers</button>
-    </div>
-
-        <div class="tab-content-wrapper response-content-wrapper"> <div id="response-body" class="tab-content active">
-            <pre id="response-display"></pre> </div>
-
-            <div id="response-headers" class="tab-content">
-                <pre id="response-headers-display"></pre> </div>
-        </div>
-    </div>
-</div>
-
-<script src="./renderer.js"></script>
-</body>
+        <script type="module" src="./src/renderer.js"></script>
+    </body>
 </html>
