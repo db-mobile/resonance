@@ -1,14 +1,19 @@
+/* style.css */
 body {
     font-family: sans-serif;
     padding: 20px;
     background-color: #f4f4f4;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh; /* Ensure body takes full viewport height */
+    margin: 0;
 }
 
 h1, h3 {
     color: #333;
 }
 
-.request-container, .headers-container, .body-container, .response-container {
+.request-container {
     background-color: #fff;
     border: 1px solid #ddd;
     padding: 15px;
@@ -16,15 +21,29 @@ h1, h3 {
     border-radius: 5px;
 }
 
+/* Flex grow allows response container to take remaining space */
+.response-container {
+    background-color: #fff;
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column; /* Content inside response-container stacks vertically */
+    flex-grow: 1; /* Allow it to grow and fill available space */
+}
+
+
 select, input[type="text"], textarea, button {
     padding: 8px;
     margin-right: 10px;
     border: 1px solid #ccc;
     border-radius: 3px;
     font-size: 14px;
+    vertical-align: middle;
 }
 
-input[type="text"] {
+input[type="text"]#url-input {
     width: 60%;
 }
 
@@ -44,16 +63,138 @@ button:hover {
     background-color: #0056b3;
 }
 
-pre {
+/* Response display styling */
+pre#response-display {
     background-color: #eee;
     padding: 10px;
     border-radius: 3px;
     overflow-x: auto;
-    white-space: pre-wrap; /* For wrapping long lines */
-    word-wrap: break-word; /* For breaking long words */
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    flex-grow: 1; /* Allows pre to take available height */
+    min-height: 50px; /* Minimum height even if no content */
+    max-height: 300px; /* Set a max height */
+    overflow-y: auto; /* Add vertical scrollbar if content overflows */
+}
+
+/* New: Styles for the response header and status */
+.response-header {
+    display: flex;
+    justify-content: space-between; /* Puts Response H3 on left, Status P on right */
+    align-items: center; /* Vertically aligns them */
+    margin-bottom: 10px;
 }
 
 #status-display {
     font-weight: bold;
+    /* Base color, will be overridden by status-specific classes */
+    color: #333;
+    margin: 0; /* Remove default paragraph margin */
+}
+
+/* Status Colors */
+.status-success {
+    color: #28a745; /* Green */
+}
+
+.status-redirect {
+    color: #ffc107; /* Yellow/Orange */
+}
+
+.status-client-error {
+    color: #dc3545; /* Red */
+}
+
+.status-server-error {
+    color: #6c757d; /* Gray for server errors (can be red too) */
+}
+
+.status-info {
+    color: #17a2b8; /* Blue-ish for informational (1xx) or generic */
+}
+
+/* Styles for dynamic key-value pairs (retained) */
+.key-value-list {
+    margin-bottom: 10px;
+}
+
+.key-value-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.key-value-row input[type="text"] {
+    flex: 1;
+    margin-right: 5px;
+}
+
+.key-value-row .key-input {
+    min-width: 120px;
+}
+
+.key-value-row .value-input {
+    min-width: 200px;
+}
+
+.key-value-row .remove-row-btn {
+    background-color: #dc3545;
+    margin-right: 0;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+.key-value-row .remove-row-btn:hover {
+    background-color: #c82333;
+}
+
+
+/* Tab Styles (retained) */
+.tab-container {
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.tab-buttons {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+}
+
+.tab-button {
+    background-color: #e9ecef;
+    color: #495057;
+    padding: 10px 15px;
+    cursor: pointer;
+    border: none;
+    border-radius: 0;
+    margin-right: 1px;
+    flex-grow: 1;
+    text-align: center;
+    transition: background-color 0.3s ease;
+}
+
+.tab-button:hover {
+    background-color: #dee2e6;
+}
+
+.tab-button.active {
+    background-color: #fff;
     color: #007bff;
+    border-bottom: 3px solid #007bff;
+    font-weight: bold;
+}
+
+.tab-content-wrapper {
+    padding: 15px;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
 }
