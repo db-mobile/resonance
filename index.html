@@ -21,8 +21,7 @@
 </div>
 
 <div class="tab-container">
-    <div class="tab-buttons">
-        <button class="tab-button active" data-tab="query-params">Query Params</button>
+    <div class="tab-buttons request-tabs"> <button class="tab-button active" data-tab="query-params">Query Params</button>
         <button class="tab-button" data-tab="headers">Headers</button>
         <button class="tab-button" data-tab="body">Body</button>
     </div>
@@ -62,8 +61,20 @@
 <div class="response-container">
     <div class="response-header">
         <h3>Response</h3>
-        <p id="status-display"></p> </div>
-    <pre id="response-display"></pre>
+        <p id="status-display"></p>
+    </div>
+
+    <div class="tab-container response-tabs-container"> <div class="tab-buttons response-tabs"> <button class="tab-button active" data-tab="response-body">Body</button>
+        <button class="tab-button" data-tab="response-headers">Headers</button>
+    </div>
+
+        <div class="tab-content-wrapper response-content-wrapper"> <div id="response-body" class="tab-content active">
+            <pre id="response-display"></pre> </div>
+
+            <div id="response-headers" class="tab-content">
+                <pre id="response-headers-display"></pre> </div>
+        </div>
+    </div>
 </div>
 
 <script src="./renderer.js"></script>

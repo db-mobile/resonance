@@ -63,8 +63,8 @@ button:hover {
     background-color: #0056b3;
 }
 
-/* Response display styling */
-pre#response-display {
+/* Response display styling - now applies to ALL pre elements in tab-content */
+.tab-content pre { /* Target pre elements specifically within tab-content */
     background-color: #eee;
     padding: 10px;
     border-radius: 3px;
@@ -87,12 +87,11 @@ pre#response-display {
 
 #status-display {
     font-weight: bold;
-    /* Base color, will be overridden by status-specific classes */
-    color: #333;
+    color: #333; /* Base color, will be overridden by status-specific classes */
     margin: 0; /* Remove default paragraph margin */
 }
 
-/* Status Colors */
+/* Status Colors (retained) */
 .status-success {
     color: #28a745; /* Green */
 }
@@ -148,8 +147,26 @@ pre#response-display {
     background-color: #c82333;
 }
 
+/* --- Specific fix for Add Param/Header buttons --- */
+/* Target buttons that are direct children of the tab-content. */
+/* We want them to only take up their natural width. */
+#add-query-param-btn,
+#add-header-btn {
+    width: auto;         /* Allow content to define width */
+    flex-grow: 0;        /* Prevent stretching */
+    align-self: flex-start; /* Crucial: Align to start of cross-axis (left) to prevent stretching */
+    margin-left: 0;      /* Ensure no extra left margin */
+    margin-right: 10px;  /* Keep standard right margin */
+}
 
-/* Tab Styles (retained) */
+/* Ensure the "remove" buttons within key-value-row are not affected */
+.key-value-row .remove-row-btn {
+    width: auto;
+    flex-grow: 0;
+    margin-right: 0;
+}
+
+/* Tab Styles (retained for general tab-container behavior) */
 .tab-container {
     background-color: #fff;
     border: 1px solid #ddd;
@@ -158,10 +175,26 @@ pre#response-display {
     overflow: hidden;
 }
 
+/* Specific styling for the response tab container to remove its own border, as it's inside another box */
+.response-tabs-container {
+    border: none; /* Remove border from inner tab container */
+    margin-bottom: 0; /* Remove bottom margin if desired */
+    border-radius: 0; /* No radius for inner tabs */
+    flex-grow: 1; /* Allow inner tab container to grow if needed */
+    display: flex;
+    flex-direction: column;
+}
+
 .tab-buttons {
     display: flex;
     border-bottom: 1px solid #ddd;
 }
+
+/* Adjust top margin for response tabs to visually separate from response-header */
+.response-tabs {
+    margin-top: 10px;
+}
+
 
 .tab-button {
     background-color: #e9ecef;
@@ -191,10 +224,27 @@ pre#response-display {
     padding: 15px;
 }
 
+/* For response content wrapper, we want it to take full height */
+.response-content-wrapper {
+    flex-grow: 1;
+    display: flex; /* To allow tab-content inside it to flex */
+    flex-direction: column;
+    padding-top: 0; /* Reduce padding if needed */
+}
+
 .tab-content {
     display: none;
+    flex-grow: 1; /* Allow content to grow within wrapper */
+    overflow: hidden; /* Ensure content doesn't overflow tab */
+    padding-top: 15px; /* Add padding to content area */
 }
 
 .tab-content.active {
-    display: block;
+    display: flex; /* Changed to flex to make pre inside it grow */
+    flex-direction: column;
+}
+
+/* Specific adjustment for request body textarea */
+#body .tab-content textarea {
+    min-height: 150px; /* Ensure body textarea has a good height */
 }

@@ -4,18 +4,23 @@ const urlInput = document.getElementById('url-input');
 const methodSelect = document.getElementById('method-select');
 const bodyInput = document.getElementById('body-input');
 const sendRequestBtn = document.getElementById('send-request-btn');
-const responseDisplay = document.getElementById('response-display');
 const statusDisplay = document.getElementById('status-display'); // Get the status display element
 
-// Elements for dynamic key-value pairs (now within tab content)
+// Elements for dynamic key-value pairs (now within request tabs)
 const headersList = document.getElementById('headers-list');
 const addHeaderBtn = document.getElementById('add-header-btn');
 const queryParamsList = document.getElementById('query-params-list');
 const addQueryParamBtn = document.getElementById('add-query-param-btn');
 
-// --- Tab Elements ---
-const tabButtons = document.querySelectorAll('.tab-button');
-const tabContents = document.querySelectorAll('.tab-content');
+// --- Request Tab Elements ---
+const requestTabButtons = document.querySelectorAll('.request-tabs .tab-button');
+const requestTabContents = document.querySelectorAll('.tab-content-wrapper .tab-content'); // All tab contents under request area
+
+// --- Response Tab Elements ---
+const responseTabButtons = document.querySelectorAll('.response-tabs .tab-button');
+const responseBodyDisplay = document.getElementById('response-display'); // This is the PRE tag for the body
+const responseHeadersDisplay = document.getElementById('response-headers-display'); // This is the PRE tag for headers
+
 
 // --- Helper Functions for Dynamic Key-Value Pairs (No change) ---
 
@@ -70,9 +75,8 @@ function parseKeyValuePairs(listContainer) {
     return result;
 }
 
-// --- Status Display Helper Function ---
+// --- Status Display Helper Function (No change) ---
 function updateStatusDisplay(statusText, statusCode = null) {
-    // Clear previous status classes
     statusDisplay.classList.remove('status-success', 'status-redirect', 'status-client-error', 'status-server-error', 'status-info');
 
     statusDisplay.textContent = statusText;
@@ -95,11 +99,10 @@ function updateStatusDisplay(statusText, statusCode = null) {
 }
 
 
-// --- Event Listeners for Adding Rows ---
+// --- Event Listeners for Adding/Removing Key-Value Rows ---
 addHeaderBtn.addEventListener('click', () => addKeyValueRow(headersList));
 addQueryParamBtn.addEventListener('click', () => addKeyValueRow(queryParamsList));
 
-// --- Event Listeners for Remove Buttons (Initial Rows) ---
 document.querySelectorAll('.remove-row-btn').forEach(button => {
     button.addEventListener('click', (event) => {
         event.target.closest('.key-value-row').remove();
@@ -107,12 +110,35 @@ document.querySelectorAll('.remove-row-btn').forEach(button => {
 });
 
 
-// --- Tab Switching Logic (No change) ---
-tabButtons.forEach(button => {
+// --- Request Tab Switching Logic ---
+requestTabButtons.forEach(button => {
     button.addEventListener('click', () => {
-        // Remove 'active' from all buttons and content
-        tabButtons.forEach(btn => btn.classList.remove('active'));
-        tabContents.forEach(content => content.classList.remove('active'));
+        // Remove 'active' from all request buttons and content
+        requestTabButtons.forEach(btn => btn.classList.remove('active'));
+        requestTabContents.forEach(content => content.classList.remove('active'));
+
+        // Add 'active' to the clicked button
+        button.classList.add('active');
+
+        // Get the ID of the content to show from data-tab attribute
+        const targetTabId = button.dataset.tab;
+        const targetTabContent = document.getElementById(targetTabId);
+
+        // Add 'active' to the corresponding content
+        if (targetTabContent) {
+            targetTabContent.classList.add('active');
+        }
+    });
+});
+
+// --- Response Tab Switching Logic ---
+responseTabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        // Remove 'active' from all response buttons and content
+        responseTabButtons.forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.response-content-wrapper .tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
 
         // Add 'active' to the clicked button
         button.classList.add('active');
@@ -150,15 +176,18 @@ sendRequestBtn.addEventListener('click', async () => {
         try {
             body = JSON.parse(bodyInput.value);
         } catch (e) {
-            updateStatusDisplay(`Invalid Body JSON: ${e.message}`, null); // Use helper for error
+            updateStatusDisplay(`Invalid Body JSON: ${e.message}`, null);
+            responseBodyDisplay.textContent = ''; // Clear previous response body
+            responseHeadersDisplay.textContent = ''; // Clear previous headers
             return;
         }
     }
 
     // --- Using IPC to Main Process (Option 2) ---
     try {
-        responseDisplay.textContent = 'Sending request...';
-        updateStatusDisplay('Status: Sending...', null); // Use helper
+        responseBodyDisplay.textContent = 'Sending request...'; // Clear previous response body
+        responseHeadersDisplay.textContent = ''; // Clear previous headers
+        updateStatusDisplay('Status: Sending...', null);
 
         // window.electronAPI.sendApiRequest is exposed via preload.js
         const response = await window.electronAPI.sendApiRequest({
@@ -168,32 +197,48 @@ sendRequestBtn.addEventListener('click', async () => {
             body
         });
 
-        // Displaying the response
-        responseDisplay.textContent = JSON.stringify(response.data, null, 2);
-        updateStatusDisplay(`Status: ${response.status} ${response.statusText}`, response.status); // Use helper for success
+        // Displaying the response body
+        responseBodyDisplay.textContent = JSON.stringify(response.data, null, 2);
+
+        // Displaying the response headers
+        // Headers are typically a Headers object or a plain object. Convert to string for display.
+        let headersString = '';
+        if (response.headers) {
+            if (typeof response.headers.entries === 'function') { // Check if it's a Headers object
+                for (const [key, value] of response.headers.entries()) {
+                    headersString += `${key}: ${value}\n`;
+                }
+            } else { // Assume it's a plain object
+                headersString = JSON.stringify(response.headers, null, 2);
+            }
+        }
+        responseHeadersDisplay.textContent = headersString || 'No response headers.';
+
+        updateStatusDisplay(`Status: ${response.status} ${response.statusText}`, response.status);
 
     } catch (error) {
-        // Handle errors returned from the main process
         let status = error.status || null;
         let errorMessage = error.message || 'Unknown error';
 
         if (error.data) {
             try {
-                responseDisplay.textContent = `Error: ${JSON.stringify(error.data, null, 2)}`;
+                responseBodyDisplay.textContent = `Error: ${JSON.stringify(error.data, null, 2)}`;
             } catch {
-                responseDisplay.textContent = `Error: ${String(error.data)}`;
+                responseBodyDisplay.textContent = `Error: ${String(error.data)}`;
             }
         } else {
-            responseDisplay.textContent = `Error: ${errorMessage}`;
+            responseBodyDisplay.textContent = `Error: ${errorMessage}`;
         }
+        responseHeadersDisplay.textContent = 'No headers available for error response.';
 
-        updateStatusDisplay(`Status: ${status || 'N/A'}`, status); // Use helper for error status
+        updateStatusDisplay(`Status: ${status || 'N/A'}`, status);
         console.error('API Error (via IPC):', error);
     }
 });
 
-// Initial setup (Optional: Add default rows if needed, or rely on HTML initial rows)
+// Initial setup
 document.addEventListener('DOMContentLoaded', () => {
-    // Set initial status text
     updateStatusDisplay('Ready', null);
+    // Ensure the first response tab is active on load
+    responseTabButtons[0].click();
 });
