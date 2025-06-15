@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Electron API Client</title>
+        <link rel="stylesheet" href="./style.css">
+    </head>
+    <body>
+        <h1>API Client</h1>
+
+        <div class="request-container">
+            <select id="method-select">
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+                <option value="PATCH">PATCH</option>
+            </select>
+            <input type="text" id="url-input" placeholder="Enter API URL" value="https://jsonplaceholder.typicode.com/posts/1">
+            <button id="send-request-btn">Send Request</button>
+        </div>
+
+        <div class="headers-container">
+            <h3>Headers</h3>
+            <textarea id="headers-input" placeholder='{"Content-Type": "application/json"}' rows="4" cols="50"></textarea>
+        </div>
+
+        <div class="body-container">
+            <h3>Request Body (for POST/PUT/PATCH)</h3>
+            <textarea id="body-input" placeholder='{"title": "foo", "body": "bar", "userId": 1}' rows="8" cols="50"></textarea>
+        </div>
+
+        <div class="response-container">
+            <h3>Response</h3>
+            <pre id="response-display"></pre>
+            <h3>Status</h3>
+            <p id="status-display"></p>
+        </div>
+
+        <script src="./renderer.js"></script>
+    </body>
+</html>
