@@ -19,8 +19,8 @@ export function displayCollections(collections) {
     if (collections.length === 0) {
         collectionsDiv.innerHTML = `
             <div class="collections-empty">
-                <svg class="collections-empty-icon" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                    <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V8zm0 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2z" clip-rule="evenodd"></path>
+                <svg class="collections-empty-icon" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L13.09 7.26L18 6L16.74 11.09L22 12L16.74 12.91L18 18L13.09 16.74L12 22L10.91 16.74L6 18L7.26 12.91L2 12L7.26 11.09L6 6L10.91 7.26L12 2Z"/>
                 </svg>
                 <p class="collections-empty-text">No collections imported yet</p>
                 <p class="collections-empty-subtext">Import an OpenAPI collection to get started</p>
@@ -86,8 +86,28 @@ function createCollectionElement(collection) {
     div.appendChild(headerDiv);
     div.appendChild(endpointsDiv);
 
-    headerDiv.addEventListener('click', () => {
+    headerDiv.addEventListener('click', (e) => {
+        if (e.target.closest('.context-menu')) {
+            return; // Don't toggle if clicking on context menu
+        }
+        
+        // Close all other expanded collections first
+        const allCollections = document.querySelectorAll('.collection-item');
+        allCollections.forEach(item => {
+            if (item !== div) {
+                item.classList.remove('expanded');
+            }
+        });
+        
+        // Toggle this collection
         div.classList.toggle('expanded');
+    });
+
+    // Add context menu functionality
+    div.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showContextMenu(e, collection);
     });
 
     return div;
@@ -206,6 +226,94 @@ function addKeyValueRow(container, key = '', value = '') {
     row.appendChild(removeBtn);
 
     container.appendChild(row);
+}
+
+// Context menu functionality
+let currentContextMenu = null;
+
+function showContextMenu(event, collection) {
+    // Remove any existing context menu
+    hideContextMenu();
+
+    const menu = document.createElement('div');
+    menu.className = 'context-menu';
+    menu.style.position = 'fixed';
+    menu.style.left = `${event.clientX}px`;
+    menu.style.top = `${event.clientY}px`;
+    menu.style.zIndex = '1000';
+
+    const deleteItem = document.createElement('div');
+    deleteItem.className = 'context-menu-item context-menu-delete';
+    deleteItem.innerHTML = `
+        <svg class="context-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M3 6H5H21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Delete Collection
+    `;
+
+    deleteItem.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hideContextMenu();
+        confirmDeleteCollection(collection);
+    });
+
+    menu.appendChild(deleteItem);
+    document.body.appendChild(menu);
+    currentContextMenu = menu;
+
+    // Adjust position if menu goes off screen
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+        menu.style.left = `${event.clientX - rect.width}px`;
+    }
+    if (rect.bottom > window.innerHeight) {
+        menu.style.top = `${event.clientY - rect.height}px`;
+    }
+
+    // Close menu when clicking elsewhere
+    setTimeout(() => {
+        document.addEventListener('click', hideContextMenu, { once: true });
+        document.addEventListener('contextmenu', hideContextMenu, { once: true });
+    }, 0);
+}
+
+function hideContextMenu() {
+    if (currentContextMenu) {
+        currentContextMenu.remove();
+        currentContextMenu = null;
+    }
+}
+
+function confirmDeleteCollection(collection) {
+    const confirmed = confirm(`Are you sure you want to delete the collection "${collection.name}"?\n\nThis action cannot be undone.`);
+    
+    if (confirmed) {
+        deleteCollection(collection.id);
+    }
+}
+
+async function deleteCollection(collectionId) {
+    try {
+        updateStatusDisplay('Deleting collection...', null);
+        
+        // Get current collections
+        const collections = await window.electronAPI.store.get('collections') || [];
+        
+        // Filter out the collection to delete
+        const updatedCollections = collections.filter(collection => collection.id !== collectionId);
+        
+        // Save updated collections
+        await window.electronAPI.store.set('collections', updatedCollections);
+        
+        // Refresh the display
+        await loadCollections();
+        
+        updateStatusDisplay('Collection deleted successfully', null);
+    } catch (error) {
+        console.error('Error deleting collection:', error);
+        updateStatusDisplay(`Error deleting collection: ${error.message}`, null);
+    }
 }
 
 export async function importOpenApiFile() {

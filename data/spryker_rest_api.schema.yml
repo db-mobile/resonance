@@ -121,7 +121,7 @@ tags:
         name: wishlists
 servers:
     -
-        url: 'https://localhost'
+        url: 'http://glue.esa.local'
 paths:
     '/concrete-products/{concreteProductId}':
         get:

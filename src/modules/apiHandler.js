@@ -41,45 +41,71 @@ export async function handleSendRequest() {
         responseHeadersDisplay.textContent = '';
         updateStatusDisplay('Status: Sending...', null);
 
-        const response = await window.electronAPI.sendApiRequest({
+        const result = await window.electronAPI.sendApiRequest({
             method,
             url,
             headers,
             body
         });
 
-        responseBodyDisplay.textContent = JSON.stringify(response.data, null, 2);
+        // Check if the request was successful
+        if (result.success) {
+            // Handle successful response
+            responseBodyDisplay.textContent = JSON.stringify(result.data, null, 2);
 
-        let headersString = '';
-        if (response.headers) {
-            if (typeof response.headers.entries === 'function') {
-                for (const [key, value] of response.headers.entries()) {
-                    headersString += `${key}: ${value}\n`;
-                }
-            } else {
-                headersString = JSON.stringify(response.headers, null, 2);
+            let headersString = '';
+            if (result.headers) {
+                headersString = JSON.stringify(result.headers, null, 2);
             }
-        }
-        responseHeadersDisplay.textContent = headersString || 'No response headers.';
+            responseHeadersDisplay.textContent = headersString || 'No response headers.';
 
-        updateStatusDisplay(`Status: ${response.status} ${response.statusText}`, response.status);
+            updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
+        } else {
+            // Handle error response (but don't throw, handle it here)
+            throw result; // This will be caught by the catch block below
+        }
 
     } catch (error) {
+        console.error('Full error object:', error);
+        
         let status = error.status || null;
+        let statusText = error.statusText || '';
         let errorMessage = error.message || 'Unknown error';
 
+        // Display error response body or fallback to error message
         if (error.data) {
             try {
-                responseBodyDisplay.textContent = `Error: ${JSON.stringify(error.data, null, 2)}`;
+                // If it's a JSON error response, format it nicely
+                if (typeof error.data === 'object') {
+                    responseBodyDisplay.textContent = JSON.stringify(error.data, null, 2);
+                } else {
+                    responseBodyDisplay.textContent = String(error.data);
+                }
             } catch {
-                responseBodyDisplay.textContent = `Error: ${String(error.data)}`;
+                responseBodyDisplay.textContent = `Error: ${errorMessage}`;
             }
         } else {
             responseBodyDisplay.textContent = `Error: ${errorMessage}`;
         }
-        responseHeadersDisplay.textContent = 'No headers available for error response.';
+        
+        // Handle headers for error responses
+        if (error.headers && Object.keys(error.headers).length > 0) {
+            try {
+                responseHeadersDisplay.textContent = JSON.stringify(error.headers, null, 2);
+            } catch {
+                responseHeadersDisplay.textContent = 'Error parsing response headers.';
+            }
+        } else {
+            responseHeadersDisplay.textContent = 'No headers available for error response.';
+        }
 
-        updateStatusDisplay(`Status: ${status || 'N/A'}`, status);
+        // Create a proper status display
+        let statusDisplayText = 'Request Failed';
+        if (status) {
+            statusDisplayText = `${status}${statusText ? ` ${statusText}` : ''}`;
+        }
+
+        updateStatusDisplay(statusDisplayText, status);
         console.error('API Error (via IPC):', error);
     }
 }

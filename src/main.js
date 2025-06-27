@@ -52,39 +52,98 @@ app.on('window-all-closed', function () {
     if (process.platform !== 'darwin') app.quit();
 });
 
-// --- IPC Handler for API Requests (no change) ---
+// --- IPC Handler for API Requests ---
 ipcMain.handle('send-api-request', async (event, requestOptions) => {
     try {
-        const response = await axios({
+        console.log('Received request options:', requestOptions);
+        
+        // Prepare the axios config
+        const axiosConfig = {
             method: requestOptions.method,
             url: requestOptions.url,
-            headers: requestOptions.headers,
-            data: requestOptions.body
-        });
+            headers: requestOptions.headers || {},
+            timeout: 30000, // 30 second timeout
+        };
+
+        // Handle request body for POST/PUT/PATCH requests
+        if (requestOptions.body && ['POST', 'PUT', 'PATCH'].includes(requestOptions.method.toUpperCase())) {
+            // If body is an object, stringify it for JSON requests
+            if (typeof requestOptions.body === 'object') {
+                axiosConfig.data = JSON.stringify(requestOptions.body);
+                // Ensure Content-Type is set for JSON
+                if (!axiosConfig.headers['Content-Type'] && !axiosConfig.headers['content-type']) {
+                    axiosConfig.headers['Content-Type'] = 'application/json';
+                }
+            } else {
+                // If body is already a string, use it as-is
+                axiosConfig.data = requestOptions.body;
+            }
+        }
+
+        console.log('Axios config:', axiosConfig);
+
+        const response = await axios(axiosConfig);
+        
+        // Return success result
         return {
+            success: true,
             data: response.data,
             status: response.status,
             statusText: response.statusText,
-            headers: response.headers
+            headers: JSON.parse(JSON.stringify(response.headers))
         };
     } catch (error) {
+        console.error('API request error:', error);
+        
+        // Create a serializable error object for IPC
+        let serializedError;
+        
         if (error.response) {
-            throw {
-                message: error.message,
+            // Server responded with error status
+            serializedError = {
+                success: false,
+                message: error.message || `HTTP Error ${error.response.status}`,
                 status: error.response.status,
+                statusText: error.response.statusText,
                 data: error.response.data,
-                headers: error.response.headers
+                headers: {}
             };
+            
+            // Safely serialize headers
+            try {
+                if (error.response.headers) {
+                    // Convert headers to plain object
+                    serializedError.headers = JSON.parse(JSON.stringify(error.response.headers));
+                }
+            } catch (headerError) {
+                console.warn('Failed to serialize response headers:', headerError);
+                serializedError.headers = {};
+            }
         } else if (error.request) {
-            throw {
+            // Request was made but no response received
+            serializedError = {
+                success: false,
                 message: "No response received from server.",
-                request: error.request
+                status: null,
+                statusText: null,
+                data: null,
+                headers: {}
             };
         } else {
-            throw {
-                message: `Error setting up request: ${error.message}`
+            // Something else happened
+            serializedError = {
+                success: false,
+                message: `Error setting up request: ${error.message}`,
+                status: null,
+                statusText: null,
+                data: null,
+                headers: {}
             };
         }
+        
+        console.error('Returning error result:', serializedError);
+        // Return the error instead of throwing it
+        return serializedError;
     }
 });
 

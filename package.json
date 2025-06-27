@@ -1,7 +1,7 @@
 {
-  "name": "electron",
+  "name": "resonance",
   "version": "1.0.0",
-  "description": "",
+  "description": "Resonance - A clean and minimal API client with excellent user experience",
   "license": "MIT",
   "author": "",
   "type": "module",
