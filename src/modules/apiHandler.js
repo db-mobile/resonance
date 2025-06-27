@@ -2,8 +2,14 @@ import { urlInput, methodSelect, bodyInput, responseBodyDisplay, responseHeaders
 import { updateStatusDisplay } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { activateTab } from './tabManager.js'; // To ensure response tab is active
+import { saveRequestBodyModification } from './collectionManager.js';
 
 export async function handleSendRequest() {
+    // Save any pending body modifications before sending request
+    if (window.currentEndpoint) {
+        await saveRequestBodyModification(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+    }
+
     let url = urlInput.value.trim();
     const method = methodSelect.value;
     let body = undefined;

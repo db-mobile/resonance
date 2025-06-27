@@ -4,7 +4,7 @@ import { initKeyValueListeners, addKeyValueRow } from './modules/keyValueManager
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest } from './modules/apiHandler.js';
-import { loadCollections, importOpenApiFile } from './modules/collectionManager.js';
+import { loadCollections, importOpenApiFile, initializeBodyTracking } from './modules/collectionManager.js';
 
 sendRequestBtn.addEventListener('click', handleSendRequest);
 importCollectionBtn.addEventListener('click', importOpenApiFile);
@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     initKeyValueListeners();
     initTabListeners();
+    initializeBodyTracking();
 
     activateTab('response', 'response-body');
     activateTab('request', 'query-params');

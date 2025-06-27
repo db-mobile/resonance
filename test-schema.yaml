@@ -1,0 +1,56 @@
+openapi: 3.0.0
+info:
+  title: Test API
+  version: 1.0.0
+  description: API for testing sample generation
+servers:
+  - url: https://api.example.com
+paths:
+  /customer-password:
+    patch:
+      summary: Update customer password
+      operationId: updateCustomerPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestCustomerPasswordRequest'
+      responses:
+        '200':
+          description: Password updated successfully
+
+components:
+  schemas:
+    RestCustomerPasswordRequest:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/RestCustomerPasswordRequestData'
+      required:
+        - data
+
+    RestCustomerPasswordRequestData:
+      type: object
+      properties:
+        type:
+          type: string
+        attributes:
+          $ref: '#/components/schemas/RestCustomerPasswordRequestAttributes'
+      required:
+        - type
+        - attributes
+
+    RestCustomerPasswordRequestAttributes:
+      type: object
+      properties:
+        password:
+          type: string
+        newPassword:
+          type: string
+        confirmPassword:
+          type: string
+      required:
+        - password
+        - newPassword
+        - confirmPassword
