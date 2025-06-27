@@ -12,9 +12,11 @@ export const addQueryParamBtn = document.getElementById('add-query-param-btn');
 export const responseBodyDisplay = document.getElementById('response-display');
 export const responseHeadersDisplay = document.getElementById('response-headers-display');
 
-export const requestListDiv = document.getElementById('request-list');
 
-export const requestTabButtons = document.querySelectorAll('.request-tabs .tab-button');
-export const requestTabContents = document.querySelectorAll('.tab-content-wrapper .tab-content'); // Assuming these target request tabs
+export const requestTabButtons = document.querySelectorAll('.request-config .tab-button');
+export const requestTabContents = document.querySelectorAll('.request-config .tab-content');
 
 export const responseTabButtons = document.querySelectorAll('.response-tabs .tab-button');
+
+export const importCollectionBtn = document.getElementById('import-collection-btn');
+export const collectionsListDiv = document.getElementById('collections-list');

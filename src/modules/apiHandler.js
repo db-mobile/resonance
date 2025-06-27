@@ -1,7 +1,6 @@
 import { urlInput, methodSelect, bodyInput, responseBodyDisplay, responseHeadersDisplay } from './domElements.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
-import { saveRequest } from './requestHistory.js';
 import { activateTab } from './tabManager.js'; // To ensure response tab is active
 
 export async function handleSendRequest() {
@@ -12,7 +11,6 @@ export async function handleSendRequest() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    const originalUrlForSaving = url;
 
     const queryString = new URLSearchParams(queryParams).toString();
     if (queryString) {
@@ -65,14 +63,6 @@ export async function handleSendRequest() {
         responseHeadersDisplay.textContent = headersString || 'No response headers.';
 
         updateStatusDisplay(`Status: ${response.status} ${response.statusText}`, response.status);
-
-        await saveRequest({
-            url: originalUrlForSaving,
-            method,
-            headers,
-            queryParams,
-            body
-        });
 
     } catch (error) {
         let status = error.status || null;

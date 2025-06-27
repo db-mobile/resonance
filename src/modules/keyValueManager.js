@@ -17,7 +17,7 @@ export function createKeyValueRow(key = '', value = '') {
     valueInput.value = value;
 
     const removeButton = document.createElement('button');
-    removeButton.classList.add('remove-row-btn');
+    removeButton.classList.add('remove-btn', 'remove-row-btn');
     removeButton.textContent = 'Remove';
     // Event listener for remove button will be handled in renderer.js for simplicity
 

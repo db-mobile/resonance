@@ -1,11 +1,19 @@
-import { requestTabButtons, requestTabContents, responseTabButtons } from './domElements.js';
-
 export function initTabListeners() {
+    // Handle request configuration tabs
+    const requestTabButtons = document.querySelectorAll('.request-config .tab-button');
+    const requestTabContents = document.querySelectorAll('.request-config .tab-content');
+
     requestTabButtons.forEach(button => {
         button.addEventListener('click', () => {
-            requestTabButtons.forEach(btn => btn.classList.remove('active'));
+            requestTabButtons.forEach(btn => {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-selected', 'false');
+            });
             requestTabContents.forEach(content => content.classList.remove('active'));
+            
             button.classList.add('active');
+            button.setAttribute('aria-selected', 'true');
+            
             const targetTabId = button.dataset.tab;
             const targetTabContent = document.getElementById(targetTabId);
             if (targetTabContent) {
@@ -14,14 +22,21 @@ export function initTabListeners() {
         });
     });
 
+    // Handle response tabs
+    const responseTabButtons = document.querySelectorAll('.response-tabs .tab-button');
+    const responseTabContents = document.querySelectorAll('.response-display .tab-content');
+
     responseTabButtons.forEach(button => {
         button.addEventListener('click', () => {
-            responseTabButtons.forEach(btn => btn.classList.remove('active'));
-            // Select all response content tabs specifically
-            document.querySelectorAll('.response-content-wrapper .tab-content').forEach(content => {
-                content.classList.remove('active');
+            responseTabButtons.forEach(btn => {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-selected', 'false');
             });
+            responseTabContents.forEach(content => content.classList.remove('active'));
+            
             button.classList.add('active');
+            button.setAttribute('aria-selected', 'true');
+            
             const targetTabId = button.dataset.tab;
             const targetTabContent = document.getElementById(targetTabId);
             if (targetTabContent) {
@@ -34,25 +49,30 @@ export function initTabListeners() {
 export function activateTab(tabType, tabId) {
     let buttons;
     let contents;
+    
     if (tabType === 'request') {
-        buttons = requestTabButtons;
-        contents = requestTabContents;
+        buttons = document.querySelectorAll('.request-config .tab-button');
+        contents = document.querySelectorAll('.request-config .tab-content');
     } else if (tabType === 'response') {
-        buttons = responseTabButtons;
-        contents = document.querySelectorAll('.response-content-wrapper .tab-content');
+        buttons = document.querySelectorAll('.response-tabs .tab-button');
+        contents = document.querySelectorAll('.response-display .tab-content');
     } else {
         console.warn('Unknown tab type:', tabType);
         return;
     }
 
-    buttons.forEach(btn => btn.classList.remove('active'));
+    buttons.forEach(btn => {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-selected', 'false');
+    });
     contents.forEach(content => content.classList.remove('active'));
 
-    const targetButton = document.querySelector(`.${tabType}-tabs .tab-button[data-tab="${tabId}"]`);
+    const targetButton = document.querySelector(`.${tabType === 'request' ? 'request-config' : 'response-tabs'} .tab-button[data-tab="${tabId}"]`);
     const targetContent = document.getElementById(tabId);
 
     if (targetButton) {
         targetButton.classList.add('active');
+        targetButton.setAttribute('aria-selected', 'true');
     }
     if (targetContent) {
         targetContent.classList.add('active');
