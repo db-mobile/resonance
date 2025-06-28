@@ -1,0 +1,38 @@
+openapi: 3.0.0
+info:
+  title: Customers API
+  version: 1.0.0
+  description: Test API for customers endpoint
+
+servers:
+  - url: https://api.example.com
+
+components:
+  parameters:
+    acceptLanguage:
+      name: Accept-Language
+      in: header
+      description: Locale value relevant for the store
+      schema:
+        type: string
+      required: false
+      example: "en-US"
+
+paths:
+  /customers/{customerId}:
+    get:
+      summary: 'Retrieves customer data.'
+      tags:
+        - customers
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          description: 'Id of customer.'
+          schema:
+            type: string
+          example: "cust-123"
+        - $ref: '#/components/parameters/acceptLanguage'
+      responses:
+        '200':
+          description: Customer data retrieved successfully

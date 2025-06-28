@@ -201,6 +201,7 @@ function parseOpenApiToCollection(openApiSpec, fileName) {
         name: openApiSpec.info?.title || fileName,
         version: openApiSpec.info?.version || '1.0.0',
         baseUrl: '',
+        defaultHeaders: {},
         endpoints: [],
         // Store the full spec for $ref resolution
         _openApiSpec: openApiSpec
@@ -209,6 +210,26 @@ function parseOpenApiToCollection(openApiSpec, fileName) {
     // Extract base URL from servers
     if (openApiSpec.servers && openApiSpec.servers.length > 0) {
         collection.baseUrl = openApiSpec.servers[0].url;
+    }
+
+    // Extract default headers from components.headers or custom x-default-headers
+    if (openApiSpec.components?.headers) {
+        // Convert OpenAPI header components to simple key-value pairs
+        for (const [headerName, headerSpec] of Object.entries(openApiSpec.components.headers)) {
+            if (headerSpec.schema?.default || headerSpec.example) {
+                collection.defaultHeaders[headerName] = headerSpec.schema?.default || headerSpec.example;
+            }
+        }
+    }
+
+    // Support custom x-default-headers extension
+    if (openApiSpec['x-default-headers']) {
+        Object.assign(collection.defaultHeaders, openApiSpec['x-default-headers']);
+    }
+
+    // Support default headers in info section
+    if (openApiSpec.info?.['x-default-headers']) {
+        Object.assign(collection.defaultHeaders, openApiSpec.info['x-default-headers']);
     }
 
     // Parse paths to create endpoints
@@ -244,26 +265,74 @@ function parseParameters(parameters) {
     };
 
     parameters.forEach(param => {
-        if (param.in === 'query') {
-            parsed.query[param.name] = {
-                required: param.required || false,
-                type: param.schema?.type || 'string',
-                description: param.description || '',
-                example: param.example || param.schema?.example || ''
+        // Resolve $ref if present
+        const resolvedParam = param.$ref ? resolveSchemaRef(param) : param;
+        if (!resolvedParam) return; // Skip if $ref couldn't be resolved
+        
+        if (resolvedParam.in === 'query') {
+            parsed.query[resolvedParam.name] = {
+                required: resolvedParam.required || false,
+                type: resolvedParam.schema?.type || 'string',
+                description: resolvedParam.description || '',
+                example: resolvedParam.example || resolvedParam.schema?.example || ''
             };
-        } else if (param.in === 'path') {
-            parsed.path[param.name] = {
+        } else if (resolvedParam.in === 'path') {
+            parsed.path[resolvedParam.name] = {
                 required: true,
-                type: param.schema?.type || 'string',
-                description: param.description || '',
-                example: param.example || param.schema?.example || ''
+                type: resolvedParam.schema?.type || 'string',
+                description: resolvedParam.description || '',
+                example: resolvedParam.example || resolvedParam.schema?.example || ''
             };
-        } else if (param.in === 'header') {
-            parsed.header[param.name] = {
-                required: param.required || false,
-                type: param.schema?.type || 'string',
-                description: param.description || '',
-                example: param.example || param.schema?.example || ''
+        } else if (resolvedParam.in === 'header') {
+            // Generate sensible default examples for common headers
+            let defaultExample = resolvedParam.example || resolvedParam.schema?.example || '';
+            
+            // Check for enum values in schema
+            if (!defaultExample && resolvedParam.schema?.enum && resolvedParam.schema.enum.length > 0) {
+                defaultExample = resolvedParam.schema.enum[0];
+            }
+            
+            if (!defaultExample) {
+                switch (resolvedParam.name.toLowerCase()) {
+                    case 'accept-language':
+                        defaultExample = 'en-US';
+                        break;
+                    case 'authorization':
+                        defaultExample = 'Bearer {{ token }}';
+                        break;
+                    case 'content-type':
+                        defaultExample = 'application/json';
+                        break;
+                    case 'accept':
+                        defaultExample = 'application/json';
+                        break;
+                    case 'user-agent':
+                        defaultExample = 'MyApp/1.0';
+                        break;
+                    case 'x-api-key':
+                        defaultExample = '{{ apiKey }}';
+                        break;
+                    case 'x-api-version':
+                        defaultExample = 'v1';
+                        break;
+                    default:
+                        // Use parameter name as hint for meaningful defaults
+                        if (param.name.toLowerCase().includes('token')) {
+                            defaultExample = '{{ token }}';
+                        } else if (param.name.toLowerCase().includes('key')) {
+                            defaultExample = '{{ apiKey }}';
+                        } else {
+                            defaultExample = 'example-value';
+                        }
+                        break;
+                }
+            }
+            
+            parsed.header[resolvedParam.name] = {
+                required: resolvedParam.required || false,
+                type: resolvedParam.schema?.type || 'string',
+                description: resolvedParam.description || '',
+                example: defaultExample
             };
         }
     });

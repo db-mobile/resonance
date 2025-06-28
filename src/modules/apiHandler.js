@@ -5,6 +5,7 @@ import { activateTab } from './tabManager.js'; // To ensure response tab is acti
 import { saveRequestBodyModification } from './collectionManager.js';
 import { VariableProcessor } from './variables/VariableProcessor.js';
 import { VariableRepository } from './storage/VariableRepository.js';
+import { CollectionRepository } from './storage/CollectionRepository.js';
 
 export async function handleSendRequest() {
     // Save any pending body modifications before sending request
@@ -19,14 +20,25 @@ export async function handleSendRequest() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    // Process variables if we have a current endpoint
+    // Process variables and merge default headers if we have a current endpoint
     if (window.currentEndpoint) {
         try {
+            const collectionRepository = new CollectionRepository(window.electronAPI);
             const variableRepository = new VariableRepository(window.electronAPI);
+            
+            // Get collection data for default headers
+            const collection = await collectionRepository.getById(window.currentEndpoint.collectionId);
+            
+            // Merge default headers from collection (they go first, can be overridden)
+            if (collection && collection.defaultHeaders) {
+                const mergedHeaders = { ...collection.defaultHeaders, ...headers };
+                Object.assign(headers, mergedHeaders);
+            }
+            
+            // Process variables in URL, headers, query params, and body
             const variables = await variableRepository.getVariablesForCollection(window.currentEndpoint.collectionId);
             const processor = new VariableProcessor();
             
-            // Process variables in URL, headers, query params, and body
             url = processor.processTemplate(url, variables);
             
             // Process headers
