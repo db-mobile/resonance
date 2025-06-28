@@ -3,6 +3,8 @@ import { updateStatusDisplay } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { activateTab } from './tabManager.js'; // To ensure response tab is active
 import { saveRequestBodyModification } from './collectionManager.js';
+import { VariableProcessor } from './variables/VariableProcessor.js';
+import { VariableRepository } from './storage/VariableRepository.js';
 
 export async function handleSendRequest() {
     // Save any pending body modifications before sending request
@@ -17,6 +19,41 @@ export async function handleSendRequest() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
+    // Process variables if we have a current endpoint
+    if (window.currentEndpoint) {
+        try {
+            const variableRepository = new VariableRepository(window.electronAPI);
+            const variables = await variableRepository.getVariablesForCollection(window.currentEndpoint.collectionId);
+            const processor = new VariableProcessor();
+            
+            // Process variables in URL, headers, query params, and body
+            url = processor.processTemplate(url, variables);
+            
+            // Process headers
+            const processedHeaders = {};
+            for (const [key, value] of Object.entries(headers)) {
+                const processedKey = processor.processTemplate(key, variables);
+                const processedValue = processor.processTemplate(value, variables);
+                processedHeaders[processedKey] = processedValue;
+            }
+            Object.assign(headers, processedHeaders);
+            
+            // Process query params
+            const processedQueryParams = {};
+            for (const [key, value] of Object.entries(queryParams)) {
+                const processedKey = processor.processTemplate(key, variables);
+                const processedValue = processor.processTemplate(value, variables);
+                processedQueryParams[processedKey] = processedValue;
+            }
+            Object.assign(queryParams, processedQueryParams);
+            
+        } catch (error) {
+            console.error('Error processing variables:', error);
+            updateStatusDisplay(`Variable processing error: ${error.message}`, null);
+            return;
+        }
+    }
+
 
     const queryString = new URLSearchParams(queryParams).toString();
     if (queryString) {
@@ -25,7 +62,17 @@ export async function handleSendRequest() {
 
     if (['POST', 'PUT', 'PATCH'].includes(method) && bodyInput.value.trim()) {
         try {
-            body = JSON.parse(bodyInput.value);
+            let bodyText = bodyInput.value.trim();
+            
+            // Process variables in body if we have a current endpoint
+            if (window.currentEndpoint) {
+                const variableRepository = new VariableRepository(window.electronAPI);
+                const variables = await variableRepository.getVariablesForCollection(window.currentEndpoint.collectionId);
+                const processor = new VariableProcessor();
+                bodyText = processor.processTemplate(bodyText, variables);
+            }
+            
+            body = JSON.parse(bodyText);
         } catch (e) {
             updateStatusDisplay(`Invalid Body JSON: ${e.message}`, null);
             responseBodyDisplay.textContent = '';

@@ -1,0 +1,139 @@
+/**
+ * Responsible for rendering collection UI elements
+ * Follows Single Responsibility Principle - only handles UI rendering
+ */
+export class CollectionRenderer {
+    constructor(containerId) {
+        this.container = document.getElementById(containerId);
+        if (!this.container) {
+            throw new Error(`Container with id '${containerId}' not found`);
+        }
+    }
+
+    renderEmptyState() {
+        this.container.innerHTML = `
+            <div class="collections-empty">
+                <svg class="collections-empty-icon" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L13.09 7.26L18 6L16.74 11.09L22 12L16.74 12.91L18 18L13.09 16.74L12 22L10.91 16.74L6 18L7.26 12.91L2 12L7.26 11.09L6 6L10.91 7.26L12 2Z"/>
+                </svg>
+                <p class="collections-empty-text">No collections imported yet</p>
+                <p class="collections-empty-subtext">Import an OpenAPI collection to get started</p>
+            </div>
+        `;
+    }
+
+    renderCollections(collections, eventHandlers = {}) {
+        if (collections.length === 0) {
+            this.renderEmptyState();
+            return;
+        }
+
+        this.container.innerHTML = '';
+        collections.forEach(collection => {
+            const collectionElement = this.createCollectionElement(collection, eventHandlers);
+            this.container.appendChild(collectionElement);
+        });
+    }
+
+    createCollectionElement(collection, eventHandlers) {
+        const div = document.createElement('div');
+        div.className = 'collection-item';
+        div.dataset.collectionId = collection.id;
+
+        const headerDiv = this.createCollectionHeader(collection);
+        const endpointsDiv = this.createEndpointsContainer(collection, eventHandlers);
+
+        div.appendChild(headerDiv);
+        div.appendChild(endpointsDiv);
+
+        this.attachCollectionEventListeners(div, headerDiv, collection, eventHandlers);
+
+        return div;
+    }
+
+    createCollectionHeader(collection) {
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'collection-header';
+
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'collection-name';
+        nameDiv.textContent = collection.name;
+
+        const toggleDiv = document.createElement('div');
+        toggleDiv.className = 'collection-toggle';
+        toggleDiv.innerHTML = '▼';
+
+        headerDiv.appendChild(nameDiv);
+        headerDiv.appendChild(toggleDiv);
+
+        return headerDiv;
+    }
+
+    createEndpointsContainer(collection, eventHandlers) {
+        const endpointsDiv = document.createElement('div');
+        endpointsDiv.className = 'collection-endpoints';
+
+        collection.endpoints.forEach(endpoint => {
+            const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers);
+            endpointsDiv.appendChild(endpointDiv);
+        });
+
+        return endpointsDiv;
+    }
+
+    createEndpointElement(endpoint, collection, eventHandlers) {
+        const endpointDiv = document.createElement('div');
+        endpointDiv.className = 'endpoint-item';
+        endpointDiv.dataset.endpointId = endpoint.id;
+        endpointDiv.dataset.collectionId = collection.id;
+
+        const methodSpan = document.createElement('span');
+        methodSpan.className = `endpoint-method ${endpoint.method.toLowerCase()}`;
+        methodSpan.textContent = endpoint.method;
+
+        const pathSpan = document.createElement('span');
+        pathSpan.className = 'endpoint-path';
+        pathSpan.textContent = endpoint.path;
+
+        endpointDiv.appendChild(methodSpan);
+        endpointDiv.appendChild(pathSpan);
+
+        if (eventHandlers.onEndpointClick) {
+            endpointDiv.addEventListener('click', (e) => {
+                e.stopPropagation();
+                eventHandlers.onEndpointClick(collection, endpoint);
+            });
+        }
+
+        return endpointDiv;
+    }
+
+    attachCollectionEventListeners(collectionDiv, headerDiv, collection, eventHandlers) {
+        // Toggle expansion
+        headerDiv.addEventListener('click', (e) => {
+            if (e.target.closest('.context-menu')) {
+                return;
+            }
+            
+            // Close all other expanded collections first
+            const allCollections = document.querySelectorAll('.collection-item');
+            allCollections.forEach(item => {
+                if (item !== collectionDiv) {
+                    item.classList.remove('expanded');
+                }
+            });
+            
+            // Toggle this collection
+            collectionDiv.classList.toggle('expanded');
+        });
+
+        // Context menu
+        if (eventHandlers.onContextMenu) {
+            collectionDiv.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                eventHandlers.onContextMenu(e, collection);
+            });
+        }
+    }
+}
