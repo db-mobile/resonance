@@ -14,6 +14,18 @@
   --color-gray-800: #1F2937;
   --color-gray-900: #111827;
   
+  /* Dark theme colors */
+  --color-dark-50: #0F1419;
+  --color-dark-100: #1A1F2E;
+  --color-dark-200: #252A39;
+  --color-dark-300: #2F3444;
+  --color-dark-400: #3A3F4F;
+  --color-dark-500: #4A4F5F;
+  --color-dark-600: #5A5F6F;
+  --color-dark-700: #6A6F7F;
+  --color-dark-800: #8A8F9F;
+  --color-dark-900: #AAB0BF;
+  
   /* Accent Colors - Subtle & Purposeful */
   --color-primary: #3B82F6;
   --color-primary-light: #DBEAFE;
@@ -25,27 +37,7 @@
   --color-error: #EF4444;
   --color-error-light: #FEE2E2;
   
-  /* Text Colors - High Contrast for Readability */
-  --text-primary: var(--color-gray-900);
-  --text-secondary: var(--color-gray-700);
-  --text-tertiary: var(--color-gray-500);
-  --text-disabled: var(--color-gray-400);
-  --text-inverse: var(--color-white);
-  
-  /* Background Colors - Clean & Layered */
-  --bg-primary: var(--color-white);
-  --bg-secondary: var(--color-gray-50);
-  --bg-tertiary: var(--color-gray-100);
-  --bg-overlay: rgba(255, 255, 255, 0.95);
-  --bg-glass: rgba(255, 255, 255, 0.8);
-  --bg-glass-strong: rgba(255, 255, 255, 0.9);
-  
-  /* Border Colors - Subtle Definition */
-  --border-light: var(--color-gray-200);
-  --border-medium: var(--color-gray-300);
-  --border-strong: var(--color-gray-400);
-  --border-focus: var(--color-primary);
-  --border-glass: rgba(255, 255, 255, 0.2);
+  /* Theme variables will be loaded dynamically */
   
   /* Spacing Scale - Consistent Rhythm */
   --space-1: 0.25rem;
@@ -854,4 +846,303 @@ body {
   .context-menu {
     animation: none;
   }
+}
+
+/* New Request Dialog */
+.new-request-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: dialogOverlayFadeIn var(--transition-normal);
+}
+
+.new-request-dialog {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-6);
+  width: 400px;
+  max-width: 90vw;
+  animation: dialogSlideIn var(--transition-normal);
+}
+
+.new-request-dialog h3 {
+  margin: 0 0 var(--space-4) 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.new-request-dialog .form-group {
+  margin-bottom: var(--space-4);
+}
+
+.new-request-dialog label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.new-request-dialog input,
+.new-request-dialog select {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  font-size: var(--font-size-sm);
+  transition: all var(--transition-fast);
+  box-sizing: border-box;
+}
+
+.new-request-dialog input:focus,
+.new-request-dialog select:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.new-request-dialog .form-buttons {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  margin-top: var(--space-5);
+}
+
+.new-request-dialog button {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.new-request-dialog button:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.new-request-dialog button[type="submit"] {
+  background: var(--color-primary);
+  color: var(--text-inverse);
+  border-color: var(--color-primary);
+}
+
+.new-request-dialog button[type="submit"]:hover {
+  background: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+}
+
+@keyframes dialogOverlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialogSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Settings Button */
+.settings-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-4);
+}
+
+/* Settings Modal */
+.settings-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: dialogOverlayFadeIn var(--transition-normal);
+}
+
+.settings-modal {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 500px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow: hidden;
+  animation: dialogSlideIn var(--transition-normal);
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.settings-header h2 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.settings-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-close-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.settings-content {
+  padding: var(--space-6);
+}
+
+.settings-section {
+  margin-bottom: var(--space-6);
+}
+
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.settings-section h3 {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-4) 0;
+}
+
+.theme-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.theme-option {
+  display: block;
+  cursor: pointer;
+}
+
+.theme-option input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.theme-option-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.theme-option:hover .theme-option-content {
+  border-color: var(--border-medium);
+}
+
+.theme-option input[type="radio"]:checked + .theme-option-content {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.theme-preview {
+  width: 40px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-medium);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.light-preview {
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+}
+
+.dark-preview {
+  background: linear-gradient(135deg, #1a1f2e 0%, #252a39 100%);
+}
+
+.system-preview {
+  background: linear-gradient(135deg, #ffffff 0%, #ffffff 50%, #1a1f2e 50%, #1a1f2e 100%);
+}
+
+.theme-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.theme-name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.theme-description {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
 }

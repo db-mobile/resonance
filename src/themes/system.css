@@ -1,0 +1,206 @@
+/**
+ * System Theme
+ * Automatically follows OS preference
+ */
+
+/* Default to light theme */
+:root {
+  /* Text Colors - High Contrast for Readability */
+  --text-primary: var(--color-gray-900);
+  --text-secondary: var(--color-gray-700);
+  --text-tertiary: var(--color-gray-500);
+  --text-disabled: var(--color-gray-400);
+  --text-inverse: var(--color-white);
+  
+  /* Background Colors - Clean & Layered */
+  --bg-primary: var(--color-white);
+  --bg-secondary: var(--color-gray-50);
+  --bg-tertiary: var(--color-gray-100);
+  --bg-overlay: rgba(255, 255, 255, 0.95);
+  --bg-glass: rgba(255, 255, 255, 0.8);
+  --bg-glass-strong: rgba(255, 255, 255, 0.9);
+  
+  /* Border Colors - Subtle Definition */
+  --border-light: var(--color-gray-200);
+  --border-medium: var(--color-gray-300);
+  --border-strong: var(--color-gray-400);
+  --border-focus: var(--color-primary);
+  --border-glass: rgba(255, 255, 255, 0.2);
+  
+  /* Light theme shadows */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  /* Light theme accent colors */
+  --color-success-light: #D1FAE5;
+  --color-warning-light: #FEF3C7;
+  --color-error-light: #FEE2E2;
+  --color-primary-light: #DBEAFE;
+}
+
+/* Dark theme when system prefers dark */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Text Colors - Optimized Contrast for Dark Background */
+    --text-primary: #E5E7EB;    /* Much lighter for better contrast */
+    --text-secondary: #D1D5DB;  /* Light gray for secondary text */
+    --text-tertiary: #9CA3AF;   /* Medium gray for tertiary text */
+    --text-disabled: #6B7280;   /* Darker for disabled state */
+    --text-inverse: #111827;    /* Dark text for light backgrounds */
+    
+    /* Background Colors - Rich Dark & Layered */
+    --bg-primary: #0F172A;      /* Very dark blue-gray */
+    --bg-secondary: #1E293B;    /* Slightly lighter blue-gray */
+    --bg-tertiary: #334155;     /* Medium blue-gray for cards */
+    --bg-overlay: rgba(15, 23, 42, 0.95);
+    --bg-glass: rgba(15, 23, 42, 0.8);
+    --bg-glass-strong: rgba(15, 23, 42, 0.9);
+    
+    /* Border Colors - Subtle Dark Definition with Better Contrast */
+    --border-light: #334155;    /* Lighter than bg-tertiary */
+    --border-medium: #475569;   /* Medium contrast borders */
+    --border-strong: #64748B;   /* Strong contrast borders */
+    --border-focus: #3B82F6;    /* Blue focus ring */
+    --border-glass: rgba(100, 116, 139, 0.2);
+    
+    /* Dark theme shadows - enhanced for depth */
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+    --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+    
+    /* Dark theme accent colors - more vibrant backgrounds */
+    --color-success-light: rgba(16, 185, 129, 0.15);
+    --color-warning-light: rgba(245, 158, 11, 0.15);
+    --color-error-light: rgba(239, 68, 68, 0.15);
+    --color-primary-light: rgba(59, 130, 246, 0.15);
+  }
+  
+  /* Dark theme specific overrides for system theme */
+  input[type="text"],
+  input[type="url"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  textarea,
+  select {
+    background: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-medium) !important;
+  }
+
+  input[type="text"]:focus,
+  input[type="url"]:focus,
+  input[type="email"]:focus,
+  input[type="password"]:focus,
+  input[type="number"]:focus,
+  textarea:focus,
+  select:focus {
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-focus) !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+  }
+
+  pre,
+  code {
+    background: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-light) !important;
+  }
+
+  button {
+    background: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-medium) !important;
+  }
+
+  button:hover {
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-strong) !important;
+  }
+
+  /* Main Content Area Sections - Fix White Backgrounds in Dark Mode */
+  .main-content-area,
+  .request-builder,
+  .request-url-section,
+  .request-config,
+  .response-area,
+  .response-content,
+  .response-display,
+  .tab-content,
+  .key-value-list,
+  .key-value-row,
+  .collections-sidebar,
+  .collections-container,
+  .collections-list,
+  .collections-empty,
+  .collection-item,
+  .collection-endpoints,
+  .endpoint-item {
+    background: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .tab-nav,
+  .response-tabs,
+  .tab-button,
+  .response-header,
+  .sidebar-header,
+  .collection-header {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+  }
+
+  h1, h2, h3, h4, h5, h6,
+  .response-title,
+  .sidebar-title,
+  .collection-name {
+    color: var(--text-primary) !important;
+  }
+
+  #response-display,
+  #response-headers-display {
+    background: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-light) !important;
+  }
+
+  /* Status Display for System Dark Mode */
+  .status-display {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-medium) !important;
+    font-weight: 600 !important;
+  }
+
+  .status-success {
+    background: rgba(34, 197, 94, 0.2) !important;
+    color: #4ADE80 !important;
+    border-color: #22C55E !important;
+  }
+
+  .status-redirect {
+    background: rgba(245, 158, 11, 0.2) !important;
+    color: #FBBF24 !important;
+    border-color: #F59E0B !important;
+  }
+
+  .status-client-error,
+  .status-server-error {
+    background: rgba(239, 68, 68, 0.2) !important;
+    color: #F87171 !important;
+    border-color: #EF4444 !important;
+  }
+
+  .status-info {
+    background: rgba(59, 130, 246, 0.2) !important;
+    color: #60A5FA !important;
+    border-color: #3B82F6 !important;
+  }
+}

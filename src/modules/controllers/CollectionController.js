@@ -40,6 +40,7 @@ export class CollectionController {
         this.handleRename = this.handleRename.bind(this);
         this.handleDelete = this.handleDelete.bind(this);
         this.handleVariables = this.handleVariables.bind(this);
+        this.handleNewRequest = this.handleNewRequest.bind(this);
     }
 
     async loadCollections() {
@@ -76,6 +77,11 @@ export class CollectionController {
 
     handleContextMenu(event, collection) {
         const menuItems = [
+            {
+                label: 'New Request',
+                icon: ContextMenu.createNewRequestIcon(),
+                onClick: () => this.handleNewRequest(collection)
+            },
             {
                 label: 'Manage Variables',
                 icon: ContextMenu.createVariableIcon(),
@@ -126,6 +132,109 @@ export class CollectionController {
         } catch (error) {
             console.error('Error managing variables:', error);
         }
+    }
+
+    async handleNewRequest(collection) {
+        try {
+            const requestData = await this.showNewRequestDialog();
+            if (requestData) {
+                await this.service.addRequestToCollection(collection.id, requestData);
+                await this.loadCollections(); // Refresh display
+            }
+        } catch (error) {
+            console.error('Error creating new request:', error);
+        }
+    }
+
+    async showNewRequestDialog() {
+        return new Promise((resolve) => {
+            const dialog = document.createElement('div');
+            dialog.className = 'new-request-dialog-overlay';
+            dialog.innerHTML = `
+                <div class="new-request-dialog">
+                    <h3>Create New Request</h3>
+                    <form id="new-request-form">
+                        <div class="form-group">
+                            <label for="request-name">Request Name:</label>
+                            <input type="text" id="request-name" placeholder="My Request" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="request-method">Method:</label>
+                            <select id="request-method" required>
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="PATCH">PATCH</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="request-path">Path:</label>
+                            <input type="text" id="request-path" placeholder="/api/endpoint" required>
+                        </div>
+                        <div class="form-buttons">
+                            <button type="button" id="cancel-btn">Cancel</button>
+                            <button type="submit" id="create-btn">Create</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            document.body.appendChild(dialog);
+
+            const form = dialog.querySelector('#new-request-form');
+            const nameInput = dialog.querySelector('#request-name');
+            const methodSelect = dialog.querySelector('#request-method');
+            const pathInput = dialog.querySelector('#request-path');
+            const cancelBtn = dialog.querySelector('#cancel-btn');
+            const createBtn = dialog.querySelector('#create-btn');
+
+            // Focus on name input
+            nameInput.focus();
+
+            const cleanup = () => {
+                dialog.remove();
+            };
+
+            cancelBtn.addEventListener('click', () => {
+                cleanup();
+                resolve(null);
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = nameInput.value.trim();
+                const method = methodSelect.value;
+                const path = pathInput.value.trim();
+
+                if (name && method && path) {
+                    cleanup();
+                    resolve({
+                        name,
+                        method,
+                        path: path.startsWith('/') ? path : '/' + path
+                    });
+                }
+            });
+
+            // Close on overlay click
+            dialog.addEventListener('click', (e) => {
+                if (e.target === dialog) {
+                    cleanup();
+                    resolve(null);
+                }
+            });
+
+            // Close on escape key
+            const escapeHandler = (e) => {
+                if (e.key === 'Escape') {
+                    cleanup();
+                    resolve(null);
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
+        });
     }
 
     async handleDelete(collection) {

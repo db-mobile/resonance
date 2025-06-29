@@ -1,0 +1,41 @@
+/**
+ * Blueprint Theme
+ * Example custom theme with blue-tinted colors
+ */
+:root {
+  /* Text Colors - Blueprint style */
+  --text-primary: #0D1929;
+  --text-secondary: #1C2D42;
+  --text-tertiary: #2F4F7F;
+  --text-disabled: #5A6B7D;
+  --text-inverse: #F5F8FF;
+  
+  /* Background Colors - Blueprint blue tints */
+  --bg-primary: #F5F8FF;
+  --bg-secondary: #E8F1FF;
+  --bg-tertiary: #DCE8F7;
+  --bg-overlay: rgba(245, 248, 255, 0.95);
+  --bg-glass: rgba(245, 248, 255, 0.8);
+  --bg-glass-strong: rgba(245, 248, 255, 0.9);
+  
+  /* Border Colors - Blue-tinted borders */
+  --border-light: #C5D9F1;
+  --border-medium: #A3C1E8;
+  --border-strong: #7AA3D1;
+  --border-focus: #2563EB;
+  --border-glass: rgba(245, 248, 255, 0.2);
+  
+  /* Blueprint theme shadows with blue tint */
+  --shadow-xs: 0 1px 2px 0 rgba(37, 99, 235, 0.1);
+  --shadow-sm: 0 1px 3px 0 rgba(37, 99, 235, 0.15), 0 1px 2px 0 rgba(37, 99, 235, 0.1);
+  --shadow-base: 0 4px 6px -1px rgba(37, 99, 235, 0.15), 0 2px 4px -1px rgba(37, 99, 235, 0.1);
+  --shadow-md: 0 10px 15px -3px rgba(37, 99, 235, 0.15), 0 4px 6px -2px rgba(37, 99, 235, 0.1);
+  --shadow-lg: 0 20px 25px -5px rgba(37, 99, 235, 0.15), 0 10px 10px -5px rgba(37, 99, 235, 0.08);
+  --shadow-xl: 0 25px 50px -12px rgba(37, 99, 235, 0.3);
+  
+  /* Blueprint theme accent colors */
+  --color-success-light: #D1F2EB;
+  --color-warning-light: #FEF3C7;
+  --color-error-light: #FEE2E2;
+  --color-primary-light: #DBEAFE;
+}

@@ -63,6 +63,58 @@ export class CollectionService {
         }
     }
 
+    async addRequestToCollection(collectionId, requestData) {
+        try {
+            this.statusDisplay.update('Adding new request...', null);
+            
+            const collection = await this.repository.getById(collectionId);
+            if (!collection) {
+                throw new Error(`Collection with id ${collectionId} not found`);
+            }
+
+            // Generate a unique ID for the new endpoint
+            const newEndpoint = {
+                id: this.generateEndpointId(collection),
+                name: requestData.name,
+                method: requestData.method,
+                path: requestData.path,
+                parameters: {
+                    query: {},
+                    header: {},
+                    path: {}
+                },
+                requestBody: null,
+                responses: {}
+            };
+
+            // Add the new endpoint to the collection
+            collection.endpoints = collection.endpoints || [];
+            collection.endpoints.push(newEndpoint);
+
+            // Save the updated collection
+            await this.repository.update(collectionId, collection);
+            
+            this.statusDisplay.update(`Added new request: ${requestData.name}`, null);
+            return newEndpoint;
+        } catch (error) {
+            this.statusDisplay.update(`Error adding request: ${error.message}`, null);
+            throw error;
+        }
+    }
+
+    generateEndpointId(collection) {
+        const existingIds = collection.endpoints.map(endpoint => endpoint.id);
+        let counter = 1;
+        let newId = `custom_${counter}`;
+        
+        while (existingIds.includes(newId)) {
+            counter++;
+            newId = `custom_${counter}`;
+        }
+        
+        return newId;
+    }
+
     async loadEndpointIntoForm(collection, endpoint, formElements) {
         try {
             // Set the OpenAPI spec for schema processing

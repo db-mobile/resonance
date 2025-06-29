@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dark Theme Test</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="dark.css">
+    <style>
+        body {
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid var(--border-medium);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+        }
+        .color-swatch {
+            display: inline-block;
+            width: 100px;
+            height: 40px;
+            margin: 5px;
+            border: 1px solid var(--border-light);
+            text-align: center;
+            line-height: 40px;
+            font-size: 12px;
+            border-radius: 4px;
+        }
+        .text-primary { color: var(--text-primary); }
+        .text-secondary { color: var(--text-secondary); }
+        .text-tertiary { color: var(--text-tertiary); }
+        .text-disabled { color: var(--text-disabled); }
+        .bg-primary { background: var(--bg-primary); }
+        .bg-secondary { background: var(--bg-secondary); }
+        .bg-tertiary { background: var(--bg-tertiary); }
+    </style>
+</head>
+<body>
+    <h1>Dark Theme Test</h1>
+    
+    <div class="test-section">
+        <h2>Text Contrast Test</h2>
+        <p class="text-primary">Primary text - should be highly readable (#E5E7EB)</p>
+        <p class="text-secondary">Secondary text - good readability (#D1D5DB)</p>
+        <p class="text-tertiary">Tertiary text - muted but readable (#9CA3AF)</p>
+        <p class="text-disabled">Disabled text - subtle (#6B7280)</p>
+    </div>
+
+    <div class="test-section">
+        <h2>Background Colors</h2>
+        <div class="color-swatch bg-primary text-primary">Primary BG</div>
+        <div class="color-swatch bg-secondary text-primary">Secondary BG</div>
+        <div class="color-swatch bg-tertiary text-primary">Tertiary BG</div>
+    </div>
+
+    <div class="test-section">
+        <h2>Form Elements Test</h2>
+        <input type="text" placeholder="Text input" style="margin: 5px; padding: 8px;">
+        <input type="url" placeholder="URL input" style="margin: 5px; padding: 8px;">
+        <select style="margin: 5px; padding: 8px;">
+            <option>Option 1</option>
+            <option>Option 2</option>
+        </select>
+        <textarea placeholder="Textarea" style="margin: 5px; padding: 8px; width: 200px; height: 60px;"></textarea>
+    </div>
+
+    <div class="test-section">
+        <h2>Button Test</h2>
+        <button style="margin: 5px; padding: 8px 16px;">Regular Button</button>
+        <button class="send-btn" style="margin: 5px; padding: 8px 16px;">Primary Button</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Code/Pre Test</h2>
+        <pre style="padding: 10px; margin: 10px 0;">
+{
+  "test": "JSON response",
+  "status": 200,
+  "data": ["item1", "item2"]
+}
+        </pre>
+        <code style="padding: 4px 8px;">inline code element</code>
+    </div>
+
+    <div class="test-section">
+        <h2>Method Badges Test</h2>
+        <span class="endpoint-method get" style="padding: 4px 8px; margin: 5px; border-radius: 4px; font-weight: bold;">GET</span>
+        <span class="endpoint-method post" style="padding: 4px 8px; margin: 5px; border-radius: 4px; font-weight: bold;">POST</span>
+        <span class="endpoint-method put" style="padding: 4px 8px; margin: 5px; border-radius: 4px; font-weight: bold;">PUT</span>
+        <span class="endpoint-method delete" style="padding: 4px 8px; margin: 5px; border-radius: 4px; font-weight: bold;">DELETE</span>
+        <span class="endpoint-method patch" style="padding: 4px 8px; margin: 5px; border-radius: 4px; font-weight: bold;">PATCH</span>
+    </div>
+
+    <div class="test-section main-content-area" style="background: var(--bg-secondary); padding: 20px;">
+        <h2>Main Content Section Test</h2>
+        <p>This simulates the main content area background</p>
+        
+        <div class="request-builder" style="background: var(--bg-secondary); padding: 15px; margin: 10px 0; border-radius: 8px;">
+            <h3>Request Builder Section</h3>
+            <div class="request-url-section" style="background: var(--bg-secondary); padding: 10px;">
+                <p>Request URL section should have dark background</p>
+            </div>
+        </div>
+
+        <div class="request-config" style="background: var(--bg-secondary); padding: 15px; margin: 10px 0; border-radius: 8px;">
+            <h3>Request Configuration Section</h3>
+            <div class="tab-nav" style="background: var(--bg-tertiary); padding: 10px; margin: 5px 0;">
+                <button class="tab-button active" style="background: var(--bg-secondary); color: var(--text-primary); padding: 8px 16px; margin: 2px; border: none; border-radius: 4px;">Query Params</button>
+                <button class="tab-button" style="background: var(--bg-tertiary); color: var(--text-secondary); padding: 8px 16px; margin: 2px; border: none; border-radius: 4px;">Headers</button>
+            </div>
+            <div class="tab-content" style="background: var(--bg-secondary); padding: 10px; margin: 5px 0;">
+                <p>Tab content area should be dark</p>
+            </div>
+        </div>
+
+        <div class="response-area" style="background: var(--bg-secondary); padding: 15px; margin: 10px 0; border-radius: 8px;">
+            <h3>Response Area Section</h3>
+            <div class="response-header" style="background: var(--bg-tertiary); color: var(--text-primary); padding: 10px; margin: 5px 0;">
+                <span class="response-title">Response</span>
+                <span class="status-display" style="color: var(--text-secondary);">Ready</span>
+            </div>
+            <div class="response-content" style="background: var(--bg-secondary); padding: 10px; margin: 5px 0;">
+                <div class="response-display" style="background: var(--bg-secondary); padding: 10px;">
+                    <pre id="test-response" style="background: var(--bg-primary); color: var(--text-primary); padding: 10px; border: 1px solid var(--border-light); border-radius: 4px;">
+{
+  "message": "Response JSON should be dark",
+  "status": "success"
+}
+                    </pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Status Display Test - Enhanced Readability</h2>
+        <p>Testing various status states for optimal dark theme readability:</p>
+        
+        <div style="display: grid; gap: 10px; margin: 20px 0;">
+            <p class="status-display status-info">Ready - Default Status</p>
+            <p class="status-display status-success">200 OK - Request Successful</p>
+            <p class="status-display status-redirect">301 Moved - Redirect</p>
+            <p class="status-display status-client-error">404 Not Found - Client Error</p>
+            <p class="status-display status-server-error">500 Internal Server Error - Server Error</p>
+            <p class="status-display status-loading">Loading... - Processing Request</p>
+            <p class="status-display status-warning">Warning - Something needs attention</p>
+        </div>
+        
+        <p style="color: var(--text-tertiary); font-size: 0.875rem; margin-top: 15px;">
+            All status displays should be clearly readable with high contrast and appropriate colors.
+        </p>
+    </div>
+
+    <script>
+        // Test dynamic interaction
+        document.querySelectorAll('input, textarea, select').forEach(el => {
+            el.addEventListener('focus', () => {
+                console.log('Focus styling should activate');
+            });
+        });
+    </script>
+</body>
+</html>

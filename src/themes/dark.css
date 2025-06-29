@@ -1,0 +1,473 @@
+/**
+ * Dark Theme
+ * Easy on the eyes with dark backgrounds and optimal readability
+ */
+:root {
+  /* Text Colors - Optimized Contrast for Dark Background */
+  --text-primary: #E5E7EB;    /* Much lighter for better contrast */
+  --text-secondary: #D1D5DB;  /* Light gray for secondary text */
+  --text-tertiary: #9CA3AF;   /* Medium gray for tertiary text */
+  --text-disabled: #6B7280;   /* Darker for disabled state */
+  --text-inverse: #111827;    /* Dark text for light backgrounds */
+  
+  /* Background Colors - Rich Dark & Layered */
+  --bg-primary: #0F172A;      /* Very dark blue-gray */
+  --bg-secondary: #1E293B;    /* Slightly lighter blue-gray */
+  --bg-tertiary: #334155;     /* Medium blue-gray for cards */
+  --bg-overlay: rgba(15, 23, 42, 0.95);
+  --bg-glass: rgba(15, 23, 42, 0.8);
+  --bg-glass-strong: rgba(15, 23, 42, 0.9);
+  
+  /* Border Colors - Subtle Dark Definition with Better Contrast */
+  --border-light: #334155;    /* Lighter than bg-tertiary */
+  --border-medium: #475569;   /* Medium contrast borders */
+  --border-strong: #64748B;   /* Strong contrast borders */
+  --border-focus: #3B82F6;    /* Blue focus ring */
+  --border-glass: rgba(100, 116, 139, 0.2);
+  
+  /* Dark theme shadows - enhanced for depth */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  
+  /* Dark theme accent colors - more vibrant backgrounds */
+  --color-success-light: rgba(16, 185, 129, 0.15);
+  --color-warning-light: rgba(245, 158, 11, 0.15);
+  --color-error-light: rgba(239, 68, 68, 0.15);
+  --color-primary-light: rgba(59, 130, 246, 0.15);
+  
+  /* Method badge colors for dark theme */
+  --method-get-bg: rgba(34, 197, 94, 0.15);
+  --method-get-text: #4ADE80;
+  --method-post-bg: rgba(59, 130, 246, 0.15);
+  --method-post-text: #60A5FA;
+  --method-put-bg: rgba(245, 158, 11, 0.15);
+  --method-put-text: #FBBF24;
+  --method-delete-bg: rgba(239, 68, 68, 0.15);
+  --method-delete-text: #F87171;
+  --method-patch-bg: rgba(168, 85, 247, 0.15);
+  --method-patch-text: #A78BFA;
+}
+
+/* Dark theme specific overrides */
+
+/* Force dark backgrounds on all form elements */
+input[type="text"],
+input[type="url"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea,
+select {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-medium) !important;
+}
+
+input[type="text"]:focus,
+input[type="url"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-focus) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Dark scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-medium) var(--bg-secondary);
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+/* Code/pre elements */
+pre,
+code {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+/* Buttons that might have hardcoded styles */
+button {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-medium) !important;
+}
+
+button:hover {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-strong) !important;
+}
+
+button:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Primary buttons */
+button.send-btn,
+button[type="submit"],
+.btn-primary {
+  background: var(--color-primary) !important;
+  color: white !important;
+  border-color: var(--color-primary) !important;
+}
+
+button.send-btn:hover,
+button[type="submit"]:hover,
+.btn-primary:hover {
+  background: #2563EB !important;
+  border-color: #2563EB !important;
+}
+
+/* Method badges */
+.endpoint-method.get {
+  background: var(--method-get-bg) !important;
+  color: var(--method-get-text) !important;
+}
+
+.endpoint-method.post {
+  background: var(--method-post-bg) !important;
+  color: var(--method-post-text) !important;
+}
+
+.endpoint-method.put {
+  background: var(--method-put-bg) !important;
+  color: var(--method-put-text) !important;
+}
+
+.endpoint-method.delete {
+  background: var(--method-delete-bg) !important;
+  color: var(--method-delete-text) !important;
+}
+
+.endpoint-method.patch {
+  background: var(--method-patch-bg) !important;
+  color: var(--method-patch-text) !important;
+}
+
+/* Specific form elements that might be missed */
+.key-input,
+.value-input,
+.url-input,
+.body-textarea {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-medium) !important;
+}
+
+.key-input:focus,
+.value-input:focus,
+.url-input:focus,
+.body-textarea:focus {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-focus) !important;
+}
+
+/* Radio buttons and checkboxes */
+input[type="radio"],
+input[type="checkbox"] {
+  accent-color: var(--color-primary) !important;
+}
+
+/* Dropdown/select styling */
+select option {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Main Content Area Sections - Fix White Backgrounds */
+
+/* Main content area */
+.main-content-area {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Request Builder Section */
+.request-builder {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+.request-url-section {
+  background: var(--bg-secondary) !important;
+}
+
+/* Request Configuration Section */
+.request-config {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Tab Navigation */
+.tab-nav {
+  background: var(--bg-tertiary) !important;
+  border-bottom: 1px solid var(--border-medium) !important;
+}
+
+.tab-button {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-secondary) !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+}
+
+.tab-button:hover {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+.tab-button.active {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-bottom-color: var(--color-primary) !important;
+}
+
+/* Tab Content Areas */
+.tab-content {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Response Area Section */
+.response-area {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+.response-header {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border-bottom: 1px solid var(--border-medium) !important;
+}
+
+.response-title {
+  color: var(--text-primary) !important;
+}
+
+.status-display {
+  color: var(--text-secondary) !important;
+}
+
+.response-content {
+  background: var(--bg-secondary) !important;
+}
+
+.response-display {
+  background: var(--bg-secondary) !important;
+}
+
+.response-tabs {
+  background: var(--bg-tertiary) !important;
+}
+
+/* Pre elements in response (JSON display) */
+#response-display,
+#response-headers-display {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+/* Key-Value Lists (headers, query params) */
+.key-value-list {
+  background: var(--bg-secondary) !important;
+}
+
+.key-value-row {
+  background: var(--bg-secondary) !important;
+}
+
+/* Remove/Add buttons */
+.remove-btn,
+.add-btn {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid var(--border-medium) !important;
+}
+
+.remove-btn:hover,
+.add-btn:hover {
+  background: var(--border-medium) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Collections sidebar */
+.collections-sidebar {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-right: 1px solid var(--border-medium) !important;
+}
+
+.sidebar-header {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border-bottom: 1px solid var(--border-medium) !important;
+}
+
+.sidebar-title {
+  color: var(--text-primary) !important;
+}
+
+.import-btn {
+  background: var(--color-primary) !important;
+  color: white !important;
+  border: none !important;
+}
+
+.import-btn:hover {
+  background: #2563EB !important;
+}
+
+.collections-container {
+  background: var(--bg-secondary) !important;
+}
+
+.collections-list {
+  background: var(--bg-secondary) !important;
+}
+
+.collections-empty {
+  background: var(--bg-secondary) !important;
+  color: var(--text-tertiary) !important;
+}
+
+.collections-empty-text {
+  color: var(--text-secondary) !important;
+}
+
+.collections-empty-subtext {
+  color: var(--text-tertiary) !important;
+}
+
+/* Collection items */
+.collection-item {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+.collection-header {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+}
+
+.collection-name {
+  color: var(--text-primary) !important;
+}
+
+.collection-toggle {
+  color: var(--text-secondary) !important;
+}
+
+.collection-endpoints {
+  background: var(--bg-secondary) !important;
+}
+
+.endpoint-item {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-bottom: 1px solid var(--border-light) !important;
+}
+
+.endpoint-item:hover {
+  background: var(--bg-tertiary) !important;
+}
+
+.endpoint-path {
+  color: var(--text-secondary) !important;
+}
+
+/* Headings and labels */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary) !important;
+}
+
+label {
+  color: var(--text-secondary) !important;
+}
+
+/* Status Display - Enhanced for Dark Theme Readability */
+.status-display {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-medium) !important;
+  font-weight: 600 !important;
+  text-shadow: none !important;
+  padding: var(--space-2) var(--space-3) !important;
+  border-radius: var(--radius-md) !important;
+  font-size: var(--font-size-sm) !important;
+  min-height: 36px !important;
+  display: flex !important;
+  align-items: center !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Status-specific colors optimized for dark theme */
+.status-success {
+  background: rgba(34, 197, 94, 0.2) !important;
+  color: #4ADE80 !important;
+  border-color: #22C55E !important;
+  font-weight: 600 !important;
+}
+
+.status-redirect {
+  background: rgba(245, 158, 11, 0.2) !important;
+  color: #FBBF24 !important;
+  border-color: #F59E0B !important;
+  font-weight: 600 !important;
+}
+
+.status-client-error,
+.status-server-error {
+  background: rgba(239, 68, 68, 0.2) !important;
+  color: #F87171 !important;
+  border-color: #EF4444 !important;
+  font-weight: 600 !important;
+}
+
+.status-info {
+  background: rgba(59, 130, 246, 0.2) !important;
+  color: #60A5FA !important;
+  border-color: #3B82F6 !important;
+  font-weight: 600 !important;
+}
+
+/* Additional status states for better UX */
+.status-loading {
+  background: rgba(156, 163, 175, 0.2) !important;
+  color: #D1D5DB !important;
+  border-color: #9CA3AF !important;
+  font-weight: 600 !important;
+}
+
+.status-warning {
+  background: rgba(251, 191, 36, 0.2) !important;
+  color: #FCD34D !important;
+  border-color: #FBBF24 !important;
+  font-weight: 600 !important;
+}

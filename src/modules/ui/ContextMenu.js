@@ -99,4 +99,11 @@ export class ContextMenu {
             <path d="M8 11L10 13L16 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         `;
     }
+
+    static createNewRequestIcon() {
+        return `
+            <path d="M12 5V19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        `;
+    }
 }
