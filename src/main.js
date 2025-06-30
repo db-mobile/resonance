@@ -232,8 +232,11 @@ function parseOpenApiToCollection(openApiSpec, fileName) {
         Object.assign(collection.defaultHeaders, openApiSpec.info['x-default-headers']);
     }
 
-    // Parse paths to create endpoints
+    // Parse paths to create endpoints grouped by URL structure
     if (openApiSpec.paths) {
+        const groupedEndpoints = {};
+        
+        // First pass: create endpoints and group them by base path
         for (const [pathKey, pathValue] of Object.entries(openApiSpec.paths)) {
             for (const [method, methodValue] of Object.entries(pathValue)) {
                 if (['get', 'post', 'put', 'delete', 'patch', 'head', 'options'].includes(method.toLowerCase())) {
@@ -248,13 +251,42 @@ function parseOpenApiToCollection(openApiSpec, fileName) {
                         headers: {}
                     };
 
-                    collection.endpoints.push(endpoint);
+                    // Extract base path for grouping (first segment after leading slash)
+                    const basePath = extractBasePath(pathKey);
+                    
+                    if (!groupedEndpoints[basePath]) {
+                        groupedEndpoints[basePath] = [];
+                    }
+                    groupedEndpoints[basePath].push(endpoint);
                 }
             }
         }
+        
+        // Second pass: create folder structure
+        collection.folders = [];
+        for (const [basePath, endpoints] of Object.entries(groupedEndpoints)) {
+            const folder = {
+                id: `folder_${basePath}`.replace(/[^a-zA-Z0-9]/g, '_'),
+                name: basePath,
+                endpoints: endpoints
+            };
+            collection.folders.push(folder);
+        }
+        
+        // Keep backwards compatibility - flatten all endpoints
+        collection.endpoints = Object.values(groupedEndpoints).flat();
     }
 
     return collection;
+}
+
+function extractBasePath(pathKey) {
+    // Remove leading slash and extract first path segment
+    const cleanPath = pathKey.replace(/^\//, '');
+    const segments = cleanPath.split('/');
+    
+    // Return the first segment, or 'root' if no segments
+    return segments[0] || 'root';
 }
 
 function parseParameters(parameters) {

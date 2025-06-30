@@ -73,12 +73,60 @@ export class CollectionRenderer {
         const endpointsDiv = document.createElement('div');
         endpointsDiv.className = 'collection-endpoints';
 
-        collection.endpoints.forEach(endpoint => {
-            const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers);
-            endpointsDiv.appendChild(endpointDiv);
-        });
+        // Check if collection has folder structure
+        if (collection.folders && collection.folders.length > 0) {
+            collection.folders.forEach(folder => {
+                const folderDiv = this.createFolderElement(folder, collection, eventHandlers);
+                endpointsDiv.appendChild(folderDiv);
+            });
+        } else {
+            // Fallback to flat endpoint structure
+            collection.endpoints.forEach(endpoint => {
+                const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers);
+                endpointsDiv.appendChild(endpointDiv);
+            });
+        }
 
         return endpointsDiv;
+    }
+
+    createFolderElement(folder, collection, eventHandlers) {
+        const folderDiv = document.createElement('div');
+        folderDiv.className = 'folder-item';
+        folderDiv.dataset.folderId = folder.id;
+
+        const folderHeader = document.createElement('div');
+        folderHeader.className = 'folder-header';
+
+        const folderName = document.createElement('div');
+        folderName.className = 'folder-name';
+        folderName.textContent = folder.name;
+
+        const folderToggle = document.createElement('div');
+        folderToggle.className = 'folder-toggle';
+        folderToggle.innerHTML = '▼';
+
+        folderHeader.appendChild(folderName);
+        folderHeader.appendChild(folderToggle);
+
+        const folderEndpoints = document.createElement('div');
+        folderEndpoints.className = 'folder-endpoints';
+
+        folder.endpoints.forEach(endpoint => {
+            const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers);
+            folderEndpoints.appendChild(endpointDiv);
+        });
+
+        folderDiv.appendChild(folderHeader);
+        folderDiv.appendChild(folderEndpoints);
+
+        // Add folder toggle functionality
+        folderHeader.addEventListener('click', (e) => {
+            e.stopPropagation();
+            folderDiv.classList.toggle('expanded');
+        });
+
+        return folderDiv;
     }
 
     createEndpointElement(endpoint, collection, eventHandlers) {
