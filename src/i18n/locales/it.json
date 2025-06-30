@@ -1,0 +1,91 @@
+{
+  "app": {
+    "title": "Resonance",
+    "tagline": "Test API semplificati"
+  },
+  "header": {
+    "settings": "Impostazioni"
+  },
+  "sidebar": {
+    "collections": "Collezioni",
+    "import": "Importa",
+    "empty": {
+      "title": "Nessuna collezione importata",
+      "subtitle": "Importa una collezione OpenAPI per iniziare"
+    }
+  },
+  "collection": {
+    "rename": "Rinomina collezione",
+    "delete": "Elimina collezione",
+    "confirm_delete": "Sei sicuro di voler eliminare la collezione \"{{name}}\"?\n\nQuesta azione non può essere annullata.",
+    "import_success": "Collezione importata con successo",
+    "import_error": "Errore nell'importazione della collezione"
+  },
+  "context_menu": {
+    "new_request": "Nuova richiesta",
+    "manage_variables": "Gestisci variabili",
+    "rename_collection": "Rinomina collezione",
+    "delete_collection": "Elimina collezione"
+  },
+  "request": {
+    "method": "Metodo",
+    "url": "URL",
+    "send": "Invia",
+    "sending": "Invio in corso...",
+    "headers": "Intestazioni",
+    "query_params": "Parametri query",
+    "body": "Corpo",
+    "response": "Risposta",
+    "status": "Stato",
+    "time": "Tempo",
+    "size": "Dimensione"
+  },
+  "tabs": {
+    "query_params": "Parametri",
+    "headers": "Intestazioni",
+    "body": "Corpo",
+    "response_body": "Corpo",
+    "response_headers": "Intestazioni"
+  },
+  "variables": {
+    "title": "Variabili",
+    "name": "Nome",
+    "value": "Valore",
+    "add": "Aggiungi variabile",
+    "save": "Salva",
+    "cancel": "Annulla",
+    "placeholder_name": "Nome variabile",
+    "placeholder_value": "Valore variabile"
+  },
+  "settings": {
+    "title": "Impostazioni",
+    "language": "Lingua",
+    "theme": "Tema",
+    "close": "Chiudi",
+    "save": "Salva",
+    "cancel": "Annulla"
+  },
+  "theme": {
+    "light": "Chiaro",
+    "dark": "Scuro",
+    "system": "Sistema"
+  },
+  "common": {
+    "ok": "OK",
+    "cancel": "Annulla",
+    "save": "Salva",
+    "delete": "Elimina",
+    "edit": "Modifica",
+    "add": "Aggiungi",
+    "remove": "Rimuovi",
+    "close": "Chiudi",
+    "yes": "Sì",
+    "no": "No"
+  },
+  "errors": {
+    "network": "Errore di rete",
+    "timeout": "Timeout della richiesta",
+    "invalid_url": "Formato URL non valido",
+    "unknown": "Si è verificato un errore sconosciuto"
+  }
+}

@@ -9,5 +9,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     collections: {
         importOpenApiFile: () => ipcRenderer.invoke('import-openapi-file')
+    },
+    settings: {
+        get: () => ipcRenderer.invoke('settings:get'),
+        set: (settings) => ipcRenderer.invoke('settings:set', settings)
     }
 });

@@ -1,0 +1,91 @@
+{
+  "app": {
+    "title": "Resonance",
+    "tagline": "API-Tests leicht gemacht"
+  },
+  "header": {
+    "settings": "Einstellungen"
+  },
+  "sidebar": {
+    "collections": "Sammlungen",
+    "import": "Importieren",
+    "empty": {
+      "title": "Noch keine Sammlungen importiert",
+      "subtitle": "Importieren Sie eine OpenAPI-Sammlung zum Starten"
+    }
+  },
+  "collection": {
+    "rename": "Sammlung umbenennen",
+    "delete": "Sammlung löschen",
+    "confirm_delete": "Sind Sie sicher, dass Sie die Sammlung \"{{name}}\" löschen möchten?\n\nDiese Aktion kann nicht rückgängig gemacht werden.",
+    "import_success": "Sammlung erfolgreich importiert",
+    "import_error": "Fehler beim Importieren der Sammlung"
+  },
+  "context_menu": {
+    "new_request": "Neue Anfrage",
+    "manage_variables": "Variablen verwalten",
+    "rename_collection": "Sammlung umbenennen", 
+    "delete_collection": "Sammlung löschen"
+  },
+  "request": {
+    "method": "Methode",
+    "url": "URL",
+    "send": "Senden",
+    "sending": "Wird gesendet...",
+    "headers": "Header",
+    "query_params": "Query-Parameter",
+    "body": "Body",
+    "response": "Antwort",
+    "status": "Status",
+    "time": "Zeit",
+    "size": "Größe"
+  },
+  "tabs": {
+    "query_params": "Query-Parameter",
+    "headers": "Header",
+    "body": "Body",
+    "response_body": "Body",
+    "response_headers": "Header"
+  },
+  "variables": {
+    "title": "Variablen",
+    "name": "Name",
+    "value": "Wert",
+    "add": "Variable hinzufügen",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "placeholder_name": "Variablenname",
+    "placeholder_value": "Variablenwert"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "language": "Sprache",
+    "theme": "Design",
+    "close": "Schließen",
+    "save": "Speichern",
+    "cancel": "Abbrechen"
+  },
+  "theme": {
+    "light": "Hell",
+    "dark": "Dunkel",
+    "system": "System"
+  },
+  "common": {
+    "ok": "OK",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "add": "Hinzufügen",
+    "remove": "Entfernen",
+    "close": "Schließen",
+    "yes": "Ja",
+    "no": "Nein"
+  },
+  "errors": {
+    "network": "Netzwerkfehler aufgetreten",
+    "timeout": "Anfrage-Timeout",
+    "invalid_url": "Ungültiges URL-Format",
+    "unknown": "Ein unbekannter Fehler ist aufgetreten"
+  }
+}

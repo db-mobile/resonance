@@ -1,0 +1,91 @@
+{
+  "app": {
+    "title": "Resonance",
+    "tagline": "Tests d'API simplifiés"
+  },
+  "header": {
+    "settings": "Paramètres"
+  },
+  "sidebar": {
+    "collections": "Collections",
+    "import": "Importer",
+    "empty": {
+      "title": "Aucune collection importée",
+      "subtitle": "Importez une collection OpenAPI pour commencer"
+    }
+  },
+  "collection": {
+    "rename": "Renommer la collection",
+    "delete": "Supprimer la collection",
+    "confirm_delete": "Êtes-vous sûr de vouloir supprimer la collection \"{{name}}\" ?\n\nCette action ne peut pas être annulée.",
+    "import_success": "Collection importée avec succès",
+    "import_error": "Échec de l'importation de la collection"
+  },
+  "context_menu": {
+    "new_request": "Nouvelle requête",
+    "manage_variables": "Gérer les variables",
+    "rename_collection": "Renommer la collection",
+    "delete_collection": "Supprimer la collection"
+  },
+  "request": {
+    "method": "Méthode",
+    "url": "URL",
+    "send": "Envoyer",
+    "sending": "Envoi en cours...",
+    "headers": "En-têtes",
+    "query_params": "Paramètres de requête",
+    "body": "Corps",
+    "response": "Réponse",
+    "status": "Statut",
+    "time": "Temps",
+    "size": "Taille"
+  },
+  "tabs": {
+    "query_params": "Paramètres",
+    "headers": "En-têtes",
+    "body": "Corps",
+    "response_body": "Corps",
+    "response_headers": "En-têtes"
+  },
+  "variables": {
+    "title": "Variables",
+    "name": "Nom",
+    "value": "Valeur",
+    "add": "Ajouter une variable",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "placeholder_name": "Nom de la variable",
+    "placeholder_value": "Valeur de la variable"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "language": "Langue",
+    "theme": "Thème",
+    "close": "Fermer",
+    "save": "Enregistrer",
+    "cancel": "Annuler"
+  },
+  "theme": {
+    "light": "Clair",
+    "dark": "Sombre",
+    "system": "Système"
+  },
+  "common": {
+    "ok": "OK",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "add": "Ajouter",
+    "remove": "Supprimer",
+    "close": "Fermer",
+    "yes": "Oui",
+    "no": "Non"
+  },
+  "errors": {
+    "network": "Erreur réseau",
+    "timeout": "Délai d'attente dépassé",
+    "invalid_url": "Format d'URL invalide",
+    "unknown": "Une erreur inconnue s'est produite"
+  }
+}

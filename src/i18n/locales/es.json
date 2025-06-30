@@ -1,0 +1,91 @@
+{
+  "app": {
+    "title": "Resonance",
+    "tagline": "Pruebas de API simplificadas"
+  },
+  "header": {
+    "settings": "Configuración"
+  },
+  "sidebar": {
+    "collections": "Colecciones",
+    "import": "Importar",
+    "empty": {
+      "title": "No hay colecciones importadas",
+      "subtitle": "Importa una colección OpenAPI para comenzar"
+    }
+  },
+  "collection": {
+    "rename": "Renombrar colección",
+    "delete": "Eliminar colección",
+    "confirm_delete": "¿Estás seguro de que quieres eliminar la colección \"{{name}}\"?\n\nEsta acción no se puede deshacer.",
+    "import_success": "Colección importada con éxito",
+    "import_error": "Error al importar la colección"
+  },
+  "context_menu": {
+    "new_request": "Nueva solicitud",
+    "manage_variables": "Gestionar variables",
+    "rename_collection": "Renombrar colección",
+    "delete_collection": "Eliminar colección"
+  },
+  "request": {
+    "method": "Método",
+    "url": "URL",
+    "send": "Enviar",
+    "sending": "Enviando...",
+    "headers": "Encabezados",
+    "query_params": "Parámetros de consulta",
+    "body": "Cuerpo",
+    "response": "Respuesta",
+    "status": "Estado",
+    "time": "Tiempo",
+    "size": "Tamaño"
+  },
+  "tabs": {
+    "query_params": "Parámetros",
+    "headers": "Encabezados",
+    "body": "Cuerpo",
+    "response_body": "Cuerpo",
+    "response_headers": "Encabezados"
+  },
+  "variables": {
+    "title": "Variables",
+    "name": "Nombre",
+    "value": "Valor",
+    "add": "Agregar variable",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "placeholder_name": "Nombre de la variable",
+    "placeholder_value": "Valor de la variable"
+  },
+  "settings": {
+    "title": "Configuración",
+    "language": "Idioma",
+    "theme": "Tema",
+    "close": "Cerrar",
+    "save": "Guardar",
+    "cancel": "Cancelar"
+  },
+  "theme": {
+    "light": "Claro",
+    "dark": "Oscuro",
+    "system": "Sistema"
+  },
+  "common": {
+    "ok": "OK",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "add": "Agregar",
+    "remove": "Quitar",
+    "close": "Cerrar",
+    "yes": "Sí",
+    "no": "No"
+  },
+  "errors": {
+    "network": "Error de red",
+    "timeout": "Tiempo de espera agotado",
+    "invalid_url": "Formato de URL inválido",
+    "unknown": "Ha ocurrido un error desconocido"
+  }
+}

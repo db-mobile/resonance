@@ -9,8 +9,8 @@
 <body>
     <!-- App Header -->
     <header class="app-header">
-        <h1 class="app-title">Resonance</h1>
-        <button id="settings-btn" class="settings-btn" title="Settings" aria-label="Settings">
+        <h1 class="app-title" data-i18n="app.title">Resonance</h1>
+        <button id="settings-btn" class="settings-btn" data-i18n-title="header.settings" data-i18n-aria="header.settings">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3"></circle>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -23,10 +23,11 @@
         <!-- Collections Sidebar -->
         <aside class="collections-sidebar" role="complementary">
             <div class="sidebar-header">
-                <h2 class="sidebar-title">Collections</h2>
+                <h2 class="sidebar-title" data-i18n="sidebar.collections">Collections</h2>
                 <button id="import-collection-btn" class="import-btn" 
-                        title="Import OpenAPI Collection" 
-                        aria-label="Import OpenAPI Collection">
+                        data-i18n-title="sidebar.import" 
+                        data-i18n-aria="sidebar.import"
+                        data-i18n="sidebar.import">
                     Import
                 </button>
             </div>
@@ -79,21 +80,24 @@
                             data-tab="query-params" 
                             role="tab" 
                             aria-selected="true" 
-                            aria-controls="query-params">
+                            aria-controls="query-params"
+                            data-i18n="tabs.query_params">
                         Query Params
                     </button>
                     <button class="tab-button" 
                             data-tab="headers" 
                             role="tab" 
                             aria-selected="false" 
-                            aria-controls="headers">
+                            aria-controls="headers"
+                            data-i18n="tabs.headers">
                         Headers
                     </button>
                     <button class="tab-button" 
                             data-tab="body" 
                             role="tab" 
                             aria-selected="false" 
-                            aria-controls="body">
+                            aria-controls="body"
+                            data-i18n="tabs.body">
                         Body
                     </button>
                 </nav>

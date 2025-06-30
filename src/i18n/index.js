@@ -1,0 +1,1 @@
+export { I18nManager, i18n } from './I18nManager.js';

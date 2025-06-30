@@ -155,6 +155,15 @@ ipcMain.handle('store:set', (event, key, value) => {
     store.set(key, value);
 });
 
+// Settings handlers
+ipcMain.handle('settings:get', () => {
+    return store.get('settings', {});
+});
+
+ipcMain.handle('settings:set', (event, settings) => {
+    store.set('settings', settings);
+});
+
 // OpenAPI Collection handlers
 ipcMain.handle('import-openapi-file', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {

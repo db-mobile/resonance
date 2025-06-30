@@ -1,0 +1,101 @@
+{
+  "app": {
+    "title": "Resonance",
+    "tagline": "API Testing Made Simple"
+  },
+  "header": {
+    "settings": "Settings"
+  },
+  "sidebar": {
+    "collections": "Collections",
+    "import": "Import",
+    "empty": {
+      "title": "No collections imported yet",
+      "subtitle": "Import an OpenAPI collection to get started"
+    }
+  },
+  "collection": {
+    "rename": "Rename Collection",
+    "delete": "Delete Collection",
+    "confirm_delete": "Are you sure you want to delete the collection \"{{name}}\"?\n\nThis action cannot be undone.",
+    "import_success": "Collection imported successfully",
+    "import_error": "Failed to import collection"
+  },
+  "context_menu": {
+    "new_request": "New Request",
+    "manage_variables": "Manage Variables", 
+    "rename_collection": "Rename Collection",
+    "delete_collection": "Delete Collection"
+  },
+  "new_request": {
+    "title": "Create New Request",
+    "name_label": "Request Name:",
+    "name_placeholder": "My Request",
+    "method_label": "Method:",
+    "path_label": "Path:",
+    "path_placeholder": "/api/endpoint",
+    "create": "Create",
+    "cancel": "Cancel"
+  },
+  "request": {
+    "method": "Method",
+    "url": "URL",
+    "send": "Send",
+    "sending": "Sending...",
+    "headers": "Headers",
+    "query_params": "Query Parameters",
+    "body": "Body",
+    "response": "Response",
+    "status": "Status",
+    "time": "Time",
+    "size": "Size"
+  },
+  "tabs": {
+    "query_params": "Query Params",
+    "headers": "Headers",
+    "body": "Body",
+    "response_body": "Body",
+    "response_headers": "Headers"
+  },
+  "variables": {
+    "title": "Variables",
+    "name": "Name",
+    "value": "Value",
+    "add": "Add Variable",
+    "save": "Save",
+    "cancel": "Cancel",
+    "placeholder_name": "Variable name",
+    "placeholder_value": "Variable value"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "common": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "remove": "Remove",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "errors": {
+    "network": "Network error occurred",
+    "timeout": "Request timed out",
+    "invalid_url": "Invalid URL format",
+    "unknown": "An unknown error occurred"
+  }
+}

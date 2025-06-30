@@ -25,6 +25,11 @@ export class ContextMenu {
         document.body.appendChild(menu);
         this.currentMenu = menu;
 
+        // Trigger translation for the newly created elements
+        if (window.i18n && window.i18n.updateUI) {
+            window.i18n.updateUI();
+        }
+
         this.adjustPosition(menu, event);
         this.attachCloseHandlers();
     }
@@ -38,9 +43,12 @@ export class ContextMenu {
                 <svg class="context-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
                     ${item.icon}
                 </svg>
-                ${item.label}
+                <span ${item.translationKey ? `data-i18n="${item.translationKey}"` : ''}>${item.label}</span>
             `;
         } else {
+            if (item.translationKey) {
+                menuItem.setAttribute('data-i18n', item.translationKey);
+            }
             menuItem.textContent = item.label;
         }
 

@@ -16,16 +16,26 @@ export class CollectionRenderer {
                 <svg class="collections-empty-icon" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12 2L13.09 7.26L18 6L16.74 11.09L22 12L16.74 12.91L18 18L13.09 16.74L12 22L10.91 16.74L6 18L7.26 12.91L2 12L7.26 11.09L6 6L10.91 7.26L12 2Z"/>
                 </svg>
-                <p class="collections-empty-text">No collections imported yet</p>
-                <p class="collections-empty-subtext">Import an OpenAPI collection to get started</p>
+                <p class="collections-empty-text" data-i18n="sidebar.empty.title">No collections imported yet</p>
+                <p class="collections-empty-subtext" data-i18n="sidebar.empty.subtitle">Import an OpenAPI collection to get started</p>
             </div>
         `;
     }
 
-    renderCollections(collections, eventHandlers = {}) {
+    renderCollections(collections, eventHandlers = {}, preserveExpansionState = false) {
         if (collections.length === 0) {
             this.renderEmptyState();
+            // Trigger translation for empty state
+            if (window.i18n && window.i18n.updateUI) {
+                window.i18n.updateUI();
+            }
             return;
+        }
+
+        // Store current expansion state if needed
+        let expansionState = {};
+        if (preserveExpansionState) {
+            expansionState = this.getExpansionState();
         }
 
         this.container.innerHTML = '';
@@ -33,6 +43,16 @@ export class CollectionRenderer {
             const collectionElement = this.createCollectionElement(collection, eventHandlers);
             this.container.appendChild(collectionElement);
         });
+
+        // Restore expansion state if needed
+        if (preserveExpansionState) {
+            this.restoreExpansionState(expansionState);
+        }
+        
+        // Trigger translation for newly rendered collections
+        if (window.i18n && window.i18n.updateUI) {
+            window.i18n.updateUI();
+        }
     }
 
     createCollectionElement(collection, eventHandlers) {
@@ -183,5 +203,50 @@ export class CollectionRenderer {
                 eventHandlers.onContextMenu(e, collection);
             });
         }
+    }
+
+    getExpansionState() {
+        const state = {};
+        const collectionElements = this.container.querySelectorAll('.collection-item');
+        collectionElements.forEach(element => {
+            const collectionId = element.dataset.collectionId;
+            if (collectionId) {
+                state[collectionId] = {
+                    expanded: element.classList.contains('expanded'),
+                    folders: {}
+                };
+                
+                // Also store folder expansion states
+                const folderElements = element.querySelectorAll('.folder-item');
+                folderElements.forEach(folderElement => {
+                    const folderId = folderElement.dataset.folderId;
+                    if (folderId) {
+                        state[collectionId].folders[folderId] = folderElement.classList.contains('expanded');
+                    }
+                });
+            }
+        });
+        return state;
+    }
+
+    restoreExpansionState(expansionState) {
+        const collectionElements = this.container.querySelectorAll('.collection-item');
+        collectionElements.forEach(element => {
+            const collectionId = element.dataset.collectionId;
+            const state = expansionState[collectionId];
+            
+            if (state && state.expanded) {
+                element.classList.add('expanded');
+                
+                // Restore folder expansion states
+                const folderElements = element.querySelectorAll('.folder-item');
+                folderElements.forEach(folderElement => {
+                    const folderId = folderElement.dataset.folderId;
+                    if (folderId && state.folders[folderId]) {
+                        folderElement.classList.add('expanded');
+                    }
+                });
+            }
+        });
     }
 }

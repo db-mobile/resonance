@@ -54,13 +54,24 @@ export class CollectionController {
         }
     }
 
-    renderCollections(collections) {
+    async loadCollectionsWithExpansionState() {
+        try {
+            const collections = await this.service.loadCollections();
+            this.renderCollections(collections, true); // Preserve expansion state
+            return collections;
+        } catch (error) {
+            console.error('Error in loadCollectionsWithExpansionState:', error);
+            return [];
+        }
+    }
+
+    renderCollections(collections, preserveExpansionState = false) {
         const eventHandlers = {
             onEndpointClick: this.handleEndpointClick,
             onContextMenu: this.handleContextMenu
         };
         
-        this.renderer.renderCollections(collections, eventHandlers);
+        this.renderer.renderCollections(collections, eventHandlers, preserveExpansionState);
     }
 
     async handleEndpointClick(collection, endpoint) {
@@ -79,21 +90,25 @@ export class CollectionController {
         const menuItems = [
             {
                 label: 'New Request',
+                translationKey: 'context_menu.new_request',
                 icon: ContextMenu.createNewRequestIcon(),
                 onClick: () => this.handleNewRequest(collection)
             },
             {
                 label: 'Manage Variables',
+                translationKey: 'context_menu.manage_variables',
                 icon: ContextMenu.createVariableIcon(),
                 onClick: () => this.handleVariables(collection)
             },
             {
                 label: 'Rename Collection',
+                translationKey: 'context_menu.rename_collection',
                 icon: ContextMenu.createRenameIcon(),
                 onClick: () => this.handleRename(collection)
             },
             {
                 label: 'Delete Collection',
+                translationKey: 'context_menu.delete_collection',
                 icon: ContextMenu.createDeleteIcon(),
                 className: 'context-menu-delete',
                 onClick: () => this.handleDelete(collection)
@@ -139,7 +154,7 @@ export class CollectionController {
             const requestData = await this.showNewRequestDialog();
             if (requestData) {
                 await this.service.addRequestToCollection(collection.id, requestData);
-                await this.loadCollections(); // Refresh display
+                await this.loadCollectionsWithExpansionState(); // Refresh display preserving state
             }
         } catch (error) {
             console.error('Error creating new request:', error);
@@ -238,7 +253,12 @@ export class CollectionController {
     }
 
     async handleDelete(collection) {
-        const confirmed = confirm(`Are you sure you want to delete the collection "${collection.name}"?\n\nThis action cannot be undone.`);
+        // Get translated confirmation message
+        const confirmMessage = window.i18n ? 
+            window.i18n.t('collection.confirm_delete', { name: collection.name }) :
+            `Are you sure you want to delete the collection "${collection.name}"?\n\nThis action cannot be undone.`;
+            
+        const confirmed = confirm(confirmMessage);
         
         if (confirmed) {
             try {

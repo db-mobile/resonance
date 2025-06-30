@@ -136,8 +136,9 @@ export class ThemeManager {
 
 // Settings Modal Component
 export class SettingsModal {
-    constructor(themeManager) {
+    constructor(themeManager, i18nManager = null) {
         this.themeManager = themeManager;
+        this.i18nManager = i18nManager;
         this.isOpen = false;
     }
 
@@ -156,11 +157,14 @@ export class SettingsModal {
     createModal() {
         const overlay = document.createElement('div');
         overlay.className = 'settings-modal-overlay';
+        
+        const languageSection = this.i18nManager ? this.createLanguageSection() : '';
+        
         overlay.innerHTML = `
             <div class="settings-modal">
                 <div class="settings-header">
-                    <h2>Settings</h2>
-                    <button class="settings-close-btn" aria-label="Close Settings">
+                    <h2 data-i18n="settings.title">Settings</h2>
+                    <button class="settings-close-btn" aria-label="Close Settings" data-i18n-aria="settings.close">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -169,15 +173,16 @@ export class SettingsModal {
                 </div>
                 
                 <div class="settings-content">
+                    ${languageSection}
                     <div class="settings-section">
-                        <h3>Appearance</h3>
+                        <h3 data-i18n="settings.theme">Theme</h3>
                         <div class="theme-options">
                             <label class="theme-option">
                                 <input type="radio" name="theme" value="light" ${this.themeManager.getCurrentTheme() === 'light' ? 'checked' : ''}>
                                 <div class="theme-option-content">
                                     <div class="theme-preview light-preview"></div>
                                     <div class="theme-option-text">
-                                        <span class="theme-name">Light</span>
+                                        <span class="theme-name" data-i18n="theme.light">Light</span>
                                         <span class="theme-description">Clean and bright interface</span>
                                     </div>
                                 </div>
@@ -188,7 +193,7 @@ export class SettingsModal {
                                 <div class="theme-option-content">
                                     <div class="theme-preview dark-preview"></div>
                                     <div class="theme-option-text">
-                                        <span class="theme-name">Dark</span>
+                                        <span class="theme-name" data-i18n="theme.dark">Dark</span>
                                         <span class="theme-description">Easy on the eyes</span>
                                     </div>
                                 </div>
@@ -199,7 +204,7 @@ export class SettingsModal {
                                 <div class="theme-option-content">
                                     <div class="theme-preview system-preview"></div>
                                     <div class="theme-option-text">
-                                        <span class="theme-name">System</span>
+                                        <span class="theme-name" data-i18n="theme.system">System</span>
                                         <span class="theme-description">Follow system preference</span>
                                     </div>
                                 </div>
@@ -214,9 +219,32 @@ export class SettingsModal {
         return overlay;
     }
 
+    createLanguageSection() {
+        if (!this.i18nManager) return '';
+        
+        const languages = this.i18nManager.getSupportedLanguages();
+        const currentLanguage = this.i18nManager.getCurrentLanguage();
+        
+        const languageOptions = Object.entries(languages).map(([code, name]) => `
+            <option value="${code}" ${currentLanguage === code ? 'selected' : ''}>${name}</option>
+        `).join('');
+        
+        return `
+            <div class="settings-section">
+                <h3 data-i18n="settings.language">Language</h3>
+                <div class="language-select-container">
+                    <select class="language-select" name="language">
+                        ${languageOptions}
+                    </select>
+                </div>
+            </div>
+        `;
+    }
+
     attachEventListeners(overlay) {
         const closeBtn = overlay.querySelector('.settings-close-btn');
         const themeInputs = overlay.querySelectorAll('input[name="theme"]');
+        const languageSelect = overlay.querySelector('select[name="language"]');
 
         // Close button
         closeBtn.addEventListener('click', () => this.hide(overlay));
@@ -227,6 +255,15 @@ export class SettingsModal {
                 await this.themeManager.setTheme(e.target.value);
             });
         });
+
+        // Language selection
+        if (this.i18nManager && languageSelect) {
+            languageSelect.addEventListener('change', async (e) => {
+                await this.i18nManager.setLanguage(e.target.value);
+                // Update the modal UI with new translations
+                this.i18nManager.updateUI();
+            });
+        }
 
         // Close on overlay click
         overlay.addEventListener('click', (e) => {

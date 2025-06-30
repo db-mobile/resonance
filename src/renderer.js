@@ -6,10 +6,11 @@ import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest } from './modules/apiHandler.js';
 import { loadCollections, importOpenApiFile, initializeBodyTracking } from './modules/collectionManager.js';
 import { ThemeManager, SettingsModal } from './modules/themeManager.js';
+import { i18n } from './i18n/I18nManager.js';
 
-// Initialize theme manager
+// Initialize theme manager and internationalization
 const themeManager = new ThemeManager();
-const settingsModal = new SettingsModal(themeManager);
+const settingsModal = new SettingsModal(themeManager, i18n);
 
 sendRequestBtn.addEventListener('click', handleSendRequest);
 importCollectionBtn.addEventListener('click', importOpenApiFile);
@@ -23,6 +24,18 @@ if (settingsBtn) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize internationalization first
+    await i18n.init();
+    
+    // Make i18n globally available for dynamic content
+    window.i18n = i18n;
+    
+    // Listen for language changes to refresh dynamic content
+    document.addEventListener('languageChanged', (event) => {
+        console.log('Language changed to:', event.detail.language);
+        // Any dynamic content that needs special handling can be refreshed here
+    });
+    
     updateStatusDisplay('Ready', null);
 
     initKeyValueListeners();

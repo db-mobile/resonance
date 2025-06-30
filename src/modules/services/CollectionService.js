@@ -78,18 +78,41 @@ export class CollectionService {
                 name: requestData.name,
                 method: requestData.method,
                 path: requestData.path,
+                description: '',
                 parameters: {
                     query: {},
                     header: {},
                     path: {}
                 },
                 requestBody: null,
-                responses: {}
+                headers: {}
             };
 
             // Add the new endpoint to the collection
             collection.endpoints = collection.endpoints || [];
             collection.endpoints.push(newEndpoint);
+
+            // If collection has folder structure, add to appropriate folder
+            if (collection.folders && collection.folders.length > 0) {
+                // Extract base path for grouping (first segment after leading slash)
+                const basePath = this.extractBasePath(requestData.path);
+                
+                // Find existing folder or create new one
+                let targetFolder = collection.folders.find(folder => folder.name === basePath);
+                
+                if (!targetFolder) {
+                    // Create new folder for this path
+                    targetFolder = {
+                        id: `folder_${basePath}`.replace(/[^a-zA-Z0-9]/g, '_'),
+                        name: basePath,
+                        endpoints: []
+                    };
+                    collection.folders.push(targetFolder);
+                }
+                
+                // Add endpoint to the folder
+                targetFolder.endpoints.push(newEndpoint);
+            }
 
             // Save the updated collection
             await this.repository.update(collectionId, collection);
@@ -113,6 +136,15 @@ export class CollectionService {
         }
         
         return newId;
+    }
+
+    extractBasePath(pathKey) {
+        // Remove leading slash and extract first path segment
+        const cleanPath = pathKey.replace(/^\//, '');
+        const segments = cleanPath.split('/');
+        
+        // Return the first segment, or 'custom' if no segments or root
+        return segments[0] || 'custom';
     }
 
     async loadEndpointIntoForm(collection, endpoint, formElements) {
