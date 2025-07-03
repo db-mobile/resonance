@@ -13,6 +13,8 @@ let collectionController = null;
 function initializeController() {
     if (!collectionController) {
         collectionController = new CollectionController(window.electronAPI, updateStatusDisplay);
+        // Make collectionService globally available for auto-save functionality
+        window.collectionService = collectionController.service;
     }
     return collectionController;
 }

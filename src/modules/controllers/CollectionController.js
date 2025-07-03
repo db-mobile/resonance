@@ -29,7 +29,7 @@ export class CollectionController {
         this.variableService = new VariableService(this.variableRepository, this.variableProcessor, this.statusDisplay);
         
         // UI components
-        this.renderer = new CollectionRenderer('collections-list');
+        this.renderer = new CollectionRenderer('collections-list', this.repository);
         this.contextMenu = new ContextMenu();
         this.renameDialog = new RenameDialog();
         this.variableManager = new VariableManager();
@@ -46,7 +46,7 @@ export class CollectionController {
     async loadCollections() {
         try {
             const collections = await this.service.loadCollections();
-            this.renderCollections(collections);
+            await this.renderCollections(collections);
             return collections;
         } catch (error) {
             console.error('Error in loadCollections:', error);
@@ -57,7 +57,7 @@ export class CollectionController {
     async loadCollectionsWithExpansionState() {
         try {
             const collections = await this.service.loadCollections();
-            this.renderCollections(collections, true); // Preserve expansion state
+            await this.renderCollections(collections, true); // Preserve expansion state
             return collections;
         } catch (error) {
             console.error('Error in loadCollectionsWithExpansionState:', error);
@@ -65,13 +65,13 @@ export class CollectionController {
         }
     }
 
-    renderCollections(collections, preserveExpansionState = false) {
+    async renderCollections(collections, preserveExpansionState = false) {
         const eventHandlers = {
             onEndpointClick: this.handleEndpointClick,
             onContextMenu: this.handleContextMenu
         };
         
-        this.renderer.renderCollections(collections, eventHandlers, preserveExpansionState);
+        await this.renderer.renderCollections(collections, eventHandlers, preserveExpansionState);
     }
 
     async handleEndpointClick(collection, endpoint) {

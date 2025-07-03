@@ -1,4 +1,4 @@
-import { urlInput, methodSelect, bodyInput, responseBodyDisplay, responseHeadersDisplay } from './domElements.js';
+import { urlInput, methodSelect, bodyInput, responseBodyDisplay, responseHeadersDisplay, responseLineNumbers } from './domElements.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { activateTab } from './tabManager.js'; // To ensure response tab is active
@@ -6,6 +6,22 @@ import { saveRequestBodyModification } from './collectionManager.js';
 import { VariableProcessor } from './variables/VariableProcessor.js';
 import { VariableRepository } from './storage/VariableRepository.js';
 import { CollectionRepository } from './storage/CollectionRepository.js';
+
+function generateLineNumbers(text) {
+    if (!text) return '';
+    const lines = text.split('\n');
+    return lines.map((_, index) => index + 1).join('\n');
+}
+
+function displayResponseWithLineNumbers(content) {
+    responseBodyDisplay.textContent = content;
+    responseLineNumbers.textContent = generateLineNumbers(content);
+}
+
+function clearResponseDisplay() {
+    responseBodyDisplay.textContent = '';
+    responseLineNumbers.textContent = '';
+}
 
 export async function handleSendRequest() {
     // Save any pending body modifications before sending request
@@ -87,7 +103,7 @@ export async function handleSendRequest() {
             body = JSON.parse(bodyText);
         } catch (e) {
             updateStatusDisplay(`Invalid Body JSON: ${e.message}`, null);
-            responseBodyDisplay.textContent = '';
+            clearResponseDisplay();
             responseHeadersDisplay.textContent = '';
             return;
         }
@@ -102,7 +118,7 @@ export async function handleSendRequest() {
             responseBodyDisplay.parentElement.offsetHeight;
         }
 
-        responseBodyDisplay.textContent = 'Sending request...';
+        displayResponseWithLineNumbers('Sending request...');
         responseHeadersDisplay.textContent = '';
         updateStatusDisplay('Status: Sending...', null);
 
@@ -116,7 +132,8 @@ export async function handleSendRequest() {
         // Check if the request was successful
         if (result.success) {
             // Handle successful response
-            responseBodyDisplay.textContent = JSON.stringify(result.data, null, 2);
+            const formattedResponse = JSON.stringify(result.data, null, 2);
+            displayResponseWithLineNumbers(formattedResponse);
 
             let headersString = '';
             if (result.headers) {
@@ -138,20 +155,22 @@ export async function handleSendRequest() {
         let errorMessage = error.message || 'Unknown error';
 
         // Display error response body or fallback to error message
+        let errorContent;
         if (error.data) {
             try {
                 // If it's a JSON error response, format it nicely
                 if (typeof error.data === 'object') {
-                    responseBodyDisplay.textContent = JSON.stringify(error.data, null, 2);
+                    errorContent = JSON.stringify(error.data, null, 2);
                 } else {
-                    responseBodyDisplay.textContent = String(error.data);
+                    errorContent = String(error.data);
                 }
             } catch {
-                responseBodyDisplay.textContent = `Error: ${errorMessage}`;
+                errorContent = `Error: ${errorMessage}`;
             }
         } else {
-            responseBodyDisplay.textContent = `Error: ${errorMessage}`;
+            errorContent = `Error: ${errorMessage}`;
         }
+        displayResponseWithLineNumbers(errorContent);
         
         // Handle headers for error responses
         if (error.headers && Object.keys(error.headers).length > 0) {

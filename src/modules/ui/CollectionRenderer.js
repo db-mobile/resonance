@@ -3,11 +3,12 @@
  * Follows Single Responsibility Principle - only handles UI rendering
  */
 export class CollectionRenderer {
-    constructor(containerId) {
+    constructor(containerId, repository = null) {
         this.container = document.getElementById(containerId);
         if (!this.container) {
             throw new Error(`Container with id '${containerId}' not found`);
         }
+        this.repository = repository;
     }
 
     renderEmptyState() {
@@ -22,7 +23,7 @@ export class CollectionRenderer {
         `;
     }
 
-    renderCollections(collections, eventHandlers = {}, preserveExpansionState = false) {
+    async renderCollections(collections, eventHandlers = {}, preserveExpansionState = false) {
         if (collections.length === 0) {
             this.renderEmptyState();
             // Trigger translation for empty state
@@ -44,9 +45,13 @@ export class CollectionRenderer {
             this.container.appendChild(collectionElement);
         });
 
-        // Restore expansion state if needed
+        // Restore expansion state
         if (preserveExpansionState) {
+            // Use in-memory state for re-renders
             this.restoreExpansionState(expansionState);
+        } else {
+            // Load from persistent storage for initial renders
+            await this.loadAndRestoreExpansionState();
         }
         
         // Trigger translation for newly rendered collections
@@ -141,9 +146,11 @@ export class CollectionRenderer {
         folderDiv.appendChild(folderEndpoints);
 
         // Add folder toggle functionality
-        folderHeader.addEventListener('click', (e) => {
+        folderHeader.addEventListener('click', async (e) => {
             e.stopPropagation();
             folderDiv.classList.toggle('expanded');
+            // Save expansion state to storage
+            await this.saveExpansionState();
         });
 
         return folderDiv;
@@ -178,7 +185,7 @@ export class CollectionRenderer {
 
     attachCollectionEventListeners(collectionDiv, headerDiv, collection, eventHandlers) {
         // Toggle expansion
-        headerDiv.addEventListener('click', (e) => {
+        headerDiv.addEventListener('click', async (e) => {
             if (e.target.closest('.context-menu')) {
                 return;
             }
@@ -193,6 +200,9 @@ export class CollectionRenderer {
             
             // Toggle this collection
             collectionDiv.classList.toggle('expanded');
+            
+            // Save expansion state to storage
+            await this.saveExpansionState();
         });
 
         // Context menu
@@ -248,5 +258,31 @@ export class CollectionRenderer {
                 });
             }
         });
+    }
+
+    async saveExpansionState() {
+        if (!this.repository) {
+            return;
+        }
+        
+        try {
+            const currentState = this.getExpansionState();
+            await this.repository.saveCollectionExpansionStates(currentState);
+        } catch (error) {
+            console.error('Error saving expansion state:', error);
+        }
+    }
+
+    async loadAndRestoreExpansionState() {
+        if (!this.repository) {
+            return;
+        }
+        
+        try {
+            const savedState = await this.repository.getCollectionExpansionStates();
+            this.restoreExpansionState(savedState);
+        } catch (error) {
+            console.error('Error loading expansion state:', error);
+        }
     }
 }

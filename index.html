@@ -159,7 +159,10 @@
                              class="tab-content active" 
                              role="tabpanel" 
                              aria-labelledby="response-body-tab">
-                            <pre id="response-display" aria-live="polite"></pre>
+                            <div class="response-body-container">
+                                <pre id="response-line-numbers" class="line-numbers" aria-hidden="true"></pre>
+                                <pre id="response-display" aria-live="polite"></pre>
+                            </div>
                         </div>
 
                         <div id="response-headers" 

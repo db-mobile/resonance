@@ -105,18 +105,67 @@ export function initKeyValueListeners() {
         if (event.target.classList.contains('key-input') || 
             event.target.classList.contains('value-input')) {
             updateUrlFromQueryParams();
+            debounceAutoSave(() => autoSaveQueryParams());
+        }
+    });
+
+    // Headers input listeners (using event delegation)
+    headersList.addEventListener('input', (event) => {
+        if (event.target.classList.contains('key-input') || 
+            event.target.classList.contains('value-input')) {
+            debounceAutoSave(() => autoSaveHeaders());
         }
     });
 
     document.addEventListener('click', (event) => {
         if (event.target.classList.contains('remove-row-btn')) {
             const isQueryParam = event.target.closest('#query-params-list');
+            const isHeader = event.target.closest('#headers-list');
             event.target.closest('.key-value-row').remove();
             
             // Update URL if a query param was removed
             if (isQueryParam) {
                 updateUrlFromQueryParams();
+                debounceAutoSave(() => autoSaveQueryParams());
+            }
+            
+            // Auto-save headers if a header was removed
+            if (isHeader) {
+                debounceAutoSave(() => autoSaveHeaders());
             }
         }
     });
+}
+
+// Auto-save functionality
+let autoSaveTimeout;
+function debounceAutoSave(callback) {
+    clearTimeout(autoSaveTimeout);
+    autoSaveTimeout = setTimeout(callback, 500); // 500ms delay
+}
+
+async function autoSaveQueryParams() {
+    if (window.currentEndpoint && window.collectionService) {
+        const formElements = {
+            queryParamsList: queryParamsList
+        };
+        await window.collectionService.saveCurrentQueryParams(
+            window.currentEndpoint.collectionId,
+            window.currentEndpoint.endpointId,
+            formElements
+        );
+    }
+}
+
+async function autoSaveHeaders() {
+    if (window.currentEndpoint && window.collectionService) {
+        const formElements = {
+            headersList: headersList
+        };
+        await window.collectionService.saveCurrentHeaders(
+            window.currentEndpoint.collectionId,
+            window.currentEndpoint.endpointId,
+            formElements
+        );
+    }
 }

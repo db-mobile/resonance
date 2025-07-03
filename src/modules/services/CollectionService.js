@@ -159,13 +159,15 @@ export class CollectionService {
                     window.currentEndpoint.endpointId,
                     formElements.bodyInput
                 );
+                await this.saveCurrentQueryParams(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId, formElements);
+                await this.saveCurrentHeaders(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId, formElements);
             }
             window.currentEndpoint = { collectionId: collection.id, endpointId: endpoint.id };
 
             // Build and populate form
             this.populateUrlAndMethod(collection, endpoint, formElements);
-            this.populateHeaders(collection, endpoint, formElements);
-            this.populateQueryParams(endpoint, formElements);
+            await this.populateHeaders(collection, endpoint, formElements);
+            await this.populateQueryParams(endpoint, formElements);
             await this.populateRequestBody(collection, endpoint, formElements);
 
             this.statusDisplay.update(`Loaded endpoint: ${endpoint.name}`, null);
@@ -193,33 +195,43 @@ export class CollectionService {
         formElements.methodSelect.value = endpoint.method;
     }
 
-    populateHeaders(collection, endpoint, formElements) {
+    async populateHeaders(collection, endpoint, formElements) {
         this.clearKeyValueList(formElements.headersList);
 
-        // Add default headers from collection first
-        if (collection.defaultHeaders) {
-            Object.entries(collection.defaultHeaders).forEach(([key, value]) => {
-                this.addKeyValueRow(formElements.headersList, key, value);
+        // Check for persisted headers first
+        const persistedHeaders = await this.repository.getPersistedHeaders(collection.id, endpoint.id);
+        
+        if (persistedHeaders.length > 0) {
+            // Load persisted headers
+            persistedHeaders.forEach(header => {
+                this.addKeyValueRow(formElements.headersList, header.key, header.value);
             });
-        }
+        } else {
+            // Add default headers from collection first
+            if (collection.defaultHeaders) {
+                Object.entries(collection.defaultHeaders).forEach(([key, value]) => {
+                    this.addKeyValueRow(formElements.headersList, key, value);
+                });
+            }
 
-        // Add endpoint-specific headers (will override defaults if same key)
-        if (endpoint.parameters?.header) {
-            Object.entries(endpoint.parameters.header).forEach(([key, param]) => {
-                this.addKeyValueRow(formElements.headersList, key, param.example || '');
-            });
-        }
+            // Add endpoint-specific headers (will override defaults if same key)
+            if (endpoint.parameters?.header) {
+                Object.entries(endpoint.parameters.header).forEach(([key, param]) => {
+                    this.addKeyValueRow(formElements.headersList, key, param.example || '');
+                });
+            }
 
-        // Add default Content-Type for POST/PUT/PATCH (if not already set)
-        if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-            const contentType = endpoint.requestBody?.contentType || 'application/json';
-            // Check if Content-Type is already set from defaults or endpoint headers
-            const existingContentType = Array.from(formElements.headersList.children).find(row => {
-                const keyInput = row.querySelector('.key-input');
-                return keyInput && keyInput.value.toLowerCase() === 'content-type';
-            });
-            if (!existingContentType) {
-                this.addKeyValueRow(formElements.headersList, 'Content-Type', contentType);
+            // Add default Content-Type for POST/PUT/PATCH (if not already set)
+            if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
+                const contentType = endpoint.requestBody?.contentType || 'application/json';
+                // Check if Content-Type is already set from defaults or endpoint headers
+                const existingContentType = Array.from(formElements.headersList.children).find(row => {
+                    const keyInput = row.querySelector('.key-input');
+                    return keyInput && keyInput.value.toLowerCase() === 'content-type';
+                });
+                if (!existingContentType) {
+                    this.addKeyValueRow(formElements.headersList, 'Content-Type', contentType);
+                }
             }
         }
 
@@ -228,34 +240,44 @@ export class CollectionService {
         }
     }
 
-    populateQueryParams(endpoint, formElements) {
+    async populateQueryParams(endpoint, formElements) {
         console.log('RENDERER: populateQueryParams called with endpoint:', endpoint);
         console.log('RENDERER: endpoint.parameters:', endpoint.parameters);
         
         this.clearKeyValueList(formElements.queryParamsList);
 
-        // Add path parameters first (from YAML file)
-        if (endpoint.parameters?.path) {
-            console.log('RENDERER: Found path parameters:', endpoint.parameters.path);
-            Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
-                // Provide a better default value if example is empty
-                const value = param.example || `{${key}}`;
-                console.log(`RENDERER: Adding path parameter ${key} with value:`, value);
-                this.addKeyValueRow(formElements.queryParamsList, key, value);
+        // Check for persisted query params first
+        const persistedQueryParams = await this.repository.getPersistedQueryParams(window.currentEndpoint.collectionId, endpoint.id);
+        
+        if (persistedQueryParams.length > 0) {
+            // Load persisted query parameters
+            persistedQueryParams.forEach(param => {
+                this.addKeyValueRow(formElements.queryParamsList, param.key, param.value);
             });
         } else {
-            console.log('RENDERER: No path parameters found');
-        }
+            // Add path parameters first (from YAML file)
+            if (endpoint.parameters?.path) {
+                console.log('RENDERER: Found path parameters:', endpoint.parameters.path);
+                Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
+                    // Provide a better default value if example is empty
+                    const value = param.example || `{${key}}`;
+                    console.log(`RENDERER: Adding path parameter ${key} with value:`, value);
+                    this.addKeyValueRow(formElements.queryParamsList, key, value);
+                });
+            } else {
+                console.log('RENDERER: No path parameters found');
+            }
 
-        // Add regular query parameters
-        if (endpoint.parameters?.query) {
-            console.log('RENDERER: Found query parameters:', endpoint.parameters.query);
-            Object.entries(endpoint.parameters.query).forEach(([key, param]) => {
-                console.log(`RENDERER: Adding query parameter ${key} with value:`, param.example || '');
-                this.addKeyValueRow(formElements.queryParamsList, key, param.example || '');
-            });
-        } else {
-            console.log('RENDERER: No query parameters found');
+            // Add regular query parameters
+            if (endpoint.parameters?.query) {
+                console.log('RENDERER: Found query parameters:', endpoint.parameters.query);
+                Object.entries(endpoint.parameters.query).forEach(([key, param]) => {
+                    console.log(`RENDERER: Adding query parameter ${key} with value:`, param.example || '');
+                    this.addKeyValueRow(formElements.queryParamsList, key, param.example || '');
+                });
+            } else {
+                console.log('RENDERER: No query parameters found');
+            }
         }
 
         if (formElements.queryParamsList.children.length === 0) {
@@ -327,6 +349,51 @@ export class CollectionService {
         } catch (error) {
             console.error('Error saving request body modification:', error);
         }
+    }
+
+    async saveCurrentQueryParams(collectionId, endpointId, formElements) {
+        try {
+            const queryParams = this.parseKeyValuePairs(formElements.queryParamsList);
+            // Only save if there are non-empty query parameters
+            if (queryParams.length > 0) {
+                await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParams);
+                console.log('Saved query parameters for endpoint:', endpointId);
+            }
+        } catch (error) {
+            console.error('Error saving query parameters:', error);
+        }
+    }
+
+    async saveCurrentHeaders(collectionId, endpointId, formElements) {
+        try {
+            const headers = this.parseKeyValuePairs(formElements.headersList);
+            // Only save if there are non-empty headers
+            if (headers.length > 0) {
+                await this.repository.savePersistedHeaders(collectionId, endpointId, headers);
+                console.log('Saved headers for endpoint:', endpointId);
+            }
+        } catch (error) {
+            console.error('Error saving headers:', error);
+        }
+    }
+
+    parseKeyValuePairs(container) {
+        const pairs = [];
+        const rows = container.querySelectorAll('.key-value-row');
+        
+        rows.forEach(row => {
+            const keyInput = row.querySelector('.key-input');
+            const valueInput = row.querySelector('.value-input');
+            
+            if (keyInput && valueInput && keyInput.value.trim()) {
+                pairs.push({
+                    key: keyInput.value.trim(),
+                    value: valueInput.value.trim()
+                });
+            }
+        });
+        
+        return pairs;
     }
 
     clearKeyValueList(container) {

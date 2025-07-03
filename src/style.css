@@ -785,6 +785,39 @@ body {
   margin: 0;
 }
 
+/* Response Body with Line Numbers */
+.response-body-container {
+  display: flex;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.line-numbers {
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  padding: var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  text-align: right;
+  user-select: none;
+  min-width: 3em;
+  border-right: 1px solid var(--border-light);
+  white-space: pre;
+  overflow: hidden;
+  margin: 0;
+}
+
+.response-body-container #response-display {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  margin: 0;
+}
+
 /* Loading States */
 .loading {
   opacity: 0.6;

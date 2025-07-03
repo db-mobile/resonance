@@ -81,4 +81,68 @@ export class CollectionRepository {
             throw new Error(`Failed to save modified request body: ${error.message}`);
         }
     }
+
+    async getPersistedQueryParams(collectionId, endpointId) {
+        try {
+            const persistedParams = await this.electronAPI.store.get('persistedQueryParams') || {};
+            const key = `${collectionId}_${endpointId}`;
+            return persistedParams[key] || [];
+        } catch (error) {
+            console.error('Error getting persisted query params:', error);
+            return [];
+        }
+    }
+
+    async savePersistedQueryParams(collectionId, endpointId, queryParams) {
+        try {
+            const persistedParams = await this.electronAPI.store.get('persistedQueryParams') || {};
+            const key = `${collectionId}_${endpointId}`;
+            persistedParams[key] = queryParams;
+            await this.electronAPI.store.set('persistedQueryParams', persistedParams);
+        } catch (error) {
+            console.error('Error saving persisted query params:', error);
+            throw new Error(`Failed to save persisted query params: ${error.message}`);
+        }
+    }
+
+    async getPersistedHeaders(collectionId, endpointId) {
+        try {
+            const persistedHeaders = await this.electronAPI.store.get('persistedHeaders') || {};
+            const key = `${collectionId}_${endpointId}`;
+            return persistedHeaders[key] || [];
+        } catch (error) {
+            console.error('Error getting persisted headers:', error);
+            return [];
+        }
+    }
+
+    async savePersistedHeaders(collectionId, endpointId, headers) {
+        try {
+            const persistedHeaders = await this.electronAPI.store.get('persistedHeaders') || {};
+            const key = `${collectionId}_${endpointId}`;
+            persistedHeaders[key] = headers;
+            await this.electronAPI.store.set('persistedHeaders', persistedHeaders);
+        } catch (error) {
+            console.error('Error saving persisted headers:', error);
+            throw new Error(`Failed to save persisted headers: ${error.message}`);
+        }
+    }
+
+    async getCollectionExpansionStates() {
+        try {
+            return await this.electronAPI.store.get('collectionExpansionStates') || {};
+        } catch (error) {
+            console.error('Error getting collection expansion states:', error);
+            return {};
+        }
+    }
+
+    async saveCollectionExpansionStates(expansionStates) {
+        try {
+            await this.electronAPI.store.set('collectionExpansionStates', expansionStates);
+        } catch (error) {
+            console.error('Error saving collection expansion states:', error);
+            throw new Error(`Failed to save collection expansion states: ${error.message}`);
+        }
+    }
 }
