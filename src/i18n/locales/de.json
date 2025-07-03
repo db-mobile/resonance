@@ -61,6 +61,7 @@
     "title": "Einstellungen",
     "language": "Sprache",
     "theme": "Design",
+    "http_version": "HTTP-Version",
     "close": "Schließen",
     "save": "Speichern",
     "cancel": "Abbrechen"
@@ -69,6 +70,11 @@
     "light": "Hell",
     "dark": "Dunkel",
     "system": "System"
+  },
+  "http_version": {
+    "auto": "Automatisch",
+    "http1": "HTTP/1.x",
+    "http2": "HTTP/2"
   },
   "common": {
     "ok": "OK",

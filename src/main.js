@@ -57,6 +57,10 @@ ipcMain.handle('send-api-request', async (event, requestOptions) => {
     try {
         console.log('Received request options:', requestOptions);
         
+        // Get HTTP version settings
+        const settings = store.get('settings', {});
+        const httpVersion = settings.httpVersion || 'auto';
+        
         // Prepare the axios config
         const axiosConfig = {
             method: requestOptions.method,
@@ -64,6 +68,23 @@ ipcMain.handle('send-api-request', async (event, requestOptions) => {
             headers: requestOptions.headers || {},
             timeout: 30000, // 30 second timeout
         };
+
+        // Apply HTTP version configuration
+        switch (httpVersion) {
+            case 'http1':
+                // Force HTTP/1.x
+                axiosConfig.httpVersion = '1.1';
+                axiosConfig.http2 = false;
+                break;
+            case 'http2':
+                // Force HTTP/2
+                axiosConfig.http2 = true;
+                break;
+            case 'auto':
+            default:
+                // Let axios/Node.js decide (default behavior)
+                break;
+        }
 
         // Handle request body for POST/PUT/PATCH requests
         if (requestOptions.body && ['POST', 'PUT', 'PATCH'].includes(requestOptions.method.toUpperCase())) {

@@ -54,6 +54,11 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - `schema/` - OpenAPI schema processing (SchemaProcessor.js)
 - `interfaces/` - TypeScript-like interfaces for structure (IStatusDisplay.js)
 
+### Additional Architecture Components
+- `src/themes/` - Theme system with CSS custom properties for light, dark, system, and blueprint themes
+- `src/i18n/` - Internationalization system supporting multiple languages
+- `themeManager.js` - Centralized theme and settings management with unified modal interface
+
 ### Key Features
 
 #### OpenAPI Collection Support
@@ -73,6 +78,20 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - Supports nested objects, arrays, and complex data types
 - Handles $ref resolution for schema references
 
+#### Theme System
+- Dynamic theme loading via `ThemeManager` class
+- Available themes: light, dark, system (follows OS preference), blueprint
+- CSS custom properties-based architecture with semantic naming
+- Theme preferences persisted via electron-store
+- Automatic OS theme detection and response
+
+#### Internationalization (i18n)
+- Multi-language support via `I18nManager` class in `src/i18n/`
+- Supported languages: English, German, Spanish, French, Italian
+- Translation interpolation with `{{variableName}}` syntax
+- Automatic UI updates via `data-i18n` attributes
+- Language preferences persisted via electron-store
+
 ### Security Configuration
 - `contextIsolation: true` and `nodeIntegration: false` in webPreferences
 - Uses `preload.js` to expose safe APIs via `contextBridge`
@@ -81,8 +100,8 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 ### Data Persistence
 - Uses `electron-store` to persist collections and variables in JSON format
 - Store name: `api-collections` with default structure `{ collections: [] }`
-- IPC handlers for `store:get` and `store:set` operations
-- Separate storage for collection data and variables
+- IPC handlers for `store:get`, `store:set`, `settings:get`, and `settings:set` operations
+- Separate storage for collection data, variables, theme preferences, and language settings
 
 ## UI Structure
 - Split layout with collections sidebar and main content area
@@ -101,3 +120,6 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - Centralized DOM element management in `domElements.js`
 - IPC communication pattern: renderer → preload → main process → external APIs
 - Modular event handling with separate initialization functions
+- CSS custom properties for theming with semantic naming conventions
+- Attribute-based i18n with automatic DOM updates (`data-i18n` attributes)
+- Unified settings management through modal interface

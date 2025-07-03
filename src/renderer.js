@@ -1,16 +1,18 @@
 import { sendRequestBtn, importCollectionBtn } from './modules/domElements.js';
 
-import { initKeyValueListeners, addKeyValueRow } from './modules/keyValueManager.js';
+import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest } from './modules/apiHandler.js';
 import { loadCollections, importOpenApiFile, initializeBodyTracking } from './modules/collectionManager.js';
 import { ThemeManager, SettingsModal } from './modules/themeManager.js';
+import { HttpVersionManager } from './modules/httpVersionManager.js';
 import { i18n } from './i18n/I18nManager.js';
 
-// Initialize theme manager and internationalization
+// Initialize theme manager, HTTP version manager, and internationalization
 const themeManager = new ThemeManager();
-const settingsModal = new SettingsModal(themeManager, i18n);
+const httpVersionManager = new HttpVersionManager();
+const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager);
 
 sendRequestBtn.addEventListener('click', handleSendRequest);
 importCollectionBtn.addEventListener('click', importOpenApiFile);
@@ -49,6 +51,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const headersList = document.getElementById('headers-list');
     const queryParamsList = document.getElementById('query-params-list');
-    if (headersList.children.length === 0) addKeyValueRow(headersList);
-    if (queryParamsList.children.length === 0) addKeyValueRow(queryParamsList);
+    if (headersList.children.length === 0) addKeyValueRow(headersList, 'Content-Type', 'application/json');
+    
+    // Initialize query params from URL or add empty row
+    updateQueryParamsFromUrl();
 });

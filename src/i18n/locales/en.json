@@ -71,6 +71,7 @@
     "title": "Settings",
     "language": "Language",
     "theme": "Theme",
+    "http_version": "HTTP Version",
     "close": "Close",
     "save": "Save",
     "cancel": "Cancel"
@@ -79,6 +80,11 @@
     "light": "Light",
     "dark": "Dark",
     "system": "System"
+  },
+  "http_version": {
+    "auto": "Auto",
+    "http1": "HTTP/1.x", 
+    "http2": "HTTP/2"
   },
   "common": {
     "ok": "OK",

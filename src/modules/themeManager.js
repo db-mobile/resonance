@@ -136,17 +136,18 @@ export class ThemeManager {
 
 // Settings Modal Component
 export class SettingsModal {
-    constructor(themeManager, i18nManager = null) {
+    constructor(themeManager, i18nManager = null, httpVersionManager = null) {
         this.themeManager = themeManager;
         this.i18nManager = i18nManager;
+        this.httpVersionManager = httpVersionManager;
         this.isOpen = false;
     }
 
-    show() {
+    async show() {
         if (this.isOpen) return;
         
         this.isOpen = true;
-        const modal = this.createModal();
+        const modal = await this.createModal();
         document.body.appendChild(modal);
         
         // Focus management
@@ -154,11 +155,13 @@ export class SettingsModal {
         if (firstInput) firstInput.focus();
     }
 
-    createModal() {
+    async createModal() {
         const overlay = document.createElement('div');
         overlay.className = 'settings-modal-overlay';
         
         const languageSection = this.i18nManager ? this.createLanguageSection() : '';
+        
+        const currentHttpVersion = this.httpVersionManager ? await this.httpVersionManager.getCurrentVersion() : 'auto';
         
         overlay.innerHTML = `
             <div class="settings-modal">
@@ -211,6 +214,17 @@ export class SettingsModal {
                             </label>
                         </div>
                     </div>
+                    
+                    <div class="settings-section">
+                        <h3 data-i18n="settings.http_version">HTTP Version</h3>
+                        <div class="http-version-select-container">
+                            <select class="http-version-select" name="httpVersion">
+                                <option value="auto" ${currentHttpVersion === 'auto' ? 'selected' : ''} data-i18n="http_version.auto">Auto</option>
+                                <option value="http1" ${currentHttpVersion === 'http1' ? 'selected' : ''} data-i18n="http_version.http1">HTTP/1.x</option>
+                                <option value="http2" ${currentHttpVersion === 'http2' ? 'selected' : ''} data-i18n="http_version.http2">HTTP/2</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -245,6 +259,7 @@ export class SettingsModal {
         const closeBtn = overlay.querySelector('.settings-close-btn');
         const themeInputs = overlay.querySelectorAll('input[name="theme"]');
         const languageSelect = overlay.querySelector('select[name="language"]');
+        const httpVersionSelect = overlay.querySelector('select[name="httpVersion"]');
 
         // Close button
         closeBtn.addEventListener('click', () => this.hide(overlay));
@@ -262,6 +277,13 @@ export class SettingsModal {
                 await this.i18nManager.setLanguage(e.target.value);
                 // Update the modal UI with new translations
                 this.i18nManager.updateUI();
+            });
+        }
+
+        // HTTP version selection
+        if (this.httpVersionManager && httpVersionSelect) {
+            httpVersionSelect.addEventListener('change', async (e) => {
+                await this.httpVersionManager.setVersion(e.target.value);
             });
         }
 

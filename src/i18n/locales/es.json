@@ -61,6 +61,7 @@
     "title": "Configuración",
     "language": "Idioma",
     "theme": "Tema",
+    "http_version": "Versión HTTP",
     "close": "Cerrar",
     "save": "Guardar",
     "cancel": "Cancelar"
@@ -69,6 +70,11 @@
     "light": "Claro",
     "dark": "Oscuro",
     "system": "Sistema"
+  },
+  "http_version": {
+    "auto": "Automático",
+    "http1": "HTTP/1.x",
+    "http2": "HTTP/2"
   },
   "common": {
     "ok": "OK",

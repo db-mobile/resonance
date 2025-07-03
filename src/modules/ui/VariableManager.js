@@ -37,31 +37,31 @@ export class VariableManager {
         const dialogContent = document.createElement('div');
         dialogContent.className = 'variable-dialog';
         dialogContent.style.cssText = `
-            background: var(--bg-color, #ffffff);
+            background: var(--bg-primary);
             border-radius: 8px;
             padding: 24px;
             min-width: 600px;
             max-width: 800px;
             max-height: 80vh;
             overflow-y: auto;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-            border: 1px solid var(--border-color, #e0e0e0);
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--border-light);
         `;
 
         const title = options.title || `Variables - ${collectionName}`;
 
         dialogContent.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h3 style="margin: 0; color: var(--text-color, #333333);">${this.escapeHtml(title)}</h3>
+                <h3 style="margin: 0; color: var(--text-primary);">${this.escapeHtml(title)}</h3>
                 <div style="display: flex; gap: 8px;">
-                    <button id="add-variable-btn" style="padding: 6px 12px; border: 1px solid var(--primary-color, #007bff); background: transparent; color: var(--primary-color, #007bff); border-radius: 4px; cursor: pointer; font-size: 12px;">+ Add Variable</button>
-                    <button id="import-variables-btn" style="padding: 6px 12px; border: 1px solid var(--border-color, #e0e0e0); background: transparent; border-radius: 4px; cursor: pointer; font-size: 12px;">Import</button>
-                    <button id="export-variables-btn" style="padding: 6px 12px; border: 1px solid var(--border-color, #e0e0e0); background: transparent; border-radius: 4px; cursor: pointer; font-size: 12px;">Export</button>
+                    <button id="add-variable-btn" style="padding: 6px 12px; border: 1px solid var(--color-primary); background: transparent; color: var(--color-primary); border-radius: 4px; cursor: pointer; font-size: 12px;">+ Add Variable</button>
+                    <button id="import-variables-btn" style="padding: 6px 12px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: 4px; cursor: pointer; font-size: 12px;">Import</button>
+                    <button id="export-variables-btn" style="padding: 6px 12px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: 4px; cursor: pointer; font-size: 12px;">Export</button>
                 </div>
             </div>
             
-            <div style="margin-bottom: 16px; padding: 12px; background: var(--info-bg, #f8f9fa); border-radius: 4px; border-left: 4px solid var(--info-border, #007bff);">
-                <p style="margin: 0; font-size: 14px; color: var(--text-color, #333333);">
+            <div style="margin-bottom: 16px; padding: 12px; background: var(--color-primary-light); border-radius: 4px; border-left: 4px solid var(--color-primary);">
+                <p style="margin: 0; font-size: 14px; color: var(--text-primary);">
                     <strong>Usage:</strong> Define variables here and use them in your requests with <code>{{ variableName }}</code> syntax.
                     <br>Variables can be used in URLs, headers, query parameters, and request bodies.
                 </p>
@@ -72,8 +72,8 @@ export class VariableManager {
             </div>
 
             <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                <button id="variables-cancel-btn" style="padding: 8px 16px; border: 1px solid var(--border-color, #e0e0e0); background: transparent; border-radius: 4px; cursor: pointer;">Cancel</button>
-                <button id="variables-save-btn" style="padding: 8px 16px; border: none; background: var(--primary-color, #007bff); color: white; border-radius: 4px; cursor: pointer;">Save Variables</button>
+                <button id="variables-cancel-btn" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: 4px; cursor: pointer;">Cancel</button>
+                <button id="variables-save-btn" style="padding: 8px 16px; border: none; background: var(--color-primary); color: white; border-radius: 4px; cursor: pointer;">Save Variables</button>
             </div>
         `;
 
@@ -110,10 +110,10 @@ export class VariableManager {
 
         row.innerHTML = `
             <input type="text" class="variable-name" value="${this.escapeHtml(name)}" placeholder="Variable name"
-                   style="flex: 1; padding: 8px 12px; border: 1px solid var(--border-color, #e0e0e0); border-radius: 4px; font-size: 14px;">
+                   style="flex: 1; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: 4px; font-size: 14px; background: var(--bg-secondary); color: var(--text-primary);">
             <input type="text" class="variable-value" value="${this.escapeHtml(value)}" placeholder="Variable value"
-                   style="flex: 2; padding: 8px 12px; border: 1px solid var(--border-color, #e0e0e0); border-radius: 4px; font-size: 14px;">
-            <button class="remove-variable-btn" style="padding: 8px; border: 1px solid var(--danger-color, #dc3545); background: transparent; color: var(--danger-color, #dc3545); border-radius: 4px; cursor: pointer; min-width: 70px;">Remove</button>
+                   style="flex: 2; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: 4px; font-size: 14px; background: var(--bg-secondary); color: var(--text-primary);">
+            <button class="remove-variable-btn" style="padding: 8px; border: 1px solid var(--color-error); background: transparent; color: var(--color-error); border-radius: 4px; cursor: pointer; min-width: 70px;">Remove</button>
         `;
 
         // Add event listeners
@@ -254,13 +254,13 @@ export class VariableManager {
         `;
 
         importDialog.innerHTML = `
-            <div style="background: white; padding: 24px; border-radius: 8px; min-width: 500px;">
-                <h4 style="margin: 0 0 16px 0;">Import Variables</h4>
+            <div style="background: var(--bg-primary); color: var(--text-primary); padding: 24px; border-radius: 8px; min-width: 500px; border: 1px solid var(--border-light);">
+                <h4 style="margin: 0 0 16px 0; color: var(--text-primary);">Import Variables</h4>
                 <textarea id="import-textarea" placeholder="Paste JSON object with variables..." 
-                          style="width: 100%; height: 200px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; resize: vertical;"></textarea>
+                          style="width: 100%; height: 200px; padding: 8px; border: 1px solid var(--border-light); border-radius: 4px; font-family: monospace; resize: vertical; background: var(--bg-secondary); color: var(--text-primary);"></textarea>
                 <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;">
-                    <button id="import-cancel">Cancel</button>
-                    <button id="import-confirm" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px;">Import</button>
+                    <button id="import-cancel" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-light); padding: 8px 16px; border-radius: 4px;">Cancel</button>
+                    <button id="import-confirm" style="background: var(--color-primary); color: white; border: none; padding: 8px 16px; border-radius: 4px;">Import</button>
                 </div>
             </div>
         `;

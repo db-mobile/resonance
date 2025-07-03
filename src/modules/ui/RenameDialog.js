@@ -37,12 +37,12 @@ export class RenameDialog {
         const dialog = document.createElement('div');
         dialog.className = 'rename-dialog';
         dialog.style.cssText = `
-            background: var(--bg-color, #ffffff);
+            background: var(--bg-primary);
             border-radius: 8px;
             padding: 24px;
             min-width: 400px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-            border: 1px solid var(--border-color, #e0e0e0);
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--border-light);
         `;
 
         const title = options.title || 'Rename Collection';
@@ -50,15 +50,15 @@ export class RenameDialog {
         const confirmText = options.confirmText || 'Rename';
 
         dialog.innerHTML = `
-            <h3 style="margin: 0 0 16px 0; color: var(--text-color, #333333);">${title}</h3>
+            <h3 style="margin: 0 0 16px 0; color: var(--text-primary);">${title}</h3>
             <div style="margin-bottom: 16px;">
-                <label for="rename-input" style="display: block; margin-bottom: 8px; color: var(--text-color, #333333); font-weight: 500;">${label}</label>
+                <label for="rename-input" style="display: block; margin-bottom: 8px; color: var(--text-primary); font-weight: 500;">${label}</label>
                 <input type="text" id="rename-input" value="${this.escapeHtml(currentName)}" 
-                       style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-color, #e0e0e0); border-radius: 4px; font-size: 14px; box-sizing: border-box;">
+                       style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: 4px; font-size: 14px; box-sizing: border-box; background: var(--bg-secondary); color: var(--text-primary);">
             </div>
             <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                <button id="rename-cancel-btn" style="padding: 8px 16px; border: 1px solid var(--border-color, #e0e0e0); background: transparent; border-radius: 4px; cursor: pointer;">Cancel</button>
-                <button id="rename-confirm-btn" style="padding: 8px 16px; border: none; background: var(--primary-color, #007bff); color: white; border-radius: 4px; cursor: pointer;">${confirmText}</button>
+                <button id="rename-cancel-btn" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: 4px; cursor: pointer;">Cancel</button>
+                <button id="rename-confirm-btn" style="padding: 8px 16px; border: none; background: var(--color-primary); color: white; border-radius: 4px; cursor: pointer;">${confirmText}</button>
             </div>
         `;
 

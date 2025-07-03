@@ -61,6 +61,7 @@
     "title": "Paramètres",
     "language": "Langue",
     "theme": "Thème",
+    "http_version": "Version HTTP",
     "close": "Fermer",
     "save": "Enregistrer",
     "cancel": "Annuler"
@@ -69,6 +70,11 @@
     "light": "Clair",
     "dark": "Sombre",
     "system": "Système"
+  },
+  "http_version": {
+    "auto": "Automatique",
+    "http1": "HTTP/1.x",
+    "http2": "HTTP/2"
   },
   "common": {
     "ok": "OK",
