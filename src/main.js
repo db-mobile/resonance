@@ -215,6 +215,16 @@ ipcMain.handle('import-openapi-file', async () => {
         collections.push(collection);
         store.set('collections', collections);
 
+        // Create baseUrl variable if a base URL was found
+        if (collection.baseUrl) {
+            const variables = store.get('collectionVariables', {});
+            if (!variables[collection.id]) {
+                variables[collection.id] = {};
+            }
+            variables[collection.id].baseUrl = collection.baseUrl;
+            store.set('collectionVariables', variables);
+        }
+
         return collection;
     } catch (error) {
         console.error('Error importing OpenAPI file:', error);

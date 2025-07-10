@@ -180,7 +180,7 @@ export class CollectionService {
     populateUrlAndMethod(collection, endpoint, formElements) {
         let fullUrl = endpoint.path;
         if (collection.baseUrl) {
-            fullUrl = collection.baseUrl.replace(/\/$/, '') + endpoint.path;
+            fullUrl = '{{baseUrl}}' + endpoint.path;
         }
 
         // Replace path parameters with example values or placeholders

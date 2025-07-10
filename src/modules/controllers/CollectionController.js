@@ -79,8 +79,8 @@ export class CollectionController {
             const formElements = this.getFormElements();
             await this.service.loadEndpointIntoForm(collection, endpoint, formElements);
             
-            // Process variables in form elements after loading
-            await this.processFormVariables(collection.id, formElements);
+            // Process variables in form elements after loading, but skip URL to show template
+            await this.processFormVariablesExceptUrl(collection.id, formElements);
         } catch (error) {
             console.error('Error loading endpoint:', error);
         }
@@ -141,7 +141,7 @@ export class CollectionController {
                 // Refresh form if we have an active endpoint to show updated variables
                 if (window.currentEndpoint && window.currentEndpoint.collectionId === collection.id) {
                     const formElements = this.getFormElements();
-                    await this.processFormVariables(collection.id, formElements);
+                    await this.processFormVariablesExceptUrl(collection.id, formElements);
                 }
             }
         } catch (error) {
@@ -376,6 +376,52 @@ export class CollectionController {
             }
         } catch (error) {
             console.error('Error processing form variables:', error);
+        }
+    }
+
+    async processFormVariablesExceptUrl(collectionId, formElements) {
+        try {
+            // Process body
+            if (formElements.bodyInput && formElements.bodyInput.value) {
+                formElements.bodyInput.value = await this.variableService.processTemplate(
+                    formElements.bodyInput.value, 
+                    collectionId
+                );
+            }
+
+            // Process headers
+            if (formElements.headersList) {
+                const headerRows = formElements.headersList.querySelectorAll('.key-value-row');
+                headerRows.forEach(async (row) => {
+                    const keyInput = row.querySelector('.key-input');
+                    const valueInput = row.querySelector('.value-input');
+                    
+                    if (keyInput && keyInput.value) {
+                        keyInput.value = await this.variableService.processTemplate(keyInput.value, collectionId);
+                    }
+                    if (valueInput && valueInput.value) {
+                        valueInput.value = await this.variableService.processTemplate(valueInput.value, collectionId);
+                    }
+                });
+            }
+
+            // Process query params
+            if (formElements.queryParamsList) {
+                const queryRows = formElements.queryParamsList.querySelectorAll('.key-value-row');
+                queryRows.forEach(async (row) => {
+                    const keyInput = row.querySelector('.key-input');
+                    const valueInput = row.querySelector('.value-input');
+                    
+                    if (keyInput && keyInput.value) {
+                        keyInput.value = await this.variableService.processTemplate(keyInput.value, collectionId);
+                    }
+                    if (valueInput && valueInput.value) {
+                        valueInput.value = await this.variableService.processTemplate(valueInput.value, collectionId);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error processing form variables (except URL):', error);
         }
     }
 
