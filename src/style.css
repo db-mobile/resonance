@@ -532,6 +532,30 @@ body {
   box-shadow: none;
 }
 
+.cancel-btn {
+  background: var(--color-error);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  box-shadow: var(--shadow-sm);
+  margin-left: var(--space-2);
+}
+
+.cancel-btn:hover {
+  background: #DC2626;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-base);
+}
+
+.cancel-btn:active {
+  transform: translateY(0);
+}
+
 /* Request Configuration Tabs */
 .request-config {
   background: var(--bg-white);

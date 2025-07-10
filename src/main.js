@@ -14,6 +14,7 @@ const store = new Store({
 });
 
 let mainWindow;
+let currentRequestController = null; // Track current request's AbortController
 
 function createWindow () {
     let mainWindowState = windowStateKeeper({
@@ -57,6 +58,9 @@ ipcMain.handle('send-api-request', async (event, requestOptions) => {
     try {
         console.log('Received request options:', requestOptions);
         
+        // Create a new AbortController for this request
+        currentRequestController = new AbortController();
+        
         // Get HTTP version settings
         const settings = store.get('settings', {});
         const httpVersion = settings.httpVersion || 'auto';
@@ -67,6 +71,7 @@ ipcMain.handle('send-api-request', async (event, requestOptions) => {
             url: requestOptions.url,
             headers: requestOptions.headers || {},
             timeout: 30000, // 30 second timeout
+            signal: currentRequestController.signal, // Add abort signal
         };
 
         // Apply HTTP version configuration
@@ -105,6 +110,9 @@ ipcMain.handle('send-api-request', async (event, requestOptions) => {
 
         const response = await axios(axiosConfig);
         
+        // Clear the controller on successful completion
+        currentRequestController = null;
+        
         // Return success result
         return {
             success: true,
@@ -116,8 +124,24 @@ ipcMain.handle('send-api-request', async (event, requestOptions) => {
     } catch (error) {
         console.error('API request error:', error);
         
+        // Clear the controller on error
+        currentRequestController = null;
+        
         // Create a serializable error object for IPC
         let serializedError;
+        
+        // Check if the error is due to cancellation
+        if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
+            return {
+                success: false,
+                message: "Request was cancelled",
+                status: null,
+                statusText: "Cancelled",
+                data: null,
+                headers: {},
+                cancelled: true
+            };
+        }
         
         if (error.response) {
             // Server responded with error status
@@ -166,6 +190,17 @@ ipcMain.handle('send-api-request', async (event, requestOptions) => {
         // Return the error instead of throwing it
         return serializedError;
     }
+});
+
+// --- IPC Handler for Cancelling Requests ---
+ipcMain.handle('cancel-api-request', async (event) => {
+    if (currentRequestController) {
+        console.log('Cancelling current request...');
+        currentRequestController.abort();
+        currentRequestController = null;
+        return { success: true, message: 'Request cancelled' };
+    }
+    return { success: false, message: 'No active request to cancel' };
 });
 
 ipcMain.handle('store:get', (event, key) => {

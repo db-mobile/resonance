@@ -143,6 +143,18 @@ button[type="submit"]:hover,
   border-color: #2563EB !important;
 }
 
+/* Cancel button */
+button.cancel-btn {
+  background: var(--color-error) !important;
+  color: white !important;
+  border-color: var(--color-error) !important;
+}
+
+button.cancel-btn:hover {
+  background: #DC2626 !important;
+  border-color: #DC2626 !important;
+}
+
 /* Method badges */
 .endpoint-method.get {
   background: var(--method-get-bg) !important;

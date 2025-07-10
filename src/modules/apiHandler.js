@@ -1,4 +1,4 @@
-import { urlInput, methodSelect, bodyInput, responseBodyDisplay, responseHeadersDisplay, responseLineNumbers } from './domElements.js';
+import { urlInput, methodSelect, bodyInput, sendRequestBtn, cancelRequestBtn, responseBodyDisplay, responseHeadersDisplay, responseLineNumbers } from './domElements.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { activateTab } from './tabManager.js'; // To ensure response tab is active
@@ -21,6 +21,36 @@ function displayResponseWithLineNumbers(content) {
 function clearResponseDisplay() {
     responseBodyDisplay.textContent = '';
     responseLineNumbers.textContent = '';
+}
+
+function setRequestInProgress(inProgress) {
+    if (inProgress) {
+        sendRequestBtn.style.display = 'none';
+        cancelRequestBtn.style.display = 'inline-block';
+        sendRequestBtn.disabled = true;
+    } else {
+        sendRequestBtn.style.display = 'inline-block';
+        cancelRequestBtn.style.display = 'none';
+        sendRequestBtn.disabled = false;
+    }
+}
+
+export async function handleCancelRequest() {
+    try {
+        const result = await window.electronAPI.cancelApiRequest();
+        console.log('Cancel result:', result);
+        
+        if (result.success) {
+            updateStatusDisplay('Request cancelled', null);
+            displayResponseWithLineNumbers('Request was cancelled by user');
+            responseHeadersDisplay.textContent = '';
+        }
+    } catch (error) {
+        console.error('Error cancelling request:', error);
+        updateStatusDisplay('Error cancelling request', null);
+    } finally {
+        setRequestInProgress(false);
+    }
 }
 
 export async function handleSendRequest() {
@@ -110,6 +140,9 @@ export async function handleSendRequest() {
     }
 
     try {
+        // Set UI to show request in progress
+        setRequestInProgress(true);
+        
         activateTab('response', 'response-body');
 
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -142,6 +175,13 @@ export async function handleSendRequest() {
             responseHeadersDisplay.textContent = headersString || 'No response headers.';
 
             updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
+            setRequestInProgress(false); // Reset UI state for successful requests
+        } else if (result.cancelled) {
+            // Handle cancelled request
+            updateStatusDisplay('Request cancelled', null);
+            displayResponseWithLineNumbers('Request was cancelled');
+            responseHeadersDisplay.textContent = '';
+            setRequestInProgress(false); // Reset UI state for cancelled requests
         } else {
             // Handle error response (but don't throw, handle it here)
             throw result; // This will be caught by the catch block below
@@ -191,5 +231,8 @@ export async function handleSendRequest() {
 
         updateStatusDisplay(statusDisplayText, status);
         console.error('API Error (via IPC):', error);
+    } finally {
+        // Always reset UI state when request completes
+        setRequestInProgress(false);
     }
 }

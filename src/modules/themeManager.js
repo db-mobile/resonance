@@ -5,7 +5,7 @@ export class ThemeManager {
     constructor() {
         this.currentTheme = 'system';
         this.currentThemeLink = null;
-        this.availableThemes = ['light', 'dark', 'system'];
+        this.availableThemes = ['light', 'dark', 'system', 'blueprint'];
         this.init();
     }
 
@@ -209,6 +209,17 @@ export class SettingsModal {
                                     <div class="theme-option-text">
                                         <span class="theme-name" data-i18n="theme.system">System</span>
                                         <span class="theme-description">Follow system preference</span>
+                                    </div>
+                                </div>
+                            </label>
+                            
+                            <label class="theme-option">
+                                <input type="radio" name="theme" value="blueprint" ${this.themeManager.getCurrentTheme() === 'blueprint' ? 'checked' : ''}>
+                                <div class="theme-option-content">
+                                    <div class="theme-preview blueprint-preview"></div>
+                                    <div class="theme-option-text">
+                                        <span class="theme-name" data-i18n="theme.blueprint">Blueprint</span>
+                                        <span class="theme-description">Technical schematic design</span>
                                     </div>
                                 </div>
                             </label>

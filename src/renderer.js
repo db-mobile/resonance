@@ -1,9 +1,9 @@
-import { sendRequestBtn, importCollectionBtn } from './modules/domElements.js';
+import { sendRequestBtn, cancelRequestBtn, importCollectionBtn } from './modules/domElements.js';
 
 import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
-import { handleSendRequest } from './modules/apiHandler.js';
+import { handleSendRequest, handleCancelRequest } from './modules/apiHandler.js';
 import { loadCollections, importOpenApiFile, initializeBodyTracking } from './modules/collectionManager.js';
 import { ThemeManager, SettingsModal } from './modules/themeManager.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
@@ -16,6 +16,7 @@ const httpVersionManager = new HttpVersionManager();
 const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager);
 
 sendRequestBtn.addEventListener('click', handleSendRequest);
+cancelRequestBtn.addEventListener('click', handleCancelRequest);
 importCollectionBtn.addEventListener('click', importOpenApiFile);
 
 // Settings button event listener
