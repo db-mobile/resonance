@@ -7,6 +7,7 @@ import { handleSendRequest } from './modules/apiHandler.js';
 import { loadCollections, importOpenApiFile, initializeBodyTracking } from './modules/collectionManager.js';
 import { ThemeManager, SettingsModal } from './modules/themeManager.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
+import { initResizer } from './modules/resizer.js';
 import { i18n } from './i18n/I18nManager.js';
 
 // Initialize theme manager, HTTP version manager, and internationalization
@@ -43,6 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initKeyValueListeners();
     initTabListeners();
     initializeBodyTracking();
+    initResizer();
 
     activateTab('response', 'response-body');
     activateTab('request', 'query-params');

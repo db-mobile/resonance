@@ -536,6 +536,9 @@ body {
 .request-config {
   background: var(--bg-white);
   border-bottom: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .tab-nav {
@@ -570,10 +573,13 @@ body {
 .tab-content {
   display: none;
   padding: var(--space-2);
+  flex: 1;
+  overflow-y: auto;
 }
 
 .tab-content.active {
-  display: block;
+  display: flex;
+  flex-direction: column;
 }
 
 .tab-content h3 {
@@ -689,6 +695,52 @@ body {
   color: var(--text-tertiary);
 }
 
+/* Resizer Handle */
+.resizer-handle {
+  height: 8px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-light);
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.resizer-handle:hover {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.resizer-handle.dragging {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.resizer-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.resizer-line {
+  width: 20px;
+  height: 1px;
+  background: var(--text-tertiary);
+  border-radius: 1px;
+  opacity: 0.5;
+}
+
+.resizer-handle:hover .resizer-line {
+  background: var(--color-primary);
+  opacity: 1;
+}
+
 /* Response Area */
 .response-area {
   flex: 1;
@@ -696,6 +748,7 @@ body {
   flex-direction: column;
   overflow: hidden;
   background: var(--bg-white);
+  min-height: 200px;
 }
 
 .response-header {
