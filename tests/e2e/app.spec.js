@@ -8,7 +8,10 @@ test.describe('Resonance App', () => {
   test.beforeAll(async () => {
     // Launch Electron app
     electronApp = await electron.launch({
-      args: ['./src/main.js'],
+      args: [
+        './src/main.js',
+        ...(process.env.CI ? ['--no-sandbox', '--disable-setuid-sandbox'] : [])
+      ],
       env: {
         ...process.env,
         NODE_ENV: 'test'

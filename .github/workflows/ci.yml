@@ -137,6 +137,7 @@ jobs:
       run: xvfb-run --auto-servernum npm run test:e2e
       env:
         DISPLAY: ':99.0'
+        CI: true
 
   release:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
