@@ -132,12 +132,18 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y xvfb
+        
+    - name: Fix chrome-sandbox permissions
+      run: |
+        sudo chown root:root node_modules/electron/dist/chrome-sandbox || true
+        sudo chmod 4755 node_modules/electron/dist/chrome-sandbox || true
     
     - name: Run E2E tests
       run: xvfb-run --auto-servernum npm run test:e2e
       env:
         DISPLAY: ':99.0'
         CI: true
+        ELECTRON_DISABLE_SANDBOX: 1
 
   release:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
