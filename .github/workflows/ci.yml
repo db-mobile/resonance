@@ -149,4 +149,4 @@ jobs:
 
         Changes in this release:
         - See commit history for details" \
-          ./out/make/zip/linux/x64/electron-linux-x64-1.0.0.zip
+          ./out/make/zip/linux/x64/resonance-linux-x64-1.0.0.zip
