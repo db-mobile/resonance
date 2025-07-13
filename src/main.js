@@ -15,6 +15,10 @@ if (process.env.CI || process.env.NODE_ENV === 'test') {
     app.commandLine.appendSwitch('disable-gpu');
     app.commandLine.appendSwitch('disable-web-security');
     app.commandLine.appendSwitch('disable-features', 'VizDisplayCompositor');
+    app.commandLine.appendSwitch('disable-background-timer-throttling');
+    app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+    app.commandLine.appendSwitch('disable-renderer-backgrounding');
+    app.commandLine.appendSwitch('disable-ipc-flooding-protection');
 }
 
 const store = new Store({
