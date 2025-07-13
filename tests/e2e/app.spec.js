@@ -7,11 +7,18 @@ test.describe('Resonance App', () => {
 
   test.beforeAll(async () => {
     // Launch Electron app
+    const ciFlags = process.env.CI ? [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-extensions',
+      '--disable-gpu',
+      '--disable-web-security',
+      '--disable-features=VizDisplayCompositor'
+    ] : [];
+    
     electronApp = await electron.launch({
-      args: [
-        './src/main.js',
-        ...(process.env.CI ? ['--no-sandbox', '--disable-setuid-sandbox'] : [])
-      ],
+      args: ['./src/main.js', ...ciFlags],
       env: {
         ...process.env,
         NODE_ENV: 'test'

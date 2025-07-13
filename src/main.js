@@ -6,6 +6,17 @@ import windowStateKeeper from 'electron-window-state';
 import axios from 'axios';
 import yaml from 'js-yaml';
 
+// Add Chrome command line switches for CI environments
+if (process.env.CI || process.env.NODE_ENV === 'test') {
+    app.commandLine.appendSwitch('no-sandbox');
+    app.commandLine.appendSwitch('disable-setuid-sandbox');
+    app.commandLine.appendSwitch('disable-dev-shm-usage');
+    app.commandLine.appendSwitch('disable-extensions');
+    app.commandLine.appendSwitch('disable-gpu');
+    app.commandLine.appendSwitch('disable-web-security');
+    app.commandLine.appendSwitch('disable-features', 'VizDisplayCompositor');
+}
+
 const store = new Store({
     name: 'api-collections',
     defaults: {
