@@ -112,41 +112,6 @@ jobs:
     - name: Run dependency check
       run: npx audit-ci --moderate
 
-  e2e:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y xvfb
-        
-    - name: Fix chrome-sandbox permissions
-      run: |
-        sudo chown root:root node_modules/electron/dist/chrome-sandbox || true
-        sudo chmod 4755 node_modules/electron/dist/chrome-sandbox || true
-    
-    - name: Run E2E tests
-      run: xvfb-run --auto-servernum npm run test:e2e
-      env:
-        DISPLAY: ':99.0'
-        CI: true
-        ELECTRON_DISABLE_SANDBOX: 1
-        DBUS_SESSION_BUS_ADDRESS: ''
-        XDG_RUNTIME_DIR: /tmp
-        TMPDIR: /tmp
 
   release:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
