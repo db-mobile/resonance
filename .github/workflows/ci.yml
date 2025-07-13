@@ -117,6 +117,9 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [test, lint, build, security]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     
     steps:
     - name: Checkout code
@@ -137,27 +140,13 @@ jobs:
       run: npm run make
     
     - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v${{ github.run_number }}
-        release_name: Release v${{ github.run_number }}
-        body: |
-          Automated release created by GitHub Actions
-          
-          Changes in this release:
-          - See commit history for details
-        draft: false
-        prerelease: false
-    
-    - name: Upload Release Assets
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./out/make/zip/linux/x64/electron-linux-x64-1.0.0.zip
-        asset_name: resonance-linux-x64.zip
-        asset_content_type: application/zip
+      run: |
+        gh release create "v${{ github.run_number }}" \
+          --title "Release v${{ github.run_number }}" \
+          --notes "Automated release created by GitHub Actions
+
+        Changes in this release:
+        - See commit history for details" \
+          ./out/make/zip/linux/x64/electron-linux-x64-1.0.0.zip
