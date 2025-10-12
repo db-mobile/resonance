@@ -52,15 +52,43 @@ export class CollectionService {
     async deleteCollection(collectionId) {
         try {
             this.statusDisplay.update('Deleting collection...', null);
-            
+
             await this.repository.delete(collectionId);
-            
+
             this.statusDisplay.update('Collection deleted successfully', null);
             return true;
         } catch (error) {
             this.statusDisplay.update(`Error deleting collection: ${error.message}`, null);
             throw error;
         }
+    }
+
+    async createCollection(name) {
+        try {
+            this.statusDisplay.update('Creating collection...', null);
+
+            const newCollection = {
+                id: this.generateCollectionId(),
+                name: name,
+                baseUrl: '',
+                endpoints: [],
+                folders: [],
+                defaultHeaders: {},
+                _openApiSpec: null
+            };
+
+            const createdCollection = await this.repository.add(newCollection);
+
+            this.statusDisplay.update(`Collection "${name}" created successfully`, null);
+            return createdCollection;
+        } catch (error) {
+            this.statusDisplay.update(`Error creating collection: ${error.message}`, null);
+            throw error;
+        }
+    }
+
+    generateCollectionId() {
+        return `collection_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     }
 
     async addRequestToCollection(collectionId, requestData) {
@@ -142,9 +170,51 @@ export class CollectionService {
         // Remove leading slash and extract first path segment
         const cleanPath = pathKey.replace(/^\//, '');
         const segments = cleanPath.split('/');
-        
+
         // Return the first segment, or 'custom' if no segments or root
         return segments[0] || 'custom';
+    }
+
+    async deleteRequestFromCollection(collectionId, endpointId) {
+        try {
+            this.statusDisplay.update('Deleting request...', null);
+
+            const collection = await this.repository.getById(collectionId);
+            if (!collection) {
+                throw new Error(`Collection with id ${collectionId} not found`);
+            }
+
+            // Remove from main endpoints array
+            if (collection.endpoints) {
+                collection.endpoints = collection.endpoints.filter(endpoint => endpoint.id !== endpointId);
+            }
+
+            // Remove from folders if collection has folder structure
+            if (collection.folders && collection.folders.length > 0) {
+                collection.folders.forEach(folder => {
+                    if (folder.endpoints) {
+                        folder.endpoints = folder.endpoints.filter(endpoint => endpoint.id !== endpointId);
+                    }
+                });
+
+                // Remove empty folders
+                collection.folders = collection.folders.filter(folder => {
+                    return folder.endpoints && folder.endpoints.length > 0;
+                });
+            }
+
+            // Save the updated collection
+            await this.repository.update(collectionId, collection);
+
+            // Clean up persisted data for this endpoint
+            await this.repository.deletePersistedEndpointData(collectionId, endpointId);
+
+            this.statusDisplay.update('Request deleted successfully', null);
+            return true;
+        } catch (error) {
+            this.statusDisplay.update(`Error deleting request: ${error.message}`, null);
+            throw error;
+        }
     }
 
     async loadEndpointIntoForm(collection, endpoint, formElements) {

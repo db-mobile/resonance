@@ -21,11 +21,33 @@
     "import_success": "Collezione importata con successo",
     "import_error": "Errore nell'importazione della collezione"
   },
+  "endpoint": {
+    "confirm_delete": "Sei sicuro di voler eliminare la richiesta \"{{name}}\"?\n\nQuesta azione non può essere annullata."
+  },
   "context_menu": {
+    "new_collection": "Nuova collezione",
     "new_request": "Nuova richiesta",
     "manage_variables": "Gestisci variabili",
     "rename_collection": "Rinomina collezione",
-    "delete_collection": "Elimina collezione"
+    "delete_collection": "Elimina collezione",
+    "delete_request": "Elimina richiesta"
+  },
+  "new_request": {
+    "title": "Crea nuova richiesta",
+    "name_label": "Nome della richiesta:",
+    "name_placeholder": "La mia richiesta",
+    "method_label": "Metodo:",
+    "path_label": "Percorso:",
+    "path_placeholder": "/api/endpoint",
+    "create": "Crea",
+    "cancel": "Annulla"
+  },
+  "new_collection": {
+    "title": "Crea nuova collezione",
+    "name_label": "Nome della collezione:",
+    "name_placeholder": "La mia collezione",
+    "create": "Crea",
+    "cancel": "Annulla"
   },
   "request": {
     "method": "Metodo",

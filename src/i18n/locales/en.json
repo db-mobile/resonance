@@ -21,11 +21,16 @@
     "import_success": "Collection imported successfully",
     "import_error": "Failed to import collection"
   },
+  "endpoint": {
+    "confirm_delete": "Are you sure you want to delete the request \"{{name}}\"?\n\nThis action cannot be undone."
+  },
   "context_menu": {
+    "new_collection": "New Collection",
     "new_request": "New Request",
-    "manage_variables": "Manage Variables", 
+    "manage_variables": "Manage Variables",
     "rename_collection": "Rename Collection",
-    "delete_collection": "Delete Collection"
+    "delete_collection": "Delete Collection",
+    "delete_request": "Delete Request"
   },
   "new_request": {
     "title": "Create New Request",
@@ -34,6 +39,13 @@
     "method_label": "Method:",
     "path_label": "Path:",
     "path_placeholder": "/api/endpoint",
+    "create": "Create",
+    "cancel": "Cancel"
+  },
+  "new_collection": {
+    "title": "Create New Collection",
+    "name_label": "Collection Name:",
+    "name_placeholder": "My Collection",
     "create": "Create",
     "cancel": "Cancel"
   },

@@ -37,10 +37,15 @@ export class CollectionController {
         // Bind methods to preserve context
         this.handleEndpointClick = this.handleEndpointClick.bind(this);
         this.handleContextMenu = this.handleContextMenu.bind(this);
+        this.handleEndpointContextMenu = this.handleEndpointContextMenu.bind(this);
+        this.handleEmptySpaceContextMenu = this.handleEmptySpaceContextMenu.bind(this);
         this.handleRename = this.handleRename.bind(this);
         this.handleDelete = this.handleDelete.bind(this);
+        this.handleDeleteRequest = this.handleDeleteRequest.bind(this);
         this.handleVariables = this.handleVariables.bind(this);
         this.handleNewRequest = this.handleNewRequest.bind(this);
+        this.handleNewCollection = this.handleNewCollection.bind(this);
+        this.handleNewRequestInEmptySpace = this.handleNewRequestInEmptySpace.bind(this);
     }
 
     async loadCollections() {
@@ -68,9 +73,11 @@ export class CollectionController {
     async renderCollections(collections, preserveExpansionState = false) {
         const eventHandlers = {
             onEndpointClick: this.handleEndpointClick,
-            onContextMenu: this.handleContextMenu
+            onContextMenu: this.handleContextMenu,
+            onEndpointContextMenu: this.handleEndpointContextMenu,
+            onEmptySpaceContextMenu: this.handleEmptySpaceContextMenu
         };
-        
+
         await this.renderer.renderCollections(collections, eventHandlers, preserveExpansionState);
     }
 
@@ -112,6 +119,39 @@ export class CollectionController {
                 icon: ContextMenu.createDeleteIcon(),
                 className: 'context-menu-delete',
                 onClick: () => this.handleDelete(collection)
+            }
+        ];
+
+        this.contextMenu.show(event, menuItems);
+    }
+
+    handleEndpointContextMenu(event, collection, endpoint) {
+        const menuItems = [
+            {
+                label: 'Delete Request',
+                translationKey: 'context_menu.delete_request',
+                icon: ContextMenu.createDeleteIcon(),
+                className: 'context-menu-delete',
+                onClick: () => this.handleDeleteRequest(collection, endpoint)
+            }
+        ];
+
+        this.contextMenu.show(event, menuItems);
+    }
+
+    handleEmptySpaceContextMenu(event) {
+        const menuItems = [
+            {
+                label: 'New Collection',
+                translationKey: 'context_menu.new_collection',
+                icon: ContextMenu.createNewRequestIcon(),
+                onClick: () => this.handleNewCollection()
+            },
+            {
+                label: 'New Request',
+                translationKey: 'context_menu.new_request',
+                icon: ContextMenu.createNewRequestIcon(),
+                onClick: () => this.handleNewRequestInEmptySpace()
             }
         ];
 
@@ -161,20 +201,124 @@ export class CollectionController {
         }
     }
 
+    async handleNewCollection() {
+        try {
+            const collectionName = await this.showNewCollectionDialog();
+            if (collectionName) {
+                await this.service.createCollection(collectionName);
+                await this.loadCollections(); // Refresh display
+            }
+        } catch (error) {
+            console.error('Error creating new collection:', error);
+        }
+    }
+
+    async handleNewRequestInEmptySpace() {
+        try {
+            const requestData = await this.showNewRequestDialog();
+            if (requestData) {
+                // First, ask for collection name
+                const collectionName = await this.showNewCollectionDialog();
+                if (collectionName) {
+                    // Create the collection
+                    const newCollection = await this.service.createCollection(collectionName);
+                    // Add the request to the new collection
+                    await this.service.addRequestToCollection(newCollection.id, requestData);
+                    await this.loadCollections(); // Refresh display
+                }
+            }
+        } catch (error) {
+            console.error('Error creating new request and collection:', error);
+        }
+    }
+
+    async showNewCollectionDialog() {
+        return new Promise((resolve) => {
+            const dialog = document.createElement('div');
+            dialog.className = 'new-request-dialog-overlay';
+            dialog.innerHTML = `
+                <div class="new-request-dialog">
+                    <h3 data-i18n="new_collection.title">Create New Collection</h3>
+                    <form id="new-collection-form">
+                        <div class="form-group">
+                            <label for="collection-name" data-i18n="new_collection.name_label">Collection Name:</label>
+                            <input type="text" id="collection-name" data-i18n-placeholder="new_collection.name_placeholder" placeholder="My Collection" required>
+                        </div>
+                        <div class="form-buttons">
+                            <button type="button" id="cancel-btn" data-i18n="new_collection.cancel">Cancel</button>
+                            <button type="submit" id="create-btn" data-i18n="new_collection.create">Create</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            document.body.appendChild(dialog);
+
+            // Trigger translation for the dialog
+            if (window.i18n && window.i18n.updateUI) {
+                window.i18n.updateUI();
+            }
+
+            const form = dialog.querySelector('#new-collection-form');
+            const nameInput = dialog.querySelector('#collection-name');
+            const cancelBtn = dialog.querySelector('#cancel-btn');
+
+            // Focus on name input
+            nameInput.focus();
+
+            const cleanup = () => {
+                dialog.remove();
+            };
+
+            cancelBtn.addEventListener('click', () => {
+                cleanup();
+                resolve(null);
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = nameInput.value.trim();
+
+                if (name) {
+                    cleanup();
+                    resolve(name);
+                }
+            });
+
+            // Close on overlay click
+            dialog.addEventListener('click', (e) => {
+                if (e.target === dialog) {
+                    cleanup();
+                    resolve(null);
+                }
+            });
+
+            // Close on escape key
+            const escapeHandler = (e) => {
+                if (e.key === 'Escape') {
+                    cleanup();
+                    resolve(null);
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
+        });
+    }
+
     async showNewRequestDialog() {
         return new Promise((resolve) => {
             const dialog = document.createElement('div');
             dialog.className = 'new-request-dialog-overlay';
             dialog.innerHTML = `
                 <div class="new-request-dialog">
-                    <h3>Create New Request</h3>
+                    <h3 data-i18n="new_request.title">Create New Request</h3>
                     <form id="new-request-form">
                         <div class="form-group">
-                            <label for="request-name">Request Name:</label>
-                            <input type="text" id="request-name" placeholder="My Request" required>
+                            <label for="request-name" data-i18n="new_request.name_label">Request Name:</label>
+                            <input type="text" id="request-name" data-i18n-placeholder="new_request.name_placeholder" placeholder="My Request" required>
                         </div>
                         <div class="form-group">
-                            <label for="request-method">Method:</label>
+                            <label for="request-method" data-i18n="new_request.method_label">Method:</label>
                             <select id="request-method" required>
                                 <option value="GET">GET</option>
                                 <option value="POST">POST</option>
@@ -184,12 +328,12 @@ export class CollectionController {
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="request-path">Path:</label>
-                            <input type="text" id="request-path" placeholder="/api/endpoint" required>
+                            <label for="request-path" data-i18n="new_request.path_label">Path:</label>
+                            <input type="text" id="request-path" data-i18n-placeholder="new_request.path_placeholder" placeholder="/api/endpoint" required>
                         </div>
                         <div class="form-buttons">
-                            <button type="button" id="cancel-btn">Cancel</button>
-                            <button type="submit" id="create-btn">Create</button>
+                            <button type="button" id="cancel-btn" data-i18n="new_request.cancel">Cancel</button>
+                            <button type="submit" id="create-btn" data-i18n="new_request.create">Create</button>
                         </div>
                     </form>
                 </div>
@@ -197,12 +341,16 @@ export class CollectionController {
 
             document.body.appendChild(dialog);
 
+            // Trigger translation for the dialog
+            if (window.i18n && window.i18n.updateUI) {
+                window.i18n.updateUI();
+            }
+
             const form = dialog.querySelector('#new-request-form');
             const nameInput = dialog.querySelector('#request-name');
             const methodSelect = dialog.querySelector('#request-method');
             const pathInput = dialog.querySelector('#request-path');
             const cancelBtn = dialog.querySelector('#cancel-btn');
-            const createBtn = dialog.querySelector('#create-btn');
 
             // Focus on name input
             nameInput.focus();
@@ -254,12 +402,12 @@ export class CollectionController {
 
     async handleDelete(collection) {
         // Get translated confirmation message
-        const confirmMessage = window.i18n ? 
+        const confirmMessage = window.i18n ?
             window.i18n.t('collection.confirm_delete', { name: collection.name }) :
             `Are you sure you want to delete the collection "${collection.name}"?\n\nThis action cannot be undone.`;
-            
+
         const confirmed = confirm(confirmMessage);
-        
+
         if (confirmed) {
             try {
                 await this.service.deleteCollection(collection.id);
@@ -267,6 +415,38 @@ export class CollectionController {
                 await this.loadCollections(); // Refresh display
             } catch (error) {
                 console.error('Error deleting collection:', error);
+            }
+        }
+    }
+
+    async handleDeleteRequest(collection, endpoint) {
+        // Get translated confirmation message
+        const confirmMessage = window.i18n ?
+            window.i18n.t('endpoint.confirm_delete', { name: endpoint.name || endpoint.path }) :
+            `Are you sure you want to delete the request "${endpoint.name || endpoint.path}"?\n\nThis action cannot be undone.`;
+
+        const confirmed = confirm(confirmMessage);
+
+        if (confirmed) {
+            try {
+                await this.service.deleteRequestFromCollection(collection.id, endpoint.id);
+
+                // Clear the form if the deleted endpoint was currently loaded
+                if (window.currentEndpoint &&
+                    window.currentEndpoint.collectionId === collection.id &&
+                    window.currentEndpoint.endpointId === endpoint.id) {
+                    const formElements = this.getFormElements();
+                    formElements.urlInput.value = '';
+                    formElements.methodSelect.value = 'GET';
+                    formElements.bodyInput.value = '';
+                    this.service.clearKeyValueList(formElements.headersList);
+                    this.service.clearKeyValueList(formElements.queryParamsList);
+                    window.currentEndpoint = null;
+                }
+
+                await this.loadCollectionsWithExpansionState(); // Refresh display preserving state
+            } catch (error) {
+                console.error('Error deleting request:', error);
             }
         }
     }

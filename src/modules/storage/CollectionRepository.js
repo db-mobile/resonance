@@ -145,4 +145,34 @@ export class CollectionRepository {
             throw new Error(`Failed to save collection expansion states: ${error.message}`);
         }
     }
+
+    async deletePersistedEndpointData(collectionId, endpointId) {
+        try {
+            const key = `${collectionId}_${endpointId}`;
+
+            // Delete modified request body
+            const modifiedBodies = await this.electronAPI.store.get(this.MODIFIED_BODIES_KEY) || {};
+            if (modifiedBodies[key]) {
+                delete modifiedBodies[key];
+                await this.electronAPI.store.set(this.MODIFIED_BODIES_KEY, modifiedBodies);
+            }
+
+            // Delete persisted query params
+            const persistedParams = await this.electronAPI.store.get('persistedQueryParams') || {};
+            if (persistedParams[key]) {
+                delete persistedParams[key];
+                await this.electronAPI.store.set('persistedQueryParams', persistedParams);
+            }
+
+            // Delete persisted headers
+            const persistedHeaders = await this.electronAPI.store.get('persistedHeaders') || {};
+            if (persistedHeaders[key]) {
+                delete persistedHeaders[key];
+                await this.electronAPI.store.set('persistedHeaders', persistedHeaders);
+            }
+        } catch (error) {
+            console.error('Error deleting persisted endpoint data:', error);
+            throw new Error(`Failed to delete persisted endpoint data: ${error.message}`);
+        }
+    }
 }

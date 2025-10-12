@@ -21,11 +21,33 @@
     "import_success": "Sammlung erfolgreich importiert",
     "import_error": "Fehler beim Importieren der Sammlung"
   },
+  "endpoint": {
+    "confirm_delete": "Sind Sie sicher, dass Sie die Anfrage \"{{name}}\" löschen möchten?\n\nDiese Aktion kann nicht rückgängig gemacht werden."
+  },
   "context_menu": {
+    "new_collection": "Neue Sammlung",
     "new_request": "Neue Anfrage",
     "manage_variables": "Variablen verwalten",
-    "rename_collection": "Sammlung umbenennen", 
-    "delete_collection": "Sammlung löschen"
+    "rename_collection": "Sammlung umbenennen",
+    "delete_collection": "Sammlung löschen",
+    "delete_request": "Anfrage löschen"
+  },
+  "new_request": {
+    "title": "Neue Anfrage erstellen",
+    "name_label": "Anfragename:",
+    "name_placeholder": "Meine Anfrage",
+    "method_label": "Methode:",
+    "path_label": "Pfad:",
+    "path_placeholder": "/api/endpoint",
+    "create": "Erstellen",
+    "cancel": "Abbrechen"
+  },
+  "new_collection": {
+    "title": "Neue Sammlung erstellen",
+    "name_label": "Sammlungsname:",
+    "name_placeholder": "Meine Sammlung",
+    "create": "Erstellen",
+    "cancel": "Abbrechen"
   },
   "request": {
     "method": "Methode",

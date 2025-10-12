@@ -9,6 +9,7 @@ export class CollectionRenderer {
             throw new Error(`Container with id '${containerId}' not found`);
         }
         this.repository = repository;
+        this.emptySpaceContextMenuHandler = null;
     }
 
     renderEmptyState() {
@@ -24,11 +25,25 @@ export class CollectionRenderer {
     }
 
     async renderCollections(collections, eventHandlers = {}, preserveExpansionState = false) {
+        // Remove old context menu handler if it exists
+        if (this.emptySpaceContextMenuHandler) {
+            this.container.removeEventListener('contextmenu', this.emptySpaceContextMenuHandler);
+            this.emptySpaceContextMenuHandler = null;
+        }
+
         if (collections.length === 0) {
             this.renderEmptyState();
             // Trigger translation for empty state
             if (window.i18n && window.i18n.updateUI) {
                 window.i18n.updateUI();
+            }
+            // Add context menu to empty state
+            if (eventHandlers.onEmptySpaceContextMenu) {
+                this.emptySpaceContextMenuHandler = (e) => {
+                    e.preventDefault();
+                    eventHandlers.onEmptySpaceContextMenu(e);
+                };
+                this.container.addEventListener('contextmenu', this.emptySpaceContextMenuHandler);
             }
             return;
         }
@@ -45,6 +60,18 @@ export class CollectionRenderer {
             this.container.appendChild(collectionElement);
         });
 
+        // Add context menu to empty spaces between collections
+        if (eventHandlers.onEmptySpaceContextMenu) {
+            this.emptySpaceContextMenuHandler = (e) => {
+                // Only trigger if clicking on the container itself (empty space)
+                if (e.target === this.container) {
+                    e.preventDefault();
+                    eventHandlers.onEmptySpaceContextMenu(e);
+                }
+            };
+            this.container.addEventListener('contextmenu', this.emptySpaceContextMenuHandler);
+        }
+
         // Restore expansion state
         if (preserveExpansionState) {
             // Use in-memory state for re-renders
@@ -53,7 +80,7 @@ export class CollectionRenderer {
             // Load from persistent storage for initial renders
             await this.loadAndRestoreExpansionState();
         }
-        
+
         // Trigger translation for newly rendered collections
         if (window.i18n && window.i18n.updateUI) {
             window.i18n.updateUI();
@@ -177,6 +204,15 @@ export class CollectionRenderer {
             endpointDiv.addEventListener('click', (e) => {
                 e.stopPropagation();
                 eventHandlers.onEndpointClick(collection, endpoint);
+            });
+        }
+
+        // Add context menu for endpoints
+        if (eventHandlers.onEndpointContextMenu) {
+            endpointDiv.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                eventHandlers.onEndpointContextMenu(e, collection, endpoint);
             });
         }
 

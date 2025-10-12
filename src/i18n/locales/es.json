@@ -21,11 +21,33 @@
     "import_success": "Colección importada con éxito",
     "import_error": "Error al importar la colección"
   },
+  "endpoint": {
+    "confirm_delete": "¿Estás seguro de que quieres eliminar la solicitud \"{{name}}\"?\n\nEsta acción no se puede deshacer."
+  },
   "context_menu": {
+    "new_collection": "Nueva colección",
     "new_request": "Nueva solicitud",
     "manage_variables": "Gestionar variables",
     "rename_collection": "Renombrar colección",
-    "delete_collection": "Eliminar colección"
+    "delete_collection": "Eliminar colección",
+    "delete_request": "Eliminar solicitud"
+  },
+  "new_request": {
+    "title": "Crear nueva solicitud",
+    "name_label": "Nombre de la solicitud:",
+    "name_placeholder": "Mi solicitud",
+    "method_label": "Método:",
+    "path_label": "Ruta:",
+    "path_placeholder": "/api/endpoint",
+    "create": "Crear",
+    "cancel": "Cancelar"
+  },
+  "new_collection": {
+    "title": "Crear nueva colección",
+    "name_label": "Nombre de la colección:",
+    "name_placeholder": "Mi colección",
+    "create": "Crear",
+    "cancel": "Cancelar"
   },
   "request": {
     "method": "Método",

@@ -5,6 +5,8 @@
 export class ContextMenu {
     constructor() {
         this.currentMenu = null;
+        this.clickHandler = null;
+        this.contextMenuHandler = null;
     }
 
     show(event, menuItems) {
@@ -74,10 +76,32 @@ export class ContextMenu {
     }
 
     attachCloseHandlers() {
+        // Remove any existing handlers first
+        this.removeCloseHandlers();
+
+        // Create new handler references
+        this.clickHandler = () => this.hide();
+        this.contextMenuHandler = (e) => {
+            e.preventDefault();
+            this.hide();
+        };
+
+        // Add handlers with a small delay to avoid immediate triggering
         setTimeout(() => {
-            document.addEventListener('click', () => this.hide(), { once: true });
-            document.addEventListener('contextmenu', () => this.hide(), { once: true });
+            document.addEventListener('click', this.clickHandler);
+            document.addEventListener('contextmenu', this.contextMenuHandler);
         }, 0);
+    }
+
+    removeCloseHandlers() {
+        if (this.clickHandler) {
+            document.removeEventListener('click', this.clickHandler);
+            this.clickHandler = null;
+        }
+        if (this.contextMenuHandler) {
+            document.removeEventListener('contextmenu', this.contextMenuHandler);
+            this.contextMenuHandler = null;
+        }
     }
 
     hide() {
@@ -85,6 +109,8 @@ export class ContextMenu {
             this.currentMenu.remove();
             this.currentMenu = null;
         }
+        // Clean up event listeners when hiding
+        this.removeCloseHandlers();
     }
 
     static createRenameIcon() {
