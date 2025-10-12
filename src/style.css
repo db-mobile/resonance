@@ -791,6 +791,13 @@ body {
   margin: 0;
 }
 
+.status-info-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: flex-end;
+}
+
 .status-display {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
@@ -799,6 +806,18 @@ body {
   margin: 0;
   border: 1px solid var(--border-light);
   background: var(--bg-white);
+}
+
+.response-time-display {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  margin: 0;
+  border: 1px solid var(--border-light);
+  background: var(--bg-white);
+  color: var(--text-secondary);
+  display: none;
 }
 
 .status-success {

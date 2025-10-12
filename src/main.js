@@ -55,16 +55,18 @@ app.on('window-all-closed', function () {
 
 // --- IPC Handler for API Requests ---
 ipcMain.handle('send-api-request', async (event, requestOptions) => {
+    let startTime = Date.now(); // Declare at function scope
+
     try {
         console.log('Received request options:', requestOptions);
-        
+
         // Create a new AbortController for this request
         currentRequestController = new AbortController();
-        
+
         // Get HTTP version settings
         const settings = store.get('settings', {});
         const httpVersion = settings.httpVersion || 'auto';
-        
+
         // Prepare the axios config
         const axiosConfig = {
             method: requestOptions.method,
@@ -108,28 +110,34 @@ ipcMain.handle('send-api-request', async (event, requestOptions) => {
 
         console.log('Axios config:', axiosConfig);
 
+        startTime = Date.now(); // Reset timing just before request
         const response = await axios(axiosConfig);
-        
+        const ttfb = Date.now() - startTime;
+
         // Clear the controller on successful completion
         currentRequestController = null;
-        
+
         // Return success result
         return {
             success: true,
             data: response.data,
             status: response.status,
             statusText: response.statusText,
-            headers: JSON.parse(JSON.stringify(response.headers))
+            headers: JSON.parse(JSON.stringify(response.headers)),
+            ttfb: ttfb
         };
     } catch (error) {
         console.error('API request error:', error);
-        
+
+        // Calculate TTFB even for errors
+        const ttfb = Date.now() - startTime;
+
         // Clear the controller on error
         currentRequestController = null;
-        
+
         // Create a serializable error object for IPC
         let serializedError;
-        
+
         // Check if the error is due to cancellation
         if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
             return {
@@ -142,7 +150,7 @@ ipcMain.handle('send-api-request', async (event, requestOptions) => {
                 cancelled: true
             };
         }
-        
+
         if (error.response) {
             // Server responded with error status
             serializedError = {
@@ -151,7 +159,8 @@ ipcMain.handle('send-api-request', async (event, requestOptions) => {
                 status: error.response.status,
                 statusText: error.response.statusText,
                 data: error.response.data,
-                headers: {}
+                headers: {},
+                ttfb: ttfb
             };
             
             // Safely serialize headers
@@ -172,7 +181,8 @@ ipcMain.handle('send-api-request', async (event, requestOptions) => {
                 status: null,
                 statusText: null,
                 data: null,
-                headers: {}
+                headers: {},
+                ttfb: ttfb
             };
         } else {
             // Something else happened
@@ -182,7 +192,8 @@ ipcMain.handle('send-api-request', async (event, requestOptions) => {
                 status: null,
                 statusText: null,
                 data: null,
-                headers: {}
+                headers: {},
+                ttfb: ttfb
             };
         }
         

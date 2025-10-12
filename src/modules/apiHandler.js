@@ -1,5 +1,5 @@
 import { urlInput, methodSelect, bodyInput, sendRequestBtn, cancelRequestBtn, responseBodyDisplay, responseHeadersDisplay, responseLineNumbers } from './domElements.js';
-import { updateStatusDisplay } from './statusDisplay.js';
+import { updateStatusDisplay, updateResponseTime } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { activateTab } from './tabManager.js'; // To ensure response tab is active
 import { saveRequestBodyModification } from './collectionManager.js';
@@ -39,15 +39,17 @@ export async function handleCancelRequest() {
     try {
         const result = await window.electronAPI.cancelApiRequest();
         console.log('Cancel result:', result);
-        
+
         if (result.success) {
             updateStatusDisplay('Request cancelled', null);
+            updateResponseTime(null);
             displayResponseWithLineNumbers('Request was cancelled by user');
             responseHeadersDisplay.textContent = '';
         }
     } catch (error) {
         console.error('Error cancelling request:', error);
         updateStatusDisplay('Error cancelling request', null);
+        updateResponseTime(null);
     } finally {
         setRequestInProgress(false);
     }
@@ -175,10 +177,12 @@ export async function handleSendRequest() {
             responseHeadersDisplay.textContent = headersString || 'No response headers.';
 
             updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
+            updateResponseTime(result.ttfb);
             setRequestInProgress(false); // Reset UI state for successful requests
         } else if (result.cancelled) {
             // Handle cancelled request
             updateStatusDisplay('Request cancelled', null);
+            updateResponseTime(null);
             displayResponseWithLineNumbers('Request was cancelled');
             responseHeadersDisplay.textContent = '';
             setRequestInProgress(false); // Reset UI state for cancelled requests
@@ -230,6 +234,7 @@ export async function handleSendRequest() {
         }
 
         updateStatusDisplay(statusDisplayText, status);
+        updateResponseTime(error.ttfb);
         console.error('API Error (via IPC):', error);
     } finally {
         // Always reset UI state when request completes

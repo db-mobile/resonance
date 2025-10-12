@@ -4,6 +4,7 @@ export const bodyInput = document.getElementById('body-input');
 export const sendRequestBtn = document.getElementById('send-request-btn');
 export const cancelRequestBtn = document.getElementById('cancel-request-btn');
 export const statusDisplay = document.getElementById('status-display');
+export const responseTimeDisplay = document.getElementById('response-time-display');
 
 export const headersList = document.getElementById('headers-list');
 export const addHeaderBtn = document.getElementById('add-header-btn');

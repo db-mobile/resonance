@@ -1,4 +1,4 @@
-import { statusDisplay } from './domElements.js';
+import { statusDisplay, responseTimeDisplay } from './domElements.js';
 
 export function updateStatusDisplay(statusText, statusCode = null) {
     statusDisplay.classList.remove('status-success', 'status-redirect', 'status-client-error', 'status-server-error', 'status-info');
@@ -19,5 +19,15 @@ export function updateStatusDisplay(statusText, statusCode = null) {
         }
     } else {
         statusDisplay.classList.add('status-info');
+    }
+}
+
+export function updateResponseTime(timeInMs) {
+    if (timeInMs !== null && timeInMs !== undefined) {
+        responseTimeDisplay.textContent = `TTFB: ${timeInMs}ms`;
+        responseTimeDisplay.style.display = 'block';
+    } else {
+        responseTimeDisplay.textContent = '';
+        responseTimeDisplay.style.display = 'none';
     }
 }

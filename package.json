@@ -7,7 +7,7 @@
   "type": "module",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron-forge start",
+    "start": "electron-forge start -- --no-sandbox",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
