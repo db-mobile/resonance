@@ -13,7 +13,10 @@
     "test:coverage": "jest --coverage",
     "lint": "echo \"Add linting tool like eslint if needed\"",
     "package": "electron-forge package",
-    "make": "electron-forge make --targets=@electron-forge/maker-zip"
+    "make": "electron-forge make",
+    "make:linux": "electron-forge make --targets=@electron-forge/maker-deb,@electron-forge/maker-rpm",
+    "make:windows": "electron-forge make --targets=@electron-forge/maker-squirrel",
+    "make:zip": "electron-forge make --targets=@electron-forge/maker-zip"
   },
   "devDependencies": {
     "@babel/core": "^7.28.0",

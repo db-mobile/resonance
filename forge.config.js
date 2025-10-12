@@ -4,16 +4,37 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 export default {
   packagerConfig: {
     asar: true,
+    icon: './assets/icons/icon', // Will use icon.icns (macOS), icon.ico (Windows)
   },
   rebuildConfig: {},
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {},
+      config: {
+        // Windows Squirrel installer
+        iconUrl: 'https://raw.githubusercontent.com/yourusername/resonance/main/assets/icons/icon.ico',
+        setupIcon: './assets/icons/icon.ico',
+      },
     },
     {
       name: '@electron-forge/maker-zip',
       platforms: ['darwin', 'linux'],
+    },
+    {
+      name: '@electron-forge/maker-deb',
+      config: {
+        options: {
+          icon: './assets/icons/icon.png', // Linux .deb package icon
+        },
+      },
+    },
+    {
+      name: '@electron-forge/maker-rpm',
+      config: {
+        options: {
+          icon: './assets/icons/icon.png', // Linux .rpm package icon
+        },
+      },
     },
   ],
   plugins: [

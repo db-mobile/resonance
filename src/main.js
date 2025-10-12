@@ -27,6 +27,7 @@ function createWindow () {
         y: mainWindowState.y,
         width: mainWindowState.width,
         height: mainWindowState.height,
+        icon: path.join(process.cwd(), 'assets', 'icons', 'icon.png'),
         webPreferences: {
             preload: path.join(process.cwd(), 'src', 'preload.js'),
             nodeIntegration: false,

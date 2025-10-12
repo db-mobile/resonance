@@ -563,6 +563,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 200px;
 }
 
 .tab-nav {
@@ -696,7 +697,8 @@ body {
 /* Request Body */
 .body-textarea {
   width: 100%;
-  min-height: 150px;
+  flex: 1;
+  min-height: 100px;
   padding: var(--space-3);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
@@ -705,7 +707,7 @@ body {
   font-family: var(--font-family-mono);
   font-size: var(--font-size-sm);
   line-height: var(--line-height-normal);
-  resize: vertical;
+  resize: none;
   transition: all var(--transition-base);
 }
 

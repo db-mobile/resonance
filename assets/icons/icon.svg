@@ -1,0 +1,73 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient circle -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1D4ED8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="waveGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:0.95" />
+      <stop offset="100%" style="stop-color:#DBEAFE;stop-opacity:0.8" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="110" fill="url(#bgGradient)"/>
+
+  <!-- Resonance waves - centered and modern -->
+  <g transform="translate(256, 256)">
+    <!-- Center circle/dot -->
+    <circle cx="0" cy="0" r="20" fill="#FFFFFF" opacity="1"/>
+
+    <!-- Inner wave arc - top -->
+    <path d="M -50 -15 Q -50 -70, 0 -70 Q 50 -70, 50 -15"
+          stroke="url(#waveGradient)"
+          stroke-width="16"
+          fill="none"
+          stroke-linecap="round"
+          opacity="0.9"/>
+
+    <!-- Inner wave arc - bottom -->
+    <path d="M -50 15 Q -50 70, 0 70 Q 50 70, 50 15"
+          stroke="url(#waveGradient)"
+          stroke-width="16"
+          fill="none"
+          stroke-linecap="round"
+          opacity="0.9"/>
+
+    <!-- Middle wave arc - top -->
+    <path d="M -90 -25 Q -90 -115, 0 -115 Q 90 -115, 90 -25"
+          stroke="url(#waveGradient)"
+          stroke-width="14"
+          fill="none"
+          stroke-linecap="round"
+          opacity="0.7"/>
+
+    <!-- Middle wave arc - bottom -->
+    <path d="M -90 25 Q -90 115, 0 115 Q 90 115, 90 25"
+          stroke="url(#waveGradient)"
+          stroke-width="14"
+          fill="none"
+          stroke-linecap="round"
+          opacity="0.7"/>
+
+    <!-- Outer wave arc - top -->
+    <path d="M -130 -35 Q -130 -165, 0 -165 Q 130 -165, 130 -35"
+          stroke="url(#waveGradient)"
+          stroke-width="12"
+          fill="none"
+          stroke-linecap="round"
+          opacity="0.5"/>
+
+    <!-- Outer wave arc - bottom -->
+    <path d="M -130 35 Q -130 165, 0 165 Q 130 165, 130 35"
+          stroke="url(#waveGradient)"
+          stroke-width="12"
+          fill="none"
+          stroke-linecap="round"
+          opacity="0.5"/>
+  </g>
+
+  <!-- Subtle glow effect -->
+  <circle cx="256" cy="256" r="20" fill="#FFFFFF" opacity="0.3" filter="blur(10px)"/>
+</svg>
