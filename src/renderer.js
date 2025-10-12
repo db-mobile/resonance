@@ -48,14 +48,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     initResizer();
 
     activateTab('response', 'response-body');
-    activateTab('request', 'query-params');
+    activateTab('request', 'path-params');
 
     await loadCollections();
 
+    const pathParamsList = document.getElementById('path-params-list');
     const headersList = document.getElementById('headers-list');
     const queryParamsList = document.getElementById('query-params-list');
+
+    // Initialize with empty rows if needed
+    if (pathParamsList.children.length === 0) addKeyValueRow(pathParamsList);
     if (headersList.children.length === 0) addKeyValueRow(headersList, 'Content-Type', 'application/json');
-    
+
     // Initialize query params from URL or add empty row
     updateQueryParamsFromUrl();
 });

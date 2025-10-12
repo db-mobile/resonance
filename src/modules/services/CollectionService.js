@@ -225,10 +225,11 @@ export class CollectionService {
             // Store current endpoint info for persistence
             if (window.currentEndpoint) {
                 await this.saveRequestBodyModification(
-                    window.currentEndpoint.collectionId, 
+                    window.currentEndpoint.collectionId,
                     window.currentEndpoint.endpointId,
                     formElements.bodyInput
                 );
+                await this.saveCurrentPathParams(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId, formElements);
                 await this.saveCurrentQueryParams(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId, formElements);
                 await this.saveCurrentHeaders(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId, formElements);
             }
@@ -236,6 +237,7 @@ export class CollectionService {
 
             // Build and populate form
             this.populateUrlAndMethod(collection, endpoint, formElements);
+            await this.populatePathParams(endpoint, formElements);
             await this.populateHeaders(collection, endpoint, formElements);
             await this.populateQueryParams(endpoint, formElements);
             await this.populateRequestBody(collection, endpoint, formElements);
@@ -253,16 +255,51 @@ export class CollectionService {
             fullUrl = '{{baseUrl}}' + endpoint.path;
         }
 
-        // Replace path parameters with example values or placeholders
+        // Replace path parameters with variable templates ({{variableName}})
+        // so they can be substituted at request time using the variable system
         if (endpoint.parameters?.path) {
             Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
-                const placeholder = param.example || `{${key}}`;
-                fullUrl = fullUrl.replace(`{${key}}`, placeholder);
+                fullUrl = fullUrl.replace(`{${key}}`, `{{${key}}}`);
             });
         }
 
         formElements.urlInput.value = fullUrl;
         formElements.methodSelect.value = endpoint.method;
+    }
+
+    async populatePathParams(endpoint, formElements) {
+        console.log('RENDERER: populatePathParams called with endpoint:', endpoint);
+        console.log('RENDERER: endpoint.parameters:', endpoint.parameters);
+
+        this.clearKeyValueList(formElements.pathParamsList);
+
+        // Check for persisted path params first
+        const persistedPathParams = await this.repository.getPersistedPathParams(window.currentEndpoint.collectionId, endpoint.id);
+
+        if (persistedPathParams.length > 0) {
+            // Load persisted path parameters
+            persistedPathParams.forEach(param => {
+                this.addKeyValueRow(formElements.pathParamsList, param.key, param.value);
+            });
+        } else {
+            // Add path parameters from endpoint definition
+            if (endpoint.parameters?.path) {
+                console.log('RENDERER: Found path parameters:', endpoint.parameters.path);
+                Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
+                    // Provide a better default value if example is empty
+                    const value = param.example || '';
+                    console.log(`RENDERER: Adding path parameter ${key} with value:`, value);
+                    this.addKeyValueRow(formElements.pathParamsList, key, value);
+                });
+            } else {
+                console.log('RENDERER: No path parameters found');
+            }
+        }
+
+        if (formElements.pathParamsList.children.length === 0) {
+            console.log('RENDERER: No path parameters added, adding empty row');
+            this.addKeyValueRow(formElements.pathParamsList);
+        }
     }
 
     async populateHeaders(collection, endpoint, formElements) {
@@ -313,32 +350,23 @@ export class CollectionService {
     async populateQueryParams(endpoint, formElements) {
         console.log('RENDERER: populateQueryParams called with endpoint:', endpoint);
         console.log('RENDERER: endpoint.parameters:', endpoint.parameters);
-        
+
         this.clearKeyValueList(formElements.queryParamsList);
 
         // Check for persisted query params first
         const persistedQueryParams = await this.repository.getPersistedQueryParams(window.currentEndpoint.collectionId, endpoint.id);
-        
+
         if (persistedQueryParams.length > 0) {
             // Load persisted query parameters
             persistedQueryParams.forEach(param => {
                 this.addKeyValueRow(formElements.queryParamsList, param.key, param.value);
             });
         } else {
-            // Add path parameters first (from YAML file)
-            if (endpoint.parameters?.path) {
-                console.log('RENDERER: Found path parameters:', endpoint.parameters.path);
-                Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
-                    // Provide a better default value if example is empty
-                    const value = param.example || `{${key}}`;
-                    console.log(`RENDERER: Adding path parameter ${key} with value:`, value);
-                    this.addKeyValueRow(formElements.queryParamsList, key, value);
-                });
-            } else {
-                console.log('RENDERER: No path parameters found');
-            }
+            // NOTE: Path parameters are NOT added to query params list
+            // They are handled in the URL path itself (see populateUrlAndMethod)
+            // and should be substituted using variables like {{variableName}}
 
-            // Add regular query parameters
+            // Add regular query parameters only
             if (endpoint.parameters?.query) {
                 console.log('RENDERER: Found query parameters:', endpoint.parameters.query);
                 Object.entries(endpoint.parameters.query).forEach(([key, param]) => {
@@ -353,6 +381,37 @@ export class CollectionService {
         if (formElements.queryParamsList.children.length === 0) {
             console.log('RENDERER: No parameters added, adding empty row');
             this.addKeyValueRow(formElements.queryParamsList);
+        }
+
+        // Update URL to include query parameters
+        this.updateUrlWithQueryParams(formElements);
+    }
+
+    updateUrlWithQueryParams(formElements) {
+        try {
+            const queryParams = this.parseKeyValuePairs(formElements.queryParamsList);
+            let urlString = formElements.urlInput.value.trim();
+
+            if (!urlString) {
+                return;
+            }
+
+            // Split URL into base and query string parts
+            const questionMarkIndex = urlString.indexOf('?');
+            const baseUrl = questionMarkIndex >= 0 ? urlString.substring(0, questionMarkIndex) : urlString;
+
+            // Build new query string from query params
+            const params = new URLSearchParams();
+            queryParams.forEach(({ key, value }) => {
+                if (key) {
+                    params.set(key, value);
+                }
+            });
+
+            const queryString = params.toString();
+            formElements.urlInput.value = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+        } catch (error) {
+            console.error('Error updating URL with query params:', error);
         }
     }
 
@@ -418,6 +477,19 @@ export class CollectionService {
             }
         } catch (error) {
             console.error('Error saving request body modification:', error);
+        }
+    }
+
+    async saveCurrentPathParams(collectionId, endpointId, formElements) {
+        try {
+            const pathParams = this.parseKeyValuePairs(formElements.pathParamsList);
+            // Only save if there are non-empty path parameters
+            if (pathParams.length > 0) {
+                await this.repository.savePersistedPathParams(collectionId, endpointId, pathParams);
+                console.log('Saved path parameters for endpoint:', endpointId);
+            }
+        } catch (error) {
+            console.error('Error saving path parameters:', error);
         }
     }
 

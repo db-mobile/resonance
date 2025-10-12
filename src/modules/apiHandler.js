@@ -65,6 +65,7 @@ export async function handleSendRequest() {
     const method = methodSelect.value;
     let body = undefined;
 
+    const pathParams = parseKeyValuePairs(document.getElementById('path-params-list'));
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
@@ -83,12 +84,15 @@ export async function handleSendRequest() {
                 Object.assign(headers, mergedHeaders);
             }
             
-            // Process variables in URL, headers, query params, and body
+            // Process variables in URL, headers, query params, path params, and body
             const variables = await variableRepository.getVariablesForCollection(window.currentEndpoint.collectionId);
             const processor = new VariableProcessor();
-            
-            url = processor.processTemplate(url, variables);
-            
+
+            // First, replace path parameters in the URL with their values
+            // Path params take precedence over collection variables for URL path replacement
+            const combinedVariables = { ...variables, ...pathParams };
+            url = processor.processTemplate(url, combinedVariables);
+
             // Process headers
             const processedHeaders = {};
             for (const [key, value] of Object.entries(headers)) {
@@ -96,14 +100,22 @@ export async function handleSendRequest() {
                 const processedValue = processor.processTemplate(value, variables);
                 processedHeaders[processedKey] = processedValue;
             }
+            // Clear and replace headers with processed versions
+            for (const key in headers) {
+                delete headers[key];
+            }
             Object.assign(headers, processedHeaders);
-            
+
             // Process query params
             const processedQueryParams = {};
             for (const [key, value] of Object.entries(queryParams)) {
                 const processedKey = processor.processTemplate(key, variables);
                 const processedValue = processor.processTemplate(value, variables);
                 processedQueryParams[processedKey] = processedValue;
+            }
+            // Clear and replace query params with processed versions
+            for (const key in queryParams) {
+                delete queryParams[key];
             }
             Object.assign(queryParams, processedQueryParams);
             

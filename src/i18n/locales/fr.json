@@ -63,6 +63,7 @@
     "size": "Taille"
   },
   "tabs": {
+    "path_params": "Paramètres de Chemin",
     "query_params": "Paramètres",
     "headers": "En-têtes",
     "body": "Corps",

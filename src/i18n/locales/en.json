@@ -63,6 +63,7 @@
     "size": "Size"
   },
   "tabs": {
+    "path_params": "Path Params",
     "query_params": "Query Params",
     "headers": "Headers",
     "body": "Body",

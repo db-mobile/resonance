@@ -439,6 +439,7 @@ export class CollectionController {
                     formElements.urlInput.value = '';
                     formElements.methodSelect.value = 'GET';
                     formElements.bodyInput.value = '';
+                    this.service.clearKeyValueList(formElements.pathParamsList);
                     this.service.clearKeyValueList(formElements.headersList);
                     this.service.clearKeyValueList(formElements.queryParamsList);
                     window.currentEndpoint = null;
@@ -610,6 +611,7 @@ export class CollectionController {
             urlInput: document.getElementById('url-input'),
             methodSelect: document.getElementById('method-select'),
             bodyInput: document.getElementById('body-input'),
+            pathParamsList: document.getElementById('path-params-list'),
             headersList: document.getElementById('headers-list'),
             queryParamsList: document.getElementById('query-params-list')
         };

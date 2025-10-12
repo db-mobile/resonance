@@ -83,33 +83,50 @@
             <!-- Request Configuration -->
             <section class="request-config">
                 <nav class="tab-nav" role="tablist" aria-label="Request Configuration">
-                    <button class="tab-button active" 
-                            data-tab="query-params" 
-                            role="tab" 
-                            aria-selected="true" 
+                    <button class="tab-button active"
+                            data-tab="path-params"
+                            role="tab"
+                            aria-selected="true"
+                            aria-controls="path-params"
+                            data-i18n="tabs.path_params">
+                        Path Params
+                    </button>
+                    <button class="tab-button"
+                            data-tab="query-params"
+                            role="tab"
+                            aria-selected="false"
                             aria-controls="query-params"
                             data-i18n="tabs.query_params">
                         Query Params
                     </button>
-                    <button class="tab-button" 
-                            data-tab="headers" 
-                            role="tab" 
-                            aria-selected="false" 
+                    <button class="tab-button"
+                            data-tab="headers"
+                            role="tab"
+                            aria-selected="false"
                             aria-controls="headers"
                             data-i18n="tabs.headers">
                         Headers
                     </button>
-                    <button class="tab-button" 
-                            data-tab="body" 
-                            role="tab" 
-                            aria-selected="false" 
+                    <button class="tab-button"
+                            data-tab="body"
+                            role="tab"
+                            aria-selected="false"
                             aria-controls="body"
                             data-i18n="tabs.body">
                         Body
                     </button>
                 </nav>
 
-                <div class="tab-content active" id="query-params" role="tabpanel" aria-labelledby="query-params-tab">
+                <div class="tab-content active" id="path-params" role="tabpanel" aria-labelledby="path-params-tab">
+                    <h3>Path Parameters</h3>
+                    <div id="path-params-list" class="key-value-list" role="group" aria-label="Path Parameters">
+                    </div>
+                    <button id="add-path-param-btn" class="add-btn" aria-label="Add Path Parameter">
+                        Add Path Param
+                    </button>
+                </div>
+
+                <div class="tab-content" id="query-params" role="tabpanel" aria-labelledby="query-params-tab">
                     <h3>Query Parameters</h3>
                     <div id="query-params-list" class="key-value-list" role="group" aria-label="Query Parameters">
                     </div>
@@ -129,9 +146,9 @@
 
                 <div class="tab-content" id="body" role="tabpanel" aria-labelledby="body-tab">
                     <h3>Request Body</h3>
-                    <textarea id="body-input" 
-                              class="body-textarea" 
-                              placeholder='{"title": "foo", "body": "bar", "userId": 1}' 
+                    <textarea id="body-input"
+                              class="body-textarea"
+                              placeholder='{"title": "foo", "body": "bar", "userId": 1}'
                               aria-label="Request Body JSON"></textarea>
                 </div>
             </section>

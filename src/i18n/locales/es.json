@@ -63,6 +63,7 @@
     "size": "Tamaño"
   },
   "tabs": {
+    "path_params": "Parámetros de Ruta",
     "query_params": "Parámetros",
     "headers": "Encabezados",
     "body": "Cuerpo",

@@ -82,6 +82,29 @@ export class CollectionRepository {
         }
     }
 
+    async getPersistedPathParams(collectionId, endpointId) {
+        try {
+            const persistedParams = await this.electronAPI.store.get('persistedPathParams') || {};
+            const key = `${collectionId}_${endpointId}`;
+            return persistedParams[key] || [];
+        } catch (error) {
+            console.error('Error getting persisted path params:', error);
+            return [];
+        }
+    }
+
+    async savePersistedPathParams(collectionId, endpointId, pathParams) {
+        try {
+            const persistedParams = await this.electronAPI.store.get('persistedPathParams') || {};
+            const key = `${collectionId}_${endpointId}`;
+            persistedParams[key] = pathParams;
+            await this.electronAPI.store.set('persistedPathParams', persistedParams);
+        } catch (error) {
+            console.error('Error saving persisted path params:', error);
+            throw new Error(`Failed to save persisted path params: ${error.message}`);
+        }
+    }
+
     async getPersistedQueryParams(collectionId, endpointId) {
         try {
             const persistedParams = await this.electronAPI.store.get('persistedQueryParams') || {};

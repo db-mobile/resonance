@@ -1,4 +1,4 @@
-import { headersList, addHeaderBtn, queryParamsList, addQueryParamBtn, urlInput } from './domElements.js';
+import { pathParamsList, addPathParamBtn, headersList, addHeaderBtn, queryParamsList, addQueryParamBtn, urlInput } from './domElements.js';
 
 export function createKeyValueRow(key = '', value = '') {
     const row = document.createElement('div');
@@ -51,41 +51,68 @@ export function parseKeyValuePairs(listContainer) {
 
 // URL and query parameters synchronization functions
 export function updateUrlFromQueryParams() {
-    const queryParams = parseKeyValuePairs(queryParamsList);
-    const url = new URL(urlInput.value.trim() || 'http://example.com');
-    
-    // Clear existing query parameters
-    url.search = '';
-    
-    // Add query params from the list
-    Object.entries(queryParams).forEach(([key, value]) => {
-        if (key) {
-            url.searchParams.set(key, value);
+    try {
+        const queryParams = parseKeyValuePairs(queryParamsList);
+        let urlString = urlInput.value.trim();
+
+        if (!urlString) {
+            return;
         }
-    });
-    
-    urlInput.value = url.toString();
+
+        // Split URL into base and query string parts
+        const questionMarkIndex = urlString.indexOf('?');
+        const baseUrl = questionMarkIndex >= 0 ? urlString.substring(0, questionMarkIndex) : urlString;
+
+        // Build new query string from query params
+        const params = new URLSearchParams();
+        Object.entries(queryParams).forEach(([key, value]) => {
+            if (key) {
+                params.set(key, value);
+            }
+        });
+
+        const queryString = params.toString();
+        urlInput.value = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+    } catch (error) {
+        console.error('Error updating URL from query params:', error);
+    }
 }
 
 export function updateQueryParamsFromUrl() {
     try {
-        const url = new URL(urlInput.value.trim() || 'http://example.com');
-        
+        let urlString = urlInput.value.trim();
+
+        if (!urlString) {
+            queryParamsList.innerHTML = '';
+            addKeyValueRow(queryParamsList);
+            return;
+        }
+
+        // Extract query string from URL (works with template variables)
+        const questionMarkIndex = urlString.indexOf('?');
+
         // Clear existing query param rows
         queryParamsList.innerHTML = '';
-        
-        // Add rows for each URL query parameter
-        const hasParams = url.searchParams.size > 0;
-        if (hasParams) {
-            url.searchParams.forEach((value, key) => {
-                addKeyValueRow(queryParamsList, key, value);
-            });
+
+        if (questionMarkIndex >= 0) {
+            const queryString = urlString.substring(questionMarkIndex + 1);
+            const params = new URLSearchParams(queryString);
+
+            // Add rows for each URL query parameter
+            if (params.toString()) {
+                params.forEach((value, key) => {
+                    addKeyValueRow(queryParamsList, key, value);
+                });
+            } else {
+                addKeyValueRow(queryParamsList);
+            }
         } else {
-            // Add empty row if no params
+            // No query parameters in URL
             addKeyValueRow(queryParamsList);
         }
     } catch (error) {
-        // If URL is invalid, just ensure we have at least one empty row
+        console.error('Error updating query params from URL:', error);
+        // If there's an error, just ensure we have at least one empty row
         if (queryParamsList.children.length === 0) {
             addKeyValueRow(queryParamsList);
         }
@@ -93,6 +120,7 @@ export function updateQueryParamsFromUrl() {
 }
 
 export function initKeyValueListeners() {
+    addPathParamBtn.addEventListener('click', () => addKeyValueRow(pathParamsList));
     addHeaderBtn.addEventListener('click', () => addKeyValueRow(headersList));
     addQueryParamBtn.addEventListener('click', () => addKeyValueRow(queryParamsList));
 
@@ -100,9 +128,17 @@ export function initKeyValueListeners() {
     urlInput.addEventListener('input', updateQueryParamsFromUrl);
     urlInput.addEventListener('blur', updateQueryParamsFromUrl);
 
+    // Path params input listeners (using event delegation)
+    pathParamsList.addEventListener('input', (event) => {
+        if (event.target.classList.contains('key-input') ||
+            event.target.classList.contains('value-input')) {
+            debounceAutoSave(() => autoSavePathParams());
+        }
+    });
+
     // Query params input listeners (using event delegation)
     queryParamsList.addEventListener('input', (event) => {
-        if (event.target.classList.contains('key-input') || 
+        if (event.target.classList.contains('key-input') ||
             event.target.classList.contains('value-input')) {
             updateUrlFromQueryParams();
             debounceAutoSave(() => autoSaveQueryParams());
@@ -111,7 +147,7 @@ export function initKeyValueListeners() {
 
     // Headers input listeners (using event delegation)
     headersList.addEventListener('input', (event) => {
-        if (event.target.classList.contains('key-input') || 
+        if (event.target.classList.contains('key-input') ||
             event.target.classList.contains('value-input')) {
             debounceAutoSave(() => autoSaveHeaders());
         }
@@ -119,16 +155,22 @@ export function initKeyValueListeners() {
 
     document.addEventListener('click', (event) => {
         if (event.target.classList.contains('remove-row-btn')) {
+            const isPathParam = event.target.closest('#path-params-list');
             const isQueryParam = event.target.closest('#query-params-list');
             const isHeader = event.target.closest('#headers-list');
             event.target.closest('.key-value-row').remove();
-            
+
+            // Auto-save path params if a path param was removed
+            if (isPathParam) {
+                debounceAutoSave(() => autoSavePathParams());
+            }
+
             // Update URL if a query param was removed
             if (isQueryParam) {
                 updateUrlFromQueryParams();
                 debounceAutoSave(() => autoSaveQueryParams());
             }
-            
+
             // Auto-save headers if a header was removed
             if (isHeader) {
                 debounceAutoSave(() => autoSaveHeaders());
@@ -142,6 +184,19 @@ let autoSaveTimeout;
 function debounceAutoSave(callback) {
     clearTimeout(autoSaveTimeout);
     autoSaveTimeout = setTimeout(callback, 500); // 500ms delay
+}
+
+async function autoSavePathParams() {
+    if (window.currentEndpoint && window.collectionService) {
+        const formElements = {
+            pathParamsList: pathParamsList
+        };
+        await window.collectionService.saveCurrentPathParams(
+            window.currentEndpoint.collectionId,
+            window.currentEndpoint.endpointId,
+            formElements
+        );
+    }
 }
 
 async function autoSaveQueryParams() {

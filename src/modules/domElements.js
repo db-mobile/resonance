@@ -6,6 +6,8 @@ export const cancelRequestBtn = document.getElementById('cancel-request-btn');
 export const statusDisplay = document.getElementById('status-display');
 export const responseTimeDisplay = document.getElementById('response-time-display');
 
+export const pathParamsList = document.getElementById('path-params-list');
+export const addPathParamBtn = document.getElementById('add-path-param-btn');
 export const headersList = document.getElementById('headers-list');
 export const addHeaderBtn = document.getElementById('add-header-btn');
 export const queryParamsList = document.getElementById('query-params-list');

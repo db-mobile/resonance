@@ -63,6 +63,7 @@
     "size": "Größe"
   },
   "tabs": {
+    "path_params": "Pfad-Parameter",
     "query_params": "Query-Parameter",
     "headers": "Header",
     "body": "Body",

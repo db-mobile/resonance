@@ -63,6 +63,7 @@
     "size": "Dimensione"
   },
   "tabs": {
+    "path_params": "Parametri del Percorso",
     "query_params": "Parametri",
     "headers": "Intestazioni",
     "body": "Corpo",
