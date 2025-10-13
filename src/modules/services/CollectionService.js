@@ -588,9 +588,7 @@ export class CollectionService {
         const removeBtn = document.createElement('button');
         removeBtn.className = 'remove-btn remove-row-btn';
         removeBtn.textContent = 'Remove';
-        removeBtn.addEventListener('click', () => {
-            row.remove();
-        });
+        // Event listener for remove button is handled by the global delegated event listener in keyValueManager.js
 
         row.appendChild(keyInput);
         row.appendChild(valueInput);
