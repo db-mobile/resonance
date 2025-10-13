@@ -98,7 +98,6 @@
   
   /* Layout Constants */
   --sidebar-width: 320px;
-  --header-height: 48px;
   
   /* Glass Effects */
   --glass-blur: blur(20px);
@@ -125,40 +124,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Header */
-.app-header {
-  height: var(--header-height);
-  background: var(--bg-glass-strong);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border-bottom: var(--glass-border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--space-4);
-  position: relative;
-  z-index: 50;
-  box-shadow: var(--shadow-xs);
-}
-
-.app-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-  color: var(--text-primary);
-  margin: 0;
-  letter-spacing: -0.025em;
-}
-
 /* Main Layout */
 .main-layout {
   display: flex;
-  height: calc(100vh - var(--header-height));
+  height: 100vh;
   overflow: hidden;
 }
 
 /* Collections Sidebar */
 .collections-sidebar {
   width: var(--sidebar-width);
+  flex: 0 0 var(--sidebar-width);
   background: var(--bg-glass);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -168,6 +144,8 @@ body {
   height: 100%;
   overflow: hidden;
   position: relative;
+  min-width: 200px;
+  max-width: 600px;
 }
 
 .sidebar-header {
@@ -177,6 +155,13 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: var(--space-3);
+}
+
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .sidebar-title {
@@ -563,7 +548,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  min-height: 200px;
+  min-height: 100px;
 }
 
 .tab-nav {
@@ -767,13 +752,60 @@ body {
   opacity: 1;
 }
 
+/* Horizontal Resizer (for sidebar) */
+.horizontal-resizer-handle {
+  width: 8px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-light);
+  border-right: 1px solid var(--border-light);
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.horizontal-resizer-handle:hover {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.horizontal-resizer-handle.dragging {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.horizontal-resizer-grip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.horizontal-resizer-line {
+  width: 1px;
+  height: 20px;
+  background: var(--text-tertiary);
+  border-radius: 1px;
+  opacity: 0.5;
+}
+
+.horizontal-resizer-handle:hover .horizontal-resizer-line {
+  background: var(--color-primary);
+  opacity: 1;
+}
+
 /* Response Area */
 .response-area {
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--bg-white);
-  min-height: 200px;
+  min-height: 100px;
 }
 
 .response-header {
@@ -865,6 +897,18 @@ body {
   padding: var(--space-3);
   overflow: auto;
   background: var(--bg-white);
+  display: flex;
+  flex-direction: column;
+}
+
+.response-display .tab-content {
+  flex: 1;
+  display: none;
+  flex-direction: column;
+}
+
+.response-display .tab-content.active {
+  display: flex;
 }
 
 .response-display pre {
@@ -885,6 +929,7 @@ body {
 /* Response Body with Line Numbers */
 .response-body-container {
   display: flex;
+  flex: 1;
   background: var(--bg-secondary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
@@ -968,7 +1013,7 @@ body {
   }
   
   .main-content-area {
-    height: calc(100vh - var(--header-height) - 200px);
+    height: calc(100vh - 200px);
   }
 }
 

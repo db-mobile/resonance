@@ -7,29 +7,26 @@
     <link rel="stylesheet" href="src/style.css">
 </head>
 <body>
-    <!-- App Header -->
-    <header class="app-header">
-        <h1 class="app-title" data-i18n="app.title">Resonance</h1>
-        <button id="settings-btn" class="settings-btn" data-i18n-title="header.settings" data-i18n-aria="header.settings">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-        </button>
-    </header>
-
     <!-- Main Layout -->
     <div class="main-layout">
         <!-- Collections Sidebar -->
         <aside class="collections-sidebar" role="complementary">
             <div class="sidebar-header">
                 <h2 class="sidebar-title" data-i18n="sidebar.collections">Collections</h2>
-                <button id="import-collection-btn" class="import-btn" 
-                        data-i18n-title="sidebar.import" 
-                        data-i18n-aria="sidebar.import"
-                        data-i18n="sidebar.import">
-                    Import
-                </button>
+                <div class="sidebar-actions">
+                    <button id="settings-btn" class="settings-btn" data-i18n-title="header.settings" data-i18n-aria="header.settings">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </button>
+                    <button id="import-collection-btn" class="import-btn"
+                            data-i18n-title="sidebar.import"
+                            data-i18n-aria="sidebar.import"
+                            data-i18n="sidebar.import">
+                        Import
+                    </button>
+                </div>
             </div>
             
             <div class="collections-container">
@@ -44,6 +41,15 @@
                 </div>
             </div>
         </aside>
+
+        <!-- Horizontal Resizer Handle -->
+        <div class="horizontal-resizer-handle" id="horizontal-resizer-handle">
+            <div class="horizontal-resizer-grip">
+                <div class="horizontal-resizer-line"></div>
+                <div class="horizontal-resizer-line"></div>
+                <div class="horizontal-resizer-line"></div>
+            </div>
+        </div>
 
         <!-- Main Content Area -->
         <main class="main-content-area" role="main">

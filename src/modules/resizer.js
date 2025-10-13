@@ -1,6 +1,7 @@
 /**
  * Resizer Module
  * Handles vertical resizing between request and response areas
+ * and horizontal resizing between sidebar and main content
  */
 
 export class Resizer {
@@ -9,7 +10,7 @@ export class Resizer {
         this.startY = 0;
         this.startRequestHeight = 0;
         this.startResponseHeight = 0;
-        this.minHeight = 150; // Reduced from 200 to allow more flexibility
+        this.minHeight = 100; // Allow more flexible resizing
 
         this.init();
     }
@@ -125,7 +126,89 @@ export class Resizer {
     }
 }
 
+/**
+ * HorizontalResizer Class
+ * Handles horizontal resizing between sidebar and main content area
+ */
+export class HorizontalResizer {
+    constructor() {
+        this.isDragging = false;
+        this.startX = 0;
+        this.startSidebarWidth = 0;
+        this.minWidth = 200; // Minimum sidebar width
+        this.maxWidth = 600; // Maximum sidebar width
+
+        this.init();
+    }
+
+    init() {
+        this.horizontalResizerHandle = document.getElementById('horizontal-resizer-handle');
+        this.sidebar = document.querySelector('.collections-sidebar');
+
+        if (!this.horizontalResizerHandle || !this.sidebar) {
+            return;
+        }
+
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        this.horizontalResizerHandle.addEventListener('mousedown', this.startDrag.bind(this));
+        document.addEventListener('mousemove', this.drag.bind(this));
+        document.addEventListener('mouseup', this.endDrag.bind(this));
+
+        // Prevent text selection during drag
+        this.horizontalResizerHandle.addEventListener('selectstart', (e) => e.preventDefault());
+    }
+
+    startDrag(e) {
+        this.isDragging = true;
+        this.startX = e.clientX;
+        this.startSidebarWidth = this.sidebar.offsetWidth;
+
+        this.horizontalResizerHandle.classList.add('dragging');
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'col-resize';
+
+        e.preventDefault();
+    }
+
+    drag(e) {
+        if (!this.isDragging) return;
+
+        const deltaX = e.clientX - this.startX;
+        const newSidebarWidth = this.startSidebarWidth + deltaX;
+
+        // Enforce min/max width constraints
+        if (newSidebarWidth < this.minWidth || newSidebarWidth > this.maxWidth) {
+            return;
+        }
+
+        this.sidebar.style.width = `${newSidebarWidth}px`;
+        this.sidebar.style.flex = `0 0 ${newSidebarWidth}px`;
+
+        e.preventDefault();
+    }
+
+    endDrag() {
+        if (!this.isDragging) return;
+
+        this.isDragging = false;
+        this.horizontalResizerHandle.classList.remove('dragging');
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+    }
+
+    // Public method to reset to default width
+    reset() {
+        this.sidebar.style.width = '';
+        this.sidebar.style.flex = '';
+    }
+}
+
 // Initialize when DOM is loaded
 export function initResizer() {
-    return new Resizer();
+    const verticalResizer = new Resizer();
+    const horizontalResizer = new HorizontalResizer();
+    return { verticalResizer, horizontalResizer };
 }
