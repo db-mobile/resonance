@@ -66,6 +66,7 @@
     "path_params": "Pfad-Parameter",
     "query_params": "Query-Parameter",
     "headers": "Header",
+    "authorization": "Autorisierung",
     "body": "Body",
     "response_body": "Body",
     "response_headers": "Header"

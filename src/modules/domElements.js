@@ -25,3 +25,6 @@ export const responseTabButtons = document.querySelectorAll('.response-tabs .tab
 
 export const importCollectionBtn = document.getElementById('import-collection-btn');
 export const collectionsListDiv = document.getElementById('collections-list');
+
+export const authTypeSelect = document.getElementById('auth-type-select');
+export const authFieldsContainer = document.getElementById('auth-fields-container');

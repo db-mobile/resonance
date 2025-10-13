@@ -9,6 +9,7 @@ import { ThemeManager, SettingsModal } from './modules/themeManager.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
 import { initResizer } from './modules/resizer.js';
 import { i18n } from './i18n/I18nManager.js';
+import { authManager } from './modules/authManager.js';
 
 // Initialize theme manager, HTTP version manager, and internationalization
 const themeManager = new ThemeManager();
@@ -30,16 +31,17 @@ if (settingsBtn) {
 document.addEventListener('DOMContentLoaded', async () => {
     // Initialize internationalization first
     await i18n.init();
-    
-    // Make i18n globally available for dynamic content
+
+    // Make i18n and authManager globally available for dynamic content
     window.i18n = i18n;
-    
+    window.authManager = authManager;
+
     // Listen for language changes to refresh dynamic content
     document.addEventListener('languageChanged', (event) => {
         console.log('Language changed to:', event.detail.language);
         // Any dynamic content that needs special handling can be refreshed here
     });
-    
+
     updateStatusDisplay('Ready', null);
 
     initKeyValueListeners();

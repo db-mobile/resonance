@@ -66,6 +66,7 @@
     "path_params": "Paramètres de Chemin",
     "query_params": "Paramètres",
     "headers": "En-têtes",
+    "authorization": "Autorisation",
     "body": "Corps",
     "response_body": "Corps",
     "response_headers": "En-têtes"

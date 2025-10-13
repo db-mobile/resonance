@@ -151,6 +151,29 @@ export class CollectionRepository {
         }
     }
 
+    async getPersistedAuthConfig(collectionId, endpointId) {
+        try {
+            const persistedAuthConfigs = await this.electronAPI.store.get('persistedAuthConfigs') || {};
+            const key = `${collectionId}_${endpointId}`;
+            return persistedAuthConfigs[key] || null;
+        } catch (error) {
+            console.error('Error getting persisted auth config:', error);
+            return null;
+        }
+    }
+
+    async savePersistedAuthConfig(collectionId, endpointId, authConfig) {
+        try {
+            const persistedAuthConfigs = await this.electronAPI.store.get('persistedAuthConfigs') || {};
+            const key = `${collectionId}_${endpointId}`;
+            persistedAuthConfigs[key] = authConfig;
+            await this.electronAPI.store.set('persistedAuthConfigs', persistedAuthConfigs);
+        } catch (error) {
+            console.error('Error saving persisted auth config:', error);
+            throw new Error(`Failed to save persisted auth config: ${error.message}`);
+        }
+    }
+
     async getCollectionExpansionStates() {
         try {
             return await this.electronAPI.store.get('collectionExpansionStates') || {};
@@ -192,6 +215,13 @@ export class CollectionRepository {
             if (persistedHeaders[key]) {
                 delete persistedHeaders[key];
                 await this.electronAPI.store.set('persistedHeaders', persistedHeaders);
+            }
+
+            // Delete persisted auth config
+            const persistedAuthConfigs = await this.electronAPI.store.get('persistedAuthConfigs') || {};
+            if (persistedAuthConfigs[key]) {
+                delete persistedAuthConfigs[key];
+                await this.electronAPI.store.set('persistedAuthConfigs', persistedAuthConfigs);
             }
         } catch (error) {
             console.error('Error deleting persisted endpoint data:', error);

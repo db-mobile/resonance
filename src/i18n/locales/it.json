@@ -66,6 +66,7 @@
     "path_params": "Parametri del Percorso",
     "query_params": "Parametri",
     "headers": "Intestazioni",
+    "authorization": "Autorizzazione",
     "body": "Corpo",
     "response_body": "Corpo",
     "response_headers": "Intestazioni"

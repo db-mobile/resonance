@@ -114,6 +114,14 @@
                         Headers
                     </button>
                     <button class="tab-button"
+                            data-tab="authorization"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="authorization"
+                            data-i18n="tabs.authorization">
+                        Authorization
+                    </button>
+                    <button class="tab-button"
                             data-tab="body"
                             role="tab"
                             aria-selected="false"
@@ -148,6 +156,24 @@
                     <button id="add-header-btn" class="add-btn" aria-label="Add Header">
                         Add Header
                     </button>
+                </div>
+
+                <div class="tab-content" id="authorization" role="tabpanel" aria-labelledby="authorization-tab">
+                    <h3>Authorization</h3>
+                    <div class="auth-type-section">
+                        <label for="auth-type-select">Type</label>
+                        <select id="auth-type-select" class="auth-type-select" aria-label="Authorization Type">
+                            <option value="none">No Auth</option>
+                            <option value="bearer">Bearer Token</option>
+                            <option value="basic">Basic Auth</option>
+                            <option value="api-key">API Key</option>
+                            <option value="oauth2">OAuth 2.0</option>
+                            <option value="digest">Digest Auth</option>
+                        </select>
+                    </div>
+                    <div id="auth-fields-container" class="auth-fields-container">
+                        <!-- Dynamic auth fields will be inserted here -->
+                    </div>
                 </div>
 
                 <div class="tab-content" id="body" role="tabpanel" aria-labelledby="body-tab">

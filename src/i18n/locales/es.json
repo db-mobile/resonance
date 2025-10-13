@@ -66,6 +66,7 @@
     "path_params": "Parámetros de Ruta",
     "query_params": "Parámetros",
     "headers": "Encabezados",
+    "authorization": "Autorización",
     "body": "Cuerpo",
     "response_body": "Cuerpo",
     "response_headers": "Encabezados"

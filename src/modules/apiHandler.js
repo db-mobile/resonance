@@ -6,6 +6,7 @@ import { saveRequestBodyModification } from './collectionManager.js';
 import { VariableProcessor } from './variables/VariableProcessor.js';
 import { VariableRepository } from './storage/VariableRepository.js';
 import { CollectionRepository } from './storage/CollectionRepository.js';
+import { authManager } from './authManager.js';
 
 function generateLineNumbers(text) {
     if (!text) return '';
@@ -68,6 +69,27 @@ export async function handleSendRequest() {
     const pathParams = parseKeyValuePairs(document.getElementById('path-params-list'));
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
+
+    console.log('Headers from UI before auth:', headers);
+
+    // Get authorization data
+    const authData = authManager.generateAuthData();
+    console.log('Auth data generated:', authData);
+
+    // Merge auth headers with existing headers (auth headers take precedence over manual headers)
+    // This ensures the Authorization tab controls auth, not the Headers tab
+    Object.keys(authData.headers).forEach(key => {
+        headers[key] = authData.headers[key];
+    });
+
+    // Merge auth query params with existing query params (manual params take precedence)
+    Object.keys(authData.queryParams).forEach(key => {
+        if (!queryParams[key]) {
+            queryParams[key] = authData.queryParams[key];
+        }
+    });
+
+    console.log('Headers after auth merge:', headers);
 
     // Process variables and merge default headers if we have a current endpoint
     if (window.currentEndpoint) {
@@ -169,12 +191,19 @@ export async function handleSendRequest() {
         responseHeadersDisplay.textContent = '';
         updateStatusDisplay('Status: Sending...', null);
 
-        const result = await window.electronAPI.sendApiRequest({
+        const requestConfig = {
             method,
             url,
             headers,
             body
-        });
+        };
+
+        // Add auth config for digest auth if available
+        if (authData.authConfig) {
+            requestConfig.auth = authData.authConfig;
+        }
+
+        const result = await window.electronAPI.sendApiRequest(requestConfig);
 
         // Check if the request was successful
         if (result.success) {

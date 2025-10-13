@@ -232,6 +232,7 @@ export class CollectionService {
                 await this.saveCurrentPathParams(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId, formElements);
                 await this.saveCurrentQueryParams(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId, formElements);
                 await this.saveCurrentHeaders(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId, formElements);
+                await this.saveCurrentAuthConfig(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
             }
             window.currentEndpoint = { collectionId: collection.id, endpointId: endpoint.id };
 
@@ -241,6 +242,7 @@ export class CollectionService {
             await this.populateHeaders(collection, endpoint, formElements);
             await this.populateQueryParams(endpoint, formElements);
             await this.populateRequestBody(collection, endpoint, formElements);
+            await this.populateAuthConfig(collection.id, endpoint.id);
 
             this.statusDisplay.update(`Loaded endpoint: ${endpoint.name}`, null);
         } catch (error) {
@@ -483,11 +485,9 @@ export class CollectionService {
     async saveCurrentPathParams(collectionId, endpointId, formElements) {
         try {
             const pathParams = this.parseKeyValuePairs(formElements.pathParamsList);
-            // Only save if there are non-empty path parameters
-            if (pathParams.length > 0) {
-                await this.repository.savePersistedPathParams(collectionId, endpointId, pathParams);
-                console.log('Saved path parameters for endpoint:', endpointId);
-            }
+            // Always save path params, even if empty (to persist removals)
+            await this.repository.savePersistedPathParams(collectionId, endpointId, pathParams);
+            console.log('Saved path parameters for endpoint:', endpointId, '- count:', pathParams.length);
         } catch (error) {
             console.error('Error saving path parameters:', error);
         }
@@ -496,11 +496,9 @@ export class CollectionService {
     async saveCurrentQueryParams(collectionId, endpointId, formElements) {
         try {
             const queryParams = this.parseKeyValuePairs(formElements.queryParamsList);
-            // Only save if there are non-empty query parameters
-            if (queryParams.length > 0) {
-                await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParams);
-                console.log('Saved query parameters for endpoint:', endpointId);
-            }
+            // Always save query params, even if empty (to persist removals)
+            await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParams);
+            console.log('Saved query parameters for endpoint:', endpointId, '- count:', queryParams.length);
         } catch (error) {
             console.error('Error saving query parameters:', error);
         }
@@ -509,13 +507,40 @@ export class CollectionService {
     async saveCurrentHeaders(collectionId, endpointId, formElements) {
         try {
             const headers = this.parseKeyValuePairs(formElements.headersList);
-            // Only save if there are non-empty headers
-            if (headers.length > 0) {
-                await this.repository.savePersistedHeaders(collectionId, endpointId, headers);
-                console.log('Saved headers for endpoint:', endpointId);
-            }
+            // Always save headers, even if empty (to persist removals)
+            await this.repository.savePersistedHeaders(collectionId, endpointId, headers);
+            console.log('Saved headers for endpoint:', endpointId, '- count:', headers.length);
         } catch (error) {
             console.error('Error saving headers:', error);
+        }
+    }
+
+    async saveCurrentAuthConfig(collectionId, endpointId) {
+        try {
+            if (window.authManager) {
+                const authConfig = window.authManager.getAuthConfig();
+                await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
+                console.log('Saved auth config for endpoint:', endpointId);
+            }
+        } catch (error) {
+            console.error('Error saving auth config:', error);
+        }
+    }
+
+    async populateAuthConfig(collectionId, endpointId) {
+        try {
+            if (window.authManager) {
+                const authConfig = await this.repository.getPersistedAuthConfig(collectionId, endpointId);
+                if (authConfig) {
+                    window.authManager.loadAuthConfig(authConfig);
+                    console.log('Loaded auth config for endpoint:', endpointId);
+                } else {
+                    // Reset to no auth if no saved config
+                    window.authManager.resetAuthConfig();
+                }
+            }
+        } catch (error) {
+            console.error('Error loading auth config:', error);
         }
     }
 
