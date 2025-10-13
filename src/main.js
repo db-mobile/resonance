@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, globalShortcut } from 'electron';
 import path from 'path';
 import fs from 'fs/promises';
 import Store from 'electron-store';
@@ -22,7 +22,7 @@ function createWindow () {
         defaultHeight: 800
     });
 
-    const win = new BrowserWindow({
+    mainWindow = new BrowserWindow({
         x: mainWindowState.x,
         y: mainWindowState.y,
         width: mainWindowState.width,
@@ -35,11 +35,14 @@ function createWindow () {
         }
     });
 
-    mainWindowState.manage(win);
+    mainWindowState.manage(mainWindow);
 
-    win.loadFile('index.html');
+    globalShortcut.register('CommandOrControl+R', function() {
+        mainWindow.reload();
+    });
 
-    mainWindow = win;
+    mainWindow.setMenu(null);
+    mainWindow.loadFile('index.html');
 }
 
 app.whenReady().then(() => {
