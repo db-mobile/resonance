@@ -11,6 +11,7 @@ export class Resizer {
         this.startRequestHeight = 0;
         this.startResponseHeight = 0;
         this.minHeight = 100; // Allow more flexible resizing
+        this.resizeTimeout = null;
 
         this.init();
     }
@@ -26,8 +27,13 @@ export class Resizer {
         }
 
         this.setupEventListeners();
-        // Delay initial height setting to ensure DOM is fully rendered
-        setTimeout(() => this.setInitialHeights(), 100);
+        // Use requestAnimationFrame to ensure DOM is fully rendered and painted
+        requestAnimationFrame(() => {
+            // Double RAF ensures layout is complete
+            requestAnimationFrame(() => {
+                this.setInitialHeights();
+            });
+        });
     }
 
     setupEventListeners() {
@@ -37,6 +43,9 @@ export class Resizer {
 
         // Prevent text selection during drag
         this.resizerHandle.addEventListener('selectstart', (e) => e.preventDefault());
+
+        // Handle window resize to maintain proportions
+        window.addEventListener('resize', this.handleWindowResize.bind(this));
     }
 
     setInitialHeights() {
@@ -62,20 +71,61 @@ export class Resizer {
         this.responseArea.style.flex = `0 0 ${initialResponseHeight}px`;
     }
 
+    handleWindowResize() {
+        // Throttle resize events to avoid excessive recalculations
+        if (this.resizeTimeout) {
+            clearTimeout(this.resizeTimeout);
+        }
+
+        this.resizeTimeout = setTimeout(() => {
+            const currentRequestHeight = this.requestConfig.offsetHeight;
+            const currentResponseHeight = this.responseArea.offsetHeight;
+
+            // Only adjust if heights were previously set
+            if (currentRequestHeight === 0 || currentResponseHeight === 0) {
+                return;
+            }
+
+            // Calculate new available height
+            const mainContentHeight = this.mainContentArea.clientHeight;
+            const requestBuilder = document.querySelector('.request-builder');
+            const requestBuilderHeight = requestBuilder ? requestBuilder.offsetHeight : 0;
+            const resizerHeight = this.resizerHandle.offsetHeight;
+            const availableHeight = mainContentHeight - requestBuilderHeight - resizerHeight;
+
+            // Calculate current proportion
+            const totalCurrentHeight = currentRequestHeight + currentResponseHeight;
+            const requestProportion = currentRequestHeight / totalCurrentHeight;
+
+            // Apply same proportion to new available height
+            const newRequestHeight = Math.max(this.minHeight, Math.floor(availableHeight * requestProportion));
+            const newResponseHeight = Math.max(this.minHeight, availableHeight - newRequestHeight);
+
+            // Update heights
+            this.requestConfig.style.height = `${newRequestHeight}px`;
+            this.requestConfig.style.flex = `0 0 ${newRequestHeight}px`;
+            this.responseArea.style.height = `${newResponseHeight}px`;
+            this.responseArea.style.flex = `0 0 ${newResponseHeight}px`;
+        }, 100); // Debounce by 100ms
+    }
+
     startDrag(e) {
         const currentRequestHeight = this.requestConfig.offsetHeight;
         const currentResponseHeight = this.responseArea.offsetHeight;
 
-        // If heights aren't set yet, initialize them now
+        // If heights aren't set yet, initialize them now and continue with drag
         if (currentRequestHeight === 0 || currentResponseHeight === 0) {
             this.setInitialHeights();
-            return; // Don't start drag yet, let user try again
+            // Use the newly set heights immediately
+            this.startRequestHeight = this.requestConfig.offsetHeight;
+            this.startResponseHeight = this.responseArea.offsetHeight;
+        } else {
+            this.startRequestHeight = currentRequestHeight;
+            this.startResponseHeight = currentResponseHeight;
         }
 
         this.isDragging = true;
         this.startY = e.clientY;
-        this.startRequestHeight = currentRequestHeight;
-        this.startResponseHeight = currentResponseHeight;
 
         this.resizerHandle.classList.add('dragging');
         document.body.style.userSelect = 'none';

@@ -4,14 +4,13 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 export default {
   packagerConfig: {
     asar: true,
-    icon: './assets/icons/icon', // Will use icon.icns (macOS), icon.ico (Windows)
+    icon: './assets/icons/icon',
   },
   rebuildConfig: {},
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
       config: {
-        // Windows Squirrel installer
         iconUrl: 'https://raw.githubusercontent.com/yourusername/resonance/main/assets/icons/icon.ico',
         setupIcon: './assets/icons/icon.ico',
       },
@@ -38,17 +37,18 @@ export default {
           description: 'A clean and minimal API client with excellent user experience',
           categories: ['Development', 'Network'],
           icon: {
-            '512x512': './assets/icons/icon.png'
+            '512x512': './assets/icons/icon_512x512.png'
           },
           files: [],
           symlinks: [],
           finishArgs: [
-            '--share=ipc',
-            '--socket=wayland',
-            '--socket=fallback-x11',
-            '--share=network',
             '--device=dri',
-            '--filesystem=xdg-documents'
+            '--filesystem=xdg-config/resonance:create',
+            '--filesystem=home:ro',
+            '--share=ipc',
+            '--share=network',
+            '--socket=wayland',
+            '--socket=x11',
           ],
           modules: [],
           branch: 'stable',
@@ -66,8 +66,6 @@ export default {
       name: '@electron-forge/plugin-auto-unpack-natives',
       config: {},
     },
-    // Fuses are used to enable/disable various Electron functionality
-    // at package time, before code signing the application
     new FusesPlugin({
       version: FuseVersion.V1,
       [FuseV1Options.RunAsNode]: false,

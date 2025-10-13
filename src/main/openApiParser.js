@@ -309,13 +309,36 @@ class OpenApiParser {
 
         const collection = this.parseOpenApiToCollection(openApiSpec, path.basename(filePath));
 
-        const collections = this.store.get('collections', []);
+        // Get collections with fallback to empty array if undefined
+        // In Flatpak environments, store.get() might return undefined even with defaults
+        let collections = this.store.get('collections');
+        if (!Array.isArray(collections)) {
+            console.warn('Collections data is invalid or undefined (possible Flatpak sandbox issue), initializing with empty array');
+            collections = [];
+            // Try to initialize the store with the default value
+            try {
+                this.store.set('collections', collections);
+            } catch (error) {
+                console.error('Unable to initialize collections in store:', error);
+            }
+        }
+
         collections.push(collection);
         this.store.set('collections', collections);
 
         // Create baseUrl variable if a base URL was found
         if (collection.baseUrl) {
-            const variables = this.store.get('collectionVariables', {});
+            let variables = this.store.get('collectionVariables');
+            if (!variables || typeof variables !== 'object') {
+                console.warn('Collection variables data is invalid or undefined (possible Flatpak sandbox issue), initializing with empty object');
+                variables = {};
+                // Try to initialize the store with the default value
+                try {
+                    this.store.set('collectionVariables', variables);
+                } catch (error) {
+                    console.error('Unable to initialize collectionVariables in store:', error);
+                }
+            }
             if (!variables[collection.id]) {
                 variables[collection.id] = {};
             }

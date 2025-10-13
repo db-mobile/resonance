@@ -16,19 +16,19 @@ const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
 const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager);
 
-sendRequestBtn.addEventListener('click', handleSendRequest);
-cancelRequestBtn.addEventListener('click', handleCancelRequest);
-importCollectionBtn.addEventListener('click', importOpenApiFile);
-
-// Settings button event listener
-const settingsBtn = document.getElementById('settings-btn');
-if (settingsBtn) {
-    settingsBtn.addEventListener('click', () => {
-        settingsModal.show();
-    });
-}
-
 document.addEventListener('DOMContentLoaded', async () => {
+    // Set up event listeners after DOM is loaded and electronAPI is available
+    sendRequestBtn.addEventListener('click', handleSendRequest);
+    cancelRequestBtn.addEventListener('click', handleCancelRequest);
+    importCollectionBtn.addEventListener('click', importOpenApiFile);
+
+    // Settings button event listener
+    const settingsBtn = document.getElementById('settings-btn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', () => {
+            settingsModal.show();
+        });
+    }
     // Initialize internationalization first
     await i18n.init();
 
