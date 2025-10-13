@@ -338,7 +338,8 @@ function parseOpenApiToCollection(openApiSpec, fileName) {
                         description: methodValue.description || '',
                         parameters: parseParameters(methodValue.parameters || []),
                         requestBody: parseRequestBody(methodValue.requestBody),
-                        headers: {}
+                        headers: {},
+                        security: parseSecurity(methodValue.security, openApiSpec)
                     };
 
                     // Extract base path for grouping (first segment after leading slash)
@@ -460,6 +461,76 @@ function parseParameters(parameters) {
     });
 
     return parsed;
+}
+
+function parseSecurity(securityRequirements, openApiSpec) {
+    // If no security defined at endpoint level, return null
+    if (!securityRequirements || !Array.isArray(securityRequirements) || securityRequirements.length === 0) {
+        return null;
+    }
+
+    // Get security schemes from OpenAPI spec
+    const securitySchemes = openApiSpec?.components?.securitySchemes;
+    if (!securitySchemes) {
+        return null;
+    }
+
+    // Process the first security requirement (most common case)
+    const firstRequirement = securityRequirements[0];
+    const schemeName = Object.keys(firstRequirement)[0];
+
+    if (!schemeName || !securitySchemes[schemeName]) {
+        return null;
+    }
+
+    const scheme = securitySchemes[schemeName];
+
+    // Map OpenAPI security scheme to auth type
+    let authType = 'none';
+    let authConfig = {};
+
+    switch (scheme.type) {
+        case 'http':
+            if (scheme.scheme === 'bearer') {
+                authType = 'bearer';
+                authConfig = {
+                    token: '{{bearerToken}}'
+                };
+            } else if (scheme.scheme === 'basic') {
+                authType = 'basic';
+                authConfig = {
+                    username: '',
+                    password: ''
+                };
+            }
+            break;
+
+        case 'apiKey':
+            authType = 'api-key';
+            authConfig = {
+                keyName: scheme.name || 'api-key',
+                keyValue: '',
+                location: scheme.in === 'header' ? 'header' : 'query'
+            };
+            break;
+
+        case 'oauth2':
+            authType = 'oauth2';
+            authConfig = {
+                token: '',
+                headerPrefix: 'Bearer'
+            };
+            break;
+
+        default:
+            return null;
+    }
+
+    return {
+        type: authType,
+        config: authConfig,
+        schemeName: schemeName
+    };
 }
 
 // Global variable to store the current OpenAPI spec for $ref resolution

@@ -565,8 +565,9 @@ body {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  border-bottom: 2px solid transparent;
+  border-bottom: 3px solid transparent;
   transition: all var(--transition-base);
+  position: relative;
 }
 
 .tab-button:hover {
@@ -578,6 +579,8 @@ body {
   color: var(--color-primary);
   background: var(--bg-white);
   border-bottom-color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: 0 -2px 0 0 var(--color-primary) inset;
 }
 
 .tab-content {

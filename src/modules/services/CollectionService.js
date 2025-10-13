@@ -530,13 +530,24 @@ export class CollectionService {
     async populateAuthConfig(collectionId, endpointId) {
         try {
             if (window.authManager) {
+                // First, check for persisted auth config (user's saved configuration)
                 const authConfig = await this.repository.getPersistedAuthConfig(collectionId, endpointId);
                 if (authConfig) {
                     window.authManager.loadAuthConfig(authConfig);
-                    console.log('Loaded auth config for endpoint:', endpointId);
+                    console.log('Loaded persisted auth config for endpoint:', endpointId);
                 } else {
-                    // Reset to no auth if no saved config
-                    window.authManager.resetAuthConfig();
+                    // If no persisted config, check if endpoint has security requirements from OpenAPI spec
+                    const collection = await this.repository.getById(collectionId);
+                    const endpoint = collection?.endpoints?.find(ep => ep.id === endpointId);
+
+                    if (endpoint?.security) {
+                        // Auto-select the auth type based on OpenAPI security requirements
+                        console.log('Auto-selecting auth type from OpenAPI spec:', endpoint.security);
+                        window.authManager.loadAuthConfig(endpoint.security);
+                    } else {
+                        // Reset to no auth if no saved config and no security requirements
+                        window.authManager.resetAuthConfig();
+                    }
                 }
             }
         } catch (error) {

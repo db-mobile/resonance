@@ -24,18 +24,42 @@ export default {
       name: '@electron-forge/maker-deb',
       config: {
         options: {
-          icon: './assets/icons/icon.png', // Linux .deb package icon
+          icon: './assets/icons/icon.png',
         },
       },
     },
     {
-      name: '@electron-forge/maker-rpm',
+      name: '@electron-forge/maker-flatpak',
       config: {
         options: {
-          icon: './assets/icons/icon.png', // Linux .rpm package icon
-        },
-      },
-    },
+          id: 'com.dbmobile.resonance',
+          productName: 'Resonance',
+          genericName: 'API Client',
+          description: 'A clean and minimal API client with excellent user experience',
+          categories: ['Development', 'Network'],
+          icon: {
+            '512x512': './assets/icons/icon.png'
+          },
+          files: [],
+          symlinks: [],
+          finishArgs: [
+            '--share=ipc',
+            '--socket=wayland',
+            '--socket=fallback-x11',
+            '--share=network',
+            '--device=dri',
+            '--filesystem=xdg-documents'
+          ],
+          modules: [],
+          branch: 'stable',
+          runtime: 'org.freedesktop.Platform',
+          runtimeVersion: '24.08',
+          sdk: 'org.freedesktop.Sdk',
+          base: 'org.electronjs.Electron2.BaseApp',
+          baseVersion: '24.08'
+        }
+      }
+    }
   ],
   plugins: [
     {

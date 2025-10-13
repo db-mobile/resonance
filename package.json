@@ -14,7 +14,8 @@
     "lint": "echo \"Add linting tool like eslint if needed\"",
     "package": "electron-forge package",
     "make": "electron-forge make",
-    "make:linux": "electron-forge make --targets=@electron-forge/maker-deb,@electron-forge/maker-rpm",
+    "make:debian": "electron-forge make --targets=@electron-forge/maker-deb",
+    "make:flatpak": "electron-forge make --targets=@electron-forge/maker-flatpak",
     "make:windows": "electron-forge make --targets=@electron-forge/maker-squirrel",
     "make:zip": "electron-forge make --targets=@electron-forge/maker-zip"
   },
@@ -23,6 +24,7 @@
     "@babel/preset-env": "^7.28.0",
     "@electron-forge/cli": "^7.7.0",
     "@electron-forge/maker-deb": "^7.7.0",
+    "@electron-forge/maker-flatpak": "^7.10.2",
     "@electron-forge/maker-rpm": "^7.7.0",
     "@electron-forge/maker-squirrel": "^7.7.0",
     "@electron-forge/maker-zip": "^7.7.0",
