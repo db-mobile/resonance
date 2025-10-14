@@ -10,7 +10,17 @@ export class VariableRepository {
 
     async getAllVariables() {
         try {
-            return await this.electronAPI.store.get(this.VARIABLES_KEY) || {};
+            const variables = await this.electronAPI.store.get(this.VARIABLES_KEY);
+
+            // Handle cases where store returns undefined (e.g., packaged Debian installations on first run)
+            if (!variables || typeof variables !== 'object' || Array.isArray(variables)) {
+                console.warn('Variables data is invalid or undefined, initializing with empty object');
+                // Initialize store with empty object
+                await this.electronAPI.store.set(this.VARIABLES_KEY, {});
+                return {};
+            }
+
+            return variables;
         } catch (error) {
             console.error('Error loading variables:', error);
             throw new Error(`Failed to load variables: ${error.message}`);

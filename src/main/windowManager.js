@@ -1,6 +1,11 @@
-import { BrowserWindow, globalShortcut } from 'electron';
+import { BrowserWindow, globalShortcut, app } from 'electron';
 import path from 'path';
 import windowStateKeeper from 'electron-window-state';
+import { fileURLToPath } from 'url';
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Manages Electron window creation and lifecycle
@@ -19,14 +24,19 @@ class WindowManager {
             defaultHeight: 800
         });
 
+        // Determine correct paths for packaged vs development
+        const isDev = !app.isPackaged;
+        const appPath = isDev ? process.cwd() : path.dirname(app.getPath('exe'));
+        const resourcesPath = isDev ? process.cwd() : process.resourcesPath;
+
         this.mainWindow = new BrowserWindow({
             x: mainWindowState.x,
             y: mainWindowState.y,
             width: mainWindowState.width,
             height: mainWindowState.height,
-            icon: path.join(process.cwd(), 'assets', 'icons', 'icon.png'),
+            icon: path.join(resourcesPath, 'assets', 'icons', 'icon.png'),
             webPreferences: {
-                preload: path.join(process.cwd(), 'src', 'preload.js'),
+                preload: path.join(__dirname, '..', 'preload.js'),
                 nodeIntegration: false,
                 contextIsolation: true
             }

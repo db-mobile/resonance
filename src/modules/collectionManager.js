@@ -12,6 +12,10 @@ let collectionController = null;
 // Initialize the controller
 function initializeController() {
     if (!collectionController) {
+        if (!window.electronAPI) {
+            console.error('electronAPI is not available. Ensure preload script is loaded.');
+            throw new Error('electronAPI is not available');
+        }
         collectionController = new CollectionController(window.electronAPI, updateStatusDisplay);
         // Make collectionService globally available for auto-save functionality
         window.collectionService = collectionController.service;

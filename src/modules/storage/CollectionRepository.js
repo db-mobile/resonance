@@ -9,9 +9,40 @@ export class CollectionRepository {
         this.MODIFIED_BODIES_KEY = 'modifiedRequestBodies';
     }
 
+    /**
+     * Helper method to safely get object data from store with initialization
+     */
+    async _getObjectFromStore(key, defaultValue = {}) {
+        try {
+            let data = await this.electronAPI.store.get(key);
+
+            // Handle invalid data
+            if (!data || typeof data !== 'object' || Array.isArray(data)) {
+                console.warn(`Store data for key "${key}" is invalid or undefined, initializing with default value`);
+                data = defaultValue;
+                await this.electronAPI.store.set(key, data);
+            }
+
+            return data;
+        } catch (error) {
+            console.error(`Error getting data from store for key "${key}":`, error);
+            return defaultValue;
+        }
+    }
+
     async getAll() {
         try {
-            return await this.electronAPI.store.get(this.COLLECTIONS_KEY) || [];
+            const collections = await this.electronAPI.store.get(this.COLLECTIONS_KEY);
+
+            // Handle cases where store returns undefined (e.g., packaged Debian installations on first run)
+            if (!Array.isArray(collections)) {
+                console.warn('Collections data is invalid or undefined, initializing with empty array');
+                // Initialize store with empty array
+                await this.electronAPI.store.set(this.COLLECTIONS_KEY, []);
+                return [];
+            }
+
+            return collections;
         } catch (error) {
             console.error('Error loading collections:', error);
             throw new Error(`Failed to load collections: ${error.message}`);
@@ -33,7 +64,14 @@ export class CollectionRepository {
     }
 
     async add(collection) {
-        const collections = await this.getAll();
+        let collections = await this.getAll();
+
+        // Extra safety check
+        if (!Array.isArray(collections)) {
+            console.warn('Collections is not an array in add(), reinitializing');
+            collections = [];
+        }
+
         collections.push(collection);
         await this.save(collections);
         return collection;
@@ -61,7 +99,7 @@ export class CollectionRepository {
 
     async getModifiedRequestBody(collectionId, endpointId) {
         try {
-            const modifiedBodies = await this.electronAPI.store.get(this.MODIFIED_BODIES_KEY) || {};
+            const modifiedBodies = await this._getObjectFromStore(this.MODIFIED_BODIES_KEY);
             const key = `${collectionId}_${endpointId}`;
             return modifiedBodies[key] || null;
         } catch (error) {
@@ -72,7 +110,7 @@ export class CollectionRepository {
 
     async saveModifiedRequestBody(collectionId, endpointId, body) {
         try {
-            const modifiedBodies = await this.electronAPI.store.get(this.MODIFIED_BODIES_KEY) || {};
+            const modifiedBodies = await this._getObjectFromStore(this.MODIFIED_BODIES_KEY);
             const key = `${collectionId}_${endpointId}`;
             modifiedBodies[key] = body;
             await this.electronAPI.store.set(this.MODIFIED_BODIES_KEY, modifiedBodies);
@@ -84,7 +122,7 @@ export class CollectionRepository {
 
     async getPersistedPathParams(collectionId, endpointId) {
         try {
-            const persistedParams = await this.electronAPI.store.get('persistedPathParams') || {};
+            const persistedParams = await this._getObjectFromStore('persistedPathParams');
             const key = `${collectionId}_${endpointId}`;
             return persistedParams[key] || [];
         } catch (error) {
@@ -95,7 +133,7 @@ export class CollectionRepository {
 
     async savePersistedPathParams(collectionId, endpointId, pathParams) {
         try {
-            const persistedParams = await this.electronAPI.store.get('persistedPathParams') || {};
+            const persistedParams = await this._getObjectFromStore('persistedPathParams');
             const key = `${collectionId}_${endpointId}`;
             persistedParams[key] = pathParams;
             await this.electronAPI.store.set('persistedPathParams', persistedParams);
@@ -107,7 +145,7 @@ export class CollectionRepository {
 
     async getPersistedQueryParams(collectionId, endpointId) {
         try {
-            const persistedParams = await this.electronAPI.store.get('persistedQueryParams') || {};
+            const persistedParams = await this._getObjectFromStore('persistedQueryParams');
             const key = `${collectionId}_${endpointId}`;
             return persistedParams[key] || [];
         } catch (error) {
@@ -118,7 +156,7 @@ export class CollectionRepository {
 
     async savePersistedQueryParams(collectionId, endpointId, queryParams) {
         try {
-            const persistedParams = await this.electronAPI.store.get('persistedQueryParams') || {};
+            const persistedParams = await this._getObjectFromStore('persistedQueryParams');
             const key = `${collectionId}_${endpointId}`;
             persistedParams[key] = queryParams;
             await this.electronAPI.store.set('persistedQueryParams', persistedParams);
@@ -130,7 +168,7 @@ export class CollectionRepository {
 
     async getPersistedHeaders(collectionId, endpointId) {
         try {
-            const persistedHeaders = await this.electronAPI.store.get('persistedHeaders') || {};
+            const persistedHeaders = await this._getObjectFromStore('persistedHeaders');
             const key = `${collectionId}_${endpointId}`;
             return persistedHeaders[key] || [];
         } catch (error) {
@@ -141,7 +179,7 @@ export class CollectionRepository {
 
     async savePersistedHeaders(collectionId, endpointId, headers) {
         try {
-            const persistedHeaders = await this.electronAPI.store.get('persistedHeaders') || {};
+            const persistedHeaders = await this._getObjectFromStore('persistedHeaders');
             const key = `${collectionId}_${endpointId}`;
             persistedHeaders[key] = headers;
             await this.electronAPI.store.set('persistedHeaders', persistedHeaders);
@@ -153,7 +191,7 @@ export class CollectionRepository {
 
     async getPersistedAuthConfig(collectionId, endpointId) {
         try {
-            const persistedAuthConfigs = await this.electronAPI.store.get('persistedAuthConfigs') || {};
+            const persistedAuthConfigs = await this._getObjectFromStore('persistedAuthConfigs');
             const key = `${collectionId}_${endpointId}`;
             return persistedAuthConfigs[key] || null;
         } catch (error) {
@@ -164,7 +202,7 @@ export class CollectionRepository {
 
     async savePersistedAuthConfig(collectionId, endpointId, authConfig) {
         try {
-            const persistedAuthConfigs = await this.electronAPI.store.get('persistedAuthConfigs') || {};
+            const persistedAuthConfigs = await this._getObjectFromStore('persistedAuthConfigs');
             const key = `${collectionId}_${endpointId}`;
             persistedAuthConfigs[key] = authConfig;
             await this.electronAPI.store.set('persistedAuthConfigs', persistedAuthConfigs);
@@ -176,7 +214,7 @@ export class CollectionRepository {
 
     async getCollectionExpansionStates() {
         try {
-            return await this.electronAPI.store.get('collectionExpansionStates') || {};
+            return await this._getObjectFromStore('collectionExpansionStates');
         } catch (error) {
             console.error('Error getting collection expansion states:', error);
             return {};
@@ -197,28 +235,28 @@ export class CollectionRepository {
             const key = `${collectionId}_${endpointId}`;
 
             // Delete modified request body
-            const modifiedBodies = await this.electronAPI.store.get(this.MODIFIED_BODIES_KEY) || {};
+            const modifiedBodies = await this._getObjectFromStore(this.MODIFIED_BODIES_KEY);
             if (modifiedBodies[key]) {
                 delete modifiedBodies[key];
                 await this.electronAPI.store.set(this.MODIFIED_BODIES_KEY, modifiedBodies);
             }
 
             // Delete persisted query params
-            const persistedParams = await this.electronAPI.store.get('persistedQueryParams') || {};
+            const persistedParams = await this._getObjectFromStore('persistedQueryParams');
             if (persistedParams[key]) {
                 delete persistedParams[key];
                 await this.electronAPI.store.set('persistedQueryParams', persistedParams);
             }
 
             // Delete persisted headers
-            const persistedHeaders = await this.electronAPI.store.get('persistedHeaders') || {};
+            const persistedHeaders = await this._getObjectFromStore('persistedHeaders');
             if (persistedHeaders[key]) {
                 delete persistedHeaders[key];
                 await this.electronAPI.store.set('persistedHeaders', persistedHeaders);
             }
 
             // Delete persisted auth config
-            const persistedAuthConfigs = await this.electronAPI.store.get('persistedAuthConfigs') || {};
+            const persistedAuthConfigs = await this._getObjectFromStore('persistedAuthConfigs');
             if (persistedAuthConfigs[key]) {
                 delete persistedAuthConfigs[key];
                 await this.electronAPI.store.set('persistedAuthConfigs', persistedAuthConfigs);
