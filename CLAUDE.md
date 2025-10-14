@@ -14,20 +14,27 @@ Resonance is an Electron-based API client application that provides a clean and 
 ### Building and Packaging
 - `npm run package` - Package the application for the current platform
 - `npm run make` - Create distributables (zip, deb, rpm, squirrel)
+- `npm run make:debian` - Create Debian (.deb) package specifically
+- **Note:** Application uses ASAR packaging (`asar: true` in forge.config.js)
 
 ### Testing
 - `npm test` - Currently outputs "no test specified" error (no tests configured)
 
 ## Architecture
 
-### Main Process (`src/main.js`)
-- Entry point for Electron application
-- Manages BrowserWindow creation and lifecycle
-- Handles IPC communication for API requests, file operations, and data persistence
+### Main Process (`src/main.js` and `src/main/`)
+- Entry point for Electron application (`src/main.js`)
+- Modular main process architecture in `src/main/`:
+  - `windowManager.js` - Window creation and lifecycle management
+  - `apiRequestHandlers.js` - HTTP request handling via axios
+  - `storeHandlers.js` - electron-store IPC operations with fallback handling
+  - `schemaProcessor.js` - OpenAPI schema processing
+  - `openApiParser.js` - OpenAPI file import and parsing
 - Uses `electron-store` for persistent storage of collections and variables
 - Uses `electron-window-state` for window state management
 - Makes HTTP requests via `axios` in the main process for security
 - Handles OpenAPI file imports and parsing via `js-yaml`
+- Store initialization includes validation and auto-recovery for sandboxed environments
 
 ### Renderer Process (`src/renderer.js`)
 - Main UI orchestrator that initializes all modules
@@ -48,7 +55,9 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 #### Architectural Layers
 - `controllers/` - MVC controllers (CollectionController.js)
 - `services/` - Business logic services (CollectionService.js, VariableService.js)
-- `storage/` - Data persistence layer (CollectionRepository.js, VariableRepository.js)
+- `storage/` - Data persistence layer with robust error handling
+  - CollectionRepository.js - Includes `_getObjectFromStore()` helper for safe store access
+  - VariableRepository.js - Validates and initializes store data
 - `ui/` - UI components (CollectionRenderer.js, ContextMenu.js, RenameDialog.js, VariableManager.js)
 - `variables/` - Variable processing and templating (VariableProcessor.js)
 - `schema/` - OpenAPI schema processing (SchemaProcessor.js)
@@ -96,12 +105,15 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - `contextIsolation: true` and `nodeIntegration: false` in webPreferences
 - Uses `preload.js` to expose safe APIs via `contextBridge`
 - Electron Forge fuses configured for security (RunAsNode disabled, cookie encryption enabled, etc.)
+- **Preload Path:** Uses `__dirname` for reliable preload script resolution in both dev and packaged (ASAR) environments
 
 ### Data Persistence
 - Uses `electron-store` to persist collections and variables in JSON format
 - Store name: `api-collections` with default structure `{ collections: [] }`
 - IPC handlers for `store:get`, `store:set`, `settings:get`, and `settings:set` operations
 - Separate storage for collection data, variables, theme preferences, and language settings
+- **Important:** Repository layer includes fallback handling for packaged apps where store may return `undefined` on first run
+- All store access methods validate data types and auto-initialize with defaults if needed
 
 ## UI Structure
 - Split layout with collections sidebar and main content area
@@ -113,8 +125,12 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 
 ## Key Patterns
 - ES6 modules throughout renderer process (`import`/`export`)
-- CommonJS in main process and preload script (`require`)
-- Repository pattern for data access
+- ES6 modules in main process (using `type: "module"` in package.json)
+- CommonJS in preload script (`require`)
+- Repository pattern for data access with defensive programming
+  - All repository methods validate data types before use
+  - Auto-initialization of undefined store values
+  - Graceful degradation for packaged app environments
 - Service layer for business logic separation
 - MVC-like controller pattern for UI coordination
 - Centralized DOM element management in `domElements.js`
@@ -123,3 +139,19 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - CSS custom properties for theming with semantic naming conventions
 - Attribute-based i18n with automatic DOM updates (`data-i18n` attributes)
 - Unified settings management through modal interface
+
+## Common Issues & Solutions
+
+### Packaged App Issues
+1. **Store returns undefined on first run:**
+   - Repository layer automatically detects and initializes with defaults
+   - See `_getObjectFromStore()` helper in CollectionRepository.js
+
+2. **Preload script not loading:**
+   - WindowManager uses `__dirname` for correct path resolution in ASAR
+   - Works in both development and packaged environments
+
+3. **Path resolution in packaged apps:**
+   - Use `app.isPackaged` to detect environment
+   - Use `process.resourcesPath` for assets in packaged apps
+   - Use `__dirname` for internal module paths

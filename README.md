@@ -58,6 +58,13 @@ Create distributables (zip, deb, rpm, etc.):
 npm run make
 ```
 
+Create Debian package specifically:
+```bash
+npm run make:debian
+```
+
+**Note:** The application uses ASAR packaging for improved performance and security.
+
 ## Usage 📖
 
 ### Getting Started
@@ -103,14 +110,20 @@ Switch between themes in Settings:
 
 ```
 src/
-├── main.js              # Main Electron process
+├── main.js              # Main Electron process entry point
+├── main/                # Main process modules
+│   ├── windowManager.js      # Window lifecycle management
+│   ├── apiRequestHandlers.js # HTTP request handling
+│   ├── storeHandlers.js      # Data persistence with fallbacks
+│   ├── schemaProcessor.js    # OpenAPI schema processing
+│   └── openApiParser.js      # OpenAPI file import
 ├── renderer.js          # Renderer process coordinator
 ├── preload.js           # Secure context bridge
 ├── style.css           # Global styles
-├── modules/            # Modular components
+├── modules/            # Modular renderer components
 │   ├── controllers/    # MVC controllers
 │   ├── services/       # Business logic
-│   ├── storage/        # Data persistence
+│   ├── storage/        # Data persistence with validation
 │   ├── ui/            # UI components
 │   ├── variables/     # Variable processing
 │   └── schema/        # OpenAPI schema handling
@@ -129,10 +142,14 @@ src/
 ### Security Features
 
 - Context isolation enabled
-- Node.js integration disabled
-- Secure IPC communication
-- Preload script for safe API exposure
-- Electron Forge fuses for additional security
+- Node.js integration disabled in renderer
+- Secure IPC communication via contextBridge
+- Preload script for safe API exposure using `__dirname` for reliable path resolution
+- Electron Forge fuses for additional security:
+  - RunAsNode disabled
+  - Cookie encryption enabled
+  - ASAR integrity validation enabled
+  - Only load app from ASAR in production
 
 ## Development 🛠️
 
@@ -140,7 +157,8 @@ src/
 
 - `npm start` - Start development server
 - `npm run package` - Package for current platform
-- `npm run make` - Create distributables
+- `npm run make` - Create all distributables
+- `npm run make:debian` - Create Debian (.deb) package
 - `npm test` - Run tests (not configured yet)
 
 ### Development Architecture
@@ -172,10 +190,12 @@ We welcome contributions! Please follow these guidelines:
 ### Code Style
 
 - Use ES6 modules in renderer process
-- Use CommonJS in main process
+- Use ES6 modules in main process (since v1.0.0)
+- Use CommonJS in preload script only
 - Follow existing patterns and conventions
 - Maintain security best practices
 - Add JSDoc comments for public APIs
+- Use defensive programming in repository layer (validate data types, handle undefined)
 
 ## License 📄
 
@@ -189,13 +209,19 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Roadmap 🗺️
 
+- [x] OpenAPI 3.0 import
+- [x] Variable templating system
+- [x] Multi-theme support
+- [x] Internationalization
+- [x] Authentication support (Bearer, Basic, API Key, OAuth2)
 - [ ] Test suite implementation
 - [ ] Plugin system for extensions
 - [ ] More export formats (Postman, Insomnia)
 - [ ] GraphQL support
 - [ ] Request history and bookmarks
 - [ ] Team collaboration features
-- [ ] Advanced authentication flows (OAuth, JWT)
+- [ ] Environment management (Dev, Staging, Production)
+- [ ] Response caching and mock servers
 
 ## Acknowledgments 🙏
 
