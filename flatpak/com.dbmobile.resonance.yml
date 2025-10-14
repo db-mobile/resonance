@@ -1,0 +1,45 @@
+id: com.dbmobile.resonance
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '24.08'
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.node20
+build-options:
+  append-path: /usr/lib/sdk/node20/bin
+command: run.sh
+finish-args:
+  - --device=dri
+  - --share=ipc
+  - --share=network
+  - --filesystem=home:ro
+  - --socket=x11
+  - --socket=wayland
+modules:
+  - name: resonance
+    buildsystem: simple
+    build-options:
+      env:
+        XDG_CACHE_HOME: /run/build/resonance/flatpak-node/cache
+        npm_config_cache: /run/build/resonance/flatpak-node/npm-cache
+        npm_config_nodedir: /usr/lib/sdk/node20
+        npm_config_offline: 'true'
+    build-commands:
+      - npm install --offline
+      - |
+        . ../flatpak-node/electron-builder-arch-args.sh
+        npm run dist -- $ELECTRON_BUILDER_ARCH_ARGS  --linux --dir
+      - cp -a dist/linux*unpacked /app/main
+      - install -Dm755 -t /app/bin/ ../run.sh
+    subdir: main
+    sources:
+      - type: archive
+        url: https://github.com/db-mobile/resonance/releases/download/v18/resonance-linux-x64-1.0.0.zip
+        sha256: sha256:ae7fab253e2aecc5f8082bb8fa4215ff55cb1a0740603d5dcb2f40db109b5049
+        dest: main
+      - generated-sources.json
+      - type: script
+        dest-filename: run.sh
+        commands:
+          - zypak-wrapper /app/main/resonance "$@"

@@ -43,7 +43,6 @@ export default {
           symlinks: [],
           finishArgs: [
             '--device=dri',
-            '--filesystem=xdg-config/resonance:create',
             '--filesystem=home:ro',
             '--share=ipc',
             '--share=network',
