@@ -34,9 +34,8 @@ modules:
       - install -Dm755 -t /app/bin/ ../run.sh
     subdir: main
     sources:
-      - type: archive
-        url: https://github.com/db-mobile/resonance/releases/download/v18/resonance-linux-x64-1.0.0.zip
-        sha256: sha256:ae7fab253e2aecc5f8082bb8fa4215ff55cb1a0740603d5dcb2f40db109b5049
+      - type: dir
+        path: ..
         dest: main
       - generated-sources.json
       - type: script

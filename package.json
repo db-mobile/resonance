@@ -12,6 +12,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "lint": "echo \"Add linting tool like eslint if needed\"",
+    "dist": "electron-builder",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "make:debian": "electron-forge make --targets=@electron-forge/maker-deb",
