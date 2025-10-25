@@ -487,7 +487,7 @@ body {
   color: var(--text-tertiary);
 }
 
-.send-btn {
+.send-btn, .curl-btn {
   background: var(--color-primary);
   color: var(--text-inverse);
   border: none;
@@ -500,21 +500,25 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-.send-btn:hover {
+.send-btn:hover, .curl-btn:hover {
   background: var(--color-primary-dark);
   transform: translateY(-1px);
   box-shadow: var(--shadow-base);
 }
 
-.send-btn:active {
+.send-btn:active, .curl-btn:active {
   transform: translateY(0);
 }
 
-.send-btn:disabled {
+.send-btn:disabled, .curl-btn:disabled {
   background: var(--color-gray-400);
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.curl-btn svg {
+  display: block;
 }
 
 .cancel-btn {

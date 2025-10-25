@@ -64,24 +64,34 @@
                         <option value="PATCH">PATCH</option>
                     </select>
                     
-                    <input type="url" 
-                           id="url-input" 
-                           class="url-input" 
-                           placeholder="Enter API URL" 
+                    <input type="url"
+                           id="url-input"
+                           class="url-input"
+                           placeholder="Enter API URL"
                            value="https://jsonplaceholder.typicode.com/posts"
                            aria-label="API URL">
-                    
-                    <button id="send-request-btn" 
-                            class="send-btn" 
+
+                    <button id="send-request-btn"
+                            class="send-btn"
                             aria-label="Send Request">
                         Send Request
                     </button>
-                    
-                    <button id="cancel-request-btn" 
-                            class="cancel-btn" 
+
+                    <button id="cancel-request-btn"
+                            class="cancel-btn"
                             aria-label="Cancel Request"
                             style="display: none;">
                         Cancel
+                    </button>
+
+                    <button id="curl-btn"
+                            class="curl-btn"
+                            aria-label="Generate cURL Command"
+                            title="Generate cURL Command">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="4 17 10 11 4 5"></polyline>
+                            <line x1="12" y1="19" x2="20" y2="19"></line>
+                        </svg>
                     </button>
                 </div>
             </section>

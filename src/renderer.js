@@ -1,9 +1,9 @@
-import { sendRequestBtn, cancelRequestBtn, importCollectionBtn } from './modules/domElements.js';
+import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn } from './modules/domElements.js';
 
 import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
-import { handleSendRequest, handleCancelRequest } from './modules/apiHandler.js';
+import { handleSendRequest, handleCancelRequest, handleGenerateCurl } from './modules/apiHandler.js';
 import { loadCollections, importOpenApiFile, initializeBodyTracking } from './modules/collectionManager.js';
 import { ThemeManager, SettingsModal } from './modules/themeManager.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
@@ -18,6 +18,7 @@ const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager);
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Set up event listeners after DOM is loaded and electronAPI is available
+    curlBtn.addEventListener('click', handleGenerateCurl);
     sendRequestBtn.addEventListener('click', handleSendRequest);
     cancelRequestBtn.addEventListener('click', handleCancelRequest);
     importCollectionBtn.addEventListener('click', importOpenApiFile);

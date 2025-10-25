@@ -7,6 +7,8 @@ import { VariableProcessor } from './variables/VariableProcessor.js';
 import { VariableRepository } from './storage/VariableRepository.js';
 import { CollectionRepository } from './storage/CollectionRepository.js';
 import { authManager } from './authManager.js';
+import { generateCurlCommand } from './curlGenerator.js';
+import { CurlDialog } from './ui/CurlDialog.js';
 
 function generateLineNumbers(text) {
     if (!text) return '';
@@ -286,4 +288,134 @@ export async function handleSendRequest() {
         // Always reset UI state when request completes
         setRequestInProgress(false);
     }
+}
+
+export async function handleGenerateCurl() {
+    // Save any pending body modifications before generating cURL
+    if (window.currentEndpoint) {
+        await saveRequestBodyModification(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+    }
+
+    let url = urlInput.value.trim();
+    const method = methodSelect.value;
+    let body = undefined;
+
+    const pathParams = parseKeyValuePairs(document.getElementById('path-params-list'));
+    const headers = parseKeyValuePairs(document.getElementById('headers-list'));
+    const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
+
+    // Get authorization data
+    const authData = authManager.generateAuthData();
+
+    // Merge auth headers with existing headers (auth headers take precedence over manual headers)
+    Object.keys(authData.headers).forEach(key => {
+        headers[key] = authData.headers[key];
+    });
+
+    // Merge auth query params with existing query params (manual params take precedence)
+    Object.keys(authData.queryParams).forEach(key => {
+        if (!queryParams[key]) {
+            queryParams[key] = authData.queryParams[key];
+        }
+    });
+
+    // Process variables and merge default headers if we have a current endpoint
+    if (window.currentEndpoint) {
+        try {
+            const collectionRepository = new CollectionRepository(window.electronAPI);
+            const variableRepository = new VariableRepository(window.electronAPI);
+
+            // Get collection data for default headers
+            const collection = await collectionRepository.getById(window.currentEndpoint.collectionId);
+
+            // Merge default headers from collection (they go first, can be overridden)
+            if (collection && collection.defaultHeaders) {
+                const mergedHeaders = { ...collection.defaultHeaders, ...headers };
+                Object.assign(headers, mergedHeaders);
+            }
+
+            // Process variables in URL, headers, query params, path params, and body
+            const variables = await variableRepository.getVariablesForCollection(window.currentEndpoint.collectionId);
+            const processor = new VariableProcessor();
+
+            // First, replace path parameters in the URL with their values
+            const combinedVariables = { ...variables, ...pathParams };
+            url = processor.processTemplate(url, combinedVariables);
+
+            // Process headers
+            const processedHeaders = {};
+            for (const [key, value] of Object.entries(headers)) {
+                const processedKey = processor.processTemplate(key, variables);
+                const processedValue = processor.processTemplate(value, variables);
+                processedHeaders[processedKey] = processedValue;
+            }
+            // Clear and replace headers with processed versions
+            for (const key in headers) {
+                delete headers[key];
+            }
+            Object.assign(headers, processedHeaders);
+
+            // Process query params
+            const processedQueryParams = {};
+            for (const [key, value] of Object.entries(queryParams)) {
+                const processedKey = processor.processTemplate(key, variables);
+                const processedValue = processor.processTemplate(value, variables);
+                processedQueryParams[processedKey] = processedValue;
+            }
+            // Clear and replace query params with processed versions
+            for (const key in queryParams) {
+                delete queryParams[key];
+            }
+            Object.assign(queryParams, processedQueryParams);
+
+        } catch (error) {
+            console.error('Error processing variables:', error);
+            updateStatusDisplay(`Variable processing error: ${error.message}`, null);
+            return;
+        }
+    }
+
+    // Strip existing query parameters from URL to avoid duplication
+    // The query params list is the source of truth
+    const urlWithoutQuery = url.split('?')[0];
+
+    const queryString = new URLSearchParams(queryParams).toString();
+    if (queryString) {
+        url = urlWithoutQuery + '?' + queryString;
+    } else {
+        url = urlWithoutQuery;
+    }
+
+    if (['POST', 'PUT', 'PATCH'].includes(method) && bodyInput.value.trim()) {
+        try {
+            let bodyText = bodyInput.value.trim();
+
+            // Process variables in body if we have a current endpoint
+            if (window.currentEndpoint) {
+                const variableRepository = new VariableRepository(window.electronAPI);
+                const variables = await variableRepository.getVariablesForCollection(window.currentEndpoint.collectionId);
+                const processor = new VariableProcessor();
+                bodyText = processor.processTemplate(bodyText, variables);
+            }
+
+            body = JSON.parse(bodyText);
+        } catch (e) {
+            updateStatusDisplay(`Invalid Body JSON: ${e.message}`, null);
+            return;
+        }
+    }
+
+    // Generate cURL command
+    const requestConfig = {
+        method,
+        url,
+        headers,
+        body
+    };
+
+    const curlCommand = generateCurlCommand(requestConfig);
+
+    // Show the cURL dialog
+    const curlDialog = new CurlDialog();
+    curlDialog.show(curlCommand);
 }

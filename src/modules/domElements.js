@@ -1,6 +1,7 @@
 export const urlInput = document.getElementById('url-input');
 export const methodSelect = document.getElementById('method-select');
 export const bodyInput = document.getElementById('body-input');
+export const curlBtn = document.getElementById('curl-btn');
 export const sendRequestBtn = document.getElementById('send-request-btn');
 export const cancelRequestBtn = document.getElementById('cancel-request-btn');
 export const statusDisplay = document.getElementById('status-display');
