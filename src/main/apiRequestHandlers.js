@@ -7,6 +7,19 @@ class ApiRequestHandler {
     }
 
     /**
+     * Calculate the size of the response body in bytes from raw response data
+     * (equivalent to cURL's size_download)
+     */
+    calculateResponseSize(rawData) {
+        if (!rawData) {
+            return 0;
+        }
+
+        // Measure the actual bytes of the raw response
+        return new TextEncoder().encode(rawData).length;
+    }
+
+    /**
      * Handle API request with abort support
      */
     async handleApiRequest(requestOptions) {
@@ -29,6 +42,8 @@ class ApiRequestHandler {
                 headers: requestOptions.headers || {},
                 timeout: 30000, // 30 second timeout
                 signal: this.currentRequestController.signal,
+                // Get raw response data to measure actual download size
+                transformResponse: [(data) => data]
             };
 
             // Apply HTTP version configuration
@@ -68,13 +83,29 @@ class ApiRequestHandler {
             // Clear the controller on successful completion
             this.currentRequestController = null;
 
+            const serializedHeaders = JSON.parse(JSON.stringify(response.headers));
+
+            // Calculate size from raw response data (before parsing)
+            const rawData = response.data;
+            const responseSize = this.calculateResponseSize(rawData);
+
+            // Parse the response data
+            let parsedData;
+            try {
+                parsedData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+            } catch (e) {
+                // If JSON parsing fails, use raw data
+                parsedData = rawData;
+            }
+
             return {
                 success: true,
-                data: response.data,
+                data: parsedData,
                 status: response.status,
                 statusText: response.statusText,
-                headers: JSON.parse(JSON.stringify(response.headers)),
-                ttfb: ttfb
+                headers: serializedHeaders,
+                ttfb: ttfb,
+                size: responseSize
             };
         } catch (error) {
             console.error('API request error:', error);
@@ -98,15 +129,29 @@ class ApiRequestHandler {
             let serializedError;
 
             if (error.response) {
+                // Calculate size from raw response data
+                const rawData = error.response.data;
+                const responseSize = this.calculateResponseSize(rawData);
+
+                // Parse the error response data
+                let parsedData;
+                try {
+                    parsedData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+                } catch (e) {
+                    // If JSON parsing fails, use raw data
+                    parsedData = rawData;
+                }
+
                 // Server responded with error status
                 serializedError = {
                     success: false,
                     message: error.message || `HTTP Error ${error.response.status}`,
                     status: error.response.status,
                     statusText: error.response.statusText,
-                    data: error.response.data,
+                    data: parsedData,
                     headers: {},
-                    ttfb: ttfb
+                    ttfb: ttfb,
+                    size: responseSize
                 };
 
                 // Safely serialize headers
