@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Resonance
+Comment=A clean and minimal API client
+Exec=resonance
+Icon=com.dbmobile.resonance
+Type=Application
+Categories=Development;Network;
+StartupNotify=true
