@@ -3,28 +3,20 @@ import path from 'path';
 import windowStateKeeper from 'electron-window-state';
 import { fileURLToPath } from 'url';
 
-// Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/**
- * Manages Electron window creation and lifecycle
- */
 class WindowManager {
     constructor() {
         this.mainWindow = null;
     }
 
-    /**
-     * Create the main application window
-     */
     createWindow() {
         let mainWindowState = windowStateKeeper({
             defaultWidth: 1200,
             defaultHeight: 800
         });
 
-        // Determine correct paths for packaged vs development
         const isDev = !app.isPackaged;
         const appPath = isDev ? process.cwd() : path.dirname(app.getPath('exe'));
         const resourcesPath = isDev ? process.cwd() : process.resourcesPath;
@@ -44,7 +36,6 @@ class WindowManager {
 
         mainWindowState.manage(this.mainWindow);
 
-        // Register global shortcuts
         globalShortcut.register('CommandOrControl+R', () => {
             if (this.mainWindow) {
                 this.mainWindow.reload();
@@ -57,9 +48,6 @@ class WindowManager {
         return this.mainWindow;
     }
 
-    /**
-     * Get the main window instance
-     */
     getMainWindow() {
         return this.mainWindow;
     }

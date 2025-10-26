@@ -43,10 +43,8 @@ export default {
           symlinks: [],
           finishArgs: [
             '--device=dri',
-            '--filesystem=home:ro',
             '--share=ipc',
             '--share=network',
-            '--socket=wayland',
             '--socket=x11',
           ],
           modules: [],

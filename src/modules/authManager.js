@@ -1,8 +1,3 @@
-/**
- * Authorization Manager
- * Handles authorization configuration and header generation for API requests
- */
-
 export class AuthManager {
     constructor() {
         this.authTypeSelect = document.getElementById('auth-type-select');
@@ -23,27 +18,19 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Handle changes to the authorization type
-     */
     handleAuthTypeChange(authType) {
         this.currentAuthConfig.type = authType;
         this.currentAuthConfig.config = {};
         this.renderAuthFields(authType);
     }
 
-    /**
-     * Render the appropriate fields based on auth type
-     */
     renderAuthFields(authType) {
         if (!this.authFieldsContainer) return;
 
-        // Clear existing fields
         this.authFieldsContainer.innerHTML = '';
 
         switch (authType) {
             case 'none':
-                // No fields needed
                 break;
 
             case 'bearer':
@@ -71,11 +58,7 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Render Bearer Token fields
-     */
     renderBearerTokenFields() {
-        // Set default value if no token is configured
         const defaultToken = this.currentAuthConfig.config.token || '{{bearerToken}}';
 
         const html = `
@@ -92,10 +75,8 @@ export class AuthManager {
         `;
         this.authFieldsContainer.innerHTML = html;
 
-        // Add event listener for token input
         const tokenInput = document.getElementById('bearer-token');
         if (tokenInput) {
-            // Set initial value in config
             this.currentAuthConfig.config.token = tokenInput.value;
 
             tokenInput.addEventListener('input', (e) => {
@@ -104,9 +85,6 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Render Basic Auth fields
-     */
     renderBasicAuthFields() {
         const html = `
             <div class="auth-field-group">
@@ -129,7 +107,6 @@ export class AuthManager {
         `;
         this.authFieldsContainer.innerHTML = html;
 
-        // Add event listeners
         const usernameInput = document.getElementById('basic-username');
         const passwordInput = document.getElementById('basic-password');
 
@@ -146,9 +123,6 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Render API Key fields
-     */
     renderApiKeyFields() {
         const html = `
             <div class="auth-field-group">
@@ -178,7 +152,6 @@ export class AuthManager {
         `;
         this.authFieldsContainer.innerHTML = html;
 
-        // Add event listeners
         const keyNameInput = document.getElementById('api-key-name');
         const keyValueInput = document.getElementById('api-key-value');
         const keyLocationSelect = document.getElementById('api-key-location');
@@ -199,14 +172,10 @@ export class AuthManager {
             keyLocationSelect.addEventListener('change', (e) => {
                 this.currentAuthConfig.config.location = e.target.value;
             });
-            // Set default
             this.currentAuthConfig.config.location = 'header';
         }
     }
 
-    /**
-     * Render OAuth 2.0 fields
-     */
     renderOAuth2Fields() {
         const html = `
             <div class="auth-field-group">
@@ -230,7 +199,6 @@ export class AuthManager {
         `;
         this.authFieldsContainer.innerHTML = html;
 
-        // Add event listeners
         const tokenInput = document.getElementById('oauth2-token');
         const prefixInput = document.getElementById('oauth2-header-prefix');
 
@@ -244,14 +212,10 @@ export class AuthManager {
             prefixInput.addEventListener('input', (e) => {
                 this.currentAuthConfig.config.headerPrefix = e.target.value;
             });
-            // Set default
             this.currentAuthConfig.config.headerPrefix = 'Bearer';
         }
     }
 
-    /**
-     * Render Digest Auth fields
-     */
     renderDigestAuthFields() {
         const html = `
             <div class="auth-field-group">
@@ -274,7 +238,6 @@ export class AuthManager {
         `;
         this.authFieldsContainer.innerHTML = html;
 
-        // Add event listeners
         const usernameInput = document.getElementById('digest-username');
         const passwordInput = document.getElementById('digest-password');
 
@@ -291,10 +254,6 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Generate authorization headers and query params based on current config
-     * @returns {Object} Object with headers and queryParams properties
-     */
     generateAuthData() {
         const authData = {
             headers: {},
@@ -303,18 +262,14 @@ export class AuthManager {
         };
 
         const { type, config } = this.currentAuthConfig;
-        console.log('generateAuthData - currentAuthConfig:', this.currentAuthConfig);
 
         switch (type) {
             case 'none':
-                // No auth data to add
                 break;
 
             case 'bearer':
-                console.log('Bearer auth - config.token:', config.token);
                 if (config.token) {
                     authData.headers['Authorization'] = `Bearer ${config.token}`;
-                    console.log('Set Authorization header:', authData.headers['Authorization']);
                 } else {
                     console.warn('Bearer token is empty or undefined');
                 }
@@ -345,8 +300,6 @@ export class AuthManager {
                 break;
 
             case 'digest':
-                // Digest auth is handled by the HTTP client (axios)
-                // Pass credentials as auth config
                 if (config.username || config.password) {
                     authData.authConfig = {
                         username: config.username || '',
@@ -362,9 +315,6 @@ export class AuthManager {
         return authData;
     }
 
-    /**
-     * Load authorization configuration
-     */
     loadAuthConfig(authConfig) {
         if (!authConfig) {
             authConfig = { type: 'none', config: {} };
@@ -372,21 +322,15 @@ export class AuthManager {
 
         this.currentAuthConfig = authConfig;
 
-        // Update the select dropdown
         if (this.authTypeSelect) {
             this.authTypeSelect.value = authConfig.type || 'none';
         }
 
-        // Render the fields
         this.renderAuthFields(authConfig.type || 'none');
 
-        // Populate the field values
         this.populateAuthFields(authConfig);
     }
 
-    /**
-     * Populate auth fields with saved values
-     */
     populateAuthFields(authConfig) {
         const { type, config } = authConfig;
 
@@ -453,16 +397,10 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Get current auth configuration
-     */
     getAuthConfig() {
         return this.currentAuthConfig;
     }
 
-    /**
-     * Reset auth configuration
-     */
     resetAuthConfig() {
         this.currentAuthConfig = {
             type: 'none',
@@ -477,5 +415,4 @@ export class AuthManager {
     }
 }
 
-// Export singleton instance
 export const authManager = new AuthManager();

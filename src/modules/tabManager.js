@@ -1,5 +1,4 @@
 export function initTabListeners() {
-    // Handle request configuration tabs
     const requestTabButtons = document.querySelectorAll('.request-config .tab-button');
     const requestTabContents = document.querySelectorAll('.request-config .tab-content');
 
@@ -22,7 +21,6 @@ export function initTabListeners() {
         });
     });
 
-    // Handle response tabs
     const responseTabButtons = document.querySelectorAll('.response-tabs .tab-button');
     const responseTabContents = document.querySelectorAll('.response-display .tab-content');
 

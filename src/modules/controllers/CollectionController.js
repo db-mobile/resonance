@@ -1,8 +1,3 @@
-/**
- * Main controller for collection management
- * Follows Facade pattern - provides simple interface to complex subsystem
- * Follows Single Responsibility Principle - only coordinates between components
- */
 import { CollectionRepository } from '../storage/CollectionRepository.js';
 import { VariableRepository } from '../storage/VariableRepository.js';
 import { SchemaProcessor } from '../schema/SchemaProcessor.js';
@@ -17,24 +12,20 @@ import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 
 export class CollectionController {
     constructor(electronAPI, updateStatusDisplay) {
-        // Initialize dependencies following Dependency Injection pattern
         this.repository = new CollectionRepository(electronAPI);
         this.variableRepository = new VariableRepository(electronAPI);
         this.schemaProcessor = new SchemaProcessor();
         this.variableProcessor = new VariableProcessor();
         this.statusDisplay = new StatusDisplayAdapter(updateStatusDisplay);
         
-        // Services
         this.service = new CollectionService(this.repository, this.schemaProcessor, this.statusDisplay);
         this.variableService = new VariableService(this.variableRepository, this.variableProcessor, this.statusDisplay);
         
-        // UI components
         this.renderer = new CollectionRenderer('collections-list', this.repository);
         this.contextMenu = new ContextMenu();
         this.renameDialog = new RenameDialog();
         this.variableManager = new VariableManager();
         
-        // Bind methods to preserve context
         this.handleEndpointClick = this.handleEndpointClick.bind(this);
         this.handleContextMenu = this.handleContextMenu.bind(this);
         this.handleEndpointContextMenu = this.handleEndpointContextMenu.bind(this);
@@ -86,13 +77,10 @@ export class CollectionController {
             const formElements = this.getFormElements();
             await this.service.loadEndpointIntoForm(collection, endpoint, formElements);
 
-            // Process variables in form elements after loading, but skip URL to show template
             await this.processFormVariablesExceptUrl(collection.id, formElements);
 
-            // Save the last selected request for restoration on app startup
             await this.repository.saveLastSelectedRequest(collection.id, endpoint.id);
 
-            // Highlight the active endpoint in the sidebar
             if (this.renderer && typeof this.renderer.setActiveEndpoint === 'function') {
                 this.renderer.setActiveEndpoint(collection.id, endpoint.id);
             }
@@ -186,7 +174,6 @@ export class CollectionController {
             if (newVariables !== null) {
                 await this.variableService.setMultipleVariables(collection.id, newVariables);
                 
-                // Refresh form if we have an active endpoint to show updated variables
                 if (window.currentEndpoint && window.currentEndpoint.collectionId === collection.id) {
                     const formElements = this.getFormElements();
                     await this.processFormVariablesExceptUrl(collection.id, formElements);
@@ -202,7 +189,7 @@ export class CollectionController {
             const requestData = await this.showNewRequestDialog();
             if (requestData) {
                 await this.service.addRequestToCollection(collection.id, requestData);
-                await this.loadCollectionsWithExpansionState(); // Refresh display preserving state
+                await this.loadCollectionsWithExpansionState();
             }
         } catch (error) {
             console.error('Error creating new request:', error);
@@ -214,7 +201,7 @@ export class CollectionController {
             const collectionName = await this.showNewCollectionDialog();
             if (collectionName) {
                 await this.service.createCollection(collectionName);
-                await this.loadCollections(); // Refresh display
+                await this.loadCollections();
             }
         } catch (error) {
             console.error('Error creating new collection:', error);
@@ -225,14 +212,11 @@ export class CollectionController {
         try {
             const requestData = await this.showNewRequestDialog();
             if (requestData) {
-                // First, ask for collection name
                 const collectionName = await this.showNewCollectionDialog();
                 if (collectionName) {
-                    // Create the collection
                     const newCollection = await this.service.createCollection(collectionName);
-                    // Add the request to the new collection
                     await this.service.addRequestToCollection(newCollection.id, requestData);
-                    await this.loadCollections(); // Refresh display
+                    await this.loadCollections();
                 }
             }
         } catch (error) {
@@ -262,7 +246,6 @@ export class CollectionController {
 
             document.body.appendChild(dialog);
 
-            // Trigger translation for the dialog
             if (window.i18n && window.i18n.updateUI) {
                 window.i18n.updateUI();
             }
@@ -271,7 +254,6 @@ export class CollectionController {
             const nameInput = dialog.querySelector('#collection-name');
             const cancelBtn = dialog.querySelector('#cancel-btn');
 
-            // Focus on name input
             nameInput.focus();
 
             const cleanup = () => {
@@ -293,7 +275,6 @@ export class CollectionController {
                 }
             });
 
-            // Close on overlay click
             dialog.addEventListener('click', (e) => {
                 if (e.target === dialog) {
                     cleanup();
@@ -301,7 +282,6 @@ export class CollectionController {
                 }
             });
 
-            // Close on escape key
             const escapeHandler = (e) => {
                 if (e.key === 'Escape') {
                     cleanup();
@@ -349,7 +329,6 @@ export class CollectionController {
 
             document.body.appendChild(dialog);
 
-            // Trigger translation for the dialog
             if (window.i18n && window.i18n.updateUI) {
                 window.i18n.updateUI();
             }
@@ -360,7 +339,6 @@ export class CollectionController {
             const pathInput = dialog.querySelector('#request-path');
             const cancelBtn = dialog.querySelector('#cancel-btn');
 
-            // Focus on name input
             nameInput.focus();
 
             const cleanup = () => {
@@ -388,7 +366,6 @@ export class CollectionController {
                 }
             });
 
-            // Close on overlay click
             dialog.addEventListener('click', (e) => {
                 if (e.target === dialog) {
                     cleanup();
@@ -396,7 +373,6 @@ export class CollectionController {
                 }
             });
 
-            // Close on escape key
             const escapeHandler = (e) => {
                 if (e.key === 'Escape') {
                     cleanup();
@@ -409,7 +385,6 @@ export class CollectionController {
     }
 
     async handleDelete(collection) {
-        // Get translated confirmation message
         const confirmMessage = window.i18n ?
             window.i18n.t('collection.confirm_delete', { name: collection.name }) :
             `Are you sure you want to delete the collection "${collection.name}"?\n\nThis action cannot be undone.`;
@@ -420,7 +395,7 @@ export class CollectionController {
             try {
                 await this.service.deleteCollection(collection.id);
                 await this.variableService.cleanupCollectionVariables(collection.id);
-                await this.loadCollections(); // Refresh display
+                await this.loadCollections();
             } catch (error) {
                 console.error('Error deleting collection:', error);
             }
@@ -428,7 +403,6 @@ export class CollectionController {
     }
 
     async handleDeleteRequest(collection, endpoint) {
-        // Get translated confirmation message
         const confirmMessage = window.i18n ?
             window.i18n.t('endpoint.confirm_delete', { name: endpoint.name || endpoint.path }) :
             `Are you sure you want to delete the request "${endpoint.name || endpoint.path}"?\n\nThis action cannot be undone.`;
@@ -439,7 +413,6 @@ export class CollectionController {
             try {
                 await this.service.deleteRequestFromCollection(collection.id, endpoint.id);
 
-                // Clear the form if the deleted endpoint was currently loaded
                 if (window.currentEndpoint &&
                     window.currentEndpoint.collectionId === collection.id &&
                     window.currentEndpoint.endpointId === endpoint.id) {
@@ -452,14 +425,12 @@ export class CollectionController {
                     this.service.clearKeyValueList(formElements.queryParamsList);
                     window.currentEndpoint = null;
 
-                    // Clear the last selected request since we deleted it
                     await this.repository.clearLastSelectedRequest();
 
-                    // Clear the active endpoint highlighting
                     this.renderer.clearActiveEndpoint();
                 }
 
-                await this.loadCollectionsWithExpansionState(); // Refresh display preserving state
+                await this.loadCollectionsWithExpansionState();
             } catch (error) {
                 console.error('Error deleting request:', error);
             }
@@ -471,7 +442,7 @@ export class CollectionController {
             const collection = await window.electronAPI.collections.importOpenApiFile();
             
             if (collection) {
-                await this.loadCollections(); // Refresh the collections display
+                await this.loadCollections();
                 return collection;
             } else {
                 this.statusDisplay.update('Import cancelled', null);
@@ -494,7 +465,6 @@ export class CollectionController {
     initializeBodyTracking() {
         const bodyInput = document.getElementById('body-input');
         if (bodyInput) {
-            // Save body modifications when user navigates away or sends request
             bodyInput.addEventListener('blur', async () => {
                 if (window.currentEndpoint) {
                     await this.saveRequestBodyModification(
@@ -504,7 +474,6 @@ export class CollectionController {
                 }
             });
 
-            // Auto-save periodically during typing (debounced)
             let saveTimeout;
             bodyInput.addEventListener('input', () => {
                 clearTimeout(saveTimeout);
@@ -515,14 +484,13 @@ export class CollectionController {
                             window.currentEndpoint.endpointId
                         );
                     }
-                }, 2000); // Save 2 seconds after user stops typing
+                }, 2000);
             });
         }
     }
 
     async processFormVariables(collectionId, formElements) {
         try {
-            // Process URL
             if (formElements.urlInput && formElements.urlInput.value) {
                 formElements.urlInput.value = await this.variableService.processTemplate(
                     formElements.urlInput.value, 
@@ -530,7 +498,6 @@ export class CollectionController {
                 );
             }
 
-            // Process body
             if (formElements.bodyInput && formElements.bodyInput.value) {
                 formElements.bodyInput.value = await this.variableService.processTemplate(
                     formElements.bodyInput.value, 
@@ -538,7 +505,6 @@ export class CollectionController {
                 );
             }
 
-            // Process headers
             if (formElements.headersList) {
                 const headerRows = formElements.headersList.querySelectorAll('.key-value-row');
                 headerRows.forEach(async (row) => {
@@ -554,7 +520,6 @@ export class CollectionController {
                 });
             }
 
-            // Process query params
             if (formElements.queryParamsList) {
                 const queryRows = formElements.queryParamsList.querySelectorAll('.key-value-row');
                 queryRows.forEach(async (row) => {
@@ -576,7 +541,6 @@ export class CollectionController {
 
     async processFormVariablesExceptUrl(collectionId, formElements) {
         try {
-            // Process body
             if (formElements.bodyInput && formElements.bodyInput.value) {
                 formElements.bodyInput.value = await this.variableService.processTemplate(
                     formElements.bodyInput.value, 
@@ -584,7 +548,6 @@ export class CollectionController {
                 );
             }
 
-            // Process headers
             if (formElements.headersList) {
                 const headerRows = formElements.headersList.querySelectorAll('.key-value-row');
                 headerRows.forEach(async (row) => {
@@ -600,7 +563,6 @@ export class CollectionController {
                 });
             }
 
-            // Process query params
             if (formElements.queryParamsList) {
                 const queryRows = formElements.queryParamsList.querySelectorAll('.key-value-row');
                 queryRows.forEach(async (row) => {
@@ -631,7 +593,6 @@ export class CollectionController {
         };
     }
 
-    // Get variables for current collection (useful for API requests)
     async getCurrentCollectionVariables() {
         if (window.currentEndpoint) {
             return await this.variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
@@ -639,7 +600,6 @@ export class CollectionController {
         return {};
     }
 
-    // Process request object before sending API request
     async processRequestForVariables(request) {
         if (window.currentEndpoint) {
             return await this.variableService.processRequest(request, window.currentEndpoint.collectionId);
@@ -647,7 +607,6 @@ export class CollectionController {
         return request;
     }
 
-    // Restore the last selected request on application startup
     async restoreLastSelectedRequest() {
         try {
             const lastSelected = await this.repository.getLastSelectedRequest();
@@ -656,7 +615,6 @@ export class CollectionController {
                 return;
             }
 
-            // Get the collection and endpoint
             const collection = await this.repository.getById(lastSelected.collectionId);
             if (!collection) {
                 console.warn('Last selected collection not found, clearing saved selection');
@@ -664,7 +622,6 @@ export class CollectionController {
                 return;
             }
 
-            // Find the endpoint in the collection or its folders
             let endpoint = null;
             if (collection.endpoints) {
                 endpoint = collection.endpoints.find(ep => ep.id === lastSelected.endpointId);
@@ -685,17 +642,12 @@ export class CollectionController {
                 return;
             }
 
-            // Load the endpoint into the form
             const formElements = this.getFormElements();
             await this.service.loadEndpointIntoForm(collection, endpoint, formElements);
 
-            // Process variables in form elements after loading, but skip URL to show template
             await this.processFormVariablesExceptUrl(collection.id, formElements);
 
-            // Highlight the active endpoint in the sidebar
             this.renderer.setActiveEndpoint(collection.id, endpoint.id);
-
-            console.log('Restored last selected request:', endpoint.name);
         } catch (error) {
             console.error('Error restoring last selected request:', error);
         }

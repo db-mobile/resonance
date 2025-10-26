@@ -1,7 +1,3 @@
-/**
- * Repository for managing collection variables
- * Follows Single Responsibility Principle - only handles variable data persistence
- */
 export class VariableRepository {
     constructor(electronAPI) {
         this.electronAPI = electronAPI;
@@ -12,10 +8,8 @@ export class VariableRepository {
         try {
             const variables = await this.electronAPI.store.get(this.VARIABLES_KEY);
 
-            // Handle cases where store returns undefined (e.g., packaged Debian installations on first run)
             if (!variables || typeof variables !== 'object' || Array.isArray(variables)) {
                 console.warn('Variables data is invalid or undefined, initializing with empty object');
-                // Initialize store with empty object
                 await this.electronAPI.store.set(this.VARIABLES_KEY, {});
                 return {};
             }

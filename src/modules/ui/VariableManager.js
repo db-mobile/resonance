@@ -1,7 +1,3 @@
-/**
- * UI component for managing collection variables
- * Follows Single Responsibility Principle - only handles variable management UI
- */
 export class VariableManager {
     constructor() {
         this.dialog = null;
@@ -93,7 +89,6 @@ export class VariableManager {
             Object.entries(variables).forEach(([name, value]) => {
                 this.addVariableRow(container, name, value);
             });
-            // Add one empty row for new variables
             this.addVariableRow(container);
         }
     }
@@ -116,12 +111,10 @@ export class VariableManager {
             <button class="remove-variable-btn" style="padding: 8px; border: 1px solid var(--color-error); background: transparent; color: var(--color-error); border-radius: 4px; cursor: pointer; min-width: 70px;">Remove</button>
         `;
 
-        // Add event listeners
         row.querySelector('.remove-variable-btn').addEventListener('click', () => {
             row.remove();
         });
 
-        // Auto-add new row when typing in the last empty row
         const nameInput = row.querySelector('.variable-name');
         const valueInput = row.querySelector('.variable-value');
         
@@ -160,14 +153,12 @@ export class VariableManager {
         importBtn.addEventListener('click', () => this.showImportDialog());
         exportBtn.addEventListener('click', () => this.exportVariables());
 
-        // Close on overlay click
         this.dialog.addEventListener('click', (e) => {
             if (e.target === this.dialog) {
                 this.close();
             }
         });
 
-        // Handle escape key
         document.addEventListener('keydown', this.handleKeyDown.bind(this), { once: false });
     }
 
@@ -195,7 +186,6 @@ export class VariableManager {
                     return;
                 }
 
-                // Validate variable name
                 if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
                     errors.push(`Row ${index + 1}: Invalid variable name "${name}". Use letters, numbers, and underscores only. Must start with letter or underscore.`);
                     return;
@@ -309,7 +299,6 @@ export class VariableManager {
 
         const json = JSON.stringify(variables, null, 2);
         
-        // Create and download file
         const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

@@ -1,7 +1,3 @@
-/**
- * Context menu component for collections
- * Follows Single Responsibility Principle - only handles context menu UI
- */
 export class ContextMenu {
     constructor() {
         this.currentMenu = null;
@@ -27,7 +23,6 @@ export class ContextMenu {
         document.body.appendChild(menu);
         this.currentMenu = menu;
 
-        // Trigger translation for the newly created elements
         if (window.i18n && window.i18n.updateUI) {
             window.i18n.updateUI();
         }
@@ -76,17 +71,14 @@ export class ContextMenu {
     }
 
     attachCloseHandlers() {
-        // Remove any existing handlers first
         this.removeCloseHandlers();
 
-        // Create new handler references
         this.clickHandler = () => this.hide();
         this.contextMenuHandler = (e) => {
             e.preventDefault();
             this.hide();
         };
 
-        // Add handlers with a small delay to avoid immediate triggering
         setTimeout(() => {
             document.addEventListener('click', this.clickHandler);
             document.addEventListener('contextmenu', this.contextMenuHandler);
@@ -109,7 +101,6 @@ export class ContextMenu {
             this.currentMenu.remove();
             this.currentMenu = null;
         }
-        // Clean up event listeners when hiding
         this.removeCloseHandlers();
     }
 

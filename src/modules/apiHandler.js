@@ -41,7 +41,6 @@ function setRequestInProgress(inProgress) {
 export async function handleCancelRequest() {
     try {
         const result = await window.electronAPI.cancelApiRequest();
-        console.log('Cancel result:', result);
 
         if (result.success) {
             updateStatusDisplay('Request cancelled', null);
@@ -61,7 +60,6 @@ export async function handleCancelRequest() {
 }
 
 export async function handleSendRequest() {
-    // Save any pending body modifications before sending request
     if (window.currentEndpoint) {
         await saveRequestBodyModification(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
     }
@@ -74,72 +72,53 @@ export async function handleSendRequest() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    console.log('Headers from UI before auth:', headers);
-
-    // Get authorization data
     const authData = authManager.generateAuthData();
-    console.log('Auth data generated:', authData);
 
-    // Merge auth headers with existing headers (auth headers take precedence over manual headers)
-    // This ensures the Authorization tab controls auth, not the Headers tab
     Object.keys(authData.headers).forEach(key => {
         headers[key] = authData.headers[key];
     });
 
-    // Merge auth query params with existing query params (manual params take precedence)
     Object.keys(authData.queryParams).forEach(key => {
         if (!queryParams[key]) {
             queryParams[key] = authData.queryParams[key];
         }
     });
 
-    console.log('Headers after auth merge:', headers);
-
-    // Process variables and merge default headers if we have a current endpoint
     if (window.currentEndpoint) {
         try {
             const collectionRepository = new CollectionRepository(window.electronAPI);
             const variableRepository = new VariableRepository(window.electronAPI);
             
-            // Get collection data for default headers
             const collection = await collectionRepository.getById(window.currentEndpoint.collectionId);
             
-            // Merge default headers from collection (they go first, can be overridden)
             if (collection && collection.defaultHeaders) {
                 const mergedHeaders = { ...collection.defaultHeaders, ...headers };
                 Object.assign(headers, mergedHeaders);
             }
             
-            // Process variables in URL, headers, query params, path params, and body
             const variables = await variableRepository.getVariablesForCollection(window.currentEndpoint.collectionId);
             const processor = new VariableProcessor();
 
-            // First, replace path parameters in the URL with their values
-            // Path params take precedence over collection variables for URL path replacement
             const combinedVariables = { ...variables, ...pathParams };
             url = processor.processTemplate(url, combinedVariables);
 
-            // Process headers
             const processedHeaders = {};
             for (const [key, value] of Object.entries(headers)) {
                 const processedKey = processor.processTemplate(key, variables);
                 const processedValue = processor.processTemplate(value, variables);
                 processedHeaders[processedKey] = processedValue;
             }
-            // Clear and replace headers with processed versions
             for (const key in headers) {
                 delete headers[key];
             }
             Object.assign(headers, processedHeaders);
 
-            // Process query params
             const processedQueryParams = {};
             for (const [key, value] of Object.entries(queryParams)) {
                 const processedKey = processor.processTemplate(key, variables);
                 const processedValue = processor.processTemplate(value, variables);
                 processedQueryParams[processedKey] = processedValue;
             }
-            // Clear and replace query params with processed versions
             for (const key in queryParams) {
                 delete queryParams[key];
             }
@@ -162,7 +141,6 @@ export async function handleSendRequest() {
         try {
             let bodyText = bodyInput.value.trim();
             
-            // Process variables in body if we have a current endpoint
             if (window.currentEndpoint) {
                 const variableRepository = new VariableRepository(window.electronAPI);
                 const variables = await variableRepository.getVariablesForCollection(window.currentEndpoint.collectionId);
@@ -180,7 +158,6 @@ export async function handleSendRequest() {
     }
 
     try {
-        // Set UI to show request in progress
         setRequestInProgress(true);
         
         activateTab('response', 'response-body');
@@ -202,16 +179,13 @@ export async function handleSendRequest() {
             body
         };
 
-        // Add auth config for digest auth if available
         if (authData.authConfig) {
             requestConfig.auth = authData.authConfig;
         }
 
         const result = await window.electronAPI.sendApiRequest(requestConfig);
 
-        // Check if the request was successful
         if (result.success) {
-            // Handle successful response
             const formattedResponse = JSON.stringify(result.data, null, 2);
             displayResponseWithLineNumbers(formattedResponse);
 
@@ -224,18 +198,16 @@ export async function handleSendRequest() {
             updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
             updateResponseTime(result.ttfb);
             updateResponseSize(result.size);
-            setRequestInProgress(false); // Reset UI state for successful requests
+            setRequestInProgress(false);
         } else if (result.cancelled) {
-            // Handle cancelled request
             updateStatusDisplay('Request cancelled', null);
             updateResponseTime(null);
             updateResponseSize(null);
             displayResponseWithLineNumbers('Request was cancelled');
             responseHeadersDisplay.textContent = '';
-            setRequestInProgress(false); // Reset UI state for cancelled requests
+            setRequestInProgress(false);
         } else {
-            // Handle error response (but don't throw, handle it here)
-            throw result; // This will be caught by the catch block below
+            throw result;
         }
 
     } catch (error) {
@@ -245,11 +217,9 @@ export async function handleSendRequest() {
         let statusText = error.statusText || '';
         let errorMessage = error.message || 'Unknown error';
 
-        // Display error response body or fallback to error message
         let errorContent;
         if (error.data) {
             try {
-                // If it's a JSON error response, format it nicely
                 if (typeof error.data === 'object') {
                     errorContent = JSON.stringify(error.data, null, 2);
                 } else {
@@ -263,7 +233,6 @@ export async function handleSendRequest() {
         }
         displayResponseWithLineNumbers(errorContent);
         
-        // Handle headers for error responses
         if (error.headers && Object.keys(error.headers).length > 0) {
             try {
                 responseHeadersDisplay.textContent = JSON.stringify(error.headers, null, 2);
@@ -274,7 +243,6 @@ export async function handleSendRequest() {
             responseHeadersDisplay.textContent = 'No headers available for error response.';
         }
 
-        // Create a proper status display
         let statusDisplayText = 'Request Failed';
         if (status) {
             statusDisplayText = `${status}${statusText ? ` ${statusText}` : ''}`;
@@ -285,13 +253,11 @@ export async function handleSendRequest() {
         updateResponseSize(error.size);
         console.error('API Error (via IPC):', error);
     } finally {
-        // Always reset UI state when request completes
         setRequestInProgress(false);
     }
 }
 
 export async function handleGenerateCurl() {
-    // Save any pending body modifications before generating cURL
     if (window.currentEndpoint) {
         await saveRequestBodyModification(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
     }
@@ -304,65 +270,53 @@ export async function handleGenerateCurl() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    // Get authorization data
     const authData = authManager.generateAuthData();
 
-    // Merge auth headers with existing headers (auth headers take precedence over manual headers)
     Object.keys(authData.headers).forEach(key => {
         headers[key] = authData.headers[key];
     });
 
-    // Merge auth query params with existing query params (manual params take precedence)
     Object.keys(authData.queryParams).forEach(key => {
         if (!queryParams[key]) {
             queryParams[key] = authData.queryParams[key];
         }
     });
 
-    // Process variables and merge default headers if we have a current endpoint
     if (window.currentEndpoint) {
         try {
             const collectionRepository = new CollectionRepository(window.electronAPI);
             const variableRepository = new VariableRepository(window.electronAPI);
 
-            // Get collection data for default headers
             const collection = await collectionRepository.getById(window.currentEndpoint.collectionId);
 
-            // Merge default headers from collection (they go first, can be overridden)
             if (collection && collection.defaultHeaders) {
                 const mergedHeaders = { ...collection.defaultHeaders, ...headers };
                 Object.assign(headers, mergedHeaders);
             }
 
-            // Process variables in URL, headers, query params, path params, and body
             const variables = await variableRepository.getVariablesForCollection(window.currentEndpoint.collectionId);
             const processor = new VariableProcessor();
 
-            // First, replace path parameters in the URL with their values
             const combinedVariables = { ...variables, ...pathParams };
             url = processor.processTemplate(url, combinedVariables);
 
-            // Process headers
             const processedHeaders = {};
             for (const [key, value] of Object.entries(headers)) {
                 const processedKey = processor.processTemplate(key, variables);
                 const processedValue = processor.processTemplate(value, variables);
                 processedHeaders[processedKey] = processedValue;
             }
-            // Clear and replace headers with processed versions
             for (const key in headers) {
                 delete headers[key];
             }
             Object.assign(headers, processedHeaders);
 
-            // Process query params
             const processedQueryParams = {};
             for (const [key, value] of Object.entries(queryParams)) {
                 const processedKey = processor.processTemplate(key, variables);
                 const processedValue = processor.processTemplate(value, variables);
                 processedQueryParams[processedKey] = processedValue;
             }
-            // Clear and replace query params with processed versions
             for (const key in queryParams) {
                 delete queryParams[key];
             }
@@ -375,8 +329,6 @@ export async function handleGenerateCurl() {
         }
     }
 
-    // Strip existing query parameters from URL to avoid duplication
-    // The query params list is the source of truth
     const urlWithoutQuery = url.split('?')[0];
 
     const queryString = new URLSearchParams(queryParams).toString();
@@ -390,7 +342,6 @@ export async function handleGenerateCurl() {
         try {
             let bodyText = bodyInput.value.trim();
 
-            // Process variables in body if we have a current endpoint
             if (window.currentEndpoint) {
                 const variableRepository = new VariableRepository(window.electronAPI);
                 const variables = await variableRepository.getVariablesForCollection(window.currentEndpoint.collectionId);
@@ -405,7 +356,6 @@ export async function handleGenerateCurl() {
         }
     }
 
-    // Generate cURL command
     const requestConfig = {
         method,
         url,
@@ -415,7 +365,6 @@ export async function handleGenerateCurl() {
 
     const curlCommand = generateCurlCommand(requestConfig);
 
-    // Show the cURL dialog
     const curlDialog = new CurlDialog();
     curlDialog.show(curlCommand);
 }

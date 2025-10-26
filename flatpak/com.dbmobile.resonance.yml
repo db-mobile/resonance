@@ -13,9 +13,7 @@ finish-args:
   - --device=dri
   - --share=ipc
   - --share=network
-  - --filesystem=home:ro
   - --socket=x11
-  - --socket=wayland
 modules:
   - name: resonance
     buildsystem: simple

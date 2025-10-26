@@ -1,8 +1,3 @@
-/**
- * Service layer for collection business logic
- * Follows Single Responsibility Principle - only handles collection business logic
- * Follows Dependency Inversion Principle - depends on abstractions (repository interface)
- */
 export class CollectionService {
     constructor(repository, schemaProcessor, statusDisplay) {
         this.repository = repository;
@@ -100,7 +95,6 @@ export class CollectionService {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }
 
-            // Generate a unique ID for the new endpoint
             const newEndpoint = {
                 id: this.generateEndpointId(collection),
                 name: requestData.name,
@@ -116,20 +110,15 @@ export class CollectionService {
                 headers: {}
             };
 
-            // Add the new endpoint to the collection
             collection.endpoints = collection.endpoints || [];
             collection.endpoints.push(newEndpoint);
 
-            // If collection has folder structure, add to appropriate folder
             if (collection.folders && collection.folders.length > 0) {
-                // Extract base path for grouping (first segment after leading slash)
                 const basePath = this.extractBasePath(requestData.path);
                 
-                // Find existing folder or create new one
                 let targetFolder = collection.folders.find(folder => folder.name === basePath);
                 
                 if (!targetFolder) {
-                    // Create new folder for this path
                     targetFolder = {
                         id: `folder_${basePath}`.replace(/[^a-zA-Z0-9]/g, '_'),
                         name: basePath,
@@ -138,11 +127,9 @@ export class CollectionService {
                     collection.folders.push(targetFolder);
                 }
                 
-                // Add endpoint to the folder
                 targetFolder.endpoints.push(newEndpoint);
             }
 
-            // Save the updated collection
             await this.repository.update(collectionId, collection);
             
             this.statusDisplay.update(`Added new request: ${requestData.name}`, null);
@@ -167,11 +154,9 @@ export class CollectionService {
     }
 
     extractBasePath(pathKey) {
-        // Remove leading slash and extract first path segment
         const cleanPath = pathKey.replace(/^\//, '');
         const segments = cleanPath.split('/');
 
-        // Return the first segment, or 'custom' if no segments or root
         return segments[0] || 'custom';
     }
 
@@ -184,12 +169,10 @@ export class CollectionService {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }
 
-            // Remove from main endpoints array
             if (collection.endpoints) {
                 collection.endpoints = collection.endpoints.filter(endpoint => endpoint.id !== endpointId);
             }
 
-            // Remove from folders if collection has folder structure
             if (collection.folders && collection.folders.length > 0) {
                 collection.folders.forEach(folder => {
                     if (folder.endpoints) {
@@ -197,16 +180,13 @@ export class CollectionService {
                     }
                 });
 
-                // Remove empty folders
                 collection.folders = collection.folders.filter(folder => {
                     return folder.endpoints && folder.endpoints.length > 0;
                 });
             }
 
-            // Save the updated collection
             await this.repository.update(collectionId, collection);
 
-            // Clean up persisted data for this endpoint
             await this.repository.deletePersistedEndpointData(collectionId, endpointId);
 
             this.statusDisplay.update('Request deleted successfully', null);
@@ -219,10 +199,8 @@ export class CollectionService {
 
     async loadEndpointIntoForm(collection, endpoint, formElements) {
         try {
-            // Set the OpenAPI spec for schema processing
             this.schemaProcessor.setOpenApiSpec(collection._openApiSpec);
             
-            // Store current endpoint info for persistence
             if (window.currentEndpoint) {
                 await this.saveRequestBodyModification(
                     window.currentEndpoint.collectionId,
@@ -236,7 +214,6 @@ export class CollectionService {
             }
             window.currentEndpoint = { collectionId: collection.id, endpointId: endpoint.id };
 
-            // Build and populate form
             this.populateUrlAndMethod(collection, endpoint, formElements);
             await this.populatePathParams(endpoint, formElements);
             await this.populateHeaders(collection, endpoint, formElements);
@@ -257,8 +234,6 @@ export class CollectionService {
             fullUrl = '{{baseUrl}}' + endpoint.path;
         }
 
-        // Replace path parameters with variable templates ({{variableName}})
-        // so they can be substituted at request time using the variable system
         if (endpoint.parameters?.path) {
             Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
                 fullUrl = fullUrl.replace(`{${key}}`, `{{${key}}}`);
@@ -270,36 +245,24 @@ export class CollectionService {
     }
 
     async populatePathParams(endpoint, formElements) {
-        console.log('RENDERER: populatePathParams called with endpoint:', endpoint);
-        console.log('RENDERER: endpoint.parameters:', endpoint.parameters);
-
         this.clearKeyValueList(formElements.pathParamsList);
 
-        // Check for persisted path params first
         const persistedPathParams = await this.repository.getPersistedPathParams(window.currentEndpoint.collectionId, endpoint.id);
 
         if (persistedPathParams.length > 0) {
-            // Load persisted path parameters
             persistedPathParams.forEach(param => {
                 this.addKeyValueRow(formElements.pathParamsList, param.key, param.value);
             });
         } else {
-            // Add path parameters from endpoint definition
             if (endpoint.parameters?.path) {
-                console.log('RENDERER: Found path parameters:', endpoint.parameters.path);
                 Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
-                    // Provide a better default value if example is empty
                     const value = param.example || '';
-                    console.log(`RENDERER: Adding path parameter ${key} with value:`, value);
                     this.addKeyValueRow(formElements.pathParamsList, key, value);
                 });
-            } else {
-                console.log('RENDERER: No path parameters found');
             }
         }
 
         if (formElements.pathParamsList.children.length === 0) {
-            console.log('RENDERER: No path parameters added, adding empty row');
             this.addKeyValueRow(formElements.pathParamsList);
         }
     }
@@ -307,33 +270,27 @@ export class CollectionService {
     async populateHeaders(collection, endpoint, formElements) {
         this.clearKeyValueList(formElements.headersList);
 
-        // Check for persisted headers first
         const persistedHeaders = await this.repository.getPersistedHeaders(collection.id, endpoint.id);
         
         if (persistedHeaders.length > 0) {
-            // Load persisted headers
             persistedHeaders.forEach(header => {
                 this.addKeyValueRow(formElements.headersList, header.key, header.value);
             });
         } else {
-            // Add default headers from collection first
             if (collection.defaultHeaders) {
                 Object.entries(collection.defaultHeaders).forEach(([key, value]) => {
                     this.addKeyValueRow(formElements.headersList, key, value);
                 });
             }
 
-            // Add endpoint-specific headers (will override defaults if same key)
             if (endpoint.parameters?.header) {
                 Object.entries(endpoint.parameters.header).forEach(([key, param]) => {
                     this.addKeyValueRow(formElements.headersList, key, param.example || '');
                 });
             }
 
-            // Add default Content-Type for POST/PUT/PATCH (if not already set)
             if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
                 const contentType = endpoint.requestBody?.contentType || 'application/json';
-                // Check if Content-Type is already set from defaults or endpoint headers
                 const existingContentType = Array.from(formElements.headersList.children).find(row => {
                     const keyInput = row.querySelector('.key-input');
                     return keyInput && keyInput.value.toLowerCase() === 'content-type';
@@ -350,42 +307,26 @@ export class CollectionService {
     }
 
     async populateQueryParams(endpoint, formElements) {
-        console.log('RENDERER: populateQueryParams called with endpoint:', endpoint);
-        console.log('RENDERER: endpoint.parameters:', endpoint.parameters);
-
         this.clearKeyValueList(formElements.queryParamsList);
 
-        // Check for persisted query params first
         const persistedQueryParams = await this.repository.getPersistedQueryParams(window.currentEndpoint.collectionId, endpoint.id);
 
         if (persistedQueryParams.length > 0) {
-            // Load persisted query parameters
             persistedQueryParams.forEach(param => {
                 this.addKeyValueRow(formElements.queryParamsList, param.key, param.value);
             });
         } else {
-            // NOTE: Path parameters are NOT added to query params list
-            // They are handled in the URL path itself (see populateUrlAndMethod)
-            // and should be substituted using variables like {{variableName}}
-
-            // Add regular query parameters only
             if (endpoint.parameters?.query) {
-                console.log('RENDERER: Found query parameters:', endpoint.parameters.query);
                 Object.entries(endpoint.parameters.query).forEach(([key, param]) => {
-                    console.log(`RENDERER: Adding query parameter ${key} with value:`, param.example || '');
                     this.addKeyValueRow(formElements.queryParamsList, key, param.example || '');
                 });
-            } else {
-                console.log('RENDERER: No query parameters found');
             }
         }
 
         if (formElements.queryParamsList.children.length === 0) {
-            console.log('RENDERER: No parameters added, adding empty row');
             this.addKeyValueRow(formElements.queryParamsList);
         }
 
-        // Update URL to include query parameters
         this.updateUrlWithQueryParams(formElements);
     }
 
@@ -398,11 +339,9 @@ export class CollectionService {
                 return;
             }
 
-            // Split URL into base and query string parts
             const questionMarkIndex = urlString.indexOf('?');
             const baseUrl = questionMarkIndex >= 0 ? urlString.substring(0, questionMarkIndex) : urlString;
 
-            // Build new query string from query params
             const params = new URLSearchParams();
             queryParams.forEach(({ key, value }) => {
                 if (key) {
@@ -418,7 +357,6 @@ export class CollectionService {
     }
 
     async populateRequestBody(collection, endpoint, formElements) {
-        // Check for persisted user modifications first
         const persistedBody = await this.repository.getModifiedRequestBody(collection.id, endpoint.id);
         
         if (persistedBody) {
@@ -432,7 +370,6 @@ export class CollectionService {
             formElements.bodyInput.value = '';
         }
 
-        // Store the original body value for modification tracking
         const key = `${collection.id}_${endpoint.id}`;
         this.originalBodyValues.set(key, formElements.bodyInput.value);
     }
@@ -451,7 +388,6 @@ export class CollectionService {
             }
         }
 
-        // Fallback
         if (requestBody.required) {
             return JSON.stringify({
                 "note": "Request body is required",
@@ -472,10 +408,8 @@ export class CollectionService {
             const key = `${collectionId}_${endpointId}`;
             const originalBody = this.originalBodyValues.get(key);
 
-            // Only save if the body was modified from the original
             if (originalBody && currentBody !== originalBody) {
                 await this.repository.saveModifiedRequestBody(collectionId, endpointId, currentBody);
-                console.log('Saved modified request body for endpoint:', endpointId);
             }
         } catch (error) {
             console.error('Error saving request body modification:', error);
@@ -485,9 +419,7 @@ export class CollectionService {
     async saveCurrentPathParams(collectionId, endpointId, formElements) {
         try {
             const pathParams = this.parseKeyValuePairs(formElements.pathParamsList);
-            // Always save path params, even if empty (to persist removals)
             await this.repository.savePersistedPathParams(collectionId, endpointId, pathParams);
-            console.log('Saved path parameters for endpoint:', endpointId, '- count:', pathParams.length);
         } catch (error) {
             console.error('Error saving path parameters:', error);
         }
@@ -496,9 +428,7 @@ export class CollectionService {
     async saveCurrentQueryParams(collectionId, endpointId, formElements) {
         try {
             const queryParams = this.parseKeyValuePairs(formElements.queryParamsList);
-            // Always save query params, even if empty (to persist removals)
             await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParams);
-            console.log('Saved query parameters for endpoint:', endpointId, '- count:', queryParams.length);
         } catch (error) {
             console.error('Error saving query parameters:', error);
         }
@@ -507,9 +437,7 @@ export class CollectionService {
     async saveCurrentHeaders(collectionId, endpointId, formElements) {
         try {
             const headers = this.parseKeyValuePairs(formElements.headersList);
-            // Always save headers, even if empty (to persist removals)
             await this.repository.savePersistedHeaders(collectionId, endpointId, headers);
-            console.log('Saved headers for endpoint:', endpointId, '- count:', headers.length);
         } catch (error) {
             console.error('Error saving headers:', error);
         }
@@ -520,7 +448,6 @@ export class CollectionService {
             if (window.authManager) {
                 const authConfig = window.authManager.getAuthConfig();
                 await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
-                console.log('Saved auth config for endpoint:', endpointId);
             }
         } catch (error) {
             console.error('Error saving auth config:', error);
@@ -530,22 +457,16 @@ export class CollectionService {
     async populateAuthConfig(collectionId, endpointId) {
         try {
             if (window.authManager) {
-                // First, check for persisted auth config (user's saved configuration)
                 const authConfig = await this.repository.getPersistedAuthConfig(collectionId, endpointId);
                 if (authConfig) {
                     window.authManager.loadAuthConfig(authConfig);
-                    console.log('Loaded persisted auth config for endpoint:', endpointId);
                 } else {
-                    // If no persisted config, check if endpoint has security requirements from OpenAPI spec
                     const collection = await this.repository.getById(collectionId);
                     const endpoint = collection?.endpoints?.find(ep => ep.id === endpointId);
 
                     if (endpoint?.security) {
-                        // Auto-select the auth type based on OpenAPI security requirements
-                        console.log('Auto-selecting auth type from OpenAPI spec:', endpoint.security);
                         window.authManager.loadAuthConfig(endpoint.security);
                     } else {
-                        // Reset to no auth if no saved config and no security requirements
                         window.authManager.resetAuthConfig();
                     }
                 }
@@ -599,7 +520,6 @@ export class CollectionService {
         const removeBtn = document.createElement('button');
         removeBtn.className = 'remove-btn remove-row-btn';
         removeBtn.textContent = 'Remove';
-        // Event listener for remove button is handled by the global delegated event listener in keyValueManager.js
 
         row.appendChild(keyInput);
         row.appendChild(valueInput);

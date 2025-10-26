@@ -1,7 +1,3 @@
-/**
- * Rename dialog component
- * Follows Single Responsibility Principle - only handles rename dialog UI
- */
 export class RenameDialog {
     constructor() {
         this.overlay = null;
@@ -106,7 +102,6 @@ export class RenameDialog {
                 this.onConfirm(trimmedName);
             }
         } else {
-            // Could show validation error here
             return;
         }
         this.cleanup();

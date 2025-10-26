@@ -1,7 +1,3 @@
-/**
- * Responsible for rendering collection UI elements
- * Follows Single Responsibility Principle - only handles UI rendering
- */
 export class CollectionRenderer {
     constructor(containerId, repository = null) {
         this.container = document.getElementById(containerId);
@@ -25,7 +21,6 @@ export class CollectionRenderer {
     }
 
     async renderCollections(collections, eventHandlers = {}, preserveExpansionState = false) {
-        // Remove old context menu handler if it exists
         if (this.emptySpaceContextMenuHandler) {
             this.container.removeEventListener('contextmenu', this.emptySpaceContextMenuHandler);
             this.emptySpaceContextMenuHandler = null;
@@ -33,11 +28,9 @@ export class CollectionRenderer {
 
         if (collections.length === 0) {
             this.renderEmptyState();
-            // Trigger translation for empty state
             if (window.i18n && window.i18n.updateUI) {
                 window.i18n.updateUI();
             }
-            // Add context menu to empty state
             if (eventHandlers.onEmptySpaceContextMenu) {
                 this.emptySpaceContextMenuHandler = (e) => {
                     e.preventDefault();
@@ -48,13 +41,11 @@ export class CollectionRenderer {
             return;
         }
 
-        // Store current expansion state if needed
         let expansionState = {};
         if (preserveExpansionState) {
             expansionState = this.getExpansionState();
         }
 
-        // Store active endpoint before re-rendering
         const activeEndpoint = this.container.querySelector('.endpoint-item.active');
         let activeCollectionId = null;
         let activeEndpointId = null;
@@ -69,10 +60,8 @@ export class CollectionRenderer {
             this.container.appendChild(collectionElement);
         });
 
-        // Add context menu to empty spaces between collections
         if (eventHandlers.onEmptySpaceContextMenu) {
             this.emptySpaceContextMenuHandler = (e) => {
-                // Only trigger if clicking on the container itself (empty space)
                 if (e.target === this.container) {
                     e.preventDefault();
                     eventHandlers.onEmptySpaceContextMenu(e);
@@ -81,21 +70,16 @@ export class CollectionRenderer {
             this.container.addEventListener('contextmenu', this.emptySpaceContextMenuHandler);
         }
 
-        // Restore expansion state
         if (preserveExpansionState) {
-            // Use in-memory state for re-renders
             this.restoreExpansionState(expansionState);
         } else {
-            // Load from persistent storage for initial renders
             await this.loadAndRestoreExpansionState();
         }
 
-        // Restore active endpoint highlighting after re-render
         if (activeCollectionId && activeEndpointId) {
             this.setActiveEndpoint(activeCollectionId, activeEndpointId);
         }
 
-        // Trigger translation for newly rendered collections
         if (window.i18n && window.i18n.updateUI) {
             window.i18n.updateUI();
         }
@@ -139,14 +123,12 @@ export class CollectionRenderer {
         const endpointsDiv = document.createElement('div');
         endpointsDiv.className = 'collection-endpoints';
 
-        // Check if collection has folder structure
         if (collection.folders && collection.folders.length > 0) {
             collection.folders.forEach(folder => {
                 const folderDiv = this.createFolderElement(folder, collection, eventHandlers);
                 endpointsDiv.appendChild(folderDiv);
             });
         } else {
-            // Fallback to flat endpoint structure
             collection.endpoints.forEach(endpoint => {
                 const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers);
                 endpointsDiv.appendChild(endpointDiv);
@@ -186,11 +168,9 @@ export class CollectionRenderer {
         folderDiv.appendChild(folderHeader);
         folderDiv.appendChild(folderEndpoints);
 
-        // Add folder toggle functionality
         folderHeader.addEventListener('click', async (e) => {
             e.stopPropagation();
             folderDiv.classList.toggle('expanded');
-            // Save expansion state to storage
             await this.saveExpansionState();
         });
 
@@ -221,7 +201,6 @@ export class CollectionRenderer {
             });
         }
 
-        // Add context menu for endpoints
         if (eventHandlers.onEndpointContextMenu) {
             endpointDiv.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
@@ -234,13 +213,11 @@ export class CollectionRenderer {
     }
 
     attachCollectionEventListeners(collectionDiv, headerDiv, collection, eventHandlers) {
-        // Toggle expansion
         headerDiv.addEventListener('click', async (e) => {
             if (e.target.closest('.context-menu')) {
                 return;
             }
             
-            // Close all other expanded collections first
             const allCollections = document.querySelectorAll('.collection-item');
             allCollections.forEach(item => {
                 if (item !== collectionDiv) {
@@ -248,14 +225,11 @@ export class CollectionRenderer {
                 }
             });
             
-            // Toggle this collection
             collectionDiv.classList.toggle('expanded');
             
-            // Save expansion state to storage
             await this.saveExpansionState();
         });
 
-        // Context menu
         if (eventHandlers.onContextMenu) {
             collectionDiv.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
@@ -276,7 +250,6 @@ export class CollectionRenderer {
                     folders: {}
                 };
                 
-                // Also store folder expansion states
                 const folderElements = element.querySelectorAll('.folder-item');
                 folderElements.forEach(folderElement => {
                     const folderId = folderElement.dataset.folderId;
@@ -298,7 +271,6 @@ export class CollectionRenderer {
             if (state && state.expanded) {
                 element.classList.add('expanded');
                 
-                // Restore folder expansion states
                 const folderElements = element.querySelectorAll('.folder-item');
                 folderElements.forEach(folderElement => {
                     const folderId = folderElement.dataset.folderId;
@@ -337,11 +309,9 @@ export class CollectionRenderer {
     }
 
     setActiveEndpoint(collectionId, endpointId) {
-        // Remove active class from all endpoints
         const allEndpoints = this.container.querySelectorAll('.endpoint-item');
         allEndpoints.forEach(endpoint => endpoint.classList.remove('active'));
 
-        // Add active class to the selected endpoint
         const activeEndpoint = this.container.querySelector(
             `.endpoint-item[data-endpoint-id="${endpointId}"][data-collection-id="${collectionId}"]`
         );

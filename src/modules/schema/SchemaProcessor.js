@@ -1,7 +1,3 @@
-/**
- * Service for processing OpenAPI schemas and generating examples
- * Follows Single Responsibility Principle - only handles schema operations
- */
 export class SchemaProcessor {
     constructor() {
         this.currentOpenApiSpec = null;
@@ -25,7 +21,6 @@ export class SchemaProcessor {
                 if (resolved && resolved[part]) {
                     resolved = resolved[part];
                 } else {
-                    console.log('Failed to resolve $ref path:', refPath, 'at part:', part);
                     return schemaOrRef;
                 }
             }

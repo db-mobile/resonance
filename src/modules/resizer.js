@@ -1,16 +1,10 @@
-/**
- * Resizer Module
- * Handles vertical resizing between request and response areas
- * and horizontal resizing between sidebar and main content
- */
-
 export class Resizer {
     constructor() {
         this.isDragging = false;
         this.startY = 0;
         this.startRequestHeight = 0;
         this.startResponseHeight = 0;
-        this.minHeight = 100; // Allow more flexible resizing
+        this.minHeight = 100;
         this.resizeTimeout = null;
 
         this.init();
@@ -27,9 +21,7 @@ export class Resizer {
         }
 
         this.setupEventListeners();
-        // Use requestAnimationFrame to ensure DOM is fully rendered and painted
         requestAnimationFrame(() => {
-            // Double RAF ensures layout is complete
             requestAnimationFrame(() => {
                 this.setInitialHeights();
             });
@@ -41,15 +33,12 @@ export class Resizer {
         document.addEventListener('mousemove', this.drag.bind(this));
         document.addEventListener('mouseup', this.endDrag.bind(this));
 
-        // Prevent text selection during drag
         this.resizerHandle.addEventListener('selectstart', (e) => e.preventDefault());
 
-        // Handle window resize to maintain proportions
         window.addEventListener('resize', this.handleWindowResize.bind(this));
     }
 
     setInitialHeights() {
-        // Set initial heights to allow for proper resizing
         const mainContentHeight = this.mainContentArea.clientHeight;
         const requestBuilder = document.querySelector('.request-builder');
         const requestBuilderHeight = requestBuilder ? requestBuilder.offsetHeight : 0;
@@ -57,7 +46,6 @@ export class Resizer {
 
         const availableHeight = mainContentHeight - requestBuilderHeight - resizerHeight;
 
-        // Ensure we have enough space to work with
         if (availableHeight < this.minHeight * 2) {
             return;
         }
@@ -72,7 +60,6 @@ export class Resizer {
     }
 
     handleWindowResize() {
-        // Throttle resize events to avoid excessive recalculations
         if (this.resizeTimeout) {
             clearTimeout(this.resizeTimeout);
         }
@@ -81,42 +68,35 @@ export class Resizer {
             const currentRequestHeight = this.requestConfig.offsetHeight;
             const currentResponseHeight = this.responseArea.offsetHeight;
 
-            // Only adjust if heights were previously set
             if (currentRequestHeight === 0 || currentResponseHeight === 0) {
                 return;
             }
 
-            // Calculate new available height
             const mainContentHeight = this.mainContentArea.clientHeight;
             const requestBuilder = document.querySelector('.request-builder');
             const requestBuilderHeight = requestBuilder ? requestBuilder.offsetHeight : 0;
             const resizerHeight = this.resizerHandle.offsetHeight;
             const availableHeight = mainContentHeight - requestBuilderHeight - resizerHeight;
 
-            // Calculate current proportion
             const totalCurrentHeight = currentRequestHeight + currentResponseHeight;
             const requestProportion = currentRequestHeight / totalCurrentHeight;
 
-            // Apply same proportion to new available height
             const newRequestHeight = Math.max(this.minHeight, Math.floor(availableHeight * requestProportion));
             const newResponseHeight = Math.max(this.minHeight, availableHeight - newRequestHeight);
 
-            // Update heights
             this.requestConfig.style.height = `${newRequestHeight}px`;
             this.requestConfig.style.flex = `0 0 ${newRequestHeight}px`;
             this.responseArea.style.height = `${newResponseHeight}px`;
             this.responseArea.style.flex = `0 0 ${newResponseHeight}px`;
-        }, 100); // Debounce by 100ms
+        }, 100);
     }
 
     startDrag(e) {
         const currentRequestHeight = this.requestConfig.offsetHeight;
         const currentResponseHeight = this.responseArea.offsetHeight;
 
-        // If heights aren't set yet, initialize them now and continue with drag
         if (currentRequestHeight === 0 || currentResponseHeight === 0) {
             this.setInitialHeights();
-            // Use the newly set heights immediately
             this.startRequestHeight = this.requestConfig.offsetHeight;
             this.startResponseHeight = this.responseArea.offsetHeight;
         } else {
@@ -141,14 +121,9 @@ export class Resizer {
         const newRequestHeight = this.startRequestHeight + deltaY;
         const newResponseHeight = this.startResponseHeight - deltaY;
 
-        // Enforce minimum heights
         if (newRequestHeight < this.minHeight || newResponseHeight < this.minHeight) {
             return;
         }
-
-        // No need to check max available height since we're redistributing fixed space
-        // The sum of newRequestHeight + newResponseHeight should always equal
-        // startRequestHeight + startResponseHeight (the total available space)
 
         this.requestConfig.style.height = `${newRequestHeight}px`;
         this.requestConfig.style.flex = `0 0 ${newRequestHeight}px`;
@@ -167,7 +142,6 @@ export class Resizer {
         document.body.style.cursor = '';
     }
 
-    // Public method to reset to default heights
     reset() {
         this.requestConfig.style.height = '';
         this.requestConfig.style.flexShrink = '';
@@ -176,17 +150,13 @@ export class Resizer {
     }
 }
 
-/**
- * HorizontalResizer Class
- * Handles horizontal resizing between sidebar and main content area
- */
 export class HorizontalResizer {
     constructor() {
         this.isDragging = false;
         this.startX = 0;
         this.startSidebarWidth = 0;
-        this.minWidth = 200; // Minimum sidebar width
-        this.maxWidth = 600; // Maximum sidebar width
+        this.minWidth = 200;
+        this.maxWidth = 600;
 
         this.init();
     }
@@ -207,7 +177,6 @@ export class HorizontalResizer {
         document.addEventListener('mousemove', this.drag.bind(this));
         document.addEventListener('mouseup', this.endDrag.bind(this));
 
-        // Prevent text selection during drag
         this.horizontalResizerHandle.addEventListener('selectstart', (e) => e.preventDefault());
     }
 
@@ -229,7 +198,6 @@ export class HorizontalResizer {
         const deltaX = e.clientX - this.startX;
         const newSidebarWidth = this.startSidebarWidth + deltaX;
 
-        // Enforce min/max width constraints
         if (newSidebarWidth < this.minWidth || newSidebarWidth > this.maxWidth) {
             return;
         }
@@ -249,14 +217,12 @@ export class HorizontalResizer {
         document.body.style.cursor = '';
     }
 
-    // Public method to reset to default width
     reset() {
         this.sidebar.style.width = '';
         this.sidebar.style.flex = '';
     }
 }
 
-// Initialize when DOM is loaded
 export function initResizer() {
     const verticalResizer = new Resizer();
     const horizontalResizer = new HorizontalResizer();

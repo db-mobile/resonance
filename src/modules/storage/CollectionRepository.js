@@ -1,7 +1,3 @@
-/**
- * Repository pattern for collection data access
- * Follows Single Responsibility Principle - only handles data persistence
- */
 export class CollectionRepository {
     constructor(electronAPI) {
         this.electronAPI = electronAPI;
@@ -9,14 +5,10 @@ export class CollectionRepository {
         this.MODIFIED_BODIES_KEY = 'modifiedRequestBodies';
     }
 
-    /**
-     * Helper method to safely get object data from store with initialization
-     */
     async _getObjectFromStore(key, defaultValue = {}) {
         try {
             let data = await this.electronAPI.store.get(key);
 
-            // Handle invalid data
             if (!data || typeof data !== 'object' || Array.isArray(data)) {
                 console.warn(`Store data for key "${key}" is invalid or undefined, initializing with default value`);
                 data = defaultValue;
@@ -34,10 +26,8 @@ export class CollectionRepository {
         try {
             const collections = await this.electronAPI.store.get(this.COLLECTIONS_KEY);
 
-            // Handle cases where store returns undefined (e.g., packaged Debian installations on first run)
             if (!Array.isArray(collections)) {
                 console.warn('Collections data is invalid or undefined, initializing with empty array');
-                // Initialize store with empty array
                 await this.electronAPI.store.set(this.COLLECTIONS_KEY, []);
                 return [];
             }
@@ -66,7 +56,6 @@ export class CollectionRepository {
     async add(collection) {
         let collections = await this.getAll();
 
-        // Extra safety check
         if (!Array.isArray(collections)) {
             console.warn('Collections is not an array in add(), reinitializing');
             collections = [];
@@ -234,28 +223,24 @@ export class CollectionRepository {
         try {
             const key = `${collectionId}_${endpointId}`;
 
-            // Delete modified request body
             const modifiedBodies = await this._getObjectFromStore(this.MODIFIED_BODIES_KEY);
             if (modifiedBodies[key]) {
                 delete modifiedBodies[key];
                 await this.electronAPI.store.set(this.MODIFIED_BODIES_KEY, modifiedBodies);
             }
 
-            // Delete persisted query params
             const persistedParams = await this._getObjectFromStore('persistedQueryParams');
             if (persistedParams[key]) {
                 delete persistedParams[key];
                 await this.electronAPI.store.set('persistedQueryParams', persistedParams);
             }
 
-            // Delete persisted headers
             const persistedHeaders = await this._getObjectFromStore('persistedHeaders');
             if (persistedHeaders[key]) {
                 delete persistedHeaders[key];
                 await this.electronAPI.store.set('persistedHeaders', persistedHeaders);
             }
 
-            // Delete persisted auth config
             const persistedAuthConfigs = await this._getObjectFromStore('persistedAuthConfigs');
             if (persistedAuthConfigs[key]) {
                 delete persistedAuthConfigs[key];

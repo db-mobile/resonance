@@ -1,6 +1,3 @@
-/**
- * Theme Manager - Handles theme switching and persistence with dynamic CSS loading
- */
 export class ThemeManager {
     constructor() {
         this.currentTheme = 'system';
@@ -10,7 +7,6 @@ export class ThemeManager {
     }
 
     async init() {
-        // Load saved theme or default to system
         await this.loadSavedTheme();
         await this.applyTheme(this.currentTheme);
         this.setupSystemThemeListener();
@@ -36,13 +32,11 @@ export class ThemeManager {
 
     async loadThemeCSS(theme) {
         return new Promise((resolve, reject) => {
-            // Remove existing theme CSS if any
             if (this.currentThemeLink) {
                 this.currentThemeLink.remove();
                 this.currentThemeLink = null;
             }
 
-            // Create new link element for the theme
             const link = document.createElement('link');
             link.rel = 'stylesheet';
             link.href = `src/themes/${theme}.css`;
@@ -57,7 +51,6 @@ export class ThemeManager {
                 reject(new Error(`Failed to load theme: ${theme}`));
             };
 
-            // Add to head
             document.head.appendChild(link);
         });
     }
@@ -69,7 +62,6 @@ export class ThemeManager {
             this.currentTheme = theme;
         } catch (error) {
             console.error('Error applying theme:', error);
-            // Fallback to system theme
             if (theme !== 'system') {
                 await this.applyTheme('system');
             }
@@ -87,12 +79,10 @@ export class ThemeManager {
     }
 
     setupSystemThemeListener() {
-        // Listen for system theme changes
         if (window.matchMedia) {
             const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
             mediaQuery.addEventListener('change', async () => {
                 if (this.currentTheme === 'system') {
-                    // Reload system theme to reflect changes
                     await this.applyTheme('system');
                 }
             });
@@ -134,7 +124,6 @@ export class ThemeManager {
     }
 }
 
-// Settings Modal Component
 export class SettingsModal {
     constructor(themeManager, i18nManager = null, httpVersionManager = null) {
         this.themeManager = themeManager;
@@ -150,7 +139,6 @@ export class SettingsModal {
         const modal = await this.createModal();
         document.body.appendChild(modal);
         
-        // Focus management
         const firstInput = modal.querySelector('input[type="radio"]');
         if (firstInput) firstInput.focus();
     }
@@ -272,40 +260,33 @@ export class SettingsModal {
         const languageSelect = overlay.querySelector('select[name="language"]');
         const httpVersionSelect = overlay.querySelector('select[name="httpVersion"]');
 
-        // Close button
         closeBtn.addEventListener('click', () => this.hide(overlay));
 
-        // Theme selection
         themeInputs.forEach(input => {
             input.addEventListener('change', async (e) => {
                 await this.themeManager.setTheme(e.target.value);
             });
         });
 
-        // Language selection
         if (this.i18nManager && languageSelect) {
             languageSelect.addEventListener('change', async (e) => {
                 await this.i18nManager.setLanguage(e.target.value);
-                // Update the modal UI with new translations
                 this.i18nManager.updateUI();
             });
         }
 
-        // HTTP version selection
         if (this.httpVersionManager && httpVersionSelect) {
             httpVersionSelect.addEventListener('change', async (e) => {
                 await this.httpVersionManager.setVersion(e.target.value);
             });
         }
 
-        // Close on overlay click
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
                 this.hide(overlay);
             }
         });
 
-        // Close on escape key
         const escapeHandler = (e) => {
             if (e.key === 'Escape') {
                 this.hide(overlay);

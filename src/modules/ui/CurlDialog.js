@@ -1,7 +1,3 @@
-/**
- * cURL dialog component
- * Displays cURL command in a modal with copy-to-clipboard functionality
- */
 export class CurlDialog {
     constructor() {
         this.overlay = null;
@@ -65,7 +61,6 @@ export class CurlDialog {
         this.overlay.appendChild(dialog);
         document.body.appendChild(this.overlay);
 
-        // Set the cURL command text
         const commandDisplay = dialog.querySelector('#curl-command-display');
         commandDisplay.textContent = curlCommand;
 
@@ -84,7 +79,6 @@ export class CurlDialog {
             try {
                 await navigator.clipboard.writeText(curlCommand);
 
-                // Update button to show success
                 const buttonText = copyBtn.querySelector('span');
                 const originalText = buttonText.textContent;
                 buttonText.textContent = 'Copied!';
@@ -100,7 +94,6 @@ export class CurlDialog {
             }
         });
 
-        // Close on escape key
         const handleKeyDown = (e) => {
             if (e.key === 'Escape') {
                 this.close();
@@ -109,7 +102,6 @@ export class CurlDialog {
         };
         document.addEventListener('keydown', handleKeyDown);
 
-        // Close on overlay click
         this.overlay.addEventListener('click', (e) => {
             if (e.target === this.overlay) {
                 this.close();

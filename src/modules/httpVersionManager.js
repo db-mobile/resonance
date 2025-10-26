@@ -1,6 +1,3 @@
-/**
- * HTTP Version Manager - Handles HTTP version setting and persistence
- */
 export class HttpVersionManager {
     constructor() {
         this.currentVersion = 'auto';
@@ -9,7 +6,6 @@ export class HttpVersionManager {
     }
 
     async init() {
-        // Load saved HTTP version or default to auto
         await this.loadSavedVersion();
     }
 
@@ -38,10 +34,9 @@ export class HttpVersionManager {
             console.error(`HTTP version '${version}' is not available`);
             return;
         }
-        
+
         this.currentVersion = version;
         await this.saveVersion(version);
-        console.log(`HTTP version set to: ${version}`);
     }
 
     getCurrentVersion() {
@@ -61,26 +56,19 @@ export class HttpVersionManager {
         return [...this.availableVersions];
     }
 
-    /**
-     * Get axios configuration options based on the selected HTTP version
-     */
     getAxiosConfig() {
         const config = {};
         
         switch (this.currentVersion) {
             case 'http1':
-                // Force HTTP/1.x
                 config.httpVersion = '1.1';
                 config.http2 = false;
                 break;
             case 'http2':
-                // Force HTTP/2
                 config.http2 = true;
                 break;
             case 'auto':
             default:
-                // Let axios/Node.js decide (default behavior)
-                // This will typically use HTTP/1.1 but can negotiate HTTP/2
                 break;
         }
         
