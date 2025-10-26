@@ -266,4 +266,35 @@ export class CollectionRepository {
             throw new Error(`Failed to delete persisted endpoint data: ${error.message}`);
         }
     }
+
+    async getLastSelectedRequest() {
+        try {
+            const lastSelected = await this.electronAPI.store.get('lastSelectedRequest');
+            return lastSelected || null;
+        } catch (error) {
+            console.error('Error getting last selected request:', error);
+            return null;
+        }
+    }
+
+    async saveLastSelectedRequest(collectionId, endpointId) {
+        try {
+            await this.electronAPI.store.set('lastSelectedRequest', {
+                collectionId,
+                endpointId
+            });
+        } catch (error) {
+            console.error('Error saving last selected request:', error);
+            throw new Error(`Failed to save last selected request: ${error.message}`);
+        }
+    }
+
+    async clearLastSelectedRequest() {
+        try {
+            await this.electronAPI.store.set('lastSelectedRequest', null);
+        } catch (error) {
+            console.error('Error clearing last selected request:', error);
+            throw new Error(`Failed to clear last selected request: ${error.message}`);
+        }
+    }
 }

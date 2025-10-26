@@ -601,15 +601,23 @@ select option {
 }
 
 .endpoint-item {
-  background: var(--bg-secondary) !important;
-  color: var(--text-primary) !important;
-  border-bottom: 1px solid var(--border-light) !important;
-  transition: all 0.2s ease !important;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-light);
+  transition: all 0.2s ease;
 }
 
 .endpoint-item:hover {
+  background: var(--bg-tertiary);
+  box-shadow: inset 3px 0 0 var(--blueprint-accent);
+}
+
+.endpoint-item.active {
   background: var(--bg-tertiary) !important;
-  box-shadow: inset 3px 0 0 var(--blueprint-accent) !important;
+  box-shadow: inset 3px 0 0 var(--blueprint-accent);
+  border-left: 3px solid var(--blueprint-accent) !important;
+  padding-left: calc(var(--space-3) - 3px) !important;
+  font-weight: var(--font-weight-medium);
 }
 
 .endpoint-path {

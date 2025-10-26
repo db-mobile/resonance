@@ -65,6 +65,11 @@ export async function processRequestForVariables(request) {
     return await controller.processRequestForVariables(request);
 }
 
+export async function restoreLastSelectedRequest() {
+    const controller = initializeController();
+    return await controller.restoreLastSelectedRequest();
+}
+
 // Legacy functions that are no longer needed but kept for compatibility
 export function generatePlaceholderBody(requestBody) {
     console.warn('generatePlaceholderBody is deprecated. Schema processing is now handled by SchemaProcessor class.');

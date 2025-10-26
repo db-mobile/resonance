@@ -4,7 +4,7 @@ import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl } from 
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest, handleCancelRequest, handleGenerateCurl } from './modules/apiHandler.js';
-import { loadCollections, importOpenApiFile, initializeBodyTracking } from './modules/collectionManager.js';
+import { loadCollections, importOpenApiFile, initializeBodyTracking, restoreLastSelectedRequest } from './modules/collectionManager.js';
 import { ThemeManager, SettingsModal } from './modules/themeManager.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
 import { initResizer } from './modules/resizer.js';
@@ -65,4 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initialize query params from URL or add empty row
     updateQueryParamsFromUrl();
+
+    // Restore the last selected request if there was one
+    await restoreLastSelectedRequest();
 });

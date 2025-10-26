@@ -331,6 +331,13 @@ body {
   background: var(--color-primary-light);
 }
 
+.endpoint-item.active {
+  background: var(--color-primary-light) !important;
+  border-left: 3px solid var(--color-primary) !important;
+  padding-left: calc(var(--space-3) - 3px) !important;
+  font-weight: var(--font-weight-semibold);
+}
+
 .endpoint-method {
   font-weight: var(--font-weight-semibold);
   font-size: 10px;

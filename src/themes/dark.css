@@ -400,13 +400,20 @@ select option {
 }
 
 .endpoint-item {
-  background: var(--bg-secondary) !important;
-  color: var(--text-primary) !important;
-  border-bottom: 1px solid var(--border-light) !important;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .endpoint-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.endpoint-item.active {
   background: var(--bg-tertiary) !important;
+  border-left: 3px solid var(--color-primary) !important;
+  padding-left: calc(var(--space-3) - 3px) !important;
+  font-weight: var(--font-weight-medium);
 }
 
 .endpoint-path {

@@ -54,6 +54,15 @@ export class CollectionRenderer {
             expansionState = this.getExpansionState();
         }
 
+        // Store active endpoint before re-rendering
+        const activeEndpoint = this.container.querySelector('.endpoint-item.active');
+        let activeCollectionId = null;
+        let activeEndpointId = null;
+        if (activeEndpoint) {
+            activeCollectionId = activeEndpoint.dataset.collectionId;
+            activeEndpointId = activeEndpoint.dataset.endpointId;
+        }
+
         this.container.innerHTML = '';
         collections.forEach(collection => {
             const collectionElement = this.createCollectionElement(collection, eventHandlers);
@@ -79,6 +88,11 @@ export class CollectionRenderer {
         } else {
             // Load from persistent storage for initial renders
             await this.loadAndRestoreExpansionState();
+        }
+
+        // Restore active endpoint highlighting after re-render
+        if (activeCollectionId && activeEndpointId) {
+            this.setActiveEndpoint(activeCollectionId, activeEndpointId);
         }
 
         // Trigger translation for newly rendered collections
@@ -313,12 +327,32 @@ export class CollectionRenderer {
         if (!this.repository) {
             return;
         }
-        
+
         try {
             const savedState = await this.repository.getCollectionExpansionStates();
             this.restoreExpansionState(savedState);
         } catch (error) {
             console.error('Error loading expansion state:', error);
         }
+    }
+
+    setActiveEndpoint(collectionId, endpointId) {
+        // Remove active class from all endpoints
+        const allEndpoints = this.container.querySelectorAll('.endpoint-item');
+        allEndpoints.forEach(endpoint => endpoint.classList.remove('active'));
+
+        // Add active class to the selected endpoint
+        const activeEndpoint = this.container.querySelector(
+            `.endpoint-item[data-endpoint-id="${endpointId}"][data-collection-id="${collectionId}"]`
+        );
+
+        if (activeEndpoint) {
+            activeEndpoint.classList.add('active');
+        }
+    }
+
+    clearActiveEndpoint() {
+        const allEndpoints = this.container.querySelectorAll('.endpoint-item');
+        allEndpoints.forEach(endpoint => endpoint.classList.remove('active'));
     }
 }

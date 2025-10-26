@@ -85,9 +85,17 @@ export class CollectionController {
         try {
             const formElements = this.getFormElements();
             await this.service.loadEndpointIntoForm(collection, endpoint, formElements);
-            
+
             // Process variables in form elements after loading, but skip URL to show template
             await this.processFormVariablesExceptUrl(collection.id, formElements);
+
+            // Save the last selected request for restoration on app startup
+            await this.repository.saveLastSelectedRequest(collection.id, endpoint.id);
+
+            // Highlight the active endpoint in the sidebar
+            if (this.renderer && typeof this.renderer.setActiveEndpoint === 'function') {
+                this.renderer.setActiveEndpoint(collection.id, endpoint.id);
+            }
         } catch (error) {
             console.error('Error loading endpoint:', error);
         }
@@ -443,6 +451,12 @@ export class CollectionController {
                     this.service.clearKeyValueList(formElements.headersList);
                     this.service.clearKeyValueList(formElements.queryParamsList);
                     window.currentEndpoint = null;
+
+                    // Clear the last selected request since we deleted it
+                    await this.repository.clearLastSelectedRequest();
+
+                    // Clear the active endpoint highlighting
+                    this.renderer.clearActiveEndpoint();
                 }
 
                 await this.loadCollectionsWithExpansionState(); // Refresh display preserving state
@@ -631,5 +645,59 @@ export class CollectionController {
             return await this.variableService.processRequest(request, window.currentEndpoint.collectionId);
         }
         return request;
+    }
+
+    // Restore the last selected request on application startup
+    async restoreLastSelectedRequest() {
+        try {
+            const lastSelected = await this.repository.getLastSelectedRequest();
+
+            if (!lastSelected || !lastSelected.collectionId || !lastSelected.endpointId) {
+                return;
+            }
+
+            // Get the collection and endpoint
+            const collection = await this.repository.getById(lastSelected.collectionId);
+            if (!collection) {
+                console.warn('Last selected collection not found, clearing saved selection');
+                await this.repository.clearLastSelectedRequest();
+                return;
+            }
+
+            // Find the endpoint in the collection or its folders
+            let endpoint = null;
+            if (collection.endpoints) {
+                endpoint = collection.endpoints.find(ep => ep.id === lastSelected.endpointId);
+            }
+
+            if (!endpoint && collection.folders) {
+                for (const folder of collection.folders) {
+                    if (folder.endpoints) {
+                        endpoint = folder.endpoints.find(ep => ep.id === lastSelected.endpointId);
+                        if (endpoint) break;
+                    }
+                }
+            }
+
+            if (!endpoint) {
+                console.warn('Last selected endpoint not found, clearing saved selection');
+                await this.repository.clearLastSelectedRequest();
+                return;
+            }
+
+            // Load the endpoint into the form
+            const formElements = this.getFormElements();
+            await this.service.loadEndpointIntoForm(collection, endpoint, formElements);
+
+            // Process variables in form elements after loading, but skip URL to show template
+            await this.processFormVariablesExceptUrl(collection.id, formElements);
+
+            // Highlight the active endpoint in the sidebar
+            this.renderer.setActiveEndpoint(collection.id, endpoint.id);
+
+            console.log('Restored last selected request:', endpoint.name);
+        } catch (error) {
+            console.error('Error restoring last selected request:', error);
+        }
     }
 }

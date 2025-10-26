@@ -40,6 +40,7 @@ class StoreHandler {
             'persistedHeaders': {},
             'persistedAuthConfigs': {},
             'collectionExpansionStates': {},
+            'lastSelectedRequest': null,
             'settings': {}
         };
 
