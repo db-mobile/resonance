@@ -31,7 +31,7 @@ export default {
       name: '@electron-forge/maker-flatpak',
       config: {
         options: {
-          id: 'com.dbmobile.resonance',
+          id: 'io.github.db_mobile.resonance',
           productName: 'Resonance',
           genericName: 'API Client',
           description: 'A clean and minimal API client with excellent user experience',

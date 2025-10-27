@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.db_mobile.resonance</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Resonance</name>
+  <summary>A clean and minimal API client</summary>
+  <developer id="io.github.db-mobile">
+    <name>Dennis Blümer</name>
+  </developer>
+
+  <description>
+    <p>
+      Resonance is a clean and minimal API client application designed to provide an excellent
+      user experience for testing and interacting with APIs. Built with Electron, it offers
+      a modern and intuitive interface for developers.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>OpenAPI/Swagger collection imports - Import OpenAPI 3.0 specifications in YAML or JSON format</li>
+      <li>Variable templating system - Use template variables with {{ variableName }} syntax for API keys, base URLs, and more</li>
+      <li>Multiple HTTP methods - Support for GET, POST, PUT, DELETE, and PATCH requests</li>
+      <li>Request body schema generation - Automatically generate example request bodies from OpenAPI schemas</li>
+      <li>Clean, organized interface - Split layout with collections sidebar and tabbed request/response sections</li>
+      <li>Theme support - Light, dark, system, and blueprint themes with CSS custom properties</li>
+      <li>Multi-language support - Available in English, German, Spanish, French, and Italian</li>
+      <li>Secure architecture - Built with context isolation and secure IPC communication</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">io.github.dbmobile.resonance.desktop</launchable>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Main interface showing API request configuration</caption>
+      <image>https://github.com/db-mobile/resonance/blob/v44/assets/screenshots/resonance_screen.png</image>
+    </screenshot>
+  </screenshots>
+
+  <url type="homepage">https://github.com/db-mobile/resonance</url>
+  <url type="bugtracker">https://github.com/db-mobile/resonance/issues</url>
+  <url type="vcs-browser">https://github.com/db-mobile/resonance</url>
+
+  <categories>
+    <category>Development</category>
+    <category>Network</category>
+  </categories>
+
+  <keywords>
+    <keyword>API</keyword>
+    <keyword>REST</keyword>
+    <keyword>HTTP</keyword>
+    <keyword>client</keyword>
+    <keyword>testing</keyword>
+    <keyword>developer</keyword>
+    <keyword>OpenAPI</keyword>
+    <keyword>Swagger</keyword>
+  </keywords>
+
+  <provides>
+    <binary>resonance</binary>
+  </provides>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="1.0.0" date="2025-10-26">
+      <description>
+        <p>Initial release of Resonance</p>
+        <ul>
+          <li>OpenAPI/Swagger collection import support</li>
+          <li>Variable templating system</li>
+          <li>Multiple HTTP methods support</li>
+          <li>Request body schema generation</li>
+          <li>Theme support (light, dark, system, blueprint)</li>
+          <li>Multi-language support (EN, DE, ES, FR, IT)</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+
+  <requires>
+    <internet>always</internet>
+  </requires>
+</component>
