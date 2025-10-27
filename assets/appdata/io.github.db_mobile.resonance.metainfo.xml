@@ -30,6 +30,8 @@
 
   <launchable type="desktop-id">io.github.dbmobile.resonance.desktop</launchable>
 
+  <icon type="stock">io.github.db_mobile.resonance</icon>
+
   <screenshots>
     <screenshot type="default">
       <caption>Main interface showing API request configuration</caption>

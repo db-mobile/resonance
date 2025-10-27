@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Resonance
 Comment=A clean and minimal API client
-Exec=resonance
+Exec=run.sh
 Icon=io.github.db_mobile.resonance
 Type=Application
 Categories=Development;Network;
