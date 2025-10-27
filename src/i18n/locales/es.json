@@ -17,11 +17,13 @@
   "collection": {
     "rename": "Renombrar colección",
     "delete": "Eliminar colección",
+    "delete_title": "Eliminar colección",
     "confirm_delete": "¿Estás seguro de que quieres eliminar la colección \"{{name}}\"?\n\nEsta acción no se puede deshacer.",
     "import_success": "Colección importada con éxito",
     "import_error": "Error al importar la colección"
   },
   "endpoint": {
+    "delete_title": "Eliminar solicitud",
     "confirm_delete": "¿Estás seguro de que quieres eliminar la solicitud \"{{name}}\"?\n\nEsta acción no se puede deshacer."
   },
   "context_menu": {

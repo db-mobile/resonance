@@ -17,11 +17,13 @@
   "collection": {
     "rename": "Renommer la collection",
     "delete": "Supprimer la collection",
+    "delete_title": "Supprimer la collection",
     "confirm_delete": "Êtes-vous sûr de vouloir supprimer la collection \"{{name}}\" ?\n\nCette action ne peut pas être annulée.",
     "import_success": "Collection importée avec succès",
     "import_error": "Échec de l'importation de la collection"
   },
   "endpoint": {
+    "delete_title": "Supprimer la requête",
     "confirm_delete": "Êtes-vous sûr de vouloir supprimer la requête \"{{name}}\" ?\n\nCette action ne peut pas être annulée."
   },
   "context_menu": {

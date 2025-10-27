@@ -17,11 +17,13 @@
   "collection": {
     "rename": "Sammlung umbenennen",
     "delete": "Sammlung löschen",
+    "delete_title": "Sammlung löschen",
     "confirm_delete": "Sind Sie sicher, dass Sie die Sammlung \"{{name}}\" löschen möchten?\n\nDiese Aktion kann nicht rückgängig gemacht werden.",
     "import_success": "Sammlung erfolgreich importiert",
     "import_error": "Fehler beim Importieren der Sammlung"
   },
   "endpoint": {
+    "delete_title": "Anfrage löschen",
     "confirm_delete": "Sind Sie sicher, dass Sie die Anfrage \"{{name}}\" löschen möchten?\n\nDiese Aktion kann nicht rückgängig gemacht werden."
   },
   "context_menu": {
