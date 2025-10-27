@@ -17,11 +17,13 @@
   "collection": {
     "rename": "Rename Collection",
     "delete": "Delete Collection",
+    "delete_title": "Delete Collection",
     "confirm_delete": "Are you sure you want to delete the collection \"{{name}}\"?\n\nThis action cannot be undone.",
     "import_success": "Collection imported successfully",
     "import_error": "Failed to import collection"
   },
   "endpoint": {
+    "delete_title": "Delete Request",
     "confirm_delete": "Are you sure you want to delete the request \"{{name}}\"?\n\nThis action cannot be undone."
   },
   "context_menu": {

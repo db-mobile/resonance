@@ -7,6 +7,7 @@ import { VariableService } from '../services/VariableService.js';
 import { CollectionRenderer } from '../ui/CollectionRenderer.js';
 import { ContextMenu } from '../ui/ContextMenu.js';
 import { RenameDialog } from '../ui/RenameDialog.js';
+import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 import { VariableManager } from '../ui/VariableManager.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 
@@ -24,6 +25,7 @@ export class CollectionController {
         this.renderer = new CollectionRenderer('collections-list', this.repository);
         this.contextMenu = new ContextMenu();
         this.renameDialog = new RenameDialog();
+        this.confirmDialog = new ConfirmDialog();
         this.variableManager = new VariableManager();
         
         this.handleEndpointClick = this.handleEndpointClick.bind(this);
@@ -389,7 +391,24 @@ export class CollectionController {
             window.i18n.t('collection.confirm_delete', { name: collection.name }) :
             `Are you sure you want to delete the collection "${collection.name}"?\n\nThis action cannot be undone.`;
 
-        const confirmed = confirm(confirmMessage);
+        const title = window.i18n ?
+            window.i18n.t('collection.delete_title') || 'Delete Collection' :
+            'Delete Collection';
+
+        const confirmText = window.i18n ?
+            window.i18n.t('common.delete') || 'Delete' :
+            'Delete';
+
+        const cancelText = window.i18n ?
+            window.i18n.t('common.cancel') || 'Cancel' :
+            'Cancel';
+
+        const confirmed = await this.confirmDialog.show(confirmMessage, {
+            title,
+            confirmText,
+            cancelText,
+            dangerous: true
+        });
 
         if (confirmed) {
             try {
@@ -407,7 +426,24 @@ export class CollectionController {
             window.i18n.t('endpoint.confirm_delete', { name: endpoint.name || endpoint.path }) :
             `Are you sure you want to delete the request "${endpoint.name || endpoint.path}"?\n\nThis action cannot be undone.`;
 
-        const confirmed = confirm(confirmMessage);
+        const title = window.i18n ?
+            window.i18n.t('endpoint.delete_title') || 'Delete Request' :
+            'Delete Request';
+
+        const confirmText = window.i18n ?
+            window.i18n.t('common.delete') || 'Delete' :
+            'Delete';
+
+        const cancelText = window.i18n ?
+            window.i18n.t('common.cancel') || 'Cancel' :
+            'Cancel';
+
+        const confirmed = await this.confirmDialog.show(confirmMessage, {
+            title,
+            confirmText,
+            cancelText,
+            dangerous: true
+        });
 
         if (confirmed) {
             try {

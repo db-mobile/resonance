@@ -1,0 +1,1253 @@
+openapi: 3.0.0
+info:
+  title: JSONPlaceholder API
+  description: Free fake API for testing and prototyping. Serves ~3 billion requests per month.
+  version: 1.0.0
+  contact:
+    name: JSONPlaceholder
+    url: https://jsonplaceholder.typicode.com/
+
+servers:
+  - url: https://jsonplaceholder.typicode.com
+    description: Production server
+
+tags:
+  - name: Posts
+    description: Blog post operations
+  - name: Comments
+    description: Comment operations
+  - name: Albums
+    description: Album operations
+  - name: Photos
+    description: Photo operations
+  - name: Todos
+    description: Todo operations
+  - name: Users
+    description: User operations
+
+components:
+  schemas:
+    Post:
+      type: object
+      required:
+        - userId
+        - id
+        - title
+        - body
+      properties:
+        userId:
+          type: integer
+          example: 1
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "sunt aut facere repellat provident occaecati excepturi optio reprehenderit"
+        body:
+          type: string
+          example: "quia et suscipit\nsuscipit recusandae consequuntur expedita et cum\nreprehenderit molestiae ut ut quas totam\nnostrum rerum est autem sunt rem eveniet architecto"
+
+    Comment:
+      type: object
+      required:
+        - postId
+        - id
+        - name
+        - email
+        - body
+      properties:
+        postId:
+          type: integer
+          example: 1
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "id labore ex et quam laborum"
+        email:
+          type: string
+          format: email
+          example: "Eliseo@gardner.biz"
+        body:
+          type: string
+          example: "laudantium enim quasi est quidem magnam voluptate ipsam eos\ntempora quo necessitatibus\ndolor quam autem quasi"
+
+    Album:
+      type: object
+      required:
+        - userId
+        - id
+        - title
+      properties:
+        userId:
+          type: integer
+          example: 1
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "quidem molestiae enim"
+
+    Photo:
+      type: object
+      required:
+        - albumId
+        - id
+        - title
+        - url
+        - thumbnailUrl
+      properties:
+        albumId:
+          type: integer
+          example: 1
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "accusamus beatae ad facilis cum similique qui sunt"
+        url:
+          type: string
+          format: uri
+          example: "https://via.placeholder.com/600/92c952"
+        thumbnailUrl:
+          type: string
+          format: uri
+          example: "https://via.placeholder.com/150/92c952"
+
+    Todo:
+      type: object
+      required:
+        - userId
+        - id
+        - title
+        - completed
+      properties:
+        userId:
+          type: integer
+          example: 1
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "delectus aut autem"
+        completed:
+          type: boolean
+          example: false
+
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - username
+        - email
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Leanne Graham"
+        username:
+          type: string
+          example: "Bret"
+        email:
+          type: string
+          format: email
+          example: "Sincere@april.biz"
+        address:
+          type: object
+          properties:
+            street:
+              type: string
+              example: "Kulas Light"
+            suite:
+              type: string
+              example: "Apt. 556"
+            city:
+              type: string
+              example: "Gwenborough"
+            zipcode:
+              type: string
+              example: "92998-3874"
+            geo:
+              type: object
+              properties:
+                lat:
+                  type: string
+                  example: "-37.3159"
+                lng:
+                  type: string
+                  example: "81.1496"
+        phone:
+          type: string
+          example: "1-770-736-8031 x56442"
+        website:
+          type: string
+          example: "hildegard.org"
+        company:
+          type: object
+          properties:
+            name:
+              type: string
+              example: "Romaguera-Crona"
+            catchPhrase:
+              type: string
+              example: "Multi-layered client-server neural-net"
+            bs:
+              type: string
+              example: "harness real-time e-markets"
+
+paths:
+  /posts:
+    get:
+      tags:
+        - Posts
+      summary: Get all posts
+      description: Retrieve a list of all posts (100 items)
+      operationId: getPosts
+      parameters:
+        - name: userId
+          in: query
+          description: Filter posts by user ID
+          schema:
+            type: integer
+        - name: _limit
+          in: query
+          description: Limit the number of results
+          schema:
+            type: integer
+        - name: _start
+          in: query
+          description: Starting index for results
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+
+    post:
+      tags:
+        - Posts
+      summary: Create a new post
+      description: Create a new post (fake - will not be saved to server)
+      operationId: createPost
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - body
+                - userId
+              properties:
+                title:
+                  type: string
+                body:
+                  type: string
+                userId:
+                  type: integer
+      responses:
+        '201':
+          description: Post created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+
+  /posts/{id}:
+    get:
+      tags:
+        - Posts
+      summary: Get post by ID
+      description: Retrieve a specific post by its ID
+      operationId: getPost
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Post ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Post details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '404':
+          description: Post not found
+
+    put:
+      tags:
+        - Posts
+      summary: Update post
+      description: Update an existing post (fake - will not be saved to server)
+      operationId: updatePost
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Post ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                title:
+                  type: string
+                body:
+                  type: string
+                userId:
+                  type: integer
+      responses:
+        '200':
+          description: Post updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+
+    patch:
+      tags:
+        - Posts
+      summary: Partially update post
+      description: Update specific fields of a post (fake - will not be saved to server)
+      operationId: patchPost
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Post ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                body:
+                  type: string
+                userId:
+                  type: integer
+      responses:
+        '200':
+          description: Post updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+
+    delete:
+      tags:
+        - Posts
+      summary: Delete post
+      description: Delete a post (fake - will not be saved to server)
+      operationId: deletePost
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Post ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Post deleted successfully
+
+  /posts/{id}/comments:
+    get:
+      tags:
+        - Comments
+      summary: Get comments for a post
+      description: Retrieve all comments for a specific post
+      operationId: getPostComments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Post ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of comments for the post
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Comment'
+
+  /comments:
+    get:
+      tags:
+        - Comments
+      summary: Get all comments
+      description: Retrieve a list of all comments (500 items)
+      operationId: getComments
+      parameters:
+        - name: postId
+          in: query
+          description: Filter comments by post ID
+          schema:
+            type: integer
+        - name: _limit
+          in: query
+          description: Limit the number of results
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Comment'
+
+    post:
+      tags:
+        - Comments
+      summary: Create a new comment
+      description: Create a new comment (fake - will not be saved to server)
+      operationId: createComment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - postId
+                - name
+                - email
+                - body
+              properties:
+                postId:
+                  type: integer
+                name:
+                  type: string
+                email:
+                  type: string
+                body:
+                  type: string
+      responses:
+        '201':
+          description: Comment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+
+  /comments/{id}:
+    get:
+      tags:
+        - Comments
+      summary: Get comment by ID
+      description: Retrieve a specific comment by its ID
+      operationId: getComment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Comment ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Comment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '404':
+          description: Comment not found
+
+    put:
+      tags:
+        - Comments
+      summary: Update comment
+      description: Update an existing comment (fake - will not be saved to server)
+      operationId: updateComment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Comment ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Comment'
+      responses:
+        '200':
+          description: Comment updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+
+    patch:
+      tags:
+        - Comments
+      summary: Partially update comment
+      description: Update specific fields of a comment (fake - will not be saved to server)
+      operationId: patchComment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Comment ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                postId:
+                  type: integer
+                name:
+                  type: string
+                email:
+                  type: string
+                body:
+                  type: string
+      responses:
+        '200':
+          description: Comment updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+
+    delete:
+      tags:
+        - Comments
+      summary: Delete comment
+      description: Delete a comment (fake - will not be saved to server)
+      operationId: deleteComment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Comment ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Comment deleted successfully
+
+  /albums:
+    get:
+      tags:
+        - Albums
+      summary: Get all albums
+      description: Retrieve a list of all albums (100 items)
+      operationId: getAlbums
+      parameters:
+        - name: userId
+          in: query
+          description: Filter albums by user ID
+          schema:
+            type: integer
+        - name: _limit
+          in: query
+          description: Limit the number of results
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of albums
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Album'
+
+    post:
+      tags:
+        - Albums
+      summary: Create a new album
+      description: Create a new album (fake - will not be saved to server)
+      operationId: createAlbum
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+                - title
+              properties:
+                userId:
+                  type: integer
+                title:
+                  type: string
+      responses:
+        '201':
+          description: Album created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Album'
+
+  /albums/{id}:
+    get:
+      tags:
+        - Albums
+      summary: Get album by ID
+      description: Retrieve a specific album by its ID
+      operationId: getAlbum
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Album ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Album details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Album'
+        '404':
+          description: Album not found
+
+    put:
+      tags:
+        - Albums
+      summary: Update album
+      description: Update an existing album (fake - will not be saved to server)
+      operationId: updateAlbum
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Album ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Album'
+      responses:
+        '200':
+          description: Album updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Album'
+
+    patch:
+      tags:
+        - Albums
+      summary: Partially update album
+      description: Update specific fields of an album (fake - will not be saved to server)
+      operationId: patchAlbum
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Album ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: integer
+                title:
+                  type: string
+      responses:
+        '200':
+          description: Album updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Album'
+
+    delete:
+      tags:
+        - Albums
+      summary: Delete album
+      description: Delete an album (fake - will not be saved to server)
+      operationId: deleteAlbum
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Album ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Album deleted successfully
+
+  /albums/{id}/photos:
+    get:
+      tags:
+        - Photos
+      summary: Get photos for an album
+      description: Retrieve all photos for a specific album
+      operationId: getAlbumPhotos
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Album ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of photos for the album
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Photo'
+
+  /photos:
+    get:
+      tags:
+        - Photos
+      summary: Get all photos
+      description: Retrieve a list of all photos (5000 items)
+      operationId: getPhotos
+      parameters:
+        - name: albumId
+          in: query
+          description: Filter photos by album ID
+          schema:
+            type: integer
+        - name: _limit
+          in: query
+          description: Limit the number of results
+          schema:
+            type: integer
+        - name: _start
+          in: query
+          description: Starting index for results
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of photos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Photo'
+
+    post:
+      tags:
+        - Photos
+      summary: Create a new photo
+      description: Create a new photo (fake - will not be saved to server)
+      operationId: createPhoto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - albumId
+                - title
+                - url
+                - thumbnailUrl
+              properties:
+                albumId:
+                  type: integer
+                title:
+                  type: string
+                url:
+                  type: string
+                thumbnailUrl:
+                  type: string
+      responses:
+        '201':
+          description: Photo created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Photo'
+
+  /photos/{id}:
+    get:
+      tags:
+        - Photos
+      summary: Get photo by ID
+      description: Retrieve a specific photo by its ID
+      operationId: getPhoto
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Photo ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Photo details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Photo'
+        '404':
+          description: Photo not found
+
+    put:
+      tags:
+        - Photos
+      summary: Update photo
+      description: Update an existing photo (fake - will not be saved to server)
+      operationId: updatePhoto
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Photo ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Photo'
+      responses:
+        '200':
+          description: Photo updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Photo'
+
+    patch:
+      tags:
+        - Photos
+      summary: Partially update photo
+      description: Update specific fields of a photo (fake - will not be saved to server)
+      operationId: patchPhoto
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Photo ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                albumId:
+                  type: integer
+                title:
+                  type: string
+                url:
+                  type: string
+                thumbnailUrl:
+                  type: string
+      responses:
+        '200':
+          description: Photo updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Photo'
+
+    delete:
+      tags:
+        - Photos
+      summary: Delete photo
+      description: Delete a photo (fake - will not be saved to server)
+      operationId: deletePhoto
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Photo ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Photo deleted successfully
+
+  /todos:
+    get:
+      tags:
+        - Todos
+      summary: Get all todos
+      description: Retrieve a list of all todos (200 items)
+      operationId: getTodos
+      parameters:
+        - name: userId
+          in: query
+          description: Filter todos by user ID
+          schema:
+            type: integer
+        - name: completed
+          in: query
+          description: Filter by completion status
+          schema:
+            type: boolean
+        - name: _limit
+          in: query
+          description: Limit the number of results
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of todos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Todo'
+
+    post:
+      tags:
+        - Todos
+      summary: Create a new todo
+      description: Create a new todo (fake - will not be saved to server)
+      operationId: createTodo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+                - title
+                - completed
+              properties:
+                userId:
+                  type: integer
+                title:
+                  type: string
+                completed:
+                  type: boolean
+      responses:
+        '201':
+          description: Todo created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+
+  /todos/{id}:
+    get:
+      tags:
+        - Todos
+      summary: Get todo by ID
+      description: Retrieve a specific todo by its ID
+      operationId: getTodo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Todo ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Todo details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+        '404':
+          description: Todo not found
+
+    put:
+      tags:
+        - Todos
+      summary: Update todo
+      description: Update an existing todo (fake - will not be saved to server)
+      operationId: updateTodo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Todo ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Todo'
+      responses:
+        '200':
+          description: Todo updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+
+    patch:
+      tags:
+        - Todos
+      summary: Partially update todo
+      description: Update specific fields of a todo (fake - will not be saved to server)
+      operationId: patchTodo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Todo ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: integer
+                title:
+                  type: string
+                completed:
+                  type: boolean
+      responses:
+        '200':
+          description: Todo updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+
+    delete:
+      tags:
+        - Todos
+      summary: Delete todo
+      description: Delete a todo (fake - will not be saved to server)
+      operationId: deleteTodo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Todo ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Todo deleted successfully
+
+  /users:
+    get:
+      tags:
+        - Users
+      summary: Get all users
+      description: Retrieve a list of all users (10 items)
+      operationId: getUsers
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+
+    post:
+      tags:
+        - Users
+      summary: Create a new user
+      description: Create a new user (fake - will not be saved to server)
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - username
+                - email
+              properties:
+                name:
+                  type: string
+                username:
+                  type: string
+                email:
+                  type: string
+                address:
+                  type: object
+                phone:
+                  type: string
+                website:
+                  type: string
+                company:
+                  type: object
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get user by ID
+      description: Retrieve a specific user by their ID
+      operationId: getUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+
+    put:
+      tags:
+        - Users
+      summary: Update user
+      description: Update an existing user (fake - will not be saved to server)
+      operationId: updateUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+    patch:
+      tags:
+        - Users
+      summary: Partially update user
+      description: Update specific fields of a user (fake - will not be saved to server)
+      operationId: patchUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                username:
+                  type: string
+                email:
+                  type: string
+                address:
+                  type: object
+                phone:
+                  type: string
+                website:
+                  type: string
+                company:
+                  type: object
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+    delete:
+      tags:
+        - Users
+      summary: Delete user
+      description: Delete a user (fake - will not be saved to server)
+      operationId: deleteUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User deleted successfully
