@@ -32,6 +32,11 @@
 
   <icon type="stock">io.github.db_mobile.resonance</icon>
 
+  <branding>
+    <color type="primary" scheme_preference="light">#ffffff</color>
+    <color type="primary" scheme_preference="dark">#0b2b56</color>
+  </branding>
+
   <screenshots>
     <screenshot type="default">
       <caption>Main interface showing API request configuration</caption>

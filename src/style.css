@@ -244,10 +244,9 @@ body {
 .collection-item {
   background: var(--bg-white);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   overflow: hidden;
   transition: all var(--transition-base);
-  box-shadow: var(--shadow-xs);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -255,12 +254,10 @@ body {
 
 .collection-item:hover {
   border-color: var(--border-medium);
-  box-shadow: var(--shadow-sm);
 }
 
 .collection-item.expanded {
-  border-color: var(--color-primary);
-  box-shadow: var(--shadow-base);
+  border-color: var(--border-medium);
   flex: 1;
   min-height: 0;
 }
@@ -280,7 +277,7 @@ body {
 }
 
 .collection-name {
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
   font-size: var(--font-size-sm);
 }
@@ -288,20 +285,20 @@ body {
 .collection-toggle {
   color: var(--text-tertiary);
   font-size: var(--font-size-xs);
-  transition: all var(--transition-base);
+  transition: transform var(--transition-base);
   transform-origin: center;
 }
 
 .collection-item.expanded .collection-toggle {
   transform: rotate(180deg);
-  color: var(--color-primary);
 }
 
 .collection-endpoints {
   max-height: 0;
   overflow: hidden;
   transition: max-height var(--transition-slow);
-  background: var(--bg-secondary);
+  background: var(--bg-white);
+  border-top: 1px solid var(--border-light);
 }
 
 .collection-item.expanded .collection-endpoints {
@@ -313,29 +310,27 @@ body {
 
 .endpoint-item {
   padding: var(--space-2) var(--space-3);
-  border-top: 1px solid var(--border-light);
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: var(--space-2);
   transition: all var(--transition-fast);
   position: relative;
+  border-left: 3px solid transparent;
+}
+
+.endpoint-item:not(:last-child) {
+  border-bottom: 1px solid var(--bg-secondary);
 }
 
 .endpoint-item:hover {
-  background: var(--bg-white);
-  padding-left: calc(var(--space-3) + var(--space-1));
-}
-
-.endpoint-item:active {
-  background: var(--color-primary-light);
+  background: var(--bg-secondary);
+  border-left-color: var(--border-medium);
 }
 
 .endpoint-item.active {
-  background: var(--color-primary-light) !important;
-  border-left: 3px solid var(--color-primary) !important;
-  padding-left: calc(var(--space-3) - 3px) !important;
-  font-weight: var(--font-weight-semibold);
+  background: var(--color-primary-light);
+  border-left-color: var(--color-primary);
 }
 
 .endpoint-method {
@@ -364,46 +359,51 @@ body {
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
   font-family: var(--font-family-mono);
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.endpoint-item:hover .endpoint-path {
+  color: var(--text-primary);
 }
 
 /* Folder Styles */
 .folder-item {
-  margin-bottom: var(--space-1);
+  /* No margin needed - clean spacing */
 }
 
 .folder-header {
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-3);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border-light);
+  background: var(--bg-secondary);
   transition: all var(--transition-base);
 }
 
 .folder-header:hover {
-  background: var(--bg-secondary);
+  background: var(--bg-tertiary);
 }
 
 .folder-name {
   font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font-size: var(--font-size-xs);
-  text-transform: capitalize;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .folder-toggle {
   color: var(--text-tertiary);
   font-size: 10px;
-  transition: all var(--transition-base);
+  transition: transform var(--transition-base);
   transform-origin: center;
 }
 
 .folder-item.expanded .folder-toggle {
   transform: rotate(180deg);
-  color: var(--color-primary);
 }
 
 .folder-endpoints {
@@ -411,8 +411,6 @@ body {
   overflow: hidden;
   transition: max-height var(--transition-slow);
   background: var(--bg-white);
-  border-left: 2px solid var(--color-primary);
-  margin-left: var(--space-3);
 }
 
 .folder-item.expanded .folder-endpoints {
@@ -420,13 +418,11 @@ body {
 }
 
 .folder-endpoints .endpoint-item {
-  padding-left: var(--space-4);
-  border-left: none;
-  border-top: 1px solid var(--border-light);
+  padding-left: var(--space-6);
 }
 
-.folder-endpoints .endpoint-item:first-child {
-  border-top: none;
+.folder-endpoints .endpoint-item:not(:last-child) {
+  border-bottom: 1px solid var(--bg-secondary);
 }
 
 /* Main Content Area */
