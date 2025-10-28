@@ -28,7 +28,7 @@
     </ul>
   </description>
 
-  <launchable type="desktop-id">io.github.dbmobile.resonance.desktop</launchable>
+  <launchable type="desktop-id">io.github.db_mobile.resonance.desktop</launchable>
 
   <icon type="stock">io.github.db_mobile.resonance</icon>
 
