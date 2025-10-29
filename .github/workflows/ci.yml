@@ -65,7 +65,7 @@ jobs:
     
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
     
     steps:
     - name: Checkout code
@@ -149,7 +149,4 @@ jobs:
 
         Changes in this release:
         - See commit history for details" \
-          ./out/make/*.zip \
-          ./out/make/*.deb \
-          ./out/make/*.rpm \
-          ./out/make/*.AppImage
+          ./out/make/*.zip
