@@ -10,6 +10,7 @@ import { HttpVersionManager } from './modules/httpVersionManager.js';
 import { initResizer } from './modules/resizer.js';
 import { i18n } from './i18n/I18nManager.js';
 import { authManager } from './modules/authManager.js';
+import { initializeCopyHandler } from './modules/copyHandler.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
@@ -43,6 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initTabListeners();
     initializeBodyTracking();
     initResizer();
+    initializeCopyHandler();
 
     activateTab('response', 'response-body');
     activateTab('request', 'path-params');

@@ -905,6 +905,38 @@ body {
   background: var(--bg-secondary);
 }
 
+.copy-response-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: var(--space-2);
+  margin-left: auto;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: var(--space-2);
+}
+
+.copy-response-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.copy-response-btn.copied {
+  color: var(--color-success);
+}
+
+.copy-response-btn.copy-error {
+  color: var(--color-error);
+}
+
+.copy-response-btn svg {
+  display: block;
+}
+
 .response-display {
   flex: 1;
   padding: var(--space-3);

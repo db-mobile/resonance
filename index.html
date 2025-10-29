@@ -217,26 +217,35 @@
 
                 <div class="response-content">
                     <nav class="response-tabs tab-nav" role="tablist" aria-label="Response Content">
-                        <button class="tab-button active" 
-                                data-tab="response-body" 
-                                role="tab" 
-                                aria-selected="true" 
+                        <button class="tab-button active"
+                                data-tab="response-body"
+                                role="tab"
+                                aria-selected="true"
                                 aria-controls="response-body">
                             Body
                         </button>
-                        <button class="tab-button" 
-                                data-tab="response-headers" 
-                                role="tab" 
-                                aria-selected="false" 
+                        <button class="tab-button"
+                                data-tab="response-headers"
+                                role="tab"
+                                aria-selected="false"
                                 aria-controls="response-headers">
                             Headers
+                        </button>
+                        <button id="copy-response-btn"
+                                class="copy-response-btn"
+                                aria-label="Copy Response"
+                                title="Copy Response Body">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
                         </button>
                     </nav>
 
                     <div class="response-display">
-                        <div id="response-body" 
-                             class="tab-content active" 
-                             role="tabpanel" 
+                        <div id="response-body"
+                             class="tab-content active"
+                             role="tabpanel"
                              aria-labelledby="response-body-tab">
                             <div class="response-body-container">
                                 <pre id="response-line-numbers" class="line-numbers" aria-hidden="true"></pre>
@@ -244,9 +253,9 @@
                             </div>
                         </div>
 
-                        <div id="response-headers" 
-                             class="tab-content" 
-                             role="tabpanel" 
+                        <div id="response-headers"
+                             class="tab-content"
+                             role="tabpanel"
                              aria-labelledby="response-headers-tab">
                             <pre id="response-headers-display" aria-live="polite"></pre>
                         </div>

@@ -71,6 +71,16 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.0.1" date="2025-10-29">
+      <description>
+        <p>Quality improvements</p>
+        <ul>
+          <li>Update dependencies</li>
+          <li>Update the app icon</li>
+          <li>Copy response body and headers to clipboard</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.0" date="2025-10-26">
       <description>
         <p>Initial release of Resonance</p>
