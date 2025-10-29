@@ -4,7 +4,7 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <name>Resonance</name>
-  <summary>A clean and minimal API client</summary>
+  <summary>Perform API testing and development with ease</summary>
   <developer id="io.github.db-mobile">
     <name>Dennis Blümer</name>
   </developer>
@@ -33,14 +33,22 @@
   <icon type="stock">io.github.db_mobile.resonance</icon>
 
   <branding>
-    <color type="primary" scheme_preference="light">#ffffff</color>
-    <color type="primary" scheme_preference="dark">#0b2b56</color>
+    <color type="primary" scheme_preference="light">#60A5FA</color>
+    <color type="primary" scheme_preference="dark">#1E3A8A</color>
   </branding>
 
   <screenshots>
     <screenshot type="default">
       <caption>Main interface showing API request configuration</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v48/assets/screenshots/resonance_screen.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v62/assets/screenshots/main_window.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Settings modal in light theme</caption>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v62/assets/screenshots/settings.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Environment variables configuration</caption>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v62/assets/screenshots/environment.png</image>
     </screenshot>
   </screenshots>
 
