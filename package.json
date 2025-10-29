@@ -1,37 +1,25 @@
 {
   "name": "resonance",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Resonance - A clean and minimal API client with excellent user experience",
   "license": "MIT",
-  "author": "",
+  "author": "Dennis Blümer",
   "type": "module",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron-forge start -- --no-sandbox",
+    "start": "electron . --no-sandbox",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "lint": "echo \"Add linting tool like eslint if needed\"",
     "dist": "electron-builder",
-    "package": "electron-forge package",
-    "make": "electron-forge make",
-    "make:debian": "electron-forge make --targets=@electron-forge/maker-deb",
-    "make:flatpak": "electron-forge make --targets=@electron-forge/maker-flatpak",
-    "make:windows": "electron-forge make --targets=@electron-forge/maker-squirrel",
-    "make:zip": "electron-forge make --targets=@electron-forge/maker-zip"
+    "dist:linux": "electron-builder --linux",
+    "dist:mac": "electron-builder --mac",
+    "dist:dir": "electron-builder --dir"
   },
   "devDependencies": {
     "@babel/core": "^7.28.0",
     "@babel/preset-env": "^7.28.0",
-    "@electron-forge/cli": "^7.7.0",
-    "@electron-forge/maker-deb": "^7.7.0",
-    "@electron-forge/maker-flatpak": "^7.10.2",
-    "@electron-forge/maker-rpm": "^7.7.0",
-    "@electron-forge/maker-squirrel": "^7.7.0",
-    "@electron-forge/maker-zip": "^7.7.0",
-    "@electron-forge/plugin-auto-unpack-natives": "^7.7.0",
-    "@electron-forge/plugin-fuses": "^7.7.0",
-    "@electron/fuses": "^1.8.0",
     "@jest/globals": "^30.0.4",
     "babel-jest": "^30.0.4",
     "electron": "^35.0.0",
@@ -50,11 +38,51 @@
   "build": {
     "appId": "io.github.db_mobile.resonance",
     "productName": "Resonance",
+    "asar": true,
     "files": [
       "**/*",
-      "!flatpak-node{,/**}"
+      "!flatpak-node{,/**}",
+      "!forge.config.js"
     ],
     "asarUnpack": [],
-    "directories": {}
+    "directories": {
+      "output": "out/make"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "rpm",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "AppImage",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "Development",
+      "icon": "./assets/icons/icon.png"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "./assets/icons/icon.icns"
+    }
   }
 }
