@@ -3,7 +3,7 @@
   "version": "1.0.1",
   "description": "Resonance - A clean and minimal API client with excellent user experience",
   "license": "MIT",
-  "author": "Dennis Blümer",
+  "author": "Dennis Blümer <dennis.bluemer@ducart.de>",
   "type": "module",
   "main": "src/main.js",
   "scripts": {
@@ -14,7 +14,6 @@
     "lint": "echo \"Add linting tool like eslint if needed\"",
     "dist": "electron-builder",
     "dist:linux": "electron-builder --linux",
-    "dist:mac": "electron-builder --mac",
     "dist:dir": "electron-builder --dir"
   },
   "devDependencies": {
@@ -46,43 +45,17 @@
     ],
     "asarUnpack": [],
     "directories": {
-      "output": "out/make"
+      "output": "dist"
     },
     "linux": {
       "target": [
         {
           "target": "zip",
           "arch": ["x64", "arm64"]
-        },
-        {
-          "target": "deb",
-          "arch": ["x64", "arm64"]
-        },
-        {
-          "target": "rpm",
-          "arch": ["x64", "arm64"]
-        },
-        {
-          "target": "AppImage",
-          "arch": ["x64", "arm64"]
         }
       ],
       "category": "Development",
-      "icon": "./assets/icons/icon.png"
-    },
-    "mac": {
-      "target": [
-        {
-          "target": "zip",
-          "arch": ["x64", "arm64"]
-        },
-        {
-          "target": "dmg",
-          "arch": ["x64", "arm64"]
-        }
-      ],
-      "category": "public.app-category.developer-tools",
-      "icon": "./assets/icons/icon.icns"
+      "icon": "./assets/icons/icon.svg"
     }
   }
 }
