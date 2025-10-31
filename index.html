@@ -14,6 +14,12 @@
             <div class="sidebar-header">
                 <h2 class="sidebar-title" data-i18n="sidebar.collections">Collections</h2>
                 <div class="sidebar-actions">
+                    <button id="history-toggle-btn" class="history-toggle-btn" data-i18n-title="sidebar.history" data-i18n-aria="sidebar.history" title="History">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </button>
                     <button id="settings-btn" class="settings-btn" data-i18n-title="header.settings" data-i18n-aria="header.settings">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="3"></circle>
@@ -52,7 +58,7 @@
         </div>
 
         <!-- Main Content Area -->
-        <main class="main-content-area" role="main">
+        <main class="main-content-area" role="main" id="main-content-area">
             <!-- Request Builder -->
             <section class="request-builder">
                 <div class="request-url-section">
@@ -231,6 +237,16 @@
                                 aria-controls="response-headers">
                             Headers
                         </button>
+                        <select id="language-selector"
+                                class="language-selector"
+                                aria-label="Syntax Highlighting Language"
+                                title="Syntax Highlighting">
+                            <option value="auto">Auto</option>
+                            <option value="json">JSON</option>
+                            <option value="xml">XML</option>
+                            <option value="html">HTML</option>
+                            <option value="text">Plain Text</option>
+                        </select>
                         <button id="copy-response-btn"
                                 class="copy-response-btn"
                                 aria-label="Copy Response"
@@ -247,9 +263,8 @@
                              class="tab-content active"
                              role="tabpanel"
                              aria-labelledby="response-body-tab">
-                            <div class="response-body-container">
-                                <pre id="response-line-numbers" class="line-numbers" aria-hidden="true"></pre>
-                                <pre id="response-display" aria-live="polite"></pre>
+                            <div id="response-body-container" class="response-body-container" aria-live="polite">
+                                <!-- CodeMirror editor will be mounted here -->
                             </div>
                         </div>
 
@@ -263,6 +278,57 @@
                 </div>
             </section>
         </main>
+
+        <!-- History Sidebar Resizer Handle -->
+        <div class="horizontal-resizer-handle" id="history-resizer-handle">
+            <div class="horizontal-resizer-grip">
+                <div class="horizontal-resizer-line"></div>
+                <div class="horizontal-resizer-line"></div>
+                <div class="horizontal-resizer-line"></div>
+            </div>
+        </div>
+
+        <!-- History Sidebar -->
+        <aside class="history-sidebar" role="complementary" id="history-sidebar">
+            <div class="sidebar-header">
+                <h2 class="sidebar-title" data-i18n="sidebar.history">History</h2>
+                <div class="sidebar-actions">
+                    <button id="clear-all-history-btn" class="clear-history-btn" data-i18n-title="history.clear_all" data-i18n-aria="history.clear_all">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                    <button id="close-history-btn" class="close-history-btn" data-i18n-title="common.close" data-i18n-aria="common.close" title="Close">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="history-search">
+                <input type="text"
+                       id="history-search-input"
+                       class="history-search-input"
+                       placeholder="Search history..."
+                       data-i18n-placeholder="history.search_placeholder"
+                       aria-label="Search history">
+            </div>
+
+            <div class="history-container">
+                <div id="history-list" class="history-list">
+                    <div class="history-empty">
+                        <svg class="history-empty-icon" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+                        </svg>
+                        <p class="history-empty-text" data-i18n="history.empty">No request history</p>
+                        <p class="history-empty-subtext" data-i18n="history.empty_subtext">Send a request to see it here</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
     </div>
 
     <script type="module" src="./src/renderer.js"></script>

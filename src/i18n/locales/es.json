@@ -8,6 +8,7 @@
   },
   "sidebar": {
     "collections": "Colecciones",
+    "history": "Historial",
     "import": "Importar",
     "empty": {
       "title": "No hay colecciones importadas",
@@ -121,5 +122,13 @@
     "timeout": "Tiempo de espera agotado",
     "invalid_url": "Formato de URL inválido",
     "unknown": "Ha ocurrido un error desconocido"
+  },
+  "history": {
+    "empty": "Sin historial de solicitudes",
+    "empty_subtext": "Envía una solicitud para verla aquí",
+    "clear_all": "Borrar todo el historial",
+    "clear_all_title": "Borrar todo el historial",
+    "confirm_clear": "¿Estás seguro de que quieres borrar todo el historial de solicitudes?\n\nEsta acción no se puede deshacer.",
+    "search_placeholder": "Buscar en el historial..."
   }
 }

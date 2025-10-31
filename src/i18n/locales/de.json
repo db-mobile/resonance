@@ -8,6 +8,7 @@
   },
   "sidebar": {
     "collections": "Sammlungen",
+    "history": "Verlauf",
     "import": "Importieren",
     "empty": {
       "title": "Noch keine Sammlungen importiert",
@@ -121,5 +122,13 @@
     "timeout": "Anfrage-Timeout",
     "invalid_url": "Ungültiges URL-Format",
     "unknown": "Ein unbekannter Fehler ist aufgetreten"
+  },
+  "history": {
+    "empty": "Kein Anfrageverlauf",
+    "empty_subtext": "Senden Sie eine Anfrage, um sie hier zu sehen",
+    "clear_all": "Gesamten Verlauf löschen",
+    "clear_all_title": "Gesamten Verlauf löschen",
+    "confirm_clear": "Sind Sie sicher, dass Sie den gesamten Anfrageverlauf löschen möchten?\n\nDiese Aktion kann nicht rückgängig gemacht werden.",
+    "search_placeholder": "Verlauf durchsuchen..."
   }
 }

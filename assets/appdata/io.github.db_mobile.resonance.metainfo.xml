@@ -4,7 +4,7 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <name>Resonance</name>
-  <summary>Perform API testing and development with ease</summary>
+  <summary>Perform API testing with ease</summary>
   <developer id="io.github.db-mobile">
     <name>Dennis Blümer</name>
   </developer>
@@ -12,8 +12,8 @@
   <description>
     <p>
       Resonance is a clean and minimal API client application designed to provide an excellent
-      user experience for testing and interacting with APIs. Built with Electron, it offers
-      a modern and intuitive interface for developers.
+      user experience for testing and interacting with APIs. It offers a modern and intuitive
+      interface for developers.
     </p>
     <p>Features:</p>
     <ul>

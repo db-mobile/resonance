@@ -15,10 +15,10 @@ export const addHeaderBtn = document.getElementById('add-header-btn');
 export const queryParamsList = document.getElementById('query-params-list');
 export const addQueryParamBtn = document.getElementById('add-query-param-btn');
 
-export const responseBodyDisplay = document.getElementById('response-display');
+export const responseBodyContainer = document.getElementById('response-body-container');
 export const responseHeadersDisplay = document.getElementById('response-headers-display');
-export const responseLineNumbers = document.getElementById('response-line-numbers');
 export const copyResponseBtn = document.getElementById('copy-response-btn');
+export const languageSelector = document.getElementById('language-selector');
 
 
 export const requestTabButtons = document.querySelectorAll('.request-config .tab-button');

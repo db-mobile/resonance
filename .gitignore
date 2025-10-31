@@ -5,3 +5,7 @@ dist
 data
 
 .idea
+
+# Build artifacts
+src/modules/*.bundle.js
+src/modules/*.bundle.js.map
