@@ -79,6 +79,17 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.1.0" date="2025-10-31">
+      <description>
+        <p>New features introduced</p>
+        <ul>
+          <li>Syntax highlighting in responses</li>
+          <li>Request history</li>
+          <li>Define request timeout</li>
+          <li>More consistent styling</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.1" date="2025-10-29">
       <description>
         <p>Quality improvements</p>
