@@ -12,11 +12,13 @@ import { initResizer } from './modules/resizer.js';
 import { i18n } from './i18n/I18nManager.js';
 import { authManager } from './modules/authManager.js';
 import { initializeCopyHandler } from './modules/copyHandler.js';
+import { HistoryController } from './modules/controllers/HistoryController.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
 const timeoutManager = new TimeoutManager();
 const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager);
+const historyController = new HistoryController(window.electronAPI);
 
 document.addEventListener('DOMContentLoaded', async () => {
     curlBtn.addEventListener('click', handleGenerateCurl);
@@ -31,10 +33,45 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // History toggle functionality
+    const historyToggleBtn = document.getElementById('history-toggle-btn');
+    const historySidebar = document.getElementById('history-sidebar');
+    const historyResizerHandle = document.getElementById('history-resizer-handle');
+    const closeHistoryBtn = document.getElementById('close-history-btn');
+
+    const toggleHistory = (show) => {
+        if (show) {
+            historySidebar.classList.add('visible');
+            historyResizerHandle.classList.add('visible');
+            historyToggleBtn.classList.add('active');
+        } else {
+            historySidebar.classList.remove('visible');
+            historyResizerHandle.classList.remove('visible');
+            historyToggleBtn.classList.remove('active');
+        }
+    };
+
+    if (historyToggleBtn && historySidebar && historyResizerHandle) {
+        historyToggleBtn.addEventListener('click', () => {
+            const isVisible = historySidebar.classList.contains('visible');
+            toggleHistory(!isVisible);
+        });
+    }
+
+    if (closeHistoryBtn) {
+        closeHistoryBtn.addEventListener('click', () => {
+            toggleHistory(false);
+        });
+    }
+
     await i18n.init();
 
     window.i18n = i18n;
     window.authManager = authManager;
+    window.historyController = historyController;
+
+    // Initialize history controller
+    await historyController.init();
 
     document.addEventListener('languageChanged', (event) => {
         // Any dynamic content that needs special handling can be refreshed here

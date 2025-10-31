@@ -8,6 +8,7 @@
   },
   "sidebar": {
     "collections": "Collezioni",
+    "history": "Cronologia",
     "import": "Importa",
     "empty": {
       "title": "Nessuna collezione importata",
@@ -121,5 +122,13 @@
     "timeout": "Timeout della richiesta",
     "invalid_url": "Formato URL non valido",
     "unknown": "Si è verificato un errore sconosciuto"
+  },
+  "history": {
+    "empty": "Nessuna cronologia delle richieste",
+    "empty_subtext": "Invia una richiesta per vederla qui",
+    "clear_all": "Cancella tutta la cronologia",
+    "clear_all_title": "Cancella tutta la cronologia",
+    "confirm_clear": "Sei sicuro di voler cancellare tutta la cronologia delle richieste?\n\nQuesta azione non può essere annullata.",
+    "search_placeholder": "Cerca nella cronologia..."
   }
 }

@@ -199,6 +199,11 @@ export async function handleSendRequest() {
             updateResponseTime(result.ttfb);
             updateResponseSize(result.size);
             setRequestInProgress(false);
+
+            // Add to history
+            if (window.historyController) {
+                await window.historyController.addHistoryEntry(requestConfig, result, window.currentEndpoint);
+            }
         } else if (result.cancelled) {
             updateStatusDisplay('Request cancelled', null);
             updateResponseTime(null);
@@ -252,6 +257,11 @@ export async function handleSendRequest() {
         updateResponseTime(error.ttfb);
         updateResponseSize(error.size);
         console.error('API Error (via IPC):', error);
+
+        // Add error to history
+        if (window.historyController) {
+            await window.historyController.addHistoryEntry(requestConfig, error, window.currentEndpoint);
+        }
     } finally {
         setRequestInProgress(false);
     }

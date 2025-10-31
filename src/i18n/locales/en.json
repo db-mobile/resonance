@@ -8,6 +8,7 @@
   },
   "sidebar": {
     "collections": "Collections",
+    "history": "History",
     "import": "Import",
     "empty": {
       "title": "No collections imported yet",
@@ -121,5 +122,13 @@
     "timeout": "Request timed out",
     "invalid_url": "Invalid URL format",
     "unknown": "An unknown error occurred"
+  },
+  "history": {
+    "empty": "No request history",
+    "empty_subtext": "Send a request to see it here",
+    "clear_all": "Clear All History",
+    "clear_all_title": "Clear All History",
+    "confirm_clear": "Are you sure you want to clear all request history?\n\nThis action cannot be undone.",
+    "search_placeholder": "Search history..."
   }
 }

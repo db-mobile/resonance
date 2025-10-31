@@ -8,6 +8,7 @@
   },
   "sidebar": {
     "collections": "Collections",
+    "history": "Historique",
     "import": "Importer",
     "empty": {
       "title": "Aucune collection importée",
@@ -121,5 +122,13 @@
     "timeout": "Délai d'attente dépassé",
     "invalid_url": "Format d'URL invalide",
     "unknown": "Une erreur inconnue s'est produite"
+  },
+  "history": {
+    "empty": "Aucun historique de requêtes",
+    "empty_subtext": "Envoyez une requête pour la voir ici",
+    "clear_all": "Effacer tout l'historique",
+    "clear_all_title": "Effacer tout l'historique",
+    "confirm_clear": "Êtes-vous sûr de vouloir effacer tout l'historique des requêtes ?\n\nCette action ne peut pas être annulée.",
+    "search_placeholder": "Rechercher dans l'historique..."
   }
 }
