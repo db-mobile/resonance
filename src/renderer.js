@@ -7,6 +7,7 @@ import { handleSendRequest, handleCancelRequest, handleGenerateCurl } from './mo
 import { loadCollections, importOpenApiFile, initializeBodyTracking, restoreLastSelectedRequest } from './modules/collectionManager.js';
 import { ThemeManager, SettingsModal } from './modules/themeManager.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
+import { TimeoutManager } from './modules/timeoutManager.js';
 import { initResizer } from './modules/resizer.js';
 import { i18n } from './i18n/I18nManager.js';
 import { authManager } from './modules/authManager.js';
@@ -14,7 +15,8 @@ import { initializeCopyHandler } from './modules/copyHandler.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
-const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager);
+const timeoutManager = new TimeoutManager();
+const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager);
 
 document.addEventListener('DOMContentLoaded', async () => {
     curlBtn.addEventListener('click', handleGenerateCurl);

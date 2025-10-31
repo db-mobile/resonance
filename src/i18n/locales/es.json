@@ -88,6 +88,8 @@
     "language": "Idioma",
     "theme": "Tema",
     "http_version": "Versión HTTP",
+    "request_timeout": "Tiempo de espera de solicitud",
+    "timeout_description": "Establecer en 0 para sin tiempo de espera",
     "close": "Cerrar",
     "save": "Guardar",
     "cancel": "Cancelar"

@@ -22,16 +22,21 @@ class ApiRequestHandler {
 
             const settings = this.store.get('settings', {});
             const httpVersion = settings.httpVersion || 'auto';
+            const requestTimeout = settings.requestTimeout !== undefined ? settings.requestTimeout : 0;
 
             const axiosConfig = {
                 method: requestOptions.method,
                 url: requestOptions.url,
                 headers: requestOptions.headers || {},
-                timeout: 30000, // 30 second timeout
                 signal: this.currentRequestController.signal,
 
                 transformResponse: [(data) => data]
             };
+
+            // Only set timeout if it's greater than 0 (0 means no timeout)
+            if (requestTimeout > 0) {
+                axiosConfig.timeout = requestTimeout;
+            }
 
             switch (httpVersion) {
                 case 'http1':

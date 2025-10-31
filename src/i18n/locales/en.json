@@ -88,6 +88,8 @@
     "language": "Language",
     "theme": "Theme",
     "http_version": "HTTP Version",
+    "request_timeout": "Request Timeout",
+    "timeout_description": "Set to 0 for no timeout",
     "close": "Close",
     "save": "Save",
     "cancel": "Cancel"

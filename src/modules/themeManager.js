@@ -125,10 +125,11 @@ export class ThemeManager {
 }
 
 export class SettingsModal {
-    constructor(themeManager, i18nManager = null, httpVersionManager = null) {
+    constructor(themeManager, i18nManager = null, httpVersionManager = null, timeoutManager = null) {
         this.themeManager = themeManager;
         this.i18nManager = i18nManager;
         this.httpVersionManager = httpVersionManager;
+        this.timeoutManager = timeoutManager;
         this.isOpen = false;
     }
 
@@ -148,8 +149,9 @@ export class SettingsModal {
         overlay.className = 'settings-modal-overlay';
         
         const languageSection = this.i18nManager ? this.createLanguageSection() : '';
-        
+
         const currentHttpVersion = this.httpVersionManager ? await this.httpVersionManager.getCurrentVersion() : 'auto';
+        const currentTimeout = this.timeoutManager ? this.timeoutManager.getCurrentTimeout() : 0;
         
         overlay.innerHTML = `
             <div class="settings-modal">
@@ -224,6 +226,19 @@ export class SettingsModal {
                             </select>
                         </div>
                     </div>
+
+                    <div class="settings-section">
+                        <h3 data-i18n="settings.request_timeout">Request Timeout</h3>
+                        <div class="timeout-input-container">
+                            <input type="number" class="timeout-input" name="requestTimeout"
+                                   value="${currentTimeout}"
+                                   min="0"
+                                   step="1000"
+                                   placeholder="0">
+                            <span class="timeout-unit">ms</span>
+                        </div>
+                        <p class="timeout-description" data-i18n="settings.timeout_description">Set to 0 for no timeout</p>
+                    </div>
                 </div>
             </div>
         `;
@@ -259,6 +274,7 @@ export class SettingsModal {
         const themeInputs = overlay.querySelectorAll('input[name="theme"]');
         const languageSelect = overlay.querySelector('select[name="language"]');
         const httpVersionSelect = overlay.querySelector('select[name="httpVersion"]');
+        const timeoutInput = overlay.querySelector('input[name="requestTimeout"]');
 
         closeBtn.addEventListener('click', () => this.hide(overlay));
 
@@ -278,6 +294,15 @@ export class SettingsModal {
         if (this.httpVersionManager && httpVersionSelect) {
             httpVersionSelect.addEventListener('change', async (e) => {
                 await this.httpVersionManager.setVersion(e.target.value);
+            });
+        }
+
+        if (this.timeoutManager && timeoutInput) {
+            timeoutInput.addEventListener('change', async (e) => {
+                const timeout = parseInt(e.target.value, 10);
+                if (!isNaN(timeout) && timeout >= 0) {
+                    await this.timeoutManager.setTimeout(timeout);
+                }
             });
         }
 
