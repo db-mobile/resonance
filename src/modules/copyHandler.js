@@ -1,4 +1,5 @@
-import { copyResponseBtn, responseBodyDisplay, responseHeadersDisplay, responseTabButtons } from './domElements.js';
+import { copyResponseBtn, responseHeadersDisplay, responseTabButtons } from './domElements.js';
+import { getResponseBodyContent } from './apiHandler.js';
 
 /**
  * Copy text to clipboard and show visual feedback
@@ -81,7 +82,7 @@ export async function handleCopyResponse() {
     let textToCopy = '';
 
     if (activeTab === 'body') {
-        textToCopy = responseBodyDisplay.textContent;
+        textToCopy = getResponseBodyContent();
     } else {
         textToCopy = responseHeadersDisplay.textContent;
     }

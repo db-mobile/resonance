@@ -237,6 +237,16 @@
                                 aria-controls="response-headers">
                             Headers
                         </button>
+                        <select id="language-selector"
+                                class="language-selector"
+                                aria-label="Syntax Highlighting Language"
+                                title="Syntax Highlighting">
+                            <option value="auto">Auto</option>
+                            <option value="json">JSON</option>
+                            <option value="xml">XML</option>
+                            <option value="html">HTML</option>
+                            <option value="text">Plain Text</option>
+                        </select>
                         <button id="copy-response-btn"
                                 class="copy-response-btn"
                                 aria-label="Copy Response"
@@ -253,9 +263,8 @@
                              class="tab-content active"
                              role="tabpanel"
                              aria-labelledby="response-body-tab">
-                            <div class="response-body-container">
-                                <pre id="response-line-numbers" class="line-numbers" aria-hidden="true"></pre>
-                                <pre id="response-display" aria-live="polite"></pre>
+                            <div id="response-body-container" class="response-body-container" aria-live="polite">
+                                <!-- CodeMirror editor will be mounted here -->
                             </div>
                         </div>
 

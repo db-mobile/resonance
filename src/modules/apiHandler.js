@@ -1,4 +1,4 @@
-import { urlInput, methodSelect, bodyInput, sendRequestBtn, cancelRequestBtn, responseBodyDisplay, responseHeadersDisplay, responseLineNumbers } from './domElements.js';
+import { urlInput, methodSelect, bodyInput, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, languageSelector } from './domElements.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { activateTab } from './tabManager.js'; // To ensure response tab is active
@@ -9,21 +9,64 @@ import { CollectionRepository } from './storage/CollectionRepository.js';
 import { authManager } from './authManager.js';
 import { generateCurlCommand } from './curlGenerator.js';
 import { CurlDialog } from './ui/CurlDialog.js';
+import { ResponseEditor } from './responseEditor.bundle.js';
 
-function generateLineNumbers(text) {
-    if (!text) return '';
-    const lines = text.split('\n');
-    return lines.map((_, index) => index + 1).join('\n');
+// Initialize CodeMirror editor for response display
+let responseEditor = null;
+
+function initResponseEditor() {
+    if (!responseEditor && responseBodyContainer) {
+        responseEditor = new ResponseEditor(responseBodyContainer);
+
+        // Set up callback to update dropdown when language changes
+        responseEditor.onLanguageChange((languageType) => {
+            if (languageSelector) {
+                // If manual override is not set, show as "auto"
+                if (responseEditor.manualLanguageOverride === null) {
+                    languageSelector.value = 'auto';
+                } else {
+                    languageSelector.value = languageType || 'text';
+                }
+            }
+        });
+
+        // Set up language selector event listener
+        if (languageSelector) {
+            languageSelector.addEventListener('change', (e) => {
+                const selectedLanguage = e.target.value;
+                if (selectedLanguage === 'auto') {
+                    responseEditor.clearLanguageOverride();
+                } else {
+                    responseEditor.setLanguage(selectedLanguage);
+                }
+            });
+        }
+    }
 }
 
-function displayResponseWithLineNumbers(content) {
-    responseBodyDisplay.textContent = content;
-    responseLineNumbers.textContent = generateLineNumbers(content);
+/**
+ * Get the current response body content from the editor
+ * @returns {string}
+ */
+export function getResponseBodyContent() {
+    if (responseEditor) {
+        return responseEditor.getContent();
+    }
+    return '';
+}
+
+function displayResponseWithLineNumbers(content, contentType = null) {
+    initResponseEditor();
+    if (responseEditor) {
+        responseEditor.setContent(content, contentType);
+    }
 }
 
 function clearResponseDisplay() {
-    responseBodyDisplay.textContent = '';
-    responseLineNumbers.textContent = '';
+    initResponseEditor();
+    if (responseEditor) {
+        responseEditor.clear();
+    }
 }
 
 function setRequestInProgress(inProgress) {
@@ -164,8 +207,8 @@ export async function handleSendRequest() {
 
         await new Promise(resolve => setTimeout(resolve, 100));
 
-        if (responseBodyDisplay && responseBodyDisplay.parentElement) {
-            responseBodyDisplay.parentElement.offsetHeight;
+        if (responseBodyContainer && responseBodyContainer.parentElement) {
+            responseBodyContainer.parentElement.offsetHeight;
         }
 
         displayResponseWithLineNumbers('Sending request...');
@@ -187,7 +230,14 @@ export async function handleSendRequest() {
 
         if (result.success) {
             const formattedResponse = JSON.stringify(result.data, null, 2);
-            displayResponseWithLineNumbers(formattedResponse);
+
+            // Extract content-type from response headers
+            let contentType = null;
+            if (result.headers && result.headers['content-type']) {
+                contentType = result.headers['content-type'];
+            }
+
+            displayResponseWithLineNumbers(formattedResponse, contentType);
 
             let headersString = '';
             if (result.headers) {
@@ -217,7 +267,7 @@ export async function handleSendRequest() {
 
     } catch (error) {
         console.error('Full error object:', error);
-        
+
         let status = error.status || null;
         let statusText = error.statusText || '';
         let errorMessage = error.message || 'Unknown error';
@@ -236,7 +286,14 @@ export async function handleSendRequest() {
         } else {
             errorContent = `Error: ${errorMessage}`;
         }
-        displayResponseWithLineNumbers(errorContent);
+
+        // Extract content-type from error headers if available
+        let contentType = null;
+        if (error.headers && error.headers['content-type']) {
+            contentType = error.headers['content-type'];
+        }
+
+        displayResponseWithLineNumbers(errorContent, contentType);
         
         if (error.headers && Object.keys(error.headers).length > 0) {
             try {

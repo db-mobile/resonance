@@ -911,7 +911,6 @@ body {
   color: var(--text-secondary);
   cursor: pointer;
   padding: var(--space-2);
-  margin-left: auto;
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
   display: flex;
@@ -935,6 +934,30 @@ body {
 
 .copy-response-btn svg {
   display: block;
+}
+
+.language-selector {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  margin-left: auto;
+  margin-right: var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.language-selector:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--border-medium);
+}
+
+.language-selector:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-alpha);
 }
 
 .response-display {
@@ -971,7 +994,7 @@ body {
   margin: 0;
 }
 
-/* Response Body with Line Numbers */
+/* Response Body with CodeMirror */
 .response-body-container {
   display: flex;
   flex: 1;
@@ -981,28 +1004,13 @@ body {
   overflow: hidden;
 }
 
-.line-numbers {
-  background: var(--bg-tertiary);
-  color: var(--text-tertiary);
-  padding: var(--space-2);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-xs);
-  line-height: var(--line-height-normal);
-  text-align: right;
-  user-select: none;
-  min-width: 3em;
-  border-right: 1px solid var(--border-light);
-  white-space: pre;
-  overflow: hidden;
-  margin: 0;
+.response-body-container .cm-editor {
+  height: 100%;
+  flex: 1;
 }
 
-.response-body-container #response-display {
-  flex: 1;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  margin: 0;
+.response-body-container .cm-scroller {
+  overflow: auto;
 }
 
 /* Loading States */
