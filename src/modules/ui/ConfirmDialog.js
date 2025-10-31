@@ -34,7 +34,7 @@ export class ConfirmDialog {
         dialog.className = 'confirm-dialog';
         dialog.style.cssText = `
             background: var(--bg-primary);
-            border-radius: 8px;
+            border-radius: var(--radius-xl);
             padding: 24px;
             min-width: 400px;
             max-width: 500px;
@@ -53,8 +53,8 @@ export class ConfirmDialog {
                 <p style="margin: 0; color: var(--text-primary); white-space: pre-wrap; line-height: 1.5;">${this.escapeHtml(message)}</p>
             </div>
             <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                <button id="confirm-cancel-btn" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: 4px; cursor: pointer;">${this.escapeHtml(cancelText)}</button>
-                <button id="confirm-confirm-btn" style="padding: 8px 16px; border: none; background: ${isDangerous ? '#dc2626' : 'var(--color-primary)'}; color: white; border-radius: 4px; cursor: pointer;">${this.escapeHtml(confirmText)}</button>
+                <button id="confirm-cancel-btn" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: var(--radius-sm); cursor: pointer;">${this.escapeHtml(cancelText)}</button>
+                <button id="confirm-confirm-btn" style="padding: 8px 16px; border: none; background: ${isDangerous ? '#dc2626' : 'var(--color-primary)'}; color: white; border-radius: var(--radius-sm); cursor: pointer;">${this.escapeHtml(confirmText)}</button>
             </div>
         `;
 

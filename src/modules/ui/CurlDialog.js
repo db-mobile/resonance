@@ -27,7 +27,7 @@ export class CurlDialog {
         dialog.className = 'curl-dialog';
         dialog.style.cssText = `
             background: var(--bg-primary);
-            border-radius: 8px;
+            border-radius: var(--radius-xl);
             padding: 24px;
             min-width: 600px;
             max-width: 90%;
@@ -44,17 +44,17 @@ export class CurlDialog {
                 <button id="curl-close-btn" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 24px; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;" aria-label="Close">&times;</button>
             </div>
             <div style="margin-bottom: 16px; flex: 1; overflow: auto;">
-                <pre id="curl-command-display" style="background: var(--bg-secondary); padding: 16px; border-radius: 4px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; color: var(--text-primary); margin: 0; white-space: pre-wrap; word-break: break-all;"></pre>
+                <pre id="curl-command-display" style="background: var(--bg-secondary); padding: 16px; border-radius: var(--radius-sm); overflow-x: auto; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; color: var(--text-primary); margin: 0; white-space: pre-wrap; word-break: break-all;"></pre>
             </div>
             <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                <button id="curl-copy-btn" style="padding: 8px 16px; border: none; background: var(--color-primary); color: white; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <button id="curl-copy-btn" style="padding: 8px 16px; border: none; background: var(--color-primary); color: white; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; gap: 8px;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                     </svg>
                     <span>Copy to Clipboard</span>
                 </button>
-                <button id="curl-close-bottom-btn" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: 4px; cursor: pointer;">Close</button>
+                <button id="curl-close-bottom-btn" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: var(--radius-sm); cursor: pointer;">Close</button>
             </div>
         `;
 
