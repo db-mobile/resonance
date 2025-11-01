@@ -21,7 +21,7 @@ A clean and minimal API client with excellent user experience built with Electro
 
 ## Screenshots 📸
 
-![Alt text](/assets/screenshots/resonance_screen.png?raw=true "Main interface showing API request configuration")
+![Alt text](/assets/screenshots/main_window.png?raw=true "Main interface showing API request configuration")
 
 ## Installation 🚀
 
