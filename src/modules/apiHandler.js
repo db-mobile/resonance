@@ -5,7 +5,10 @@ import { activateTab } from './tabManager.js'; // To ensure response tab is acti
 import { saveRequestBodyModification } from './collectionManager.js';
 import { VariableProcessor } from './variables/VariableProcessor.js';
 import { VariableRepository } from './storage/VariableRepository.js';
+import { EnvironmentRepository } from './storage/EnvironmentRepository.js';
 import { CollectionRepository } from './storage/CollectionRepository.js';
+import { VariableService } from './services/VariableService.js';
+import { StatusDisplayAdapter } from './interfaces/IStatusDisplay.js';
 import { authManager } from './authManager.js';
 import { generateCurlCommand } from './curlGenerator.js';
 import { CurlDialog } from './ui/CurlDialog.js';
@@ -13,6 +16,16 @@ import { ResponseEditor } from './responseEditor.bundle.js';
 
 // Initialize CodeMirror editor for response display
 let responseEditor = null;
+
+// Helper function to get variable service with environment support
+function getVariableService() {
+    const variableRepository = new VariableRepository(window.electronAPI);
+    const environmentRepository = new EnvironmentRepository(window.electronAPI);
+    const variableProcessor = new VariableProcessor();
+    const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
+
+    return new VariableService(variableRepository, variableProcessor, statusDisplayAdapter, environmentRepository);
+}
 
 function initResponseEditor() {
     if (!responseEditor && responseBodyContainer) {
@@ -130,16 +143,16 @@ export async function handleSendRequest() {
     if (window.currentEndpoint) {
         try {
             const collectionRepository = new CollectionRepository(window.electronAPI);
-            const variableRepository = new VariableRepository(window.electronAPI);
-            
+            const variableService = getVariableService();
+
             const collection = await collectionRepository.getById(window.currentEndpoint.collectionId);
-            
+
             if (collection && collection.defaultHeaders) {
                 const mergedHeaders = { ...collection.defaultHeaders, ...headers };
                 Object.assign(headers, mergedHeaders);
             }
-            
-            const variables = await variableRepository.getVariablesForCollection(window.currentEndpoint.collectionId);
+
+            const variables = await variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
             const processor = new VariableProcessor();
 
             const combinedVariables = { ...variables, ...pathParams };
@@ -183,14 +196,14 @@ export async function handleSendRequest() {
     if (['POST', 'PUT', 'PATCH'].includes(method) && bodyInput.value.trim()) {
         try {
             let bodyText = bodyInput.value.trim();
-            
+
             if (window.currentEndpoint) {
-                const variableRepository = new VariableRepository(window.electronAPI);
-                const variables = await variableRepository.getVariablesForCollection(window.currentEndpoint.collectionId);
+                const variableService = getVariableService();
+                const variables = await variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
                 const processor = new VariableProcessor();
                 bodyText = processor.processTemplate(bodyText, variables);
             }
-            
+
             body = JSON.parse(bodyText);
         } catch (e) {
             updateStatusDisplay(`Invalid Body JSON: ${e.message}`, null);
@@ -352,7 +365,7 @@ export async function handleGenerateCurl() {
     if (window.currentEndpoint) {
         try {
             const collectionRepository = new CollectionRepository(window.electronAPI);
-            const variableRepository = new VariableRepository(window.electronAPI);
+            const variableService = getVariableService();
 
             const collection = await collectionRepository.getById(window.currentEndpoint.collectionId);
 
@@ -361,7 +374,7 @@ export async function handleGenerateCurl() {
                 Object.assign(headers, mergedHeaders);
             }
 
-            const variables = await variableRepository.getVariablesForCollection(window.currentEndpoint.collectionId);
+            const variables = await variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
             const processor = new VariableProcessor();
 
             const combinedVariables = { ...variables, ...pathParams };
@@ -410,8 +423,8 @@ export async function handleGenerateCurl() {
             let bodyText = bodyInput.value.trim();
 
             if (window.currentEndpoint) {
-                const variableRepository = new VariableRepository(window.electronAPI);
-                const variables = await variableRepository.getVariablesForCollection(window.currentEndpoint.collectionId);
+                const variableService = getVariableService();
+                const variables = await variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
                 const processor = new VariableProcessor();
                 bodyText = processor.processTemplate(bodyText, variables);
             }

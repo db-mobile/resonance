@@ -13,12 +13,34 @@ import { i18n } from './i18n/I18nManager.js';
 import { authManager } from './modules/authManager.js';
 import { initializeCopyHandler } from './modules/copyHandler.js';
 import { HistoryController } from './modules/controllers/HistoryController.js';
+import { EnvironmentController } from './modules/controllers/EnvironmentController.js';
+import { EnvironmentRepository } from './modules/storage/EnvironmentRepository.js';
+import { EnvironmentService } from './modules/services/EnvironmentService.js';
+import { EnvironmentManager } from './modules/ui/EnvironmentManager.js';
+import { EnvironmentSelector } from './modules/ui/EnvironmentSelector.js';
+import { StatusDisplayAdapter } from './modules/interfaces/IStatusDisplay.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
 const timeoutManager = new TimeoutManager();
 const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager);
 const historyController = new HistoryController(window.electronAPI);
+
+// Initialize environment system
+const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
+const environmentRepository = new EnvironmentRepository(window.electronAPI);
+const environmentService = new EnvironmentService(environmentRepository, statusDisplayAdapter);
+const environmentManager = new EnvironmentManager(environmentService);
+const environmentSelector = new EnvironmentSelector(
+    environmentService,
+    (envId) => environmentController.switchEnvironment(envId),
+    () => environmentController.openEnvironmentManager()
+);
+const environmentController = new EnvironmentController(
+    environmentService,
+    environmentManager,
+    environmentSelector
+);
 
 document.addEventListener('DOMContentLoaded', async () => {
     curlBtn.addEventListener('click', handleGenerateCurl);
@@ -69,6 +91,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.i18n = i18n;
     window.authManager = authManager;
     window.historyController = historyController;
+    window.environmentController = environmentController;
+
+    // Initialize environment selector
+    environmentSelector.initialize('environment-selector-container');
+
+    // Initialize environment controller and load active environment
+    await environmentController.initialize();
 
     // Initialize history controller
     await historyController.init();

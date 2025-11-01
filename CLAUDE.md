@@ -65,13 +65,16 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 #### Architectural Layers
 - `controllers/` - MVC controllers
   - CollectionController.js - Manages collection operations
+  - EnvironmentController.js - Coordinates environment operations between UI and services
   - HistoryController.js - Manages request history
 - `services/` - Business logic services
   - CollectionService.js - Collection business logic
+  - EnvironmentService.js - Environment management with validation and event notifications
   - HistoryService.js - Request history tracking and management
-  - VariableService.js - Variable substitution logic
+  - VariableService.js - Variable substitution logic with environment support
 - `storage/` - Data persistence layer with robust error handling
   - CollectionRepository.js - Includes `_getObjectFromStore()` helper for safe store access
+  - EnvironmentRepository.js - Persists environments and manages active environment state
   - HistoryRepository.js - Persists request history with validation
   - VariableRepository.js - Validates and initializes store data
 - `ui/` - UI components
@@ -79,6 +82,8 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
   - ConfirmDialog.js - Confirmation dialog component
   - ContextMenu.js - Right-click context menus
   - CurlDialog.js - cURL export dialog
+  - EnvironmentManager.js - Environment management dialog with full CRUD operations
+  - EnvironmentSelector.js - Dropdown for quick environment switching
   - HistoryRenderer.js - Request history UI
   - RenameDialog.js - Collection/endpoint rename dialog
   - VariableManager.js - Variable management UI
@@ -101,9 +106,20 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 
 #### Variable System
 - Template variable support using `{{ variableName }}` syntax
-- Collection-scoped variables for API keys, base URLs, etc.
+- Environment-scoped variables for API keys, base URLs, etc.
 - Automatic substitution in URLs, headers, and request bodies
 - Variable management UI for easy editing
+- Variables are organized within environments for different contexts (e.g., Development, Staging, Production)
+
+#### Environment Management
+- Create, edit, delete, and duplicate environments via `EnvironmentController`
+- Switch between environments with dropdown selector (`EnvironmentSelector`)
+- Full-featured environment management dialog (`EnvironmentManager`)
+- Environment-specific variable sets for different API contexts
+- Import/export environments as JSON for backup and sharing
+- Active environment state persisted across sessions
+- Event-driven architecture for environment changes with listener notifications
+- Validation and error handling for environment operations
 
 #### Request Body Schema Generation
 - Automatically generates example request bodies from OpenAPI schemas
@@ -164,21 +180,24 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - **Jest** (v30.0.x) - Testing framework with Babel integration
 
 ### Data Persistence
-- Uses `electron-store` to persist collections, variables, and request history in JSON format
+- Uses `electron-store` to persist collections, variables, environments, and request history in JSON format
 - Store name: `api-collections` with default structure `{ collections: [] }`
 - IPC handlers for `store:get`, `store:set`, `settings:get`, and `settings:set` operations
-- Separate storage for collection data, variables, theme preferences, language settings, and request history
+- Separate storage for collection data, environments, variables, theme preferences, language settings, and request history
+- **Environment Storage:** Environments stored with structure `{ items: [], activeEnvironmentId: null }`
 - **Important:** Repository layer includes fallback handling for packaged apps where store may return `undefined` on first run
 - All store access methods validate data types and auto-initialize with defaults if needed
 
 ## UI Structure
 - Split layout with collections sidebar and main content area
 - Collection hierarchy with expandable endpoints
+- Environment selector dropdown for quick switching between environments
 - Tabbed interface for request configuration (Query Params, Headers, Body, Auth)
 - Tabbed response display (Body, Headers)
 - Context menus for collection management (rename, delete, export as cURL)
 - Request history panel with timestamp and replay functionality
 - Authentication panel supporting multiple auth methods
+- Environment management dialog with full CRUD operations and import/export
 - Settings modal for theme, language, and timeout configuration
 - Resizable panels for customizable workspace layout
 - Support for multiple HTTP methods (GET, POST, PUT, DELETE, PATCH, etc.)
@@ -201,10 +220,12 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - Attribute-based i18n with automatic DOM updates (`data-i18n` attributes)
 - Unified settings management through modal interface
 - **CodeMirror Integration**: `responseEditor.js` bundled separately with esbuild for optimal loading
-- **Dialog Pattern**: Reusable dialog components (ConfirmDialog, RenameDialog, CurlDialog) for user interactions
+- **Dialog Pattern**: Reusable dialog components (ConfirmDialog, RenameDialog, CurlDialog, EnvironmentManager) for user interactions
 - **History Tracking**: Automatic request/response capture with timestamp and replay capability
 - **Authentication State**: Per-request auth configuration with secure storage
-- **Copy/Export Pattern**: Unified handlers for clipboard operations and format exports (cURL)
+- **Copy/Export Pattern**: Unified handlers for clipboard operations and format exports (cURL, environments)
+- **Environment Pattern**: Event-driven environment management with controller coordination, service business logic, and repository persistence
+- **Change Listeners**: Observer pattern for environment changes with notification system for UI synchronization
 
 ## Common Issues & Solutions
 

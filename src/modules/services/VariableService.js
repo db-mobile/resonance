@@ -1,13 +1,46 @@
 export class VariableService {
-    constructor(variableRepository, variableProcessor, statusDisplay) {
+    constructor(variableRepository, variableProcessor, statusDisplay, environmentRepository = null) {
         this.repository = variableRepository;
         this.processor = variableProcessor;
         this.statusDisplay = statusDisplay;
+        this.environmentRepository = environmentRepository;
+    }
+
+    /**
+     * Get variables - returns environment variables only (no collection context)
+     * For collection-specific variables, use getVariablesForCollection()
+     */
+    async getVariables() {
+        try {
+            // If environment repository is available, use active environment variables
+            if (this.environmentRepository) {
+                return await this.environmentRepository.getActiveEnvironmentVariables();
+            }
+
+            // No environment variables available
+            return {};
+        } catch (error) {
+            console.error('Error loading variables:', error);
+            return {};
+        }
     }
 
     async getVariablesForCollection(collectionId) {
         try {
-            return await this.repository.getVariablesForCollection(collectionId);
+            let variables = {};
+
+            // Start with collection variables as base
+            const collectionVariables = await this.repository.getVariablesForCollection(collectionId);
+            variables = { ...collectionVariables };
+
+            // If environment repository exists, merge environment variables (with precedence)
+            if (this.environmentRepository) {
+                const environmentVariables = await this.environmentRepository.getActiveEnvironmentVariables();
+                // Environment variables override collection variables
+                variables = { ...variables, ...environmentVariables };
+            }
+
+            return variables;
         } catch (error) {
             this.statusDisplay.update(`Error loading variables: ${error.message}`, null);
             throw error;
