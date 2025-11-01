@@ -48,22 +48,27 @@ npm start
 
 ### Build for Distribution
 
-Package the application for your current platform:
+Build the application:
 ```bash
-npm run package
+npm run build
 ```
 
-Create distributables (zip, deb, rpm, etc.):
+Create distributables for all platforms:
 ```bash
-npm run make
+npm run dist
 ```
 
-Create Debian package specifically:
+Create Linux-specific distributables:
 ```bash
-npm run make:debian
+npm run dist:linux
 ```
 
-**Note:** The application uses ASAR packaging for improved performance and security.
+Create directory distribution (unpacked):
+```bash
+npm run dist:dir
+```
+
+**Note:** The application uses ASAR packaging for improved performance and security. Builds are created using electron-builder.
 
 ## Usage 📖
 
@@ -156,10 +161,13 @@ src/
 ### Scripts
 
 - `npm start` - Start development server
-- `npm run package` - Package for current platform
-- `npm run make` - Create all distributables
-- `npm run make:debian` - Create Debian (.deb) package
-- `npm test` - Run tests (not configured yet)
+- `npm run build` - Build the application
+- `npm run dist` - Create distributables for all platforms
+- `npm run dist:linux` - Create Linux-specific distributables
+- `npm run dist:dir` - Create directory distribution (unpacked)
+- `npm test` - Run tests with Jest
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Run tests with coverage report
 
 ### Development Architecture
 
@@ -214,11 +222,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Multi-theme support
 - [x] Internationalization
 - [x] Authentication support (Bearer, Basic, API Key, OAuth2)
-- [ ] Test suite implementation
+- [x] Request history and bookmarks
+- [x] Test suite implementation (Jest configured)
 - [ ] Plugin system for extensions
 - [ ] More export formats (Postman, Insomnia)
 - [ ] GraphQL support
-- [ ] Request history and bookmarks
 - [ ] Team collaboration features
 - [ ] Environment management (Dev, Staging, Production)
 - [ ] Response caching and mock servers
