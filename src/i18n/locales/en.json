@@ -130,5 +130,32 @@
     "clear_all_title": "Clear All History",
     "confirm_clear": "Are you sure you want to clear all request history?\n\nThis action cannot be undone.",
     "search_placeholder": "Search history..."
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "category": {
+      "request": "Request",
+      "navigation": "Navigation",
+      "actions": "Actions",
+      "settings": "Settings",
+      "help": "Help",
+      "tabs": "Tabs"
+    },
+    "ctrl_enter": "Send request",
+    "escape": "Cancel request",
+    "ctrl_keyl": "Focus URL bar",
+    "ctrl_keyb": "Toggle collections sidebar",
+    "ctrl_keyh": "Toggle history sidebar",
+    "ctrl_keyk": "Generate cURL command",
+    "ctrl_keyo": "Import OpenAPI collection",
+    "ctrl_keye": "Open environment manager",
+    "ctrl_comma": "Open settings",
+    "ctrl_slash": "Show keyboard shortcuts",
+    "shift_slash": "Show keyboard shortcuts (alternative)",
+    "ctrl_digit1": "Switch to Path Params tab",
+    "ctrl_digit2": "Switch to Query Params tab",
+    "ctrl_digit3": "Switch to Headers tab",
+    "ctrl_digit4": "Switch to Body tab",
+    "ctrl_digit5": "Switch to Auth tab"
   }
 }
