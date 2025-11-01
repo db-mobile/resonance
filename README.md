@@ -9,13 +9,15 @@ A clean and minimal API client with excellent user experience built with Electro
 ## Features ✨
 
 - **OpenAPI/Swagger Import**: Import OpenAPI 3.0 specifications (YAML/JSON) and automatically generate organized request collections
+- **Environment Management**: Organize variables into environments (Development, Staging, Production, etc.) for easy context switching
 - **Variable Templating**: Use `{{ variableName }}` syntax for dynamic values in URLs, headers, and request bodies
 - **Schema-Based Body Generation**: Automatically generate example request bodies from OpenAPI schemas
 - **Multi-Theme Support**: Light, dark, system-adaptive, and blueprint themes
 - **Internationalization**: Support for English, German, Spanish, French, and Italian
+- **Import/Export**: Export and import environments as JSON for backup and team sharing
 - **Secure Architecture**: Built with security best practices including context isolation and secure IPC
-- **Persistent Storage**: Collections, variables, and settings are automatically saved and restored
-- **Modern UI**: Clean, minimal interface with tabbed request/response views
+- **Persistent Storage**: Collections, variables, environments, and settings are automatically saved and restored
+- **Modern UI**: Clean, minimal interface with tabbed request/response views and environment selector
 
 ## Screenshots 📸
 
@@ -48,45 +50,65 @@ npm start
 
 ### Build for Distribution
 
-Package the application for your current platform:
+Build the application:
 ```bash
-npm run package
+npm run build
 ```
 
-Create distributables (zip, deb, rpm, etc.):
+Create distributables for all platforms:
 ```bash
-npm run make
+npm run dist
 ```
 
-Create Debian package specifically:
+Create Linux-specific distributables:
 ```bash
-npm run make:debian
+npm run dist:linux
 ```
 
-**Note:** The application uses ASAR packaging for improved performance and security.
+Create directory distribution (unpacked):
+```bash
+npm run dist:dir
+```
+
+**Note:** The application uses ASAR packaging for improved performance and security. Builds are created using electron-builder.
 
 ## Usage 📖
 
 ### Getting Started
 
-1. **Import Collections**: Use File > Import Collection to load OpenAPI/Swagger specifications
-2. **Set Variables**: Define reusable variables like API keys and base URLs in the Variables panel
-3. **Make Requests**: Select endpoints from the collections sidebar and configure headers, query parameters, and request bodies
-4. **View Responses**: Examine response data in the tabbed response viewer
+1. **Create Environments**: Set up environments (Development, Staging, Production) with environment-specific variables
+2. **Import Collections**: Use File > Import Collection to load OpenAPI/Swagger specifications
+3. **Set Variables**: Define reusable variables like API keys and base URLs within each environment
+4. **Switch Environments**: Use the environment selector dropdown to quickly switch between different API contexts
+5. **Make Requests**: Select endpoints from the collections sidebar and configure headers, query parameters, and request bodies
+6. **View Responses**: Examine response data in the tabbed response viewer
+
+### Environment Management
+
+Organize your API variables into separate environments:
+- **Create Multiple Environments**: Development, Staging, Production, or any custom environment
+- **Environment-Specific Variables**: Each environment has its own set of variables
+- **Quick Switching**: Use the dropdown selector to instantly switch between environments
+- **Import/Export**: Share environments with your team or backup as JSON files
+- **Manage Variables**: Full CRUD operations for environment variables through the Environment Manager
 
 ### Variable System
 
 Variables use the `{{ variableName }}` syntax and can be used in:
 - Request URLs
 - Headers
-- Query parameters 
+- Query parameters
 - Request bodies
+
+Variables are scoped to the active environment, allowing different values for different contexts.
 
 Example:
 ```
 URL: {{ baseUrl }}/users/{{ userId }}
 Header: Authorization: Bearer {{ apiKey }}
 ```
+
+The values of `baseUrl` and `apiKey` will automatically change when you switch environments.
 
 ### OpenAPI Integration
 
@@ -121,10 +143,10 @@ src/
 ├── preload.js           # Secure context bridge
 ├── style.css           # Global styles
 ├── modules/            # Modular renderer components
-│   ├── controllers/    # MVC controllers
-│   ├── services/       # Business logic
+│   ├── controllers/    # MVC controllers (Collection, Environment, History)
+│   ├── services/       # Business logic (Collection, Environment, History, Variable)
 │   ├── storage/        # Data persistence with validation
-│   ├── ui/            # UI components
+│   ├── ui/            # UI components (including EnvironmentManager, EnvironmentSelector)
 │   ├── variables/     # Variable processing
 │   └── schema/        # OpenAPI schema handling
 ├── themes/            # Theme CSS files
@@ -156,10 +178,13 @@ src/
 ### Scripts
 
 - `npm start` - Start development server
-- `npm run package` - Package for current platform
-- `npm run make` - Create all distributables
-- `npm run make:debian` - Create Debian (.deb) package
-- `npm test` - Run tests (not configured yet)
+- `npm run build` - Build the application
+- `npm run dist` - Create distributables for all platforms
+- `npm run dist:linux` - Create Linux-specific distributables
+- `npm run dist:dir` - Create directory distribution (unpacked)
+- `npm test` - Run tests with Jest
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Run tests with coverage report
 
 ### Development Architecture
 
@@ -214,19 +239,18 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Multi-theme support
 - [x] Internationalization
 - [x] Authentication support (Bearer, Basic, API Key, OAuth2)
-- [ ] Test suite implementation
+- [x] Request history and bookmarks
+- [x] Environment management (Dev, Staging, Production)
+- [x] Test suite implementation (Jest configured)
 - [ ] Plugin system for extensions
 - [ ] More export formats (Postman, Insomnia)
 - [ ] GraphQL support
-- [ ] Request history and bookmarks
 - [ ] Team collaboration features
-- [ ] Environment management (Dev, Staging, Production)
 - [ ] Response caching and mock servers
 
 ## Acknowledgments 🙏
 
 - Built with [Electron](https://electronjs.org/)
-- Icons from [Lucide](https://lucide.dev/)
 - Inspired by modern API development tools
 
 ---

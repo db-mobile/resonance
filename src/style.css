@@ -1934,3 +1934,283 @@ body {
   color: var(--color-error);
   border-color: var(--color-error);
 }
+/* ===========================
+   Environment Management Styles
+   =========================== */
+
+/* Environment Section in Sidebar */
+.environment-section {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-light);
+}
+
+/* Environment Selector Button */
+.environment-selector {
+  position: relative;
+}
+
+.env-selector-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.env-selector-button:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--color-primary);
+}
+
+.env-icon {
+  flex-shrink: 0;
+  color: var(--text-primary);
+}
+
+.env-name {
+  flex: 1;
+  text-align: left;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.env-arrow {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+/* Environment Dropdown */
+.env-dropdown {
+  position: fixed;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  min-width: 200px;
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 9999;
+  padding: var(--space-2) 0;
+}
+
+.env-dropdown-item {
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: all var(--transition-base);
+}
+
+.env-dropdown-item:hover {
+  background: var(--bg-secondary);
+}
+
+.env-dropdown-item.active {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.env-dropdown-name {
+  flex: 1;
+}
+
+.env-check {
+  color: var(--color-success);
+  font-weight: bold;
+  margin-left: var(--space-2);
+}
+
+.env-dropdown-separator {
+  height: 1px;
+  background: var(--border-light);
+  margin: var(--space-2) 0;
+}
+
+.env-manage-item {
+  color: var(--color-primary);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.env-manage-item svg {
+  flex-shrink: 0;
+}
+
+.env-manage-item:hover {
+  background: var(--color-primary-light);
+}
+
+/* Environment Manager Dialog */
+.environment-manager-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.environment-manager-dialog {
+  background: var(--bg-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  min-width: 800px;
+  max-width: 900px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border-light);
+}
+
+/* Environment Toolbar Buttons */
+.env-toolbar-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  transition: all var(--transition-base);
+}
+
+.env-toolbar-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--color-primary);
+}
+
+/* Environment Create Button */
+.env-create-btn {
+  padding: 4px 8px;
+  border: 1px solid var(--color-primary);
+  background: transparent;
+  color: var(--color-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all var(--transition-base);
+}
+
+.env-create-btn:hover {
+  background: var(--color-primary);
+  color: white;
+}
+
+/* Environment List Item */
+.env-list-item {
+  padding: 10px 12px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid transparent;
+  transition: all var(--transition-base);
+}
+
+.env-list-item:hover {
+  background: var(--bg-secondary);
+}
+
+/* Environment Action Buttons */
+.env-action-btn {
+  padding: 6px 10px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.env-action-btn svg {
+  flex-shrink: 0;
+}
+
+.env-action-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--color-primary);
+}
+
+.env-danger-btn {
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.env-danger-btn:hover {
+  background: var(--color-error-light);
+  border-color: var(--color-error);
+}
+
+/* Environment Variable Row */
+.env-variable-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  align-items: center;
+}
+
+.var-name-input,
+.var-value-input {
+  padding: var(--space-2);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: all var(--transition-base);
+}
+
+.var-name-input:focus,
+.var-value-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.var-delete-btn {
+  padding: 6px 10px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all var(--transition-base);
+}
+
+.var-delete-btn:hover {
+  background: var(--color-error-light);
+  color: var(--color-error);
+  border-color: var(--color-error);
+}

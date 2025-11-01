@@ -79,6 +79,14 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.2.0" date="2025-10-31">
+      <description>
+        <p>New features introduced</p>
+        <ul>
+          <li>Environment management</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.1.0" date="2025-10-31">
       <description>
         <p>New features introduced</p>
