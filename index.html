@@ -249,6 +249,13 @@
                                 aria-controls="response-cookies">
                             Cookies
                         </button>
+                        <button class="tab-button"
+                                data-tab="response-performance"
+                                role="tab"
+                                aria-selected="false"
+                                aria-controls="response-performance">
+                            Performance
+                        </button>
                     </nav>
 
                     <div class="response-display">
@@ -294,6 +301,15 @@
                              role="tabpanel"
                              aria-labelledby="response-cookies-tab">
                             <div id="response-cookies-display" class="response-cookies-display" aria-live="polite"></div>
+                        </div>
+
+                        <div id="response-performance"
+                             class="tab-content"
+                             role="tabpanel"
+                             aria-labelledby="response-performance-tab">
+                            <div id="response-performance-display" class="response-performance-display" aria-live="polite">
+                                <p class="no-data">Send a request to see performance metrics</p>
+                            </div>
                         </div>
                     </div>
                 </div>

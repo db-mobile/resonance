@@ -1,4 +1,4 @@
-import { urlInput, methodSelect, bodyInput, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, responseCookiesDisplay, languageSelector } from './domElements.js';
+import { urlInput, methodSelect, bodyInput, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, responseCookiesDisplay, responsePerformanceDisplay, languageSelector } from './domElements.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { activateTab } from './tabManager.js'; // To ensure response tab is active
@@ -14,6 +14,7 @@ import { generateCurlCommand } from './curlGenerator.js';
 import { CurlDialog } from './ui/CurlDialog.js';
 import { ResponseEditor } from './responseEditor.bundle.js';
 import { extractCookies, formatCookiesAsHtml } from './cookieParser.js';
+import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
 
 // Initialize CodeMirror editor for response display
 let responseEditor = null;
@@ -106,6 +107,7 @@ export async function handleCancelRequest() {
             displayResponseWithLineNumbers('Request was cancelled by user');
             responseHeadersDisplay.textContent = '';
             responseCookiesDisplay.innerHTML = '';
+            clearPerformanceMetrics(responsePerformanceDisplay);
         }
     } catch (error) {
         console.error('Error cancelling request:', error);
@@ -229,6 +231,7 @@ export async function handleSendRequest() {
         displayResponseWithLineNumbers('Sending request...');
         responseHeadersDisplay.textContent = '';
         responseCookiesDisplay.innerHTML = '';
+        clearPerformanceMetrics(responsePerformanceDisplay);
         updateStatusDisplay('Status: Sending...', null);
 
         const requestConfig = {
@@ -265,6 +268,9 @@ export async function handleSendRequest() {
             const cookies = extractCookies(result.headers);
             responseCookiesDisplay.innerHTML = formatCookiesAsHtml(cookies);
 
+            // Display performance metrics
+            displayPerformanceMetrics(responsePerformanceDisplay, result.timings, result.size);
+
             updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
             updateResponseTime(result.ttfb);
             updateResponseSize(result.size);
@@ -281,6 +287,7 @@ export async function handleSendRequest() {
             displayResponseWithLineNumbers('Request was cancelled');
             responseHeadersDisplay.textContent = '';
             responseCookiesDisplay.innerHTML = '';
+            clearPerformanceMetrics(responsePerformanceDisplay);
             setRequestInProgress(false);
         } else {
             throw result;
@@ -315,7 +322,7 @@ export async function handleSendRequest() {
         }
 
         displayResponseWithLineNumbers(errorContent, contentType);
-        
+
         if (error.headers && Object.keys(error.headers).length > 0) {
             try {
                 responseHeadersDisplay.textContent = JSON.stringify(error.headers, null, 2);
@@ -329,6 +336,13 @@ export async function handleSendRequest() {
         } else {
             responseHeadersDisplay.textContent = 'No headers available for error response.';
             responseCookiesDisplay.innerHTML = '';
+        }
+
+        // Display performance metrics for error responses
+        if (error.timings) {
+            displayPerformanceMetrics(responsePerformanceDisplay, error.timings, error.size);
+        } else {
+            clearPerformanceMetrics(responsePerformanceDisplay);
         }
 
         let statusDisplayText = 'Request Failed';

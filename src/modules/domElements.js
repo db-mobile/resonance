@@ -18,6 +18,7 @@ export const addQueryParamBtn = document.getElementById('add-query-param-btn');
 export const responseBodyContainer = document.getElementById('response-body-container');
 export const responseHeadersDisplay = document.getElementById('response-headers-display');
 export const responseCookiesDisplay = document.getElementById('response-cookies-display');
+export const responsePerformanceDisplay = document.getElementById('response-performance-display');
 export const copyResponseBtn = document.getElementById('copy-response-btn');
 export const languageSelector = document.getElementById('language-selector');
 
