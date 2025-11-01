@@ -1,4 +1,4 @@
-import { urlInput, methodSelect, bodyInput, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, languageSelector } from './domElements.js';
+import { urlInput, methodSelect, bodyInput, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, responseCookiesDisplay, languageSelector } from './domElements.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { activateTab } from './tabManager.js'; // To ensure response tab is active
@@ -13,6 +13,7 @@ import { authManager } from './authManager.js';
 import { generateCurlCommand } from './curlGenerator.js';
 import { CurlDialog } from './ui/CurlDialog.js';
 import { ResponseEditor } from './responseEditor.bundle.js';
+import { extractCookies, formatCookiesAsHtml } from './cookieParser.js';
 
 // Initialize CodeMirror editor for response display
 let responseEditor = null;
@@ -104,6 +105,7 @@ export async function handleCancelRequest() {
             updateResponseSize(null);
             displayResponseWithLineNumbers('Request was cancelled by user');
             responseHeadersDisplay.textContent = '';
+            responseCookiesDisplay.innerHTML = '';
         }
     } catch (error) {
         console.error('Error cancelling request:', error);
@@ -226,6 +228,7 @@ export async function handleSendRequest() {
 
         displayResponseWithLineNumbers('Sending request...');
         responseHeadersDisplay.textContent = '';
+        responseCookiesDisplay.innerHTML = '';
         updateStatusDisplay('Status: Sending...', null);
 
         const requestConfig = {
@@ -258,6 +261,10 @@ export async function handleSendRequest() {
             }
             responseHeadersDisplay.textContent = headersString || 'No response headers.';
 
+            // Parse and display cookies
+            const cookies = extractCookies(result.headers);
+            responseCookiesDisplay.innerHTML = formatCookiesAsHtml(cookies);
+
             updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
             updateResponseTime(result.ttfb);
             updateResponseSize(result.size);
@@ -273,6 +280,7 @@ export async function handleSendRequest() {
             updateResponseSize(null);
             displayResponseWithLineNumbers('Request was cancelled');
             responseHeadersDisplay.textContent = '';
+            responseCookiesDisplay.innerHTML = '';
             setRequestInProgress(false);
         } else {
             throw result;
@@ -314,8 +322,13 @@ export async function handleSendRequest() {
             } catch {
                 responseHeadersDisplay.textContent = 'Error parsing response headers.';
             }
+
+            // Parse and display cookies from error response
+            const cookies = extractCookies(error.headers);
+            responseCookiesDisplay.innerHTML = formatCookiesAsHtml(cookies);
         } else {
             responseHeadersDisplay.textContent = 'No headers available for error response.';
+            responseCookiesDisplay.innerHTML = '';
         }
 
         let statusDisplayText = 'Request Failed';
