@@ -40,15 +40,15 @@
   <screenshots>
     <screenshot type="default">
       <caption>Main interface showing API request configuration</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v62/assets/screenshots/main_window.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v79/assets/screenshots/main_window.png</image>
     </screenshot>
     <screenshot>
       <caption>Settings modal in light theme</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v62/assets/screenshots/settings.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v79/assets/screenshots/settings.png</image>
     </screenshot>
     <screenshot>
       <caption>Environment variables configuration</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v62/assets/screenshots/environment.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v79/assets/screenshots/environment.png</image>
     </screenshot>
   </screenshots>
 
