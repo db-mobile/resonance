@@ -258,7 +258,6 @@ export class EnvironmentManager {
                         <input
                             type="text"
                             id="env-name-input"
-                            value="${this.escapeHtml(environment.name)}"
                             style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-size: 16px; font-weight: 600;"
                         />
                         <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
@@ -294,6 +293,12 @@ export class EnvironmentManager {
                     </div>
                 </div>
             `;
+
+            // Set environment name directly via .value property to preserve special characters like {{ }}
+            const nameInput = detailsContainer.querySelector('#env-name-input');
+            if (nameInput) {
+                nameInput.value = environment.name;
+            }
 
             // Setup detail event listeners
             this.setupDetailEventListeners(environment);
@@ -445,20 +450,24 @@ export class EnvironmentManager {
                 type="text"
                 class="var-name-input"
                 placeholder="Variable name"
-                value="${this.escapeHtml(name)}"
                 style="padding: 8px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-size: 13px;"
             />
             <input
                 type="text"
                 class="var-value-input"
                 placeholder="Value"
-                value="${this.escapeHtml(value)}"
                 style="padding: 8px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-size: 13px;"
             />
             <button class="var-delete-btn" style="padding: 6px 10px; border: 1px solid var(--border-light); background: transparent; color: var(--text-secondary); border-radius: var(--radius-sm); cursor: pointer; font-size: 12px;">×</button>
         `;
 
         container.appendChild(row);
+
+        // Set values directly via .value property to preserve special characters like {{ }}
+        const nameInput = row.querySelector('.var-name-input');
+        const valueInput = row.querySelector('.var-value-input');
+        if (nameInput) nameInput.value = name;
+        if (valueInput) valueInput.value = value;
 
         // Setup variable row event listeners
         this.setupVariableRowListeners(row, name);
@@ -601,7 +610,6 @@ export class EnvironmentManager {
                 <input
                     type="text"
                     id="input-dialog-input"
-                    value="${this.escapeHtml(defaultValue)}"
                     style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-size: 14px; margin-bottom: 16px;"
                 />
                 <div style="display: flex; gap: 8px; justify-content: flex-end;">
@@ -614,6 +622,8 @@ export class EnvironmentManager {
             document.body.appendChild(overlay);
 
             const input = dialog.querySelector('#input-dialog-input');
+            // Set value directly via .value property to preserve special characters like {{ }}
+            if (input) input.value = defaultValue;
             const okBtn = dialog.querySelector('#input-dialog-ok');
             const cancelBtn = dialog.querySelector('#input-dialog-cancel');
 

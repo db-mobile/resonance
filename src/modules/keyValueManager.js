@@ -1,5 +1,15 @@
 import { pathParamsList, addPathParamBtn, headersList, addHeaderBtn, queryParamsList, addQueryParamBtn, urlInput } from './domElements.js';
 
+// Flag to prevent circular updates between query params and URL
+let isUpdatingUrlFromQueryParams = false;
+
+/**
+ * Set the flag to prevent circular updates - call before programmatically updating URL
+ */
+export function setUrlUpdating(value) {
+    isUpdatingUrlFromQueryParams = value;
+}
+
 export function createKeyValueRow(key = '', value = '') {
     const row = document.createElement('div');
     row.classList.add('key-value-row');
@@ -48,6 +58,34 @@ export function parseKeyValuePairs(listContainer) {
     return result;
 }
 
+/**
+ * URL encode a value while preserving variable placeholders like {{variableName}}
+ * This allows users to see their variables in the URL preview without encoding
+ */
+function encodeValuePreservingPlaceholders(value) {
+    // Find all {{...}} patterns and temporarily replace them with placeholders
+    const placeholders = [];
+    let index = 0;
+
+    const withPlaceholders = value.replace(/\{\{[^}]+\}\}/g, (match) => {
+        const placeholder = `__PLACEHOLDER_${index}__`;
+        placeholders.push({ placeholder, original: match });
+        index++;
+        return placeholder;
+    });
+
+    // URL encode the value (this encodes special chars but not our placeholders)
+    const encoded = encodeURIComponent(withPlaceholders);
+
+    // Restore the original {{...}} patterns
+    let result = encoded;
+    placeholders.forEach(({ placeholder, original }) => {
+        result = result.replace(placeholder, original);
+    });
+
+    return result;
+}
+
 export function updateUrlFromQueryParams() {
     try {
         const queryParams = parseKeyValuePairs(queryParamsList);
@@ -60,21 +98,37 @@ export function updateUrlFromQueryParams() {
         const questionMarkIndex = urlString.indexOf('?');
         const baseUrl = questionMarkIndex >= 0 ? urlString.substring(0, questionMarkIndex) : urlString;
 
-        const params = new URLSearchParams();
+        // Build query string with encoding that preserves variable placeholders
+        const queryPairs = [];
         Object.entries(queryParams).forEach(([key, value]) => {
             if (key) {
-                params.set(key, value);
+                const encodedKey = encodeValuePreservingPlaceholders(key);
+                const encodedValue = encodeValuePreservingPlaceholders(value);
+                queryPairs.push(`${encodedKey}=${encodedValue}`);
             }
         });
 
-        const queryString = params.toString();
+        const queryString = queryPairs.join('&');
+
+        // Set flag to prevent circular update when URL input event fires
+        isUpdatingUrlFromQueryParams = true;
         urlInput.value = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+        // Clear flag after event loop to allow the input event to be skipped
+        setTimeout(() => {
+            isUpdatingUrlFromQueryParams = false;
+        }, 0);
     } catch (error) {
         console.error('Error updating URL from query params:', error);
+        isUpdatingUrlFromQueryParams = false;
     }
 }
 
 export function updateQueryParamsFromUrl() {
+    // Skip if we're in the middle of updating URL from query params to prevent circular update
+    if (isUpdatingUrlFromQueryParams) {
+        return;
+    }
+
     try {
         let urlString = urlInput.value.trim();
 
@@ -90,12 +144,35 @@ export function updateQueryParamsFromUrl() {
 
         if (questionMarkIndex >= 0) {
             const queryString = urlString.substring(questionMarkIndex + 1);
-            const params = new URLSearchParams(queryString);
 
-            if (params.toString()) {
-                params.forEach((value, key) => {
-                    addKeyValueRow(queryParamsList, key, value);
-                });
+            // Parse query string manually to preserve variable placeholders like {{variableName}}
+            // URLSearchParams doesn't handle unencoded braces correctly
+            if (queryString) {
+                const pairs = queryString.split('&');
+                let hasParams = false;
+
+                for (const pair of pairs) {
+                    const equalIndex = pair.indexOf('=');
+                    if (equalIndex >= 0) {
+                        const key = pair.substring(0, equalIndex);
+                        const value = pair.substring(equalIndex + 1);
+
+                        // Decode URL-encoded values but preserve {{...}} patterns
+                        const decodedKey = decodeURIComponent(key);
+                        const decodedValue = decodeURIComponent(value);
+
+                        addKeyValueRow(queryParamsList, decodedKey, decodedValue);
+                        hasParams = true;
+                    } else if (pair.trim()) {
+                        // Key without value
+                        addKeyValueRow(queryParamsList, decodeURIComponent(pair), '');
+                        hasParams = true;
+                    }
+                }
+
+                if (!hasParams) {
+                    addKeyValueRow(queryParamsList);
+                }
             } else {
                 addKeyValueRow(queryParamsList);
             }

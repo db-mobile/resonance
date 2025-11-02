@@ -1,6 +1,6 @@
 import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput } from './modules/domElements.js';
 
-import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl } from './modules/keyValueManager.js';
+import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl, setUrlUpdating } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest, handleCancelRequest, handleGenerateCurl } from './modules/apiHandler.js';
@@ -277,6 +277,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.authManager = authManager;
     window.historyController = historyController;
     window.environmentController = environmentController;
+    window.setUrlUpdating = setUrlUpdating;
 
     // Initialize environment selector
     environmentSelector.initialize('environment-selector-container');

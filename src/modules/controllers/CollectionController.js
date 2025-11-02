@@ -79,7 +79,9 @@ export class CollectionController {
             const formElements = this.getFormElements();
             await this.service.loadEndpointIntoForm(collection, endpoint, formElements);
 
-            await this.processFormVariablesExceptUrl(collection.id, formElements);
+            // Don't substitute variables in the form - they should stay as {{...}} placeholders
+            // Variable substitution happens at request time in apiHandler.js
+            // await this.processFormVariablesExceptUrl(collection.id, formElements);
 
             await this.repository.saveLastSelectedRequest(collection.id, endpoint.id);
 
@@ -175,11 +177,13 @@ export class CollectionController {
             
             if (newVariables !== null) {
                 await this.variableService.setMultipleVariables(collection.id, newVariables);
-                
-                if (window.currentEndpoint && window.currentEndpoint.collectionId === collection.id) {
-                    const formElements = this.getFormElements();
-                    await this.processFormVariablesExceptUrl(collection.id, formElements);
-                }
+
+                // Don't substitute variables in the form - they should stay as {{...}} placeholders
+                // Variable substitution happens at request time in apiHandler.js
+                // if (window.currentEndpoint && window.currentEndpoint.collectionId === collection.id) {
+                //     const formElements = this.getFormElements();
+                //     await this.processFormVariablesExceptUrl(collection.id, formElements);
+                // }
             }
         } catch (error) {
             console.error('Error managing variables:', error);
@@ -681,7 +685,9 @@ export class CollectionController {
             const formElements = this.getFormElements();
             await this.service.loadEndpointIntoForm(collection, endpoint, formElements);
 
-            await this.processFormVariablesExceptUrl(collection.id, formElements);
+            // Don't substitute variables in the form - they should stay as {{...}} placeholders
+            // Variable substitution happens at request time in apiHandler.js
+            // await this.processFormVariablesExceptUrl(collection.id, formElements);
 
             this.renderer.setActiveEndpoint(collection.id, endpoint.id);
         } catch (error) {
