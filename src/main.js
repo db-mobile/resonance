@@ -4,6 +4,7 @@ import Store from 'electron-store';
 import WindowManager from './main/windowManager.js';
 import ApiRequestHandler from './main/apiRequestHandlers.js';
 import StoreHandler from './main/storeHandlers.js';
+import ProxyHandler from './main/proxyHandlers.js';
 import SchemaProcessor from './main/schemaProcessor.js';
 import OpenApiParser from './main/openApiParser.js';
 
@@ -57,7 +58,8 @@ try {
 }
 
 const windowManager = new WindowManager();
-const apiRequestHandler = new ApiRequestHandler(store);
+const proxyHandler = new ProxyHandler(store);
+const apiRequestHandler = new ApiRequestHandler(store, proxyHandler);
 const storeHandler = new StoreHandler(store);
 const schemaProcessor = new SchemaProcessor();
 const openApiParser = new OpenApiParser(schemaProcessor, store);
@@ -124,4 +126,17 @@ ipcMain.handle('import-openapi-file', async () => {
         console.error('Error importing OpenAPI file:', error);
         throw error;
     }
+});
+
+// Proxy settings handlers
+ipcMain.handle('proxy:get', () => {
+    return proxyHandler.getProxySettings();
+});
+
+ipcMain.handle('proxy:set', (event, settings) => {
+    return proxyHandler.setProxySettings(settings);
+});
+
+ipcMain.handle('proxy:test', async () => {
+    return await proxyHandler.testProxyConnection();
 });

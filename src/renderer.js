@@ -18,17 +18,25 @@ import { EnvironmentRepository } from './modules/storage/EnvironmentRepository.j
 import { EnvironmentService } from './modules/services/EnvironmentService.js';
 import { EnvironmentManager } from './modules/ui/EnvironmentManager.js';
 import { EnvironmentSelector } from './modules/ui/EnvironmentSelector.js';
+import { ProxyController } from './modules/controllers/ProxyController.js';
+import { ProxyRepository } from './modules/storage/ProxyRepository.js';
+import { ProxyService } from './modules/services/ProxyService.js';
 import { StatusDisplayAdapter } from './modules/interfaces/IStatusDisplay.js';
 import { keyboardShortcuts } from './modules/keyboardShortcuts.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
 const timeoutManager = new TimeoutManager();
-const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager);
-const historyController = new HistoryController(window.electronAPI);
+
+// Initialize shared status display adapter
+const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
+
+// Initialize proxy system
+const proxyRepository = new ProxyRepository(window.electronAPI);
+const proxyService = new ProxyService(proxyRepository, statusDisplayAdapter);
+const proxyController = new ProxyController(proxyService);
 
 // Initialize environment system
-const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
 const environmentRepository = new EnvironmentRepository(window.electronAPI);
 const environmentService = new EnvironmentService(environmentRepository, statusDisplayAdapter);
 const environmentManager = new EnvironmentManager(environmentService);
@@ -42,6 +50,12 @@ const environmentController = new EnvironmentController(
     environmentManager,
     environmentSelector
 );
+
+// Initialize settings modal with all managers
+const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager, proxyController);
+
+// Initialize history controller
+const historyController = new HistoryController(window.electronAPI);
 
 // Initialize keyboard shortcuts
 function initKeyboardShortcuts() {

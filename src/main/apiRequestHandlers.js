@@ -3,8 +3,9 @@ import http from 'http';
 import https from 'https';
 
 class ApiRequestHandler {
-    constructor(store) {
+    constructor(store, proxyHandler) {
         this.store = store;
+        this.proxyHandler = proxyHandler;
         this.currentRequestController = null;
     }
 
@@ -79,6 +80,15 @@ class ApiRequestHandler {
                 case 'auto':
                 default:
                     break;
+            }
+
+            // Add proxy configuration if available
+            if (this.proxyHandler) {
+                const proxyConfig = this.proxyHandler.getAxiosProxyConfig(requestOptions.url);
+                if (proxyConfig) {
+                    axiosConfig.proxy = proxyConfig;
+                    console.log(`Using proxy: ${proxyConfig.protocol}://${proxyConfig.host}:${proxyConfig.port}`);
+                }
             }
 
             if (requestOptions.body && ['POST', 'PUT', 'PATCH'].includes(requestOptions.method.toUpperCase())) {

@@ -67,13 +67,18 @@
             <!-- Request Builder -->
             <section class="request-builder">
                 <div class="request-url-section">
-                    <select id="method-select" class="method-select" aria-label="HTTP Method">
-                        <option value="GET">GET</option>
-                        <option value="POST">POST</option>
-                        <option value="PUT">PUT</option>
-                        <option value="DELETE">DELETE</option>
-                        <option value="PATCH">PATCH</option>
-                    </select>
+                    <div class="method-select-container">
+                        <select id="method-select" class="method-select" aria-label="HTTP Method">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                            <option value="PATCH">PATCH</option>
+                        </select>
+                        <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="2 4 6 8 10 4"></polyline>
+                        </svg>
+                    </div>
                     
                     <input type="url"
                            id="url-input"
@@ -183,14 +188,19 @@
                     <h3>Authorization</h3>
                     <div class="auth-type-section">
                         <label for="auth-type-select">Type</label>
-                        <select id="auth-type-select" class="auth-type-select" aria-label="Authorization Type">
-                            <option value="none">No Auth</option>
-                            <option value="bearer">Bearer Token</option>
-                            <option value="basic">Basic Auth</option>
-                            <option value="api-key">API Key</option>
-                            <option value="oauth2">OAuth 2.0</option>
-                            <option value="digest">Digest Auth</option>
-                        </select>
+                        <div class="auth-type-select-container">
+                            <select id="auth-type-select" class="auth-type-select" aria-label="Authorization Type">
+                                <option value="none">No Auth</option>
+                                <option value="bearer">Bearer Token</option>
+                                <option value="basic">Basic Auth</option>
+                                <option value="api-key">API Key</option>
+                                <option value="oauth2">OAuth 2.0</option>
+                                <option value="digest">Digest Auth</option>
+                            </select>
+                            <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="2 4 6 8 10 4"></polyline>
+                            </svg>
+                        </div>
                     </div>
                     <div id="auth-fields-container" class="auth-fields-container">
                         <!-- Dynamic auth fields will be inserted here -->
@@ -264,16 +274,21 @@
                              role="tabpanel"
                              aria-labelledby="response-body-tab">
                             <div class="response-body-toolbar">
-                                <select id="language-selector"
-                                        class="language-selector"
-                                        aria-label="Syntax Highlighting Language"
-                                        title="Syntax Highlighting">
-                                    <option value="auto">Auto</option>
-                                    <option value="json">JSON</option>
-                                    <option value="xml">XML</option>
-                                    <option value="html">HTML</option>
-                                    <option value="text">Plain Text</option>
-                                </select>
+                                <div class="language-selector-container">
+                                    <select id="language-selector"
+                                            class="language-selector"
+                                            aria-label="Syntax Highlighting Language"
+                                            title="Syntax Highlighting">
+                                        <option value="auto">Auto</option>
+                                        <option value="json">JSON</option>
+                                        <option value="xml">XML</option>
+                                        <option value="html">HTML</option>
+                                        <option value="text">Plain Text</option>
+                                    </select>
+                                    <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="2 4 6 8 10 4"></polyline>
+                                    </svg>
+                                </div>
                                 <button id="copy-response-btn"
                                         class="copy-response-btn"
                                         aria-label="Copy Response"
