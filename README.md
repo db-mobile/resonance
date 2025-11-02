@@ -12,6 +12,7 @@ A clean and minimal API client with excellent user experience built with Electro
 - **Environment Management**: Organize variables into environments (Development, Staging, Production, etc.) for easy context switching
 - **Variable Templating**: Use `{{ variableName }}` syntax for dynamic values in URLs, headers, and request bodies
 - **Schema-Based Body Generation**: Automatically generate example request bodies from OpenAPI schemas
+- **Keyboard Shortcuts**: Comprehensive keyboard shortcuts for all common actions with platform-aware bindings (⌘ on macOS, Ctrl on Windows/Linux)
 - **Multi-Theme Support**: Light, dark, system-adaptive, and blueprint themes
 - **Internationalization**: Support for English, German, Spanish, French, and Italian
 - **Import/Export**: Export and import environments as JSON for backup and team sharing
@@ -125,6 +126,37 @@ Switch between themes in Settings:
 - **Dark**: Easy on the eyes for low-light environments
 - **System**: Automatically matches your OS theme
 - **Blueprint**: Technical schematic-inspired design
+
+## Keyboard Shortcuts ⌨️
+
+Resonance includes comprehensive keyboard shortcuts to speed up your workflow. Press `Ctrl+/` (or `Cmd+/` on macOS) to view the shortcuts help dialog in the app.
+
+### Request Actions
+- `Ctrl/Cmd+Enter` - Send request
+- `Esc` - Cancel current request
+
+### Navigation
+- `Ctrl/Cmd+L` - Focus URL bar
+- `Ctrl/Cmd+B` - Toggle collections sidebar
+- `Ctrl/Cmd+H` - Toggle history sidebar
+
+### Actions
+- `Ctrl/Cmd+K` - Generate cURL command
+- `Ctrl/Cmd+O` - Import OpenAPI collection
+- `Ctrl/Cmd+E` - Open environment manager
+
+### Settings & Help
+- `Ctrl/Cmd+,` - Open settings
+- `Ctrl/Cmd+/` or `Shift+/` - Show keyboard shortcuts help
+
+### Tab Switching
+- `Ctrl/Cmd+1` - Switch to Path Params tab
+- `Ctrl/Cmd+2` - Switch to Query Params tab
+- `Ctrl/Cmd+3` - Switch to Headers tab
+- `Ctrl/Cmd+4` - Switch to Body tab
+- `Ctrl/Cmd+5` - Switch to Auth tab
+
+**Note:** On macOS, use `Cmd` instead of `Ctrl`. Shortcuts are platform-aware and automatically adapt.
 
 ## Architecture 🏗️
 
@@ -242,6 +274,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Request history and bookmarks
 - [x] Environment management (Dev, Staging, Production)
 - [x] Test suite implementation (Jest configured)
+- [x] Keyboard shortcuts for all major actions
 - [ ] Plugin system for extensions
 - [ ] More export formats (Postman, Insomnia)
 - [ ] GraphQL support

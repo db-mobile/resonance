@@ -130,5 +130,32 @@
     "clear_all_title": "Borrar todo el historial",
     "confirm_clear": "¿Estás seguro de que quieres borrar todo el historial de solicitudes?\n\nEsta acción no se puede deshacer.",
     "search_placeholder": "Buscar en el historial..."
+  },
+  "shortcuts": {
+    "title": "Atajos de teclado",
+    "category": {
+      "request": "Solicitud",
+      "navigation": "Navegación",
+      "actions": "Acciones",
+      "settings": "Configuración",
+      "help": "Ayuda",
+      "tabs": "Pestañas"
+    },
+    "ctrl_enter": "Enviar solicitud",
+    "escape": "Cancelar solicitud",
+    "ctrl_keyl": "Enfocar barra de URL",
+    "ctrl_keyb": "Alternar barra de colecciones",
+    "ctrl_keyh": "Alternar barra de historial",
+    "ctrl_keyk": "Generar comando cURL",
+    "ctrl_keyo": "Importar colección OpenAPI",
+    "ctrl_keye": "Abrir gestor de entornos",
+    "ctrl_comma": "Abrir configuración",
+    "ctrl_slash": "Mostrar atajos de teclado",
+    "shift_slash": "Mostrar atajos de teclado (alternativo)",
+    "ctrl_digit1": "Cambiar a pestaña de Parámetros de Ruta",
+    "ctrl_digit2": "Cambiar a pestaña de Parámetros",
+    "ctrl_digit3": "Cambiar a pestaña de Encabezados",
+    "ctrl_digit4": "Cambiar a pestaña de Cuerpo",
+    "ctrl_digit5": "Cambiar a pestaña de Autorización"
   }
 }

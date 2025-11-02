@@ -130,5 +130,32 @@
     "clear_all_title": "Cancella tutta la cronologia",
     "confirm_clear": "Sei sicuro di voler cancellare tutta la cronologia delle richieste?\n\nQuesta azione non può essere annullata.",
     "search_placeholder": "Cerca nella cronologia..."
+  },
+  "shortcuts": {
+    "title": "Scorciatoie da tastiera",
+    "category": {
+      "request": "Richiesta",
+      "navigation": "Navigazione",
+      "actions": "Azioni",
+      "settings": "Impostazioni",
+      "help": "Aiuto",
+      "tabs": "Schede"
+    },
+    "ctrl_enter": "Invia richiesta",
+    "escape": "Annulla richiesta",
+    "ctrl_keyl": "Metti il focus sulla barra URL",
+    "ctrl_keyb": "Attiva/disattiva barra collezioni",
+    "ctrl_keyh": "Attiva/disattiva barra cronologia",
+    "ctrl_keyk": "Genera comando cURL",
+    "ctrl_keyo": "Importa collezione OpenAPI",
+    "ctrl_keye": "Apri gestore ambienti",
+    "ctrl_comma": "Apri impostazioni",
+    "ctrl_slash": "Mostra scorciatoie da tastiera",
+    "shift_slash": "Mostra scorciatoie da tastiera (alternativa)",
+    "ctrl_digit1": "Passa alla scheda Parametri del Percorso",
+    "ctrl_digit2": "Passa alla scheda Parametri",
+    "ctrl_digit3": "Passa alla scheda Intestazioni",
+    "ctrl_digit4": "Passa alla scheda Corpo",
+    "ctrl_digit5": "Passa alla scheda Autorizzazione"
   }
 }

@@ -130,5 +130,32 @@
     "clear_all_title": "Gesamten Verlauf löschen",
     "confirm_clear": "Sind Sie sicher, dass Sie den gesamten Anfrageverlauf löschen möchten?\n\nDiese Aktion kann nicht rückgängig gemacht werden.",
     "search_placeholder": "Verlauf durchsuchen..."
+  },
+  "shortcuts": {
+    "title": "Tastaturkürzel",
+    "category": {
+      "request": "Anfrage",
+      "navigation": "Navigation",
+      "actions": "Aktionen",
+      "settings": "Einstellungen",
+      "help": "Hilfe",
+      "tabs": "Registerkarten"
+    },
+    "ctrl_enter": "Anfrage senden",
+    "escape": "Anfrage abbrechen",
+    "ctrl_keyl": "URL-Leiste fokussieren",
+    "ctrl_keyb": "Sammlungs-Sidebar umschalten",
+    "ctrl_keyh": "Verlaufs-Sidebar umschalten",
+    "ctrl_keyk": "cURL-Befehl generieren",
+    "ctrl_keyo": "OpenAPI-Sammlung importieren",
+    "ctrl_keye": "Umgebungsmanager öffnen",
+    "ctrl_comma": "Einstellungen öffnen",
+    "ctrl_slash": "Tastaturkürzel anzeigen",
+    "shift_slash": "Tastaturkürzel anzeigen (Alternative)",
+    "ctrl_digit1": "Zu Pfad-Parameter wechseln",
+    "ctrl_digit2": "Zu Query-Parameter wechseln",
+    "ctrl_digit3": "Zu Header wechseln",
+    "ctrl_digit4": "Zu Body wechseln",
+    "ctrl_digit5": "Zu Autorisierung wechseln"
   }
 }

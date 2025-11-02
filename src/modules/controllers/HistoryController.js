@@ -108,8 +108,8 @@ export class HistoryController {
         const row = document.createElement('div');
         row.className = 'key-value-row';
         row.innerHTML = `
-            <input type="text" class="key-input" placeholder="Key" value="${this.escapeHtml(key)}">
-            <input type="text" class="value-input" placeholder="Value" value="${this.escapeHtml(value)}">
+            <input type="text" class="key-input" placeholder="Key">
+            <input type="text" class="value-input" placeholder="Value">
             <button type="button" class="remove-btn" aria-label="Remove">×</button>
         `;
 
@@ -129,6 +129,10 @@ export class HistoryController {
         // Add input handlers for auto-adding new rows
         const keyInput = row.querySelector('.key-input');
         const valueInput = row.querySelector('.value-input');
+
+        // Set values directly via .value property (not via innerHTML) to preserve special characters like {{ }}
+        if (keyInput) keyInput.value = key;
+        if (valueInput) valueInput.value = value;
 
         const handleInput = () => {
             if (keyInput.value || valueInput.value) {

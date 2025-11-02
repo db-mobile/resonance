@@ -33,8 +33,8 @@
   <icon type="stock">io.github.db_mobile.resonance</icon>
 
   <branding>
-    <color type="primary" scheme_preference="light">#60A5FA</color>
-    <color type="primary" scheme_preference="dark">#1E3A8A</color>
+    <color type="primary" scheme_preference="light">#75abbf</color>
+    <color type="primary" scheme_preference="dark">#113084</color>
   </branding>
 
   <screenshots>
@@ -79,11 +79,23 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.3.0" date="2025-11-02">
+      <description>
+        <p>New features introduced</p>
+        <ul>
+          <li>Cookie tab</li>
+          <li>Keyboard shortcuts</li>
+          <li>Performance metrics</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.2.0" date="2025-10-31">
       <description>
         <p>New features introduced</p>
         <ul>
           <li>Environment management</li>
+          <li>Keyboard shortcuts</li>
+          <li>Performance metrics</li>
         </ul>
       </description>
     </release>

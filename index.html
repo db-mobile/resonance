@@ -242,24 +242,19 @@
                                 aria-controls="response-headers">
                             Headers
                         </button>
-                        <select id="language-selector"
-                                class="language-selector"
-                                aria-label="Syntax Highlighting Language"
-                                title="Syntax Highlighting">
-                            <option value="auto">Auto</option>
-                            <option value="json">JSON</option>
-                            <option value="xml">XML</option>
-                            <option value="html">HTML</option>
-                            <option value="text">Plain Text</option>
-                        </select>
-                        <button id="copy-response-btn"
-                                class="copy-response-btn"
-                                aria-label="Copy Response"
-                                title="Copy Response Body">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                            </svg>
+                        <button class="tab-button"
+                                data-tab="response-cookies"
+                                role="tab"
+                                aria-selected="false"
+                                aria-controls="response-cookies">
+                            Cookies
+                        </button>
+                        <button class="tab-button"
+                                data-tab="response-performance"
+                                role="tab"
+                                aria-selected="false"
+                                aria-controls="response-performance">
+                            Performance
                         </button>
                     </nav>
 
@@ -268,6 +263,27 @@
                              class="tab-content active"
                              role="tabpanel"
                              aria-labelledby="response-body-tab">
+                            <div class="response-body-toolbar">
+                                <select id="language-selector"
+                                        class="language-selector"
+                                        aria-label="Syntax Highlighting Language"
+                                        title="Syntax Highlighting">
+                                    <option value="auto">Auto</option>
+                                    <option value="json">JSON</option>
+                                    <option value="xml">XML</option>
+                                    <option value="html">HTML</option>
+                                    <option value="text">Plain Text</option>
+                                </select>
+                                <button id="copy-response-btn"
+                                        class="copy-response-btn"
+                                        aria-label="Copy Response"
+                                        title="Copy Response Body">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                </button>
+                            </div>
                             <div id="response-body-container" class="response-body-container" aria-live="polite">
                                 <!-- CodeMirror editor will be mounted here -->
                             </div>
@@ -278,6 +294,22 @@
                              role="tabpanel"
                              aria-labelledby="response-headers-tab">
                             <pre id="response-headers-display" aria-live="polite"></pre>
+                        </div>
+
+                        <div id="response-cookies"
+                             class="tab-content"
+                             role="tabpanel"
+                             aria-labelledby="response-cookies-tab">
+                            <div id="response-cookies-display" class="response-cookies-display" aria-live="polite"></div>
+                        </div>
+
+                        <div id="response-performance"
+                             class="tab-content"
+                             role="tabpanel"
+                             aria-labelledby="response-performance-tab">
+                            <div id="response-performance-display" class="response-performance-display" aria-live="polite">
+                                <p class="no-data">Send a request to see performance metrics</p>
+                            </div>
                         </div>
                     </div>
                 </div>

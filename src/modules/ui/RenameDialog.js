@@ -49,7 +49,7 @@ export class RenameDialog {
             <h3 style="margin: 0 0 16px 0; color: var(--text-primary);">${title}</h3>
             <div style="margin-bottom: 16px;">
                 <label for="rename-input" style="display: block; margin-bottom: 8px; color: var(--text-primary); font-weight: 500;">${label}</label>
-                <input type="text" id="rename-input" value="${this.escapeHtml(currentName)}"
+                <input type="text" id="rename-input"
                        style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-size: 14px; box-sizing: border-box; background: var(--bg-secondary); color: var(--text-primary);">
             </div>
             <div style="display: flex; gap: 8px; justify-content: flex-end;">
@@ -60,6 +60,10 @@ export class RenameDialog {
 
         this.overlay.appendChild(dialog);
         document.body.appendChild(this.overlay);
+
+        // Set value directly via .value property to preserve special characters like {{ }}
+        const input = dialog.querySelector('#rename-input');
+        if (input) input.value = currentName;
 
         this.setupEventListeners(dialog);
         this.focusInput(dialog);

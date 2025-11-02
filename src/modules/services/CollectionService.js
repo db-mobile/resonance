@@ -327,6 +327,7 @@ export class CollectionService {
             this.addKeyValueRow(formElements.queryParamsList);
         }
 
+        // Update URL with query params (with flag to prevent circular updates)
         this.updateUrlWithQueryParams(formElements);
     }
 
@@ -342,18 +343,66 @@ export class CollectionService {
             const questionMarkIndex = urlString.indexOf('?');
             const baseUrl = questionMarkIndex >= 0 ? urlString.substring(0, questionMarkIndex) : urlString;
 
-            const params = new URLSearchParams();
+            // Build query string with encoding that preserves variable placeholders like {{variableName}}
+            const queryPairs = [];
             queryParams.forEach(({ key, value }) => {
                 if (key) {
-                    params.set(key, value);
+                    // Use the same encoding function as keyValueManager to preserve {{...}} patterns
+                    const encodedKey = this.encodeValuePreservingPlaceholders(key);
+                    const encodedValue = this.encodeValuePreservingPlaceholders(value);
+                    queryPairs.push(`${encodedKey}=${encodedValue}`);
                 }
             });
 
-            const queryString = params.toString();
+            const queryString = queryPairs.join('&');
+
+            // Import setUrlUpdating to prevent circular update
+            // Set flag before updating URL to prevent triggering updateQueryParamsFromUrl
+            if (typeof window !== 'undefined' && window.setUrlUpdating) {
+                window.setUrlUpdating(true);
+            }
+
             formElements.urlInput.value = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+
+            // Clear flag after event loop
+            if (typeof window !== 'undefined' && window.setUrlUpdating) {
+                setTimeout(() => {
+                    window.setUrlUpdating(false);
+                }, 0);
+            }
         } catch (error) {
             console.error('Error updating URL with query params:', error);
+            if (typeof window !== 'undefined' && window.setUrlUpdating) {
+                window.setUrlUpdating(false);
+            }
         }
+    }
+
+    /**
+     * URL encode a value while preserving variable placeholders like {{variableName}}
+     */
+    encodeValuePreservingPlaceholders(value) {
+        // Find all {{...}} patterns and temporarily replace them with placeholders
+        const placeholders = [];
+        let index = 0;
+
+        const withPlaceholders = value.replace(/\{\{[^}]+\}\}/g, (match) => {
+            const placeholder = `__PLACEHOLDER_${index}__`;
+            placeholders.push({ placeholder, original: match });
+            index++;
+            return placeholder;
+        });
+
+        // URL encode the value (this encodes special chars but not our placeholders)
+        const encoded = encodeURIComponent(withPlaceholders);
+
+        // Restore the original {{...}} patterns
+        let result = encoded;
+        placeholders.forEach(({ placeholder, original }) => {
+            result = result.replace(placeholder, original);
+        });
+
+        return result;
     }
 
     async populateRequestBody(collection, endpoint, formElements) {

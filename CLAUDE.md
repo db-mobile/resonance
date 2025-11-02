@@ -54,6 +54,7 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - `curlGenerator.js` - Generates cURL commands from requests
 - `domElements.js` - Centralized DOM element references and exports
 - `httpVersionManager.js` - Manages HTTP protocol version selection
+- `keyboardShortcuts.js` - Manages keyboard shortcuts with platform-aware bindings and help dialog
 - `keyValueManager.js` - Manages key-value input pairs (headers, query params)
 - `resizer.js` - Handles UI panel resizing functionality
 - `responseEditor.js` - CodeMirror-based response viewer with syntax highlighting
@@ -144,6 +145,11 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - **HTTP Version Control**: Support for HTTP/1.1, HTTP/2, and HTTP/3
 - **Request Timeouts**: Configurable timeout settings per request
 - **Copy to Clipboard**: Easy copying of responses and request data
+- **Keyboard Shortcuts**: Comprehensive keyboard shortcuts system via `keyboardShortcuts.js`
+  - Platform-aware (⌘ on macOS, Ctrl on Windows/Linux)
+  - Context-aware activation (respects input field focus)
+  - Categorized help dialog with i18n support
+  - Available shortcuts for requests, navigation, actions, settings, and tab switching
 
 #### Theme System
 - Dynamic theme loading via `ThemeManager` class
@@ -199,6 +205,7 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - Authentication panel supporting multiple auth methods
 - Environment management dialog with full CRUD operations and import/export
 - Settings modal for theme, language, and timeout configuration
+- Keyboard shortcuts help dialog (`Ctrl/Cmd+/`) with categorized shortcuts
 - Resizable panels for customizable workspace layout
 - Support for multiple HTTP methods (GET, POST, PUT, DELETE, PATCH, etc.)
 - HTTP version selector (HTTP/1.1, HTTP/2, HTTP/3)
@@ -220,12 +227,13 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - Attribute-based i18n with automatic DOM updates (`data-i18n` attributes)
 - Unified settings management through modal interface
 - **CodeMirror Integration**: `responseEditor.js` bundled separately with esbuild for optimal loading
-- **Dialog Pattern**: Reusable dialog components (ConfirmDialog, RenameDialog, CurlDialog, EnvironmentManager) for user interactions
+- **Dialog Pattern**: Reusable dialog components (ConfirmDialog, RenameDialog, CurlDialog, EnvironmentManager, KeyboardShortcuts Help) for user interactions
 - **History Tracking**: Automatic request/response capture with timestamp and replay capability
 - **Authentication State**: Per-request auth configuration with secure storage
 - **Copy/Export Pattern**: Unified handlers for clipboard operations and format exports (cURL, environments)
 - **Environment Pattern**: Event-driven environment management with controller coordination, service business logic, and repository persistence
 - **Change Listeners**: Observer pattern for environment changes with notification system for UI synchronization
+- **Keyboard Shortcuts Pattern**: Centralized keyboard event handling with platform detection, context awareness, and categorized help system
 
 ## Common Issues & Solutions
 

@@ -104,9 +104,9 @@ export class VariableManager {
         `;
 
         row.innerHTML = `
-            <input type="text" class="variable-name" value="${this.escapeHtml(name)}" placeholder="Variable name"
+            <input type="text" class="variable-name" placeholder="Variable name"
                    style="flex: 1; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-size: 14px; background: var(--bg-secondary); color: var(--text-primary);">
-            <input type="text" class="variable-value" value="${this.escapeHtml(value)}" placeholder="Variable value"
+            <input type="text" class="variable-value" placeholder="Variable value"
                    style="flex: 2; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-size: 14px; background: var(--bg-secondary); color: var(--text-primary);">
             <button class="remove-variable-btn" style="padding: 8px; border: 1px solid var(--color-error); background: transparent; color: var(--color-error); border-radius: var(--radius-sm); cursor: pointer; min-width: 70px;">Remove</button>
         `;
@@ -117,6 +117,10 @@ export class VariableManager {
 
         const nameInput = row.querySelector('.variable-name');
         const valueInput = row.querySelector('.variable-value');
+
+        // Set values directly via .value property to preserve special characters like {{ }}
+        if (nameInput) nameInput.value = name;
+        if (valueInput) valueInput.value = value;
         
         const autoAddRow = () => {
             const allRows = container.querySelectorAll('.variable-row');

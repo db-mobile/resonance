@@ -1,4 +1,6 @@
 import axios from 'axios';
+import http from 'http';
+import https from 'https';
 
 class ApiRequestHandler {
     constructor(store) {
@@ -14,8 +16,34 @@ class ApiRequestHandler {
         return new TextEncoder().encode(rawData).length;
     }
 
+    createTimingAgent(isHttps, timings) {
+        const Agent = isHttps ? https.Agent : http.Agent;
+
+        return new Agent({
+            keepAlive: false,
+            lookup: (hostname, options, callback) => {
+                const dnsStart = Date.now();
+                const originalLookup = isHttps ? https.Agent.prototype.constructor.super_.prototype.lookup : http.Agent.prototype.constructor.super_.prototype.lookup;
+
+                require('dns').lookup(hostname, options, (err, address, family) => {
+                    timings.dnsLookup = Date.now() - dnsStart;
+                    callback(err, address, family);
+                });
+            }
+        });
+    }
+
     async handleApiRequest(requestOptions) {
         let startTime = Date.now();
+        const timings = {
+            startTime: startTime,
+            dnsLookup: 0,
+            tcpConnection: 0,
+            tlsHandshake: 0,
+            firstByte: 0,
+            download: 0,
+            total: 0
+        };
 
         try {
             this.currentRequestController = new AbortController();
@@ -23,6 +51,8 @@ class ApiRequestHandler {
             const settings = this.store.get('settings', {});
             const httpVersion = settings.httpVersion || 'auto';
             const requestTimeout = settings.requestTimeout !== undefined ? settings.requestTimeout : 0;
+
+            const isHttps = requestOptions.url.startsWith('https://');
 
             const axiosConfig = {
                 method: requestOptions.method,
@@ -62,9 +92,66 @@ class ApiRequestHandler {
                 }
             }
 
+            // Custom agent to capture timing metrics
+            const Agent = isHttps ? https.Agent : http.Agent;
+            const agent = new Agent({ keepAlive: false });
+
+            let socketAssigned = false;
+            let dnsStart = 0;
+            let tcpStart = 0;
+            let tlsStart = 0;
+            let firstByteReceived = false;
+
+            axiosConfig.httpAgent = !isHttps ? agent : undefined;
+            axiosConfig.httpsAgent = isHttps ? agent : undefined;
+
+            // Intercept socket events for detailed timing
+            const originalCreateConnection = agent.createConnection;
+            agent.createConnection = function(options, callback) {
+                dnsStart = Date.now();
+
+                const socket = originalCreateConnection.call(this, options, callback);
+
+                if (!socketAssigned) {
+                    socketAssigned = true;
+
+                    socket.once('lookup', () => {
+                        timings.dnsLookup = Date.now() - dnsStart;
+                        tcpStart = Date.now();
+                    });
+
+                    socket.once('connect', () => {
+                        timings.tcpConnection = Date.now() - tcpStart;
+                        if (isHttps) {
+                            tlsStart = Date.now();
+                        }
+                    });
+
+                    if (isHttps) {
+                        socket.once('secureConnect', () => {
+                            timings.tlsHandshake = Date.now() - tlsStart;
+                        });
+                    }
+
+                    socket.once('data', () => {
+                        if (!firstByteReceived) {
+                            firstByteReceived = true;
+                            timings.firstByte = Date.now() - startTime;
+                        }
+                    });
+                }
+
+                return socket;
+            };
+
             startTime = Date.now();
+            timings.startTime = startTime;
             const response = await axios(axiosConfig);
-            const ttfb = Date.now() - startTime;
+            const endTime = Date.now();
+
+            timings.total = endTime - startTime;
+            timings.download = endTime - startTime - timings.firstByte;
+            const ttfb = timings.firstByte || timings.total;
 
             this.currentRequestController = null;
 
@@ -87,11 +174,13 @@ class ApiRequestHandler {
                 statusText: response.statusText,
                 headers: serializedHeaders,
                 ttfb: ttfb,
-                size: responseSize
+                size: responseSize,
+                timings: timings
             };
         } catch (error) {
             console.error('API request error:', error);
 
+            timings.total = Date.now() - startTime;
             const ttfb = Date.now() - startTime;
             this.currentRequestController = null;
 
@@ -103,7 +192,8 @@ class ApiRequestHandler {
                     statusText: "Cancelled",
                     data: null,
                     headers: {},
-                    cancelled: true
+                    cancelled: true,
+                    timings: timings
                 };
             }
 
@@ -128,7 +218,8 @@ class ApiRequestHandler {
                     data: parsedData,
                     headers: {},
                     ttfb: ttfb,
-                    size: responseSize
+                    size: responseSize,
+                    timings: timings
                 };
 
                 try {
@@ -147,7 +238,8 @@ class ApiRequestHandler {
                     statusText: null,
                     data: null,
                     headers: {},
-                    ttfb: ttfb
+                    ttfb: ttfb,
+                    timings: timings
                 };
             } else {
                 serializedError = {
@@ -157,7 +249,8 @@ class ApiRequestHandler {
                     statusText: null,
                     data: null,
                     headers: {},
-                    ttfb: ttfb
+                    ttfb: ttfb,
+                    timings: timings
                 };
             }
 
