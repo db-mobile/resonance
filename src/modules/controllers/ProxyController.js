@@ -25,7 +25,6 @@ export class ProxyController {
             case 'proxy-toggled':
             case 'proxy-settings-reset':
                 // Can be used to update UI elements if needed
-                console.log('Proxy configuration changed:', event);
                 break;
         }
     }

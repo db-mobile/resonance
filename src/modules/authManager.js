@@ -401,6 +401,27 @@ export class AuthManager {
         return this.currentAuthConfig;
     }
 
+    setAuthType(authType) {
+        if (this.authTypeSelect) {
+            this.authTypeSelect.value = authType;
+        }
+        this.currentAuthConfig.type = authType;
+        this.renderAuthFields(authType);
+    }
+
+    setAuthConfig(authConfig) {
+        this.currentAuthConfig = {
+            type: authConfig.type || 'none',
+            config: authConfig.config || {}
+        };
+
+        if (this.authTypeSelect) {
+            this.authTypeSelect.value = this.currentAuthConfig.type;
+        }
+
+        this.renderAuthFields(this.currentAuthConfig.type);
+    }
+
     resetAuthConfig() {
         this.currentAuthConfig = {
             type: 'none',

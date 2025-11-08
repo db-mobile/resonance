@@ -168,7 +168,6 @@ class ProxyHandler {
 
             // Check if URL should bypass proxy
             if (this._shouldBypassProxy(requestUrl, settings.bypassList)) {
-                console.log(`URL ${requestUrl} is in bypass list, skipping proxy`);
                 return null;
             }
 
@@ -176,7 +175,6 @@ class ProxyHandler {
             if (settings.useSystemProxy) {
                 const systemProxy = this._getSystemProxySettings();
                 if (systemProxy) {
-                    console.log(`Using system proxy: ${systemProxy.protocol}://${systemProxy.host}:${systemProxy.port}`);
                     return systemProxy;
                 } else {
                     console.warn('System proxy is enabled but no system proxy configuration found');

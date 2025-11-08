@@ -54,7 +54,6 @@ try {
 } catch (error) {
     console.error('ERROR: Store is not writable. This may cause issues in sandboxed environments:', error);
     console.error('Store path:', store.path);
-    console.error('Store may not be accessible in Flatpak sandbox. Some features may not work correctly.');
 }
 
 const windowManager = new WindowManager();

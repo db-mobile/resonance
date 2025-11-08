@@ -59,6 +59,28 @@ export function parseKeyValuePairs(listContainer) {
 }
 
 /**
+ * Populate a key-value list with data
+ * @param {HTMLElement} listContainer
+ * @param {Object} data - Key-value pairs to populate
+ */
+export function populateKeyValueList(listContainer, data) {
+    if (!listContainer || !data) return;
+
+    Object.entries(data).forEach(([key, value]) => {
+        addKeyValueRow(listContainer, key, value);
+    });
+}
+
+/**
+ * Clear all rows from a key-value list
+ * @param {HTMLElement} listContainer
+ */
+export function clearKeyValueList(listContainer) {
+    if (!listContainer) return;
+    listContainer.innerHTML = '';
+}
+
+/**
  * URL encode a value while preserving variable placeholders like {{variableName}}
  * This allows users to see their variables in the URL preview without encoding
  */
@@ -199,6 +221,9 @@ export function initKeyValueListeners() {
         if (event.target.classList.contains('key-input') ||
             event.target.classList.contains('value-input')) {
             debounceAutoSave(() => autoSavePathParams());
+            if (window.workspaceTabController) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
         }
     });
 
@@ -207,6 +232,9 @@ export function initKeyValueListeners() {
             event.target.classList.contains('value-input')) {
             updateUrlFromQueryParams();
             debounceAutoSave(() => autoSaveQueryParams());
+            if (window.workspaceTabController) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
         }
     });
 
@@ -214,6 +242,9 @@ export function initKeyValueListeners() {
         if (event.target.classList.contains('key-input') ||
             event.target.classList.contains('value-input')) {
             debounceAutoSave(() => autoSaveHeaders());
+            if (window.workspaceTabController) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
         }
     });
 

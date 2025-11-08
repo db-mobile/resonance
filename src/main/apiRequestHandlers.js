@@ -87,7 +87,6 @@ class ApiRequestHandler {
                 const proxyConfig = this.proxyHandler.getAxiosProxyConfig(requestOptions.url);
                 if (proxyConfig) {
                     axiosConfig.proxy = proxyConfig;
-                    console.log(`Using proxy: ${proxyConfig.protocol}://${proxyConfig.host}:${proxyConfig.port}`);
                 }
             }
 
