@@ -13,5 +13,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     settings: {
         get: () => ipcRenderer.invoke('settings:get'),
         set: (settings) => ipcRenderer.invoke('settings:set', settings)
+    },
+    proxySettings: {
+        get: () => ipcRenderer.invoke('proxy:get'),
+        set: (settings) => ipcRenderer.invoke('proxy:set', settings),
+        test: () => ipcRenderer.invoke('proxy:test')
     }
 });

@@ -22,7 +22,6 @@ export function initTabListeners() {
     });
 
     const responseTabButtons = document.querySelectorAll('.response-tabs .tab-button');
-    const responseTabContents = document.querySelectorAll('.response-display .tab-content');
 
     responseTabButtons.forEach(button => {
         button.addEventListener('click', () => {
@@ -30,15 +29,34 @@ export function initTabListeners() {
                 btn.classList.remove('active');
                 btn.setAttribute('aria-selected', 'false');
             });
-            responseTabContents.forEach(content => content.classList.remove('active'));
-            
+
             button.classList.add('active');
             button.setAttribute('aria-selected', 'true');
-            
+
             const targetTabId = button.dataset.tab;
-            const targetTabContent = document.getElementById(targetTabId);
-            if (targetTabContent) {
-                targetTabContent.classList.add('active');
+
+            // Get the active workspace tab container
+            const activeContainer = document.querySelector('.workspace-tab-response[style*="display: block"]');
+            if (activeContainer) {
+                // Deactivate all tab contents in this workspace tab
+                const allContents = activeContainer.querySelectorAll('.tab-content');
+                allContents.forEach(content => content.classList.remove('active'));
+
+                // Get the workspace tab ID and activate the correct content
+                const workspaceTabId = activeContainer.dataset.tabId;
+                const targetTabContent = document.getElementById(`${targetTabId}-${workspaceTabId}`);
+                if (targetTabContent) {
+                    targetTabContent.classList.add('active');
+                }
+            } else {
+                // Fallback for old structure
+                const responseTabContents = document.querySelectorAll('.response-display .tab-content');
+                responseTabContents.forEach(content => content.classList.remove('active'));
+
+                const targetTabContent = document.getElementById(targetTabId);
+                if (targetTabContent) {
+                    targetTabContent.classList.add('active');
+                }
             }
         });
     });
@@ -47,13 +65,19 @@ export function initTabListeners() {
 export function activateTab(tabType, tabId) {
     let buttons;
     let contents;
-    
+
     if (tabType === 'request') {
         buttons = document.querySelectorAll('.request-config .tab-button');
         contents = document.querySelectorAll('.request-config .tab-content');
     } else if (tabType === 'response') {
         buttons = document.querySelectorAll('.response-tabs .tab-button');
-        contents = document.querySelectorAll('.response-display .tab-content');
+        // Get response tab contents from the active workspace tab container
+        const activeContainer = document.querySelector('.workspace-tab-response[style*="display: block"]');
+        if (activeContainer) {
+            contents = activeContainer.querySelectorAll('.tab-content');
+        } else {
+            contents = document.querySelectorAll('.response-display .tab-content');
+        }
     } else {
         console.warn('Unknown tab type:', tabType);
         return;
@@ -66,7 +90,21 @@ export function activateTab(tabType, tabId) {
     contents.forEach(content => content.classList.remove('active'));
 
     const targetButton = document.querySelector(`.${tabType === 'request' ? 'request-config' : 'response-tabs'} .tab-button[data-tab="${tabId}"]`);
-    const targetContent = document.getElementById(tabId);
+
+    // For response tabs, need to find the content within the active workspace tab
+    let targetContent;
+    if (tabType === 'response') {
+        const activeContainer = document.querySelector('.workspace-tab-response[style*="display: block"]');
+        if (activeContainer) {
+            // Get the workspace tab ID from the container
+            const workspaceTabId = activeContainer.dataset.tabId;
+            targetContent = document.getElementById(`${tabId}-${workspaceTabId}`);
+        } else {
+            targetContent = document.getElementById(tabId);
+        }
+    } else {
+        targetContent = document.getElementById(tabId);
+    }
 
     if (targetButton) {
         targetButton.classList.add('active');

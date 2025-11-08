@@ -76,12 +76,44 @@ export class CollectionController {
 
     async handleEndpointClick(collection, endpoint) {
         try {
-            const formElements = this.getFormElements();
-            await this.service.loadEndpointIntoForm(collection, endpoint, formElements);
+            // Use workspace tab controller to load endpoint into current tab
+            if (window.workspaceTabController) {
+                // Set the OpenAPI spec for schema processor
+                this.schemaProcessor.setOpenApiSpec(collection._openApiSpec);
 
-            // Don't substitute variables in the form - they should stay as {{...}} placeholders
-            // Variable substitution happens at request time in apiHandler.js
-            // await this.processFormVariablesExceptUrl(collection.id, formElements);
+                // Generate request body string if needed
+                let requestBodyString = '';
+                if (endpoint.requestBody) {
+                    requestBodyString = this.service.generateRequestBody(endpoint.requestBody);
+                }
+
+                // Load all persisted data if available
+                const persistedAuthConfig = await this.repository.getPersistedAuthConfig(collection.id, endpoint.id);
+                const persistedPathParams = await this.repository.getPersistedPathParams(collection.id, endpoint.id);
+                const persistedQueryParams = await this.repository.getPersistedQueryParams(collection.id, endpoint.id);
+                const persistedHeaders = await this.repository.getPersistedHeaders(collection.id, endpoint.id);
+                const persistedBody = await this.repository.getModifiedRequestBody(collection.id, endpoint.id);
+
+                const endpointData = {
+                    ...endpoint,
+                    collectionId: collection.id,
+                    collectionBaseUrl: collection.baseUrl,
+                    collectionDefaultHeaders: collection.defaultHeaders,
+                    path: endpoint.path,
+                    method: endpoint.method,
+                    requestBodyString: requestBodyString,  // Pass the generated string
+                    persistedAuthConfig: persistedAuthConfig,  // Pass persisted data if available
+                    persistedPathParams: persistedPathParams,
+                    persistedQueryParams: persistedQueryParams,
+                    persistedHeaders: persistedHeaders,
+                    persistedBody: persistedBody
+                };
+                await window.workspaceTabController.loadEndpoint(endpointData, false);
+            } else {
+                // Fallback to old behavior if workspace tabs not available
+                const formElements = this.getFormElements();
+                await this.service.loadEndpointIntoForm(collection, endpoint, formElements);
+            }
 
             await this.repository.saveLastSelectedRequest(collection.id, endpoint.id);
 

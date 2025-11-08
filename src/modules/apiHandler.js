@@ -29,7 +29,7 @@ function getVariableService() {
     return new VariableService(variableRepository, variableProcessor, statusDisplayAdapter, environmentRepository);
 }
 
-function initResponseEditor() {
+export function initResponseEditor() {
     if (!responseEditor && responseBodyContainer) {
         responseEditor = new ResponseEditor(responseBodyContainer);
 
@@ -70,17 +70,33 @@ export function getResponseBodyContent() {
     return '';
 }
 
-function displayResponseWithLineNumbers(content, contentType = null) {
-    initResponseEditor();
-    if (responseEditor) {
-        responseEditor.setContent(content, contentType);
+export function displayResponseWithLineNumbers(content, contentType = null) {
+    // Use per-tab editor if available, otherwise fall back to global editor
+    const containerElements = window.responseContainerManager?.getActiveElements();
+
+    if (containerElements && containerElements.editor) {
+        containerElements.editor.setContent(content, contentType);
+    } else {
+        // Fallback to global editor
+        initResponseEditor();
+        if (responseEditor) {
+            responseEditor.setContent(content, contentType);
+        }
     }
 }
 
-function clearResponseDisplay() {
-    initResponseEditor();
-    if (responseEditor) {
-        responseEditor.clear();
+export function clearResponseDisplay() {
+    // Use per-tab editor if available, otherwise fall back to global editor
+    const containerElements = window.responseContainerManager?.getActiveElements();
+
+    if (containerElements && containerElements.editor) {
+        containerElements.editor.clear();
+    } else {
+        // Fallback to global editor
+        initResponseEditor();
+        if (responseEditor) {
+            responseEditor.clear();
+        }
     }
 }
 
@@ -105,9 +121,19 @@ export async function handleCancelRequest() {
             updateResponseTime(null);
             updateResponseSize(null);
             displayResponseWithLineNumbers('Request was cancelled by user');
-            responseHeadersDisplay.textContent = '';
-            responseCookiesDisplay.innerHTML = '';
-            clearPerformanceMetrics(responsePerformanceDisplay);
+
+            // Use per-tab elements if available
+            const containerElements = window.responseContainerManager?.getActiveElements();
+            if (containerElements) {
+                if (containerElements.headersDisplay) containerElements.headersDisplay.textContent = '';
+                if (containerElements.cookiesDisplay) containerElements.cookiesDisplay.innerHTML = '';
+                if (containerElements.performanceDisplay) clearPerformanceMetrics(containerElements.performanceDisplay);
+            } else {
+                // Fallback to global elements
+                if (responseHeadersDisplay) responseHeadersDisplay.textContent = '';
+                if (responseCookiesDisplay) responseCookiesDisplay.innerHTML = '';
+                if (responsePerformanceDisplay) clearPerformanceMetrics(responsePerformanceDisplay);
+            }
         }
     } catch (error) {
         console.error('Error cancelling request:', error);
@@ -239,9 +265,17 @@ export async function handleSendRequest() {
         }
     }
 
+    // Define requestConfig outside try block so it's accessible in catch block
+    const requestConfig = {
+        method,
+        url,
+        headers,
+        body
+    };
+
     try {
         setRequestInProgress(true);
-        
+
         activateTab('response', 'response-body');
 
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -251,17 +285,21 @@ export async function handleSendRequest() {
         }
 
         displayResponseWithLineNumbers('Sending request...');
-        responseHeadersDisplay.textContent = '';
-        responseCookiesDisplay.innerHTML = '';
-        clearPerformanceMetrics(responsePerformanceDisplay);
-        updateStatusDisplay('Status: Sending...', null);
 
-        const requestConfig = {
-            method,
-            url,
-            headers,
-            body
-        };
+        // Clear response displays using per-tab elements if available
+        const containerElements = window.responseContainerManager?.getActiveElements();
+        if (containerElements) {
+            if (containerElements.headersDisplay) containerElements.headersDisplay.textContent = '';
+            if (containerElements.cookiesDisplay) containerElements.cookiesDisplay.innerHTML = '';
+            if (containerElements.performanceDisplay) clearPerformanceMetrics(containerElements.performanceDisplay);
+        } else {
+            // Fallback to global elements
+            if (responseHeadersDisplay) responseHeadersDisplay.textContent = '';
+            if (responseCookiesDisplay) responseCookiesDisplay.innerHTML = '';
+            if (responsePerformanceDisplay) clearPerformanceMetrics(responsePerformanceDisplay);
+        }
+
+        updateStatusDisplay('Status: Sending...', null);
 
         if (authData.authConfig) {
             requestConfig.auth = authData.authConfig;
@@ -278,20 +316,60 @@ export async function handleSendRequest() {
                 contentType = result.headers['content-type'];
             }
 
+            // Display response body (currently uses global editor - TODO: make per-tab)
             displayResponseWithLineNumbers(formattedResponse, contentType);
 
-            let headersString = '';
-            if (result.headers) {
-                headersString = JSON.stringify(result.headers, null, 2);
+            // Get active workspace tab's response container elements for headers/cookies/performance
+            const containerElements = window.responseContainerManager?.getActiveElements();
+
+            if (containerElements) {
+                // Write headers to workspace tab's container
+                let headersString = '';
+                if (result.headers) {
+                    headersString = JSON.stringify(result.headers, null, 2);
+                }
+                containerElements.headersDisplay.textContent = headersString || 'No response headers.';
+
+                // Parse and display cookies to workspace tab's container
+                const cookies = extractCookies(result.headers);
+                containerElements.cookiesDisplay.innerHTML = formatCookiesAsHtml(cookies);
+
+                // Display performance metrics to workspace tab's container
+                displayPerformanceMetrics(containerElements.performanceDisplay, result.timings, result.size);
+            } else {
+                // Fallback to global elements
+                let headersString = '';
+                if (result.headers) {
+                    headersString = JSON.stringify(result.headers, null, 2);
+                }
+                responseHeadersDisplay.textContent = headersString || 'No response headers.';
+
+                const cookies = extractCookies(result.headers);
+                responseCookiesDisplay.innerHTML = formatCookiesAsHtml(cookies);
+
+                displayPerformanceMetrics(responsePerformanceDisplay, result.timings, result.size);
             }
-            responseHeadersDisplay.textContent = headersString || 'No response headers.';
 
-            // Parse and display cookies
-            const cookies = extractCookies(result.headers);
-            responseCookiesDisplay.innerHTML = formatCookiesAsHtml(cookies);
-
-            // Display performance metrics
-            displayPerformanceMetrics(responsePerformanceDisplay, result.timings, result.size);
+            // Save response data to workspace tab
+            if (window.workspaceTabController) {
+                const activeTabId = await window.workspaceTabController.service.getActiveTabId();
+                if (activeTabId) {
+                    await window.workspaceTabController.service.updateTab(activeTabId, {
+                        response: {
+                            data: result.data,
+                            headers: result.headers || {},
+                            status: result.status,
+                            statusText: result.statusText,
+                            ttfb: result.ttfb,
+                            size: result.size,
+                            timings: result.timings,
+                            cookies: extractCookies(result.headers)
+                        },
+                        isModified: false
+                    });
+                    await window.workspaceTabController.markCurrentTabUnmodified();
+                }
+            }
 
             updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
             updateResponseTime(result.ttfb);
@@ -307,9 +385,19 @@ export async function handleSendRequest() {
             updateResponseTime(null);
             updateResponseSize(null);
             displayResponseWithLineNumbers('Request was cancelled');
-            responseHeadersDisplay.textContent = '';
-            responseCookiesDisplay.innerHTML = '';
-            clearPerformanceMetrics(responsePerformanceDisplay);
+
+            // Use per-tab elements if available
+            const containerElements = window.responseContainerManager?.getActiveElements();
+            if (containerElements) {
+                if (containerElements.headersDisplay) containerElements.headersDisplay.textContent = '';
+                if (containerElements.cookiesDisplay) containerElements.cookiesDisplay.innerHTML = '';
+                if (containerElements.performanceDisplay) clearPerformanceMetrics(containerElements.performanceDisplay);
+            } else {
+                // Fallback to global elements
+                if (responseHeadersDisplay) responseHeadersDisplay.textContent = '';
+                if (responseCookiesDisplay) responseCookiesDisplay.innerHTML = '';
+                if (responsePerformanceDisplay) clearPerformanceMetrics(responsePerformanceDisplay);
+            }
             setRequestInProgress(false);
         } else {
             throw result;
@@ -345,26 +433,60 @@ export async function handleSendRequest() {
 
         displayResponseWithLineNumbers(errorContent, contentType);
 
+        // Get active workspace tab's response container elements
+        const containerElements = window.responseContainerManager?.getActiveElements();
+
         if (error.headers && Object.keys(error.headers).length > 0) {
             try {
-                responseHeadersDisplay.textContent = JSON.stringify(error.headers, null, 2);
+                const headersText = JSON.stringify(error.headers, null, 2);
+                if (containerElements && containerElements.headersDisplay) {
+                    containerElements.headersDisplay.textContent = headersText;
+                } else if (responseHeadersDisplay) {
+                    responseHeadersDisplay.textContent = headersText;
+                }
             } catch {
-                responseHeadersDisplay.textContent = 'Error parsing response headers.';
+                if (containerElements && containerElements.headersDisplay) {
+                    containerElements.headersDisplay.textContent = 'Error parsing response headers.';
+                } else if (responseHeadersDisplay) {
+                    responseHeadersDisplay.textContent = 'Error parsing response headers.';
+                }
             }
 
             // Parse and display cookies from error response
             const cookies = extractCookies(error.headers);
-            responseCookiesDisplay.innerHTML = formatCookiesAsHtml(cookies);
+            const cookiesHtml = formatCookiesAsHtml(cookies);
+            if (containerElements && containerElements.cookiesDisplay) {
+                containerElements.cookiesDisplay.innerHTML = cookiesHtml;
+            } else if (responseCookiesDisplay) {
+                responseCookiesDisplay.innerHTML = cookiesHtml;
+            }
         } else {
-            responseHeadersDisplay.textContent = 'No headers available for error response.';
-            responseCookiesDisplay.innerHTML = '';
+            if (containerElements && containerElements.headersDisplay) {
+                containerElements.headersDisplay.textContent = 'No headers available for error response.';
+            } else if (responseHeadersDisplay) {
+                responseHeadersDisplay.textContent = 'No headers available for error response.';
+            }
+
+            if (containerElements && containerElements.cookiesDisplay) {
+                containerElements.cookiesDisplay.innerHTML = '';
+            } else if (responseCookiesDisplay) {
+                responseCookiesDisplay.innerHTML = '';
+            }
         }
 
         // Display performance metrics for error responses
         if (error.timings) {
-            displayPerformanceMetrics(responsePerformanceDisplay, error.timings, error.size);
+            if (containerElements && containerElements.performanceDisplay) {
+                displayPerformanceMetrics(containerElements.performanceDisplay, error.timings, error.size);
+            } else if (responsePerformanceDisplay) {
+                displayPerformanceMetrics(responsePerformanceDisplay, error.timings, error.size);
+            }
         } else {
-            clearPerformanceMetrics(responsePerformanceDisplay);
+            if (containerElements && containerElements.performanceDisplay) {
+                clearPerformanceMetrics(containerElements.performanceDisplay);
+            } else if (responsePerformanceDisplay) {
+                clearPerformanceMetrics(responsePerformanceDisplay);
+            }
         }
 
         let statusDisplayText = 'Request Failed';

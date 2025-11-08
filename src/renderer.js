@@ -1,4 +1,4 @@
-import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput } from './modules/domElements.js';
+import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, pathParamsList, queryParamsList, headersList, authTypeSelect, responseBodyContainer, statusDisplay, responseHeadersDisplay, responseCookiesDisplay } from './modules/domElements.js';
 
 import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl, setUrlUpdating } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
@@ -18,17 +18,31 @@ import { EnvironmentRepository } from './modules/storage/EnvironmentRepository.j
 import { EnvironmentService } from './modules/services/EnvironmentService.js';
 import { EnvironmentManager } from './modules/ui/EnvironmentManager.js';
 import { EnvironmentSelector } from './modules/ui/EnvironmentSelector.js';
+import { ProxyController } from './modules/controllers/ProxyController.js';
+import { ProxyRepository } from './modules/storage/ProxyRepository.js';
+import { ProxyService } from './modules/services/ProxyService.js';
 import { StatusDisplayAdapter } from './modules/interfaces/IStatusDisplay.js';
 import { keyboardShortcuts } from './modules/keyboardShortcuts.js';
+import { WorkspaceTabRepository } from './modules/storage/WorkspaceTabRepository.js';
+import { WorkspaceTabService } from './modules/services/WorkspaceTabService.js';
+import { WorkspaceTabBar } from './modules/ui/WorkspaceTabBar.js';
+import { WorkspaceTabController } from './modules/controllers/WorkspaceTabController.js';
+import { WorkspaceTabStateManager } from './modules/WorkspaceTabStateManager.js';
+import { ResponseContainerManager } from './modules/ResponseContainerManager.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
 const timeoutManager = new TimeoutManager();
-const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager);
-const historyController = new HistoryController(window.electronAPI);
+
+// Initialize shared status display adapter
+const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
+
+// Initialize proxy system
+const proxyRepository = new ProxyRepository(window.electronAPI);
+const proxyService = new ProxyService(proxyRepository, statusDisplayAdapter);
+const proxyController = new ProxyController(proxyService);
 
 // Initialize environment system
-const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
 const environmentRepository = new EnvironmentRepository(window.electronAPI);
 const environmentService = new EnvironmentService(environmentRepository, statusDisplayAdapter);
 const environmentManager = new EnvironmentManager(environmentService);
@@ -41,6 +55,40 @@ const environmentController = new EnvironmentController(
     environmentService,
     environmentManager,
     environmentSelector
+);
+
+// Initialize settings modal with all managers
+const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager, proxyController);
+
+// Initialize history controller
+const historyController = new HistoryController(window.electronAPI);
+
+// Initialize response container manager for multiple workspace tabs
+const responseContainerManager = new ResponseContainerManager();
+window.responseContainerManager = responseContainerManager;
+
+// Initialize workspace tab system
+const workspaceTabRepository = new WorkspaceTabRepository(window.electronAPI);
+const workspaceTabService = new WorkspaceTabService(workspaceTabRepository, statusDisplayAdapter);
+const workspaceTabBar = new WorkspaceTabBar('workspace-tab-bar-container');
+const workspaceTabStateManager = new WorkspaceTabStateManager({
+    urlInput,
+    methodSelect,
+    bodyInput,
+    pathParamsList,
+    queryParamsList,
+    headersList,
+    authTypeSelect,
+    responseBodyContainer,
+    statusDisplay,
+    responseHeadersDisplay,
+    responseCookiesDisplay
+});
+const workspaceTabController = new WorkspaceTabController(
+    workspaceTabService,
+    workspaceTabBar,
+    workspaceTabStateManager,
+    responseContainerManager
 );
 
 // Initialize keyboard shortcuts
@@ -225,6 +273,63 @@ function initKeyboardShortcuts() {
         description: 'Switch to Auth tab',
         category: 'Tabs'
     });
+
+    // Workspace Tab shortcuts
+    keyboardShortcuts.register('KeyT', {
+        ctrl: true,
+        handler: () => {
+            if (workspaceTabController) {
+                workspaceTabController.createNewTab();
+            }
+        },
+        description: 'New workspace tab',
+        category: 'Workspace Tabs'
+    });
+
+    keyboardShortcuts.register('KeyW', {
+        ctrl: true,
+        handler: async () => {
+            if (workspaceTabController) {
+                const activeTabId = await workspaceTabController.service.getActiveTabId();
+                if (activeTabId) {
+                    await workspaceTabController.closeTab(activeTabId);
+                }
+            }
+        },
+        description: 'Close current tab',
+        category: 'Workspace Tabs'
+    });
+
+    keyboardShortcuts.register('Tab', {
+        ctrl: true,
+        handler: async () => {
+            if (workspaceTabController) {
+                const tabs = await workspaceTabController.service.getAllTabs();
+                const activeTabId = await workspaceTabController.service.getActiveTabId();
+                const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+                const nextIndex = (currentIndex + 1) % tabs.length;
+                await workspaceTabController.switchTab(tabs[nextIndex].id);
+            }
+        },
+        description: 'Switch to next tab',
+        category: 'Workspace Tabs'
+    });
+
+    keyboardShortcuts.register('Tab', {
+        ctrl: true,
+        shift: true,
+        handler: async () => {
+            if (workspaceTabController) {
+                const tabs = await workspaceTabController.service.getAllTabs();
+                const activeTabId = await workspaceTabController.service.getActiveTabId();
+                const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+                const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+                await workspaceTabController.switchTab(tabs[prevIndex].id);
+            }
+        },
+        description: 'Switch to previous tab',
+        category: 'Workspace Tabs'
+    });
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -277,6 +382,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.authManager = authManager;
     window.historyController = historyController;
     window.environmentController = environmentController;
+    window.workspaceTabController = workspaceTabController;
     window.setUrlUpdating = setUrlUpdating;
 
     // Initialize environment selector
@@ -288,6 +394,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initialize history controller
     await historyController.init();
 
+    // Initialize workspace tabs
+    await workspaceTabController.initialize();
+
+    // Initialize tab listeners AFTER workspace tabs are created
+    initTabListeners();
+
+    // Activate default response tab
+    activateTab('response', 'response-body');
+
     document.addEventListener('languageChanged', (event) => {
         // Any dynamic content that needs special handling can be refreshed here
     });
@@ -295,13 +410,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateStatusDisplay('Ready', null);
 
     initKeyValueListeners();
-    initTabListeners();
     initializeBodyTracking();
     initResizer();
     initializeCopyHandler();
     initKeyboardShortcuts();
 
-    activateTab('response', 'response-body');
+    // Track changes to mark tabs as modified
+    if (urlInput) {
+        urlInput.addEventListener('input', () => {
+            if (window.workspaceTabController) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
+    }
+
+    if (bodyInput) {
+        bodyInput.addEventListener('input', () => {
+            if (window.workspaceTabController) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
+    }
+
+    if (methodSelect) {
+        methodSelect.addEventListener('change', () => {
+            if (window.workspaceTabController) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
+    }
+
     activateTab('request', 'path-params');
 
     await loadCollections();
@@ -315,5 +453,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     updateQueryParamsFromUrl();
 
-    await restoreLastSelectedRequest();
+    // Note: restoreLastSelectedRequest() is no longer called here because
+    // workspace tabs now handle all tab state persistence and restoration.
+    // Calling it here would overwrite the workspace tab state restored earlier.
+});
+
+// Save current tab state before window closes
+window.addEventListener('beforeunload', async (e) => {
+    try {
+        const activeTabId = await workspaceTabService.getActiveTabId();
+        if (activeTabId) {
+            const currentState = await workspaceTabStateManager.captureCurrentState();
+            await workspaceTabService.updateTab(activeTabId, currentState);
+        }
+    } catch (error) {
+        console.error('Error saving tab state before unload:', error);
+    }
 });
