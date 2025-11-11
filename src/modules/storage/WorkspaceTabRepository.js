@@ -4,6 +4,10 @@
  * Handles persistence of workspace tabs (multiple request tabs).
  * Each tab contains complete request/response state.
  */
+import logger from '../logger.js';
+
+const log = logger.scope('WorkspaceTabRepository');
+
 export class WorkspaceTabRepository {
     constructor(electronAPI) {
         this.electronAPI = electronAPI;
@@ -136,12 +140,6 @@ export class WorkspaceTabRepository {
             ...tabs[index]
         };
 
-        console.log(`[WorkspaceTabRepository] Updating tab ${tabId}:`, {
-            hasResponseUpdate: updates.response !== undefined,
-            existingResponseTimings: existingTab.response?.timings,
-            newResponseTimings: updates.response?.timings
-        });
-
         // Deep merge nested objects first to avoid shallow overwrite
         // Use JSON parse/stringify to create deep clones and avoid reference issues
         const mergedRequest = updates.request ?
@@ -162,8 +160,6 @@ export class WorkspaceTabRepository {
                 ...updates.endpoint
             })) : (updates.endpoint ? JSON.parse(JSON.stringify(updates.endpoint)) : JSON.parse(JSON.stringify(existingTab.endpoint)));
 
-        console.log('[WorkspaceTabRepository] After merge, response timings:', mergedResponse?.timings);
-
         // Create merged tab, excluding nested objects from updates
         const { request: _r, response: _res, endpoint: _e, ...restUpdates } = updates;
 
@@ -180,8 +176,6 @@ export class WorkspaceTabRepository {
         tabs[index] = mergedTab;
 
         await this.saveTabs(tabs);
-
-        console.log(`[WorkspaceTabRepository] Saved tab ${tabId}, final response timings:`, tabs[index].response?.timings);
 
         return tabs[index];
     }

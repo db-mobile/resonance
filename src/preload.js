@@ -1,6 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
+    logger: {
+        error: (scope, message, meta) => ipcRenderer.invoke('logger:error', scope, message, meta),
+        warn: (scope, message, meta) => ipcRenderer.invoke('logger:warn', scope, message, meta),
+        info: (scope, message, meta) => ipcRenderer.invoke('logger:info', scope, message, meta),
+        debug: (scope, message, meta) => ipcRenderer.invoke('logger:debug', scope, message, meta),
+        verbose: (scope, message, meta) => ipcRenderer.invoke('logger:verbose', scope, message, meta)
+    },
     sendApiRequest: (requestOptions) => ipcRenderer.invoke('send-api-request', requestOptions),
     cancelApiRequest: () => ipcRenderer.invoke('cancel-api-request'),
     store: {

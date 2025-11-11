@@ -4,6 +4,10 @@
  * Business logic for workspace tab management.
  * Coordinates between repository and controller layers.
  */
+import logger from '../logger.js';
+
+const log = logger.scope('WorkspaceTabService');
+
 export class WorkspaceTabService {
     constructor(repository, statusDisplay) {
         this.repository = repository;
@@ -91,11 +95,9 @@ export class WorkspaceTabService {
         try {
             const tab = await this.repository.getTabById(tabId);
             if (!tab) {
-                console.warn('Tab not found:', tabId);
+                log.warn('Tab not found', { tabId });
                 return null;
             }
-
-            console.log(`[WorkspaceTabService] Switching to tab ${tabId}, response timings:`, tab.response?.timings);
 
             await this.repository.setActiveTabId(tabId);
             this._notifyListeners('tab-switched', tab);

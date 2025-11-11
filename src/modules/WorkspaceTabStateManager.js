@@ -8,6 +8,9 @@ import { parseKeyValuePairs, populateKeyValueList, clearKeyValueList, addKeyValu
 import { authManager } from './authManager.js';
 import { displayResponseWithLineNumbers, clearResponseDisplay } from './apiHandler.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
+import logger from './logger.js';
+
+const log = logger.scope('WorkspaceTabStateManager');
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
 import { formatCookiesAsHtml } from './cookieParser.js';
 import { activateTab } from './tabManager.js';
@@ -161,7 +164,6 @@ export class WorkspaceTabStateManager {
 
         // Restore response if it exists
         if (response) {
-            console.log('[WorkspaceTabStateManager] Restoring response with timings:', response.timings);
             await this._restoreResponse(response);
         } else {
             this._clearResponse();
@@ -242,14 +244,11 @@ export class WorkspaceTabStateManager {
         if (this.dom.responsePerformanceDisplay) {
             if (response.performanceHTML) {
                 // Restore the saved HTML directly
-                console.log('[WorkspaceTabStateManager] Restoring performance HTML');
                 this.dom.responsePerformanceDisplay.innerHTML = response.performanceHTML;
             } else if (response.timings) {
                 // Generate from timings if HTML not saved
-                console.log('[WorkspaceTabStateManager] Generating performance metrics from timings');
                 displayPerformanceMetrics(this.dom.responsePerformanceDisplay, response.timings, response.size);
             } else {
-                console.log('[WorkspaceTabStateManager] No performance data, clearing');
                 clearPerformanceMetrics(this.dom.responsePerformanceDisplay);
             }
         }

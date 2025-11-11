@@ -7,6 +7,13 @@ import StoreHandler from './main/storeHandlers.js';
 import ProxyHandler from './main/proxyHandlers.js';
 import SchemaProcessor from './main/schemaProcessor.js';
 import OpenApiParser from './main/openApiParser.js';
+import loggerService from './services/LoggerService.js';
+
+// Initialize logger for main process
+loggerService.initialize({
+    appName: 'Resonance',
+    isDevelopment: !app.isPackaged
+});
 
 const store = new Store({
     name: 'api-collections',
@@ -125,3 +132,29 @@ ipcMain.handle('proxy:get', () => proxyHandler.getProxySettings());
 ipcMain.handle('proxy:set', (_event, settings) => proxyHandler.setProxySettings(settings));
 
 ipcMain.handle('proxy:test', async () => proxyHandler.testProxyConnection());
+
+// Logger handlers - forward renderer logs to main process logger
+ipcMain.handle('logger:error', (_event, scope, message, meta) => {
+    const log = loggerService.scope(scope);
+    log.error(message, meta);
+});
+
+ipcMain.handle('logger:warn', (_event, scope, message, meta) => {
+    const log = loggerService.scope(scope);
+    log.warn(message, meta);
+});
+
+ipcMain.handle('logger:info', (_event, scope, message, meta) => {
+    const log = loggerService.scope(scope);
+    log.info(message, meta);
+});
+
+ipcMain.handle('logger:debug', (_event, scope, message, meta) => {
+    const log = loggerService.scope(scope);
+    log.debug(message, meta);
+});
+
+ipcMain.handle('logger:verbose', (_event, scope, message, meta) => {
+    const log = loggerService.scope(scope);
+    log.verbose(message, meta);
+});

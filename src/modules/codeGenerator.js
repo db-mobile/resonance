@@ -2,25 +2,33 @@
 
 // Helper function to escape shell arguments for cURL
 function escapeShellArg(str) {
-    if (!str) return "''";
+    if (!str) {
+        return "''";
+    }
     return `'${str.replace(/'/g, "'\\''")}'`;
 }
 
 // Helper function to escape strings for Python
 function escapePythonString(str) {
-    if (!str) return '';
+    if (!str) {
+        return '';
+    }
     return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
 }
 
 // Helper function to escape strings for JavaScript
 function escapeJavaScriptString(str) {
-    if (!str) return '';
+    if (!str) {
+        return '';
+    }
     return str.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
 }
 
 // Helper function to escape strings for Go
 function escapeGoString(str) {
-    if (!str) return '';
+    if (!str) {
+        return '';
+    }
     return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
 }
 
