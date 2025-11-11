@@ -10,8 +10,7 @@ import { CollectionRepository } from './storage/CollectionRepository.js';
 import { VariableService } from './services/VariableService.js';
 import { StatusDisplayAdapter } from './interfaces/IStatusDisplay.js';
 import { authManager } from './authManager.js';
-import { generateCurlCommand } from './curlGenerator.js';
-import { CurlDialog } from './ui/CurlDialog.js';
+import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
 import { ResponseEditor } from './responseEditor.bundle.js';
 import { extractCookies, formatCookiesAsHtml } from './cookieParser.js';
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
@@ -125,14 +124,14 @@ export async function handleCancelRequest() {
             // Use per-tab elements if available
             const containerElements = window.responseContainerManager?.getActiveElements();
             if (containerElements) {
-                if (containerElements.headersDisplay) containerElements.headersDisplay.textContent = '';
-                if (containerElements.cookiesDisplay) containerElements.cookiesDisplay.innerHTML = '';
-                if (containerElements.performanceDisplay) clearPerformanceMetrics(containerElements.performanceDisplay);
+                if (containerElements.headersDisplay) {containerElements.headersDisplay.textContent = '';}
+                if (containerElements.cookiesDisplay) {containerElements.cookiesDisplay.innerHTML = '';}
+                if (containerElements.performanceDisplay) {clearPerformanceMetrics(containerElements.performanceDisplay);}
             } else {
                 // Fallback to global elements
-                if (responseHeadersDisplay) responseHeadersDisplay.textContent = '';
-                if (responseCookiesDisplay) responseCookiesDisplay.innerHTML = '';
-                if (responsePerformanceDisplay) clearPerformanceMetrics(responsePerformanceDisplay);
+                if (responseHeadersDisplay) {responseHeadersDisplay.textContent = '';}
+                if (responseCookiesDisplay) {responseCookiesDisplay.innerHTML = '';}
+                if (responsePerformanceDisplay) {clearPerformanceMetrics(responsePerformanceDisplay);}
             }
         }
     } catch (error) {
@@ -281,7 +280,7 @@ export async function handleSendRequest() {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         if (responseBodyContainer && responseBodyContainer.parentElement) {
-            responseBodyContainer.parentElement.offsetHeight;
+            void responseBodyContainer.parentElement.offsetHeight; // Force reflow
         }
 
         displayResponseWithLineNumbers('Sending request...');
@@ -289,14 +288,14 @@ export async function handleSendRequest() {
         // Clear response displays using per-tab elements if available
         const containerElements = window.responseContainerManager?.getActiveElements();
         if (containerElements) {
-            if (containerElements.headersDisplay) containerElements.headersDisplay.textContent = '';
-            if (containerElements.cookiesDisplay) containerElements.cookiesDisplay.innerHTML = '';
-            if (containerElements.performanceDisplay) clearPerformanceMetrics(containerElements.performanceDisplay);
+            if (containerElements.headersDisplay) {containerElements.headersDisplay.textContent = '';}
+            if (containerElements.cookiesDisplay) {containerElements.cookiesDisplay.innerHTML = '';}
+            if (containerElements.performanceDisplay) {clearPerformanceMetrics(containerElements.performanceDisplay);}
         } else {
             // Fallback to global elements
-            if (responseHeadersDisplay) responseHeadersDisplay.textContent = '';
-            if (responseCookiesDisplay) responseCookiesDisplay.innerHTML = '';
-            if (responsePerformanceDisplay) clearPerformanceMetrics(responsePerformanceDisplay);
+            if (responseHeadersDisplay) {responseHeadersDisplay.textContent = '';}
+            if (responseCookiesDisplay) {responseCookiesDisplay.innerHTML = '';}
+            if (responsePerformanceDisplay) {clearPerformanceMetrics(responsePerformanceDisplay);}
         }
 
         updateStatusDisplay('Status: Sending...', null);
@@ -389,14 +388,14 @@ export async function handleSendRequest() {
             // Use per-tab elements if available
             const containerElements = window.responseContainerManager?.getActiveElements();
             if (containerElements) {
-                if (containerElements.headersDisplay) containerElements.headersDisplay.textContent = '';
-                if (containerElements.cookiesDisplay) containerElements.cookiesDisplay.innerHTML = '';
-                if (containerElements.performanceDisplay) clearPerformanceMetrics(containerElements.performanceDisplay);
+                if (containerElements.headersDisplay) {containerElements.headersDisplay.textContent = '';}
+                if (containerElements.cookiesDisplay) {containerElements.cookiesDisplay.innerHTML = '';}
+                if (containerElements.performanceDisplay) {clearPerformanceMetrics(containerElements.performanceDisplay);}
             } else {
                 // Fallback to global elements
-                if (responseHeadersDisplay) responseHeadersDisplay.textContent = '';
-                if (responseCookiesDisplay) responseCookiesDisplay.innerHTML = '';
-                if (responsePerformanceDisplay) clearPerformanceMetrics(responsePerformanceDisplay);
+                if (responseHeadersDisplay) {responseHeadersDisplay.textContent = '';}
+                if (responseCookiesDisplay) {responseCookiesDisplay.innerHTML = '';}
+                if (responsePerformanceDisplay) {clearPerformanceMetrics(responsePerformanceDisplay);}
             }
             setRequestInProgress(false);
         } else {
@@ -406,9 +405,9 @@ export async function handleSendRequest() {
     } catch (error) {
         console.error('Full error object:', error);
 
-        let status = error.status || null;
-        let statusText = error.statusText || '';
-        let errorMessage = error.message || 'Unknown error';
+        const status = error.status || null;
+        const statusText = error.statusText || '';
+        const errorMessage = error.message || 'Unknown error';
 
         let errorContent;
         if (error.data) {
@@ -481,13 +480,11 @@ export async function handleSendRequest() {
             } else if (responsePerformanceDisplay) {
                 displayPerformanceMetrics(responsePerformanceDisplay, error.timings, error.size);
             }
-        } else {
-            if (containerElements && containerElements.performanceDisplay) {
+        } else if (containerElements && containerElements.performanceDisplay) {
                 clearPerformanceMetrics(containerElements.performanceDisplay);
             } else if (responsePerformanceDisplay) {
                 clearPerformanceMetrics(responsePerformanceDisplay);
             }
-        }
 
         let statusDisplayText = 'Request Failed';
         if (status) {
@@ -600,7 +597,7 @@ export async function handleGenerateCurl() {
 
     const queryString = new URLSearchParams(queryParams).toString();
     if (queryString) {
-        url = urlWithoutQuery + '?' + queryString;
+        url = `${urlWithoutQuery  }?${  queryString}`;
     } else {
         url = urlWithoutQuery;
     }
@@ -636,8 +633,6 @@ export async function handleGenerateCurl() {
         body
     };
 
-    const curlCommand = generateCurlCommand(requestConfig);
-
-    const curlDialog = new CurlDialog();
-    curlDialog.show(curlCommand);
+    const codeSnippetDialog = new CodeSnippetDialog();
+    codeSnippetDialog.show(requestConfig);
 }

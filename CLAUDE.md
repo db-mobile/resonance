@@ -250,3 +250,4 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
    - Use `app.isPackaged` to detect environment
    - Use `process.resourcesPath` for assets in packaged apps
    - Use `__dirname` for internal module paths
+- for all changes "npm run lint" must always pass

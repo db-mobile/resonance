@@ -1,4 +1,20 @@
+/**
+ * @fileoverview Modal dialog for managing collection-scoped variables
+ * @module ui/VariableManager
+ */
+
+/**
+ * Variable management dialog with import/export functionality
+ *
+ * @class
+ * @classdesc Provides a modal interface for CRUD operations on collection variables.
+ * Supports key-value pair editing, import/export to JSON, and auto-adds empty rows.
+ * Variables use {{variableName}} template syntax in requests.
+ */
 export class VariableManager {
+    /**
+     * Creates a VariableManager instance
+     */
     constructor() {
         this.dialog = null;
         this.onSave = null;
@@ -6,10 +22,10 @@ export class VariableManager {
     }
 
     show(collectionName, variables = {}, options = {}) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve, _reject) => {
             this.onSave = resolve;
             this.onCancel = () => resolve(null);
-            
+
             this.createDialog(collectionName, variables, options);
         });
     }
@@ -119,15 +135,15 @@ export class VariableManager {
         const valueInput = row.querySelector('.variable-value');
 
         // Set values directly via .value property to preserve special characters like {{ }}
-        if (nameInput) nameInput.value = name;
-        if (valueInput) valueInput.value = value;
+        if (nameInput) {nameInput.value = name;}
+        if (valueInput) {valueInput.value = value;}
         
         const autoAddRow = () => {
             const allRows = container.querySelectorAll('.variable-row');
             const lastRow = allRows[allRows.length - 1];
-            const lastNameInput = lastRow.querySelector('.variable-name');
-            const lastValueInput = lastRow.querySelector('.variable-value');
-            
+            const _lastNameInput = lastRow.querySelector('.variable-name');
+            const _lastValueInput = lastRow.querySelector('.variable-value');
+
             if (row === lastRow && (nameInput.value.trim() || valueInput.value.trim())) {
                 this.addVariableRow(container);
             }
@@ -205,7 +221,7 @@ export class VariableManager {
         });
 
         if (errors.length > 0) {
-            alert('Validation errors:\n\n' + errors.join('\n'));
+            alert(`Validation errors:\n\n${  errors.join('\n')}`);
             return;
         }
 
@@ -277,7 +293,7 @@ export class VariableManager {
                 this.importVariables(variables);
                 importDialog.remove();
             } catch (error) {
-                alert('Invalid JSON: ' + error.message);
+                alert(`Invalid JSON: ${  error.message}`);
             }
         });
     }

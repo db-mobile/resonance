@@ -1,10 +1,43 @@
+/**
+ * @fileoverview Repository for managing collection data persistence
+ * @module storage/CollectionRepository
+ */
+
+/**
+ * Repository for managing collection data persistence
+ *
+ * @class
+ * @classdesc Handles all CRUD operations for collections in electron-store.
+ * Implements defensive programming with auto-initialization and validation
+ * to ensure reliable operation in both development and packaged environments.
+ * Also manages endpoint-specific data such as request bodies, headers, query
+ * parameters, authentication configs, and UI state.
+ */
 export class CollectionRepository {
+    /**
+     * Creates a CollectionRepository instance
+     *
+     * @param {Object} electronAPI - The Electron IPC API bridge from preload script
+     */
     constructor(electronAPI) {
         this.electronAPI = electronAPI;
         this.COLLECTIONS_KEY = 'collections';
         this.MODIFIED_BODIES_KEY = 'modifiedRequestBodies';
     }
 
+    /**
+     * Safely retrieves an object from electron-store with fallback handling
+     *
+     * Implements defensive programming to handle packaged app environments where
+     * store may return undefined on first run. Automatically initializes with
+     * default value if data is invalid or missing.
+     *
+     * @private
+     * @async
+     * @param {string} key - The store key to retrieve
+     * @param {Object} [defaultValue={}] - Default value to use if data is invalid
+     * @returns {Promise<Object>} The stored object or default value
+     */
     async _getObjectFromStore(key, defaultValue = {}) {
         try {
             let data = await this.electronAPI.store.get(key);
@@ -22,6 +55,15 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Retrieves all collections from storage
+     *
+     * Automatically initializes storage with empty array if undefined (packaged app first run).
+     *
+     * @async
+     * @returns {Promise<Array<Object>>} Array of collection objects
+     * @throws {Error} If storage access fails
+     */
     async getAll() {
         try {
             const collections = await this.electronAPI.store.get(this.COLLECTIONS_KEY);
@@ -39,6 +81,14 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Saves collections array to storage
+     *
+     * @async
+     * @param {Array<Object>} collections - Array of collection objects to save
+     * @returns {Promise<void>}
+     * @throws {Error} If storage write fails
+     */
     async save(collections) {
         try {
             await this.electronAPI.store.set(this.COLLECTIONS_KEY, collections);
@@ -48,11 +98,28 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Retrieves a collection by its ID
+     *
+     * @async
+     * @param {string} id - The collection ID
+     * @returns {Promise<Object|undefined>} The collection object or undefined if not found
+     */
     async getById(id) {
         const collections = await this.getAll();
         return collections.find(collection => collection.id === id);
     }
 
+    /**
+     * Adds a new collection to storage
+     *
+     * Includes defensive validation to ensure collections array integrity.
+     *
+     * @async
+     * @param {Object} collection - The collection object to add
+     * @returns {Promise<Object>} The added collection object
+     * @throws {Error} If save operation fails
+     */
     async add(collection) {
         let collections = await this.getAll();
 
@@ -66,19 +133,36 @@ export class CollectionRepository {
         return collection;
     }
 
+    /**
+     * Updates an existing collection
+     *
+     * @async
+     * @param {string} id - The collection ID to update
+     * @param {Object} updatedCollection - Object with properties to update
+     * @returns {Promise<Object>} The updated collection object
+     * @throws {Error} If collection not found or save fails
+     */
     async update(id, updatedCollection) {
         const collections = await this.getAll();
         const index = collections.findIndex(collection => collection.id === id);
-        
+
         if (index === -1) {
             throw new Error(`Collection with id ${id} not found`);
         }
-        
+
         collections[index] = { ...collections[index], ...updatedCollection };
         await this.save(collections);
         return collections[index];
     }
 
+    /**
+     * Deletes a collection by ID
+     *
+     * @async
+     * @param {string} id - The collection ID to delete
+     * @returns {Promise<boolean>} True if deletion succeeded
+     * @throws {Error} If save operation fails
+     */
     async delete(id) {
         const collections = await this.getAll();
         const updatedCollections = collections.filter(collection => collection.id !== id);
@@ -86,6 +170,17 @@ export class CollectionRepository {
         return true;
     }
 
+    /**
+     * Retrieves modified request body for a specific endpoint
+     *
+     * Returns the user-modified request body for an endpoint, allowing customization
+     * of request bodies beyond the OpenAPI schema defaults.
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<string|null>} The modified request body or null if not found
+     */
     async getModifiedRequestBody(collectionId, endpointId) {
         try {
             const modifiedBodies = await this._getObjectFromStore(this.MODIFIED_BODIES_KEY);
@@ -97,6 +192,16 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Saves modified request body for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {string} body - The modified request body
+     * @returns {Promise<void>}
+     * @throws {Error} If save operation fails
+     */
     async saveModifiedRequestBody(collectionId, endpointId, body) {
         try {
             const modifiedBodies = await this._getObjectFromStore(this.MODIFIED_BODIES_KEY);
@@ -109,6 +214,14 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Retrieves persisted path parameters for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<Array>} Array of path parameter objects or empty array
+     */
     async getPersistedPathParams(collectionId, endpointId) {
         try {
             const persistedParams = await this._getObjectFromStore('persistedPathParams');
@@ -120,6 +233,16 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Saves path parameters for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {Array} pathParams - Array of path parameter objects
+     * @returns {Promise<void>}
+     * @throws {Error} If save operation fails
+     */
     async savePersistedPathParams(collectionId, endpointId, pathParams) {
         try {
             const persistedParams = await this._getObjectFromStore('persistedPathParams');
@@ -132,6 +255,14 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Retrieves persisted query parameters for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<Array>} Array of query parameter objects or empty array
+     */
     async getPersistedQueryParams(collectionId, endpointId) {
         try {
             const persistedParams = await this._getObjectFromStore('persistedQueryParams');
@@ -143,6 +274,16 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Saves query parameters for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {Array} queryParams - Array of query parameter objects
+     * @returns {Promise<void>}
+     * @throws {Error} If save operation fails
+     */
     async savePersistedQueryParams(collectionId, endpointId, queryParams) {
         try {
             const persistedParams = await this._getObjectFromStore('persistedQueryParams');
@@ -155,6 +296,14 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Retrieves persisted headers for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<Array>} Array of header objects or empty array
+     */
     async getPersistedHeaders(collectionId, endpointId) {
         try {
             const persistedHeaders = await this._getObjectFromStore('persistedHeaders');
@@ -166,6 +315,16 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Saves headers for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {Array} headers - Array of header objects
+     * @returns {Promise<void>}
+     * @throws {Error} If save operation fails
+     */
     async savePersistedHeaders(collectionId, endpointId, headers) {
         try {
             const persistedHeaders = await this._getObjectFromStore('persistedHeaders');
@@ -178,6 +337,14 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Retrieves persisted authentication config for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<Object|null>} The auth config object or null if not found
+     */
     async getPersistedAuthConfig(collectionId, endpointId) {
         try {
             const persistedAuthConfigs = await this._getObjectFromStore('persistedAuthConfigs');
@@ -189,6 +356,16 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Saves authentication config for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {Object} authConfig - The authentication configuration object
+     * @returns {Promise<void>}
+     * @throws {Error} If save operation fails
+     */
     async savePersistedAuthConfig(collectionId, endpointId, authConfig) {
         try {
             const persistedAuthConfigs = await this._getObjectFromStore('persistedAuthConfigs');
@@ -201,6 +378,14 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Retrieves collection expansion states for UI
+     *
+     * Returns which collections and endpoints are expanded/collapsed in the tree view.
+     *
+     * @async
+     * @returns {Promise<Object>} Object mapping collection IDs to expansion state
+     */
     async getCollectionExpansionStates() {
         try {
             return await this._getObjectFromStore('collectionExpansionStates');
@@ -210,6 +395,14 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Saves collection expansion states for UI persistence
+     *
+     * @async
+     * @param {Object} expansionStates - Object mapping collection IDs to expansion state
+     * @returns {Promise<void>}
+     * @throws {Error} If save operation fails
+     */
     async saveCollectionExpansionStates(expansionStates) {
         try {
             await this.electronAPI.store.set('collectionExpansionStates', expansionStates);
@@ -219,6 +412,18 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Deletes all persisted data for a specific endpoint
+     *
+     * Removes modified bodies, query params, headers, and auth configs.
+     * Used when deleting an endpoint or collection to clean up orphaned data.
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<void>}
+     * @throws {Error} If delete operation fails
+     */
     async deletePersistedEndpointData(collectionId, endpointId) {
         try {
             const key = `${collectionId}_${endpointId}`;
@@ -252,6 +457,14 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Retrieves the last selected request
+     *
+     * Used to restore UI state on app startup.
+     *
+     * @async
+     * @returns {Promise<Object|null>} Object with collectionId and endpointId or null
+     */
     async getLastSelectedRequest() {
         try {
             const lastSelected = await this.electronAPI.store.get('lastSelectedRequest');
@@ -262,6 +475,15 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Saves the last selected request for UI state restoration
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<void>}
+     * @throws {Error} If save operation fails
+     */
     async saveLastSelectedRequest(collectionId, endpointId) {
         try {
             await this.electronAPI.store.set('lastSelectedRequest', {
@@ -274,6 +496,13 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * Clears the last selected request
+     *
+     * @async
+     * @returns {Promise<void>}
+     * @throws {Error} If clear operation fails
+     */
     async clearLastSelectedRequest() {
         try {
             await this.electronAPI.store.set('lastSelectedRequest', null);

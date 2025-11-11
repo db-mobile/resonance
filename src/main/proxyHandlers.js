@@ -1,13 +1,37 @@
+/**
+ * @fileoverview Proxy configuration and connection management for HTTP requests
+ * @module main/proxyHandlers
+ */
+
 import axios from 'axios';
 
+/**
+ * Handler for managing proxy configurations and connections
+ *
+ * @class
+ * @classdesc Manages proxy settings including manual and system proxy configurations,
+ * authentication, bypass lists, and connection testing. Provides axios-compatible
+ * proxy configuration objects for seamless integration with HTTP requests.
+ */
 class ProxyHandler {
+    /**
+     * Creates a ProxyHandler instance
+     *
+     * @param {Object} store - Electron-store instance for proxy settings persistence
+     */
     constructor(store) {
         this.store = store;
         this.PROXY_KEY = 'proxySettings';
     }
 
     /**
-     * Get proxy settings from store
+     * Retrieves proxy settings from persistent storage
+     *
+     * Fetches proxy configuration from electron-store with automatic fallback
+     * to defaults if settings are missing or invalid. Merges stored settings
+     * with defaults to ensure all required fields are present.
+     *
+     * @returns {Object} Proxy settings object with enabled, host, port, auth, and bypass list
      */
     getProxySettings() {
         try {
@@ -34,7 +58,14 @@ class ProxyHandler {
     }
 
     /**
-     * Save proxy settings to store
+     * Saves proxy settings to persistent storage
+     *
+     * Persists the provided proxy configuration to electron-store for use
+     * across application restarts.
+     *
+     * @param {Object} settings - Proxy configuration object to save
+     * @returns {Object} The saved settings object
+     * @throws {Error} If storage write fails
      */
     setProxySettings(settings) {
         try {
@@ -47,7 +78,14 @@ class ProxyHandler {
     }
 
     /**
-     * Test proxy connection
+     * Tests the proxy connection by making a request to an external service
+     *
+     * Validates proxy configuration by attempting to connect to a public IP
+     * checking service (api.ipify.org). Measures response time and reports
+     * connection success or specific failure reasons.
+     *
+     * @async
+     * @returns {Promise<Object>} Test result object with success status, message, IP, and response time
      */
     async testProxyConnection() {
         try {
@@ -155,7 +193,14 @@ class ProxyHandler {
     }
 
     /**
-     * Get axios-compatible proxy configuration for a request URL
+     * Generates axios-compatible proxy configuration for a specific request URL
+     *
+     * Creates a proxy configuration object suitable for axios requests, taking into
+     * account proxy enable status, bypass list, system vs manual proxy settings,
+     * and authentication requirements.
+     *
+     * @param {string} requestUrl - The target URL for the request
+     * @returns {Object|null} Axios proxy config object with protocol, host, port, and auth, or null if proxy disabled/bypassed
      */
     getAxiosProxyConfig(requestUrl) {
         try {
@@ -176,10 +221,10 @@ class ProxyHandler {
                 const systemProxy = this._getSystemProxySettings();
                 if (systemProxy) {
                     return systemProxy;
-                } else {
+                } 
                     console.warn('System proxy is enabled but no system proxy configuration found');
                     return null;
-                }
+                
             }
 
             // Build manual proxy config
@@ -205,7 +250,15 @@ class ProxyHandler {
     }
 
     /**
-     * Check if URL should bypass proxy
+     * Determines if a URL should bypass the proxy based on bypass list patterns
+     *
+     * Checks the URL's hostname against bypass patterns including exact matches,
+     * wildcard patterns (*.example.com), and suffix patterns (.example.com).
+     *
+     * @private
+     * @param {string} url - The full URL to check
+     * @param {Array<string>} bypassList - Array of bypass patterns
+     * @returns {boolean} True if URL should bypass proxy, false otherwise
      */
     _shouldBypassProxy(url, bypassList) {
         if (!url || !Array.isArray(bypassList) || bypassList.length === 0) {
@@ -214,14 +267,14 @@ class ProxyHandler {
 
         try {
             const urlObj = new URL(url);
-            const hostname = urlObj.hostname;
+            const {hostname} = urlObj;
 
             return bypassList.some(pattern => {
                 const cleanPattern = pattern.trim();
-                if (!cleanPattern) return false;
+                if (!cleanPattern) {return false;}
 
                 // Exact match
-                if (cleanPattern === hostname) return true;
+                if (cleanPattern === hostname) {return true;}
 
                 // Wildcard match (*.example.com)
                 if (cleanPattern.startsWith('*.')) {
@@ -243,7 +296,13 @@ class ProxyHandler {
     }
 
     /**
-     * Get default proxy settings
+     * Returns default proxy settings structure
+     *
+     * Provides the default configuration used when no proxy settings exist
+     * or when settings are invalid.
+     *
+     * @private
+     * @returns {Object} Default proxy settings with all fields initialized
      */
     _getDefaultProxySettings() {
         return {
@@ -263,14 +322,20 @@ class ProxyHandler {
     }
 
     /**
-     * Get system proxy settings
-     * Returns null if no system proxy is configured
+     * Retrieves system proxy settings from environment variables
+     *
+     * Reads proxy configuration from standard environment variables (HTTP_PROXY,
+     * HTTPS_PROXY, http_proxy, https_proxy). Parses the proxy URL to extract
+     * protocol, host, port, and authentication credentials if present.
+     *
+     * @private
+     * @returns {Object|null} Proxy configuration object, or null if no system proxy is configured
      */
     _getSystemProxySettings() {
         // Check environment variables for proxy configuration
         const httpProxy = process.env.HTTP_PROXY || process.env.http_proxy;
         const httpsProxy = process.env.HTTPS_PROXY || process.env.https_proxy;
-        const noProxy = process.env.NO_PROXY || process.env.no_proxy;
+        const _noProxy = process.env.NO_PROXY || process.env.no_proxy;
 
         // Use HTTPS proxy if available, otherwise HTTP proxy
         const proxyUrl = httpsProxy || httpProxy;

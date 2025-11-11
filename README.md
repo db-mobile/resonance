@@ -111,6 +111,17 @@ Header: Authorization: Bearer {{ apiKey }}
 
 The values of `baseUrl` and `apiKey` will automatically change when you switch environments.
 
+### Authentication
+
+Resonance supports multiple authentication methods:
+- **Bearer Token**: OAuth 2.0 and custom bearer tokens
+- **Basic Auth**: Username/password authentication with base64 encoding
+- **API Key**: Custom header or query parameter authentication
+- **OAuth 2.0**: Flexible OAuth 2.0 authentication with custom prefixes
+- **Digest Auth**: RFC 2617 compliant Digest authentication with MD5 hashing
+
+All authentication credentials are automatically applied to requests and work seamlessly with the variable templating system.
+
 ### OpenAPI Integration
 
 Resonance automatically:
@@ -217,6 +228,10 @@ src/
 - `npm test` - Run tests with Jest
 - `npm run test:watch` - Run tests in watch mode
 - `npm run test:coverage` - Run tests with coverage report
+- `npm run lint` - Run ESLint to check code quality
+- `npm run lint:fix` - Automatically fix ESLint issues
+- `npm run format` - Format code with Prettier
+- `npm run format:check` - Check code formatting
 
 ### Development Architecture
 
@@ -253,6 +268,11 @@ We welcome contributions! Please follow these guidelines:
 - Maintain security best practices
 - Add JSDoc comments for public APIs
 - Use defensive programming in repository layer (validate data types, handle undefined)
+- **Code Quality Tools**:
+  - ESLint for code linting and quality checks
+  - Prettier for consistent code formatting
+  - Run `npm run lint` before committing
+  - Use `npm run format` to auto-format code
 
 ## License 📄
 
@@ -270,7 +290,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Variable templating system
 - [x] Multi-theme support
 - [x] Internationalization
-- [x] Authentication support (Bearer, Basic, API Key, OAuth2)
+- [x] Authentication support (Bearer, Basic, API Key, OAuth2, Digest)
 - [x] Request history and bookmarks
 - [x] Environment management (Dev, Staging, Production)
 - [x] Test suite implementation (Jest configured)

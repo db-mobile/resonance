@@ -1,10 +1,41 @@
+/**
+ * @fileoverview Right-click context menu component with dynamic positioning
+ * @module ui/ContextMenu
+ */
+
+/**
+ * Context menu component for right-click interactions
+ *
+ * @class
+ * @classdesc Provides customizable context menus with icons, i18n support,
+ * and automatic positioning to stay within viewport bounds. Handles click
+ * outside to dismiss and provides static helper methods for common icons.
+ */
 export class ContextMenu {
+    /**
+     * Creates a ContextMenu instance
+     */
     constructor() {
         this.currentMenu = null;
         this.clickHandler = null;
         this.contextMenuHandler = null;
     }
 
+    /**
+     * Shows context menu at event position
+     *
+     * Displays a context menu with provided items at the cursor position.
+     * Automatically adjusts position to stay within viewport bounds.
+     *
+     * @param {MouseEvent} event - The context menu event
+     * @param {Array<Object>} menuItems - Array of menu item configurations
+     * @param {string} menuItems[].label - Item display text
+     * @param {string} [menuItems[].translationKey] - i18n translation key
+     * @param {string} [menuItems[].icon] - SVG icon markup
+     * @param {string} [menuItems[].className] - Additional CSS class
+     * @param {Function} [menuItems[].onClick] - Click handler function
+     * @returns {void}
+     */
     show(event, menuItems) {
         this.hide();
 
@@ -31,10 +62,20 @@ export class ContextMenu {
         this.attachCloseHandlers();
     }
 
+    /**
+     * Creates a menu item element
+     *
+     * Builds menu item with optional icon and i18n support. Attaches
+     * click handler that dismisses menu after execution.
+     *
+     * @private
+     * @param {Object} item - Menu item configuration
+     * @returns {HTMLDivElement} Menu item element
+     */
     createMenuItem(item) {
         const menuItem = document.createElement('div');
         menuItem.className = `context-menu-item ${item.className || ''}`;
-        
+
         if (item.icon) {
             menuItem.innerHTML = `
                 <svg class="context-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -60,6 +101,17 @@ export class ContextMenu {
         return menuItem;
     }
 
+    /**
+     * Adjusts menu position to stay within viewport
+     *
+     * Repositions menu if it would overflow viewport bounds, ensuring
+     * the menu is always fully visible.
+     *
+     * @private
+     * @param {HTMLElement} menu - Menu element
+     * @param {MouseEvent} event - Original mouse event
+     * @returns {void}
+     */
     adjustPosition(menu, event) {
         const rect = menu.getBoundingClientRect();
         if (rect.right > window.innerWidth) {
@@ -70,6 +122,15 @@ export class ContextMenu {
         }
     }
 
+    /**
+     * Attaches document-level handlers to close menu
+     *
+     * Sets up click and context menu listeners to dismiss the menu.
+     * Uses setTimeout to prevent immediate closure from same event.
+     *
+     * @private
+     * @returns {void}
+     */
     attachCloseHandlers() {
         this.removeCloseHandlers();
 
@@ -85,6 +146,12 @@ export class ContextMenu {
         }, 0);
     }
 
+    /**
+     * Removes document-level close handlers
+     *
+     * @private
+     * @returns {void}
+     */
     removeCloseHandlers() {
         if (this.clickHandler) {
             document.removeEventListener('click', this.clickHandler);
@@ -96,6 +163,13 @@ export class ContextMenu {
         }
     }
 
+    /**
+     * Hides and removes current menu
+     *
+     * Cleans up menu element and event listeners.
+     *
+     * @returns {void}
+     */
     hide() {
         if (this.currentMenu) {
             this.currentMenu.remove();
@@ -104,6 +178,12 @@ export class ContextMenu {
         this.removeCloseHandlers();
     }
 
+    /**
+     * Creates SVG icon for rename action
+     *
+     * @static
+     * @returns {string} SVG markup for rename icon
+     */
     static createRenameIcon() {
         return `
             <path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -111,6 +191,12 @@ export class ContextMenu {
         `;
     }
 
+    /**
+     * Creates SVG icon for delete action
+     *
+     * @static
+     * @returns {string} SVG markup for delete icon
+     */
     static createDeleteIcon() {
         return `
             <path d="M3 6H5H21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -118,6 +204,12 @@ export class ContextMenu {
         `;
     }
 
+    /**
+     * Creates SVG icon for variable/settings action
+     *
+     * @static
+     * @returns {string} SVG markup for variable icon
+     */
     static createVariableIcon() {
         return `
             <path d="M12 2L3.09 8.26L4 21L12 17L20 21L20.91 8.26L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -125,6 +217,12 @@ export class ContextMenu {
         `;
     }
 
+    /**
+     * Creates SVG icon for new request/add action
+     *
+     * @static
+     * @returns {string} SVG markup for new request icon
+     */
     static createNewRequestIcon() {
         return `
             <path d="M12 5V19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>

@@ -6,6 +6,8 @@ data
 
 .idea
 
+.vscode
+
 # Build artifacts
 src/modules/*.bundle.js
 src/modules/*.bundle.js.map

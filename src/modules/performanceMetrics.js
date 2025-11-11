@@ -28,7 +28,7 @@ function formatTime(ms) {
  * @returns {number} - Percentage
  */
 function calculatePercentage(value, total) {
-    if (!value || !total || total === 0) return 0;
+    if (!value || !total || total === 0) {return 0;}
     return Math.min((value / total) * 100, 100);
 }
 

@@ -1,4 +1,24 @@
+/**
+ * @fileoverview UI component for rendering OpenAPI collections in a hierarchical tree structure
+ * @module ui/CollectionRenderer
+ */
+
+/**
+ * UI component for rendering and managing collection tree display
+ *
+ * @class
+ * @classdesc Renders OpenAPI collections in a hierarchical tree with folders, endpoints,
+ * and manages expansion states, active selections, and user interactions. Supports
+ * persistence of expansion state across sessions.
+ */
 export class CollectionRenderer {
+    /**
+     * Creates a CollectionRenderer instance
+     *
+     * @param {string} containerId - DOM element ID where collections will be rendered
+     * @param {Object} [repository=null] - Repository for persisting expansion states
+     * @throws {Error} If container element is not found
+     */
     constructor(containerId, repository = null) {
         this.container = document.getElementById(containerId);
         if (!this.container) {
@@ -8,6 +28,14 @@ export class CollectionRenderer {
         this.emptySpaceContextMenuHandler = null;
     }
 
+    /**
+     * Renders empty state when no collections are imported
+     *
+     * Displays a placeholder message with icon encouraging users to import
+     * OpenAPI collections. Updates i18n translations if available.
+     *
+     * @returns {void}
+     */
     renderEmptyState() {
         this.container.innerHTML = `
             <div class="collections-empty">
@@ -20,6 +48,22 @@ export class CollectionRenderer {
         `;
     }
 
+    /**
+     * Renders collections list with folders and endpoints
+     *
+     * Creates DOM elements for each collection, attaches event handlers, and manages
+     * expansion state. Can preserve current expansion state or load from storage.
+     *
+     * @async
+     * @param {Array<Object>} collections - Array of collection objects to render
+     * @param {Object} [eventHandlers={}] - Event handler callbacks
+     * @param {Function} [eventHandlers.onEndpointClick] - Called when endpoint is clicked
+     * @param {Function} [eventHandlers.onEndpointContextMenu] - Called on endpoint right-click
+     * @param {Function} [eventHandlers.onContextMenu] - Called on collection right-click
+     * @param {Function} [eventHandlers.onEmptySpaceContextMenu] - Called on empty area right-click
+     * @param {boolean} [preserveExpansionState=false] - Whether to preserve current expansion state
+     * @returns {Promise<void>}
+     */
     async renderCollections(collections, eventHandlers = {}, preserveExpansionState = false) {
         if (this.emptySpaceContextMenuHandler) {
             this.container.removeEventListener('contextmenu', this.emptySpaceContextMenuHandler);
@@ -85,6 +129,20 @@ export class CollectionRenderer {
         }
     }
 
+    /**
+     * Creates DOM element for a collection
+     *
+     * Builds the complete collection element including header and endpoints container.
+     * Attaches click and context menu event listeners.
+     *
+     * @param {Object} collection - Collection object to render
+     * @param {string} collection.id - Unique collection identifier
+     * @param {string} collection.name - Collection display name
+     * @param {Array} collection.endpoints - Array of endpoint objects
+     * @param {Array} [collection.folders] - Optional array of folder objects
+     * @param {Object} eventHandlers - Event handler callbacks
+     * @returns {HTMLDivElement} The created collection element
+     */
     createCollectionElement(collection, eventHandlers) {
         const div = document.createElement('div');
         div.className = 'collection-item';
@@ -101,6 +159,13 @@ export class CollectionRenderer {
         return div;
     }
 
+    /**
+     * Creates header element for a collection
+     *
+     * @param {Object} collection - Collection object
+     * @param {string} collection.name - Collection name to display
+     * @returns {HTMLDivElement} Collection header element
+     */
     createCollectionHeader(collection) {
         const headerDiv = document.createElement('div');
         headerDiv.className = 'collection-header';
@@ -119,6 +184,18 @@ export class CollectionRenderer {
         return headerDiv;
     }
 
+    /**
+     * Creates container element for endpoints or folders
+     *
+     * Renders either folders (if present) or endpoints directly. Supports
+     * nested folder structure for organizing endpoints.
+     *
+     * @param {Object} collection - Collection object
+     * @param {Array} [collection.folders] - Optional array of folder objects
+     * @param {Array} collection.endpoints - Array of endpoint objects
+     * @param {Object} eventHandlers - Event handler callbacks
+     * @returns {HTMLDivElement} Container element with endpoints or folders
+     */
     createEndpointsContainer(collection, eventHandlers) {
         const endpointsDiv = document.createElement('div');
         endpointsDiv.className = 'collection-endpoints';
@@ -138,6 +215,20 @@ export class CollectionRenderer {
         return endpointsDiv;
     }
 
+    /**
+     * Creates DOM element for a folder
+     *
+     * Builds folder element with header, toggle, and nested endpoints. Supports
+     * expansion/collapse with state persistence.
+     *
+     * @param {Object} folder - Folder object to render
+     * @param {string} folder.id - Unique folder identifier
+     * @param {string} folder.name - Folder display name
+     * @param {Array} folder.endpoints - Array of endpoint objects in this folder
+     * @param {Object} collection - Parent collection object
+     * @param {Object} eventHandlers - Event handler callbacks
+     * @returns {HTMLDivElement} The created folder element
+     */
     createFolderElement(folder, collection, eventHandlers) {
         const folderDiv = document.createElement('div');
         folderDiv.className = 'folder-item';
@@ -177,6 +268,20 @@ export class CollectionRenderer {
         return folderDiv;
     }
 
+    /**
+     * Creates DOM element for an endpoint
+     *
+     * Builds endpoint element with HTTP method badge and path. Attaches click
+     * and context menu event handlers.
+     *
+     * @param {Object} endpoint - Endpoint object to render
+     * @param {string} endpoint.id - Unique endpoint identifier
+     * @param {string} endpoint.method - HTTP method (GET, POST, etc.)
+     * @param {string} endpoint.path - Endpoint URL path
+     * @param {Object} collection - Parent collection object
+     * @param {Object} eventHandlers - Event handler callbacks
+     * @returns {HTMLDivElement} The created endpoint element
+     */
     createEndpointElement(endpoint, collection, eventHandlers) {
         const endpointDiv = document.createElement('div');
         endpointDiv.className = 'endpoint-item';
@@ -212,6 +317,18 @@ export class CollectionRenderer {
         return endpointDiv;
     }
 
+    /**
+     * Attaches event listeners to collection element
+     *
+     * Handles collection expansion/collapse and context menu. Ensures only one
+     * collection is expanded at a time (accordion behavior).
+     *
+     * @param {HTMLDivElement} collectionDiv - Collection container element
+     * @param {HTMLDivElement} headerDiv - Collection header element
+     * @param {Object} collection - Collection object
+     * @param {Object} eventHandlers - Event handler callbacks
+     * @returns {void}
+     */
     attachCollectionEventListeners(collectionDiv, headerDiv, collection, eventHandlers) {
         headerDiv.addEventListener('click', async (e) => {
             if (e.target.closest('.context-menu')) {
@@ -239,11 +356,20 @@ export class CollectionRenderer {
         }
     }
 
+    /**
+     * Gets current expansion state of all collections and folders
+     *
+     * Captures which collections and folders are currently expanded for persistence.
+     *
+     * @returns {Object} State object mapping collection IDs to expansion states
+     * @returns {Object.expanded} boolean - Whether collection is expanded
+     * @returns {Object.folders} Object - Map of folder IDs to expansion states
+     */
     getExpansionState() {
         const state = {};
         const collectionElements = this.container.querySelectorAll('.collection-item');
         collectionElements.forEach(element => {
-            const collectionId = element.dataset.collectionId;
+            const {collectionId} = element.dataset;
             if (collectionId) {
                 state[collectionId] = {
                     expanded: element.classList.contains('expanded'),
@@ -252,7 +378,7 @@ export class CollectionRenderer {
                 
                 const folderElements = element.querySelectorAll('.folder-item');
                 folderElements.forEach(folderElement => {
-                    const folderId = folderElement.dataset.folderId;
+                    const {folderId} = folderElement.dataset;
                     if (folderId) {
                         state[collectionId].folders[folderId] = folderElement.classList.contains('expanded');
                     }
@@ -262,10 +388,18 @@ export class CollectionRenderer {
         return state;
     }
 
+    /**
+     * Restores expansion state from saved state object
+     *
+     * Applies expansion state to collections and folders based on saved preferences.
+     *
+     * @param {Object} expansionState - State object from getExpansionState()
+     * @returns {void}
+     */
     restoreExpansionState(expansionState) {
         const collectionElements = this.container.querySelectorAll('.collection-item');
         collectionElements.forEach(element => {
-            const collectionId = element.dataset.collectionId;
+            const {collectionId} = element.dataset;
             const state = expansionState[collectionId];
             
             if (state && state.expanded) {
@@ -273,7 +407,7 @@ export class CollectionRenderer {
                 
                 const folderElements = element.querySelectorAll('.folder-item');
                 folderElements.forEach(folderElement => {
-                    const folderId = folderElement.dataset.folderId;
+                    const {folderId} = folderElement.dataset;
                     if (folderId && state.folders[folderId]) {
                         folderElement.classList.add('expanded');
                     }
@@ -282,6 +416,15 @@ export class CollectionRenderer {
         });
     }
 
+    /**
+     * Saves current expansion state to repository
+     *
+     * Persists expansion state for restoration on next render. Silently fails
+     * if repository is not available.
+     *
+     * @async
+     * @returns {Promise<void>}
+     */
     async saveExpansionState() {
         if (!this.repository) {
             return;
@@ -295,6 +438,15 @@ export class CollectionRenderer {
         }
     }
 
+    /**
+     * Loads expansion state from repository and applies it
+     *
+     * Retrieves saved expansion state and restores it to the UI. Silently fails
+     * if repository is not available.
+     *
+     * @async
+     * @returns {Promise<void>}
+     */
     async loadAndRestoreExpansionState() {
         if (!this.repository) {
             return;
@@ -308,6 +460,15 @@ export class CollectionRenderer {
         }
     }
 
+    /**
+     * Sets an endpoint as active (highlighted)
+     *
+     * Removes active state from all endpoints and applies it to the specified one.
+     *
+     * @param {string} collectionId - Collection ID containing the endpoint
+     * @param {string} endpointId - Endpoint ID to mark as active
+     * @returns {void}
+     */
     setActiveEndpoint(collectionId, endpointId) {
         const allEndpoints = this.container.querySelectorAll('.endpoint-item');
         allEndpoints.forEach(endpoint => endpoint.classList.remove('active'));
@@ -321,6 +482,13 @@ export class CollectionRenderer {
         }
     }
 
+    /**
+     * Clears active state from all endpoints
+     *
+     * Removes highlighting from any currently active endpoint.
+     *
+     * @returns {void}
+     */
     clearActiveEndpoint() {
         const allEndpoints = this.container.querySelectorAll('.endpoint-item');
         allEndpoints.forEach(endpoint => endpoint.classList.remove('active'));

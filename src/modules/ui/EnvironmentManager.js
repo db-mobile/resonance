@@ -13,10 +13,10 @@ export class EnvironmentManager {
     /**
      * Show environment manager dialog
      */
-    async show() {
-        return new Promise(async (resolve) => {
+    show() {
+        return new Promise((resolve) => {
             this.resolve = resolve;
-            await this.createDialog();
+            this.createDialog();
         });
     }
 
@@ -246,7 +246,7 @@ export class EnvironmentManager {
                 envs.find(e => e.id === environmentId)
             );
 
-            if (!environment) return;
+            if (!environment) {return;}
 
             const activeEnvId = await this.service.getActiveEnvironmentId();
             const isActive = environment.id === activeEnvId;
@@ -466,8 +466,8 @@ export class EnvironmentManager {
         // Set values directly via .value property to preserve special characters like {{ }}
         const nameInput = row.querySelector('.var-name-input');
         const valueInput = row.querySelector('.var-value-input');
-        if (nameInput) nameInput.value = name;
-        if (valueInput) valueInput.value = value;
+        if (nameInput) {nameInput.value = name;}
+        if (valueInput) {valueInput.value = value;}
 
         // Setup variable row event listeners
         this.setupVariableRowListeners(row, name);
@@ -505,11 +505,11 @@ export class EnvironmentManager {
         valueInput.addEventListener('blur', saveVariable);
 
         nameInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') valueInput.focus();
+            if (e.key === 'Enter') {valueInput.focus();}
         });
 
         valueInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') saveVariable();
+            if (e.key === 'Enter') {saveVariable();}
         });
 
         deleteBtn.addEventListener('click', async () => {
@@ -529,7 +529,7 @@ export class EnvironmentManager {
                 envs.find(e => e.id === this.currentEnvironmentId)
             );
 
-            if (!environment) return;
+            if (!environment) {return;}
 
             const variables = { ...environment.variables, [name]: value };
             await this.service.updateEnvironment(this.currentEnvironmentId, { variables });
@@ -548,7 +548,7 @@ export class EnvironmentManager {
                 envs.find(e => e.id === this.currentEnvironmentId)
             );
 
-            if (!environment) return;
+            if (!environment) {return;}
 
             const variables = { ...environment.variables };
             delete variables[name];
@@ -564,7 +564,7 @@ export class EnvironmentManager {
      */
     async handleCreateEnvironment() {
         const name = await this.showInputDialog('Create Environment', 'Enter environment name:', 'New Environment');
-        if (!name) return;
+        if (!name) {return;}
 
         try {
             const newEnv = await this.service.createEnvironment(name.trim());
@@ -623,7 +623,7 @@ export class EnvironmentManager {
 
             const input = dialog.querySelector('#input-dialog-input');
             // Set value directly via .value property to preserve special characters like {{ }}
-            if (input) input.value = defaultValue;
+            if (input) {input.value = defaultValue;}
             const okBtn = dialog.querySelector('#input-dialog-ok');
             const cancelBtn = dialog.querySelector('#input-dialog-cancel');
 
@@ -636,12 +636,12 @@ export class EnvironmentManager {
             cancelBtn.addEventListener('click', () => cleanup(null));
 
             input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') cleanup(input.value.trim());
-                if (e.key === 'Escape') cleanup(null);
+                if (e.key === 'Enter') {cleanup(input.value.trim());}
+                if (e.key === 'Escape') {cleanup(null);}
             });
 
             overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) cleanup(null);
+                if (e.target === overlay) {cleanup(null);}
             });
 
             input.focus();
@@ -697,7 +697,7 @@ export class EnvironmentManager {
         okBtn.addEventListener('click', cleanup);
 
         overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) cleanup();
+            if (e.target === overlay) {cleanup();}
         });
 
         document.addEventListener('keydown', function escapeHandler(e) {
@@ -761,7 +761,7 @@ export class EnvironmentManager {
             cancelBtn.addEventListener('click', () => cleanup(false));
 
             overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) cleanup(false);
+                if (e.target === overlay) {cleanup(false);}
             });
 
             document.addEventListener('keydown', function escapeHandler(e) {
@@ -786,7 +786,7 @@ export class EnvironmentManager {
         input.onchange = async (e) => {
             try {
                 const file = e.target.files[0];
-                if (!file) return;
+                if (!file) {return;}
 
                 const text = await file.text();
                 const data = JSON.parse(text);

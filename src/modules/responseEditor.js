@@ -94,7 +94,7 @@ export class ResponseEditor {
      * @returns {object|null} - Language extension or null
      */
     detectLanguageFromContentType(contentType) {
-        if (!contentType) return null;
+        if (!contentType) {return null;}
 
         const lowerContentType = contentType.toLowerCase();
 

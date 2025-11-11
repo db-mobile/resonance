@@ -1,10 +1,19 @@
+/**
+ * @fileoverview Main renderer process orchestrator for Resonance
+ * @module renderer
+ *
+ * Initializes and coordinates all UI modules, controllers, services, and repositories.
+ * Sets up event listeners, keyboard shortcuts, and manages the application lifecycle
+ * in the renderer process. This is the entry point for the Electron renderer.
+ */
+
 import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, pathParamsList, queryParamsList, headersList, authTypeSelect, responseBodyContainer, statusDisplay, responseHeadersDisplay, responseCookiesDisplay } from './modules/domElements.js';
 
 import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl, setUrlUpdating } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest, handleCancelRequest, handleGenerateCurl } from './modules/apiHandler.js';
-import { loadCollections, importOpenApiFile, initializeBodyTracking, restoreLastSelectedRequest } from './modules/collectionManager.js';
+import { loadCollections, importOpenApiFile, initializeBodyTracking } from './modules/collectionManager.js';
 import { ThemeManager, SettingsModal } from './modules/themeManager.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
 import { TimeoutManager } from './modules/timeoutManager.js';
@@ -46,12 +55,19 @@ const proxyController = new ProxyController(proxyService);
 const environmentRepository = new EnvironmentRepository(window.electronAPI);
 const environmentService = new EnvironmentService(environmentRepository, statusDisplayAdapter);
 const environmentManager = new EnvironmentManager(environmentService);
+
+// Create environment controller first
+let environmentController; // eslint-disable-line prefer-const
+
+// Create environment selector with callbacks that will use the controller
 const environmentSelector = new EnvironmentSelector(
     environmentService,
     (envId) => environmentController.switchEnvironment(envId),
     () => environmentController.openEnvironmentManager()
 );
-const environmentController = new EnvironmentController(
+
+// Now create the controller
+environmentController = new EnvironmentController(
     environmentService,
     environmentManager,
     environmentSelector
@@ -91,7 +107,19 @@ const workspaceTabController = new WorkspaceTabController(
     responseContainerManager
 );
 
-// Initialize keyboard shortcuts
+/**
+ * Initializes application keyboard shortcuts
+ *
+ * Registers all keyboard shortcuts for the application including:
+ * - Request actions (send, cancel, generate cURL)
+ * - Navigation (focus URL, toggle sidebars)
+ * - Tab switching (request tabs, workspace tabs)
+ * - Settings and help
+ *
+ * Uses platform-aware modifier keys (Cmd on macOS, Ctrl on Windows/Linux).
+ *
+ * @returns {void}
+ */
 function initKeyboardShortcuts() {
     // Initialize the shortcuts manager
     keyboardShortcuts.init();
@@ -121,7 +149,7 @@ function initKeyboardShortcuts() {
     // Navigation & UI
     keyboardShortcuts.register('KeyL', {
         ctrl: true,
-        handler: (e) => {
+        handler: (_e) => {
             if (urlInput) {
                 urlInput.focus();
                 urlInput.select();
@@ -162,11 +190,11 @@ function initKeyboardShortcuts() {
                 if (isVisible) {
                     historySidebar.classList.remove('visible');
                     historyResizerHandle.classList.remove('visible');
-                    if (historyToggleBtn) historyToggleBtn.classList.remove('active');
+                    if (historyToggleBtn) {historyToggleBtn.classList.remove('active');}
                 } else {
                     historySidebar.classList.add('visible');
                     historyResizerHandle.classList.add('visible');
-                    if (historyToggleBtn) historyToggleBtn.classList.add('active');
+                    if (historyToggleBtn) {historyToggleBtn.classList.add('active');}
                 }
             }
         },
@@ -403,7 +431,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Activate default response tab
     activateTab('response', 'response-body');
 
-    document.addEventListener('languageChanged', (event) => {
+    document.addEventListener('languageChanged', (_event) => {
         // Any dynamic content that needs special handling can be refreshed here
     });
 
@@ -446,10 +474,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const pathParamsList = document.getElementById('path-params-list');
     const headersList = document.getElementById('headers-list');
-    const queryParamsList = document.getElementById('query-params-list');
+    const _queryParamsList = document.getElementById('query-params-list');
 
-    if (pathParamsList.children.length === 0) addKeyValueRow(pathParamsList);
-    if (headersList.children.length === 0) addKeyValueRow(headersList, 'Content-Type', 'application/json');
+    if (pathParamsList.children.length === 0) {addKeyValueRow(pathParamsList);}
+    if (headersList.children.length === 0) {addKeyValueRow(headersList, 'Content-Type', 'application/json');}
 
     updateQueryParamsFromUrl();
 
@@ -459,7 +487,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // Save current tab state before window closes
-window.addEventListener('beforeunload', async (e) => {
+window.addEventListener('beforeunload', async (_e) => {
     try {
         const activeTabId = await workspaceTabService.getActiveTabId();
         if (activeTabId) {
