@@ -6,7 +6,7 @@
  */
 import logger from '../logger.js';
 
-const log = logger.scope('WorkspaceTabRepository');
+const _log = logger.scope('WorkspaceTabRepository');
 
 export class WorkspaceTabRepository {
     constructor(electronAPI) {

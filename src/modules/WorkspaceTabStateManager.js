@@ -10,7 +10,7 @@ import { displayResponseWithLineNumbers, clearResponseDisplay } from './apiHandl
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import logger from './logger.js';
 
-const log = logger.scope('WorkspaceTabStateManager');
+const _log = logger.scope('WorkspaceTabStateManager');
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
 import { formatCookiesAsHtml } from './cookieParser.js';
 import { activateTab } from './tabManager.js';

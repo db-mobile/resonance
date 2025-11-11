@@ -85,7 +85,7 @@ function generatePythonRequests(config) {
     // Body
     if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
         const bodyString = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
-        lines.push('data = """' + bodyString + '"""');
+        lines.push(`data = """${  bodyString  }"""`);
         lines.push('');
     }
 
@@ -478,7 +478,7 @@ export function generateCode(language, config) {
 
 // Language metadata for UI
 export const SUPPORTED_LANGUAGES = [
-    { id: 'curl', name: 'cURL', description: 'Command line tool' },
+    { id: 'curl', name: 'cURL', description: 'Command line' },
     { id: 'python', name: 'Python', description: 'requests library' },
     { id: 'javascript-fetch', name: 'JavaScript', description: 'Fetch API' },
     { id: 'javascript-axios', name: 'JavaScript', description: 'Axios' },
