@@ -71,7 +71,7 @@ export class HistoryRenderer {
     }
 
     renderHistoryList(historyItems) {
-        if (!this.container) return;
+        if (!this.container) {return;}
 
         if (historyItems.length === 0) {
             this.container.innerHTML = `

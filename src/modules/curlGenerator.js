@@ -1,13 +1,13 @@
 function escapeShellArg(str) {
-    if (!str) return "''";
+    if (!str) {return "''";}
 
-    return "'" + str.replace(/'/g, "'\\''") + "'";
+    return `'${  str.replace(/'/g, "'\\''")  }'`;
 }
 
 export function generateCurlCommand(config) {
     const { method, url, headers, body } = config;
 
-    let curlParts = ['curl'];
+    const curlParts = ['curl'];
 
     if (method && method !== 'GET') {
         curlParts.push(`-X ${method}`);

@@ -115,7 +115,7 @@ export class Resizer {
     }
 
     drag(e) {
-        if (!this.isDragging) return;
+        if (!this.isDragging) {return;}
 
         const deltaY = e.clientY - this.startY;
         const newRequestHeight = this.startRequestHeight + deltaY;
@@ -134,7 +134,7 @@ export class Resizer {
     }
 
     endDrag() {
-        if (!this.isDragging) return;
+        if (!this.isDragging) {return;}
         
         this.isDragging = false;
         this.resizerHandle.classList.remove('dragging');
@@ -193,7 +193,7 @@ export class HorizontalResizer {
     }
 
     drag(e) {
-        if (!this.isDragging) return;
+        if (!this.isDragging) {return;}
 
         const deltaX = e.clientX - this.startX;
         const newSidebarWidth = this.startSidebarWidth + deltaX;
@@ -209,7 +209,7 @@ export class HorizontalResizer {
     }
 
     endDrag() {
-        if (!this.isDragging) return;
+        if (!this.isDragging) {return;}
 
         this.isDragging = false;
         this.horizontalResizerHandle.classList.remove('dragging');

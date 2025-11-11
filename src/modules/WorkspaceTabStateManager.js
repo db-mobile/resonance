@@ -95,9 +95,9 @@ export class WorkspaceTabStateManager {
         }
 
         // Use tab.request directly to avoid stale destructured references
-        const request = tab.request;
-        const response = tab.response;
-        const endpoint = tab.endpoint;
+        const {request} = tab;
+        const {response} = tab;
+        const {endpoint} = tab;
 
         // Restore request fields
         if (this.dom.urlInput) {
@@ -172,7 +172,7 @@ export class WorkspaceTabStateManager {
         // This ensures variable substitution uses the correct collection context
         if (endpoint) {
             window.currentEndpoint = endpoint;
-        } else if (tab.hasOwnProperty('endpoint')) {
+        } else if (Object.prototype.hasOwnProperty.call(tab, 'endpoint')) {
             // Tab explicitly has no endpoint (e.g., manually created tab)
             window.currentEndpoint = null;
         }

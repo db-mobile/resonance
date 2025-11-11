@@ -149,15 +149,15 @@ export class ProxyService {
 
         try {
             const urlObj = new URL(url);
-            const hostname = urlObj.hostname;
+            const {hostname} = urlObj;
 
             return bypassList.some(pattern => {
                 // Remove whitespace
                 const cleanPattern = pattern.trim();
-                if (!cleanPattern) return false;
+                if (!cleanPattern) {return false;}
 
                 // Exact match
-                if (cleanPattern === hostname) return true;
+                if (cleanPattern === hostname) {return true;}
 
                 // Wildcard match (*.example.com)
                 if (cleanPattern.startsWith('*.')) {
@@ -280,10 +280,10 @@ export class ProxyService {
      * Validate host format
      */
     isValidHost(host) {
-        if (!host || typeof host !== 'string') return false;
+        if (!host || typeof host !== 'string') {return false;}
 
         const trimmed = host.trim();
-        if (trimmed.length === 0) return false;
+        if (trimmed.length === 0) {return false;}
 
         // Remove protocol if present (shouldn't be there, but just in case)
         const cleanHost = trimmed.replace(/^(https?|socks[45]?):\/\//, '');

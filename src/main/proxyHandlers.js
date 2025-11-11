@@ -176,10 +176,10 @@ class ProxyHandler {
                 const systemProxy = this._getSystemProxySettings();
                 if (systemProxy) {
                     return systemProxy;
-                } else {
+                } 
                     console.warn('System proxy is enabled but no system proxy configuration found');
                     return null;
-                }
+                
             }
 
             // Build manual proxy config
@@ -214,14 +214,14 @@ class ProxyHandler {
 
         try {
             const urlObj = new URL(url);
-            const hostname = urlObj.hostname;
+            const {hostname} = urlObj;
 
             return bypassList.some(pattern => {
                 const cleanPattern = pattern.trim();
-                if (!cleanPattern) return false;
+                if (!cleanPattern) {return false;}
 
                 // Exact match
-                if (cleanPattern === hostname) return true;
+                if (cleanPattern === hostname) {return true;}
 
                 // Wildcard match (*.example.com)
                 if (cleanPattern.startsWith('*.')) {
@@ -270,7 +270,7 @@ class ProxyHandler {
         // Check environment variables for proxy configuration
         const httpProxy = process.env.HTTP_PROXY || process.env.http_proxy;
         const httpsProxy = process.env.HTTPS_PROXY || process.env.https_proxy;
-        const noProxy = process.env.NO_PROXY || process.env.no_proxy;
+        const _noProxy = process.env.NO_PROXY || process.env.no_proxy;
 
         // Use HTTPS proxy if available, otherwise HTTP proxy
         const proxyUrl = httpsProxy || httpProxy;

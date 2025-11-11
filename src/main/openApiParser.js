@@ -109,7 +109,7 @@ class OpenApiParser {
 
         parameters.forEach(param => {
             const resolvedParam = param.$ref ? this.schemaProcessor.resolveSchemaRef(param) : param;
-            if (!resolvedParam) return;
+            if (!resolvedParam) {return;}
 
             if (resolvedParam.in === 'query') {
                 parsed.query[resolvedParam.name] = {

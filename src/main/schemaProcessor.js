@@ -67,7 +67,7 @@ class SchemaProcessor {
             return null;
         }
 
-        const content = requestBody.content;
+        const {content} = requestBody;
         if (!content) {
             return null;
         }
@@ -86,7 +86,7 @@ class SchemaProcessor {
                 schema: resolvedSchema,
                 required: isRequired,
                 example: (generatedExample === null || generatedExample === undefined) ?
-                    JSON.stringify({ "data": "example" }, null, 2) : generatedExample
+                    JSON.stringify({ 'data': 'example' }, null, 2) : generatedExample
             };
 
             return finalResult;
@@ -103,13 +103,13 @@ class SchemaProcessor {
             schema: resolvedSchema,
             required: isRequired,
             example: (generatedExample === null || generatedExample === undefined) ?
-                JSON.stringify({ "data": "example" }, null, 2) : generatedExample
+                JSON.stringify({ 'data': 'example' }, null, 2) : generatedExample
         };
     }
 
     generateExampleFromSchema(schema, depth = 0) {
         if (!schema) {
-            return JSON.stringify({ "data": "example" }, null, 2);
+            return JSON.stringify({ 'data': 'example' }, null, 2);
         }
 
         if (schema.example !== undefined && schema.example !== null) {
@@ -157,7 +157,7 @@ class SchemaProcessor {
 
                 case 'array':
                     if (propSchema.items) {
-                        const itemExample = generateValue(propSchema.items, propName + '_item', currentDepth + 1);
+                        const itemExample = generateValue(propSchema.items, `${propName  }_item`, currentDepth + 1);
                         return [itemExample];
                     }
                     return [];
@@ -193,27 +193,27 @@ class SchemaProcessor {
         }
 
         if (example === null || example === undefined) {
-            example = { "data": "example" };
+            example = { 'data': 'example' };
         }
 
         if (depth === 0) {
             if (typeof example === 'string') {
                 return example;
-            } else {
+            } 
                 const result = JSON.stringify(example, null, 2);
                 return result;
-            }
-        } else {
+            
+        } 
             return example;
-        }
+        
     }
 
     _generateStringExample(propSchema, propName) {
-        if (propSchema.format === 'email') return 'user@example.com';
-        if (propSchema.format === 'date') return '2024-01-01';
-        if (propSchema.format === 'date-time') return '2024-01-01T12:00:00Z';
-        if (propSchema.format === 'uuid') return '123e4567-e89b-12d3-a456-426614174000';
-        if (propSchema.enum) return propSchema.enum[0];
+        if (propSchema.format === 'email') {return 'user@example.com';}
+        if (propSchema.format === 'date') {return '2024-01-01';}
+        if (propSchema.format === 'date-time') {return '2024-01-01T12:00:00Z';}
+        if (propSchema.format === 'uuid') {return '123e4567-e89b-12d3-a456-426614174000';}
+        if (propSchema.enum) {return propSchema.enum[0];}
 
         const sampleStrings = [
             'nisi', 'est magna Excepteur ipsum', 'officia', 'dolor ea adipisicing cillum',
@@ -222,36 +222,36 @@ class SchemaProcessor {
         ];
 
         const name = propName.toLowerCase();
-        if (name.includes('name')) return 'Example Name';
-        if (name.includes('title')) return 'Example Title';
-        if (name.includes('description')) return 'Example description text';
-        if (name.includes('id')) return 'example-id-123';
-        if (name.includes('email')) return 'user@example.com';
-        if (name.includes('password')) return sampleStrings[Math.floor(Math.random() * sampleStrings.length)];
-        if (name.includes('newpassword')) return sampleStrings[Math.floor(Math.random() * sampleStrings.length)];
-        if (name.includes('confirmpassword')) return sampleStrings[Math.floor(Math.random() * sampleStrings.length)];
-        if (name.includes('type')) return sampleStrings[0];
-        if (name.includes('phone')) return '+1-555-0123';
-        if (name.includes('address')) return '123 Main Street';
-        if (name.includes('city')) return 'New York';
-        if (name.includes('country')) return 'United States';
-        if (name.includes('token')) return 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9';
-        if (name.includes('url')) return 'https://example.com';
-        if (name.includes('code')) return 'ABC123';
+        if (name.includes('name')) {return 'Example Name';}
+        if (name.includes('title')) {return 'Example Title';}
+        if (name.includes('description')) {return 'Example description text';}
+        if (name.includes('id')) {return 'example-id-123';}
+        if (name.includes('email')) {return 'user@example.com';}
+        if (name.includes('password')) {return sampleStrings[Math.floor(Math.random() * sampleStrings.length)];}
+        if (name.includes('newpassword')) {return sampleStrings[Math.floor(Math.random() * sampleStrings.length)];}
+        if (name.includes('confirmpassword')) {return sampleStrings[Math.floor(Math.random() * sampleStrings.length)];}
+        if (name.includes('type')) {return sampleStrings[0];}
+        if (name.includes('phone')) {return '+1-555-0123';}
+        if (name.includes('address')) {return '123 Main Street';}
+        if (name.includes('city')) {return 'New York';}
+        if (name.includes('country')) {return 'United States';}
+        if (name.includes('token')) {return 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9';}
+        if (name.includes('url')) {return 'https://example.com';}
+        if (name.includes('code')) {return 'ABC123';}
 
         return sampleStrings[Math.floor(Math.random() * sampleStrings.length)];
     }
 
     _generateNumberExample(propSchema, propName) {
-        if (propSchema.minimum !== undefined) return propSchema.minimum;
+        if (propSchema.minimum !== undefined) {return propSchema.minimum;}
         if (propSchema.maximum !== undefined && propSchema.minimum !== undefined) {
             return Math.floor((propSchema.minimum + propSchema.maximum) / 2);
         }
-        if (propSchema.enum) return propSchema.enum[0];
-        if (propName.toLowerCase().includes('id')) return 1;
-        if (propName.toLowerCase().includes('count')) return 10;
-        if (propName.toLowerCase().includes('price')) return 99.99;
-        if (propName.toLowerCase().includes('age')) return 25;
+        if (propSchema.enum) {return propSchema.enum[0];}
+        if (propName.toLowerCase().includes('id')) {return 1;}
+        if (propName.toLowerCase().includes('count')) {return 10;}
+        if (propName.toLowerCase().includes('price')) {return 99.99;}
+        if (propName.toLowerCase().includes('age')) {return 25;}
         return propSchema.type === 'integer' ? 42 : 42.5;
     }
 }

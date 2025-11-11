@@ -12,13 +12,13 @@ class WindowManager {
     }
 
     createWindow() {
-        let mainWindowState = windowStateKeeper({
+        const mainWindowState = windowStateKeeper({
             defaultWidth: 1200,
             defaultHeight: 800
         });
 
         const isDev = !app.isPackaged;
-        const appPath = isDev ? process.cwd() : path.dirname(app.getPath('exe'));
+        const _appPath = isDev ? process.cwd() : path.dirname(app.getPath('exe'));
         const resourcesPath = isDev ? process.cwd() : process.resourcesPath;
 
         this.mainWindow = new BrowserWindow({

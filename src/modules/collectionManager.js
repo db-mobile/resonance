@@ -17,7 +17,7 @@ function initializeController() {
 
 export async function loadCollections() {
     const controller = initializeController();
-    return await controller.loadCollections();
+    return controller.loadCollections();
 }
 
 export function displayCollections(collections) {
@@ -32,7 +32,7 @@ export async function loadEndpointIntoForm(collection, endpoint) {
 
 export async function importOpenApiFile() {
     const controller = initializeController();
-    return await controller.importOpenApiFile();
+    return controller.importOpenApiFile();
 }
 
 export async function saveRequestBodyModification(collectionId, endpointId) {
@@ -47,25 +47,25 @@ export function initializeBodyTracking() {
 
 export async function getCurrentCollectionVariables() {
     const controller = initializeController();
-    return await controller.getCurrentCollectionVariables();
+    return controller.getCurrentCollectionVariables();
 }
 
 export async function processRequestForVariables(request) {
     const controller = initializeController();
-    return await controller.processRequestForVariables(request);
+    return controller.processRequestForVariables(request);
 }
 
 export async function restoreLastSelectedRequest() {
     const controller = initializeController();
-    return await controller.restoreLastSelectedRequest();
+    return controller.restoreLastSelectedRequest();
 }
 
-export function generatePlaceholderBody(requestBody) {
+export function generatePlaceholderBody(_requestBody) {
     console.warn('generatePlaceholderBody is deprecated. Schema processing is now handled by SchemaProcessor class.');
     return null;
 }
 
-export function generateExampleFromSchema(schema) {
+export function generateExampleFromSchema(_schema) {
     console.warn('generateExampleFromSchema is deprecated. Schema processing is now handled by SchemaProcessor class.');
     return null;
 }

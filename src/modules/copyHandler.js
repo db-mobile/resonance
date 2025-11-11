@@ -53,8 +53,8 @@ function getActiveResponseTab() {
     for (const button of responseTabButtons) {
         if (button.classList.contains('active')) {
             const tabName = button.getAttribute('data-tab');
-            if (tabName === 'response-body') return 'body';
-            if (tabName === 'response-headers') return 'headers';
+            if (tabName === 'response-body') {return 'body';}
+            if (tabName === 'response-headers') {return 'headers';}
         }
     }
     return 'body'; // Default to body

@@ -55,7 +55,7 @@ export class EnvironmentController {
     /**
      * Handle environment switch
      */
-    async onEnvironmentSwitched(event) {
+    async onEnvironmentSwitched(_event) {
         try {
             const environment = await this.service.getActiveEnvironment();
             if (environment) {

@@ -82,7 +82,7 @@ export class VariableService {
             }
 
             await this.repository.setVariablesForCollection(collectionId, variables);
-            this.statusDisplay.update(`Variables saved successfully`, null);
+            this.statusDisplay.update('Variables saved successfully', null);
             return true;
         } catch (error) {
             this.statusDisplay.update(`Error saving variables: ${error.message}`, null);
@@ -133,7 +133,7 @@ export class VariableService {
     }
 
     async exportVariables(collectionId) {
-        return await this.getVariablesForCollection(collectionId);
+        return this.getVariablesForCollection(collectionId);
     }
 
     async importVariables(collectionId, variables, merge = false) {

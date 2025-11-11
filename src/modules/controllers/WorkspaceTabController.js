@@ -253,10 +253,10 @@ export class WorkspaceTabController {
     async updateCurrentTabName(method, url) {
         try {
             const activeTabId = await this.service.getActiveTabId();
-            if (!activeTabId) return;
+            if (!activeTabId) {return;}
 
             const activeTab = await this.service.getActiveTab();
-            if (!activeTab) return;
+            if (!activeTab) {return;}
 
             // Don't auto-rename if user has customized the name
             if (activeTab.name !== 'New Request' && !activeTab.name.match(/^(GET|POST|PUT|DELETE|PATCH)/)) {
@@ -292,12 +292,12 @@ export class WorkspaceTabController {
             // Construct URL with {{baseUrl}} if collection has a baseUrl
             let fullUrl = endpoint.path;
             if (endpoint.collectionBaseUrl) {
-                fullUrl = '{{baseUrl}}' + endpoint.path;
+                fullUrl = `{{baseUrl}}${  endpoint.path}`;
             }
 
             // Replace path parameters with {{paramName}} format
             if (endpoint.parameters?.path) {
-                Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
+                Object.entries(endpoint.parameters.path).forEach(([key, _param]) => {
                     fullUrl = fullUrl.replace(`{${key}}`, `{{${key}}}`);
                 });
             }
@@ -366,7 +366,7 @@ export class WorkspaceTabController {
                 // Use the properly generated body string passed from CollectionController
                 bodyString = endpoint.requestBodyString;
             } else if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-                bodyString = JSON.stringify({ "data": "example" }, null, 2);
+                bodyString = JSON.stringify({ 'data': 'example' }, null, 2);
             }
 
             // Load auth configuration (prioritize persisted config over OpenAPI spec)
@@ -441,7 +441,7 @@ export class WorkspaceTabController {
      * Handle service events
      * @private
      */
-    _handleServiceEvent(event, data) {
+    _handleServiceEvent(_event, _data) {
         // Can be extended to handle various service events
         // For now, most updates are handled directly in methods
     }
@@ -451,6 +451,6 @@ export class WorkspaceTabController {
      * @returns {Promise<Object|null>}
      */
     async getActiveTab() {
-        return await this.service.getActiveTab();
+        return this.service.getActiveTab();
     }
 }

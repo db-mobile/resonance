@@ -69,7 +69,7 @@ export class I18nManager {
     }
 
     async setLanguage(language) {
-        if (language === this.currentLanguage) return;
+        if (language === this.currentLanguage) {return;}
         
         await this.loadLanguage(language);
         await this.saveLanguage(language);
@@ -87,7 +87,7 @@ export class I18nManager {
         
         for (const k of keys) {
             value = value?.[k];
-            if (value === undefined) break;
+            if (value === undefined) {break;}
         }
         
         if (value === undefined) {
@@ -100,9 +100,7 @@ export class I18nManager {
     }
 
     interpolate(template, params) {
-        return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
-            return params[key] !== undefined ? params[key] : match;
-        });
+        return template.replace(/\{\{(\w+)\}\}/g, (match, key) => params[key] !== undefined ? params[key] : match);
     }
 
     updateUI() {

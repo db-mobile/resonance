@@ -243,7 +243,7 @@ export class CollectionRenderer {
         const state = {};
         const collectionElements = this.container.querySelectorAll('.collection-item');
         collectionElements.forEach(element => {
-            const collectionId = element.dataset.collectionId;
+            const {collectionId} = element.dataset;
             if (collectionId) {
                 state[collectionId] = {
                     expanded: element.classList.contains('expanded'),
@@ -252,7 +252,7 @@ export class CollectionRenderer {
                 
                 const folderElements = element.querySelectorAll('.folder-item');
                 folderElements.forEach(folderElement => {
-                    const folderId = folderElement.dataset.folderId;
+                    const {folderId} = folderElement.dataset;
                     if (folderId) {
                         state[collectionId].folders[folderId] = folderElement.classList.contains('expanded');
                     }
@@ -265,7 +265,7 @@ export class CollectionRenderer {
     restoreExpansionState(expansionState) {
         const collectionElements = this.container.querySelectorAll('.collection-item');
         collectionElements.forEach(element => {
-            const collectionId = element.dataset.collectionId;
+            const {collectionId} = element.dataset;
             const state = expansionState[collectionId];
             
             if (state && state.expanded) {
@@ -273,7 +273,7 @@ export class CollectionRenderer {
                 
                 const folderElements = element.querySelectorAll('.folder-item');
                 folderElements.forEach(folderElement => {
-                    const folderId = folderElement.dataset.folderId;
+                    const {folderId} = folderElement.dataset;
                     if (folderId && state.folders[folderId]) {
                         folderElement.classList.add('expanded');
                     }

@@ -162,7 +162,7 @@ export class WorkspaceTabRepository {
                 ...updates.endpoint
             })) : (updates.endpoint ? JSON.parse(JSON.stringify(updates.endpoint)) : JSON.parse(JSON.stringify(existingTab.endpoint)));
 
-        console.log(`[WorkspaceTabRepository] After merge, response timings:`, mergedResponse?.timings);
+        console.log('[WorkspaceTabRepository] After merge, response timings:', mergedResponse?.timings);
 
         // Create merged tab, excluding nested objects from updates
         const { request: _r, response: _res, endpoint: _e, ...restUpdates } = updates;

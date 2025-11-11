@@ -91,7 +91,7 @@ export class EnvironmentRepository {
     async getActiveEnvironment() {
         try {
             const activeId = await this.getActiveEnvironmentId();
-            if (!activeId) return null;
+            if (!activeId) {return null;}
             return await this.getEnvironmentById(activeId);
         } catch (error) {
             console.error('Error getting active environment:', error);

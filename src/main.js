@@ -66,38 +66,30 @@ const openApiParser = new OpenApiParser(schemaProcessor, store);
 app.whenReady().then(() => {
     windowManager.createWindow();
 
-    app.on('activate', function () {
+    app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
             windowManager.createWindow();
         }
     });
 });
 
-app.on('window-all-closed', function () {
+app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit();
     }
 });
 
-ipcMain.handle('send-api-request', async (event, requestOptions) => {
-    return apiRequestHandler.handleApiRequest(requestOptions);
-});
+ipcMain.handle('send-api-request', async (_event, requestOptions) => apiRequestHandler.handleApiRequest(requestOptions));
 
-ipcMain.handle('cancel-api-request', async (event) => {
-    return apiRequestHandler.cancelRequest();
-});
+ipcMain.handle('cancel-api-request', async (_event) => apiRequestHandler.cancelRequest());
 
-ipcMain.handle('store:get', (event, key) => {
-    return storeHandler.get(key);
-});
+ipcMain.handle('store:get', (_event, key) => storeHandler.get(key));
 
 ipcMain.handle('store:set', (event, key, value) => {
     storeHandler.set(key, value);
 });
 
-ipcMain.handle('settings:get', () => {
-    return storeHandler.getSettings();
-});
+ipcMain.handle('settings:get', () => storeHandler.getSettings());
 
 ipcMain.handle('settings:set', (event, settings) => {
     storeHandler.setSettings(settings);
@@ -128,14 +120,8 @@ ipcMain.handle('import-openapi-file', async () => {
 });
 
 // Proxy settings handlers
-ipcMain.handle('proxy:get', () => {
-    return proxyHandler.getProxySettings();
-});
+ipcMain.handle('proxy:get', () => proxyHandler.getProxySettings());
 
-ipcMain.handle('proxy:set', (event, settings) => {
-    return proxyHandler.setProxySettings(settings);
-});
+ipcMain.handle('proxy:set', (_event, settings) => proxyHandler.setProxySettings(settings));
 
-ipcMain.handle('proxy:test', async () => {
-    return await proxyHandler.testProxyConnection();
-});
+ipcMain.handle('proxy:test', async () => proxyHandler.testProxyConnection());

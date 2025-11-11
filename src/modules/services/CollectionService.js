@@ -180,9 +180,7 @@ export class CollectionService {
                     }
                 });
 
-                collection.folders = collection.folders.filter(folder => {
-                    return folder.endpoints && folder.endpoints.length > 0;
-                });
+                collection.folders = collection.folders.filter(folder => folder.endpoints && folder.endpoints.length > 0);
             }
 
             await this.repository.update(collectionId, collection);
@@ -231,11 +229,11 @@ export class CollectionService {
     populateUrlAndMethod(collection, endpoint, formElements) {
         let fullUrl = endpoint.path;
         if (collection.baseUrl) {
-            fullUrl = '{{baseUrl}}' + endpoint.path;
+            fullUrl = `{{baseUrl}}${  endpoint.path}`;
         }
 
         if (endpoint.parameters?.path) {
-            Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
+            Object.entries(endpoint.parameters.path).forEach(([key, _param]) => {
                 fullUrl = fullUrl.replace(`{${key}}`, `{{${key}}}`);
             });
         }
@@ -253,14 +251,12 @@ export class CollectionService {
             persistedPathParams.forEach(param => {
                 this.addKeyValueRow(formElements.pathParamsList, param.key, param.value);
             });
-        } else {
-            if (endpoint.parameters?.path) {
+        } else if (endpoint.parameters?.path) {
                 Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
                     const value = param.example || '';
                     this.addKeyValueRow(formElements.pathParamsList, key, value);
                 });
             }
-        }
 
         if (formElements.pathParamsList.children.length === 0) {
             this.addKeyValueRow(formElements.pathParamsList);
@@ -315,13 +311,11 @@ export class CollectionService {
             persistedQueryParams.forEach(param => {
                 this.addKeyValueRow(formElements.queryParamsList, param.key, param.value);
             });
-        } else {
-            if (endpoint.parameters?.query) {
+        } else if (endpoint.parameters?.query) {
                 Object.entries(endpoint.parameters.query).forEach(([key, param]) => {
                     this.addKeyValueRow(formElements.queryParamsList, key, param.example || '');
                 });
             }
-        }
 
         if (formElements.queryParamsList.children.length === 0) {
             this.addKeyValueRow(formElements.queryParamsList);
@@ -334,7 +328,7 @@ export class CollectionService {
     updateUrlWithQueryParams(formElements) {
         try {
             const queryParams = this.parseKeyValuePairs(formElements.queryParamsList);
-            let urlString = formElements.urlInput.value.trim();
+            const urlString = formElements.urlInput.value.trim();
 
             if (!urlString) {
                 return;
@@ -414,7 +408,7 @@ export class CollectionService {
             const generatedBody = this.generateRequestBody(endpoint.requestBody);
             formElements.bodyInput.value = generatedBody;
         } else if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-            formElements.bodyInput.value = JSON.stringify({ "data": "example" }, null, 2);
+            formElements.bodyInput.value = JSON.stringify({ 'data': 'example' }, null, 2);
         } else {
             formElements.bodyInput.value = '';
         }
@@ -439,12 +433,12 @@ export class CollectionService {
 
         if (requestBody.required) {
             return JSON.stringify({
-                "note": "Request body is required",
-                "data": "Please fill in the required fields"
+                'note': 'Request body is required',
+                'data': 'Please fill in the required fields'
             }, null, 2);
         }
 
-        return JSON.stringify({ "data": "example" }, null, 2);
+        return JSON.stringify({ 'data': 'example' }, null, 2);
     }
 
     async saveRequestBodyModification(collectionId, endpointId, bodyInput) {

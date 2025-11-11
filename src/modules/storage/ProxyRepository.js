@@ -196,7 +196,7 @@ export class ProxyRepository {
      * Sanitize host string
      */
     _sanitizeHost(host) {
-        if (typeof host !== 'string') return '';
+        if (typeof host !== 'string') {return '';}
         // Remove protocol if present
         return host.replace(/^(https?|socks[45]?):\/\//, '').trim();
     }

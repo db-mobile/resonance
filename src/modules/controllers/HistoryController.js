@@ -90,12 +90,12 @@ export class HistoryController {
     }
 
     clearKeyValueList(listElement) {
-        if (!listElement) return;
+        if (!listElement) {return;}
         listElement.innerHTML = '';
     }
 
     populateKeyValueList(listElement, data) {
-        if (!listElement || !data) return;
+        if (!listElement || !data) {return;}
 
         Object.entries(data).forEach(([key, value]) => {
             this.addKeyValueRow(listElement, key, value);
@@ -103,7 +103,7 @@ export class HistoryController {
     }
 
     addKeyValueRow(listElement, key = '', value = '') {
-        if (!listElement) return;
+        if (!listElement) {return;}
 
         const row = document.createElement('div');
         row.className = 'key-value-row';
@@ -131,8 +131,8 @@ export class HistoryController {
         const valueInput = row.querySelector('.value-input');
 
         // Set values directly via .value property (not via innerHTML) to preserve special characters like {{ }}
-        if (keyInput) keyInput.value = key;
-        if (valueInput) valueInput.value = value;
+        if (keyInput) {keyInput.value = key;}
+        if (valueInput) {valueInput.value = value;}
 
         const handleInput = () => {
             if (keyInput.value || valueInput.value) {
@@ -143,8 +143,8 @@ export class HistoryController {
             }
         };
 
-        if (keyInput) keyInput.addEventListener('input', handleInput);
-        if (valueInput) valueInput.addEventListener('input', handleInput);
+        if (keyInput) {keyInput.addEventListener('input', handleInput);}
+        if (valueInput) {valueInput.addEventListener('input', handleInput);}
     }
 
     escapeHtml(text) {

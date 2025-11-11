@@ -399,7 +399,7 @@ export class CollectionController {
                     resolve({
                         name,
                         method,
-                        path: path.startsWith('/') ? path : '/' + path
+                        path: path.startsWith('/') ? path : `/${  path}`
                     });
                 }
             });
@@ -516,10 +516,10 @@ export class CollectionController {
             if (collection) {
                 await this.loadCollections();
                 return collection;
-            } else {
+            } 
                 this.statusDisplay.update('Import cancelled', null);
                 return null;
-            }
+            
         } catch (error) {
             console.error('Error importing collection:', error);
             this.statusDisplay.update(`Import error: ${error.message}`, null);
@@ -667,14 +667,14 @@ export class CollectionController {
 
     async getCurrentCollectionVariables() {
         if (window.currentEndpoint) {
-            return await this.variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
+            return this.variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
         }
         return {};
     }
 
     async processRequestForVariables(request) {
         if (window.currentEndpoint) {
-            return await this.variableService.processRequest(request, window.currentEndpoint.collectionId);
+            return this.variableService.processRequest(request, window.currentEndpoint.collectionId);
         }
         return request;
     }
@@ -703,7 +703,7 @@ export class CollectionController {
                 for (const folder of collection.folders) {
                     if (folder.endpoints) {
                         endpoint = folder.endpoints.find(ep => ep.id === lastSelected.endpointId);
-                        if (endpoint) break;
+                        if (endpoint) {break;}
                     }
                 }
             }

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import http from 'http';
 import https from 'https';
+import { handleDigestAuth } from './digestAuthHandler.js';
 
 class ApiRequestHandler {
     constructor(store, proxyHandler) {
@@ -24,7 +25,7 @@ class ApiRequestHandler {
             keepAlive: false,
             lookup: (hostname, options, callback) => {
                 const dnsStart = Date.now();
-                const originalLookup = isHttps ? https.Agent.prototype.constructor.super_.prototype.lookup : http.Agent.prototype.constructor.super_.prototype.lookup;
+                const _originalLookup = isHttps ? https.Agent.prototype.constructor.super_.prototype.lookup : http.Agent.prototype.constructor.super_.prototype.lookup;
 
                 require('dns').lookup(hostname, options, (err, address, family) => {
                     timings.dnsLookup = Date.now() - dnsStart;
@@ -155,7 +156,30 @@ class ApiRequestHandler {
 
             startTime = Date.now();
             timings.startTime = startTime;
-            const response = await axios(axiosConfig);
+
+            let response;
+
+            // Handle Digest Authentication if auth config is provided
+            if (requestOptions.auth && requestOptions.auth.username) {
+                // Create a wrapper function for axios request that can accept auth header
+                const makeRequest = async (authHeader) => {
+                    const config = { ...axiosConfig };
+                    if (authHeader) {
+                        config.headers = { ...config.headers, Authorization: authHeader };
+                    }
+                    return axios(config);
+                };
+
+                response = await handleDigestAuth(
+                    makeRequest,
+                    requestOptions.auth,
+                    requestOptions.method,
+                    requestOptions.url
+                );
+            } else {
+                response = await axios(axiosConfig);
+            }
+
             const endTime = Date.now();
 
             timings.total = endTime - startTime;
@@ -196,9 +220,9 @@ class ApiRequestHandler {
             if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
                 return {
                     success: false,
-                    message: "Request was cancelled",
+                    message: 'Request was cancelled',
                     status: null,
-                    statusText: "Cancelled",
+                    statusText: 'Cancelled',
                     data: null,
                     headers: {},
                     cancelled: true,
@@ -242,7 +266,7 @@ class ApiRequestHandler {
             } else if (error.request) {
                 serializedError = {
                     success: false,
-                    message: "No response received from server.",
+                    message: 'No response received from server.',
                     status: null,
                     statusText: null,
                     data: null,

@@ -101,7 +101,7 @@ export class EnvironmentSelector {
             // Add environments
             environments.forEach(env => {
                 const item = document.createElement('div');
-                item.className = 'env-dropdown-item' + (env.id === activeEnvId ? ' active' : '');
+                item.className = `env-dropdown-item${  env.id === activeEnvId ? ' active' : ''}`;
                 item.innerHTML = `
                     <span class="env-dropdown-name">${this.escapeHtml(env.name)}</span>
                     ${env.id === activeEnvId ? '<svg class="env-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
@@ -170,7 +170,7 @@ export class EnvironmentSelector {
      */
     positionDropdown() {
         const button = document.getElementById('env-selector-btn');
-        if (!button) return;
+        if (!button) {return;}
 
         const rect = button.getBoundingClientRect();
         this.dropdown.style.top = `${rect.bottom + 4}px`;

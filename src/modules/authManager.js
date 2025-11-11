@@ -25,7 +25,7 @@ export class AuthManager {
     }
 
     renderAuthFields(authType) {
-        if (!this.authFieldsContainer) return;
+        if (!this.authFieldsContainer) {return;}
 
         this.authFieldsContainer.innerHTML = '';
 
@@ -334,17 +334,18 @@ export class AuthManager {
     populateAuthFields(authConfig) {
         const { type, config } = authConfig;
 
-        if (!config) return;
+        if (!config) {return;}
 
         switch (type) {
-            case 'bearer':
+            case 'bearer': {
                 const bearerToken = document.getElementById('bearer-token');
                 if (bearerToken && config.token) {
                     bearerToken.value = config.token;
                 }
                 break;
+            }
 
-            case 'basic':
+            case 'basic': {
                 const basicUsername = document.getElementById('basic-username');
                 const basicPassword = document.getElementById('basic-password');
                 if (basicUsername && config.username) {
@@ -354,8 +355,9 @@ export class AuthManager {
                     basicPassword.value = config.password;
                 }
                 break;
+            }
 
-            case 'api-key':
+            case 'api-key': {
                 const keyName = document.getElementById('api-key-name');
                 const keyValue = document.getElementById('api-key-value');
                 const keyLocation = document.getElementById('api-key-location');
@@ -369,8 +371,9 @@ export class AuthManager {
                     keyLocation.value = config.location;
                 }
                 break;
+            }
 
-            case 'oauth2':
+            case 'oauth2': {
                 const oauth2Token = document.getElementById('oauth2-token');
                 const oauth2Prefix = document.getElementById('oauth2-header-prefix');
                 if (oauth2Token && config.token) {
@@ -380,8 +383,9 @@ export class AuthManager {
                     oauth2Prefix.value = config.headerPrefix;
                 }
                 break;
+            }
 
-            case 'digest':
+            case 'digest': {
                 const digestUsername = document.getElementById('digest-username');
                 const digestPassword = document.getElementById('digest-password');
                 if (digestUsername && config.username) {
@@ -391,6 +395,7 @@ export class AuthManager {
                     digestPassword.value = config.password;
                 }
                 break;
+            }
 
             default:
                 break;

@@ -41,34 +41,34 @@ export class HistoryService {
             success: result.success || false
         };
 
-        return await this.repository.add(historyEntry);
+        return this.repository.add(historyEntry);
     }
 
     async getAllHistory() {
-        return await this.repository.getAll();
+        return this.repository.getAll();
     }
 
     async getHistoryById(id) {
-        return await this.repository.getById(id);
+        return this.repository.getById(id);
     }
 
     async deleteHistoryEntry(id) {
-        return await this.repository.delete(id);
+        return this.repository.delete(id);
     }
 
     async clearAllHistory() {
-        return await this.repository.clear();
+        return this.repository.clear();
     }
 
     async getHistoryByCollection(collectionId) {
-        return await this.repository.getByCollection(collectionId);
+        return this.repository.getByCollection(collectionId);
     }
 
     async searchHistory(searchTerm) {
         if (!searchTerm || searchTerm.trim() === '') {
-            return await this.getAllHistory();
+            return this.getAllHistory();
         }
-        return await this.repository.search(searchTerm);
+        return this.repository.search(searchTerm);
     }
 
     formatTimestamp(timestamp) {
@@ -87,17 +87,17 @@ export class HistoryService {
             return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
         } else if (diffDays < 7) {
             return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-        } else {
-            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-        }
+        } 
+            return `${date.toLocaleDateString()  } ${  date.toLocaleTimeString()}`;
+        
     }
 
     getStatusColor(status) {
-        if (!status) return 'var(--text-secondary)';
-        if (status >= 200 && status < 300) return 'var(--success-color, #10b981)';
-        if (status >= 300 && status < 400) return 'var(--warning-color, #f59e0b)';
-        if (status >= 400 && status < 500) return 'var(--error-color, #ef4444)';
-        if (status >= 500) return 'var(--error-color, #dc2626)';
+        if (!status) {return 'var(--text-secondary)';}
+        if (status >= 200 && status < 300) {return 'var(--success-color, #10b981)';}
+        if (status >= 300 && status < 400) {return 'var(--warning-color, #f59e0b)';}
+        if (status >= 400 && status < 500) {return 'var(--error-color, #ef4444)';}
+        if (status >= 500) {return 'var(--error-color, #dc2626)';}
         return 'var(--text-secondary)';
     }
 
@@ -113,7 +113,7 @@ export class HistoryService {
     }
 
     truncateUrl(url, maxLength = 50) {
-        if (url.length <= maxLength) return url;
-        return url.substring(0, maxLength - 3) + '...';
+        if (url.length <= maxLength) {return url;}
+        return `${url.substring(0, maxLength - 3)  }...`;
     }
 }

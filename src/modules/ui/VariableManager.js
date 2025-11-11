@@ -6,10 +6,10 @@ export class VariableManager {
     }
 
     show(collectionName, variables = {}, options = {}) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve, _reject) => {
             this.onSave = resolve;
             this.onCancel = () => resolve(null);
-            
+
             this.createDialog(collectionName, variables, options);
         });
     }
@@ -119,15 +119,15 @@ export class VariableManager {
         const valueInput = row.querySelector('.variable-value');
 
         // Set values directly via .value property to preserve special characters like {{ }}
-        if (nameInput) nameInput.value = name;
-        if (valueInput) valueInput.value = value;
+        if (nameInput) {nameInput.value = name;}
+        if (valueInput) {valueInput.value = value;}
         
         const autoAddRow = () => {
             const allRows = container.querySelectorAll('.variable-row');
             const lastRow = allRows[allRows.length - 1];
-            const lastNameInput = lastRow.querySelector('.variable-name');
-            const lastValueInput = lastRow.querySelector('.variable-value');
-            
+            const _lastNameInput = lastRow.querySelector('.variable-name');
+            const _lastValueInput = lastRow.querySelector('.variable-value');
+
             if (row === lastRow && (nameInput.value.trim() || valueInput.value.trim())) {
                 this.addVariableRow(container);
             }
@@ -205,7 +205,7 @@ export class VariableManager {
         });
 
         if (errors.length > 0) {
-            alert('Validation errors:\n\n' + errors.join('\n'));
+            alert(`Validation errors:\n\n${  errors.join('\n')}`);
             return;
         }
 
@@ -277,7 +277,7 @@ export class VariableManager {
                 this.importVariables(variables);
                 importDialog.remove();
             } catch (error) {
-                alert('Invalid JSON: ' + error.message);
+                alert(`Invalid JSON: ${  error.message}`);
             }
         });
     }

@@ -6,10 +6,10 @@ export class RenameDialog {
     }
 
     show(currentName, options = {}) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve, _reject) => {
             this.onConfirm = resolve;
             this.onCancel = () => resolve(null);
-            
+
             this.createDialog(currentName, options);
         });
     }
@@ -63,7 +63,7 @@ export class RenameDialog {
 
         // Set value directly via .value property to preserve special characters like {{ }}
         const input = dialog.querySelector('#rename-input');
-        if (input) input.value = currentName;
+        if (input) {input.value = currentName;}
 
         this.setupEventListeners(dialog);
         this.focusInput(dialog);

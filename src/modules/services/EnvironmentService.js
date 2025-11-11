@@ -139,7 +139,7 @@ export class EnvironmentService {
 
             const updatedEnvironment = await this.repository.updateEnvironment(environmentId, updates);
 
-            this.statusDisplay.update(`Environment updated`, null);
+            this.statusDisplay.update('Environment updated', null);
 
             this._notifyListeners({
                 type: 'environment-updated',
@@ -157,7 +157,7 @@ export class EnvironmentService {
      * Rename environment
      */
     async renameEnvironment(environmentId, newName) {
-        return await this.updateEnvironment(environmentId, { name: newName });
+        return this.updateEnvironment(environmentId, { name: newName });
     }
 
     /**

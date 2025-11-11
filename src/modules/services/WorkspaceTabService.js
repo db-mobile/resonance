@@ -44,7 +44,7 @@ export class WorkspaceTabService {
      * @returns {Promise<Array>}
      */
     async getAllTabs() {
-        return await this.repository.getTabs();
+        return this.repository.getTabs();
     }
 
     /**
@@ -53,8 +53,8 @@ export class WorkspaceTabService {
      */
     async getActiveTab() {
         const activeTabId = await this.repository.getActiveTabId();
-        if (!activeTabId) return null;
-        return await this.repository.getTabById(activeTabId);
+        if (!activeTabId) {return null;}
+        return this.repository.getTabById(activeTabId);
     }
 
     /**
@@ -62,7 +62,7 @@ export class WorkspaceTabService {
      * @returns {Promise<string|null>}
      */
     async getActiveTabId() {
-        return await this.repository.getActiveTabId();
+        return this.repository.getActiveTabId();
     }
 
     /**
@@ -243,7 +243,7 @@ export class WorkspaceTabService {
      * @returns {string}
      */
     generateTabName(method, url) {
-        if (!url) return 'New Request';
+        if (!url) {return 'New Request';}
 
         try {
             const urlObj = new URL(url);

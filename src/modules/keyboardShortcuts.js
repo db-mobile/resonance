@@ -61,9 +61,9 @@ class KeyboardShortcutsManager {
      */
     _createShortcutKey(key, ctrl, shift, alt) {
         const parts = [];
-        if (ctrl) parts.push('ctrl');
-        if (shift) parts.push('shift');
-        if (alt) parts.push('alt');
+        if (ctrl) {parts.push('ctrl');}
+        if (shift) {parts.push('shift');}
+        if (alt) {parts.push('alt');}
         parts.push(key.toLowerCase());
         return parts.join('+');
     }
@@ -73,9 +73,9 @@ class KeyboardShortcutsManager {
      */
     _getDisplayKey(key, ctrl, shift, alt) {
         const parts = [];
-        if (ctrl) parts.push(this.modifierDisplayKey);
-        if (shift) parts.push(this.isMac ? '⇧' : 'Shift');
-        if (alt) parts.push(this.isMac ? '⌥' : 'Alt');
+        if (ctrl) {parts.push(this.modifierDisplayKey);}
+        if (shift) {parts.push(this.isMac ? '⇧' : 'Shift');}
+        if (alt) {parts.push(this.isMac ? '⌥' : 'Alt');}
 
         // Format key for display
         let displayKey = key;
@@ -145,7 +145,7 @@ class KeyboardShortcutsManager {
      * Create and show the help dialog
      */
     showHelp() {
-        if (this.helpDialogVisible) return;
+        if (this.helpDialogVisible) {return;}
 
         const overlay = document.createElement('div');
         overlay.className = 'keyboard-shortcuts-overlay';
@@ -170,7 +170,7 @@ class KeyboardShortcutsManager {
         }
 
         const closeBtn = overlay.querySelector('.close-shortcuts-btn');
-        const dialog = overlay.querySelector('.keyboard-shortcuts-dialog');
+        const _dialog = overlay.querySelector('.keyboard-shortcuts-dialog');
 
         const close = () => {
             overlay.remove();
@@ -179,7 +179,7 @@ class KeyboardShortcutsManager {
 
         closeBtn.addEventListener('click', close);
         overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) close();
+            if (e.target === overlay) {close();}
         });
 
         // Close on Escape
@@ -213,7 +213,7 @@ class KeyboardShortcutsManager {
                 `;
             }
 
-            html += `</div></div>`;
+            html += '</div></div>';
         }
 
         return html;
