@@ -1,5 +1,21 @@
+/**
+ * @fileoverview Status display utilities for showing request status and response metrics
+ * @module modules/statusDisplay
+ */
+
 import { statusDisplay, responseTimeDisplay, responseSizeDisplay } from './domElements.js';
 
+/**
+ * Updates the status display with request status and applies appropriate styling
+ *
+ * @param {string} statusText - Status text to display
+ * @param {number|null} [statusCode=null] - HTTP status code for styling
+ * @returns {void}
+ *
+ * @example
+ * updateStatusDisplay('Status: 200 OK', 200);
+ * updateStatusDisplay('Request Failed', 404);
+ */
 export function updateStatusDisplay(statusText, statusCode = null) {
     statusDisplay.classList.remove('status-success', 'status-redirect', 'status-client-error', 'status-server-error', 'status-info');
 
@@ -22,6 +38,15 @@ export function updateStatusDisplay(statusText, statusCode = null) {
     }
 }
 
+/**
+ * Updates the response time display with TTFB (Time To First Byte)
+ *
+ * @param {number|null} timeInMs - Response time in milliseconds
+ * @returns {void}
+ *
+ * @example
+ * updateResponseTime(245); // Displays "TTFB: 245ms"
+ */
 export function updateResponseTime(timeInMs) {
     if (timeInMs !== null && timeInMs !== undefined) {
         responseTimeDisplay.textContent = `TTFB: ${timeInMs}ms`;
@@ -32,6 +57,13 @@ export function updateResponseTime(timeInMs) {
     }
 }
 
+/**
+ * Formats bytes to human-readable string
+ *
+ * @private
+ * @param {number} bytes - Number of bytes
+ * @returns {string} Formatted string (e.g., "1.5 KB", "2.3 MB")
+ */
 function formatBytes(bytes) {
     if (bytes === 0) {return '0 B';}
     if (!bytes) {return '';}
@@ -43,6 +75,15 @@ function formatBytes(bytes) {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))  } ${  sizes[i]}`;
 }
 
+/**
+ * Updates the response size display
+ *
+ * @param {number|null} sizeInBytes - Response size in bytes
+ * @returns {void}
+ *
+ * @example
+ * updateResponseSize(1536); // Displays "Size: 1.5 KB"
+ */
 export function updateResponseSize(sizeInBytes) {
     if (sizeInBytes !== null && sizeInBytes !== undefined) {
         responseSizeDisplay.textContent = `Size: ${formatBytes(sizeInBytes)}`;

@@ -1,16 +1,27 @@
+/**
+ * @fileoverview HTTP Digest Authentication implementation following RFC 2617
+ * @module main/digestAuthHandler
+ */
+
 import crypto from 'crypto';
 
 /**
- * DigestAuthHandler - Implements HTTP Digest Authentication (RFC 2617)
+ * Handler for HTTP Digest Authentication
  *
- * Digest authentication uses MD5 hashing to securely authenticate without
- * sending passwords in plain text over the network.
+ * @class
+ * @classdesc Implements HTTP Digest Authentication (RFC 2617) using MD5 hashing
+ * to securely authenticate without sending passwords in plain text. Supports
+ * both legacy digest and modern qop-based authentication schemes.
  */
 export class DigestAuthHandler {
     /**
-     * Parse WWW-Authenticate header for Digest challenge
-     * @param {string} wwwAuthenticateHeader - The WWW-Authenticate header value
-     * @returns {Object|null} Parsed digest parameters or null if invalid
+     * Parses WWW-Authenticate header to extract digest challenge parameters
+     *
+     * Extracts authentication parameters like realm, nonce, qop, algorithm, and opaque
+     * from the server's digest challenge.
+     *
+     * @param {string} wwwAuthenticateHeader - The WWW-Authenticate header value from server response
+     * @returns {Object|null} Object containing digest challenge parameters, or null if invalid/missing
      */
     static parseDigestChallenge(wwwAuthenticateHeader) {
         if (!wwwAuthenticateHeader || !wwwAuthenticateHeader.includes('Digest')) {
@@ -29,33 +40,47 @@ export class DigestAuthHandler {
     }
 
     /**
-     * Calculate MD5 hash of a string
-     * @param {string} data - Data to hash
-     * @returns {string} MD5 hash in hexadecimal
+     * Calculates MD5 hash of a string
+     *
+     * Uses Node.js crypto module to generate an MD5 hash for digest authentication.
+     * MD5 is required by RFC 2617 for digest authentication despite known vulnerabilities.
+     *
+     * @param {string} data - The string data to hash
+     * @returns {string} MD5 hash as a hexadecimal string
      */
     static md5(data) {
         return crypto.createHash('md5').update(data).digest('hex');
     }
 
     /**
-     * Generate client nonce for digest authentication
-     * @returns {string} Random nonce
+     * Generates a random client nonce for digest authentication
+     *
+     * Creates a cryptographically random 16-byte value used to prevent replay attacks
+     * in digest authentication.
+     *
+     * @returns {string} Random 32-character hexadecimal nonce
      */
     static generateClientNonce() {
         return crypto.randomBytes(16).toString('hex');
     }
 
     /**
-     * Build Authorization header for Digest authentication
-     * @param {Object} options - Authentication options
-     * @param {string} options.username - Username
-     * @param {string} options.password - Password
+     * Builds the Authorization header value for digest authentication
+     *
+     * Constructs the complete digest authentication header by calculating HA1 (hash of
+     * credentials), HA2 (hash of method and URI), and the response hash. Supports both
+     * MD5 and MD5-SESS algorithms, and handles qop (quality of protection) modes.
+     *
+     * @param {Object} options - Authentication configuration options
+     * @param {string} options.username - Username for authentication
+     * @param {string} options.password - Password for authentication
      * @param {string} options.method - HTTP method (GET, POST, etc.)
-     * @param {string} options.uri - Request URI
-     * @param {Object} options.challenge - Parsed digest challenge from server
-     * @param {number} options.nc - Nonce count (default: 1)
-     * @param {string} options.cnonce - Client nonce (auto-generated if not provided)
-     * @returns {string} Authorization header value
+     * @param {string} options.uri - Request URI path with query string
+     * @param {Object} options.challenge - Parsed digest challenge from server (from parseDigestChallenge)
+     * @param {number} [options.nc=1] - Nonce count for request tracking
+     * @param {string} [options.cnonce] - Client nonce (auto-generated if not provided)
+     * @returns {string} Complete Authorization header value
+     * @throws {Error} If unsupported algorithm is specified in challenge
      */
     static buildAuthorizationHeader(options) {
         const {
@@ -119,9 +144,13 @@ export class DigestAuthHandler {
     }
 
     /**
-     * Extract URI path from full URL
-     * @param {string} url - Full URL
-     * @returns {string} URI path
+     * Extracts the URI path and query string from a full URL
+     *
+     * Parses the URL to extract just the pathname and search components needed
+     * for digest authentication. Falls back to manual parsing if URL parsing fails.
+     *
+     * @param {string} url - The complete URL (e.g., "https://example.com/api/users?id=1")
+     * @returns {string} URI path with query string (e.g., "/api/users?id=1"), or "/" if parsing fails
      */
     static extractUriFromUrl(url) {
         try {
@@ -136,17 +165,22 @@ export class DigestAuthHandler {
 }
 
 /**
- * Handle Digest authentication for axios requests
- * This function makes an initial request, handles the 401 challenge,
- * and retries with the proper Digest authentication header.
+ * Handles digest authentication for HTTP requests using a two-step process
  *
- * @param {Function} axiosRequest - Function that makes the axios request
- * @param {Object} authConfig - Authentication configuration
- * @param {string} authConfig.username - Username
- * @param {string} authConfig.password - Password
- * @param {string} method - HTTP method
- * @param {string} url - Request URL
- * @returns {Promise<Object>} Axios response
+ * Implements the digest authentication flow by making an initial request,
+ * capturing the 401 challenge from the server, computing the digest response,
+ * and retrying the request with proper authentication. This follows the standard
+ * digest authentication handshake defined in RFC 2617.
+ *
+ * @async
+ * @param {Function} axiosRequest - Function that executes the axios request, optionally accepting an Authorization header
+ * @param {Object} authConfig - Authentication credentials
+ * @param {string} authConfig.username - Username for authentication
+ * @param {string} authConfig.password - Password for authentication
+ * @param {string} method - HTTP method (GET, POST, etc.)
+ * @param {string} url - Complete request URL
+ * @returns {Promise<Object>} Axios response object from the authenticated request
+ * @throws {Error} If authentication fails or request errors occur
  */
 export async function handleDigestAuth(axiosRequest, authConfig, method, url) {
     try {

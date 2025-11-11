@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Main renderer process orchestrator for Resonance
+ * @module renderer
+ *
+ * Initializes and coordinates all UI modules, controllers, services, and repositories.
+ * Sets up event listeners, keyboard shortcuts, and manages the application lifecycle
+ * in the renderer process. This is the entry point for the Electron renderer.
+ */
+
 import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, pathParamsList, queryParamsList, headersList, authTypeSelect, responseBodyContainer, statusDisplay, responseHeadersDisplay, responseCookiesDisplay } from './modules/domElements.js';
 
 import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl, setUrlUpdating } from './modules/keyValueManager.js';
@@ -98,7 +107,19 @@ const workspaceTabController = new WorkspaceTabController(
     responseContainerManager
 );
 
-// Initialize keyboard shortcuts
+/**
+ * Initializes application keyboard shortcuts
+ *
+ * Registers all keyboard shortcuts for the application including:
+ * - Request actions (send, cancel, generate cURL)
+ * - Navigation (focus URL, toggle sidebars)
+ * - Tab switching (request tabs, workspace tabs)
+ * - Settings and help
+ *
+ * Uses platform-aware modifier keys (Cmd on macOS, Ctrl on Windows/Linux).
+ *
+ * @returns {void}
+ */
 function initKeyboardShortcuts() {
     // Initialize the shortcuts manager
     keyboardShortcuts.init();

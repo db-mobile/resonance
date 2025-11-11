@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Central export module for UI components
+ * @module ui
+ */
+
 export { CollectionRenderer } from './CollectionRenderer.js';
 export { ContextMenu } from './ContextMenu.js';
 export { RenameDialog } from './RenameDialog.js';

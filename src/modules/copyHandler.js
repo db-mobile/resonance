@@ -1,6 +1,3 @@
-import { copyResponseBtn, responseHeadersDisplay, responseTabButtons } from './domElements.js';
-import { getResponseBodyContent } from './apiHandler.js';
-
 /**
  * Copy text to clipboard and show visual feedback
  * @param {string} text - The text to copy
@@ -46,72 +43,60 @@ function showCopyFeedback(button, success) {
 }
 
 /**
- * Get the currently active response tab
- * @returns {string} - 'body' or 'headers'
+ * Handle copy button click for a specific tab
+ * @param {HTMLElement} button - The copy button that was clicked
+ * @param {string} tabId - The workspace tab ID
  */
-function getActiveResponseTab() {
-    for (const button of responseTabButtons) {
-        if (button.classList.contains('active')) {
-            const tabName = button.getAttribute('data-tab');
-            if (tabName === 'response-body') {return 'body';}
-            if (tabName === 'response-headers') {return 'headers';}
-        }
+export async function handleCopyResponse(button, tabId) {
+    // Get the response container manager from the window
+    const { responseContainerManager } = window;
+    if (!responseContainerManager) {
+        console.error('ResponseContainerManager not found');
+        showCopyFeedback(button, false);
+        return;
     }
-    return 'body'; // Default to body
-}
 
-/**
- * Update copy button tooltip based on active tab
- */
-function updateCopyButtonTooltip() {
-    const activeTab = getActiveResponseTab();
-    if (copyResponseBtn) {
-        if (activeTab === 'body') {
-            copyResponseBtn.title = 'Copy Response Body';
-        } else {
-            copyResponseBtn.title = 'Copy Response Headers';
-        }
+    // Get the container elements for this tab
+    const containerElements = responseContainerManager.getOrCreateContainer(tabId);
+    if (!containerElements) {
+        console.error('Container elements not found for tab:', tabId);
+        showCopyFeedback(button, false);
+        return;
     }
-}
 
-/**
- * Handle copy button click
- */
-export async function handleCopyResponse() {
-    const activeTab = getActiveResponseTab();
+    // Get the response body content from the editor
+    const { editor } = containerElements;
     let textToCopy = '';
-
-    if (activeTab === 'body') {
-        textToCopy = getResponseBodyContent();
-    } else {
-        textToCopy = responseHeadersDisplay.textContent;
+    if (editor) {
+        textToCopy = editor.getContent();
     }
 
     if (!textToCopy || textToCopy.trim() === '') {
-        showCopyFeedback(copyResponseBtn, false);
+        showCopyFeedback(button, false);
         return;
     }
 
     const success = await copyToClipboard(textToCopy);
-    showCopyFeedback(copyResponseBtn, success);
+    showCopyFeedback(button, success);
 }
 
 /**
- * Initialize copy functionality
+ * Attach copy handler to a copy button
+ * @param {HTMLElement} button - The copy button element
+ * @param {string} tabId - The workspace tab ID
+ */
+export function attachCopyHandler(button, tabId) {
+    if (button) {
+        button.addEventListener('click', () => {
+            handleCopyResponse(button, tabId);
+        });
+    }
+}
+
+/**
+ * Initialize copy functionality (legacy support)
  */
 export function initializeCopyHandler() {
-    if (copyResponseBtn) {
-        copyResponseBtn.addEventListener('click', handleCopyResponse);
-
-        // Update tooltip initially
-        updateCopyButtonTooltip();
-
-        // Update tooltip when response tabs are clicked
-        for (const button of responseTabButtons) {
-            button.addEventListener('click', () => {
-                // Use setTimeout to ensure the active class has been updated
-                setTimeout(updateCopyButtonTooltip, 0);
-            });
-        }
-    }
+    // This function is kept for backwards compatibility
+    // The new approach uses attachCopyHandler() for per-tab buttons
 }

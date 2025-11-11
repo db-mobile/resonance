@@ -1,4 +1,27 @@
+/**
+ * @fileoverview Service for managing variable business logic and template processing
+ * @module services/VariableService
+ */
+
+/**
+ * Service for managing variable business logic
+ *
+ * @class
+ * @classdesc Provides high-level variable operations including storage, retrieval,
+ * validation, and template processing. Handles both collection-scoped and
+ * environment-scoped variables with precedence rules (environment variables
+ * override collection variables). Coordinates with VariableProcessor for
+ * template substitution and with repositories for persistence.
+ */
 export class VariableService {
+    /**
+     * Creates a VariableService instance
+     *
+     * @param {VariableRepository} variableRepository - Data access layer for collection variables
+     * @param {VariableProcessor} variableProcessor - Template processing engine
+     * @param {IStatusDisplay} statusDisplay - Status display interface
+     * @param {EnvironmentRepository} [environmentRepository=null] - Optional environment repository
+     */
     constructor(variableRepository, variableProcessor, statusDisplay, environmentRepository = null) {
         this.repository = variableRepository;
         this.processor = variableProcessor;
@@ -7,8 +30,13 @@ export class VariableService {
     }
 
     /**
-     * Get variables - returns environment variables only (no collection context)
-     * For collection-specific variables, use getVariablesForCollection()
+     * Gets variables from active environment only
+     *
+     * Returns environment variables only (no collection context).
+     * For collection-specific variables, use getVariablesForCollection().
+     *
+     * @async
+     * @returns {Promise<Object>} Environment variables as key-value object
      */
     async getVariables() {
         try {
@@ -25,6 +53,17 @@ export class VariableService {
         }
     }
 
+    /**
+     * Gets variables for a specific collection with environment precedence
+     *
+     * Merges collection variables with active environment variables.
+     * Environment variables take precedence over collection variables.
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @returns {Promise<Object>} Merged variables as key-value object
+     * @throws {Error} If variable loading fails
+     */
     async getVariablesForCollection(collectionId) {
         try {
             let variables = {};
@@ -47,6 +86,18 @@ export class VariableService {
         }
     }
 
+    /**
+     * Sets a single variable for a collection
+     *
+     * Validates variable name before saving.
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} name - Variable name (must be valid identifier)
+     * @param {string} value - Variable value
+     * @returns {Promise<boolean>} True if successful
+     * @throws {Error} If variable name is invalid or save fails
+     */
     async setVariable(collectionId, name, value) {
         try {
             if (!this.processor.isValidVariableName(name)) {
@@ -62,6 +113,15 @@ export class VariableService {
         }
     }
 
+    /**
+     * Deletes a variable from a collection
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} name - Variable name to delete
+     * @returns {Promise<boolean>} True if successful
+     * @throws {Error} If deletion fails
+     */
     async deleteVariable(collectionId, name) {
         try {
             await this.repository.deleteVariable(collectionId, name);
@@ -73,6 +133,17 @@ export class VariableService {
         }
     }
 
+    /**
+     * Sets multiple variables for a collection
+     *
+     * Validates all variable names before saving.
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {Object} variables - Variables as key-value object
+     * @returns {Promise<boolean>} True if successful
+     * @throws {Error} If any variable name is invalid or save fails
+     */
     async setMultipleVariables(collectionId, variables) {
         try {
             for (const name of Object.keys(variables)) {
@@ -90,6 +161,16 @@ export class VariableService {
         }
     }
 
+    /**
+     * Processes a request object with variable substitution
+     *
+     * Replaces {{variableName}} templates with actual values.
+     *
+     * @async
+     * @param {Object} request - The request object to process
+     * @param {string} collectionId - The collection ID for variable context
+     * @returns {Promise<Object>} Processed request object
+     */
     async processRequest(request, collectionId) {
         try {
             const variables = await this.getVariablesForCollection(collectionId);
@@ -100,6 +181,14 @@ export class VariableService {
         }
     }
 
+    /**
+     * Processes a template string with variable substitution
+     *
+     * @async
+     * @param {string} template - The template string
+     * @param {string} collectionId - The collection ID for variable context
+     * @returns {Promise<string>} Processed string
+     */
     async processTemplate(template, collectionId) {
         try {
             const variables = await this.getVariablesForCollection(collectionId);
@@ -110,6 +199,17 @@ export class VariableService {
         }
     }
 
+    /**
+     * Gets a preview of template substitution with variable analysis
+     *
+     * @async
+     * @param {string} template - The template string
+     * @param {string} collectionId - The collection ID for variable context
+     * @returns {Promise<Object>} Preview object with processed string and variable info
+     * @returns {Promise<Object>} result.preview - Processed template
+     * @returns {Promise<Array<string>>} result.missingVariables - Variables not found
+     * @returns {Promise<Array<string>>} result.foundVariables - Variables that were substituted
+     */
     async getTemplatePreview(template, collectionId) {
         try {
             const variables = await this.getVariablesForCollection(collectionId);
@@ -120,10 +220,23 @@ export class VariableService {
         }
     }
 
+    /**
+     * Finds all variable names used in a request object
+     *
+     * @param {Object} request - The request object to analyze
+     * @returns {Array<string>} Array of unique variable names found
+     */
     findUsedVariables(request) {
         return this.processor.extractVariableNamesFromObject(request);
     }
 
+    /**
+     * Deletes all variables for a collection
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @returns {Promise<void>}
+     */
     async cleanupCollectionVariables(collectionId) {
         try {
             await this.repository.deleteAllVariablesForCollection(collectionId);
@@ -132,10 +245,27 @@ export class VariableService {
         }
     }
 
+    /**
+     * Exports all variables for a collection
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @returns {Promise<Object>} Variables as key-value object
+     */
     async exportVariables(collectionId) {
         return this.getVariablesForCollection(collectionId);
     }
 
+    /**
+     * Imports variables for a collection
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {Object} variables - Variables to import as key-value object
+     * @param {boolean} [merge=false] - If true, merges with existing variables
+     * @returns {Promise<boolean>} True if successful
+     * @throws {Error} If import fails
+     */
     async importVariables(collectionId, variables, merge = false) {
         try {
             let finalVariables = variables;

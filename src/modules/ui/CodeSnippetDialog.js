@@ -1,6 +1,22 @@
+/**
+ * @fileoverview Dialog for generating code snippets in multiple languages
+ * @module ui/CodeSnippetDialog
+ */
+
 import { generateCode, SUPPORTED_LANGUAGES } from '../codeGenerator.js';
 
+/**
+ * Multi-language code snippet generator dialog
+ *
+ * @class
+ * @classdesc Displays generated code snippets for API requests in multiple languages
+ * (cURL, JavaScript, Python, etc.). Provides language selector, syntax highlighting,
+ * and copy-to-clipboard functionality.
+ */
 export class CodeSnippetDialog {
+    /**
+     * Creates a CodeSnippetDialog instance
+     */
     constructor() {
         this.overlay = null;
         this.currentLanguage = 'curl'; // Default language

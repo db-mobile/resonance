@@ -1,14 +1,28 @@
 /**
- * WorkspaceTabRepository
- *
- * Handles persistence of workspace tabs (multiple request tabs).
- * Each tab contains complete request/response state.
+ * @fileoverview Repository for managing workspace tab persistence
+ * @module storage/WorkspaceTabRepository
  */
+
 import logger from '../logger.js';
 
 const _log = logger.scope('WorkspaceTabRepository');
 
+/**
+ * Repository for managing workspace tab persistence
+ *
+ * @class
+ * @classdesc Handles persistence of workspace tabs (multiple request tabs) in electron-store.
+ * Each tab contains complete request/response state including URL, method, headers, body,
+ * query params, authentication config, and response data. Implements defensive programming
+ * with deep cloning to avoid reference issues and auto-initialization for packaged apps.
+ * Ensures at least one tab always exists.
+ */
 export class WorkspaceTabRepository {
+    /**
+     * Creates a WorkspaceTabRepository instance
+     *
+     * @param {Object} electronAPI - The Electron IPC API bridge from preload script
+     */
     constructor(electronAPI) {
         this.electronAPI = electronAPI;
         this.STORE_KEY = 'workspace-tabs';
@@ -16,8 +30,13 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Get all workspace tabs
-     * @returns {Promise<Array>}
+     * Retrieves all workspace tabs
+     *
+     * Automatically initializes with default tab if data is invalid. Uses deep cloning
+     * to avoid reference issues between tabs.
+     *
+     * @async
+     * @returns {Promise<Array<Object>>} Array of workspace tab objects
      */
     async getTabs() {
         try {
@@ -41,9 +60,12 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Save all workspace tabs
-     * @param {Array} tabs
+     * Saves all workspace tabs
+     *
+     * @async
+     * @param {Array<Object>} tabs - Array of tab objects to save
      * @returns {Promise<void>}
+     * @throws {Error} If tabs is not an array or save fails
      */
     async saveTabs(tabs) {
         try {
@@ -58,8 +80,10 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Get active tab ID
-     * @returns {Promise<string|null>}
+     * Retrieves the active tab ID
+     *
+     * @async
+     * @returns {Promise<string|null>} The active tab ID or null
      */
     async getActiveTabId() {
         try {
@@ -72,9 +96,12 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Set active tab ID
-     * @param {string} tabId
+     * Sets the active tab ID
+     *
+     * @async
+     * @param {string} tabId - The tab ID to set as active
      * @returns {Promise<void>}
+     * @throws {Error} If save fails
      */
     async setActiveTabId(tabId) {
         try {
@@ -86,9 +113,13 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Get tab by ID
-     * @param {string} tabId
-     * @returns {Promise<Object|null>}
+     * Retrieves a tab by ID
+     *
+     * Uses deep cloning to avoid reference issues.
+     *
+     * @async
+     * @param {string} tabId - The tab ID
+     * @returns {Promise<Object|null>} The tab object or null if not found
      */
     async getTabById(tabId) {
         const tabs = await this.getTabs();
@@ -102,9 +133,18 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Add a new tab
-     * @param {Object} tab
-     * @returns {Promise<Object>}
+     * Adds a new workspace tab
+     *
+     * Merges provided tab data with default tab structure. Generates ID and timestamps.
+     *
+     * @async
+     * @param {Object} tab - Tab object with initial data
+     * @param {string} [tab.id] - Optional tab ID (generated if not provided)
+     * @param {string} [tab.name] - Tab name
+     * @param {Object} [tab.request] - Request configuration
+     * @param {Object} [tab.endpoint] - Associated endpoint data
+     * @returns {Promise<Object>} The created tab object
+     * @throws {Error} If save fails
      */
     async addTab(tab) {
         const tabs = await this.getTabs();
@@ -121,10 +161,21 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Update an existing tab
-     * @param {string} tabId
-     * @param {Object} updates
-     * @returns {Promise<Object|null>}
+     * Updates an existing workspace tab
+     *
+     * Deep merges nested objects to preserve sub-properties. Uses deep cloning to ensure
+     * each tab has isolated data. Response is completely replaced instead of merged.
+     *
+     * @async
+     * @param {string} tabId - The tab ID to update
+     * @param {Object} updates - Object with properties to update
+     * @param {Object} [updates.request] - Request updates (deep merged)
+     * @param {Object} [updates.response] - Response data (completely replaced)
+     * @param {Object} [updates.endpoint] - Endpoint updates (deep merged)
+     * @param {string} [updates.name] - Tab name
+     * @param {boolean} [updates.isModified] - Modified state
+     * @returns {Promise<Object|null>} The updated tab object or null if not found
+     * @throws {Error} If save fails
      */
     async updateTab(tabId, updates) {
         const tabs = await this.getTabs();
@@ -181,9 +232,14 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Delete a tab
-     * @param {string} tabId
-     * @returns {Promise<boolean>}
+     * Deletes a workspace tab
+     *
+     * Ensures at least one tab always exists. If deleting the last tab, creates a new default tab.
+     *
+     * @async
+     * @param {string} tabId - The tab ID to delete
+     * @returns {Promise<boolean>} True if deletion succeeded, false if tab not found
+     * @throws {Error} If save fails
      */
     async deleteTab(tabId) {
         const tabs = await this.getTabs();
@@ -203,8 +259,12 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Create a default tab
-     * @returns {Object}
+     * Creates a default workspace tab
+     *
+     * Provides initial structure for new tabs with empty request/response data.
+     *
+     * @private
+     * @returns {Object} Default tab object
      */
     _createDefaultTab() {
         return {
@@ -238,16 +298,23 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Generate a unique tab ID
-     * @returns {string}
+     * Generates a unique tab ID
+     *
+     * @private
+     * @returns {string} Unique tab ID
      */
     _generateTabId() {
         return `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     }
 
     /**
-     * Clear all tabs and create a new default tab
+     * Clears all tabs and creates a new default tab
+     *
+     * Resets workspace to initial state with single empty tab.
+     *
+     * @async
      * @returns {Promise<void>}
+     * @throws {Error} If save fails
      */
     async clearAllTabs() {
         const defaultTabs = [this._createDefaultTab()];

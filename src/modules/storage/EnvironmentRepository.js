@@ -1,15 +1,40 @@
 /**
+ * @fileoverview Repository for managing environment data persistence
+ * @module storage/EnvironmentRepository
+ */
+
+/**
  * Repository for managing environment data persistence
- * Handles CRUD operations for environments and active environment tracking
+ *
+ * @class
+ * @classdesc Handles CRUD operations for environments and active environment tracking
+ * in electron-store. Environments provide variable scoping for different contexts
+ * (Development, Staging, Production, etc.). Implements defensive programming with
+ * validation, auto-initialization, and duplicate name detection. Ensures at least
+ * one environment always exists and is active.
  */
 export class EnvironmentRepository {
+    /**
+     * Creates an EnvironmentRepository instance
+     *
+     * @param {Object} electronAPI - The Electron IPC API bridge from preload script
+     */
     constructor(electronAPI) {
         this.electronAPI = electronAPI;
         this.ENVIRONMENTS_KEY = 'environments';
     }
 
     /**
-     * Get all environments with validation and initialization
+     * Retrieves all environments with validation and initialization
+     *
+     * Automatically initializes storage with default environment if undefined
+     * (packaged app first run). Validates structure and ensures items array exists.
+     *
+     * @async
+     * @returns {Promise<Object>} Object containing items array and activeEnvironmentId
+     * @returns {Promise<Object>} return.items - Array of environment objects
+     * @returns {Promise<string|null>} return.activeEnvironmentId - ID of active environment
+     * @throws {Error} If storage access fails
      */
     async getAllEnvironments() {
         try {
@@ -38,7 +63,12 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Get active environment ID
+     * Retrieves the active environment ID
+     *
+     * Falls back to first environment ID if no active environment is set.
+     *
+     * @async
+     * @returns {Promise<string|null>} The active environment ID or null
      */
     async getActiveEnvironmentId() {
         try {
@@ -51,7 +81,14 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Set active environment
+     * Sets the active environment
+     *
+     * Validates that the environment exists before setting it as active.
+     *
+     * @async
+     * @param {string} environmentId - The environment ID to activate
+     * @returns {Promise<boolean>} True if activation succeeded
+     * @throws {Error} If environment not found or save fails
      */
     async setActiveEnvironment(environmentId) {
         try {
@@ -73,7 +110,11 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Get environment by ID
+     * Retrieves an environment by ID
+     *
+     * @async
+     * @param {string} environmentId - The environment ID
+     * @returns {Promise<Object|undefined>} The environment object or undefined if not found
      */
     async getEnvironmentById(environmentId) {
         try {
@@ -86,7 +127,10 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Get active environment
+     * Retrieves the active environment
+     *
+     * @async
+     * @returns {Promise<Object|null>} The active environment object or null
      */
     async getActiveEnvironment() {
         try {
@@ -100,7 +144,15 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Create new environment
+     * Creates a new environment
+     *
+     * Validates that environment name is unique before creating.
+     *
+     * @async
+     * @param {string} name - The environment name
+     * @param {Object} [variables={}] - Initial variables object
+     * @returns {Promise<Object>} The created environment object
+     * @throws {Error} If name already exists or save fails
      */
     async createEnvironment(name, variables = {}) {
         try {
@@ -129,7 +181,17 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Update environment
+     * Updates an existing environment
+     *
+     * Validates name uniqueness if name is being updated. Preserves environment ID.
+     *
+     * @async
+     * @param {string} environmentId - The environment ID to update
+     * @param {Object} updates - Object with properties to update
+     * @param {string} [updates.name] - New environment name
+     * @param {Object} [updates.variables] - Updated variables object
+     * @returns {Promise<Object>} The updated environment object
+     * @throws {Error} If environment not found, name conflict, or save fails
      */
     async updateEnvironment(environmentId, updates) {
         try {
@@ -164,7 +226,15 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Delete environment
+     * Deletes an environment
+     *
+     * Prevents deletion of the last environment. If deleting active environment,
+     * automatically sets first remaining environment as active.
+     *
+     * @async
+     * @param {string} environmentId - The environment ID to delete
+     * @returns {Promise<boolean>} True if deletion succeeded
+     * @throws {Error} If last environment, not found, or save fails
      */
     async deleteEnvironment(environmentId) {
         try {
@@ -197,7 +267,15 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Duplicate environment
+     * Duplicates an environment with a new name
+     *
+     * Creates a copy of the environment with all its variables.
+     *
+     * @async
+     * @param {string} environmentId - The environment ID to duplicate
+     * @param {string} [newName] - Name for the duplicated environment (defaults to "Name (Copy)")
+     * @returns {Promise<Object>} The created duplicate environment object
+     * @throws {Error} If source environment not found or creation fails
      */
     async duplicateEnvironment(environmentId, newName) {
         try {
@@ -217,7 +295,12 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Get variables for active environment
+     * Retrieves variables for the active environment
+     *
+     * Convenience method for accessing current environment variables.
+     *
+     * @async
+     * @returns {Promise<Object>} Object mapping variable names to values, or empty object
      */
     async getActiveEnvironmentVariables() {
         try {
@@ -230,14 +313,20 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Generate unique ID
+     * Generates a unique environment ID
+     *
+     * @private
+     * @returns {string} Unique environment ID
      */
     _generateId() {
         return `env_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 
     /**
-     * Get default environments structure
+     * Creates the default environments structure
+     *
+     * @private
+     * @returns {Object} Default environments object with one environment
      */
     _getDefaultEnvironments() {
         const defaultEnvId = this._generateId();
@@ -254,7 +343,11 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Export all environments
+     * Exports all environments for backup or sharing
+     *
+     * @async
+     * @returns {Promise<Object>} Complete environments data structure
+     * @throws {Error} If export fails
      */
     async exportEnvironments() {
         try {
@@ -266,7 +359,18 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Import environments
+     * Imports environments from backup or shared data
+     *
+     * Supports both merge and replace modes. In merge mode, adds new environments
+     * without duplicating names. In replace mode, completely replaces all environments.
+     * New IDs are generated for all imported environments.
+     *
+     * @async
+     * @param {Object} environmentsData - Environments data to import
+     * @param {Array<Object>} environmentsData.items - Array of environment objects
+     * @param {boolean} [merge=false] - If true, merge with existing; if false, replace all
+     * @returns {Promise<boolean>} True if import succeeded
+     * @throws {Error} If data format invalid or save fails
      */
     async importEnvironments(environmentsData, merge = false) {
         try {

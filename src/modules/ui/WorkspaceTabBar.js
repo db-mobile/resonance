@@ -1,8 +1,15 @@
 /**
+ * @fileoverview Tab bar UI component for workspace tab management
+ * @module ui/WorkspaceTabBar
+ */
+
+/**
  * WorkspaceTabBar
  *
- * UI component for the workspace tab bar.
- * Handles rendering and interaction with workspace tabs.
+ * @class
+ * @classdesc UI component for the workspace tab bar. Handles rendering and interaction
+ * with workspace tabs including switching, closing, creating, renaming, and duplicating.
+ * Displays tab names with modified indicators and provides context menus.
  */
 export class WorkspaceTabBar {
     constructor(containerId) {

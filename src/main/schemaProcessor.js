@@ -1,12 +1,45 @@
+/**
+ * @fileoverview OpenAPI schema processing and example generation
+ * @module main/schemaProcessor
+ */
+
+/**
+ * Processes OpenAPI schemas and generates request body examples
+ *
+ * @class
+ * @classdesc Handles resolution of OpenAPI $ref references, generates example
+ * request bodies from schemas, and processes complex schema structures including
+ * nested objects, arrays, and schema composition (allOf, oneOf, anyOf).
+ */
 class SchemaProcessor {
+    /**
+     * Creates a SchemaProcessor instance
+     */
     constructor() {
+        /** @type {Object|null} The currently active OpenAPI specification */
         this.currentOpenApiSpec = null;
     }
 
+    /**
+     * Sets the current OpenAPI specification for reference resolution
+     *
+     * @param {Object} spec - The OpenAPI specification object
+     * @returns {void}
+     */
     setCurrentSpec(spec) {
         this.currentOpenApiSpec = spec;
     }
 
+    /**
+     * Resolves a single $ref reference in an OpenAPI schema
+     *
+     * Follows JSON Reference syntax (e.g., "#/components/schemas/User") and
+     * recursively resolves nested references.
+     *
+     * @param {Object} schemaOrRef - Schema object that may contain a $ref property
+     * @param {Object} [openApiSpec=null] - OpenAPI spec to use, defaults to current spec
+     * @returns {Object} The resolved schema object
+     */
     resolveSchemaRef(schemaOrRef, openApiSpec = null) {
         const spec = openApiSpec || this.currentOpenApiSpec;
         if (!schemaOrRef || !spec) {
@@ -31,6 +64,16 @@ class SchemaProcessor {
         return schemaOrRef;
     }
 
+    /**
+     * Recursively resolves all $ref references in a schema
+     *
+     * Handles complex schemas including objects with properties, arrays with items,
+     * and schema composition keywords (allOf, oneOf, anyOf).
+     *
+     * @param {Object} schema - The schema object to process
+     * @param {Object} [openApiSpec=null] - OpenAPI spec to use, defaults to current spec
+     * @returns {Object} The fully resolved schema with all references replaced
+     */
     resolveSchemaRefs(schema, openApiSpec = null) {
         if (!schema || typeof schema !== 'object') {
             return schema;
@@ -62,6 +105,19 @@ class SchemaProcessor {
         return resolved;
     }
 
+    /**
+     * Parses OpenAPI request body and generates example data
+     *
+     * Extracts the schema from requestBody content (prefers application/json),
+     * resolves all references, and generates an example request body.
+     *
+     * @param {Object} requestBody - OpenAPI requestBody object
+     * @returns {Object|null} Parsed request body with schema and example, or null
+     * @property {string} contentType - The content type (e.g., 'application/json')
+     * @property {Object} schema - The resolved schema object
+     * @property {boolean} required - Whether the request body is required
+     * @property {string} example - JSON string example of the request body
+     */
     parseRequestBody(requestBody) {
         if (!requestBody) {
             return null;
@@ -107,6 +163,16 @@ class SchemaProcessor {
         };
     }
 
+    /**
+     * Generates example data from an OpenAPI schema
+     *
+     * Creates realistic example values based on schema type, format, property names,
+     * and constraints. Supports nested objects, arrays, and all primitive types.
+     *
+     * @param {Object} schema - The OpenAPI schema object
+     * @param {number} [depth=0] - Current nesting depth (0 = root level)
+     * @returns {string|Object|Array|null} Generated example (JSON string at depth 0, value otherwise)
+     */
     generateExampleFromSchema(schema, depth = 0) {
         if (!schema) {
             return JSON.stringify({ 'data': 'example' }, null, 2);
@@ -208,6 +274,17 @@ class SchemaProcessor {
         
     }
 
+    /**
+     * Generates example string values based on schema format and property name
+     *
+     * Uses heuristics to generate realistic examples (e.g., email format returns
+     * "user@example.com", properties named "name" return "Example Name").
+     *
+     * @private
+     * @param {Object} propSchema - The property schema
+     * @param {string} propName - The property name (used for intelligent defaults)
+     * @returns {string} Generated example string
+     */
     _generateStringExample(propSchema, propName) {
         if (propSchema.format === 'email') {return 'user@example.com';}
         if (propSchema.format === 'date') {return '2024-01-01';}
@@ -242,6 +319,17 @@ class SchemaProcessor {
         return sampleStrings[Math.floor(Math.random() * sampleStrings.length)];
     }
 
+    /**
+     * Generates example number values based on schema constraints and property name
+     *
+     * Respects minimum/maximum constraints and uses property name hints
+     * (e.g., "price" returns 99.99, "age" returns 25).
+     *
+     * @private
+     * @param {Object} propSchema - The property schema
+     * @param {string} propName - The property name (used for intelligent defaults)
+     * @returns {number} Generated example number
+     */
     _generateNumberExample(propSchema, propName) {
         if (propSchema.minimum !== undefined) {return propSchema.minimum;}
         if (propSchema.maximum !== undefined && propSchema.minimum !== undefined) {

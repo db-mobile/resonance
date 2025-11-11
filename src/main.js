@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Main process entry point for Resonance Electron application
+ * @module main
+ *
+ * Initializes the Electron application, sets up IPC handlers, and manages
+ * the application lifecycle. Coordinates communication between the main
+ * process and renderer process through secure IPC channels.
+ */
+
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import Store from 'electron-store';
 

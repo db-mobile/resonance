@@ -6,6 +6,7 @@
  */
 
 import { ResponseEditor } from './responseEditor.bundle.js';
+import { attachCopyHandler } from './copyHandler.js';
 
 export class ResponseContainerManager {
     constructor() {
@@ -148,6 +149,12 @@ export class ResponseContainerManager {
             });
         }
 
+        // Get the copy button and attach handler
+        const copyBtn = wrapper.querySelector('.copy-response-btn');
+        if (copyBtn) {
+            attachCopyHandler(copyBtn, tabId);
+        }
+
         return {
             wrapper,
             tabId,
@@ -156,7 +163,7 @@ export class ResponseContainerManager {
             cookiesDisplay: wrapper.querySelector('.response-cookies-display'),
             performanceDisplay: wrapper.querySelector('.response-performance-display'),
             languageSelector,
-            copyBtn: wrapper.querySelector('.copy-response-btn'),
+            copyBtn,
             editor // Include editor instance
         };
     }

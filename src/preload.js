@@ -1,5 +1,29 @@
+/**
+ * @fileoverview Preload script for secure IPC communication
+ * @module preload
+ *
+ * Exposes a safe API to the renderer process through contextBridge.
+ * This script runs in a privileged context and bridges the gap between
+ * the main process and renderer process with context isolation enabled.
+ * All IPC communication is channeled through the exposed electronAPI.
+ */
+
 const { contextBridge, ipcRenderer } = require('electron');
 
+/**
+ * Exposes the electronAPI to the renderer process
+ *
+ * Provides safe access to main process functionality including:
+ * - API requests (send, cancel)
+ * - Data persistence (electron-store)
+ * - OpenAPI collection imports
+ * - Application settings
+ * - Proxy configuration
+ * - Logging (forwarded to main process)
+ *
+ * @namespace electronAPI
+ * @global
+ */
 contextBridge.exposeInMainWorld('electronAPI', {
     logger: {
         error: (scope, message, meta) => ipcRenderer.invoke('logger:error', scope, message, meta),

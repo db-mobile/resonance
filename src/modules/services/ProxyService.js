@@ -1,8 +1,30 @@
 /**
+ * @fileoverview Service for managing proxy configuration business logic
+ * @module services/ProxyService
+ */
+
+/**
  * Service for managing proxy configuration business logic
- * Provides high-level proxy operations with validation
+ *
+ * @class
+ * @classdesc Provides high-level proxy operations with comprehensive validation,
+ * error handling, and event notifications. Manages HTTP/HTTPS/SOCKS proxy settings,
+ * authentication, bypass lists, and timeout configuration. Implements observer pattern
+ * for proxy configuration change notifications and provides axios-compatible
+ * proxy configuration generation.
+ *
+ * Event types emitted:
+ * - 'proxy-settings-updated': When proxy settings are modified
+ * - 'proxy-toggled': When proxy is enabled/disabled
+ * - 'proxy-settings-reset': When settings are reset to defaults
  */
 export class ProxyService {
+    /**
+     * Creates a ProxyService instance
+     *
+     * @param {ProxyRepository} proxyRepository - Data access layer for proxy settings
+     * @param {IStatusDisplay} statusDisplay - Status display interface
+     */
     constructor(proxyRepository, statusDisplay) {
         this.repository = proxyRepository;
         this.statusDisplay = statusDisplay;
@@ -10,21 +32,35 @@ export class ProxyService {
     }
 
     /**
-     * Register listener for proxy configuration changes
+     * Registers a listener for proxy configuration changes
+     *
+     * @param {Function} callback - The callback function
+     * @param {Object} callback.event - Event object
+     * @param {string} callback.event.type - Event type
+     * @returns {void}
      */
     addChangeListener(callback) {
         this.listeners.add(callback);
     }
 
     /**
-     * Remove change listener
+     * Removes a change listener
+     *
+     * @param {Function} callback - The callback function to remove
+     * @returns {void}
      */
     removeChangeListener(callback) {
         this.listeners.delete(callback);
     }
 
     /**
-     * Notify all listeners of proxy configuration change
+     * Notifies all listeners of proxy configuration change
+     *
+     * Catches and logs listener errors to prevent disruption.
+     *
+     * @private
+     * @param {Object} event - Event object with type and data
+     * @returns {void}
      */
     _notifyListeners(event) {
         this.listeners.forEach(callback => {
@@ -37,7 +73,11 @@ export class ProxyService {
     }
 
     /**
-     * Get current proxy settings
+     * Gets current proxy settings
+     *
+     * @async
+     * @returns {Promise<Object>} Proxy settings object
+     * @throws {Error} If retrieval fails
      */
     async getSettings() {
         try {
@@ -49,7 +89,25 @@ export class ProxyService {
     }
 
     /**
-     * Update proxy settings with validation
+     * Updates proxy settings with comprehensive validation
+     *
+     * Validates all settings before saving and notifies listeners of changes.
+     *
+     * @async
+     * @param {Object} settings - Proxy settings object
+     * @param {boolean} [settings.enabled] - Whether proxy is enabled
+     * @param {string} [settings.type] - Proxy type (http, https, socks4, socks5)
+     * @param {string} [settings.host] - Proxy host
+     * @param {number} [settings.port] - Proxy port (1-65535)
+     * @param {Object} [settings.auth] - Authentication settings
+     * @param {boolean} [settings.auth.enabled] - Whether auth is enabled
+     * @param {string} [settings.auth.username] - Username for auth
+     * @param {string} [settings.auth.password] - Password for auth
+     * @param {Array<string>} [settings.bypassList] - Domains to bypass proxy
+     * @param {number} [settings.timeout] - Proxy timeout in ms
+     * @returns {Promise<Object>} Updated proxy settings
+     * @throws {Error} If validation fails or update fails
+     * @fires ProxyService#proxy-settings-updated
      */
     async updateSettings(settings) {
         try {
@@ -81,7 +139,12 @@ export class ProxyService {
     }
 
     /**
-     * Toggle proxy enabled/disabled
+     * Toggles proxy enabled/disabled state
+     *
+     * @async
+     * @returns {Promise<boolean>} New enabled state
+     * @throws {Error} If toggle fails
+     * @fires ProxyService#proxy-toggled
      */
     async toggleProxy() {
         try {

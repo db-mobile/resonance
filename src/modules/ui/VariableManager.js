@@ -1,4 +1,20 @@
+/**
+ * @fileoverview Modal dialog for managing collection-scoped variables
+ * @module ui/VariableManager
+ */
+
+/**
+ * Variable management dialog with import/export functionality
+ *
+ * @class
+ * @classdesc Provides a modal interface for CRUD operations on collection variables.
+ * Supports key-value pair editing, import/export to JSON, and auto-adds empty rows.
+ * Variables use {{variableName}} template syntax in requests.
+ */
 export class VariableManager {
+    /**
+     * Creates a VariableManager instance
+     */
     constructor() {
         this.dialog = null;
         this.onSave = null;
