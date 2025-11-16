@@ -82,7 +82,6 @@ export class ResponseContainerManager {
         wrapper.className = 'workspace-tab-response';
         wrapper.dataset.tabId = tabId;
         wrapper.style.display = 'none';
-        wrapper.style.height = '100%';
 
         wrapper.innerHTML = `
             <div id="response-body-${tabId}" class="tab-content active" role="tabpanel">
