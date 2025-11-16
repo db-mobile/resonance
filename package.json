@@ -54,7 +54,10 @@
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.1.0",
     "electron-window-state": "^5.0.3",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.1"
+  },
+  "overrides": {
+    "js-yaml": "^4.1.1"
   },
   "build": {
     "appId": "io.github.db_mobile.resonance",
