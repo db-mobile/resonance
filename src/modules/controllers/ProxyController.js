@@ -150,13 +150,11 @@ export class ProxyController {
                 throw new Error('Proxy host and port are required');
             }
 
-            // Validate settings before testing
             const validationErrors = this.service.validateSettings(settings);
             if (validationErrors.length > 0) {
                 throw new Error(validationErrors.join('; '));
             }
 
-            // Use the IPC to test connection (will be handled in main process)
             const result = await window.electronAPI.proxySettings.test();
 
             return result;

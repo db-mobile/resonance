@@ -16,6 +16,7 @@ import StoreHandler from './main/storeHandlers.js';
 import ProxyHandler from './main/proxyHandlers.js';
 import SchemaProcessor from './main/schemaProcessor.js';
 import OpenApiParser from './main/openApiParser.js';
+import PostmanParser from './main/postmanParser.js';
 import loggerService from './services/LoggerService.js';
 
 // Initialize logger for main process
@@ -78,6 +79,7 @@ const apiRequestHandler = new ApiRequestHandler(store, proxyHandler);
 const storeHandler = new StoreHandler(store);
 const schemaProcessor = new SchemaProcessor();
 const openApiParser = new OpenApiParser(schemaProcessor, store);
+const postmanParser = new PostmanParser(store);
 
 app.whenReady().then(() => {
     windowManager.createWindow();
@@ -131,6 +133,54 @@ ipcMain.handle('import-openapi-file', async () => {
         return collection;
     } catch (error) {
         console.error('Error importing OpenAPI file:', error);
+        throw error;
+    }
+});
+
+ipcMain.handle('import-postman-collection', async () => {
+    const mainWindow = windowManager.getMainWindow();
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openFile'],
+        filters: [
+            { name: 'Postman Collection', extensions: ['json'] }
+        ]
+    });
+
+    if (result.canceled) {
+        return null;
+    }
+
+    try {
+        const filePath = result.filePaths[0];
+        const importResult = await postmanParser.importPostmanFile(filePath);
+        return importResult;
+    } catch (error) {
+        console.error('Error importing Postman collection:', error);
+        throw error;
+    }
+});
+
+ipcMain.handle('import-postman-environment', async () => {
+    const mainWindow = windowManager.getMainWindow();
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openFile'],
+        filters: [
+            { name: 'Postman Environment', extensions: ['json'] }
+        ]
+    });
+
+    if (result.canceled) {
+        return null;
+    }
+
+    try {
+        const filePath = result.filePaths[0];
+        const environment = await postmanParser.importPostmanEnvironment(filePath);
+        return environment;
+    } catch (error) {
+        console.error('Error importing Postman environment:', error);
         throw error;
     }
 });

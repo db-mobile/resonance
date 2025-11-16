@@ -39,7 +39,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         set: (key, value) => ipcRenderer.invoke('store:set', key, value)
     },
     collections: {
-        importOpenApiFile: () => ipcRenderer.invoke('import-openapi-file')
+        importOpenApiFile: () => ipcRenderer.invoke('import-openapi-file'),
+        importPostmanCollection: () => ipcRenderer.invoke('import-postman-collection'),
+        importPostmanEnvironment: () => ipcRenderer.invoke('import-postman-environment')
     },
     settings: {
         get: () => ipcRenderer.invoke('settings:get'),

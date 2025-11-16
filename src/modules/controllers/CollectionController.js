@@ -692,6 +692,71 @@ export class CollectionController {
     }
 
     /**
+     * Imports a Postman collection file and creates a collection
+     *
+     * Triggers file picker dialog via IPC and processes the selected Postman collection file.
+     * Also imports any collection variables extracted from the Postman collection.
+     *
+     * @async
+     * @returns {Promise<Object|null>} Created collection object or null if cancelled
+     * @throws {Error} If import fails
+     */
+    async importPostmanCollection() {
+        try {
+            const result = await window.electronAPI.collections.importPostmanCollection();
+
+            if (result) {
+                await this.loadCollections();
+                this.statusDisplay.update('Postman collection imported successfully', null);
+                return result.collection;
+            }
+                this.statusDisplay.update('Import cancelled', null);
+                return null;
+
+        } catch (error) {
+            console.error('Error importing Postman collection:', error);
+            this.statusDisplay.update(`Import error: ${error.message}`, null);
+            throw error;
+        }
+    }
+
+    /**
+     * Imports a Postman environment file and creates/updates an environment
+     *
+     * Triggers file picker dialog via IPC and processes the selected Postman environment file.
+     * Creates a new environment with the imported variables or allows user to merge with existing.
+     *
+     * @async
+     * @returns {Promise<Object|null>} Environment object with name and variables, or null if cancelled
+     * @throws {Error} If import fails
+     */
+    async importPostmanEnvironment() {
+        try {
+            const environment = await window.electronAPI.collections.importPostmanEnvironment();
+
+            if (environment) {
+                if (window.environmentController) {
+                    await window.environmentController.createEnvironment(
+                        environment.name,
+                        environment.variables
+                    );
+                    this.statusDisplay.update('Postman environment imported successfully', null);
+                } else {
+                    console.warn('Environment controller not available, environment data returned without creating');
+                }
+                return environment;
+            }
+                this.statusDisplay.update('Import cancelled', null);
+                return null;
+
+        } catch (error) {
+            console.error('Error importing Postman environment:', error);
+            this.statusDisplay.update(`Import error: ${error.message}`, null);
+            throw error;
+        }
+    }
+
+    /**
      * Saves user modifications to a request body
      *
      * @async
@@ -949,10 +1014,6 @@ export class CollectionController {
 
             const formElements = this.getFormElements();
             await this.service.loadEndpointIntoForm(collection, endpoint, formElements);
-
-            // Don't substitute variables in the form - they should stay as {{...}} placeholders
-            // Variable substitution happens at request time in apiHandler.js
-            // await this.processFormVariablesExceptUrl(collection.id, formElements);
 
             this.renderer.setActiveEndpoint(collection.id, endpoint.id);
         } catch (error) {

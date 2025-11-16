@@ -80,6 +80,28 @@ export async function importOpenApiFile() {
 }
 
 /**
+ * Opens file dialog and imports Postman collection file
+ *
+ * @async
+ * @returns {Promise<Object|null>} Imported collection or null if cancelled
+ */
+export async function importPostmanCollection() {
+    const controller = initializeController();
+    return controller.importPostmanCollection();
+}
+
+/**
+ * Opens file dialog and imports Postman environment file
+ *
+ * @async
+ * @returns {Promise<Object|null>} Environment object with name and variables, or null if cancelled
+ */
+export async function importPostmanEnvironment() {
+    const controller = initializeController();
+    return controller.importPostmanEnvironment();
+}
+
+/**
  * Saves modified request body for an endpoint
  *
  * @async

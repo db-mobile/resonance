@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-Resonance is an Electron-based API client application that provides a clean and minimal interface for testing APIs. The application supports OpenAPI/Swagger collection imports, variable templating, and features a modern modular architecture with secure IPC communication between main and renderer processes.
+Resonance is an Electron-based API client application that provides a clean and minimal interface for testing APIs. The application supports OpenAPI/Swagger and Postman collection imports, variable templating with environments, multi-language code generation, and features a modern modular architecture with secure IPC communication between main and renderer processes.
 
 ## Development Commands
 
@@ -30,12 +30,16 @@ Resonance is an Electron-based API client application that provides a clean and 
   - `windowManager.js` - Window creation and lifecycle management
   - `apiRequestHandlers.js` - HTTP request handling via axios
   - `storeHandlers.js` - electron-store IPC operations with fallback handling
-  - `schemaProcessor.js` - OpenAPI schema processing
+  - `schemaProcessor.js` - OpenAPI schema processing and example generation
   - `openApiParser.js` - OpenAPI file import and parsing
+  - `postmanParser.js` - Postman collection and environment import
+  - `digestAuthHandler.js` - Digest authentication implementation
+  - `proxyHandlers.js` - Proxy configuration and connection testing
 - Uses `electron-store` for persistent storage of collections and variables
 - Uses `electron-window-state` for window state management
 - Makes HTTP requests via `axios` in the main process for security
 - Handles OpenAPI file imports and parsing via `js-yaml`
+- Handles Postman collection imports (v2.0 and v2.1 formats)
 - Store initialization includes validation and auto-recovery for sandboxed environments
 
 ### Renderer Process (`src/renderer.js`)
@@ -48,46 +52,61 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 
 #### Core Modules
 - `apiHandler.js` - Handles sending requests and processing responses
-- `authManager.js` - Manages authentication methods (Bearer, Basic, API Key, OAuth2)
-- `collectionManager.js` - Manages OpenAPI collection imports and organization
+- `authManager.js` - Manages authentication methods (Bearer, Basic, API Key, OAuth2, Digest)
+- `codeGenerator.js` - Multi-language code generation (cURL, Python, JavaScript, Node.js, Go, PHP, Ruby, Java)
+- `collectionManager.js` - Manages OpenAPI and Postman collection imports and organization
+- `cookieParser.js` - Parses and displays cookies from responses
 - `copyHandler.js` - Handles copying responses and request data to clipboard
-- `curlGenerator.js` - Generates cURL commands from requests
+- `curlGenerator.js` - Generates cURL commands from requests (legacy, now part of codeGenerator)
 - `domElements.js` - Centralized DOM element references and exports
+- `graphqlEditor.bundle.js` - GraphQL query editor with syntax support
 - `httpVersionManager.js` - Manages HTTP protocol version selection
 - `keyboardShortcuts.js` - Manages keyboard shortcuts with platform-aware bindings and help dialog
-- `keyValueManager.js` - Manages key-value input pairs (headers, query params)
+- `keyValueManager.js` - Manages key-value input pairs (headers, query params, path params)
+- `logger.js` - Centralized logging with scopes and levels
+- `performanceMetrics.js` - Request performance visualization (DNS, TCP, TLS, TTFB, download timing)
 - `resizer.js` - Handles UI panel resizing functionality
 - `responseEditor.js` - CodeMirror-based response viewer with syntax highlighting
+- `ResponseContainerManager.js` - Manages response containers for workspace tabs
 - `statusDisplay.js` - Manages status display updates
 - `tabManager.js` - Handles tab switching functionality for request/response sections
 - `themeManager.js` - Manages theme switching and settings
 - `timeoutManager.js` - Manages request timeout configuration
+- `WorkspaceTabStateManager.js` - Captures and restores workspace tab state
 
 #### Architectural Layers
 - `controllers/` - MVC controllers
-  - CollectionController.js - Manages collection operations
+  - CollectionController.js - Manages collection operations (OpenAPI and Postman imports)
   - EnvironmentController.js - Coordinates environment operations between UI and services
   - HistoryController.js - Manages request history
+  - ProxyController.js - Manages proxy configuration and testing
+  - WorkspaceTabController.js - Coordinates workspace tab operations and state
 - `services/` - Business logic services
   - CollectionService.js - Collection business logic
   - EnvironmentService.js - Environment management with validation and event notifications
   - HistoryService.js - Request history tracking and management
+  - ProxyService.js - Proxy configuration business logic and validation
   - VariableService.js - Variable substitution logic with environment support
+  - WorkspaceTabService.js - Workspace tab management and state persistence
 - `storage/` - Data persistence layer with robust error handling
   - CollectionRepository.js - Includes `_getObjectFromStore()` helper for safe store access
   - EnvironmentRepository.js - Persists environments and manages active environment state
   - HistoryRepository.js - Persists request history with validation
+  - ProxyRepository.js - Persists proxy configuration
   - VariableRepository.js - Validates and initializes store data
+  - WorkspaceTabRepository.js - Persists workspace tab state
 - `ui/` - UI components
+  - CodeSnippetDialog.js - Multi-language code export dialog
   - CollectionRenderer.js - Renders collection tree
   - ConfirmDialog.js - Confirmation dialog component
   - ContextMenu.js - Right-click context menus
-  - CurlDialog.js - cURL export dialog
+  - CurlDialog.js - cURL export dialog (legacy, replaced by CodeSnippetDialog)
   - EnvironmentManager.js - Environment management dialog with full CRUD operations
   - EnvironmentSelector.js - Dropdown for quick environment switching
   - HistoryRenderer.js - Request history UI
   - RenameDialog.js - Collection/endpoint rename dialog
   - VariableManager.js - Variable management UI
+  - WorkspaceTabBar.js - Workspace tab management UI
 - `variables/` - Variable processing and templating (VariableProcessor.js)
 - `schema/` - OpenAPI schema processing (SchemaProcessor.js)
 - `interfaces/` - TypeScript-like interfaces for structure (IStatusDisplay.js)
@@ -99,11 +118,21 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 
 ### Key Features
 
-#### OpenAPI Collection Support
+#### Collection Import Support
+**OpenAPI/Swagger:**
 - Import OpenAPI 3.0 specs (YAML/JSON format)
 - Parse endpoints into organized collections
-- Generate request examples from schemas
+- Generate intelligent request examples from schemas with context-aware defaults
 - Handle complex schema references and nested objects
+
+**Postman:**
+- Import Postman Collection Format v2.0 and v2.1
+- Import Postman Environment files
+- Preserve exact request examples from Postman collections
+- Automatically extract and store collection variables
+- Convert nested folder structures to flat organization by path segment
+- Full authentication mapping (Bearer, Basic, API Key, OAuth2, Digest)
+- Support for all Postman body modes (raw, urlencoded, formdata, GraphQL)
 
 #### Variable System
 - Template variable support using `{{ variableName }}` syntax
@@ -129,9 +158,10 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 
 #### Authentication Support
 - Multiple authentication methods via `authManager.js`
-- Supported types: Bearer Token, Basic Auth, API Key, OAuth2
+- Supported types: Bearer Token, Basic Auth, API Key, OAuth2, Digest Auth
 - Authentication state persisted per request
 - Secure credential handling
+- Per-request and collection-level authentication configuration
 
 #### Request History
 - Complete request/response history tracking via `HistoryController`
@@ -140,7 +170,25 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - Automatic cleanup and management
 
 #### Advanced Features
-- **cURL Export**: Generate cURL commands for any request via `curlGenerator.js`
+- **Multi-Language Code Generation**: Export requests in 9 languages via `codeGenerator.js`
+  - cURL, Python (requests), JavaScript (Fetch), JavaScript (Axios)
+  - Node.js (axios), Go (net/http), PHP (cURL), Ruby (net/http), Java (HttpClient)
+- **GraphQL Support**: Dedicated GraphQL query editor with syntax support
+- **Workspace Tabs**: Multiple concurrent request tabs with independent state
+  - Save and restore tab state across sessions
+  - Switch between tabs with keyboard shortcuts (Ctrl/Cmd+1-9)
+  - Per-tab request/response isolation
+- **Performance Metrics**: Detailed request timing breakdown
+  - DNS lookup, TCP connection, TLS handshake timing
+  - Time to First Byte (TTFB), content download time
+  - Visual timeline representation
+- **Cookie Management**: Parse and display response cookies
+  - Cookie attributes (domain, path, expires, httpOnly, secure)
+  - Dedicated Cookies tab in response viewer
+- **Proxy Support**: HTTP/HTTPS proxy configuration
+  - Authentication support for proxies
+  - Bypass list for specific domains
+  - Connection testing
 - **Syntax Highlighting**: CodeMirror-based response viewer with language detection
 - **HTTP Version Control**: Support for HTTP/1.1, HTTP/2, and HTTP/3
 - **Request Timeouts**: Configurable timeout settings per request
@@ -148,7 +196,7 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - **Keyboard Shortcuts**: Comprehensive keyboard shortcuts system via `keyboardShortcuts.js`
   - Platform-aware (⌘ on macOS, Ctrl on Windows/Linux)
   - Context-aware activation (respects input field focus)
-  - Categorized help dialog with i18n support
+  - Categorized help dialog with i18n support (Ctrl/Cmd+/)
   - Available shortcuts for requests, navigation, actions, settings, and tab switching
 
 #### Theme System
@@ -197,17 +245,20 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 ## UI Structure
 - Split layout with collections sidebar and main content area
 - Collection hierarchy with expandable endpoints
+- **Import menu** with context menu (OpenAPI, Postman Collection, Postman Environment)
+- **Workspace tabs** for managing multiple concurrent requests
 - Environment selector dropdown for quick switching between environments
-- Tabbed interface for request configuration (Query Params, Headers, Body, Auth)
-- Tabbed response display (Body, Headers)
-- Context menus for collection management (rename, delete, export as cURL)
-- Request history panel with timestamp and replay functionality
-- Authentication panel supporting multiple auth methods
+- Tabbed interface for request configuration (Path Params, Query Params, Headers, Body, Auth)
+- Tabbed response display (Body, Headers, Cookies, Performance)
+- Context menus for collection management (rename, delete, export code in multiple languages)
+- Request history panel with search, timestamp, and replay functionality
+- Authentication panel supporting multiple auth methods (Bearer, Basic, API Key, OAuth2, Digest)
 - Environment management dialog with full CRUD operations and import/export
-- Settings modal for theme, language, and timeout configuration
+- Settings modal for theme, language, timeout, and proxy configuration
 - Keyboard shortcuts help dialog (`Ctrl/Cmd+/`) with categorized shortcuts
+- Code snippet export dialog with multi-language support
 - Resizable panels for customizable workspace layout
-- Support for multiple HTTP methods (GET, POST, PUT, DELETE, PATCH, etc.)
+- Support for multiple HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
 - HTTP version selector (HTTP/1.1, HTTP/2, HTTP/3)
 
 ## Key Patterns
@@ -227,13 +278,15 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - Attribute-based i18n with automatic DOM updates (`data-i18n` attributes)
 - Unified settings management through modal interface
 - **CodeMirror Integration**: `responseEditor.js` bundled separately with esbuild for optimal loading
-- **Dialog Pattern**: Reusable dialog components (ConfirmDialog, RenameDialog, CurlDialog, EnvironmentManager, KeyboardShortcuts Help) for user interactions
+- **Dialog Pattern**: Reusable dialog components (ConfirmDialog, RenameDialog, CodeSnippetDialog, EnvironmentManager, KeyboardShortcuts Help) for user interactions
 - **History Tracking**: Automatic request/response capture with timestamp and replay capability
 - **Authentication State**: Per-request auth configuration with secure storage
-- **Copy/Export Pattern**: Unified handlers for clipboard operations and format exports (cURL, environments)
+- **Copy/Export Pattern**: Unified handlers for clipboard operations and format exports (multi-language code, environments)
 - **Environment Pattern**: Event-driven environment management with controller coordination, service business logic, and repository persistence
 - **Change Listeners**: Observer pattern for environment changes with notification system for UI synchronization
 - **Keyboard Shortcuts Pattern**: Centralized keyboard event handling with platform detection, context awareness, and categorized help system
+- **Import Pattern**: Unified collection import supporting both OpenAPI (schema-based) and Postman (example-based) formats with consistent folder organization
+- **Workspace Tab Pattern**: Multi-tab state management with per-tab isolation and persistent state across sessions
 
 ## Common Issues & Solutions
 

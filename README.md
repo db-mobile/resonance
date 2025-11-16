@@ -8,17 +8,48 @@ A clean and minimal API client with excellent user experience built with Electro
 
 ## Features ✨
 
-- **OpenAPI/Swagger Import**: Import OpenAPI 3.0 specifications (YAML/JSON) and automatically generate organized request collections
-- **Environment Management**: Organize variables into environments (Development, Staging, Production, etc.) for easy context switching
+### Collection Import & Management
+- **OpenAPI/Swagger Import**: Import OpenAPI 3.0 specifications (YAML/JSON) with automatic schema-based example generation
+- **Postman Import**: Import Postman Collection Format v2.0 and v2.1 files
+- **Postman Environment Import**: Import Postman environment files with variables
+- **Smart Folder Organization**: Both formats create consistent flat folder structures by path segment
+
+### Code Generation
+- **Multi-Language Export**: Generate request code in 9 languages:
+  - cURL, Python (requests), JavaScript (Fetch), JavaScript (Axios)
+  - Node.js (axios), Go (net/http), PHP (cURL), Ruby (net/http), Java (HttpClient)
+
+### Advanced Features
+- **GraphQL Support**: Dedicated GraphQL query editor with syntax highlighting
+- **Workspace Tabs**: Multiple concurrent request tabs with independent state and persistent storage
+- **Performance Metrics**: Detailed request timing breakdown (DNS, TCP, TLS, TTFB, download)
+- **Cookie Management**: Parse and display response cookies with full attribute support
+- **Request History**: Complete request/response history with search and replay capability
+- **Proxy Support**: HTTP/HTTPS proxy configuration with authentication and bypass lists
+
+### Environment & Variables
+- **Environment Management**: Organize variables into environments (Development, Staging, Production, etc.)
 - **Variable Templating**: Use `{{ variableName }}` syntax for dynamic values in URLs, headers, and request bodies
-- **Schema-Based Body Generation**: Automatically generate example request bodies from OpenAPI schemas
-- **Keyboard Shortcuts**: Comprehensive keyboard shortcuts for all common actions with platform-aware bindings (⌘ on macOS, Ctrl on Windows/Linux)
+- **Environment Switching**: Quick dropdown selector to switch between different API contexts
+- **Import/Export**: Share environments with your team or backup as JSON files
+
+### Authentication
+- **Multiple Auth Methods**: Bearer Token, Basic Auth, API Key, OAuth 2.0, Digest Auth
+- **Per-Request Configuration**: Set authentication at request, folder, or collection level
+- **Secure Credential Storage**: All credentials encrypted and stored securely
+
+### User Experience
+- **Keyboard Shortcuts**: Comprehensive shortcuts for all actions with platform-aware bindings (⌘/Ctrl)
 - **Multi-Theme Support**: Light, dark, system-adaptive, and blueprint themes
-- **Internationalization**: Support for English, German, Spanish, French, and Italian
-- **Import/Export**: Export and import environments as JSON for backup and team sharing
-- **Secure Architecture**: Built with security best practices including context isolation and secure IPC
-- **Persistent Storage**: Collections, variables, environments, and settings are automatically saved and restored
-- **Modern UI**: Clean, minimal interface with tabbed request/response views and environment selector
+- **Internationalization**: Full support for English, German, Spanish, French, and Italian
+- **Syntax Highlighting**: CodeMirror-based response viewer with automatic language detection
+- **Resizable Panels**: Customizable workspace layout with draggable panel dividers
+
+### Technical Features
+- **HTTP Version Control**: Support for HTTP/1.1, HTTP/2, and HTTP/3
+- **Request Timeouts**: Configurable timeout settings per request
+- **Secure Architecture**: Context isolation, secure IPC, and ASAR packaging
+- **Persistent Storage**: Auto-save for collections, variables, environments, settings, and history
 
 ## Screenshots 📸
 
@@ -77,12 +108,16 @@ npm run dist:dir
 
 ### Getting Started
 
-1. **Create Environments**: Set up environments (Development, Staging, Production) with environment-specific variables
-2. **Import Collections**: Use File > Import Collection to load OpenAPI/Swagger specifications
+1. **Import Collections**: Click the Import button and choose:
+   - **OpenAPI Collection**: For OpenAPI 3.0 specs (YAML/JSON)
+   - **Postman Collection**: For Postman v2.0/v2.1 files
+   - **Postman Environment**: To import Postman environment variables
+2. **Create Environments**: Set up environments (Development, Staging, Production) with environment-specific variables
 3. **Set Variables**: Define reusable variables like API keys and base URLs within each environment
 4. **Switch Environments**: Use the environment selector dropdown to quickly switch between different API contexts
-5. **Make Requests**: Select endpoints from the collections sidebar and configure headers, query parameters, and request bodies
-6. **View Responses**: Examine response data in the tabbed response viewer
+5. **Make Requests**: Select endpoints from the collections sidebar and configure path params, query params, headers, body, and auth
+6. **View Responses**: Examine response data in the tabbed viewer (Body, Headers, Cookies, Performance)
+7. **Export Code**: Generate request code in your preferred language for documentation or automation
 
 ### Environment Management
 
@@ -122,13 +157,23 @@ Resonance supports multiple authentication methods:
 
 All authentication credentials are automatically applied to requests and work seamlessly with the variable templating system.
 
-### OpenAPI Integration
+### Collection Import
 
+**OpenAPI Integration**
 Resonance automatically:
-- Parses OpenAPI 3.0 specifications
-- Generates organized endpoint collections
-- Creates example request bodies from schemas
+- Parses OpenAPI 3.0 specifications (YAML/JSON)
+- Generates intelligent example request bodies from schemas
 - Resolves schema references and nested objects
+- Groups endpoints by first path segment
+
+**Postman Integration**
+Import your existing Postman collections:
+- Supports Postman Collection Format v2.0 and v2.1
+- Preserves exact request examples from your collections
+- Automatically extracts collection variables
+- Import Postman environments to recreate your workflow
+- Full authentication mapping (Bearer, Basic, API Key, OAuth2, Digest)
+- Supports all body modes (raw, urlencoded, formdata, GraphQL)
 
 ### Themes
 
@@ -152,8 +197,8 @@ Resonance includes comprehensive keyboard shortcuts to speed up your workflow. P
 - `Ctrl/Cmd+H` - Toggle history sidebar
 
 ### Actions
-- `Ctrl/Cmd+K` - Generate cURL command
-- `Ctrl/Cmd+O` - Import OpenAPI collection
+- `Ctrl/Cmd+K` - Generate code (multi-language export)
+- `Ctrl/Cmd+O` - Import collection (shows import menu)
 - `Ctrl/Cmd+E` - Open environment manager
 
 ### Settings & Help
@@ -177,32 +222,44 @@ Resonance includes comprehensive keyboard shortcuts to speed up your workflow. P
 src/
 ├── main.js              # Main Electron process entry point
 ├── main/                # Main process modules
-│   ├── windowManager.js      # Window lifecycle management
-│   ├── apiRequestHandlers.js # HTTP request handling
-│   ├── storeHandlers.js      # Data persistence with fallbacks
-│   ├── schemaProcessor.js    # OpenAPI schema processing
-│   └── openApiParser.js      # OpenAPI file import
+│   ├── windowManager.js        # Window lifecycle management
+│   ├── apiRequestHandlers.js   # HTTP request handling
+│   ├── storeHandlers.js        # Data persistence with fallbacks
+│   ├── schemaProcessor.js      # OpenAPI schema processing
+│   ├── openApiParser.js        # OpenAPI file import
+│   ├── postmanParser.js        # Postman collection & environment import
+│   ├── digestAuthHandler.js    # Digest authentication
+│   └── proxyHandlers.js        # Proxy configuration
 ├── renderer.js          # Renderer process coordinator
 ├── preload.js           # Secure context bridge
 ├── style.css           # Global styles
 ├── modules/            # Modular renderer components
-│   ├── controllers/    # MVC controllers (Collection, Environment, History)
-│   ├── services/       # Business logic (Collection, Environment, History, Variable)
-│   ├── storage/        # Data persistence with validation
-│   ├── ui/            # UI components (including EnvironmentManager, EnvironmentSelector)
-│   ├── variables/     # Variable processing
-│   └── schema/        # OpenAPI schema handling
+│   ├── controllers/    # MVC controllers (Collection, Environment, History, Proxy, WorkspaceTab)
+│   ├── services/       # Business logic services
+│   ├── storage/        # Data persistence repositories
+│   ├── ui/            # UI components (dialogs, renderers, selectors)
+│   ├── variables/     # Variable processing and templating
+│   ├── schema/        # OpenAPI schema handling
+│   ├── codeGenerator.js       # Multi-language code export
+│   ├── cookieParser.js        # Cookie parsing and display
+│   ├── performanceMetrics.js  # Performance timing visualization
+│   ├── graphqlEditor.bundle.js # GraphQL editor
+│   └── [20+ other modules]
 ├── themes/            # Theme CSS files
-└── i18n/             # Internationalization
+└── i18n/             # Internationalization (5 languages)
 ```
 
 ### Key Technologies
 
-- **Electron**: Cross-platform desktop app framework
-- **Axios**: HTTP client for API requests
-- **electron-store**: Persistent configuration storage
-- **js-yaml**: YAML parsing for OpenAPI specs
-- **electron-window-state**: Window state management
+- **Electron** (v35.0.0): Cross-platform desktop app framework
+- **Axios** (v1.10.0): HTTP client for API requests
+- **CodeMirror** (v6.x): Advanced syntax highlighting and code editing
+- **electron-store** (v10.1.0): Persistent configuration storage
+- **js-yaml** (v4.1.0): YAML parsing for OpenAPI specs
+- **electron-window-state** (v5.0.3): Window state management
+- **esbuild** (v0.25.x): Fast JavaScript bundler
+- **electron-builder** (v26.0.x): Application packaging
+- **Jest** (v30.0.x): Testing framework
 
 ### Security Features
 
@@ -286,20 +343,35 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Roadmap 🗺️
 
-- [x] OpenAPI 3.0 import
-- [x] Variable templating system
-- [x] Multi-theme support
-- [x] Internationalization
+### Completed ✅
+- [x] OpenAPI 3.0 import with schema-based generation
+- [x] **Postman collection import (v2.0 & v2.1)**
+- [x] **Postman environment import**
+- [x] **Multi-language code generation (9 languages)**
+- [x] **GraphQL support with dedicated editor**
+- [x] **Workspace tabs for concurrent requests**
+- [x] **Performance metrics and timing breakdown**
+- [x] **Cookie management and display**
+- [x] **Proxy support with authentication**
+- [x] Variable templating system with environment support
+- [x] Multi-theme support (4 themes)
+- [x] Internationalization (5 languages)
 - [x] Authentication support (Bearer, Basic, API Key, OAuth2, Digest)
-- [x] Request history and bookmarks
-- [x] Environment management (Dev, Staging, Production)
+- [x] Request history with search and replay
+- [x] Environment management (Dev, Staging, Production, custom)
 - [x] Test suite implementation (Jest configured)
 - [x] Keyboard shortcuts for all major actions
+
+### Planned 🚀
+- [ ] Pre/post-request scripts & testing framework
+- [ ] WebSocket support
+- [ ] Mock server functionality
+- [ ] Request chaining and assertions
+- [ ] Collection export
+- [ ] Response comparison and diff view
+- [ ] gRPC support
 - [ ] Plugin system for extensions
-- [ ] More export formats (Postman, Insomnia)
-- [ ] GraphQL support
 - [ ] Team collaboration features
-- [ ] Response caching and mock servers
 
 ## Acknowledgments 🙏
 
