@@ -135,14 +135,14 @@ export class SettingsModal {
     }
 
     async show() {
-        if (this.isOpen) return;
+        if (this.isOpen) {return;}
 
         this.isOpen = true;
         const modal = await this.createModal();
         document.body.appendChild(modal);
 
         const firstSelect = modal.querySelector('select[name="theme"]');
-        if (firstSelect) firstSelect.focus();
+        if (firstSelect) {firstSelect.focus();}
     }
 
     async createModal() {
@@ -156,7 +156,7 @@ export class SettingsModal {
         const currentTimeout = this.timeoutManager ? this.timeoutManager.getCurrentTimeout() : 0;
 
         // Determine which tabs to show
-        const showProxyTab = this.proxyController ? true : false;
+        const showProxyTab = !!this.proxyController;
 
         overlay.innerHTML = `
             <div class="settings-modal">
@@ -231,7 +231,7 @@ export class SettingsModal {
     }
 
     createLanguageSection() {
-        if (!this.i18nManager) return '';
+        if (!this.i18nManager) {return '';}
 
         const languages = this.i18nManager.getSupportedLanguages();
         const currentLanguage = this.i18nManager.getCurrentLanguage();
@@ -256,7 +256,7 @@ export class SettingsModal {
     }
 
     async createProxySection() {
-        if (!this.proxyController) return '';
+        if (!this.proxyController) {return '';}
 
         const settings = await this.proxyController.getSettings();
 
@@ -511,7 +511,7 @@ export class SettingsModal {
     }
 
     async saveProxySettings(overlay) {
-        if (!this.proxyController) return;
+        if (!this.proxyController) {return;}
 
         try {
             const enabled = overlay.querySelector('input[name="proxyEnabled"]')?.checked || false;
@@ -552,7 +552,7 @@ export class SettingsModal {
     }
 
     hide(overlay) {
-        if (!this.isOpen) return;
+        if (!this.isOpen) {return;}
 
         this.isOpen = false;
         overlay.remove();

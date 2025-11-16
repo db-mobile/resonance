@@ -1,3 +1,20 @@
+/**
+ * @fileoverview Tab switching and management for request/response UI sections
+ * @module modules/tabManager
+ */
+
+/**
+ * Initializes tab switching event listeners for request and response tabs
+ *
+ * Sets up click handlers for request configuration tabs (Query Params, Headers, Body, Auth)
+ * and response display tabs (Body, Headers, Cookies, Performance). Handles workspace
+ * tab integration for per-tab response displays.
+ *
+ * @returns {void}
+ *
+ * @example
+ * initTabListeners();
+ */
 export function initTabListeners() {
     const requestTabButtons = document.querySelectorAll('.request-config .tab-button');
     const requestTabContents = document.querySelectorAll('.request-config .tab-content');
@@ -9,10 +26,10 @@ export function initTabListeners() {
                 btn.setAttribute('aria-selected', 'false');
             });
             requestTabContents.forEach(content => content.classList.remove('active'));
-            
+
             button.classList.add('active');
             button.setAttribute('aria-selected', 'true');
-            
+
             const targetTabId = button.dataset.tab;
             const targetTabContent = document.getElementById(targetTabId);
             if (targetTabContent) {
@@ -62,6 +79,17 @@ export function initTabListeners() {
     });
 }
 
+/**
+ * Programmatically activates a tab
+ *
+ * @param {string} tabType - Tab type ('request' or 'response')
+ * @param {string} tabId - Tab ID to activate
+ * @returns {void}
+ *
+ * @example
+ * activateTab('response', 'response-body');
+ * activateTab('request', 'headers');
+ */
 export function activateTab(tabType, tabId) {
     let buttons;
     let contents;

@@ -1,10 +1,40 @@
+/**
+ * @fileoverview Modal confirmation dialog component for user confirmations
+ * @module ui/ConfirmDialog
+ */
+
+/**
+ * Modal dialog component for confirmation prompts
+ *
+ * @class
+ * @classdesc Provides a customizable confirmation dialog with promise-based API.
+ * Supports keyboard navigation (Enter/Escape/Tab), dangerous action styling,
+ * and focus management for accessibility.
+ */
 export class ConfirmDialog {
+    /**
+     * Creates a ConfirmDialog instance
+     */
     constructor() {
         this.overlay = null;
         this.onConfirm = null;
         this.onCancel = null;
     }
 
+    /**
+     * Shows confirmation dialog and waits for user response
+     *
+     * Displays a modal dialog with customizable message and buttons. Returns a promise
+     * that resolves to true if confirmed, false if cancelled.
+     *
+     * @param {string} message - The confirmation message to display
+     * @param {Object} [options={}] - Dialog configuration options
+     * @param {string} [options.title='Confirm Action'] - Dialog title
+     * @param {string} [options.confirmText='Confirm'] - Confirm button label
+     * @param {string} [options.cancelText='Cancel'] - Cancel button label
+     * @param {boolean} [options.dangerous=true] - Whether to style as dangerous action (red button)
+     * @returns {Promise<boolean>} Resolves to true if confirmed, false if cancelled
+     */
     show(message, options = {}) {
         return new Promise((resolve) => {
             this.onConfirm = () => resolve(true);
@@ -14,6 +44,17 @@ export class ConfirmDialog {
         });
     }
 
+    /**
+     * Creates and displays the dialog DOM elements
+     *
+     * Builds dialog with inline styles for theme compatibility. Escapes HTML
+     * in message text for security.
+     *
+     * @private
+     * @param {string} message - Confirmation message
+     * @param {Object} options - Dialog options
+     * @returns {void}
+     */
     createDialog(message, options) {
         this.overlay = document.createElement('div');
         this.overlay.className = 'confirm-dialog-overlay';
@@ -65,6 +106,16 @@ export class ConfirmDialog {
         this.focusCancelButton(dialog);
     }
 
+    /**
+     * Attaches event listeners for dialog interactions
+     *
+     * Handles button clicks, keyboard navigation (Enter/Escape/Tab), and
+     * overlay click to dismiss. Prevents accidental confirmations.
+     *
+     * @private
+     * @param {HTMLElement} dialog - Dialog element
+     * @returns {void}
+     */
     setupEventListeners(dialog) {
         const cancelBtn = dialog.querySelector('#confirm-cancel-btn');
         const confirmBtn = dialog.querySelector('#confirm-confirm-btn');
@@ -100,12 +151,29 @@ export class ConfirmDialog {
         });
     }
 
+    /**
+     * Focuses cancel button by default for safety
+     *
+     * Prevents accidental destructive actions by focusing the safe option.
+     *
+     * @private
+     * @param {HTMLElement} dialog - Dialog element
+     * @returns {void}
+     */
     focusCancelButton(dialog) {
         // Focus cancel button by default for safety (prevents accidental deletions)
         const cancelBtn = dialog.querySelector('#confirm-cancel-btn');
         cancelBtn.focus();
     }
 
+    /**
+     * Handles confirm action
+     *
+     * Resolves promise with true and closes dialog.
+     *
+     * @private
+     * @returns {void}
+     */
     confirm() {
         if (this.onConfirm) {
             this.onConfirm();
@@ -113,6 +181,14 @@ export class ConfirmDialog {
         this.cleanup();
     }
 
+    /**
+     * Handles cancel action
+     *
+     * Resolves promise with false and closes dialog.
+     *
+     * @private
+     * @returns {void}
+     */
     cancel() {
         if (this.onCancel) {
             this.onCancel();
@@ -120,6 +196,14 @@ export class ConfirmDialog {
         this.cleanup();
     }
 
+    /**
+     * Removes dialog from DOM and restores focus
+     *
+     * Cleans up event listeners and restores focus to collections list.
+     *
+     * @private
+     * @returns {void}
+     */
     cleanup() {
         if (this.overlay) {
             this.overlay.remove();
@@ -136,6 +220,13 @@ export class ConfirmDialog {
         }
     }
 
+    /**
+     * Escapes HTML characters in text for safe display
+     *
+     * @private
+     * @param {string} text - Text to escape
+     * @returns {string} HTML-escaped text
+     */
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;

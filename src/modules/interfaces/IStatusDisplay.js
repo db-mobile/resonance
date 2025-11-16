@@ -1,5 +1,5 @@
 export class IStatusDisplay {
-    update(message, details) {
+    update(_message, _details) {
         throw new Error('update method must be implemented');
     }
 }

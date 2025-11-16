@@ -1,4 +1,26 @@
+/**
+ * @fileoverview Service for managing collection business logic and request handling
+ * @module services/CollectionService
+ */
+
+/**
+ * Service for managing API collection business logic
+ *
+ * @class
+ * @classdesc Provides high-level collection operations including CRUD operations,
+ * endpoint management, request body generation, and form population. Handles
+ * OpenAPI schema processing and coordinates with repository layer for persistence.
+ * Manages request state including path parameters, query parameters, headers, and
+ * authentication configuration.
+ */
 export class CollectionService {
+    /**
+     * Creates a CollectionService instance
+     *
+     * @param {CollectionRepository} repository - Data access layer for collections
+     * @param {SchemaProcessor} schemaProcessor - OpenAPI schema processor
+     * @param {IStatusDisplay} statusDisplay - Status display interface
+     */
     constructor(repository, schemaProcessor, statusDisplay) {
         this.repository = repository;
         this.schemaProcessor = schemaProcessor;
@@ -6,6 +28,13 @@ export class CollectionService {
         this.originalBodyValues = new Map();
     }
 
+    /**
+     * Loads all collections from storage
+     *
+     * @async
+     * @returns {Promise<Array<Object>>} Array of collection objects
+     * @throws {Error} If storage access fails
+     */
     async loadCollections() {
         try {
             const collections = await this.repository.getAll();
@@ -16,6 +45,19 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Imports a collection into storage
+     *
+     * Updates status display with progress and completion status.
+     *
+     * @async
+     * @param {Object} collection - The collection object to import
+     * @param {string} collection.name - Collection name
+     * @param {string} [collection.baseUrl] - Base URL for the collection
+     * @param {Array<Object>} [collection.endpoints] - Collection endpoints
+     * @returns {Promise<Object>} The imported collection with generated ID
+     * @throws {Error} If import or storage operation fails
+     */
     async importCollection(collection) {
         try {
             this.statusDisplay.update('Importing collection...', null);
@@ -30,12 +72,21 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Renames an existing collection
+     *
+     * @async
+     * @param {string} collectionId - The ID of the collection to rename
+     * @param {string} newName - The new name for the collection
+     * @returns {Promise<Object>} The updated collection object
+     * @throws {Error} If collection is not found or update fails
+     */
     async renameCollection(collectionId, newName) {
         try {
             this.statusDisplay.update('Renaming collection...', null);
-            
+
             const updatedCollection = await this.repository.update(collectionId, { name: newName });
-            
+
             this.statusDisplay.update(`Collection renamed to "${newName}"`, null);
             return updatedCollection;
         } catch (error) {
@@ -44,6 +95,14 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Deletes a collection from storage
+     *
+     * @async
+     * @param {string} collectionId - The ID of the collection to delete
+     * @returns {Promise<boolean>} True if deletion was successful
+     * @throws {Error} If collection is not found or deletion fails
+     */
     async deleteCollection(collectionId) {
         try {
             this.statusDisplay.update('Deleting collection...', null);
@@ -58,6 +117,16 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Creates a new empty collection
+     *
+     * Generates a unique collection ID and initializes default structure.
+     *
+     * @async
+     * @param {string} name - The name for the new collection
+     * @returns {Promise<Object>} The newly created collection object
+     * @throws {Error} If creation or storage operation fails
+     */
     async createCollection(name) {
         try {
             this.statusDisplay.update('Creating collection...', null);
@@ -82,10 +151,30 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Generates a unique collection ID
+     *
+     * @private
+     * @returns {string} A unique collection identifier
+     */
     generateCollectionId() {
         return `collection_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     }
 
+    /**
+     * Adds a new request to an existing collection
+     *
+     * Automatically organizes the request into folders based on path structure.
+     *
+     * @async
+     * @param {string} collectionId - The ID of the target collection
+     * @param {Object} requestData - The request data
+     * @param {string} requestData.name - Request name
+     * @param {string} requestData.method - HTTP method (GET, POST, etc.)
+     * @param {string} requestData.path - Request path/URL
+     * @returns {Promise<Object>} The created endpoint object
+     * @throws {Error} If collection is not found or request cannot be added
+     */
     async addRequestToCollection(collectionId, requestData) {
         try {
             this.statusDisplay.update('Adding new request...', null);
@@ -140,19 +229,35 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Generates a unique endpoint ID within a collection
+     *
+     * @private
+     * @param {Object} collection - The collection object
+     * @returns {string} A unique endpoint identifier
+     */
     generateEndpointId(collection) {
         const existingIds = collection.endpoints.map(endpoint => endpoint.id);
         let counter = 1;
         let newId = `custom_${counter}`;
-        
+
         while (existingIds.includes(newId)) {
             counter++;
             newId = `custom_${counter}`;
         }
-        
+
         return newId;
     }
 
+    /**
+     * Extracts the base path segment from a URL path
+     *
+     * Used for automatic folder organization.
+     *
+     * @private
+     * @param {string} pathKey - The full URL path
+     * @returns {string} The first path segment or 'custom'
+     */
     extractBasePath(pathKey) {
         const cleanPath = pathKey.replace(/^\//, '');
         const segments = cleanPath.split('/');
@@ -160,6 +265,18 @@ export class CollectionService {
         return segments[0] || 'custom';
     }
 
+    /**
+     * Deletes a request from a collection
+     *
+     * Removes the endpoint from the collection and all folders, and cleans up
+     * persisted endpoint data (headers, params, body, auth).
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID to delete
+     * @returns {Promise<boolean>} True if deletion was successful
+     * @throws {Error} If collection is not found or deletion fails
+     */
     async deleteRequestFromCollection(collectionId, endpointId) {
         try {
             this.statusDisplay.update('Deleting request...', null);
@@ -180,9 +297,7 @@ export class CollectionService {
                     }
                 });
 
-                collection.folders = collection.folders.filter(folder => {
-                    return folder.endpoints && folder.endpoints.length > 0;
-                });
+                collection.folders = collection.folders.filter(folder => folder.endpoints && folder.endpoints.length > 0);
             }
 
             await this.repository.update(collectionId, collection);
@@ -197,10 +312,30 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Loads an endpoint into the request form
+     *
+     * Saves current endpoint state before switching, then populates form with
+     * endpoint data including URL, method, parameters, headers, body, and auth.
+     * Uses persisted values if available, otherwise falls back to endpoint defaults.
+     *
+     * @async
+     * @param {Object} collection - The collection containing the endpoint
+     * @param {Object} endpoint - The endpoint to load
+     * @param {Object} formElements - DOM form element references
+     * @param {HTMLInputElement} formElements.urlInput - URL input field
+     * @param {HTMLSelectElement} formElements.methodSelect - Method dropdown
+     * @param {HTMLElement} formElements.pathParamsList - Path params container
+     * @param {HTMLElement} formElements.queryParamsList - Query params container
+     * @param {HTMLElement} formElements.headersList - Headers container
+     * @param {HTMLTextAreaElement} formElements.bodyInput - Request body textarea
+     * @returns {Promise<void>}
+     * @throws {Error} If form population fails
+     */
     async loadEndpointIntoForm(collection, endpoint, formElements) {
         try {
             this.schemaProcessor.setOpenApiSpec(collection._openApiSpec);
-            
+
             if (window.currentEndpoint) {
                 await this.saveRequestBodyModification(
                     window.currentEndpoint.collectionId,
@@ -228,14 +363,25 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Populates URL and HTTP method fields
+     *
+     * Converts path parameters to variable template format ({{paramName}}).
+     *
+     * @private
+     * @param {Object} collection - The collection
+     * @param {Object} endpoint - The endpoint
+     * @param {Object} formElements - Form element references
+     * @returns {void}
+     */
     populateUrlAndMethod(collection, endpoint, formElements) {
         let fullUrl = endpoint.path;
         if (collection.baseUrl) {
-            fullUrl = '{{baseUrl}}' + endpoint.path;
+            fullUrl = `{{baseUrl}}${  endpoint.path}`;
         }
 
         if (endpoint.parameters?.path) {
-            Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
+            Object.entries(endpoint.parameters.path).forEach(([key, _param]) => {
                 fullUrl = fullUrl.replace(`{${key}}`, `{{${key}}}`);
             });
         }
@@ -244,6 +390,15 @@ export class CollectionService {
         formElements.methodSelect.value = endpoint.method;
     }
 
+    /**
+     * Populates path parameters from endpoint or persisted data
+     *
+     * @async
+     * @private
+     * @param {Object} endpoint - The endpoint object
+     * @param {Object} formElements - Form element references
+     * @returns {Promise<void>}
+     */
     async populatePathParams(endpoint, formElements) {
         this.clearKeyValueList(formElements.pathParamsList);
 
@@ -253,20 +408,28 @@ export class CollectionService {
             persistedPathParams.forEach(param => {
                 this.addKeyValueRow(formElements.pathParamsList, param.key, param.value);
             });
-        } else {
-            if (endpoint.parameters?.path) {
+        } else if (endpoint.parameters?.path) {
                 Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
                     const value = param.example || '';
                     this.addKeyValueRow(formElements.pathParamsList, key, value);
                 });
             }
-        }
 
         if (formElements.pathParamsList.children.length === 0) {
             this.addKeyValueRow(formElements.pathParamsList);
         }
     }
 
+    /**
+     * Populates headers from collection defaults, endpoint spec, or persisted data
+     *
+     * @async
+     * @private
+     * @param {Object} collection - The collection object
+     * @param {Object} endpoint - The endpoint object
+     * @param {Object} formElements - Form element references
+     * @returns {Promise<void>}
+     */
     async populateHeaders(collection, endpoint, formElements) {
         this.clearKeyValueList(formElements.headersList);
 
@@ -306,6 +469,17 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Populates query parameters from endpoint spec or persisted data
+     *
+     * Also updates URL with encoded query string.
+     *
+     * @async
+     * @private
+     * @param {Object} endpoint - The endpoint object
+     * @param {Object} formElements - Form element references
+     * @returns {Promise<void>}
+     */
     async populateQueryParams(endpoint, formElements) {
         this.clearKeyValueList(formElements.queryParamsList);
 
@@ -315,13 +489,11 @@ export class CollectionService {
             persistedQueryParams.forEach(param => {
                 this.addKeyValueRow(formElements.queryParamsList, param.key, param.value);
             });
-        } else {
-            if (endpoint.parameters?.query) {
+        } else if (endpoint.parameters?.query) {
                 Object.entries(endpoint.parameters.query).forEach(([key, param]) => {
                     this.addKeyValueRow(formElements.queryParamsList, key, param.example || '');
                 });
             }
-        }
 
         if (formElements.queryParamsList.children.length === 0) {
             this.addKeyValueRow(formElements.queryParamsList);
@@ -331,10 +503,20 @@ export class CollectionService {
         this.updateUrlWithQueryParams(formElements);
     }
 
+    /**
+     * Updates URL input field with encoded query parameters
+     *
+     * Preserves variable placeholders like {{variableName}} during encoding.
+     * Prevents circular updates with setUrlUpdating flag.
+     *
+     * @private
+     * @param {Object} formElements - Form element references
+     * @returns {void}
+     */
     updateUrlWithQueryParams(formElements) {
         try {
             const queryParams = this.parseKeyValuePairs(formElements.queryParamsList);
-            let urlString = formElements.urlInput.value.trim();
+            const urlString = formElements.urlInput.value.trim();
 
             if (!urlString) {
                 return;
@@ -379,7 +561,14 @@ export class CollectionService {
     }
 
     /**
-     * URL encode a value while preserving variable placeholders like {{variableName}}
+     * URL encodes a value while preserving variable placeholders
+     *
+     * Temporarily replaces {{variableName}} patterns before encoding,
+     * then restores them after encoding.
+     *
+     * @private
+     * @param {string} value - The value to encode
+     * @returns {string} URL-encoded value with preserved placeholders
      */
     encodeValuePreservingPlaceholders(value) {
         // Find all {{...}} patterns and temporarily replace them with placeholders
@@ -405,6 +594,16 @@ export class CollectionService {
         return result;
     }
 
+    /**
+     * Populates request body from persisted data, generated example, or defaults
+     *
+     * @async
+     * @private
+     * @param {Object} collection - The collection object
+     * @param {Object} endpoint - The endpoint object
+     * @param {Object} formElements - Form element references
+     * @returns {Promise<void>}
+     */
     async populateRequestBody(collection, endpoint, formElements) {
         const persistedBody = await this.repository.getModifiedRequestBody(collection.id, endpoint.id);
         
@@ -414,7 +613,7 @@ export class CollectionService {
             const generatedBody = this.generateRequestBody(endpoint.requestBody);
             formElements.bodyInput.value = generatedBody;
         } else if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-            formElements.bodyInput.value = JSON.stringify({ "data": "example" }, null, 2);
+            formElements.bodyInput.value = JSON.stringify({ 'data': 'example' }, null, 2);
         } else {
             formElements.bodyInput.value = '';
         }
@@ -423,6 +622,13 @@ export class CollectionService {
         this.originalBodyValues.set(key, formElements.bodyInput.value);
     }
 
+    /**
+     * Generates request body from OpenAPI schema or examples
+     *
+     * @private
+     * @param {Object} requestBody - The request body spec from OpenAPI
+     * @returns {string} Generated JSON request body
+     */
     generateRequestBody(requestBody) {
         if (requestBody.example && requestBody.example !== null && requestBody.example !== 'null') {
             return requestBody.example;
@@ -439,14 +645,26 @@ export class CollectionService {
 
         if (requestBody.required) {
             return JSON.stringify({
-                "note": "Request body is required",
-                "data": "Please fill in the required fields"
+                'note': 'Request body is required',
+                'data': 'Please fill in the required fields'
             }, null, 2);
         }
 
-        return JSON.stringify({ "data": "example" }, null, 2);
+        return JSON.stringify({ 'data': 'example' }, null, 2);
     }
 
+    /**
+     * Saves modified request body to persistence layer
+     *
+     * Only saves if body has changed from original value.
+     *
+     * @async
+     * @private
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {HTMLTextAreaElement} bodyInput - The body input element
+     * @returns {Promise<void>}
+     */
     async saveRequestBodyModification(collectionId, endpointId, bodyInput) {
         try {
             if (!bodyInput || !bodyInput.value.trim()) {
@@ -465,6 +683,16 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Saves current path parameters to persistence layer
+     *
+     * @async
+     * @private
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {Object} formElements - Form element references
+     * @returns {Promise<void>}
+     */
     async saveCurrentPathParams(collectionId, endpointId, formElements) {
         try {
             const pathParams = this.parseKeyValuePairs(formElements.pathParamsList);
@@ -474,6 +702,16 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Saves current query parameters to persistence layer
+     *
+     * @async
+     * @private
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {Object} formElements - Form element references
+     * @returns {Promise<void>}
+     */
     async saveCurrentQueryParams(collectionId, endpointId, formElements) {
         try {
             const queryParams = this.parseKeyValuePairs(formElements.queryParamsList);
@@ -483,6 +721,16 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Saves current headers to persistence layer
+     *
+     * @async
+     * @private
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {Object} formElements - Form element references
+     * @returns {Promise<void>}
+     */
     async saveCurrentHeaders(collectionId, endpointId, formElements) {
         try {
             const headers = this.parseKeyValuePairs(formElements.headersList);
@@ -492,6 +740,15 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Saves current authentication configuration to persistence layer
+     *
+     * @async
+     * @private
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<void>}
+     */
     async saveCurrentAuthConfig(collectionId, endpointId) {
         try {
             if (window.authManager) {
@@ -503,6 +760,15 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Populates authentication configuration from persisted data or endpoint defaults
+     *
+     * @async
+     * @private
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<void>}
+     */
     async populateAuthConfig(collectionId, endpointId) {
         try {
             if (window.authManager) {
@@ -525,14 +791,21 @@ export class CollectionService {
         }
     }
 
+    /**
+     * Parses key-value pairs from a container element
+     *
+     * @private
+     * @param {HTMLElement} container - Container with key-value rows
+     * @returns {Array<Object>} Array of {key, value} objects
+     */
     parseKeyValuePairs(container) {
         const pairs = [];
         const rows = container.querySelectorAll('.key-value-row');
-        
+
         rows.forEach(row => {
             const keyInput = row.querySelector('.key-input');
             const valueInput = row.querySelector('.value-input');
-            
+
             if (keyInput && valueInput && keyInput.value.trim()) {
                 pairs.push({
                     key: keyInput.value.trim(),
@@ -540,16 +813,34 @@ export class CollectionService {
                 });
             }
         });
-        
+
         return pairs;
     }
 
+    /**
+     * Clears all child elements from a container
+     *
+     * @private
+     * @param {HTMLElement} container - Container to clear
+     * @returns {void}
+     */
     clearKeyValueList(container) {
         while (container.firstChild) {
             container.removeChild(container.firstChild);
         }
     }
 
+    /**
+     * Adds a key-value row to a container
+     *
+     * Creates input fields and remove button.
+     *
+     * @private
+     * @param {HTMLElement} container - Container to add row to
+     * @param {string} [key=''] - Initial key value
+     * @param {string} [value=''] - Initial value
+     * @returns {void}
+     */
     addKeyValueRow(container, key = '', value = '') {
         const row = document.createElement('div');
         row.className = 'key-value-row';

@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Controller for coordinating collection operations between UI and services
+ * @module controllers/CollectionController
+ */
+
 import { CollectionRepository } from '../storage/CollectionRepository.js';
 import { VariableRepository } from '../storage/VariableRepository.js';
 import { SchemaProcessor } from '../schema/SchemaProcessor.js';
@@ -11,7 +16,22 @@ import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 import { VariableManager } from '../ui/VariableManager.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 
+/**
+ * Controller for coordinating collection operations between UI and services
+ *
+ * @class
+ * @classdesc Mediates between UI components and collection/variable services,
+ * handling user interactions such as loading collections, managing endpoints,
+ * context menus, and variable operations. Coordinates with workspace tabs
+ * for endpoint loading and state management.
+ */
 export class CollectionController {
+    /**
+     * Creates a CollectionController instance
+     *
+     * @param {Object} electronAPI - The Electron IPC API bridge for storage operations
+     * @param {Function} updateStatusDisplay - Callback function to update status display UI
+     */
     constructor(electronAPI, updateStatusDisplay) {
         this.repository = new CollectionRepository(electronAPI);
         this.variableRepository = new VariableRepository(electronAPI);
@@ -41,6 +61,12 @@ export class CollectionController {
         this.handleNewRequestInEmptySpace = this.handleNewRequestInEmptySpace.bind(this);
     }
 
+    /**
+     * Loads all collections from storage and renders them in the UI
+     *
+     * @async
+     * @returns {Promise<Array<Object>>} Array of collection objects, or empty array on error
+     */
     async loadCollections() {
         try {
             const collections = await this.service.loadCollections();
@@ -52,6 +78,12 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Loads all collections from storage and renders them preserving folder expansion state
+     *
+     * @async
+     * @returns {Promise<Array<Object>>} Array of collection objects, or empty array on error
+     */
     async loadCollectionsWithExpansionState() {
         try {
             const collections = await this.service.loadCollections();
@@ -63,6 +95,14 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Renders collections in the UI with optional expansion state preservation
+     *
+     * @async
+     * @param {Array<Object>} collections - Array of collection objects to render
+     * @param {boolean} [preserveExpansionState=false] - Whether to preserve folder expansion state
+     * @returns {Promise<void>}
+     */
     async renderCollections(collections, preserveExpansionState = false) {
         const eventHandlers = {
             onEndpointClick: this.handleEndpointClick,
@@ -74,6 +114,17 @@ export class CollectionController {
         await this.renderer.renderCollections(collections, eventHandlers, preserveExpansionState);
     }
 
+    /**
+     * Handles user click on an endpoint in the collection tree
+     *
+     * Loads endpoint data into the current workspace tab or fallback form.
+     * Persists the selection and updates UI state.
+     *
+     * @async
+     * @param {Object} collection - The parent collection object
+     * @param {Object} endpoint - The endpoint object to load
+     * @returns {Promise<void>}
+     */
     async handleEndpointClick(collection, endpoint) {
         try {
             // Use workspace tab controller to load endpoint into current tab
@@ -125,6 +176,16 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Handles right-click context menu on a collection
+     *
+     * Displays context menu with options: New Request, Manage Variables,
+     * Rename Collection, and Delete Collection.
+     *
+     * @param {Event} event - The context menu event
+     * @param {Object} collection - The collection object
+     * @returns {void}
+     */
     handleContextMenu(event, collection) {
         const menuItems = [
             {
@@ -157,6 +218,16 @@ export class CollectionController {
         this.contextMenu.show(event, menuItems);
     }
 
+    /**
+     * Handles right-click context menu on an endpoint
+     *
+     * Displays context menu with delete option.
+     *
+     * @param {Event} event - The context menu event
+     * @param {Object} collection - The parent collection object
+     * @param {Object} endpoint - The endpoint object
+     * @returns {void}
+     */
     handleEndpointContextMenu(event, collection, endpoint) {
         const menuItems = [
             {
@@ -171,6 +242,14 @@ export class CollectionController {
         this.contextMenu.show(event, menuItems);
     }
 
+    /**
+     * Handles right-click context menu on empty space in collections panel
+     *
+     * Displays context menu with options: New Collection and New Request.
+     *
+     * @param {Event} event - The context menu event
+     * @returns {void}
+     */
     handleEmptySpaceContextMenu(event) {
         const menuItems = [
             {
@@ -190,6 +269,15 @@ export class CollectionController {
         this.contextMenu.show(event, menuItems);
     }
 
+    /**
+     * Handles collection rename operation
+     *
+     * Shows rename dialog and updates collection name if confirmed.
+     *
+     * @async
+     * @param {Object} collection - The collection to rename
+     * @returns {Promise<void>}
+     */
     async handleRename(collection) {
         try {
             const newName = await this.renameDialog.show(collection.name);
@@ -202,6 +290,16 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Handles variable management for a collection
+     *
+     * Opens variable manager dialog and saves changes if confirmed.
+     * Variable substitution occurs at request time, not in the form.
+     *
+     * @async
+     * @param {Object} collection - The collection whose variables to manage
+     * @returns {Promise<void>}
+     */
     async handleVariables(collection) {
         try {
             const currentVariables = await this.variableService.getVariablesForCollection(collection.id);
@@ -222,6 +320,15 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Handles creation of a new request in an existing collection
+     *
+     * Shows new request dialog and adds request to collection if confirmed.
+     *
+     * @async
+     * @param {Object} collection - The collection to add the request to
+     * @returns {Promise<void>}
+     */
     async handleNewRequest(collection) {
         try {
             const requestData = await this.showNewRequestDialog();
@@ -234,6 +341,14 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Handles creation of a new empty collection
+     *
+     * Shows new collection dialog and creates collection if confirmed.
+     *
+     * @async
+     * @returns {Promise<void>}
+     */
     async handleNewCollection() {
         try {
             const collectionName = await this.showNewCollectionDialog();
@@ -246,6 +361,14 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Handles creation of a new request with a new collection
+     *
+     * Shows both request and collection dialogs, creates both if confirmed.
+     *
+     * @async
+     * @returns {Promise<void>}
+     */
     async handleNewRequestInEmptySpace() {
         try {
             const requestData = await this.showNewRequestDialog();
@@ -262,6 +385,12 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Shows dialog for creating a new collection
+     *
+     * @async
+     * @returns {Promise<string|null>} Collection name if confirmed, null if cancelled
+     */
     async showNewCollectionDialog() {
         return new Promise((resolve) => {
             const dialog = document.createElement('div');
@@ -331,6 +460,12 @@ export class CollectionController {
         });
     }
 
+    /**
+     * Shows dialog for creating a new request
+     *
+     * @async
+     * @returns {Promise<Object|null>} Request data object with name, method, and path if confirmed, null if cancelled
+     */
     async showNewRequestDialog() {
         return new Promise((resolve) => {
             const dialog = document.createElement('div');
@@ -399,7 +534,7 @@ export class CollectionController {
                     resolve({
                         name,
                         method,
-                        path: path.startsWith('/') ? path : '/' + path
+                        path: path.startsWith('/') ? path : `/${  path}`
                     });
                 }
             });
@@ -422,6 +557,15 @@ export class CollectionController {
         });
     }
 
+    /**
+     * Handles collection deletion with confirmation
+     *
+     * Shows confirmation dialog and deletes collection and its variables if confirmed.
+     *
+     * @async
+     * @param {Object} collection - The collection to delete
+     * @returns {Promise<void>}
+     */
     async handleDelete(collection) {
         const confirmMessage = window.i18n ?
             window.i18n.t('collection.confirm_delete', { name: collection.name }) :
@@ -457,6 +601,17 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Handles request deletion with confirmation
+     *
+     * Shows confirmation dialog and deletes request from collection if confirmed.
+     * Clears form UI if the deleted request is currently active.
+     *
+     * @async
+     * @param {Object} collection - The parent collection
+     * @param {Object} endpoint - The request/endpoint to delete
+     * @returns {Promise<void>}
+     */
     async handleDeleteRequest(collection, endpoint) {
         const confirmMessage = window.i18n ?
             window.i18n.t('endpoint.confirm_delete', { name: endpoint.name || endpoint.path }) :
@@ -509,17 +664,26 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Imports an OpenAPI specification file and creates a collection
+     *
+     * Triggers file picker dialog via IPC and processes the selected file.
+     *
+     * @async
+     * @returns {Promise<Object|null>} Created collection object or null if cancelled
+     * @throws {Error} If import fails
+     */
     async importOpenApiFile() {
         try {
             const collection = await window.electronAPI.collections.importOpenApiFile();
-            
+
             if (collection) {
                 await this.loadCollections();
                 return collection;
-            } else {
+            }
                 this.statusDisplay.update('Import cancelled', null);
                 return null;
-            }
+
         } catch (error) {
             console.error('Error importing collection:', error);
             this.statusDisplay.update(`Import error: ${error.message}`, null);
@@ -527,6 +691,79 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Imports a Postman collection file and creates a collection
+     *
+     * Triggers file picker dialog via IPC and processes the selected Postman collection file.
+     * Also imports any collection variables extracted from the Postman collection.
+     *
+     * @async
+     * @returns {Promise<Object|null>} Created collection object or null if cancelled
+     * @throws {Error} If import fails
+     */
+    async importPostmanCollection() {
+        try {
+            const result = await window.electronAPI.collections.importPostmanCollection();
+
+            if (result) {
+                await this.loadCollections();
+                this.statusDisplay.update('Postman collection imported successfully', null);
+                return result.collection;
+            }
+                this.statusDisplay.update('Import cancelled', null);
+                return null;
+
+        } catch (error) {
+            console.error('Error importing Postman collection:', error);
+            this.statusDisplay.update(`Import error: ${error.message}`, null);
+            throw error;
+        }
+    }
+
+    /**
+     * Imports a Postman environment file and creates/updates an environment
+     *
+     * Triggers file picker dialog via IPC and processes the selected Postman environment file.
+     * Creates a new environment with the imported variables or allows user to merge with existing.
+     *
+     * @async
+     * @returns {Promise<Object|null>} Environment object with name and variables, or null if cancelled
+     * @throws {Error} If import fails
+     */
+    async importPostmanEnvironment() {
+        try {
+            const environment = await window.electronAPI.collections.importPostmanEnvironment();
+
+            if (environment) {
+                if (window.environmentController) {
+                    await window.environmentController.createEnvironment(
+                        environment.name,
+                        environment.variables
+                    );
+                    this.statusDisplay.update('Postman environment imported successfully', null);
+                } else {
+                    console.warn('Environment controller not available, environment data returned without creating');
+                }
+                return environment;
+            }
+                this.statusDisplay.update('Import cancelled', null);
+                return null;
+
+        } catch (error) {
+            console.error('Error importing Postman environment:', error);
+            this.statusDisplay.update(`Import error: ${error.message}`, null);
+            throw error;
+        }
+    }
+
+    /**
+     * Saves user modifications to a request body
+     *
+     * @async
+     * @param {string} collectionId - Collection ID
+     * @param {string} endpointId - Endpoint ID
+     * @returns {Promise<void>}
+     */
     async saveRequestBodyModification(collectionId, endpointId) {
         const bodyInput = document.getElementById('body-input');
         if (bodyInput) {
@@ -534,6 +771,13 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Initializes automatic tracking of request body changes
+     *
+     * Sets up event listeners to save body modifications on blur and after debounced input.
+     *
+     * @returns {void}
+     */
     initializeBodyTracking() {
         const bodyInput = document.getElementById('body-input');
         if (bodyInput) {
@@ -561,6 +805,16 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Processes and substitutes variables in all form elements
+     *
+     * Substitutes template variables in URL, body, headers, and query params.
+     *
+     * @async
+     * @param {string} collectionId - Collection ID for variable lookup
+     * @param {Object} formElements - Object containing form element references
+     * @returns {Promise<void>}
+     */
     async processFormVariables(collectionId, formElements) {
         try {
             if (formElements.urlInput && formElements.urlInput.value) {
@@ -611,6 +865,17 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Processes and substitutes variables in form elements except URL
+     *
+     * Substitutes template variables in body, headers, and query params only.
+     * Used when URL should remain as template for user visibility.
+     *
+     * @async
+     * @param {string} collectionId - Collection ID for variable lookup
+     * @param {Object} formElements - Object containing form element references
+     * @returns {Promise<void>}
+     */
     async processFormVariablesExceptUrl(collectionId, formElements) {
         try {
             if (formElements.bodyInput && formElements.bodyInput.value) {
@@ -654,6 +919,17 @@ export class CollectionController {
         }
     }
 
+    /**
+     * Gets references to form elements in the UI
+     *
+     * @returns {Object} Object containing references to form input elements
+     * @returns {HTMLInputElement} return.urlInput - URL input element
+     * @returns {HTMLSelectElement} return.methodSelect - HTTP method select element
+     * @returns {HTMLTextAreaElement} return.bodyInput - Request body textarea element
+     * @returns {HTMLElement} return.pathParamsList - Path parameters list container
+     * @returns {HTMLElement} return.headersList - Headers list container
+     * @returns {HTMLElement} return.queryParamsList - Query parameters list container
+     */
     getFormElements() {
         return {
             urlInput: document.getElementById('url-input'),
@@ -665,20 +941,42 @@ export class CollectionController {
         };
     }
 
+    /**
+     * Gets variables for the currently loaded collection
+     *
+     * @async
+     * @returns {Promise<Object>} Variables object for current collection, or empty object if no endpoint loaded
+     */
     async getCurrentCollectionVariables() {
         if (window.currentEndpoint) {
-            return await this.variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
+            return this.variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
         }
         return {};
     }
 
+    /**
+     * Processes a request object with variable substitution
+     *
+     * @async
+     * @param {Object} request - Request configuration object
+     * @returns {Promise<Object>} Processed request with substituted variables
+     */
     async processRequestForVariables(request) {
         if (window.currentEndpoint) {
-            return await this.variableService.processRequest(request, window.currentEndpoint.collectionId);
+            return this.variableService.processRequest(request, window.currentEndpoint.collectionId);
         }
         return request;
     }
 
+    /**
+     * Restores the last selected request from storage
+     *
+     * Loads the previously selected endpoint into the form on application startup.
+     * Clears saved selection if collection or endpoint no longer exists.
+     *
+     * @async
+     * @returns {Promise<void>}
+     */
     async restoreLastSelectedRequest() {
         try {
             const lastSelected = await this.repository.getLastSelectedRequest();
@@ -703,7 +1001,7 @@ export class CollectionController {
                 for (const folder of collection.folders) {
                     if (folder.endpoints) {
                         endpoint = folder.endpoints.find(ep => ep.id === lastSelected.endpointId);
-                        if (endpoint) break;
+                        if (endpoint) {break;}
                     }
                 }
             }
@@ -716,10 +1014,6 @@ export class CollectionController {
 
             const formElements = this.getFormElements();
             await this.service.loadEndpointIntoForm(collection, endpoint, formElements);
-
-            // Don't substitute variables in the form - they should stay as {{...}} placeholders
-            // Variable substitution happens at request time in apiHandler.js
-            // await this.processFormVariablesExceptUrl(collection.id, formElements);
 
             this.renderer.setActiveEndpoint(collection.id, endpoint.id);
         } catch (error) {

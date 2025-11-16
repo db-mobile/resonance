@@ -168,7 +168,7 @@ describe('SchemaProcessor', () => {
             const result = processor.generateExampleFromSchema(null);
             const parsed = JSON.parse(result);
             
-            expect(parsed).toEqual({ "data": "example" });
+            expect(parsed).toEqual({ 'data': 'example' });
         });
 
         test('should handle schema with default values', () => {

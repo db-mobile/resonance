@@ -64,7 +64,7 @@ export function parseKeyValuePairs(listContainer) {
  * @param {Object} data - Key-value pairs to populate
  */
 export function populateKeyValueList(listContainer, data) {
-    if (!listContainer || !data) return;
+    if (!listContainer || !data) {return;}
 
     Object.entries(data).forEach(([key, value]) => {
         addKeyValueRow(listContainer, key, value);
@@ -76,7 +76,7 @@ export function populateKeyValueList(listContainer, data) {
  * @param {HTMLElement} listContainer
  */
 export function clearKeyValueList(listContainer) {
-    if (!listContainer) return;
+    if (!listContainer) {return;}
     listContainer.innerHTML = '';
 }
 
@@ -111,7 +111,7 @@ function encodeValuePreservingPlaceholders(value) {
 export function updateUrlFromQueryParams() {
     try {
         const queryParams = parseKeyValuePairs(queryParamsList);
-        let urlString = urlInput.value.trim();
+        const urlString = urlInput.value.trim();
 
         if (!urlString) {
             return;
@@ -152,7 +152,7 @@ export function updateQueryParamsFromUrl() {
     }
 
     try {
-        let urlString = urlInput.value.trim();
+        const urlString = urlInput.value.trim();
 
         if (!urlString) {
             queryParamsList.innerHTML = '';

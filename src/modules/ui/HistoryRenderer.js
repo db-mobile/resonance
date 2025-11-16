@@ -1,7 +1,26 @@
+/**
+ * @fileoverview UI renderer for request history sidebar
+ * @module ui/HistoryRenderer
+ */
+
 import { HistoryService } from '../services/HistoryService.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
 
+/**
+ * History sidebar UI renderer
+ *
+ * @class
+ * @classdesc Renders the request history list with search, filtering, and replay functionality.
+ * Displays timestamps, HTTP methods, URLs, and status codes with color coding.
+ * Provides delete and clear-all operations with confirmation dialogs.
+ */
 export class HistoryRenderer {
+    /**
+     * Creates a HistoryRenderer instance
+     *
+     * @param {Object} electronAPI - Electron IPC API bridge
+     * @param {Function} onHistorySelect - Callback when history item is selected for replay
+     */
     constructor(electronAPI, onHistorySelect) {
         this.service = new HistoryService(electronAPI);
         this.onHistorySelect = onHistorySelect;
@@ -71,7 +90,7 @@ export class HistoryRenderer {
     }
 
     renderHistoryList(historyItems) {
-        if (!this.container) return;
+        if (!this.container) {return;}
 
         if (historyItems.length === 0) {
             this.container.innerHTML = `

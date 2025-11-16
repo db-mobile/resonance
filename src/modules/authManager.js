@@ -1,4 +1,20 @@
+/**
+ * @fileoverview Authentication manager for handling multiple authentication methods
+ * @module modules/authManager
+ */
+
+/**
+ * Manages authentication configuration for API requests
+ *
+ * @class
+ * @classdesc Handles multiple authentication types including Bearer, Basic Auth,
+ * API Key, OAuth2, and Digest authentication. Provides UI for configuring and
+ * managing authentication credentials.
+ */
 export class AuthManager {
+    /**
+     * Creates an AuthManager instance
+     */
     constructor() {
         this.authTypeSelect = document.getElementById('auth-type-select');
         this.authFieldsContainer = document.getElementById('auth-fields-container');
@@ -10,6 +26,12 @@ export class AuthManager {
         this.initializeEventListeners();
     }
 
+    /**
+     * Initializes event listeners for authentication controls
+     *
+     * @private
+     * @returns {void}
+     */
     initializeEventListeners() {
         if (this.authTypeSelect) {
             this.authTypeSelect.addEventListener('change', (e) => {
@@ -18,14 +40,26 @@ export class AuthManager {
         }
     }
 
+    /**
+     * Handles authentication type change
+     *
+     * @param {string} authType - The selected authentication type
+     * @returns {void}
+     */
     handleAuthTypeChange(authType) {
         this.currentAuthConfig.type = authType;
         this.currentAuthConfig.config = {};
         this.renderAuthFields(authType);
     }
 
+    /**
+     * Renders authentication fields based on selected type
+     *
+     * @param {string} authType - The authentication type ('none', 'bearer', 'basic', 'api-key', 'oauth2', 'digest')
+     * @returns {void}
+     */
     renderAuthFields(authType) {
-        if (!this.authFieldsContainer) return;
+        if (!this.authFieldsContainer) {return;}
 
         this.authFieldsContainer.innerHTML = '';
 
@@ -58,6 +92,12 @@ export class AuthManager {
         }
     }
 
+    /**
+     * Renders Bearer token authentication fields
+     *
+     * @private
+     * @returns {void}
+     */
     renderBearerTokenFields() {
         const defaultToken = this.currentAuthConfig.config.token || '{{bearerToken}}';
 
@@ -85,6 +125,12 @@ export class AuthManager {
         }
     }
 
+    /**
+     * Renders Basic authentication fields
+     *
+     * @private
+     * @returns {void}
+     */
     renderBasicAuthFields() {
         const html = `
             <div class="auth-field-group">
@@ -123,6 +169,12 @@ export class AuthManager {
         }
     }
 
+    /**
+     * Renders API Key authentication fields
+     *
+     * @private
+     * @returns {void}
+     */
     renderApiKeyFields() {
         const html = `
             <div class="auth-field-group">
@@ -176,6 +228,12 @@ export class AuthManager {
         }
     }
 
+    /**
+     * Renders OAuth2 authentication fields
+     *
+     * @private
+     * @returns {void}
+     */
     renderOAuth2Fields() {
         const html = `
             <div class="auth-field-group">
@@ -216,6 +274,12 @@ export class AuthManager {
         }
     }
 
+    /**
+     * Renders Digest authentication fields
+     *
+     * @private
+     * @returns {void}
+     */
     renderDigestAuthFields() {
         const html = `
             <div class="auth-field-group">
@@ -254,6 +318,17 @@ export class AuthManager {
         }
     }
 
+    /**
+     * Generates authentication data for API requests
+     *
+     * Converts current authentication configuration into headers, query parameters,
+     * and auth config that can be used in HTTP requests.
+     *
+     * @returns {Object} Authentication data
+     * @returns {Object} return.headers - Headers to include in request
+     * @returns {Object} return.queryParams - Query parameters to include in request
+     * @returns {Object|null} return.authConfig - Auth configuration for digest auth
+     */
     generateAuthData() {
         const authData = {
             headers: {},
@@ -315,6 +390,14 @@ export class AuthManager {
         return authData;
     }
 
+    /**
+     * Loads authentication configuration into the UI
+     *
+     * @param {Object} authConfig - Authentication configuration
+     * @param {string} authConfig.type - Authentication type
+     * @param {Object} authConfig.config - Authentication configuration details
+     * @returns {void}
+     */
     loadAuthConfig(authConfig) {
         if (!authConfig) {
             authConfig = { type: 'none', config: {} };
@@ -331,20 +414,28 @@ export class AuthManager {
         this.populateAuthFields(authConfig);
     }
 
+    /**
+     * Populates authentication fields with configuration values
+     *
+     * @private
+     * @param {Object} authConfig - Authentication configuration
+     * @returns {void}
+     */
     populateAuthFields(authConfig) {
         const { type, config } = authConfig;
 
-        if (!config) return;
+        if (!config) {return;}
 
         switch (type) {
-            case 'bearer':
+            case 'bearer': {
                 const bearerToken = document.getElementById('bearer-token');
                 if (bearerToken && config.token) {
                     bearerToken.value = config.token;
                 }
                 break;
+            }
 
-            case 'basic':
+            case 'basic': {
                 const basicUsername = document.getElementById('basic-username');
                 const basicPassword = document.getElementById('basic-password');
                 if (basicUsername && config.username) {
@@ -354,8 +445,9 @@ export class AuthManager {
                     basicPassword.value = config.password;
                 }
                 break;
+            }
 
-            case 'api-key':
+            case 'api-key': {
                 const keyName = document.getElementById('api-key-name');
                 const keyValue = document.getElementById('api-key-value');
                 const keyLocation = document.getElementById('api-key-location');
@@ -369,8 +461,9 @@ export class AuthManager {
                     keyLocation.value = config.location;
                 }
                 break;
+            }
 
-            case 'oauth2':
+            case 'oauth2': {
                 const oauth2Token = document.getElementById('oauth2-token');
                 const oauth2Prefix = document.getElementById('oauth2-header-prefix');
                 if (oauth2Token && config.token) {
@@ -380,8 +473,9 @@ export class AuthManager {
                     oauth2Prefix.value = config.headerPrefix;
                 }
                 break;
+            }
 
-            case 'digest':
+            case 'digest': {
                 const digestUsername = document.getElementById('digest-username');
                 const digestPassword = document.getElementById('digest-password');
                 if (digestUsername && config.username) {
@@ -391,16 +485,30 @@ export class AuthManager {
                     digestPassword.value = config.password;
                 }
                 break;
+            }
 
             default:
                 break;
         }
     }
 
+    /**
+     * Gets current authentication configuration
+     *
+     * @returns {Object} Current authentication configuration
+     * @returns {string} return.type - Authentication type
+     * @returns {Object} return.config - Authentication configuration details
+     */
     getAuthConfig() {
         return this.currentAuthConfig;
     }
 
+    /**
+     * Sets authentication type
+     *
+     * @param {string} authType - Authentication type to set
+     * @returns {void}
+     */
     setAuthType(authType) {
         if (this.authTypeSelect) {
             this.authTypeSelect.value = authType;
@@ -409,6 +517,14 @@ export class AuthManager {
         this.renderAuthFields(authType);
     }
 
+    /**
+     * Sets authentication configuration
+     *
+     * @param {Object} authConfig - Authentication configuration
+     * @param {string} authConfig.type - Authentication type
+     * @param {Object} authConfig.config - Authentication configuration details
+     * @returns {void}
+     */
     setAuthConfig(authConfig) {
         this.currentAuthConfig = {
             type: authConfig.type || 'none',
@@ -422,6 +538,11 @@ export class AuthManager {
         this.renderAuthFields(this.currentAuthConfig.type);
     }
 
+    /**
+     * Resets authentication configuration to default (none)
+     *
+     * @returns {void}
+     */
     resetAuthConfig() {
         this.currentAuthConfig = {
             type: 'none',
@@ -436,4 +557,9 @@ export class AuthManager {
     }
 }
 
+/**
+ * Singleton instance of AuthManager
+ *
+ * @const {AuthManager}
+ */
 export const authManager = new AuthManager();

@@ -1,13 +1,43 @@
+/**
+ * @fileoverview OpenAPI specification parser for converting OpenAPI/Swagger files into API collections
+ * @module main/openApiParser
+ */
+
 import fs from 'fs/promises';
 import path from 'path';
 import yaml from 'js-yaml';
 
+/**
+ * Parser for OpenAPI 3.0 specifications
+ *
+ * @class
+ * @classdesc Handles parsing of OpenAPI/Swagger files (YAML/JSON) and converts them into
+ * structured API collections with endpoints, parameters, and authentication configurations.
+ * Supports schema reference resolution and automatic endpoint grouping.
+ */
 class OpenApiParser {
+    /**
+     * Creates an OpenApiParser instance
+     *
+     * @param {Object} schemaProcessor - Schema processor for handling OpenAPI schema references and request bodies
+     * @param {Object} store - Electron-store instance for persistent storage
+     */
     constructor(schemaProcessor, store) {
         this.schemaProcessor = schemaProcessor;
         this.store = store;
     }
 
+    /**
+     * Converts an OpenAPI specification into a collection object
+     *
+     * Parses the OpenAPI spec and creates a structured collection with endpoints
+     * organized into folders based on path hierarchy. Extracts server URLs,
+     * default headers, and security configurations.
+     *
+     * @param {Object} openApiSpec - The parsed OpenAPI 3.0 specification object
+     * @param {string} fileName - The original filename for fallback naming
+     * @returns {Object} Collection object with endpoints, folders, and metadata
+     */
     parseOpenApiToCollection(openApiSpec, fileName) {
         this.schemaProcessor.setCurrentSpec(openApiSpec);
 
@@ -34,6 +64,18 @@ class OpenApiParser {
         return collection;
     }
 
+    /**
+     * Extracts default headers from OpenAPI specification
+     *
+     * Searches for default headers in multiple locations within the spec:
+     * component headers, custom x-default-headers extension at root level,
+     * and x-default-headers in the info section.
+     *
+     * @private
+     * @param {Object} openApiSpec - The OpenAPI specification object
+     * @param {Object} collection - The collection object to populate with headers
+     * @returns {void}
+     */
     _extractDefaultHeaders(openApiSpec, collection) {
         if (openApiSpec.components?.headers) {
             for (const [headerName, headerSpec] of Object.entries(openApiSpec.components.headers)) {
@@ -52,6 +94,18 @@ class OpenApiParser {
         }
     }
 
+    /**
+     * Parses all paths from OpenAPI spec and groups endpoints into folders
+     *
+     * Iterates through all paths and HTTP methods, creating endpoint objects
+     * with parsed parameters, request bodies, and security configurations.
+     * Groups endpoints by their base path into folders for organization.
+     *
+     * @private
+     * @param {Object} openApiSpec - The OpenAPI specification object
+     * @param {Object} collection - The collection object to populate with endpoints and folders
+     * @returns {void}
+     */
     _parsePaths(openApiSpec, collection) {
         const groupedEndpoints = {};
 
@@ -93,6 +147,16 @@ class OpenApiParser {
         collection.endpoints = Object.values(groupedEndpoints).flat();
     }
 
+    /**
+     * Extracts the base path segment from a full path for folder grouping
+     *
+     * Takes the first segment of the path to use as a folder name.
+     * For example, "/users/123/profile" becomes "users".
+     *
+     * @private
+     * @param {string} pathKey - The full path string (e.g., "/users/{id}")
+     * @returns {string} The base path segment, or "root" if empty
+     */
     _extractBasePath(pathKey) {
         const cleanPath = pathKey.replace(/^\//, '');
         const segments = cleanPath.split('/');
@@ -100,6 +164,16 @@ class OpenApiParser {
         return segments[0] || 'root';
     }
 
+    /**
+     * Parses parameter definitions from OpenAPI specification
+     *
+     * Resolves parameter references and organizes them by location (query, path, header).
+     * Extracts type information, requirements, descriptions, and example values.
+     *
+     * @private
+     * @param {Array<Object>} parameters - Array of parameter objects from OpenAPI spec
+     * @returns {Object} Object with query, path, and header parameter maps
+     */
     _parseParameters(parameters) {
         const parsed = {
             query: {},
@@ -109,7 +183,7 @@ class OpenApiParser {
 
         parameters.forEach(param => {
             const resolvedParam = param.$ref ? this.schemaProcessor.resolveSchemaRef(param) : param;
-            if (!resolvedParam) return;
+            if (!resolvedParam) {return;}
 
             if (resolvedParam.in === 'query') {
                 parsed.query[resolvedParam.name] = {
@@ -138,6 +212,17 @@ class OpenApiParser {
         return parsed;
     }
 
+    /**
+     * Generates example values for header parameters
+     *
+     * Uses explicit examples from the spec if available, otherwise generates
+     * sensible defaults based on common header names. Supports variable
+     * templating for sensitive values like tokens and API keys.
+     *
+     * @private
+     * @param {Object} resolvedParam - The resolved parameter object
+     * @returns {string} Example value for the header
+     */
     _generateHeaderExample(resolvedParam) {
         let defaultExample = resolvedParam.example || resolvedParam.schema?.example || '';
 
@@ -183,6 +268,18 @@ class OpenApiParser {
         return defaultExample;
     }
 
+    /**
+     * Parses security requirements into authentication configuration
+     *
+     * Converts OpenAPI security schemes (Bearer, Basic, API Key, OAuth2) into
+     * the application's internal authentication configuration format. Only
+     * processes the first security requirement if multiple are defined.
+     *
+     * @private
+     * @param {Array<Object>} securityRequirements - Array of security requirement objects
+     * @param {Object} openApiSpec - The full OpenAPI specification for scheme lookup
+     * @returns {Object|null} Authentication configuration object, or null if no valid security found
+     */
     _parseSecurity(securityRequirements, openApiSpec) {
         if (!securityRequirements || !Array.isArray(securityRequirements) || securityRequirements.length === 0) {
             return null;
@@ -249,6 +346,19 @@ class OpenApiParser {
         };
     }
 
+    /**
+     * Imports an OpenAPI file and stores it as a collection
+     *
+     * Reads and parses OpenAPI files in JSON or YAML format, converts them to
+     * collections, and persists them to electron-store. Automatically initializes
+     * storage if undefined (handles packaged app first-run scenarios). Also stores
+     * the base URL as a collection variable if present.
+     *
+     * @async
+     * @param {string} filePath - Absolute path to the OpenAPI file (.json or .yaml/.yml)
+     * @returns {Promise<Object>} The created collection object
+     * @throws {Error} If file reading or parsing fails
+     */
     async importOpenApiFile(filePath) {
         const fileContent = await fs.readFile(filePath, 'utf8');
 

@@ -13,7 +13,10 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "lint": "echo \"Add linting tool like eslint if needed\"",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{js,json,md,css,html}\"",
+    "format:check": "prettier --check \"**/*.{js,json,md,css,html}\"",
     "dist": "electron-builder",
     "dist:linux": "electron-builder --linux",
     "dist:dir": "electron-builder --dir"
@@ -21,13 +24,19 @@
   "devDependencies": {
     "@babel/core": "^7.28.0",
     "@babel/preset-env": "^7.28.0",
+    "@eslint/js": "^9.39.1",
     "@jest/globals": "^30.0.4",
     "babel-jest": "^30.0.4",
     "electron": "^35.0.0",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.25.11",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jest": "^29.1.0",
+    "globals": "^16.5.0",
     "jest": "^30.0.4",
-    "jest-environment-jsdom": "^30.0.4"
+    "jest-environment-jsdom": "^30.0.4",
+    "prettier": "^3.6.2"
   },
   "dependencies": {
     "@codemirror/lang-html": "^6.4.11",
@@ -41,10 +50,14 @@
     "assert-plus": "^1.0.0",
     "axios": "^1.10.0",
     "codemirror": "^6.0.2",
+    "electron-log": "^5.4.3",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.1.0",
     "electron-window-state": "^5.0.3",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.1"
+  },
+  "overrides": {
+    "js-yaml": "^4.1.1"
   },
   "build": {
     "appId": "io.github.db_mobile.resonance",

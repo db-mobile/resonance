@@ -12,8 +12,13 @@
     "import": "Importieren",
     "empty": {
       "title": "Noch keine Sammlungen importiert",
-      "subtitle": "Importieren Sie eine OpenAPI-Sammlung zum Starten"
+      "subtitle": "Importieren Sie eine OpenAPI- oder Postman-Sammlung zum Starten"
     }
+  },
+  "import": {
+    "openapi": "OpenAPI-Sammlung",
+    "postman_collection": "Postman-Sammlung",
+    "postman_environment": "Postman-Umgebung"
   },
   "collection": {
     "rename": "Sammlung umbenennen",

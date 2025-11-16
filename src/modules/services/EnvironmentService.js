@@ -1,8 +1,31 @@
 /**
+ * @fileoverview Service for managing environment business logic with event notifications
+ * @module services/EnvironmentService
+ */
+
+/**
  * Service for managing environment business logic
- * Provides high-level environment operations with validation
+ *
+ * @class
+ * @classdesc Provides high-level environment operations with validation, error handling,
+ * and event notifications. Manages environment CRUD operations, active environment state,
+ * variable management, and import/export functionality. Implements observer pattern for
+ * environment change notifications to keep UI synchronized.
+ *
+ * Event types emitted:
+ * - 'environment-switched': When active environment changes
+ * - 'environment-created': When new environment is created
+ * - 'environment-updated': When environment is modified
+ * - 'environment-deleted': When environment is removed
+ * - 'environments-imported': When environments are imported
  */
 export class EnvironmentService {
+    /**
+     * Creates an EnvironmentService instance
+     *
+     * @param {EnvironmentRepository} environmentRepository - Data access layer
+     * @param {IStatusDisplay} statusDisplay - Status display interface
+     */
     constructor(environmentRepository, statusDisplay) {
         this.repository = environmentRepository;
         this.statusDisplay = statusDisplay;
@@ -10,21 +33,37 @@ export class EnvironmentService {
     }
 
     /**
-     * Register listener for environment changes
+     * Registers a listener for environment changes
+     *
+     * Listener receives event objects with type and relevant data.
+     *
+     * @param {Function} callback - The callback function
+     * @param {Object} callback.event - Event object
+     * @param {string} callback.event.type - Event type
+     * @returns {void}
      */
     addChangeListener(callback) {
         this.listeners.add(callback);
     }
 
     /**
-     * Remove change listener
+     * Removes a change listener
+     *
+     * @param {Function} callback - The callback function to remove
+     * @returns {void}
      */
     removeChangeListener(callback) {
         this.listeners.delete(callback);
     }
 
     /**
-     * Notify all listeners of environment change
+     * Notifies all listeners of environment change
+     *
+     * Catches and logs listener errors to prevent disruption.
+     *
+     * @private
+     * @param {Object} event - Event object with type and data
+     * @returns {void}
      */
     _notifyListeners(event) {
         this.listeners.forEach(callback => {
@@ -37,7 +76,11 @@ export class EnvironmentService {
     }
 
     /**
-     * Get all environments
+     * Gets all environments
+     *
+     * @async
+     * @returns {Promise<Array<Object>>} Array of environment objects
+     * @throws {Error} If loading fails
      */
     async getAllEnvironments() {
         try {
@@ -50,7 +93,10 @@ export class EnvironmentService {
     }
 
     /**
-     * Get active environment
+     * Gets the active environment
+     *
+     * @async
+     * @returns {Promise<Object|null>} Active environment object or null if none active
      */
     async getActiveEnvironment() {
         try {
@@ -62,7 +108,10 @@ export class EnvironmentService {
     }
 
     /**
-     * Get active environment ID
+     * Gets the active environment ID
+     *
+     * @async
+     * @returns {Promise<string|null>} Active environment ID or null if none active
      */
     async getActiveEnvironmentId() {
         try {
@@ -74,7 +123,15 @@ export class EnvironmentService {
     }
 
     /**
-     * Switch active environment
+     * Switches to a different environment
+     *
+     * Updates active environment and notifies listeners of change.
+     *
+     * @async
+     * @param {string} environmentId - The ID of environment to activate
+     * @returns {Promise<Object>} The activated environment object
+     * @throws {Error} If environment not found or switch fails
+     * @fires EnvironmentService#environment-switched
      */
     async switchEnvironment(environmentId) {
         try {
@@ -100,7 +157,16 @@ export class EnvironmentService {
     }
 
     /**
-     * Create new environment
+     * Creates a new environment
+     *
+     * Validates name and notifies listeners of creation.
+     *
+     * @async
+     * @param {string} name - Environment name (required, non-empty)
+     * @param {Object} [variables={}] - Initial variables as key-value object
+     * @returns {Promise<Object>} The created environment object
+     * @throws {Error} If name is invalid or creation fails
+     * @fires EnvironmentService#environment-created
      */
     async createEnvironment(name, variables = {}) {
         try {
@@ -126,7 +192,18 @@ export class EnvironmentService {
     }
 
     /**
-     * Update environment
+     * Updates an environment
+     *
+     * Validates updates and notifies listeners of change.
+     *
+     * @async
+     * @param {string} environmentId - The environment ID
+     * @param {Object} updates - Update object
+     * @param {string} [updates.name] - New name (validated if provided)
+     * @param {Object} [updates.variables] - New variables object
+     * @returns {Promise<Object>} The updated environment object
+     * @throws {Error} If validation fails or update fails
+     * @fires EnvironmentService#environment-updated
      */
     async updateEnvironment(environmentId, updates) {
         try {
@@ -139,7 +216,7 @@ export class EnvironmentService {
 
             const updatedEnvironment = await this.repository.updateEnvironment(environmentId, updates);
 
-            this.statusDisplay.update(`Environment updated`, null);
+            this.statusDisplay.update('Environment updated', null);
 
             this._notifyListeners({
                 type: 'environment-updated',
@@ -154,14 +231,30 @@ export class EnvironmentService {
     }
 
     /**
-     * Rename environment
+     * Renames an environment
+     *
+     * Convenience method that calls updateEnvironment.
+     *
+     * @async
+     * @param {string} environmentId - The environment ID
+     * @param {string} newName - New name for environment
+     * @returns {Promise<Object>} The updated environment object
+     * @throws {Error} If name is invalid or update fails
      */
     async renameEnvironment(environmentId, newName) {
-        return await this.updateEnvironment(environmentId, { name: newName });
+        return this.updateEnvironment(environmentId, { name: newName });
     }
 
     /**
-     * Delete environment
+     * Deletes an environment
+     *
+     * Notifies listeners of deletion.
+     *
+     * @async
+     * @param {string} environmentId - The environment ID to delete
+     * @returns {Promise<boolean>} True if deletion successful
+     * @throws {Error} If environment not found or deletion fails
+     * @fires EnvironmentService#environment-deleted
      */
     async deleteEnvironment(environmentId) {
         try {
@@ -187,7 +280,15 @@ export class EnvironmentService {
     }
 
     /**
-     * Duplicate environment
+     * Duplicates an environment
+     *
+     * Creates a copy with unique name and notifies listeners.
+     *
+     * @async
+     * @param {string} environmentId - The environment ID to duplicate
+     * @returns {Promise<Object>} The duplicated environment object
+     * @throws {Error} If environment not found or duplication fails
+     * @fires EnvironmentService#environment-created
      */
     async duplicateEnvironment(environmentId) {
         try {

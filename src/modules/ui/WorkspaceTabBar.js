@@ -1,8 +1,15 @@
 /**
+ * @fileoverview Tab bar UI component for workspace tab management
+ * @module ui/WorkspaceTabBar
+ */
+
+/**
  * WorkspaceTabBar
  *
- * UI component for the workspace tab bar.
- * Handles rendering and interaction with workspace tabs.
+ * @class
+ * @classdesc UI component for the workspace tab bar. Handles rendering and interaction
+ * with workspace tabs including switching, closing, creating, renaming, and duplicating.
+ * Displays tab names with modified indicators and provides context menus.
  */
 export class WorkspaceTabBar {
     constructor(containerId) {
@@ -206,7 +213,7 @@ export class WorkspaceTabBar {
      * @private
      */
     _updateScrollButtons() {
-        if (!this.tabBar || !this.leftScrollBtn || !this.rightScrollBtn) return;
+        if (!this.tabBar || !this.leftScrollBtn || !this.rightScrollBtn) {return;}
 
         const { scrollLeft, scrollWidth, clientWidth } = this.tabBar;
         const hasOverflow = scrollWidth > clientWidth;
@@ -497,7 +504,7 @@ export class WorkspaceTabBar {
      */
     updateTab(tabId, updates) {
         const tabEl = this.container?.querySelector(`[data-tab-id="${tabId}"]`);
-        if (!tabEl) return;
+        if (!tabEl) {return;}
 
         // Update the stored tabs array
         if (this.tabs) {
@@ -544,7 +551,7 @@ export class WorkspaceTabBar {
      * @param {string} tabId
      */
     setActiveTab(tabId) {
-        if (!this.container) return;
+        if (!this.container) {return;}
 
         // Update stored active tab ID
         this.activeTabId = tabId;

@@ -1,10 +1,19 @@
+/**
+ * @fileoverview Main renderer process orchestrator for Resonance
+ * @module renderer
+ *
+ * Initializes and coordinates all UI modules, controllers, services, and repositories.
+ * Sets up event listeners, keyboard shortcuts, and manages the application lifecycle
+ * in the renderer process. This is the entry point for the Electron renderer.
+ */
+
 import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, pathParamsList, queryParamsList, headersList, authTypeSelect, responseBodyContainer, statusDisplay, responseHeadersDisplay, responseCookiesDisplay } from './modules/domElements.js';
 
 import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl, setUrlUpdating } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest, handleCancelRequest, handleGenerateCurl } from './modules/apiHandler.js';
-import { loadCollections, importOpenApiFile, initializeBodyTracking, restoreLastSelectedRequest } from './modules/collectionManager.js';
+import { loadCollections, importOpenApiFile, importPostmanCollection, importPostmanEnvironment, initializeBodyTracking } from './modules/collectionManager.js';
 import { ThemeManager, SettingsModal } from './modules/themeManager.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
 import { TimeoutManager } from './modules/timeoutManager.js';
@@ -18,6 +27,7 @@ import { EnvironmentRepository } from './modules/storage/EnvironmentRepository.j
 import { EnvironmentService } from './modules/services/EnvironmentService.js';
 import { EnvironmentManager } from './modules/ui/EnvironmentManager.js';
 import { EnvironmentSelector } from './modules/ui/EnvironmentSelector.js';
+import { ContextMenu } from './modules/ui/ContextMenu.js';
 import { ProxyController } from './modules/controllers/ProxyController.js';
 import { ProxyRepository } from './modules/storage/ProxyRepository.js';
 import { ProxyService } from './modules/services/ProxyService.js';
@@ -46,12 +56,19 @@ const proxyController = new ProxyController(proxyService);
 const environmentRepository = new EnvironmentRepository(window.electronAPI);
 const environmentService = new EnvironmentService(environmentRepository, statusDisplayAdapter);
 const environmentManager = new EnvironmentManager(environmentService);
+
+// Create environment controller first
+let environmentController; // eslint-disable-line prefer-const
+
+// Create environment selector with callbacks that will use the controller
 const environmentSelector = new EnvironmentSelector(
     environmentService,
     (envId) => environmentController.switchEnvironment(envId),
     () => environmentController.openEnvironmentManager()
 );
-const environmentController = new EnvironmentController(
+
+// Now create the controller
+environmentController = new EnvironmentController(
     environmentService,
     environmentManager,
     environmentSelector
@@ -91,7 +108,19 @@ const workspaceTabController = new WorkspaceTabController(
     responseContainerManager
 );
 
-// Initialize keyboard shortcuts
+/**
+ * Initializes application keyboard shortcuts
+ *
+ * Registers all keyboard shortcuts for the application including:
+ * - Request actions (send, cancel, generate cURL)
+ * - Navigation (focus URL, toggle sidebars)
+ * - Tab switching (request tabs, workspace tabs)
+ * - Settings and help
+ *
+ * Uses platform-aware modifier keys (Cmd on macOS, Ctrl on Windows/Linux).
+ *
+ * @returns {void}
+ */
 function initKeyboardShortcuts() {
     // Initialize the shortcuts manager
     keyboardShortcuts.init();
@@ -121,7 +150,7 @@ function initKeyboardShortcuts() {
     // Navigation & UI
     keyboardShortcuts.register('KeyL', {
         ctrl: true,
-        handler: (e) => {
+        handler: (_e) => {
             if (urlInput) {
                 urlInput.focus();
                 urlInput.select();
@@ -162,11 +191,11 @@ function initKeyboardShortcuts() {
                 if (isVisible) {
                     historySidebar.classList.remove('visible');
                     historyResizerHandle.classList.remove('visible');
-                    if (historyToggleBtn) historyToggleBtn.classList.remove('active');
+                    if (historyToggleBtn) {historyToggleBtn.classList.remove('active');}
                 } else {
                     historySidebar.classList.add('visible');
                     historyResizerHandle.classList.add('visible');
-                    if (historyToggleBtn) historyToggleBtn.classList.add('active');
+                    if (historyToggleBtn) {historyToggleBtn.classList.add('active');}
                 }
             }
         },
@@ -336,7 +365,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     curlBtn.addEventListener('click', handleGenerateCurl);
     sendRequestBtn.addEventListener('click', handleSendRequest);
     cancelRequestBtn.addEventListener('click', handleCancelRequest);
-    importCollectionBtn.addEventListener('click', importOpenApiFile);
+
+    // Import menu for OpenAPI and Postman formats
+    const importMenu = new ContextMenu();
+    importCollectionBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        importMenu.show(event, [
+            {
+                label: 'OpenAPI Collection',
+                translationKey: 'import.openapi',
+                icon: '<path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path><path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14 3v6h6"></path>',
+                onClick: importOpenApiFile
+            },
+            {
+                label: 'Postman Collection',
+                translationKey: 'import.postman_collection',
+                icon: '<path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>',
+                onClick: importPostmanCollection
+            },
+            {
+                label: 'Postman Environment',
+                translationKey: 'import.postman_environment',
+                icon: '<path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>',
+                onClick: importPostmanEnvironment
+            }
+        ]);
+    });
 
     const settingsBtn = document.getElementById('settings-btn');
     if (settingsBtn) {
@@ -403,7 +457,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Activate default response tab
     activateTab('response', 'response-body');
 
-    document.addEventListener('languageChanged', (event) => {
+    document.addEventListener('languageChanged', (_event) => {
         // Any dynamic content that needs special handling can be refreshed here
     });
 
@@ -446,10 +500,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const pathParamsList = document.getElementById('path-params-list');
     const headersList = document.getElementById('headers-list');
-    const queryParamsList = document.getElementById('query-params-list');
+    const _queryParamsList = document.getElementById('query-params-list');
 
-    if (pathParamsList.children.length === 0) addKeyValueRow(pathParamsList);
-    if (headersList.children.length === 0) addKeyValueRow(headersList, 'Content-Type', 'application/json');
+    if (pathParamsList.children.length === 0) {addKeyValueRow(pathParamsList);}
+    if (headersList.children.length === 0) {addKeyValueRow(headersList, 'Content-Type', 'application/json');}
 
     updateQueryParamsFromUrl();
 
@@ -459,7 +513,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // Save current tab state before window closes
-window.addEventListener('beforeunload', async (e) => {
+window.addEventListener('beforeunload', async (_e) => {
     try {
         const activeTabId = await workspaceTabService.getActiveTabId();
         if (activeTabId) {

@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Main process entry point for Resonance Electron application
+ * @module main
+ *
+ * Initializes the Electron application, sets up IPC handlers, and manages
+ * the application lifecycle. Coordinates communication between the main
+ * process and renderer process through secure IPC channels.
+ */
+
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import Store from 'electron-store';
 
@@ -7,6 +16,14 @@ import StoreHandler from './main/storeHandlers.js';
 import ProxyHandler from './main/proxyHandlers.js';
 import SchemaProcessor from './main/schemaProcessor.js';
 import OpenApiParser from './main/openApiParser.js';
+import PostmanParser from './main/postmanParser.js';
+import loggerService from './services/LoggerService.js';
+
+// Initialize logger for main process
+loggerService.initialize({
+    appName: 'Resonance',
+    isDevelopment: !app.isPackaged
+});
 
 const store = new Store({
     name: 'api-collections',
@@ -62,42 +79,35 @@ const apiRequestHandler = new ApiRequestHandler(store, proxyHandler);
 const storeHandler = new StoreHandler(store);
 const schemaProcessor = new SchemaProcessor();
 const openApiParser = new OpenApiParser(schemaProcessor, store);
+const postmanParser = new PostmanParser(store);
 
 app.whenReady().then(() => {
     windowManager.createWindow();
 
-    app.on('activate', function () {
+    app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
             windowManager.createWindow();
         }
     });
 });
 
-app.on('window-all-closed', function () {
+app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit();
     }
 });
 
-ipcMain.handle('send-api-request', async (event, requestOptions) => {
-    return apiRequestHandler.handleApiRequest(requestOptions);
-});
+ipcMain.handle('send-api-request', async (_event, requestOptions) => apiRequestHandler.handleApiRequest(requestOptions));
 
-ipcMain.handle('cancel-api-request', async (event) => {
-    return apiRequestHandler.cancelRequest();
-});
+ipcMain.handle('cancel-api-request', async (_event) => apiRequestHandler.cancelRequest());
 
-ipcMain.handle('store:get', (event, key) => {
-    return storeHandler.get(key);
-});
+ipcMain.handle('store:get', (_event, key) => storeHandler.get(key));
 
 ipcMain.handle('store:set', (event, key, value) => {
     storeHandler.set(key, value);
 });
 
-ipcMain.handle('settings:get', () => {
-    return storeHandler.getSettings();
-});
+ipcMain.handle('settings:get', () => storeHandler.getSettings());
 
 ipcMain.handle('settings:set', (event, settings) => {
     storeHandler.setSettings(settings);
@@ -127,15 +137,83 @@ ipcMain.handle('import-openapi-file', async () => {
     }
 });
 
+ipcMain.handle('import-postman-collection', async () => {
+    const mainWindow = windowManager.getMainWindow();
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openFile'],
+        filters: [
+            { name: 'Postman Collection', extensions: ['json'] }
+        ]
+    });
+
+    if (result.canceled) {
+        return null;
+    }
+
+    try {
+        const filePath = result.filePaths[0];
+        const importResult = await postmanParser.importPostmanFile(filePath);
+        return importResult;
+    } catch (error) {
+        console.error('Error importing Postman collection:', error);
+        throw error;
+    }
+});
+
+ipcMain.handle('import-postman-environment', async () => {
+    const mainWindow = windowManager.getMainWindow();
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openFile'],
+        filters: [
+            { name: 'Postman Environment', extensions: ['json'] }
+        ]
+    });
+
+    if (result.canceled) {
+        return null;
+    }
+
+    try {
+        const filePath = result.filePaths[0];
+        const environment = await postmanParser.importPostmanEnvironment(filePath);
+        return environment;
+    } catch (error) {
+        console.error('Error importing Postman environment:', error);
+        throw error;
+    }
+});
+
 // Proxy settings handlers
-ipcMain.handle('proxy:get', () => {
-    return proxyHandler.getProxySettings();
+ipcMain.handle('proxy:get', () => proxyHandler.getProxySettings());
+
+ipcMain.handle('proxy:set', (_event, settings) => proxyHandler.setProxySettings(settings));
+
+ipcMain.handle('proxy:test', async () => proxyHandler.testProxyConnection());
+
+// Logger handlers - forward renderer logs to main process logger
+ipcMain.handle('logger:error', (_event, scope, message, meta) => {
+    const log = loggerService.scope(scope);
+    log.error(message, meta);
 });
 
-ipcMain.handle('proxy:set', (event, settings) => {
-    return proxyHandler.setProxySettings(settings);
+ipcMain.handle('logger:warn', (_event, scope, message, meta) => {
+    const log = loggerService.scope(scope);
+    log.warn(message, meta);
 });
 
-ipcMain.handle('proxy:test', async () => {
-    return await proxyHandler.testProxyConnection();
+ipcMain.handle('logger:info', (_event, scope, message, meta) => {
+    const log = loggerService.scope(scope);
+    log.info(message, meta);
+});
+
+ipcMain.handle('logger:debug', (_event, scope, message, meta) => {
+    const log = loggerService.scope(scope);
+    log.debug(message, meta);
+});
+
+ipcMain.handle('logger:verbose', (_event, scope, message, meta) => {
+    const log = loggerService.scope(scope);
+    log.verbose(message, meta);
 });

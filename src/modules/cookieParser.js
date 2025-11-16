@@ -125,9 +125,9 @@ export function formatCookiesAsHtml(cookies) {
 
         // Build flags column
         const flags = [];
-        if (cookie.httpOnly) flags.push('HttpOnly');
-        if (cookie.secure) flags.push('Secure');
-        if (cookie.sameSite) flags.push(`SameSite=${cookie.sameSite}`);
+        if (cookie.httpOnly) {flags.push('HttpOnly');}
+        if (cookie.secure) {flags.push('Secure');}
+        if (cookie.sameSite) {flags.push(`SameSite=${cookie.sameSite}`);}
 
         html += `<td>${flags.length > 0 ? escapeHtml(flags.join(', ')) : '-'}</td>`;
         html += '</tr>';
@@ -143,7 +143,7 @@ export function formatCookiesAsHtml(cookies) {
  * @returns {string} Escaped string
  */
 function escapeHtml(str) {
-    if (str == null) return '';
+    if (str == null) {return '';}
 
     const div = document.createElement('div');
     div.textContent = str;

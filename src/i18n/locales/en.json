@@ -12,8 +12,13 @@
     "import": "Import",
     "empty": {
       "title": "No collections imported yet",
-      "subtitle": "Import an OpenAPI collection to get started"
+      "subtitle": "Import an OpenAPI or Postman collection to get started"
     }
+  },
+  "import": {
+    "openapi": "OpenAPI Collection",
+    "postman_collection": "Postman Collection",
+    "postman_environment": "Postman Environment"
   },
   "collection": {
     "rename": "Rename Collection",

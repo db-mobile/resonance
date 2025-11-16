@@ -1,14 +1,44 @@
+/**
+ * @fileoverview HTTP API request handler with support for multiple protocols and authentication methods
+ * @module main/apiRequestHandlers
+ */
+
 import axios from 'axios';
 import http from 'http';
 import https from 'https';
+import { handleDigestAuth } from './digestAuthHandler.js';
 
+/**
+ * Handler for making HTTP API requests with detailed timing and metrics
+ *
+ * @class
+ * @classdesc Manages HTTP requests to external APIs using axios with support for
+ * multiple HTTP versions (1.1, 2, 3), custom timeouts, proxy configuration,
+ * digest authentication, and detailed performance timing metrics. Tracks socket-level
+ * events for precise DNS, TCP, and TLS timing measurements.
+ */
 class ApiRequestHandler {
+    /**
+     * Creates an ApiRequestHandler instance
+     *
+     * @param {Object} store - Electron-store instance for settings retrieval
+     * @param {Object} proxyHandler - ProxyHandler instance for proxy configuration
+     */
     constructor(store, proxyHandler) {
         this.store = store;
         this.proxyHandler = proxyHandler;
         this.currentRequestController = null;
     }
 
+    /**
+     * Calculates the byte size of response data
+     *
+     * Uses TextEncoder to accurately measure the size of string data in bytes,
+     * accounting for multi-byte UTF-8 characters.
+     *
+     * @param {string|null} rawData - The raw response data
+     * @returns {number} Size in bytes, or 0 if data is null/undefined
+     */
     calculateResponseSize(rawData) {
         if (!rawData) {
             return 0;
@@ -17,6 +47,17 @@ class ApiRequestHandler {
         return new TextEncoder().encode(rawData).length;
     }
 
+    /**
+     * Creates a custom HTTP/HTTPS agent with DNS timing capture
+     *
+     * This method is currently unused but provides an alternative approach for
+     * capturing DNS lookup timing using a custom agent with lookup override.
+     *
+     * @private
+     * @param {boolean} isHttps - Whether to create an HTTPS agent or HTTP agent
+     * @param {Object} timings - Timings object to populate with DNS lookup duration
+     * @returns {Object} Custom http.Agent or https.Agent instance
+     */
     createTimingAgent(isHttps, timings) {
         const Agent = isHttps ? https.Agent : http.Agent;
 
@@ -24,7 +65,7 @@ class ApiRequestHandler {
             keepAlive: false,
             lookup: (hostname, options, callback) => {
                 const dnsStart = Date.now();
-                const originalLookup = isHttps ? https.Agent.prototype.constructor.super_.prototype.lookup : http.Agent.prototype.constructor.super_.prototype.lookup;
+                const _originalLookup = isHttps ? https.Agent.prototype.constructor.super_.prototype.lookup : http.Agent.prototype.constructor.super_.prototype.lookup;
 
                 require('dns').lookup(hostname, options, (err, address, family) => {
                     timings.dnsLookup = Date.now() - dnsStart;
@@ -34,6 +75,25 @@ class ApiRequestHandler {
         });
     }
 
+    /**
+     * Handles an HTTP API request with detailed timing metrics
+     *
+     * Executes an HTTP request with configurable options including method, URL, headers,
+     * and body. Captures detailed performance metrics including DNS lookup, TCP connection,
+     * TLS handshake, time to first byte, and download time. Supports HTTP version selection,
+     * request timeouts, proxy configuration, and digest authentication.
+     *
+     * @async
+     * @param {Object} requestOptions - Configuration for the HTTP request
+     * @param {string} requestOptions.method - HTTP method (GET, POST, PUT, etc.)
+     * @param {string} requestOptions.url - Target URL for the request
+     * @param {Object} [requestOptions.headers] - HTTP headers to include
+     * @param {Object|string} [requestOptions.body] - Request body for POST/PUT/PATCH
+     * @param {Object} [requestOptions.auth] - Digest authentication credentials
+     * @param {string} [requestOptions.auth.username] - Username for digest auth
+     * @param {string} [requestOptions.auth.password] - Password for digest auth
+     * @returns {Promise<Object>} Response object with data, status, headers, and timing metrics
+     */
     async handleApiRequest(requestOptions) {
         let startTime = Date.now();
         const timings = {
@@ -155,7 +215,30 @@ class ApiRequestHandler {
 
             startTime = Date.now();
             timings.startTime = startTime;
-            const response = await axios(axiosConfig);
+
+            let response;
+
+            // Handle Digest Authentication if auth config is provided
+            if (requestOptions.auth && requestOptions.auth.username) {
+                // Create a wrapper function for axios request that can accept auth header
+                const makeRequest = async (authHeader) => {
+                    const config = { ...axiosConfig };
+                    if (authHeader) {
+                        config.headers = { ...config.headers, Authorization: authHeader };
+                    }
+                    return axios(config);
+                };
+
+                response = await handleDigestAuth(
+                    makeRequest,
+                    requestOptions.auth,
+                    requestOptions.method,
+                    requestOptions.url
+                );
+            } else {
+                response = await axios(axiosConfig);
+            }
+
             const endTime = Date.now();
 
             timings.total = endTime - startTime;
@@ -196,9 +279,9 @@ class ApiRequestHandler {
             if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
                 return {
                     success: false,
-                    message: "Request was cancelled",
+                    message: 'Request was cancelled',
                     status: null,
-                    statusText: "Cancelled",
+                    statusText: 'Cancelled',
                     data: null,
                     headers: {},
                     cancelled: true,
@@ -242,7 +325,7 @@ class ApiRequestHandler {
             } else if (error.request) {
                 serializedError = {
                     success: false,
-                    message: "No response received from server.",
+                    message: 'No response received from server.',
                     status: null,
                     statusText: null,
                     data: null,
@@ -268,6 +351,14 @@ class ApiRequestHandler {
         }
     }
 
+    /**
+     * Cancels the currently active HTTP request
+     *
+     * Aborts the in-flight request using the AbortController signal if one exists.
+     * Safe to call even when no request is active.
+     *
+     * @returns {Object} Result object with success status and message
+     */
     cancelRequest() {
         if (this.currentRequestController) {
             this.currentRequestController.abort();
