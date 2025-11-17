@@ -1,4 +1,4 @@
-# Resonance 🎵
+# Resonance
 
 A clean and minimal API client with excellent user experience built with Electron.
 
@@ -6,7 +6,7 @@ A clean and minimal API client with excellent user experience built with Electro
 ![Electron](https://img.shields.io/badge/Electron-v35.0.0-brightgreen.svg)
 ![Node.js](https://img.shields.io/badge/Node.js-Latest-green.svg)
 
-## Features ✨
+## Features
 
 ### Collection Import & Management
 - **OpenAPI/Swagger Import**: Import OpenAPI 3.0 specifications (YAML/JSON) with automatic schema-based example generation
@@ -51,16 +51,18 @@ A clean and minimal API client with excellent user experience built with Electro
 - **Secure Architecture**: Context isolation, secure IPC, and ASAR packaging
 - **Persistent Storage**: Auto-save for collections, variables, environments, settings, and history
 
-## Screenshots 📸
+## Screenshots
 
 ![Alt text](/assets/screenshots/main_window.png?raw=true "Main interface showing API request configuration")
 
-## Installation 🚀
+## Installation
 
 ### Prerequisites
 
-- Node.js (Latest stable version)
-- npm or yarn
+- **Node.js** v18.0.0 or higher (v20.x or later recommended)
+- **Git** (for cloning the repository)
+
+**Note:** npm comes bundled with Node.js and is the default package manager for this project.
 
 ### From Source
 
@@ -104,7 +106,7 @@ npm run dist:dir
 
 **Note:** The application uses ASAR packaging for improved performance and security. Builds are created using electron-builder.
 
-## Usage 📖
+## Usage
 
 ### Getting Started
 
@@ -183,7 +185,7 @@ Switch between themes in Settings:
 - **System**: Automatically matches your OS theme
 - **Blueprint**: Technical schematic-inspired design
 
-## Keyboard Shortcuts ⌨️
+## Keyboard Shortcuts
 
 Resonance includes comprehensive keyboard shortcuts to speed up your workflow. Press `Ctrl+/` (or `Cmd+/` on macOS) to view the shortcuts help dialog in the app.
 
@@ -214,7 +216,7 @@ Resonance includes comprehensive keyboard shortcuts to speed up your workflow. P
 
 **Note:** On macOS, use `Cmd` instead of `Ctrl`. Shortcuts are platform-aware and automatically adapt.
 
-## Architecture 🏗️
+## Architecture
 
 ### Project Structure
 
@@ -273,7 +275,7 @@ src/
   - ASAR integrity validation enabled
   - Only load app from ASAR in production
 
-## Development 🛠️
+## Development
 
 ### Scripts
 
@@ -306,7 +308,7 @@ The application follows a modular MVC-like architecture:
 3. Import and initialize in `renderer.js`
 4. Add IPC handlers in `main.js` if needed
 
-## Contributing 🤝
+## Contributing
 
 We welcome contributions! Please follow these guidelines:
 
@@ -331,19 +333,19 @@ We welcome contributions! Please follow these guidelines:
   - Run `npm run lint` before committing
   - Use `npm run format` to auto-format code
 
-## License 📄
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support 💬
+## Support
 
 - Create an issue for bug reports or feature requests
 - Check existing issues before creating new ones
 - Provide detailed information for faster resolution
 
-## Roadmap 🗺️
+## Roadmap
 
-### Completed ✅
+### Completed
 - [x] OpenAPI 3.0 import with schema-based generation
 - [x] **Postman collection import (v2.0 & v2.1)**
 - [x] **Postman environment import**
@@ -362,7 +364,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Test suite implementation (Jest configured)
 - [x] Keyboard shortcuts for all major actions
 
-### Planned 🚀
+### Planned
 - [ ] Pre/post-request scripts & testing framework
 - [ ] WebSocket support
 - [ ] Mock server functionality
@@ -373,11 +375,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Plugin system for extensions
 - [ ] Team collaboration features
 
-## Acknowledgments 🙏
+## Acknowledgments
 
 - Built with [Electron](https://electronjs.org/)
 - Inspired by modern API development tools
 
 ---
 
-Made with ❤️ for the API development community
+Made with love for the API development community

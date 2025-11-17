@@ -59,6 +59,8 @@ export class CollectionController {
         this.handleNewRequest = this.handleNewRequest.bind(this);
         this.handleNewCollection = this.handleNewCollection.bind(this);
         this.handleNewRequestInEmptySpace = this.handleNewRequestInEmptySpace.bind(this);
+        this.handleExportOpenApiJson = this.handleExportOpenApiJson.bind(this);
+        this.handleExportOpenApiYaml = this.handleExportOpenApiYaml.bind(this);
     }
 
     /**
@@ -180,7 +182,7 @@ export class CollectionController {
      * Handles right-click context menu on a collection
      *
      * Displays context menu with options: New Request, Manage Variables,
-     * Rename Collection, and Delete Collection.
+     * Export options, Rename Collection, and Delete Collection.
      *
      * @param {Event} event - The context menu event
      * @param {Object} collection - The collection object
@@ -199,6 +201,18 @@ export class CollectionController {
                 translationKey: 'context_menu.manage_variables',
                 icon: ContextMenu.createVariableIcon(),
                 onClick: () => this.handleVariables(collection)
+            },
+            {
+                label: 'Export as OpenAPI (JSON)',
+                translationKey: 'context_menu.export_openapi_json',
+                icon: ContextMenu.createExportIcon(),
+                onClick: () => this.handleExportOpenApiJson(collection)
+            },
+            {
+                label: 'Export as OpenAPI (YAML)',
+                translationKey: 'context_menu.export_openapi_yaml',
+                icon: ContextMenu.createExportIcon(),
+                onClick: () => this.handleExportOpenApiYaml(collection)
             },
             {
                 label: 'Rename Collection',
@@ -598,6 +612,40 @@ export class CollectionController {
             } catch (error) {
                 console.error('Error deleting collection:', error);
             }
+        }
+    }
+
+    /**
+     * Handles export of collection as OpenAPI JSON
+     *
+     * Triggers export process via service layer.
+     *
+     * @async
+     * @param {Object} collection - The collection to export
+     * @returns {Promise<void>}
+     */
+    async handleExportOpenApiJson(collection) {
+        try {
+            await this.service.exportCollectionAsOpenApi(collection.id, 'json');
+        } catch (error) {
+            console.error('Error exporting collection as OpenAPI JSON:', error);
+        }
+    }
+
+    /**
+     * Handles export of collection as OpenAPI YAML
+     *
+     * Triggers export process via service layer.
+     *
+     * @async
+     * @param {Object} collection - The collection to export
+     * @returns {Promise<void>}
+     */
+    async handleExportOpenApiYaml(collection) {
+        try {
+            await this.service.exportCollectionAsOpenApi(collection.id, 'yaml');
+        } catch (error) {
+            console.error('Error exporting collection as OpenAPI YAML:', error);
         }
     }
 

@@ -120,7 +120,6 @@ class PostmanParser {
             requestBody: this._parseBody(request.body)
         };
 
-        // Parse authentication if present
         if (request.auth) {
             endpoint.security = this._parseAuth(request.auth);
         }
@@ -352,7 +351,6 @@ class PostmanParser {
                 break;
 
             default:
-                // Unsupported auth type
                 return null;
         }
 
