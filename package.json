@@ -8,6 +8,7 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron . --no-sandbox",
+    "dev": "npm run build && electronmon . --no-sandbox",
     "build": "node build.js",
     "prestart": "npm run build",
     "test": "jest",
@@ -29,6 +30,7 @@
     "babel-jest": "^30.0.4",
     "electron": "^35.0.0",
     "electron-builder": "^26.0.12",
+    "electronmon": "^2.0.4",
     "esbuild": "^0.25.11",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
