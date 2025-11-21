@@ -118,6 +118,42 @@ export class CollectionService {
     }
 
     /**
+     * Exports a collection as OpenAPI specification
+     *
+     * Triggers the export process via IPC to the main process, which handles
+     * file dialog and file writing. Updates status display with progress.
+     *
+     * @async
+     * @param {string} collectionId - The ID of the collection to export
+     * @param {string} format - Export format ('json' or 'yaml')
+     * @returns {Promise<Object>} Result object with success status and file path
+     * @throws {Error} If collection is not found or export fails
+     */
+    async exportCollectionAsOpenApi(collectionId, format) {
+        try {
+            this.statusDisplay.update('Exporting collection...', null);
+
+            // Call IPC handler via electronAPI
+            const result = await window.electronAPI.collections.exportOpenApi(collectionId, format);
+
+            if (result.cancelled) {
+                this.statusDisplay.update('Export cancelled', null);
+                return { success: false, cancelled: true };
+            }
+
+            if (result.success) {
+                this.statusDisplay.update(`Collection exported successfully to ${format.toUpperCase()}`, null);
+                return result;
+            }
+
+            throw new Error('Export failed');
+        } catch (error) {
+            this.statusDisplay.update(`Export error: ${error.message}`, null);
+            throw error;
+        }
+    }
+
+    /**
      * Creates a new empty collection
      *
      * Generates a unique collection ID and initializes default structure.

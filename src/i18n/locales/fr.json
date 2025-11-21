@@ -36,6 +36,8 @@
     "new_collection": "Nouvelle collection",
     "new_request": "Nouvelle requête",
     "manage_variables": "Gérer les variables",
+    "export_openapi_json": "Exporter en OpenAPI (JSON)",
+    "export_openapi_yaml": "Exporter en OpenAPI (YAML)",
     "rename_collection": "Renommer la collection",
     "delete_collection": "Supprimer la collection",
     "delete_request": "Supprimer la requête"
