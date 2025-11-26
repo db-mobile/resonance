@@ -79,6 +79,14 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.6.0" date="2025-11-20">
+      <description>
+        <p>New features introduced</p>
+        <ul>
+          <li>Export collections to OpenAPI formats</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5.0" date="2025-11-16">
       <description>
         <p>New features introduced</p>

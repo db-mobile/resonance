@@ -10,6 +10,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import Store from 'electron-store';
 
+import fs from 'fs/promises';
 import WindowManager from './main/windowManager.js';
 import ApiRequestHandler from './main/apiRequestHandlers.js';
 import StoreHandler from './main/storeHandlers.js';
@@ -17,6 +18,7 @@ import ProxyHandler from './main/proxyHandlers.js';
 import SchemaProcessor from './main/schemaProcessor.js';
 import OpenApiParser from './main/openApiParser.js';
 import PostmanParser from './main/postmanParser.js';
+import OpenApiExporter from './main/openApiExporter.js';
 import loggerService from './services/LoggerService.js';
 
 // Initialize logger for main process
@@ -80,6 +82,7 @@ const storeHandler = new StoreHandler(store);
 const schemaProcessor = new SchemaProcessor();
 const openApiParser = new OpenApiParser(schemaProcessor, store);
 const postmanParser = new PostmanParser(store);
+const openApiExporter = new OpenApiExporter();
 
 app.whenReady().then(() => {
     windowManager.createWindow();
@@ -181,6 +184,56 @@ ipcMain.handle('import-postman-environment', async () => {
         return environment;
     } catch (error) {
         console.error('Error importing Postman environment:', error);
+        throw error;
+    }
+});
+
+// Export OpenAPI collection
+ipcMain.handle('export-openapi', async (_event, collectionId, format) => {
+    const mainWindow = windowManager.getMainWindow();
+
+    try {
+        // Get collection from store
+        const collections = store.get('collections');
+        if (!Array.isArray(collections)) {
+            throw new Error('No collections found in store');
+        }
+
+        const collection = collections.find(c => c.id === collectionId);
+        if (!collection) {
+            throw new Error(`Collection with id ${collectionId} not found`);
+        }
+
+        // Show save dialog
+        const fileExtension = format === 'yaml' ? 'yaml' : 'json';
+        const filterName = format === 'yaml' ? 'YAML Files' : 'JSON Files';
+
+        const result = await dialog.showSaveDialog(mainWindow, {
+            title: 'Export as OpenAPI',
+            defaultPath: `${collection.name}.openapi.${fileExtension}`,
+            filters: [
+                { name: filterName, extensions: [fileExtension] },
+                { name: 'All Files', extensions: ['*'] }
+            ]
+        });
+
+        if (result.canceled || !result.filePath) {
+            return { success: false, cancelled: true };
+        }
+
+        // Export collection to OpenAPI format
+        const openApiContent = openApiExporter.exportToOpenApi(collection, format);
+
+        // Write file
+        await fs.writeFile(result.filePath, openApiContent, 'utf8');
+
+        return {
+            success: true,
+            filePath: result.filePath,
+            format: format
+        };
+    } catch (error) {
+        console.error('Error exporting OpenAPI collection:', error);
         throw error;
     }
 });

@@ -99,7 +99,6 @@ export class DigestAuthHandler {
         const algorithm = (challenge.algorithm || 'MD5').toUpperCase();
         const opaque = challenge.opaque || '';
 
-        // Calculate HA1 - hash of username:realm:password
         let ha1;
         if (algorithm === 'MD5' || algorithm === 'MD5-SESS') {
             ha1 = this.md5(`${username}:${realm}:${password}`);
@@ -110,21 +109,16 @@ export class DigestAuthHandler {
             throw new Error(`Unsupported algorithm: ${algorithm}`);
         }
 
-        // Calculate HA2 - hash of method:uri
         const ha2 = this.md5(`${method}:${uri}`);
 
-        // Calculate response hash
         let response;
         if (qop === 'auth' || qop === 'auth-int') {
-            // Format nc as 8-digit hex
             const ncHex = (`00000000${  nc.toString(16)}`).slice(-8);
             response = this.md5(`${ha1}:${nonce}:${ncHex}:${cnonce}:${qop}:${ha2}`);
         } else {
-            // Legacy digest without qop
             response = this.md5(`${ha1}:${nonce}:${ha2}`);
         }
 
-        // Build authorization header
         let authHeader = `Digest username="${username}", realm="${realm}", nonce="${nonce}", uri="${uri}", response="${response}"`;
 
         if (algorithm) {
@@ -157,7 +151,6 @@ export class DigestAuthHandler {
             const urlObj = new URL(url);
             return urlObj.pathname + urlObj.search;
         } catch (error) {
-            // If URL parsing fails, try to extract path manually
             const match = url.match(/https?:\/\/[^/]+(\/.*)/);
             return match ? match[1] : '/';
         }
@@ -184,10 +177,8 @@ export class DigestAuthHandler {
  */
 export async function handleDigestAuth(axiosRequest, authConfig, method, url) {
     try {
-        // First attempt - will likely get 401
         return await axiosRequest();
     } catch (error) {
-        // Check if it's a 401 with Digest challenge
         if (error.response && error.response.status === 401) {
             const wwwAuthenticate = error.response.headers['www-authenticate'];
 
@@ -205,13 +196,11 @@ export async function handleDigestAuth(axiosRequest, authConfig, method, url) {
                         challenge: challenge
                     });
 
-                    // Retry request with digest auth header
                     return axiosRequest(authHeader);
                 }
             }
         }
 
-        // If it's not a digest auth challenge or retry failed, re-throw the error
         throw error;
     }
 }
