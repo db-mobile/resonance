@@ -124,7 +124,6 @@ class ApiRequestHandler {
                 transformResponse: [(data) => data]
             };
 
-            // Only set timeout if it's greater than 0 (0 means no timeout)
             if (requestTimeout > 0) {
                 axiosConfig.timeout = requestTimeout;
             }
@@ -142,7 +141,6 @@ class ApiRequestHandler {
                     break;
             }
 
-            // Add proxy configuration if available
             if (this.proxyHandler) {
                 const proxyConfig = this.proxyHandler.getAxiosProxyConfig(requestOptions.url);
                 if (proxyConfig) {
@@ -161,7 +159,6 @@ class ApiRequestHandler {
                 }
             }
 
-            // Custom agent to capture timing metrics
             const Agent = isHttps ? https.Agent : http.Agent;
             const agent = new Agent({ keepAlive: false });
 
@@ -174,7 +171,6 @@ class ApiRequestHandler {
             axiosConfig.httpAgent = !isHttps ? agent : undefined;
             axiosConfig.httpsAgent = isHttps ? agent : undefined;
 
-            // Intercept socket events for detailed timing
             const originalCreateConnection = agent.createConnection;
             agent.createConnection = function(options, callback) {
                 dnsStart = Date.now();
@@ -218,9 +214,7 @@ class ApiRequestHandler {
 
             let response;
 
-            // Handle Digest Authentication if auth config is provided
             if (requestOptions.auth && requestOptions.auth.username) {
-                // Create a wrapper function for axios request that can accept auth header
                 const makeRequest = async (authHeader) => {
                     const config = { ...axiosConfig };
                     if (authHeader) {

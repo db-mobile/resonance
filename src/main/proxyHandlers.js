@@ -42,7 +42,6 @@ class ProxyHandler {
                 return this._getDefaultProxySettings();
             }
 
-            // Merge with defaults to ensure all fields exist
             return {
                 ...this._getDefaultProxySettings(),
                 ...settings,
@@ -100,7 +99,6 @@ class ProxyHandler {
 
             let proxyConfig;
 
-            // Use system proxy if enabled
             if (settings.useSystemProxy) {
                 proxyConfig = this._getSystemProxySettings();
                 if (!proxyConfig) {
@@ -110,7 +108,6 @@ class ProxyHandler {
                     };
                 }
             } else {
-                // Manual proxy configuration
                 if (!settings.host || !settings.port) {
                     return {
                         success: false,
@@ -118,14 +115,12 @@ class ProxyHandler {
                     };
                 }
 
-                // Build proxy configuration for axios
                 proxyConfig = {
                     protocol: settings.type,
                     host: settings.host,
                     port: settings.port
                 };
 
-                // Add authentication if enabled
                 if (settings.auth?.enabled && settings.auth.username) {
                     proxyConfig.auth = {
                         username: settings.auth.username,
@@ -134,8 +129,6 @@ class ProxyHandler {
                 }
             }
 
-            // Test connection to a public IP checker service
-            // This helps verify the proxy is working by comparing IPs
             const testUrl = 'https://api.ipify.org?format=json';
 
             const axiosConfig = {
@@ -206,17 +199,14 @@ class ProxyHandler {
         try {
             const settings = this.getProxySettings();
 
-            // If proxy is disabled, return null
             if (!settings.enabled) {
                 return null;
             }
 
-            // Check if URL should bypass proxy
             if (this._shouldBypassProxy(requestUrl, settings.bypassList)) {
                 return null;
             }
 
-            // Use system proxy if enabled
             if (settings.useSystemProxy) {
                 const systemProxy = this._getSystemProxySettings();
                 if (systemProxy) {
@@ -227,14 +217,12 @@ class ProxyHandler {
                 
             }
 
-            // Build manual proxy config
             const proxyConfig = {
                 protocol: settings.type,
                 host: settings.host,
                 port: settings.port
             };
 
-            // Add authentication if enabled
             if (settings.auth?.enabled && settings.auth.username) {
                 proxyConfig.auth = {
                     username: settings.auth.username,
@@ -273,16 +261,13 @@ class ProxyHandler {
                 const cleanPattern = pattern.trim();
                 if (!cleanPattern) {return false;}
 
-                // Exact match
                 if (cleanPattern === hostname) {return true;}
 
-                // Wildcard match (*.example.com)
                 if (cleanPattern.startsWith('*.')) {
                     const domain = cleanPattern.substring(2);
                     return hostname.endsWith(domain);
                 }
 
-                // Suffix match (.example.com matches subdomain.example.com)
                 if (cleanPattern.startsWith('.')) {
                     return hostname.endsWith(cleanPattern);
                 }
@@ -337,7 +322,6 @@ class ProxyHandler {
         const httpsProxy = process.env.HTTPS_PROXY || process.env.https_proxy;
         const _noProxy = process.env.NO_PROXY || process.env.no_proxy;
 
-        // Use HTTPS proxy if available, otherwise HTTP proxy
         const proxyUrl = httpsProxy || httpProxy;
 
         if (!proxyUrl) {
@@ -352,7 +336,6 @@ class ProxyHandler {
                 port: parseInt(url.port, 10) || (url.protocol === 'https:' ? 443 : 8080)
             };
 
-            // Add authentication if present in URL
             if (url.username) {
                 proxyConfig.auth = {
                     username: url.username,
