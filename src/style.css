@@ -1284,11 +1284,13 @@ body {
 }
 
 .response-display {
-  flex: 1;
-  overflow: auto;
+  flex: 1 1 0;
+  overflow: hidden;
   background: var(--bg-white);
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  height: 100%;
 }
 
 .response-display .tab-content {
@@ -1301,7 +1303,33 @@ body {
   display: flex;
 }
 
+/* Workspace Tab Response Container */
+.workspace-tab-response {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.workspace-tab-response .tab-content {
+  flex: 1 1 0;
+  display: none;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.workspace-tab-response .tab-content.active {
+  display: flex;
+}
+
 .response-display pre {
+  flex: 1;
+  min-height: 0;
   background: var(--bg-secondary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
@@ -1310,20 +1338,23 @@ body {
   font-size: var(--font-size-xs);
   line-height: var(--line-height-normal);
   color: var(--text-primary);
-  overflow-x: auto;
+  overflow: auto;
   white-space: pre-wrap;
   word-wrap: break-word;
   margin: 0;
+  margin-bottom: 40px;
 }
 
 /* Response Body with CodeMirror */
 .response-body-container {
   display: flex;
   flex: 1;
+  min-height: 0;
   background: var(--bg-secondary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   overflow: hidden;
+  margin-bottom: 40px;
 }
 
 .response-body-container .cm-editor {
@@ -2791,6 +2822,7 @@ body {
   overflow-y: auto;
   height: 100%;
   background: var(--bg-primary);
+  margin-bottom: 40px;
 }
 
 .response-performance-display .no-data {

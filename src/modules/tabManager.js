@@ -53,7 +53,7 @@ export function initTabListeners() {
             const targetTabId = button.dataset.tab;
 
             // Get the active workspace tab container
-            const activeContainer = document.querySelector('.workspace-tab-response[style*="display: block"]');
+            const activeContainer = document.querySelector('.workspace-tab-response[style*="display: flex"]');
             if (activeContainer) {
                 // Deactivate all tab contents in this workspace tab
                 const allContents = activeContainer.querySelectorAll('.tab-content');
@@ -100,7 +100,7 @@ export function activateTab(tabType, tabId) {
     } else if (tabType === 'response') {
         buttons = document.querySelectorAll('.response-tabs .tab-button');
         // Get response tab contents from the active workspace tab container
-        const activeContainer = document.querySelector('.workspace-tab-response[style*="display: block"]');
+        const activeContainer = document.querySelector('.workspace-tab-response[style*="display: flex"]');
         if (activeContainer) {
             contents = activeContainer.querySelectorAll('.tab-content');
         } else {
@@ -122,7 +122,7 @@ export function activateTab(tabType, tabId) {
     // For response tabs, need to find the content within the active workspace tab
     let targetContent;
     if (tabType === 'response') {
-        const activeContainer = document.querySelector('.workspace-tab-response[style*="display: block"]');
+        const activeContainer = document.querySelector('.workspace-tab-response[style*="display: flex"]');
         if (activeContainer) {
             // Get the workspace tab ID from the container
             const workspaceTabId = activeContainer.dataset.tabId;

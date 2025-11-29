@@ -43,7 +43,7 @@ export class ResponseContainerManager {
 
         this.containers.forEach((container, id) => {
             if (id === tabId) {
-                container.wrapper.style.display = 'block';
+                container.wrapper.style.display = 'flex';
             } else {
                 container.wrapper.style.display = 'none';
             }
