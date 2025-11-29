@@ -270,11 +270,3 @@ ipcMain.handle('logger:verbose', (_event, scope, message, meta) => {
     const log = loggerService.scope(scope);
     log.verbose(message, meta);
 });
-
-// DevTools toggle handler
-ipcMain.handle('devtools:toggle', () => {
-    const mainWindow = BrowserWindow.getFocusedWindow();
-    if (mainWindow) {
-        mainWindow.webContents.toggleDevTools();
-    }
-});

@@ -68,12 +68,6 @@ class WindowManager {
             }
         });
 
-        globalShortcut.register('CommandOrControl+Shift+I', () => {
-            if (this.mainWindow) {
-                this.mainWindow.webContents.toggleDevTools();
-            }
-        });
-
         this.mainWindow.setMenu(null);
         this.mainWindow.loadFile('index.html');
 

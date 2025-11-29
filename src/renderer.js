@@ -399,17 +399,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // DevTools toggle button
-    const devtoolsBtn = document.getElementById('devtools-btn');
-    if (devtoolsBtn) {
-        devtoolsBtn.addEventListener('click', () => {
-            console.log('DevTools button clicked');
-            window.electronAPI.devtools.toggle();
-        });
-    } else {
-        console.error('DevTools button not found');
-    }
-
     // History toggle functionality
     const historyToggleBtn = document.getElementById('history-toggle-btn');
     const historySidebar = document.getElementById('history-sidebar');
