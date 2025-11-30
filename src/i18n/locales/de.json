@@ -6,6 +6,9 @@
   "header": {
     "settings": "Einstellungen"
   },
+  "toolbar": {
+    "mockServer": "Mock-Server"
+  },
   "sidebar": {
     "collections": "Sammlungen",
     "history": "Verlauf",
@@ -178,5 +181,39 @@
     "ctrl_digit3": "Zu Header wechseln",
     "ctrl_digit4": "Zu Body wechseln",
     "ctrl_digit5": "Zu Autorisierung wechseln"
+  },
+  "mock_server": {
+    "title": "Mock-Server",
+    "status_stopped": "Gestoppt",
+    "status_running": "Läuft",
+    "start_server": "Server starten",
+    "stop_server": "Server stoppen",
+    "port": "Port",
+    "collections_heading": "ZU MOCKENDE SAMMLUNGEN",
+    "request_log_heading": "ANFRAGENPROTOKOLL",
+    "clear": "Löschen",
+    "close": "Schließen",
+    "empty_collections": "Keine Sammlungen verfügbar.<br>Importieren Sie zuerst eine OpenAPI- oder Postman-Sammlung.",
+    "endpoints": "Endpunkte",
+    "more_endpoints": "... und {{count}} weitere Endpunkte",
+    "show_all_endpoints": "Alle {{count}} Endpunkte anzeigen",
+    "show_less": "Weniger anzeigen",
+    "delay_ms": "ms",
+    "delay": "Verzögerung (ms)",
+    "edit_response": "Bearbeiten",
+    "edit_response_tooltip": "Benutzerdefinierte Antwort bearbeiten",
+    "edit_response_title": "Antwort bearbeiten",
+    "using_custom_response": "Verwendet benutzerdefinierte Antwort",
+    "response_body": "Antwortkörper (JSON)",
+    "reset_to_default": "Auf Standard zurücksetzen",
+    "invalid_json": "Ungültiges JSON: {{message}}",
+    "empty_logs": "Noch keine Anfragen protokolliert.",
+    "log_time": "Zeit",
+    "log_method": "Methode",
+    "log_path": "Pfad",
+    "log_status": "Status",
+    "log_time_ms": "Zeit (ms)",
+    "ok": "OK",
+    "error_toggle_server": "Server konnte nicht umgeschaltet werden"
   }
 }

@@ -6,6 +6,9 @@
   "header": {
     "settings": "Paramètres"
   },
+  "toolbar": {
+    "mockServer": "Serveur Simulé"
+  },
   "sidebar": {
     "collections": "Collections",
     "history": "Historique",
@@ -178,5 +181,39 @@
     "ctrl_digit3": "Passer à l'onglet En-têtes",
     "ctrl_digit4": "Passer à l'onglet Corps",
     "ctrl_digit5": "Passer à l'onglet Autorisation"
+  },
+  "mock_server": {
+    "title": "Serveur Simulé",
+    "status_stopped": "Arrêté",
+    "status_running": "En cours d'exécution",
+    "start_server": "Démarrer le Serveur",
+    "stop_server": "Arrêter le Serveur",
+    "port": "Port",
+    "collections_heading": "COLLECTIONS À SIMULER",
+    "request_log_heading": "JOURNAL DES REQUÊTES",
+    "clear": "Effacer",
+    "close": "Fermer",
+    "empty_collections": "Aucune collection disponible.<br>Importez d'abord une collection OpenAPI ou Postman.",
+    "endpoints": "endpoints",
+    "more_endpoints": "... et {{count}} endpoints de plus",
+    "show_all_endpoints": "Afficher tous les {{count}} endpoints",
+    "show_less": "Afficher moins",
+    "delay_ms": "ms",
+    "delay": "Délai (ms)",
+    "edit_response": "Modifier",
+    "edit_response_tooltip": "Modifier la réponse personnalisée",
+    "edit_response_title": "Modifier la Réponse",
+    "using_custom_response": "Utilisation d'une réponse personnalisée",
+    "response_body": "Corps de la Réponse (JSON)",
+    "reset_to_default": "Réinitialiser par Défaut",
+    "invalid_json": "JSON invalide : {{message}}",
+    "empty_logs": "Aucune requête enregistrée pour le moment.",
+    "log_time": "Heure",
+    "log_method": "Méthode",
+    "log_path": "Chemin",
+    "log_status": "Statut",
+    "log_time_ms": "Temps (ms)",
+    "ok": "OK",
+    "error_toggle_server": "Échec du basculement du serveur"
   }
 }

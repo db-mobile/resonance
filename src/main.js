@@ -19,6 +19,7 @@ import SchemaProcessor from './main/schemaProcessor.js';
 import OpenApiParser from './main/openApiParser.js';
 import PostmanParser from './main/postmanParser.js';
 import OpenApiExporter from './main/openApiExporter.js';
+import MockServerHandler from './main/mockServerHandler.js';
 import loggerService from './services/LoggerService.js';
 
 // Initialize logger for main process
@@ -38,7 +39,12 @@ const store = new Store({
         persistedHeaders: {},
         persistedAuthConfigs: {},
         collectionExpansionStates: {},
-        settings: {}
+        settings: {},
+        mockServer: {
+            port: 3000,
+            enabledCollections: [],
+            endpointDelays: {}
+        }
     }
 });
 
@@ -56,7 +62,8 @@ try {
         'persistedHeaders',
         'persistedAuthConfigs',
         'collectionExpansionStates',
-        'settings'
+        'settings',
+        'mockServer'
     ];
 
     requiredKeys.forEach(key => {
@@ -77,12 +84,13 @@ try {
 
 const windowManager = new WindowManager();
 const proxyHandler = new ProxyHandler(store);
-const apiRequestHandler = new ApiRequestHandler(store, proxyHandler);
 const storeHandler = new StoreHandler(store);
 const schemaProcessor = new SchemaProcessor();
 const openApiParser = new OpenApiParser(schemaProcessor, store);
 const postmanParser = new PostmanParser(store);
 const openApiExporter = new OpenApiExporter();
+const mockServerHandler = new MockServerHandler(store, schemaProcessor);
+const apiRequestHandler = new ApiRequestHandler(store, proxyHandler, mockServerHandler);
 
 app.whenReady().then(() => {
     windowManager.createWindow();
@@ -95,6 +103,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+    mockServerHandler.stopServer().catch(console.error);
     if (process.platform !== 'darwin') {
         app.quit();
     }
@@ -270,3 +279,19 @@ ipcMain.handle('logger:verbose', (_event, scope, message, meta) => {
     const log = loggerService.scope(scope);
     log.verbose(message, meta);
 });
+
+// Mock server handlers
+ipcMain.handle('mock-server:start', async (_event, settings, collections) =>
+    mockServerHandler.startServer(settings, collections));
+
+ipcMain.handle('mock-server:stop', async (_event) =>
+    mockServerHandler.stopServer());
+
+ipcMain.handle('mock-server:status', async (_event) =>
+    mockServerHandler.getStatus());
+
+ipcMain.handle('mock-server:logs', async (_event, limit) =>
+    mockServerHandler.getRequestLogs(limit));
+
+ipcMain.handle('mock-server:clear-logs', async (_event) =>
+    mockServerHandler.clearRequestLogs());

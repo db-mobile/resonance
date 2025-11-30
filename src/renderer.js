@@ -39,6 +39,11 @@ import { WorkspaceTabBar } from './modules/ui/WorkspaceTabBar.js';
 import { WorkspaceTabController } from './modules/controllers/WorkspaceTabController.js';
 import { WorkspaceTabStateManager } from './modules/WorkspaceTabStateManager.js';
 import { ResponseContainerManager } from './modules/ResponseContainerManager.js';
+import { MockServerRepository } from './modules/storage/MockServerRepository.js';
+import { MockServerService } from './modules/services/MockServerService.js';
+import { MockServerController } from './modules/controllers/MockServerController.js';
+import { MockServerDialog } from './modules/ui/MockServerDialog.js';
+import { CollectionRepository } from './modules/storage/CollectionRepository.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
@@ -76,6 +81,13 @@ environmentController = new EnvironmentController(
 
 // Initialize settings modal with all managers
 const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager, proxyController);
+
+// Initialize mock server system
+const collectionRepository = new CollectionRepository(window.electronAPI);
+const mockServerRepository = new MockServerRepository(window.electronAPI);
+const mockServerService = new MockServerService(mockServerRepository, statusDisplayAdapter);
+const mockServerController = new MockServerController(mockServerService, collectionRepository);
+const mockServerDialog = new MockServerDialog(mockServerController);
 
 // Initialize history controller
 const historyController = new HistoryController(window.electronAPI);
@@ -399,6 +411,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // Mock server button functionality
+    const mockServerBtn = document.getElementById('mock-server-btn');
+    if (mockServerBtn) {
+        mockServerBtn.addEventListener('click', () => {
+            mockServerDialog.show();
+        });
+    }
+
     // History toggle functionality
     const historyToggleBtn = document.getElementById('history-toggle-btn');
     const historySidebar = document.getElementById('history-sidebar');
@@ -447,6 +467,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initialize history controller
     await historyController.init();
+
+    // Initialize mock server controller
+    await mockServerController.initialize();
 
     // Initialize workspace tabs
     await workspaceTabController.initialize();

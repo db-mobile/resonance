@@ -6,6 +6,9 @@
   "header": {
     "settings": "Settings"
   },
+  "toolbar": {
+    "mockServer": "Mock Server"
+  },
   "sidebar": {
     "collections": "Collections",
     "history": "History",
@@ -178,5 +181,39 @@
     "ctrl_digit3": "Switch to Headers tab",
     "ctrl_digit4": "Switch to Body tab",
     "ctrl_digit5": "Switch to Auth tab"
+  },
+  "mock_server": {
+    "title": "Mock Server",
+    "status_stopped": "Stopped",
+    "status_running": "Running",
+    "start_server": "Start Server",
+    "stop_server": "Stop Server",
+    "port": "Port",
+    "collections_heading": "COLLECTIONS TO MOCK",
+    "request_log_heading": "REQUEST LOG",
+    "clear": "Clear",
+    "close": "Close",
+    "empty_collections": "No collections available.<br>Import an OpenAPI or Postman collection first.",
+    "endpoints": "endpoints",
+    "more_endpoints": "... and {{count}} more endpoints",
+    "show_all_endpoints": "Show all {{count}} endpoints",
+    "show_less": "Show less",
+    "delay_ms": "ms",
+    "delay": "Delay (ms)",
+    "edit_response": "Edit",
+    "edit_response_tooltip": "Edit custom response",
+    "edit_response_title": "Edit Response",
+    "using_custom_response": "Using custom response",
+    "response_body": "Response Body (JSON)",
+    "reset_to_default": "Reset to Default",
+    "invalid_json": "Invalid JSON: {{message}}",
+    "empty_logs": "No requests logged yet.",
+    "log_time": "Time",
+    "log_method": "Method",
+    "log_path": "Path",
+    "log_status": "Status",
+    "log_time_ms": "Time (ms)",
+    "ok": "OK",
+    "error_toggle_server": "Failed to toggle server"
   }
 }

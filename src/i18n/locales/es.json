@@ -6,6 +6,9 @@
   "header": {
     "settings": "Configuración"
   },
+  "toolbar": {
+    "mockServer": "Servidor Simulado"
+  },
   "sidebar": {
     "collections": "Colecciones",
     "history": "Historial",
@@ -178,5 +181,39 @@
     "ctrl_digit3": "Cambiar a pestaña de Encabezados",
     "ctrl_digit4": "Cambiar a pestaña de Cuerpo",
     "ctrl_digit5": "Cambiar a pestaña de Autorización"
+  },
+  "mock_server": {
+    "title": "Servidor Simulado",
+    "status_stopped": "Detenido",
+    "status_running": "En ejecución",
+    "start_server": "Iniciar Servidor",
+    "stop_server": "Detener Servidor",
+    "port": "Puerto",
+    "collections_heading": "COLECCIONES A SIMULAR",
+    "request_log_heading": "REGISTRO DE SOLICITUDES",
+    "clear": "Limpiar",
+    "close": "Cerrar",
+    "empty_collections": "No hay colecciones disponibles.<br>Importe primero una colección OpenAPI o Postman.",
+    "endpoints": "endpoints",
+    "more_endpoints": "... y {{count}} endpoints más",
+    "show_all_endpoints": "Mostrar todos los {{count}} endpoints",
+    "show_less": "Mostrar menos",
+    "delay_ms": "ms",
+    "delay": "Retraso (ms)",
+    "edit_response": "Editar",
+    "edit_response_tooltip": "Editar respuesta personalizada",
+    "edit_response_title": "Editar Respuesta",
+    "using_custom_response": "Usando respuesta personalizada",
+    "response_body": "Cuerpo de Respuesta (JSON)",
+    "reset_to_default": "Restablecer Predeterminado",
+    "invalid_json": "JSON inválido: {{message}}",
+    "empty_logs": "No se han registrado solicitudes todavía.",
+    "log_time": "Hora",
+    "log_method": "Método",
+    "log_path": "Ruta",
+    "log_status": "Estado",
+    "log_time_ms": "Tiempo (ms)",
+    "ok": "OK",
+    "error_toggle_server": "Error al cambiar el servidor"
   }
 }

@@ -23,10 +23,12 @@ class ApiRequestHandler {
      *
      * @param {Object} store - Electron-store instance for settings retrieval
      * @param {Object} proxyHandler - ProxyHandler instance for proxy configuration
+     * @param {Object} mockServerHandler - MockServerHandler instance for mock server routing
      */
-    constructor(store, proxyHandler) {
+    constructor(store, proxyHandler, mockServerHandler = null) {
         this.store = store;
         this.proxyHandler = proxyHandler;
+        this.mockServerHandler = mockServerHandler;
         this.currentRequestController = null;
     }
 
@@ -76,12 +78,57 @@ class ApiRequestHandler {
     }
 
     /**
+     * Checks if request should be routed to mock server
+     *
+     * @private
+     * @param {string} method - HTTP method
+     * @param {string} url - Request URL
+     * @returns {string|null} Mock server URL if should route, null otherwise
+     */
+    _getMockServerUrl(method, url) {
+        if (!this.mockServerHandler) {
+            return null;
+        }
+
+        const status = this.mockServerHandler.getStatus();
+        if (!status.running) {
+            return null;
+        }
+
+        try {
+            // Extract path from URL
+            const urlObj = new URL(url);
+            const path = urlObj.pathname;
+
+            // Check if this endpoint is mocked
+            for (const [_key, route] of this.mockServerHandler.endpoints.entries()) {
+                if (route.method !== method.toUpperCase()) {
+                    continue;
+                }
+
+                const match = path.match(route.regex);
+                if (match) {
+                    // Found a matching endpoint - route to mock server
+                    return `http://localhost:${status.port}${path}${urlObj.search}`;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking mock server routing:', error);
+        }
+
+        return null;
+    }
+
+    /**
      * Handles an HTTP API request with detailed timing metrics
      *
      * Executes an HTTP request with configurable options including method, URL, headers,
      * and body. Captures detailed performance metrics including DNS lookup, TCP connection,
      * TLS handshake, time to first byte, and download time. Supports HTTP version selection,
      * request timeouts, proxy configuration, and digest authentication.
+     *
+     * If the mock server is running and the endpoint matches a mocked endpoint, the request
+     * will be automatically routed to the mock server.
      *
      * @async
      * @param {Object} requestOptions - Configuration for the HTTP request
@@ -95,6 +142,13 @@ class ApiRequestHandler {
      * @returns {Promise<Object>} Response object with data, status, headers, and timing metrics
      */
     async handleApiRequest(requestOptions) {
+        // Check if we should route to mock server
+        const mockServerUrl = this._getMockServerUrl(requestOptions.method, requestOptions.url);
+        if (mockServerUrl) {
+            console.log(`Routing request to mock server: ${mockServerUrl}`);
+            requestOptions = { ...requestOptions, url: mockServerUrl };
+        }
+
         let startTime = Date.now();
         const timings = {
             startTime: startTime,
