@@ -26,6 +26,11 @@ A clean and minimal API client with excellent user experience built with Electro
 - **Cookie Management**: Parse and display response cookies with full attribute support
 - **Request History**: Complete request/response history with search and replay capability
 - **Proxy Support**: HTTP/HTTPS proxy configuration with authentication and bypass lists
+- **Mock Server**: Local HTTP mock server for testing API clients without a backend
+  - Generate responses from OpenAPI schemas automatically
+  - Configure custom response bodies and delays per endpoint
+  - Enable/disable collections individually
+  - Real-time request logging and monitoring
 
 ### Environment & Variables
 - **Environment Management**: Organize variables into environments (Development, Staging, Production, etc.)
@@ -176,6 +181,35 @@ Import your existing Postman collections:
 - Import Postman environments to recreate your workflow
 - Full authentication mapping (Bearer, Basic, API Key, OAuth2, Digest)
 - Supports all body modes (raw, urlencoded, formdata, GraphQL)
+
+### Mock Server
+
+Test your API clients without a running backend using Resonance's built-in mock server:
+
+**Getting Started with Mock Server**
+1. Click the Mock Server icon in the toolbar to open the mock server dialog
+2. Configure the port (default: 3000)
+3. Select which collections to mock by enabling their checkboxes
+4. Click "Start Server" to begin mocking
+
+**Features**
+- **Automatic Response Generation**: Generates realistic responses from OpenAPI schemas
+- **Custom Responses**: Override default responses with custom JSON for any endpoint
+- **Configurable Delays**: Add realistic latency by setting delays (0-30000ms) per endpoint
+- **Request Logging**: Monitor all incoming requests with method, path, status, and timing
+- **Request Routing**: Automatically intercepts and routes matching requests to the mock server
+
+**Per-Endpoint Configuration**
+Click the "Edit" button next to any endpoint to:
+- Set custom response body (JSON)
+- Configure request delay in milliseconds
+- Reset to schema-generated defaults
+
+The mock server is perfect for:
+- Frontend development without backend dependencies
+- Testing error scenarios and edge cases
+- Simulating network latency and slow responses
+- API prototyping and demonstrations
 
 ### Themes
 
@@ -363,11 +397,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Environment management (Dev, Staging, Production, custom)
 - [x] Test suite implementation (Jest configured)
 - [x] Keyboard shortcuts for all major actions
+- [x] **Mock server with custom responses and delays**
 
 ### Planned
 - [ ] Pre/post-request scripts & testing framework
 - [ ] WebSocket support
-- [ ] Mock server functionality
 - [ ] Request chaining and assertions
 - [ ] Collection export
 - [ ] Response comparison and diff view

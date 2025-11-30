@@ -35,6 +35,7 @@ Resonance is an Electron-based API client application that provides a clean and 
   - `postmanParser.js` - Postman collection and environment import
   - `digestAuthHandler.js` - Digest authentication implementation
   - `proxyHandlers.js` - Proxy configuration and connection testing
+  - `mockServerHandler.js` - Mock server for generating API responses from OpenAPI schemas
 - Uses `electron-store` for persistent storage of collections and variables
 - Uses `electron-window-state` for window state management
 - Makes HTTP requests via `axios` in the main process for security
@@ -79,12 +80,14 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
   - CollectionController.js - Manages collection operations (OpenAPI and Postman imports)
   - EnvironmentController.js - Coordinates environment operations between UI and services
   - HistoryController.js - Manages request history
+  - MockServerController.js - Coordinates mock server operations between UI and service
   - ProxyController.js - Manages proxy configuration and testing
   - WorkspaceTabController.js - Coordinates workspace tab operations and state
 - `services/` - Business logic services
   - CollectionService.js - Collection business logic
   - EnvironmentService.js - Environment management with validation and event notifications
   - HistoryService.js - Request history tracking and management
+  - MockServerService.js - Mock server business logic with event notifications
   - ProxyService.js - Proxy configuration business logic and validation
   - VariableService.js - Variable substitution logic with environment support
   - WorkspaceTabService.js - Workspace tab management and state persistence
@@ -92,6 +95,7 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
   - CollectionRepository.js - Includes `_getObjectFromStore()` helper for safe store access
   - EnvironmentRepository.js - Persists environments and manages active environment state
   - HistoryRepository.js - Persists request history with validation
+  - MockServerRepository.js - Persists mock server settings (port, enabled collections, delays, custom responses)
   - ProxyRepository.js - Persists proxy configuration
   - VariableRepository.js - Validates and initializes store data
   - WorkspaceTabRepository.js - Persists workspace tab state
@@ -104,6 +108,7 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
   - EnvironmentManager.js - Environment management dialog with full CRUD operations
   - EnvironmentSelector.js - Dropdown for quick environment switching
   - HistoryRenderer.js - Request history UI
+  - MockServerDialog.js - Mock server management dialog with collection selection, endpoint configuration, and request logs
   - RenameDialog.js - Collection/endpoint rename dialog
   - VariableManager.js - Variable management UI
   - WorkspaceTabBar.js - Workspace tab management UI
@@ -168,6 +173,33 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - Persistent storage of request history with timestamps
 - History UI for browsing and replaying past requests
 - Automatic cleanup and management
+
+#### Mock Server
+- **HTTP Mock Server**: Local mock server for testing API clients without backend
+  - Runs on configurable port (default: 3000)
+  - Automatic request routing and interception
+  - Generates responses from OpenAPI schemas via `SchemaProcessor`
+  - Support for custom response bodies per endpoint
+- **Collection-Based Mocking**: Enable/disable collections individually
+  - Select which collections to mock in the UI
+  - Multiple collections can be mocked simultaneously
+  - Real-time request logging with timestamps and response times
+- **Per-Endpoint Configuration**: Fine-grained control over endpoint behavior
+  - Configurable delay per endpoint (0-30000ms)
+  - Custom JSON response bodies override schema-generated defaults
+  - Unified response editor dialog for delay and response configuration
+  - Visual indicators for endpoints with custom configurations
+- **Request Logging**: Monitor all incoming mock requests
+  - Request method, path, query parameters
+  - Response status codes and timing
+  - Matched endpoint information
+  - Circular buffer with configurable log limit (default: 100)
+- **Architecture**: Three-layer MVC pattern
+  - `MockServerController` - UI coordination
+  - `MockServerService` - Business logic with event notifications
+  - `MockServerRepository` - Settings persistence (port, enabled collections, delays, custom responses)
+  - `MockServerHandler` (main process) - HTTP server lifecycle and request processing
+  - `MockServerDialog` - Comprehensive management UI
 
 #### Advanced Features
 - **Multi-Language Code Generation**: Export requests in 9 languages via `codeGenerator.js`

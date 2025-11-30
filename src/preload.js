@@ -53,7 +53,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         set: (settings) => ipcRenderer.invoke('proxy:set', settings),
         test: () => ipcRenderer.invoke('proxy:test')
     },
-    devtools: {
-        toggle: () => ipcRenderer.invoke('devtools:toggle')
+    mockServer: {
+        start: (settings, collections) => ipcRenderer.invoke('mock-server:start', settings, collections),
+        stop: () => ipcRenderer.invoke('mock-server:stop'),
+        status: () => ipcRenderer.invoke('mock-server:status'),
+        logs: (limit) => ipcRenderer.invoke('mock-server:logs', limit),
+        clearLogs: () => ipcRenderer.invoke('mock-server:clear-logs')
     }
 });

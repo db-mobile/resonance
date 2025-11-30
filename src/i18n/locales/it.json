@@ -6,6 +6,9 @@
   "header": {
     "settings": "Impostazioni"
   },
+  "toolbar": {
+    "mockServer": "Server Simulato"
+  },
   "sidebar": {
     "collections": "Collezioni",
     "history": "Cronologia",
@@ -178,5 +181,39 @@
     "ctrl_digit3": "Passa alla scheda Intestazioni",
     "ctrl_digit4": "Passa alla scheda Corpo",
     "ctrl_digit5": "Passa alla scheda Autorizzazione"
+  },
+  "mock_server": {
+    "title": "Server Simulato",
+    "status_stopped": "Fermato",
+    "status_running": "In esecuzione",
+    "start_server": "Avvia Server",
+    "stop_server": "Ferma Server",
+    "port": "Porta",
+    "collections_heading": "COLLEZIONI DA SIMULARE",
+    "request_log_heading": "REGISTRO RICHIESTE",
+    "clear": "Cancella",
+    "close": "Chiudi",
+    "empty_collections": "Nessuna collezione disponibile.<br>Importa prima una collezione OpenAPI o Postman.",
+    "endpoints": "endpoints",
+    "more_endpoints": "... e altri {{count}} endpoints",
+    "show_all_endpoints": "Mostra tutti i {{count}} endpoints",
+    "show_less": "Mostra meno",
+    "delay_ms": "ms",
+    "delay": "Ritardo (ms)",
+    "edit_response": "Modifica",
+    "edit_response_tooltip": "Modifica risposta personalizzata",
+    "edit_response_title": "Modifica Risposta",
+    "using_custom_response": "Utilizzo risposta personalizzata",
+    "response_body": "Corpo della Risposta (JSON)",
+    "reset_to_default": "Ripristina Predefinito",
+    "invalid_json": "JSON non valido: {{message}}",
+    "empty_logs": "Nessuna richiesta registrata ancora.",
+    "log_time": "Ora",
+    "log_method": "Metodo",
+    "log_path": "Percorso",
+    "log_status": "Stato",
+    "log_time_ms": "Tempo (ms)",
+    "ok": "OK",
+    "error_toggle_server": "Impossibile attivare/disattivare il server"
   }
 }
