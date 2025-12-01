@@ -290,7 +290,12 @@ export class MockServerService {
                 throw new Error(errors.join(', '));
             }
 
-            return await this.repository.setEndpointDelay(collectionId, endpointId, delayMs);
+            const result = await this.repository.setEndpointDelay(collectionId, endpointId, delayMs);
+
+            // Hot-reload settings if server is running
+            await this._reloadServerSettings();
+
+            return result;
         } catch (error) {
             this.statusDisplay.update(`Error setting endpoint delay: ${error.message}`, null);
             throw error;
@@ -309,7 +314,12 @@ export class MockServerService {
      */
     async setCustomResponse(collectionId, endpointId, response) {
         try {
-            return await this.repository.setCustomResponse(collectionId, endpointId, response);
+            const result = await this.repository.setCustomResponse(collectionId, endpointId, response);
+
+            // Hot-reload settings if server is running
+            await this._reloadServerSettings();
+
+            return result;
         } catch (error) {
             this.statusDisplay.update(`Error setting custom response: ${error.message}`, null);
             throw error;
@@ -345,6 +355,47 @@ export class MockServerService {
         // This will be implemented to get the schema-generated response
         // For now, return null - will be implemented when we have access to collections
         return null;
+    }
+
+    /**
+     * Sets custom status code for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - Collection ID
+     * @param {string} endpointId - Endpoint ID
+     * @param {number|null} statusCode - Custom status code (null to reset to default)
+     * @returns {Promise<Object>} Updated settings
+     * @throws {Error} If update fails
+     */
+    async setCustomStatusCode(collectionId, endpointId, statusCode) {
+        try {
+            const result = await this.repository.setCustomStatusCode(collectionId, endpointId, statusCode);
+
+            // Hot-reload settings if server is running
+            await this._reloadServerSettings();
+
+            return result;
+        } catch (error) {
+            this.statusDisplay.update(`Error setting custom status code: ${error.message}`, null);
+            throw error;
+        }
+    }
+
+    /**
+     * Gets custom status code for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - Collection ID
+     * @param {string} endpointId - Endpoint ID
+     * @returns {Promise<number|null>} Custom status code or null if using default
+     */
+    async getCustomStatusCode(collectionId, endpointId) {
+        try {
+            return await this.repository.getCustomStatusCode(collectionId, endpointId);
+        } catch (error) {
+            console.error('Error getting custom status code:', error);
+            return null;
+        }
     }
 
     /**
@@ -416,5 +467,46 @@ export class MockServerService {
         }
 
         return errors;
+    }
+
+    /**
+     * Validates status code
+     *
+     * @param {number} statusCode - Status code to validate
+     * @returns {Array<string>} Array of error messages (empty if valid)
+     */
+    validateStatusCode(statusCode) {
+        const errors = [];
+        const code = parseInt(statusCode, 10);
+
+        if (isNaN(code)) {
+            errors.push('Status code must be a number');
+        } else if (code < 100 || code > 599) {
+            errors.push('Status code must be between 100 and 599');
+        }
+
+        return errors;
+    }
+
+    /**
+     * Reloads settings in the running mock server
+     *
+     * Hot-reloads endpoint configuration without restarting the server.
+     * Silently fails if server is not running.
+     *
+     * @private
+     * @async
+     * @returns {Promise<void>}
+     */
+    async _reloadServerSettings() {
+        try {
+            const status = await this.getStatus();
+            if (status.running) {
+                await window.electronAPI.mockServer.reloadSettings();
+            }
+        } catch (error) {
+            // Silently fail - settings will be picked up on next server start
+            console.warn('Failed to reload mock server settings:', error);
+        }
     }
 }

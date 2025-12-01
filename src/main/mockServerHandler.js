@@ -172,6 +172,56 @@ class MockServerHandler {
     }
 
     /**
+     * Reloads settings from store without restarting the server
+     *
+     * Hot-reloads delays, custom responses, and custom status codes
+     * for the currently running server.
+     *
+     * @async
+     * @returns {Promise<Object>} Result object with success status
+     */
+    async reloadSettings() {
+        if (!this.server) {
+            return {
+                success: false,
+                message: 'Server is not running'
+            };
+        }
+
+        try {
+            // Fetch fresh settings from store
+            const freshSettings = this.store.get(this.SETTINGS_KEY);
+
+            if (!freshSettings) {
+                return {
+                    success: false,
+                    message: 'Failed to load settings'
+                };
+            }
+
+            // Update settings (keeps port and other config)
+            this.settings = {
+                ...this.settings,
+                endpointDelays: freshSettings.endpointDelays || {},
+                customResponses: freshSettings.customResponses || {},
+                customStatusCodes: freshSettings.customStatusCodes || {}
+            };
+
+            console.log('Mock server settings reloaded');
+            return {
+                success: true,
+                message: 'Settings reloaded successfully'
+            };
+        } catch (error) {
+            console.error('Error reloading settings:', error);
+            return {
+                success: false,
+                message: error.message || 'Failed to reload settings'
+            };
+        }
+    }
+
+    /**
      * Gets request logs
      *
      * @param {number} limit - Maximum number of logs to return
@@ -327,7 +377,11 @@ class MockServerHandler {
         const responseData = customResponse || this._generateResponse(matched.endpoint);
         const responseBody = JSON.stringify(responseData, null, 2);
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        // Check for custom status code, otherwise use default based on method
+        const customStatusCode = this.settings?.customStatusCodes?.[delayKey];
+        const statusCode = customStatusCode || this._getDefaultStatusCode(matched.endpoint.method);
+
+        res.writeHead(statusCode, { 'Content-Type': 'application/json' });
         res.end(responseBody);
 
         const responseTime = Date.now() - startTime;
@@ -337,7 +391,7 @@ class MockServerHandler {
             method: req.method,
             path: url.pathname,
             query: Object.fromEntries(url.searchParams),
-            responseStatus: 200,
+            responseStatus: statusCode,
             responseTime,
             matchedEndpoint: {
                 collectionId: matched.collection.id,
@@ -397,6 +451,31 @@ class MockServerHandler {
             method: endpoint.method,
             timestamp: new Date().toISOString()
         };
+    }
+
+    /**
+     * Gets default status code based on HTTP method
+     *
+     * @private
+     * @param {string} method - HTTP method
+     * @returns {number} Default status code
+     */
+    _getDefaultStatusCode(method) {
+        const upperMethod = method.toUpperCase();
+
+        switch (upperMethod) {
+            case 'POST':
+                return 201; // Created
+            case 'DELETE':
+                return 204; // No Content
+            case 'GET':
+            case 'PUT':
+            case 'PATCH':
+            case 'HEAD':
+            case 'OPTIONS':
+            default:
+                return 200; // OK
+        }
     }
 
     /**

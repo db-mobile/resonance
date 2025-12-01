@@ -276,6 +276,59 @@ export class MockServerController {
     }
 
     /**
+     * Sets custom status code for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - Collection ID
+     * @param {string} endpointId - Endpoint ID
+     * @param {number|null} statusCode - Custom status code (null to reset)
+     * @returns {Promise<Object>} Result object with success status
+     */
+    async handleSetCustomStatusCode(collectionId, endpointId, statusCode) {
+        try {
+            // Validate status code if not null
+            if (statusCode !== null) {
+                const errors = this.service.validateStatusCode(statusCode);
+                if (errors.length > 0) {
+                    return {
+                        success: false,
+                        message: errors.join(', ')
+                    };
+                }
+            }
+
+            await this.service.setCustomStatusCode(collectionId, endpointId, statusCode);
+            return {
+                success: true,
+                message: 'Custom status code updated successfully'
+            };
+        } catch (error) {
+            console.error('Error setting custom status code:', error);
+            return {
+                success: false,
+                message: error.message || 'Failed to set custom status code'
+            };
+        }
+    }
+
+    /**
+     * Gets custom status code for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - Collection ID
+     * @param {string} endpointId - Endpoint ID
+     * @returns {Promise<number|null>} Custom status code or null
+     */
+    async getCustomStatusCode(collectionId, endpointId) {
+        try {
+            return await this.service.getCustomStatusCode(collectionId, endpointId);
+        } catch (error) {
+            console.error('Error getting custom status code:', error);
+            return null;
+        }
+    }
+
+    /**
      * Gets all collections
      *
      * @async

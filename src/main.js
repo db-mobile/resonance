@@ -295,3 +295,6 @@ ipcMain.handle('mock-server:logs', async (_event, limit) =>
 
 ipcMain.handle('mock-server:clear-logs', async (_event) =>
     mockServerHandler.clearRequestLogs());
+
+ipcMain.handle('mock-server:reload-settings', async (_event) =>
+    mockServerHandler.reloadSettings());

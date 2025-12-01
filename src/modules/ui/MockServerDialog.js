@@ -722,6 +722,10 @@ export class MockServerDialog {
         const delayKey = `${collection.id}_${endpoint.id}`;
         const currentDelay = settings.endpointDelays[delayKey] || 0;
 
+        // Get current status code
+        const customStatusCode = await this.controller.getCustomStatusCode(collection.id, endpoint.id);
+        const currentStatusCode = customStatusCode || this.getDefaultStatusCode(endpoint);
+
         // For default, we'll generate it from the endpoint schema (similar to mock server)
         const defaultResponse = this.generateDefaultResponse(endpoint);
         const currentResponse = customResponse || defaultResponse;
@@ -769,19 +773,35 @@ export class MockServerDialog {
                 </div>
             ` : ''}
 
-            <div style="margin-bottom: 16px;">
-                <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 14px; font-weight: 500;">
-                    ${t('mock_server.delay', 'Delay (ms)')}
-                </label>
-                <input
-                    type="number"
-                    id="response-editor-delay"
-                    min="0"
-                    max="30000"
-                    value="${currentDelay}"
-                    style="width: 150px; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-size: 13px;"
-                />
-                <span style="margin-left: 8px; color: var(--text-secondary); font-size: 12px;">(0-30000)</span>
+            <div style="display: flex; gap: 24px; margin-bottom: 16px;">
+                <div style="flex: 1;">
+                    <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 14px; font-weight: 500;">
+                        ${t('mock_server.delay', 'Delay (ms)')}
+                    </label>
+                    <input
+                        type="number"
+                        id="response-editor-delay"
+                        min="0"
+                        max="30000"
+                        value="${currentDelay}"
+                        style="width: 150px; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-size: 13px;"
+                    />
+                    <span style="margin-left: 8px; color: var(--text-secondary); font-size: 12px;">(0-30000)</span>
+                </div>
+                <div style="flex: 1;">
+                    <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 14px; font-weight: 500;">
+                        ${t('mock_server.status_code', 'Status Code')}
+                    </label>
+                    <input
+                        type="number"
+                        id="response-editor-status-code"
+                        min="100"
+                        max="599"
+                        value="${currentStatusCode}"
+                        style="width: 150px; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-size: 13px;"
+                    />
+                    <span style="margin-left: 8px; color: var(--text-secondary); font-size: 12px;">(100-599)</span>
+                </div>
             </div>
 
             <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
@@ -816,6 +836,7 @@ export class MockServerDialog {
 
         const textarea = dialog.querySelector('#response-editor-textarea');
         const delayInput = dialog.querySelector('#response-editor-delay');
+        const statusCodeInput = dialog.querySelector('#response-editor-status-code');
         const errorDiv = dialog.querySelector('#response-editor-error');
         const saveBtn = dialog.querySelector('#response-editor-save');
         const cancelBtn = dialog.querySelector('#response-editor-cancel');
@@ -840,11 +861,12 @@ export class MockServerDialog {
             }
         });
 
-        // Save custom response and delay
+        // Save custom response, delay, and status code
         saveBtn.addEventListener('click', async () => {
             try {
                 const response = JSON.parse(textarea.value);
                 const delay = parseInt(delayInput.value, 10);
+                const statusCode = parseInt(statusCodeInput.value, 10);
 
                 // Validate delay
                 if (delay < 0 || delay > 30000) {
@@ -852,13 +874,18 @@ export class MockServerDialog {
                     return;
                 }
 
-                // Save both delay and custom response
-                const [responseResult, delayResult] = await Promise.all([
-                    this.controller.handleSetCustomResponse(collection.id, endpoint.id, response),
-                    this.controller.handleSetDelay(collection.id, endpoint.id, delay)
-                ]);
+                // Validate status code
+                if (statusCode < 100 || statusCode > 599) {
+                    errorDiv.textContent = 'Status code must be between 100 and 599';
+                    return;
+                }
 
-                if (responseResult.success && delayResult.success) {
+                // Save all three settings sequentially to avoid race condition
+                const delayResult = await this.controller.handleSetDelay(collection.id, endpoint.id, delay);
+                const statusCodeResult = await this.controller.handleSetCustomStatusCode(collection.id, endpoint.id, statusCode);
+                const responseResult = await this.controller.handleSetCustomResponse(collection.id, endpoint.id, response);
+
+                if (responseResult.success && delayResult.success && statusCodeResult.success) {
                     cleanup();
                     // Refresh the collections display
                     const [updatedSettings, collections] = await Promise.all([
@@ -867,20 +894,19 @@ export class MockServerDialog {
                     ]);
                     await this.renderCollections(collections, updatedSettings);
                 } else {
-                    errorDiv.textContent = responseResult.message || delayResult.message;
+                    errorDiv.textContent = responseResult.message || delayResult.message || statusCodeResult.message;
                 }
             } catch (e) {
                 errorDiv.textContent = t('mock_server.invalid_json', `Invalid JSON: ${e.message}`);
             }
         });
 
-        // Reset to default (both response and delay)
+        // Reset to default (response, delay, and status code)
         resetBtn.addEventListener('click', async () => {
-            const [responseResult, delayResult] = await Promise.all([
-                this.controller.handleSetCustomResponse(collection.id, endpoint.id, null),
-                this.controller.handleSetDelay(collection.id, endpoint.id, 0)
-            ]);
-            if (responseResult.success && delayResult.success) {
+            const delayResult = await this.controller.handleSetDelay(collection.id, endpoint.id, 0);
+            const statusCodeResult = await this.controller.handleSetCustomStatusCode(collection.id, endpoint.id, null);
+            const responseResult = await this.controller.handleSetCustomResponse(collection.id, endpoint.id, null);
+            if (responseResult.success && delayResult.success && statusCodeResult.success) {
                 cleanup();
                 const [updatedSettings, collections] = await Promise.all([
                     this.controller.getSettings(),
@@ -939,6 +965,31 @@ export class MockServerDialog {
 
         // Return the example or a basic object
         return schema.example || { message: 'Success' };
+    }
+
+    /**
+     * Gets default status code based on endpoint method
+     *
+     * @param {Object} endpoint - Endpoint object
+     * @returns {number} Default status code
+     */
+    getDefaultStatusCode(endpoint) {
+        const method = endpoint.method.toUpperCase();
+
+        // Return appropriate default based on HTTP method
+        switch (method) {
+            case 'POST':
+                return 201; // Created
+            case 'DELETE':
+                return 204; // No Content
+            case 'GET':
+            case 'PUT':
+            case 'PATCH':
+            case 'HEAD':
+            case 'OPTIONS':
+            default:
+                return 200; // OK
+        }
     }
 
     /**

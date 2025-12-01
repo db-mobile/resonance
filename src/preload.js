@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         stop: () => ipcRenderer.invoke('mock-server:stop'),
         status: () => ipcRenderer.invoke('mock-server:status'),
         logs: (limit) => ipcRenderer.invoke('mock-server:logs', limit),
-        clearLogs: () => ipcRenderer.invoke('mock-server:clear-logs')
+        clearLogs: () => ipcRenderer.invoke('mock-server:clear-logs'),
+        reloadSettings: () => ipcRenderer.invoke('mock-server:reload-settings')
     }
 });

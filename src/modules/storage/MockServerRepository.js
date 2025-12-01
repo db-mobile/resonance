@@ -34,6 +34,7 @@ export class MockServerRepository {
      * @returns {Promise<Array<string>>} return.enabledCollections - Array of enabled collection IDs
      * @returns {Promise<Object>} return.endpointDelays - Per-endpoint delays in milliseconds
      * @returns {Promise<Object>} return.customResponses - Per-endpoint custom response bodies
+     * @returns {Promise<Object>} return.customStatusCodes - Per-endpoint custom status codes
      * @throws {Error} If storage access fails
      */
     async getSettings() {
@@ -66,6 +67,11 @@ export class MockServerRepository {
             // Ensure customResponses is an object
             if (!validatedData.customResponses || typeof validatedData.customResponses !== 'object') {
                 validatedData.customResponses = {};
+            }
+
+            // Ensure customStatusCodes is an object
+            if (!validatedData.customStatusCodes || typeof validatedData.customStatusCodes !== 'object') {
+                validatedData.customStatusCodes = {};
             }
 
             return validatedData;
@@ -134,6 +140,14 @@ export class MockServerRepository {
                 updatedSettings.customResponses = {
                     ...currentSettings.customResponses,
                     ...updates.customResponses
+                };
+            }
+
+            // If customStatusCodes is being updated, merge with existing
+            if (updates.customStatusCodes) {
+                updatedSettings.customStatusCodes = {
+                    ...currentSettings.customStatusCodes,
+                    ...updates.customStatusCodes
                 };
             }
 
@@ -245,6 +259,54 @@ export class MockServerRepository {
     }
 
     /**
+     * Sets custom status code for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - Collection ID
+     * @param {string} endpointId - Endpoint ID
+     * @param {number|null} statusCode - Custom status code (null to reset to default)
+     * @returns {Promise<Object>} The updated settings object
+     * @throws {Error} If save fails
+     */
+    async setCustomStatusCode(collectionId, endpointId, statusCode) {
+        try {
+            const settings = await this.getSettings();
+            const key = `${collectionId}_${endpointId}`;
+
+            if (statusCode === null) {
+                // Remove custom status code entry to use default
+                delete settings.customStatusCodes[key];
+            } else {
+                settings.customStatusCodes[key] = statusCode;
+            }
+
+            return await this.saveSettings(settings);
+        } catch (error) {
+            console.error('Error setting custom status code:', error);
+            throw new Error(`Failed to set custom status code: ${error.message}`);
+        }
+    }
+
+    /**
+     * Gets custom status code for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - Collection ID
+     * @param {string} endpointId - Endpoint ID
+     * @returns {Promise<number|null>} Custom status code or null if using default
+     */
+    async getCustomStatusCode(collectionId, endpointId) {
+        try {
+            const settings = await this.getSettings();
+            const key = `${collectionId}_${endpointId}`;
+            return settings.customStatusCodes[key] || null;
+        } catch (error) {
+            console.error('Error getting custom status code:', error);
+            return null;
+        }
+    }
+
+    /**
      * Toggles collection enabled state
      *
      * @async
@@ -325,7 +387,8 @@ export class MockServerRepository {
                 ? settings.enabledCollections.filter(id => typeof id === 'string' && id.trim())
                 : defaults.enabledCollections,
             endpointDelays: this._validateEndpointDelays(settings.endpointDelays),
-            customResponses: this._validateCustomResponses(settings.customResponses)
+            customResponses: this._validateCustomResponses(settings.customResponses),
+            customStatusCodes: this._validateCustomStatusCodes(settings.customStatusCodes)
         };
     }
 
@@ -398,6 +461,40 @@ export class MockServerRepository {
     }
 
     /**
+     * Validates and sanitizes custom status codes object
+     *
+     * @private
+     * @param {Object} statusCodes - Custom status codes object to validate
+     * @returns {Object} Validated custom status codes object
+     */
+    _validateCustomStatusCodes(statusCodes) {
+        if (!statusCodes || typeof statusCodes !== 'object') {
+            return {};
+        }
+
+        const validatedStatusCodes = {};
+        for (const [key, value] of Object.entries(statusCodes)) {
+            if (typeof key === 'string' && this._validateStatusCode(value)) {
+                validatedStatusCodes[key] = parseInt(value, 10);
+            }
+        }
+
+        return validatedStatusCodes;
+    }
+
+    /**
+     * Validates status code
+     *
+     * @private
+     * @param {number|string} statusCode - Status code to validate
+     * @returns {boolean} True if status code is valid (100-599)
+     */
+    _validateStatusCode(statusCode) {
+        const code = parseInt(statusCode, 10);
+        return !isNaN(code) && code >= 100 && code <= 599;
+    }
+
+    /**
      * Creates the default mock server settings structure
      *
      * @private
@@ -408,7 +505,8 @@ export class MockServerRepository {
             port: 3000,
             enabledCollections: [],
             endpointDelays: {},
-            customResponses: {}
+            customResponses: {},
+            customStatusCodes: {}
         };
     }
 }
