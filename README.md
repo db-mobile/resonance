@@ -398,12 +398,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Test suite implementation (Jest configured)
 - [x] Keyboard shortcuts for all major actions
 - [x] **Mock server with custom responses and delays**
+- [x] **Collection export (OpenAPI format)**
 
 ### Planned
 - [ ] Pre/post-request scripts & testing framework
 - [ ] WebSocket support
 - [ ] Request chaining and assertions
-- [ ] Collection export
 - [ ] Response comparison and diff view
 - [ ] gRPC support
 - [ ] Plugin system for extensions
