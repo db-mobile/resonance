@@ -27,7 +27,7 @@ export function createKeyValueRow(key = '', value = '') {
     valueInput.value = value;
 
     const removeButton = document.createElement('button');
-    removeButton.classList.add('remove-btn', 'remove-row-btn');
+    removeButton.classList.add('btn', 'btn-danger', 'btn-xs', 'remove-row-btn');
     removeButton.textContent = 'Remove';
 
     row.appendChild(keyInput);

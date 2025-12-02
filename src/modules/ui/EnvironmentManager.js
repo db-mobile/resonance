@@ -62,7 +62,7 @@ export class EnvironmentManager {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
                 <h3 style="margin: 0; color: var(--text-primary);">Manage Environments</h3>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button id="env-import-btn" class="env-toolbar-btn" title="Import Environments">
+                    <button id="env-import-btn" class="btn btn-outline btn-xs" title="Import Environments">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="7 10 12 15 17 10"></polyline>
@@ -70,7 +70,7 @@ export class EnvironmentManager {
                         </svg>
                         <span>Import</span>
                     </button>
-                    <button id="env-export-all-btn" class="env-toolbar-btn" title="Export All Environments">
+                    <button id="env-export-all-btn" class="btn btn-outline btn-xs" title="Export All Environments">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="17 8 12 3 7 8"></polyline>
@@ -86,7 +86,7 @@ export class EnvironmentManager {
                 <div style="flex: 0 0 250px; display: flex; flex-direction: column; border-right: 1px solid var(--border-light); padding-right: 16px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                         <h4 style="margin: 0; font-size: 14px; color: var(--text-secondary);">ENVIRONMENTS</h4>
-                        <button id="env-create-btn" class="env-create-btn" title="Create New Environment">+</button>
+                        <button id="env-create-btn" class="btn btn-outline-primary btn-sm" title="Create New Environment">+</button>
                     </div>
                     <div id="env-list" style="flex: 1; overflow-y: auto;"></div>
                 </div>
@@ -261,14 +261,14 @@ export class EnvironmentManager {
                             style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-size: 16px; font-weight: 600;"
                         />
                         <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                            ${!isActive ? '<button id="env-set-active-btn" class="env-action-btn" title="Set as Active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Active</button>' : '<span style="color: var(--color-success); font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> ACTIVE</span>'}
-                            <button id="env-duplicate-btn" class="env-action-btn" title="Duplicate Environment">
+                            ${!isActive ? '<button id="env-set-active-btn" class="btn btn-outline btn-xs" title="Set as Active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Active</button>' : '<span style="color: var(--color-success); font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> ACTIVE</span>'}
+                            <button id="env-duplicate-btn" class="btn btn-outline btn-xs" title="Duplicate Environment">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                                 </svg>
                             </button>
-                            <button id="env-export-btn" class="env-action-btn" title="Export Environment">
+                            <button id="env-export-btn" class="btn btn-outline btn-xs" title="Export Environment">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                     <polyline points="17 8 12 3 7 8"></polyline>
@@ -287,7 +287,7 @@ export class EnvironmentManager {
                     <div style="margin-bottom: 16px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                             <h4 style="margin: 0; font-size: 14px; color: var(--text-secondary);">VARIABLES</h4>
-                            <button id="env-add-variable-btn" class="env-create-btn" title="Add Variable">+ Add</button>
+                            <button id="env-add-variable-btn" class="btn btn-outline-primary btn-sm" title="Add Variable">+ Add</button>
                         </div>
                         <div id="env-variables-container"></div>
                     </div>

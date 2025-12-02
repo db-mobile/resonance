@@ -186,13 +186,13 @@ export class HistoryController {
         row.innerHTML = `
             <input type="text" class="key-input" placeholder="Key">
             <input type="text" class="value-input" placeholder="Value">
-            <button type="button" class="remove-btn" aria-label="Remove">×</button>
+            <button type="button" class="btn btn-danger btn-xs" aria-label="Remove">×</button>
         `;
 
         listElement.appendChild(row);
 
         // Add remove button handler
-        const removeBtn = row.querySelector('.remove-btn');
+        const removeBtn = row.querySelector('.btn-danger');
         if (removeBtn) {
             removeBtn.addEventListener('click', () => {
                 row.remove();

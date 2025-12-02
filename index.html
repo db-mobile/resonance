@@ -15,19 +15,19 @@
             <div class="sidebar-header">
                 <h2 class="sidebar-title" data-i18n="sidebar.collections">Collections</h2>
                 <div class="sidebar-actions">
-                    <button id="history-toggle-btn" class="history-toggle-btn" data-i18n-title="sidebar.history" data-i18n-aria="sidebar.history" title="History">
+                    <button id="history-toggle-btn" class="btn btn-icon" data-i18n-title="sidebar.history" data-i18n-aria="sidebar.history" title="History">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"></circle>
                             <polyline points="12 6 12 12 16 14"></polyline>
                         </svg>
                     </button>
-                    <button id="settings-btn" class="settings-btn" data-i18n-title="header.settings" data-i18n-aria="header.settings">
+                    <button id="settings-btn" class="btn btn-icon" data-i18n-title="header.settings" data-i18n-aria="header.settings">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="3"></circle>
                             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                         </svg>
                     </button>
-                    <button id="mock-server-btn" class="settings-btn" data-i18n-title="toolbar.mockServer" data-i18n-aria="toolbar.mockServer" title="Mock Server">
+                    <button id="mock-server-btn" class="btn btn-icon" data-i18n-title="toolbar.mockServer" data-i18n-aria="toolbar.mockServer" title="Mock Server">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
                             <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
@@ -35,7 +35,7 @@
                             <line x1="6" y1="18" x2="6.01" y2="18"></line>
                         </svg>
                     </button>
-                    <button id="import-collection-btn" class="import-btn"
+                    <button id="import-collection-btn" class="btn btn-primary btn-sm"
                             data-i18n-title="sidebar.import"
                             data-i18n-aria="sidebar.import"
                             data-i18n="sidebar.import">
@@ -100,20 +100,20 @@
                            aria-label="API URL">
 
                     <button id="send-request-btn"
-                            class="send-btn"
+                            class="btn btn-primary"
                             aria-label="Send Request">
                         Send Request
                     </button>
 
                     <button id="cancel-request-btn"
-                            class="cancel-btn"
+                            class="btn btn-danger"
                             aria-label="Cancel Request"
                             style="display: none;">
                         Cancel
                     </button>
 
                     <button id="curl-btn"
-                            class="curl-btn"
+                            class="btn btn-primary"
                             aria-label="Generate Code Snippet"
                             title="Generate Code Snippet (cURL, Python, JavaScript, etc.)">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -173,7 +173,7 @@
                     <h3>Path Parameters</h3>
                     <div id="path-params-list" class="key-value-list" role="group" aria-label="Path Parameters">
                     </div>
-                    <button id="add-path-param-btn" class="add-btn" aria-label="Add Path Parameter">
+                    <button id="add-path-param-btn" class="btn btn-secondary btn-sm" aria-label="Add Path Parameter">
                         Add Path Param
                     </button>
                 </div>
@@ -182,7 +182,7 @@
                     <h3>Query Parameters</h3>
                     <div id="query-params-list" class="key-value-list" role="group" aria-label="Query Parameters">
                     </div>
-                    <button id="add-query-param-btn" class="add-btn" aria-label="Add Query Parameter">
+                    <button id="add-query-param-btn" class="btn btn-secondary btn-sm" aria-label="Add Query Parameter">
                         Add Query Param
                     </button>
                 </div>
@@ -191,7 +191,7 @@
                     <h3>Headers</h3>
                     <div id="headers-list" class="key-value-list" role="group" aria-label="Request Headers">
                     </div>
-                    <button id="add-header-btn" class="add-btn" aria-label="Add Header">
+                    <button id="add-header-btn" class="btn btn-secondary btn-sm" aria-label="Add Header">
                         Add Header
                     </button>
                 </div>
@@ -301,13 +301,13 @@
             <div class="sidebar-header">
                 <h2 class="sidebar-title" data-i18n="sidebar.history">History</h2>
                 <div class="sidebar-actions">
-                    <button id="clear-all-history-btn" class="clear-history-btn" data-i18n-title="history.clear_all" data-i18n-aria="history.clear_all">
+                    <button id="clear-all-history-btn" class="btn btn-icon-bordered" data-i18n-title="history.clear_all" data-i18n-aria="history.clear_all">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                         </svg>
                     </button>
-                    <button id="close-history-btn" class="close-history-btn" data-i18n-title="common.close" data-i18n-aria="common.close" title="Close">
+                    <button id="close-history-btn" class="btn btn-icon-bordered" data-i18n-title="common.close" data-i18n-aria="common.close" title="Close">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
