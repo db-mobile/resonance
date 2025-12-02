@@ -213,6 +213,7 @@
     "log_path": "Percorso",
     "log_status": "Stato",
     "log_time_ms": "Tempo (ms)",
+    "status_code": "Codice di stato",
     "ok": "OK",
     "error_toggle_server": "Impossibile attivare/disattivare il server"
   }
