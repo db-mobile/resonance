@@ -213,6 +213,7 @@
     "log_path": "Chemin",
     "log_status": "Statut",
     "log_time_ms": "Temps (ms)",
+    "status_code": "Code de statut",
     "ok": "OK",
     "error_toggle_server": "Échec du basculement du serveur"
   }

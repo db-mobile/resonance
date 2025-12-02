@@ -213,6 +213,7 @@
     "log_path": "Path",
     "log_status": "Status",
     "log_time_ms": "Time (ms)",
+    "status_code": "Status Code",
     "ok": "OK",
     "error_toggle_server": "Failed to toggle server"
   }

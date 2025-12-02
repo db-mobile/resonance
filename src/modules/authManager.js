@@ -106,11 +106,11 @@ export class AuthManager {
                 <label for="bearer-token">Token</label>
                 <input type="text"
                        id="bearer-token"
-                       class="auth-input"
+                       class="form-input"
                        placeholder="Enter bearer token"
                        value="${defaultToken}"
                        aria-label="Bearer Token">
-                <small class="auth-field-hint">The token will be sent in the Authorization header as "Bearer {token}". You can use variables like {{bearerToken}}.</small>
+                <small class="form-input-hint">The token will be sent in the Authorization header as "Bearer {token}". You can use variables like {{bearerToken}}.</small>
             </div>
         `;
         this.authFieldsContainer.innerHTML = html;
@@ -137,7 +137,7 @@ export class AuthManager {
                 <label for="basic-username">Username</label>
                 <input type="text"
                        id="basic-username"
-                       class="auth-input"
+                       class="form-input"
                        placeholder="Enter username"
                        aria-label="Username">
             </div>
@@ -145,11 +145,11 @@ export class AuthManager {
                 <label for="basic-password">Password</label>
                 <input type="password"
                        id="basic-password"
-                       class="auth-input"
+                       class="form-input"
                        placeholder="Enter password"
                        aria-label="Password">
             </div>
-            <small class="auth-field-hint">Credentials will be base64 encoded and sent in the Authorization header</small>
+            <small class="form-input-hint">Credentials will be base64 encoded and sent in the Authorization header</small>
         `;
         this.authFieldsContainer.innerHTML = html;
 
@@ -181,7 +181,7 @@ export class AuthManager {
                 <label for="api-key-name">Key Name</label>
                 <input type="text"
                        id="api-key-name"
-                       class="auth-input"
+                       class="form-input"
                        placeholder="e.g., X-API-Key"
                        aria-label="API Key Name">
             </div>
@@ -189,18 +189,18 @@ export class AuthManager {
                 <label for="api-key-value">Key Value</label>
                 <input type="text"
                        id="api-key-value"
-                       class="auth-input"
+                       class="form-input"
                        placeholder="Enter API key"
                        aria-label="API Key Value">
             </div>
             <div class="auth-field-group">
                 <label for="api-key-location">Add To</label>
-                <select id="api-key-location" class="auth-select" aria-label="API Key Location">
+                <select id="api-key-location" class="form-select" aria-label="API Key Location">
                     <option value="header">Header</option>
                     <option value="query">Query Parameters</option>
                 </select>
             </div>
-            <small class="auth-field-hint">The API key will be added to the request as specified</small>
+            <small class="form-input-hint">The API key will be added to the request as specified</small>
         `;
         this.authFieldsContainer.innerHTML = html;
 
@@ -240,16 +240,16 @@ export class AuthManager {
                 <label for="oauth2-token">Access Token</label>
                 <input type="text"
                        id="oauth2-token"
-                       class="auth-input"
+                       class="form-input"
                        placeholder="Enter access token"
                        aria-label="OAuth 2.0 Access Token">
-                <small class="auth-field-hint">The token will be sent in the Authorization header as "Bearer {token}"</small>
+                <small class="form-input-hint">The token will be sent in the Authorization header as "Bearer {token}"</small>
             </div>
             <div class="auth-field-group">
                 <label for="oauth2-header-prefix">Header Prefix</label>
                 <input type="text"
                        id="oauth2-header-prefix"
-                       class="auth-input"
+                       class="form-input"
                        placeholder="Bearer"
                        value="Bearer"
                        aria-label="OAuth 2.0 Header Prefix">
@@ -286,7 +286,7 @@ export class AuthManager {
                 <label for="digest-username">Username</label>
                 <input type="text"
                        id="digest-username"
-                       class="auth-input"
+                       class="form-input"
                        placeholder="Enter username"
                        aria-label="Digest Auth Username">
             </div>
@@ -294,11 +294,11 @@ export class AuthManager {
                 <label for="digest-password">Password</label>
                 <input type="password"
                        id="digest-password"
-                       class="auth-input"
+                       class="form-input"
                        placeholder="Enter password"
                        aria-label="Digest Auth Password">
             </div>
-            <small class="auth-field-hint">Digest authentication will be handled automatically by the HTTP client</small>
+            <small class="form-input-hint">Digest authentication will be handled automatically by the HTTP client</small>
         `;
         this.authFieldsContainer.innerHTML = html;
 

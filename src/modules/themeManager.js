@@ -209,15 +209,15 @@ export class SettingsModal {
 
                         <div class="settings-section">
                             <h3 data-i18n="settings.request_timeout">Request Timeout</h3>
-                            <div class="timeout-input-container">
-                                <input type="number" class="timeout-input" name="requestTimeout"
+                            <div class="form-input-container">
+                                <input type="number" class="form-input" name="requestTimeout"
                                        value="${currentTimeout}"
                                        min="0"
                                        step="1000"
                                        placeholder="0">
-                                <span class="timeout-unit">ms</span>
+                                <span class="form-input-unit">ms</span>
                             </div>
-                            <p class="timeout-description" data-i18n="settings.timeout_description">Set to 0 for no timeout</p>
+                            <p class="form-input-hint" data-i18n="settings.timeout_description">Set to 0 for no timeout</p>
                         </div>
                     </div>
 
