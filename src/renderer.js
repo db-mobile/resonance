@@ -149,6 +149,24 @@ function initKeyboardShortcuts() {
         category: 'Request'
     });
 
+    keyboardShortcuts.register('KeyS', {
+        ctrl: true,
+        handler: async () => {
+            if (window.currentEndpoint) {
+                const { saveAllRequestModifications } = await import('./modules/collectionManager.js');
+                await saveAllRequestModifications(
+                    window.currentEndpoint.collectionId,
+                    window.currentEndpoint.endpointId
+                );
+                if (window.workspaceTabController) {
+                    await window.workspaceTabController.markCurrentTabUnmodified();
+                }
+            }
+        },
+        description: 'Save request',
+        category: 'Request'
+    });
+
     keyboardShortcuts.register('Escape', {
         handler: () => {
             if (cancelRequestBtn && !cancelRequestBtn.disabled) {

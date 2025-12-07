@@ -114,10 +114,11 @@ class KeyboardShortcutsManager {
         const shortcut = this.shortcuts.get(shortcutKey);
 
         if (shortcut) {
-            // Some shortcuts work in input fields (like Ctrl+Enter to send)
+            // Some shortcuts work in input fields (like Ctrl+Enter to send, Ctrl+S to save)
             // Check if we should skip based on context
             const isInputSafeShortcut = shortcutKey.includes('enter') ||
                                        shortcutKey.includes('escape') ||
+                                       shortcutKey.includes('ctrl+keys') ||
                                        (ctrl && !isInputField);
 
             if (!isInputField || isInputSafeShortcut) {

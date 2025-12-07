@@ -366,17 +366,24 @@ export class WorkspaceTabController {
                 targetTabId = await this.service.getActiveTabId();
             }
 
-            // Construct URL with {{baseUrl}} if collection has a baseUrl
-            let fullUrl = endpoint.path;
-            if (endpoint.collectionBaseUrl) {
-                fullUrl = `{{baseUrl}}${  endpoint.path}`;
-            }
+            // Use persisted URL if available, otherwise construct from endpoint
+            let fullUrl;
+            if (endpoint.persistedUrl) {
+                // Use the persisted URL (user has edited it)
+                fullUrl = endpoint.persistedUrl;
+            } else {
+                // Construct URL with {{baseUrl}} if collection has a baseUrl
+                fullUrl = endpoint.path;
+                if (endpoint.collectionBaseUrl) {
+                    fullUrl = `{{baseUrl}}${  endpoint.path}`;
+                }
 
-            // Replace path parameters with {{paramName}} format
-            if (endpoint.parameters?.path) {
-                Object.entries(endpoint.parameters.path).forEach(([key, _param]) => {
-                    fullUrl = fullUrl.replace(`{${key}}`, `{{${key}}}`);
-                });
+                // Replace path parameters with {{paramName}} format
+                if (endpoint.parameters?.path) {
+                    Object.entries(endpoint.parameters.path).forEach(([key, _param]) => {
+                        fullUrl = fullUrl.replace(`{${key}}`, `{{${key}}}`);
+                    });
+                }
             }
 
             // Load path parameters (prioritize persisted over defaults)

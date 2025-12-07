@@ -213,6 +213,7 @@
     "log_path": "Pfad",
     "log_status": "Status",
     "log_time_ms": "Zeit (ms)",
+    "status_code": "Statuscode",
     "ok": "OK",
     "error_toggle_server": "Server konnte nicht umgeschaltet werden"
   }

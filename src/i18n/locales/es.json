@@ -213,6 +213,7 @@
     "log_path": "Ruta",
     "log_status": "Estado",
     "log_time_ms": "Tiempo (ms)",
+    "status_code": "Código de estado",
     "ok": "OK",
     "error_toggle_server": "Error al cambiar el servidor"
   }
