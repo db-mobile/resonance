@@ -2,7 +2,7 @@ import { urlInput, methodSelect, bodyInput, sendRequestBtn, cancelRequestBtn, re
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { activateTab } from './tabManager.js'; // To ensure response tab is active
-import { saveRequestBodyModification } from './collectionManager.js';
+import { saveAllRequestModifications } from './collectionManager.js';
 import { VariableProcessor } from './variables/VariableProcessor.js';
 import { VariableRepository } from './storage/VariableRepository.js';
 import { EnvironmentRepository } from './storage/EnvironmentRepository.js';
@@ -146,7 +146,7 @@ export async function handleCancelRequest() {
 
 export async function handleSendRequest() {
     if (window.currentEndpoint) {
-        await saveRequestBodyModification(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+        await saveAllRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
     }
 
     let url = urlInput.value.trim();
@@ -507,7 +507,7 @@ export async function handleSendRequest() {
 
 export async function handleGenerateCurl() {
     if (window.currentEndpoint) {
-        await saveRequestBodyModification(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+        await saveAllRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
     }
 
     let url = urlInput.value.trim();

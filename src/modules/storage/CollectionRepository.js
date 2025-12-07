@@ -379,6 +379,47 @@ export class CollectionRepository {
     }
 
     /**
+     * Retrieves persisted URL for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<string|null>} The persisted URL or null if not found
+     */
+    async getPersistedUrl(collectionId, endpointId) {
+        try {
+            const persistedUrls = await this._getObjectFromStore('persistedUrls');
+            const key = `${collectionId}_${endpointId}`;
+            return persistedUrls[key] || null;
+        } catch (error) {
+            console.error('Error getting persisted URL:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Saves URL for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {string} url - The URL to persist
+     * @returns {Promise<void>}
+     * @throws {Error} If save operation fails
+     */
+    async savePersistedUrl(collectionId, endpointId, url) {
+        try {
+            const persistedUrls = await this._getObjectFromStore('persistedUrls');
+            const key = `${collectionId}_${endpointId}`;
+            persistedUrls[key] = url;
+            await this.electronAPI.store.set('persistedUrls', persistedUrls);
+        } catch (error) {
+            console.error('Error saving persisted URL:', error);
+            throw new Error(`Failed to save persisted URL: ${error.message}`);
+        }
+    }
+
+    /**
      * Retrieves collection expansion states for UI
      *
      * Returns which collections and endpoints are expanded/collapsed in the tree view.

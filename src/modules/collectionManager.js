@@ -115,6 +115,19 @@ export async function saveRequestBodyModification(collectionId, endpointId) {
 }
 
 /**
+ * Saves all request modifications for an endpoint (params, headers, body, auth)
+ *
+ * @async
+ * @param {string} collectionId - Collection ID
+ * @param {string} endpointId - Endpoint ID
+ * @returns {Promise<void>}
+ */
+export async function saveAllRequestModifications(collectionId, endpointId) {
+    const controller = initializeController();
+    await controller.saveAllRequestModifications(collectionId, endpointId);
+}
+
+/**
  * Initializes body input change tracking
  *
  * @returns {void}

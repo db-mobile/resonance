@@ -225,6 +225,7 @@ Resonance includes comprehensive keyboard shortcuts to speed up your workflow. P
 
 ### Request Actions
 - `Ctrl/Cmd+Enter` - Send request
+- `Ctrl/Cmd+S` - Save request modifications
 - `Esc` - Cancel current request
 
 ### Navigation

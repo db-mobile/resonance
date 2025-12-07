@@ -141,6 +141,7 @@ export class CollectionController {
                 }
 
                 // Load all persisted data if available
+                const persistedUrl = await this.repository.getPersistedUrl(collection.id, endpoint.id);
                 const persistedAuthConfig = await this.repository.getPersistedAuthConfig(collection.id, endpoint.id);
                 const persistedPathParams = await this.repository.getPersistedPathParams(collection.id, endpoint.id);
                 const persistedQueryParams = await this.repository.getPersistedQueryParams(collection.id, endpoint.id);
@@ -155,6 +156,7 @@ export class CollectionController {
                     path: endpoint.path,
                     method: endpoint.method,
                     requestBodyString: requestBodyString,  // Pass the generated string
+                    persistedUrl: persistedUrl,  // Pass persisted URL if available
                     persistedAuthConfig: persistedAuthConfig,  // Pass persisted data if available
                     persistedPathParams: persistedPathParams,
                     persistedQueryParams: persistedQueryParams,
@@ -816,6 +818,123 @@ export class CollectionController {
         const bodyInput = document.getElementById('body-input');
         if (bodyInput) {
             await this.service.saveRequestBodyModification(collectionId, endpointId, bodyInput);
+        }
+    }
+
+    /**
+     * Saves all request modifications (path params, query params, headers, body, auth)
+     *
+     * @async
+     * @param {string} collectionId - Collection ID
+     * @param {string} endpointId - Endpoint ID
+     * @returns {Promise<void>}
+     */
+    async saveAllRequestModifications(collectionId, endpointId) {
+        try {
+            // Import parseKeyValuePairs from keyValueManager
+            const { parseKeyValuePairs } = await import('../keyValueManager.js');
+            const { authManager } = await import('../authManager.js');
+
+            // Get all form elements
+            const urlInput = document.getElementById('url-input');
+            const pathParamsList = document.getElementById('path-params-list');
+            const queryParamsList = document.getElementById('query-params-list');
+            const headersList = document.getElementById('headers-list');
+            const bodyInput = document.getElementById('body-input');
+
+            // Save URL and update endpoint path in collection
+            if (urlInput && urlInput.value) {
+                await this.repository.savePersistedUrl(collectionId, endpointId, urlInput.value);
+
+                // Update the endpoint's path in the collection for sidebar display
+                try {
+                    const url = urlInput.value;
+                    // Extract path from URL (remove baseUrl variables and domain if present)
+                    let path = url;
+
+                    // Remove {{baseUrl}} if present
+                    path = path.replace(/\{\{baseUrl\}\}/g, '');
+
+                    // If it's a full URL, extract just the path
+                    if (path.match(/^https?:\/\//)) {
+                        const urlObj = new URL(path);
+                        path = urlObj.pathname + urlObj.search;
+                    }
+
+                    // Update the endpoint in the collection
+                    const collections = await this.repository.getAll();
+                    const collection = collections.find(c => c.id === collectionId);
+                    if (collection) {
+                        const endpoint = collection.endpoints?.find(e => e.id === endpointId);
+                        if (endpoint) {
+                            endpoint.path = path;
+                            await this.repository.save(collections);
+
+                            // Refresh the collection tree display
+                            await this.loadCollectionsWithExpansionState();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error updating endpoint path in collection:', error);
+                }
+            }
+
+            // Save path parameters
+            if (pathParamsList) {
+                const pathParams = parseKeyValuePairs(pathParamsList);
+                const pathParamsArray = Object.entries(pathParams).map(([key, value]) => ({ key, value }));
+                await this.repository.savePersistedPathParams(collectionId, endpointId, pathParamsArray);
+            }
+
+            // Save query parameters
+            if (queryParamsList) {
+                const queryParams = parseKeyValuePairs(queryParamsList);
+                const queryParamsArray = Object.entries(queryParams).map(([key, value]) => ({ key, value }));
+                await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParamsArray);
+            }
+
+            // Save headers
+            if (headersList) {
+                const headers = parseKeyValuePairs(headersList);
+                const headersArray = Object.entries(headers).map(([key, value]) => ({ key, value }));
+                await this.repository.savePersistedHeaders(collectionId, endpointId, headersArray);
+            }
+
+            // Save request body
+            if (bodyInput) {
+                await this.service.saveRequestBodyModification(collectionId, endpointId, bodyInput);
+            }
+
+            // Save auth configuration
+            const authConfig = authManager.getAuthConfig();
+            if (authConfig) {
+                await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
+            }
+
+            this.statusDisplay.update('Request saved', null);
+
+            // Update the current workspace tab state to reflect the saved changes
+            if (window.workspaceTabController) {
+                const activeTab = await window.workspaceTabController.getActiveTab();
+                if (activeTab && activeTab.request) {
+                    // Update the tab's request URL if it was changed
+                    if (urlInput && urlInput.value && activeTab.request.url !== urlInput.value) {
+                        activeTab.request.url = urlInput.value;
+
+                        // Update the tab in the service to persist the change
+                        const activeTabId = await window.workspaceTabController.service.getActiveTabId();
+                        if (activeTabId) {
+                            await window.workspaceTabController.service.updateTab(activeTabId, {
+                                request: activeTab.request
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error saving request modifications:', error);
+            this.statusDisplay.update(`Error saving request: ${error.message}`, null);
+            throw error;
         }
     }
 
