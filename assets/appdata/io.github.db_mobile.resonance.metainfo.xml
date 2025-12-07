@@ -4,7 +4,7 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <name>Resonance</name>
-  <summary>Perform API testing with ease</summary>
+  <summary>Test and explore web services</summary>
   <developer id="io.github.db-mobile">
     <name>Dennis Blümer</name>
   </developer>
@@ -12,19 +12,26 @@
   <description>
     <p>
       Resonance is a clean and minimal API client application designed to provide an excellent
-      user experience for testing and interacting with APIs. It offers a modern and intuitive
-      interface for developers.
+      user experience for testing and interacting with web services. It offers a modern and intuitive
+      interface for developers with powerful features for API development and testing.
     </p>
-    <p>Features:</p>
+    <p>Key Features:</p>
     <ul>
-      <li>OpenAPI/Swagger collection imports - Import OpenAPI 3.0 specifications in YAML or JSON format</li>
-      <li>Variable templating system - Use template variables with {{ variableName }} syntax for API keys, base URLs, and more</li>
-      <li>Multiple HTTP methods - Support for GET, POST, PUT, DELETE, and PATCH requests</li>
-      <li>Request body schema generation - Automatically generate example request bodies from OpenAPI schemas</li>
-      <li>Clean, organized interface - Split layout with collections sidebar and tabbed request/response sections</li>
-      <li>Theme support - Light, dark, system, and blueprint themes with CSS custom properties</li>
-      <li>Multi-language support - Available in English, German, Spanish, French, and Italian</li>
-      <li>Secure architecture - Built with context isolation and secure IPC communication</li>
+      <li>Import collections from OpenAPI 3.0 specifications and Postman collections</li>
+      <li>Environment management with variable templating for different deployment contexts</li>
+      <li>Multiple authentication methods including Bearer tokens, Basic Auth, API keys, OAuth 2.0, and Digest authentication</li>
+      <li>Generate code in 9 languages: cURL, Python, JavaScript, Node.js, Go, PHP, Ruby, and Java</li>
+      <li>GraphQL support with dedicated query editor and syntax highlighting</li>
+      <li>Built-in mock server for testing without a backend, with custom responses and configurable delays</li>
+      <li>Workspace tabs for managing multiple concurrent requests with independent state</li>
+      <li>Request history with search and replay capability for easy debugging</li>
+      <li>Performance metrics showing detailed timing breakdown including DNS, TCP, TLS, and download times</li>
+      <li>Cookie management with full attribute display</li>
+      <li>HTTP proxy support with authentication and bypass lists</li>
+      <li>Protocol version control supporting HTTP/1.1, HTTP/2, and HTTP/3</li>
+      <li>Comprehensive keyboard shortcuts for efficient workflow</li>
+      <li>Four theme options: light, dark, system-adaptive, and blueprint</li>
+      <li>Available in English, German, Spanish, French, and Italian</li>
     </ul>
   </description>
 
@@ -33,22 +40,26 @@
   <icon type="stock">io.github.db_mobile.resonance</icon>
 
   <branding>
-    <color type="primary" scheme_preference="light">#75abbf</color>
-    <color type="primary" scheme_preference="dark">#113084</color>
+    <color type="primary" scheme_preference="light">#62a0ea</color>
+    <color type="primary" scheme_preference="dark">#1c71d8</color>
   </branding>
 
   <screenshots>
     <screenshot type="default">
       <caption>Main interface showing API request configuration</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v79/assets/screenshots/main_window.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v114/assets/screenshots/main_window.png</image>
     </screenshot>
     <screenshot>
-      <caption>Settings modal in light theme</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v79/assets/screenshots/settings.png</image>
+      <caption>Environment management</caption>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v114/assets/screenshots/environment.png</image>
     </screenshot>
     <screenshot>
-      <caption>Environment variables configuration</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v79/assets/screenshots/environment.png</image>
+      <caption>Mock server</caption>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v114/assets/screenshots/mock_server.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Settings modal in dark theme</caption>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v114/assets/screenshots/settings.png</image>
     </screenshot>
   </screenshots>
 
@@ -70,6 +81,12 @@
     <keyword>developer</keyword>
     <keyword>OpenAPI</keyword>
     <keyword>Swagger</keyword>
+    <keyword>Postman</keyword>
+    <keyword>GraphQL</keyword>
+    <keyword>mock</keyword>
+    <keyword>proxy</keyword>
+    <keyword>web service</keyword>
+    <keyword>request</keyword>
   </keywords>
 
   <provides>

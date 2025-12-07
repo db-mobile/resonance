@@ -2,8 +2,8 @@
   <defs>
     <!-- Gradient for background shape -->
     <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#3584e4;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#1c71d8;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#1c71d8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#155bb8;stop-opacity:1" />
     </linearGradient>
 
     <!-- Gradient for resonance waves -->
@@ -29,9 +29,9 @@
     </radialGradient>
   </defs>
 
-  <g transform="translate(102.4, 102.4) scale(0.8)">
+  <g transform="translate(64, 64) scale(0.875)">
     <!-- Rounded rectangle background with gradient -->
-    <path fill="url(#bgGradient)" d="M0 128C0 57.3076 57.3076 0 128 0H896C966.6924 0 1024 57.3076 1024 128V896C1024 966.6924 966.6924 1024 896 1024H128C57.3076 1024 0 966.6924 0 896Z"/>
+    <path fill="url(#bgGradient)" d="M0 96C0 42.98 42.98 0 96 0H928C981.02 0 1024 42.98 1024 96V928C1024 981.02 981.02 1024 928 1024H96C42.98 1024 0 981.02 0 928Z"/>
 
     <!-- Outer resonance waves (yellow/gold) -->
     <path fill="url(#waveGradient1)" fill-rule="evenodd" d="M340.8183 802.4999C338.6597 802.4999 336.5068 801.6691 334.8574 800.019C241.48 706.2777 148.1027 612.5364 54.7253 518.7951C51.4386 515.4998 51.4308 510.1549 54.7079 506.8499C148.0853 412.5663 241.4627 318.2828 334.8401 223.9992C339.4154 219.3814 347.2544 221.4675 348.9503 227.7543C349.7374 230.672 348.9142 233.7897 346.7907 235.9328C255.3888 328.2178 163.9868 420.5027 72.5848 512.7877C163.981 604.542 255.3772 696.2963 346.7734 788.0506C351.3665 792.6487 349.279 800.5142 343.0159 802.2085C342.2993 802.4024 341.5604 802.5003 340.8183 802.4999Z"/>
