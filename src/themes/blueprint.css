@@ -732,8 +732,27 @@ label {
   left: 0;
   right: 0;
   bottom: 0;
-  background-image: 
+  background-image:
     linear-gradient(rgba(96, 165, 250, 0.2) 1px, transparent 1px),
     linear-gradient(90deg, rgba(96, 165, 250, 0.2) 1px, transparent 1px);
   background-size: 8px 8px;
+}
+
+/* Resizer handles with more subtle hover effect for blueprint theme */
+.resizer-handle:hover,
+.horizontal-resizer-handle:hover {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-medium) !important;
+}
+
+.resizer-handle.dragging,
+.horizontal-resizer-handle.dragging {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-medium) !important;
+}
+
+.resizer-handle:hover .resizer-line,
+.horizontal-resizer-handle:hover .horizontal-resizer-line {
+  background: var(--border-medium) !important;
+  opacity: 1 !important;
 }
