@@ -490,3 +490,22 @@ label {
   border-color: #FBBF24 !important;
   font-weight: 600 !important;
 }
+
+/* Resizer handles with more subtle hover effect for dark theme */
+.resizer-handle:hover,
+.horizontal-resizer-handle:hover {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-strong) !important;
+}
+
+.resizer-handle.dragging,
+.horizontal-resizer-handle.dragging {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-strong) !important;
+}
+
+.resizer-handle:hover .resizer-line,
+.horizontal-resizer-handle:hover .horizontal-resizer-line {
+  background: var(--border-strong) !important;
+  opacity: 1 !important;
+}

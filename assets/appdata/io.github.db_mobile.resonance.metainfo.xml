@@ -47,19 +47,19 @@
   <screenshots>
     <screenshot type="default">
       <caption>Main interface showing API request configuration</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v114/assets/screenshots/main_window.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v115/assets/screenshots/main_window.png</image>
     </screenshot>
     <screenshot>
       <caption>Environment management</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v114/assets/screenshots/environment.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v115/assets/screenshots/environment.png</image>
     </screenshot>
     <screenshot>
       <caption>Mock server</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v114/assets/screenshots/mock_server.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v115/assets/screenshots/mock_server.png</image>
     </screenshot>
     <screenshot>
       <caption>Settings modal in dark theme</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v114/assets/screenshots/settings.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v115/assets/screenshots/settings.png</image>
     </screenshot>
   </screenshots>
 
@@ -83,10 +83,8 @@
     <keyword>Swagger</keyword>
     <keyword>Postman</keyword>
     <keyword>GraphQL</keyword>
-    <keyword>mock</keyword>
-    <keyword>proxy</keyword>
+    <keyword>mock server</keyword>
     <keyword>web service</keyword>
-    <keyword>request</keyword>
   </keywords>
 
   <provides>
@@ -96,7 +94,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
-    <release version="1.6.1" date="2025-12-07">
+    <release version="1.6.2" date="2025-12-08">
+      <description>
+        <p>Issues addressed</p>
+        <ul>
+          <li>Minor styling issues</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.6.2" date="2025-12-07">
       <description>
         <p>Issues addressed</p>
         <ul>
