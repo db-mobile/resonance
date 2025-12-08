@@ -1,41 +1,208 @@
 /**
  * Light Theme
- * Clean and bright interface
+ * Clean and bright interface with strong contrast
  */
 :root {
-  /* Text Colors - High Contrast for Readability */
-  --text-primary: var(--color-gray-900);
-  --text-secondary: var(--color-gray-700);
-  --text-tertiary: var(--color-gray-500);
-  --text-disabled: var(--color-gray-400);
-  --text-inverse: var(--color-white);
-  
-  /* Background Colors - Clean & Layered */
-  --bg-primary: var(--color-white);
-  --bg-secondary: var(--color-gray-50);
-  --bg-tertiary: var(--color-gray-100);
+  /* Text Colors - Enhanced Contrast for Readability */
+  --text-primary: #111827;        /* Darker for better contrast (gray-900) */
+  --text-secondary: #374151;      /* Darker secondary text (gray-700) */
+  --text-tertiary: #6B7280;       /* Medium gray for tertiary text (gray-500) */
+  --text-disabled: #9CA3AF;       /* Light gray for disabled state (gray-400) */
+  --text-inverse: #FFFFFF;        /* White text for dark backgrounds */
+
+  /* Background Colors - Clear Layering with Better Separation */
+  --bg-primary: #FFFFFF;          /* Pure white */
+  --bg-secondary: #F9FAFB;        /* Very light gray (gray-50) */
+  --bg-tertiary: #F3F4F6;         /* Light gray for cards (gray-100) */
   --bg-overlay: rgba(255, 255, 255, 0.95);
   --bg-glass: rgba(255, 255, 255, 0.8);
   --bg-glass-strong: rgba(255, 255, 255, 0.9);
-  
-  /* Border Colors - Subtle Definition */
-  --border-light: var(--color-gray-200);
-  --border-medium: var(--color-gray-300);
-  --border-strong: var(--color-gray-400);
-  --border-focus: var(--color-primary);
-  --border-glass: rgba(255, 255, 255, 0.2);
-  
-  /* Light theme shadows */
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  --shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  
-  /* Light theme accent colors */
+
+  /* Border Colors - Stronger Definition for Better Visibility */
+  --border-light: #E5E7EB;        /* Visible light borders (gray-200) */
+  --border-medium: #D1D5DB;       /* Medium borders (gray-300) */
+  --border-strong: #9CA3AF;       /* Strong borders (gray-400) */
+  --border-focus: #3B82F6;        /* Blue focus ring */
+  --border-glass: rgba(0, 0, 0, 0.1);
+
+  /* Light theme shadows - slightly stronger */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 1px 2px 0 rgba(0, 0, 0, 0.08);
+  --shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -1px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.12), 0 4px 6px -2px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.12), 0 10px 10px -5px rgba(0, 0, 0, 0.06);
+  --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
+
+  /* Light theme accent colors - vibrant for visibility */
   --color-success-light: #D1FAE5;
   --color-warning-light: #FEF3C7;
   --color-error-light: #FEE2E2;
   --color-primary-light: #DBEAFE;
+}
+
+/* Light theme specific overrides for better contrast */
+input[type="text"],
+input[type="url"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea,
+select {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-medium) !important;
+}
+
+input[type="text"]:focus,
+input[type="url"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+  background: var(--bg-primary) !important;
+  border-color: var(--border-focus) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+pre,
+code {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+button {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-medium) !important;
+}
+
+button:hover {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-strong) !important;
+}
+
+/* Main Content Area Sections - Clear Backgrounds with Strong Borders */
+.main-content-area {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.request-builder,
+.request-url-section,
+.request-config,
+.response-area,
+.response-content,
+.response-display,
+.tab-content,
+.key-value-list,
+.key-value-row {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-medium) !important;
+}
+
+.collections-sidebar,
+.collections-container,
+.collections-list {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-right: 1px solid var(--border-medium) !important;
+}
+
+.collections-empty,
+.collection-item,
+.collection-endpoints,
+.endpoint-item {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-light) !important;
+}
+
+.tab-nav,
+.response-tabs,
+.tab-button,
+.response-header,
+.sidebar-header,
+.collection-header {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-medium) !important;
+}
+
+h1, h2, h3, h4, h5, h6,
+.response-title,
+.sidebar-title,
+.collection-name {
+  color: var(--text-primary) !important;
+}
+
+label {
+  color: var(--text-secondary) !important;
+  font-weight: 500 !important;
+}
+
+#response-display,
+#response-headers-display {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+/* Status Display for Light Mode - High Contrast */
+.status-display {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-medium) !important;
+  font-weight: 600 !important;
+}
+
+.status-success {
+  background: #D1FAE5 !important;
+  color: #065F46 !important;
+  border-color: #10B981 !important;
+}
+
+.status-redirect {
+  background: #FEF3C7 !important;
+  color: #92400E !important;
+  border-color: #F59E0B !important;
+}
+
+.status-client-error,
+.status-server-error {
+  background: #FEE2E2 !important;
+  color: #991B1B !important;
+  border-color: #EF4444 !important;
+}
+
+.status-info {
+  background: #DBEAFE !important;
+  color: #1E40AF !important;
+  border-color: #3B82F6 !important;
+}
+
+/* Resizer handles with visible hover effect for light mode */
+.resizer-handle,
+.horizontal-resizer-handle {
+  border-color: var(--border-light) !important;
+}
+
+.resizer-handle:hover,
+.horizontal-resizer-handle:hover {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-strong) !important;
+}
+
+.resizer-handle.dragging,
+.horizontal-resizer-handle.dragging {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-strong) !important;
+}
+
+.resizer-handle:hover .resizer-line,
+.horizontal-resizer-handle:hover .horizontal-resizer-line {
+  background: var(--border-strong) !important;
+  opacity: 1 !important;
 }

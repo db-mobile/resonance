@@ -37,16 +37,22 @@ export class ThemeManager {
                 this.currentThemeLink = null;
             }
 
+            // If system theme is selected, resolve to actual theme (dark or light)
+            let themeFile = theme;
+            if (theme === 'system') {
+                themeFile = this.getSystemTheme();
+            }
+
             const link = document.createElement('link');
             link.rel = 'stylesheet';
-            link.href = `src/themes/${theme}.css`;
+            link.href = `src/themes/${themeFile}.css`;
             link.id = `theme-${theme}`;
-            
+
             link.onload = () => {
                 this.currentThemeLink = link;
                 resolve();
             };
-            
+
             link.onerror = () => {
                 reject(new Error(`Failed to load theme: ${theme}`));
             };
@@ -181,7 +187,7 @@ export class SettingsModal {
                         <div class="settings-section">
                             <h3 data-i18n="settings.theme">Theme</h3>
                             <div class="theme-select-container">
-                                <select class="theme-select" name="theme">
+                                <select class="select-base theme-select" name="theme">
                                     <option value="light" ${this.themeManager.getCurrentTheme() === 'light' ? 'selected' : ''} data-i18n="theme.light">Light</option>
                                     <option value="dark" ${this.themeManager.getCurrentTheme() === 'dark' ? 'selected' : ''} data-i18n="theme.dark">Dark</option>
                                     <option value="system" ${this.themeManager.getCurrentTheme() === 'system' ? 'selected' : ''} data-i18n="theme.system">System</option>
@@ -196,7 +202,7 @@ export class SettingsModal {
                     <div class="settings-section">
                         <h3 data-i18n="settings.http_version">HTTP Version</h3>
                         <div class="http-version-select-container">
-                            <select class="http-version-select" name="httpVersion">
+                            <select class="select-base http-version-select" name="httpVersion">
                                 <option value="auto" ${currentHttpVersion === 'auto' ? 'selected' : ''} data-i18n="http_version.auto">Auto</option>
                                 <option value="http1" ${currentHttpVersion === 'http1' ? 'selected' : ''} data-i18n="http_version.http1">HTTP/1.x</option>
                                 <option value="http2" ${currentHttpVersion === 'http2' ? 'selected' : ''} data-i18n="http_version.http2">HTTP/2</option>
@@ -244,7 +250,7 @@ export class SettingsModal {
             <div class="settings-section">
                 <h3 data-i18n="settings.language">Language</h3>
                 <div class="language-select-container">
-                    <select class="language-select" name="language">
+                    <select class="select-base language-select" name="language">
                         ${languageOptions}
                     </select>
                     <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
