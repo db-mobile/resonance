@@ -5,6 +5,7 @@
 
 import { HistoryService } from '../services/HistoryService.js';
 import { HistoryRenderer } from '../ui/HistoryRenderer.js';
+import { updateUrlFromQueryParams } from '../keyValueManager.js';
 
 /**
  * Controller for coordinating request history operations between UI and services
@@ -129,6 +130,9 @@ export class HistoryController {
             if (pathParamsList && pathParamsList.children.length === 0) {
                 this.addKeyValueRow(pathParamsList);
             }
+
+            // Update URL field to include query params
+            updateUrlFromQueryParams();
 
             // Switch to the request section if in history view
             this.showRequestSection();
