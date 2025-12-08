@@ -232,10 +232,28 @@ export async function handleSendRequest() {
         return;
     }
 
+    // Strip existing query params from URL and rebuild from query params list
+    // This prevents duplication since updateUrlFromQueryParams() already shows them in the URL field
+    const urlWithoutQuery = url.split('?')[0];
 
-    const queryString = new URLSearchParams(queryParams).toString();
+    // Build query string manually to preserve exact encoding
+    // URLSearchParams over-encodes some characters (e.g., %2F -> %252F)
+    const queryPairs = [];
+    for (const [key, value] of Object.entries(queryParams)) {
+        if (key) {
+            // Only encode if not already encoded, by checking for % signs
+            // If value contains %, assume it's already encoded and use as-is
+            const encodedValue = value.includes('%') ? value : encodeURIComponent(value);
+            const encodedKey = key.includes('%') ? key : encodeURIComponent(key);
+            queryPairs.push(`${encodedKey}=${encodedValue}`);
+        }
+    }
+
+    const queryString = queryPairs.join('&');
     if (queryString) {
-        url += (url.includes('?') ? '&' : '?') + queryString;
+        url = `${urlWithoutQuery}?${queryString}`;
+    } else {
+        url = urlWithoutQuery;
     }
 
     if (['POST', 'PUT', 'PATCH'].includes(method) && bodyInput.value.trim()) {
@@ -595,9 +613,19 @@ export async function handleGenerateCurl() {
 
     const urlWithoutQuery = url.split('?')[0];
 
-    const queryString = new URLSearchParams(queryParams).toString();
+    // Build query string manually to preserve exact encoding (same as handleSendRequest)
+    const queryPairs = [];
+    for (const [key, value] of Object.entries(queryParams)) {
+        if (key) {
+            const encodedValue = value.includes('%') ? value : encodeURIComponent(value);
+            const encodedKey = key.includes('%') ? key : encodeURIComponent(key);
+            queryPairs.push(`${encodedKey}=${encodedValue}`);
+        }
+    }
+
+    const queryString = queryPairs.join('&');
     if (queryString) {
-        url = `${urlWithoutQuery  }?${  queryString}`;
+        url = `${urlWithoutQuery}?${queryString}`;
     } else {
         url = urlWithoutQuery;
     }
