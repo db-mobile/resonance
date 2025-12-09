@@ -64,6 +64,7 @@
   "build": {
     "appId": "io.github.db_mobile.resonance",
     "productName": "Resonance",
+    "publish": null,
     "asar": true,
     "files": [
       "**/*",
