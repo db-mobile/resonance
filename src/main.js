@@ -20,6 +20,8 @@ import OpenApiParser from './main/openApiParser.js';
 import PostmanParser from './main/postmanParser.js';
 import OpenApiExporter from './main/openApiExporter.js';
 import MockServerHandler from './main/mockServerHandler.js';
+import ScriptExecutor from './main/scriptExecutor.js';
+import ScriptHandlers from './main/scriptHandlers.js';
 import loggerService from './services/LoggerService.js';
 
 // Initialize logger for main process
@@ -44,7 +46,8 @@ const store = new Store({
             port: 3000,
             enabledCollections: [],
             endpointDelays: {}
-        }
+        },
+        persistedScripts: {}
     }
 });
 
@@ -63,7 +66,8 @@ try {
         'persistedAuthConfigs',
         'collectionExpansionStates',
         'settings',
-        'mockServer'
+        'mockServer',
+        'persistedScripts'
     ];
 
     requiredKeys.forEach(key => {
@@ -90,6 +94,8 @@ const openApiParser = new OpenApiParser(schemaProcessor, store);
 const postmanParser = new PostmanParser(store);
 const openApiExporter = new OpenApiExporter();
 const mockServerHandler = new MockServerHandler(store, schemaProcessor);
+const scriptExecutor = new ScriptExecutor(store);
+const scriptHandlers = new ScriptHandlers(store, scriptExecutor);
 const apiRequestHandler = new ApiRequestHandler(store, proxyHandler, mockServerHandler);
 
 app.whenReady().then(() => {
@@ -124,6 +130,12 @@ ipcMain.handle('settings:get', () => storeHandler.getSettings());
 ipcMain.handle('settings:set', (event, settings) => {
     storeHandler.setSettings(settings);
 });
+
+// Script IPC handlers
+ipcMain.handle('script:get', (e, cId, eId) => scriptHandlers.handleGetScripts(e, cId, eId));
+ipcMain.handle('script:save', (e, cId, eId, s) => scriptHandlers.handleSaveScripts(e, cId, eId, s));
+ipcMain.handle('script:execute-pre-request', (e, d) => scriptHandlers.handlePreRequestScript(e, d));
+ipcMain.handle('script:execute-test', (e, d) => scriptHandlers.handleTestScript(e, d));
 
 ipcMain.handle('import-openapi-file', async () => {
     const mainWindow = windowManager.getMainWindow();

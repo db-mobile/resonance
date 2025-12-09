@@ -243,4 +243,17 @@ export class ContextMenu {
             <path d="M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         `;
     }
+
+    /**
+     * Creates script/code icon SVG markup
+     * @static
+     * @returns {string} SVG path markup
+     */
+    static createScriptIcon() {
+        return `
+            <path d="M7 8L3 11.6923L7 15.3846" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M17 8L21 11.6923L17 15.3846" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M14 4L10 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        `;
+    }
 }

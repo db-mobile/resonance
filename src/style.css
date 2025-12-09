@@ -977,6 +977,118 @@ body {
   color: var(--text-tertiary);
 }
 
+/* Scripts Tab */
+.scripts-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  height: 100%;
+}
+
+.script-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+  min-height: 0;
+}
+
+.script-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.script-section-header h4 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.script-help-text {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.script-textarea {
+  width: 100%;
+  flex: 1;
+  min-height: 150px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-white);
+  color: var(--text-primary);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  resize: vertical;
+  transition: all var(--transition-base);
+}
+
+.script-textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.script-textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+.script-help {
+  margin-top: auto;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+}
+
+.script-help summary {
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  font-weight: 500;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.script-help summary:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.script-help-content {
+  padding: var(--space-3);
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.help-section {
+  font-size: var(--font-size-xs);
+  line-height: 1.6;
+}
+
+.help-section h5 {
+  margin: 0 0 var(--space-2) 0;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.help-section code {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-primary);
+  background: var(--bg-tertiary);
+  padding: 2px 4px;
+  border-radius: var(--radius-xs);
+}
+
 /* Resizer Handle */
 .resizer-handle {
   height: 8px;
