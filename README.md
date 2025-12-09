@@ -382,24 +382,23 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### Completed
 - [x] OpenAPI 3.0 import with schema-based generation
-- [x] **Postman collection import (v2.0 & v2.1)**
-- [x] **Postman environment import**
-- [x] **Multi-language code generation (9 languages)**
-- [x] **GraphQL support with dedicated editor**
-- [x] **Workspace tabs for concurrent requests**
-- [x] **Performance metrics and timing breakdown**
-- [x] **Cookie management and display**
-- [x] **Proxy support with authentication**
+- [x] Postman collection import (v2.0 & v2.1)
+- [x] Postman environment import
+- [x] Multi-language code generation (9 languages)
+- [x] GraphQL support with dedicated editor
+- [x] Workspace tabs for concurrent requests
+- [x] Performance metrics and timing breakdown
+- [x] Cookie management and display
+- [x] Proxy support with authentication
 - [x] Variable templating system with environment support
-- [x] Multi-theme support (4 themes)
+- [x] Multi-theme support (3 themes)
 - [x] Internationalization (5 languages)
 - [x] Authentication support (Bearer, Basic, API Key, OAuth2, Digest)
 - [x] Request history with search and replay
 - [x] Environment management (Dev, Staging, Production, custom)
-- [x] Test suite implementation (Jest configured)
 - [x] Keyboard shortcuts for all major actions
-- [x] **Mock server with custom responses and delays**
-- [x] **Collection export (OpenAPI format)**
+- [x] Mock server with custom responses and delays
+- [x] Collection export (OpenAPI format)
 
 ### Planned
 - [ ] Pre/post-request scripts & testing framework

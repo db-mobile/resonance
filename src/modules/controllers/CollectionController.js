@@ -911,23 +911,28 @@ export class CollectionController {
                 }
             }
 
+            // Parse all key-value pairs for saving and workspace tab update
+            let pathParams = {};
+            let queryParams = {};
+            let headers = {};
+
             // Save path parameters
             if (pathParamsList) {
-                const pathParams = parseKeyValuePairs(pathParamsList);
+                pathParams = parseKeyValuePairs(pathParamsList);
                 const pathParamsArray = Object.entries(pathParams).map(([key, value]) => ({ key, value }));
                 await this.repository.savePersistedPathParams(collectionId, endpointId, pathParamsArray);
             }
 
             // Save query parameters
             if (queryParamsList) {
-                const queryParams = parseKeyValuePairs(queryParamsList);
+                queryParams = parseKeyValuePairs(queryParamsList);
                 const queryParamsArray = Object.entries(queryParams).map(([key, value]) => ({ key, value }));
                 await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParamsArray);
             }
 
             // Save headers
             if (headersList) {
-                const headers = parseKeyValuePairs(headersList);
+                headers = parseKeyValuePairs(headersList);
                 const headersArray = Object.entries(headers).map(([key, value]) => ({ key, value }));
                 await this.repository.savePersistedHeaders(collectionId, endpointId, headersArray);
             }
@@ -949,15 +954,53 @@ export class CollectionController {
             if (window.workspaceTabController) {
                 const activeTab = await window.workspaceTabController.getActiveTab();
                 if (activeTab && activeTab.request) {
-                    // Update the tab's request URL if it was changed
-                    if (urlInput && urlInput.value && activeTab.request.url !== urlInput.value) {
-                        activeTab.request.url = urlInput.value;
+                    // Update the tab's request data with all saved changes
+                    const updatedRequest = {};
+                    let hasChanges = false;
 
-                        // Update the tab in the service to persist the change
+                    // Update URL
+                    if (urlInput && urlInput.value && activeTab.request.url !== urlInput.value) {
+                        updatedRequest.url = urlInput.value;
+                        hasChanges = true;
+                    }
+
+                    // Update path params
+                    if (pathParamsList) {
+                        updatedRequest.pathParams = pathParams;
+                        hasChanges = true;
+                    }
+
+                    // Update query params
+                    if (queryParamsList) {
+                        updatedRequest.queryParams = queryParams;
+                        hasChanges = true;
+                    }
+
+                    // Update headers
+                    if (headersList) {
+                        updatedRequest.headers = headers;
+                        hasChanges = true;
+                    }
+
+                    // Update body
+                    if (bodyInput) {
+                        updatedRequest.body = bodyInput.value;
+                        hasChanges = true;
+                    }
+
+                    // Update auth config
+                    if (authConfig) {
+                        updatedRequest.authType = authConfig.type || 'none';
+                        updatedRequest.authConfig = authConfig.config || {};
+                        hasChanges = true;
+                    }
+
+                    // Update the tab in the service to persist the changes
+                    if (hasChanges) {
                         const activeTabId = await window.workspaceTabController.service.getActiveTabId();
                         if (activeTabId) {
                             await window.workspaceTabController.service.updateTab(activeTabId, {
-                                request: activeTab.request
+                                request: updatedRequest
                             });
                         }
                     }
