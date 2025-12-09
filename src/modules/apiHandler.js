@@ -151,11 +151,6 @@ export async function handleSendRequest() {
 
     let url = urlInput.value.trim();
 
-    // Auto-prepend https:// if no protocol is specified
-    if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {
-        url = `https://${url}`;
-    }
-
     const method = methodSelect.value;
     let body = undefined;
 
@@ -207,6 +202,11 @@ export async function handleSendRequest() {
         // Then substitute variables in URL (include processed path params)
         const combinedVariables = { ...variables, ...processedPathParams };
         url = processor.processTemplate(url, combinedVariables);
+
+        // Auto-prepend https:// if no protocol is specified (after variable substitution)
+        if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {
+            url = `https://${url}`;
+        }
 
         // Substitute variables in headers
         const processedHeaders = {};
@@ -536,11 +536,6 @@ export async function handleGenerateCurl() {
 
     let url = urlInput.value.trim();
 
-    // Auto-prepend https:// if no protocol is specified
-    if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {
-        url = `https://${url}`;
-    }
-
     const method = methodSelect.value;
     let body = undefined;
 
@@ -592,6 +587,11 @@ export async function handleGenerateCurl() {
         // Then substitute variables in URL (include processed path params)
         const combinedVariables = { ...variables, ...processedPathParams };
         url = processor.processTemplate(url, combinedVariables);
+
+        // Auto-prepend https:// if no protocol is specified (after variable substitution)
+        if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {
+            url = `https://${url}`;
+        }
 
         // Substitute variables in headers
         const processedHeaders = {};
