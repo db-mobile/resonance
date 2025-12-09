@@ -167,6 +167,14 @@
                             data-i18n="tabs.body">
                         Body
                     </button>
+                    <button class="tab-button"
+                            data-tab="scripts"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="scripts"
+                            data-i18n="tabs.scripts">
+                        Scripts
+                    </button>
                 </nav>
 
                 <div class="tab-content active" id="path-params" role="tabpanel" aria-labelledby="path-params-tab">
@@ -226,6 +234,60 @@
                               placeholder='{"title": "foo", "body": "bar", "userId": 1}'
                               aria-label="Request Body JSON"></textarea>
                 </div>
+
+                <div class="tab-content" id="scripts" role="tabpanel" aria-labelledby="scripts-tab">
+                    <h3>Scripts</h3>
+                    <div class="scripts-container">
+                        <div class="script-section">
+                            <div class="script-section-header">
+                                <h4>Pre-request Script</h4>
+                                <span class="script-help-text">Runs before the request is sent</span>
+                            </div>
+                            <textarea id="pre-request-script"
+                                      class="script-textarea"
+                                      placeholder="// Modify request before sending&#10;request.headers['X-Custom-Header'] = 'value';&#10;environment.set('timestamp', Date.now());"
+                                      aria-label="Pre-request Script"></textarea>
+                        </div>
+
+                        <div class="script-section">
+                            <div class="script-section-header">
+                                <h4>Test Script</h4>
+                                <span class="script-help-text">Runs after receiving the response</span>
+                            </div>
+                            <textarea id="test-script"
+                                      class="script-textarea"
+                                      placeholder="// Validate response and extract data&#10;expect(response.status).toBe(200);&#10;expect(response.body.id).toBeDefined();&#10;environment.set('userId', response.body.id);"
+                                      aria-label="Test Script"></textarea>
+                        </div>
+
+                        <details class="script-help">
+                            <summary>API Reference</summary>
+                            <div class="script-help-content">
+                                <div class="help-section">
+                                    <h5>Pre-request Script APIs</h5>
+                                    <code>request.url</code> - The request URL<br>
+                                    <code>request.method</code> - HTTP method<br>
+                                    <code>request.headers</code> - Request headers object<br>
+                                    <code>request.body</code> - Request body<br>
+                                    <code>environment.get(name)</code> - Get variable<br>
+                                    <code>environment.set(name, value)</code> - Set variable<br>
+                                    <code>console.log(...)</code> - Log to Scripts tab
+                                </div>
+                                <div class="help-section">
+                                    <h5>Test Script APIs</h5>
+                                    <code>response.status</code> - Status code<br>
+                                    <code>response.statusText</code> - Status text<br>
+                                    <code>response.headers</code> - Response headers<br>
+                                    <code>response.body</code> - Parsed response body<br>
+                                    <code>expect(value).toBe(expected)</code> - Assert equality<br>
+                                    <code>expect(value).toBeDefined()</code> - Assert not undefined<br>
+                                    <code>expect(value).toContain(item)</code> - Assert contains<br>
+                                    More: <code>toEqual</code>, <code>toBeTruthy</code>, <code>toBeGreaterThan</code>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                </div>
             </section>
 
             <!-- Resizer Handle -->
@@ -277,6 +339,13 @@
                                 aria-selected="false"
                                 aria-controls="response-performance">
                             Performance
+                        </button>
+                        <button class="tab-button"
+                                data-tab="response-scripts"
+                                role="tab"
+                                aria-selected="false"
+                                aria-controls="response-scripts">
+                            Scripts
                         </button>
                     </nav>
 

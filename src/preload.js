@@ -60,5 +60,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         logs: (limit) => ipcRenderer.invoke('mock-server:logs', limit),
         clearLogs: () => ipcRenderer.invoke('mock-server:clear-logs'),
         reloadSettings: () => ipcRenderer.invoke('mock-server:reload-settings')
+    },
+    scripts: {
+        get: (collectionId, endpointId) => ipcRenderer.invoke('script:get', collectionId, endpointId),
+        save: (collectionId, endpointId, scripts) => ipcRenderer.invoke('script:save', collectionId, endpointId, scripts),
+        executePreRequest: (scriptData) => ipcRenderer.invoke('script:execute-pre-request', scriptData),
+        executeTest: (scriptData) => ipcRenderer.invoke('script:execute-test', scriptData)
     }
 });

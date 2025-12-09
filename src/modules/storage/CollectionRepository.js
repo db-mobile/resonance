@@ -492,6 +492,12 @@ export class CollectionRepository {
                 delete persistedAuthConfigs[key];
                 await this.electronAPI.store.set('persistedAuthConfigs', persistedAuthConfigs);
             }
+
+            const persistedScripts = await this._getObjectFromStore('persistedScripts');
+            if (persistedScripts[key]) {
+                delete persistedScripts[key];
+                await this.electronAPI.store.set('persistedScripts', persistedScripts);
+            }
         } catch (error) {
             console.error('Error deleting persisted endpoint data:', error);
             throw new Error(`Failed to delete persisted endpoint data: ${error.message}`);

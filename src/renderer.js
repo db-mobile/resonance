@@ -39,6 +39,11 @@ import { WorkspaceTabBar } from './modules/ui/WorkspaceTabBar.js';
 import { WorkspaceTabController } from './modules/controllers/WorkspaceTabController.js';
 import { WorkspaceTabStateManager } from './modules/WorkspaceTabStateManager.js';
 import { ResponseContainerManager } from './modules/ResponseContainerManager.js';
+import { ScriptController } from './modules/controllers/ScriptController.js';
+import { ScriptService } from './modules/services/ScriptService.js';
+import { ScriptRepository } from './modules/storage/ScriptRepository.js';
+import { InlineScriptManager } from './modules/ui/InlineScriptManager.js';
+import { ScriptConsolePanel } from './modules/ui/ScriptConsolePanel.js';
 import { MockServerRepository } from './modules/storage/MockServerRepository.js';
 import { MockServerService } from './modules/services/MockServerService.js';
 import { MockServerController } from './modules/controllers/MockServerController.js';
@@ -77,6 +82,24 @@ environmentController = new EnvironmentController(
     environmentService,
     environmentManager,
     environmentSelector
+);
+
+// Initialize script system
+const scriptRepository = new ScriptRepository(window.electronAPI);
+const scriptService = new ScriptService(
+    scriptRepository,
+    environmentService,
+    statusDisplayAdapter
+);
+const inlineScriptManager = new InlineScriptManager();
+// Initialize script manager event listeners
+inlineScriptManager.initialize();
+// ScriptConsolePanel will be initialized per workspace tab, so pass null for now
+const scriptConsolePanel = new ScriptConsolePanel(null);
+const scriptController = new ScriptController(
+    scriptService,
+    inlineScriptManager,
+    scriptConsolePanel
 );
 
 // Initialize settings modal with all managers
@@ -475,6 +498,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.historyController = historyController;
     window.environmentController = environmentController;
     window.workspaceTabController = workspaceTabController;
+    window.scriptController = scriptController;
     window.setUrlUpdating = setUrlUpdating;
 
     // Initialize environment selector
