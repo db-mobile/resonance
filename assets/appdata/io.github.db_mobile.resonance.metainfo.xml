@@ -47,19 +47,19 @@
   <screenshots>
     <screenshot type="default">
       <caption>Main interface showing API request configuration</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v115/assets/screenshots/main_window.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v1.6.3/assets/screenshots/main_window.png</image>
     </screenshot>
     <screenshot>
       <caption>Environment management</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v115/assets/screenshots/environment.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v1.6.3/assets/screenshots/environment.png</image>
     </screenshot>
     <screenshot>
       <caption>Mock server</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v115/assets/screenshots/mock_server.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v1.6.3/assets/screenshots/mock_server.png</image>
     </screenshot>
     <screenshot>
       <caption>Settings modal in dark theme</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v115/assets/screenshots/settings.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v1.6.3/assets/screenshots/settings.png</image>
     </screenshot>
   </screenshots>
 
@@ -94,7 +94,7 @@
   <content_rating type="oars-1.1" />
 
   <releases>
-    <release version="1.6.3" date="2025-12-08">
+    <release version="1.6.3" date="2025-12-09">
       <description>
         <p>Stabilization release</p>
         <ul>
