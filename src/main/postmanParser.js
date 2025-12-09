@@ -99,14 +99,14 @@ class PostmanParser {
      * @returns {Object|null} Endpoint object, or null if invalid
      */
     _parseRequest(item) {
-        const request = item.request;
+        const {request} = item;
         if (!request) {
             return null;
         }
 
         const urlObj = this._parseUrl(request.url);
         const endpoint = {
-            id: `${item.name}`.replace(/[^a-zA-Z0-9]/g, '_') + `_${Date.now()}`,
+            id: `${`${item.name}`.replace(/[^a-zA-Z0-9]/g, '_')  }_${Date.now()}`,
             name: item.name || 'Unnamed Request',
             description: item.description || '',
             method: (request.method || 'GET').toUpperCase(),
@@ -162,7 +162,7 @@ class PostmanParser {
             }
         } else if (url && typeof url === 'object') {
             if (url.path && Array.isArray(url.path)) {
-                result.path = '/' + url.path.join('/');
+                result.path = `/${  url.path.join('/')}`;
             } else if (url.raw) {
                 try {
                     const urlObj = new URL(url.raw);

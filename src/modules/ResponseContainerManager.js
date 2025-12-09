@@ -121,6 +121,10 @@ export class ResponseContainerManager {
                     <p class="no-data">Send a request to see performance metrics</p>
                 </div>
             </div>
+
+            <div id="response-scripts-${tabId}" class="tab-content" role="tabpanel">
+                <div class="script-console-container response-scripts-display" data-tab-id="${tabId}" aria-live="polite"></div>
+            </div>
         `;
 
         this.parentContainer.appendChild(wrapper);
@@ -161,6 +165,7 @@ export class ResponseContainerManager {
             headersDisplay: wrapper.querySelector('.response-headers-display'),
             cookiesDisplay: wrapper.querySelector('.response-cookies-display'),
             performanceDisplay: wrapper.querySelector('.response-performance-display'),
+            scriptsDisplay: wrapper.querySelector('.response-scripts-display'),
             languageSelector,
             copyBtn,
             editor // Include editor instance

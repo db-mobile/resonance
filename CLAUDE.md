@@ -36,6 +36,8 @@ Resonance is an Electron-based API client application that provides a clean and 
   - `digestAuthHandler.js` - Digest authentication implementation
   - `proxyHandlers.js` - Proxy configuration and connection testing
   - `mockServerHandler.js` - Mock server for generating API responses from OpenAPI schemas
+  - `scriptExecutor.js` - Sandboxed script execution engine with timeout (10s) and security restrictions
+  - `scriptHandlers.js` - IPC handlers for pre-request and test script execution
 - Uses `electron-store` for persistent storage of collections and variables
 - Uses `electron-window-state` for window state management
 - Makes HTTP requests via `axios` in the main process for security
@@ -69,6 +71,7 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - `resizer.js` - Handles UI panel resizing functionality
 - `responseEditor.js` - CodeMirror-based response viewer with syntax highlighting
 - `ResponseContainerManager.js` - Manages response containers for workspace tabs
+- `scriptSubTabs.js` - Manages script editor sub-tabs for pre-request and test scripts
 - `statusDisplay.js` - Manages status display updates
 - `tabManager.js` - Handles tab switching functionality for request/response sections
 - `themeManager.js` - Manages theme switching and settings
@@ -82,6 +85,7 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
   - HistoryController.js - Manages request history
   - MockServerController.js - Coordinates mock server operations between UI and service
   - ProxyController.js - Manages proxy configuration and testing
+  - ScriptController.js - Coordinates script editing, execution, and result display
   - WorkspaceTabController.js - Coordinates workspace tab operations and state
 - `services/` - Business logic services
   - CollectionService.js - Collection business logic
@@ -89,6 +93,7 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
   - HistoryService.js - Request history tracking and management
   - MockServerService.js - Mock server business logic with event notifications
   - ProxyService.js - Proxy configuration business logic and validation
+  - ScriptService.js - Script execution coordination with environment integration
   - VariableService.js - Variable substitution logic with environment support
   - WorkspaceTabService.js - Workspace tab management and state persistence
 - `storage/` - Data persistence layer with robust error handling
@@ -97,6 +102,7 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
   - HistoryRepository.js - Persists request history with validation
   - MockServerRepository.js - Persists mock server settings (port, enabled collections, delays, custom responses)
   - ProxyRepository.js - Persists proxy configuration
+  - ScriptRepository.js - Persists pre-request and test scripts per endpoint
   - VariableRepository.js - Validates and initializes store data
   - WorkspaceTabRepository.js - Persists workspace tab state
 - `ui/` - UI components
@@ -108,8 +114,11 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
   - EnvironmentManager.js - Environment management dialog with full CRUD operations
   - EnvironmentSelector.js - Dropdown for quick environment switching
   - HistoryRenderer.js - Request history UI
+  - InlineScriptManager.js - Inline script editor with auto-save functionality
   - MockServerDialog.js - Mock server management dialog with collection selection, endpoint configuration, and request logs
   - RenameDialog.js - Collection/endpoint rename dialog
+  - ScriptConsolePanel.js - Script console with logs and test results display
+  - ScriptEditorDialog.js - Full-screen script editor dialog (if needed for advanced editing)
   - VariableManager.js - Variable management UI
   - WorkspaceTabBar.js - Workspace tab management UI
 - `variables/` - Variable processing and templating (VariableProcessor.js)
@@ -173,6 +182,52 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - Persistent storage of request history with timestamps
 - History UI for browsing and replaying past requests
 - Automatic cleanup and management
+
+#### Scripts and Automation
+- **Pre-request Scripts**: JavaScript code executed before sending requests
+  - Modify request headers, body, query parameters, and path parameters dynamically
+  - Calculate authentication signatures, timestamps, and nonces
+  - Load and process data from environment variables
+  - Conditional request preparation based on environment or other factors
+- **Test Scripts**: JavaScript code executed after receiving responses
+  - Validate response status codes, headers, and body content
+  - Assert response structure and data types with rich assertion API
+  - Extract data from responses and save to environment variables
+  - Chain requests by passing data between endpoints
+  - Measure and validate performance metrics
+- **Script Execution Environment**:
+  - Secure sandboxed execution in main process with 10-second timeout
+  - Access to Date, Math, JSON, and standard JavaScript features
+  - Restricted access (no require, fs, process, or network operations)
+  - Console logging with multiple levels (log, info, warn, error)
+- **Script APIs**:
+  - `request` object - Access/modify URL, method, headers, body, query params, path params
+  - `response` object (test only) - Access status, headers, body, cookies, performance timings
+  - `environment` object - Get/set/delete environment variables
+  - `console` object - Log messages with timestamps for debugging
+  - `expect()` API - Rich assertion library for test scripts (toBe, toEqual, toContain, toHaveProperty, etc.)
+- **User Interface**:
+  - Inline script editor with syntax highlighting in Scripts request tab
+  - Separate sub-tabs for pre-request and test scripts
+  - Auto-save functionality (1-second delay)
+  - Script console panel in response section showing logs and test results
+  - Visual indicators for passed/failed assertions
+- **Architecture**: Three-layer MVC pattern
+  - `ScriptController` - UI coordination and execution orchestration
+  - `ScriptService` - Business logic with environment integration
+  - `ScriptRepository` - Per-endpoint script persistence
+  - `scriptExecutor.js` (main process) - Sandboxed script execution engine
+  - `InlineScriptManager` - Script editing UI with auto-save
+  - `ScriptConsolePanel` - Console output and test results display
+- **Use Cases**:
+  - Request chaining workflows (login → get token → use token)
+  - Dynamic authentication header generation
+  - Response validation and automated testing
+  - Data extraction for subsequent requests
+  - Pagination handling with state management
+  - Performance testing and validation
+
+For detailed documentation, examples, and troubleshooting, see `SCRIPTS.md`.
 
 #### Mock Server
 - **HTTP Mock Server**: Local mock server for testing API clients without backend
@@ -266,11 +321,12 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - **Jest** (v30.0.x) - Testing framework with Babel integration
 
 ### Data Persistence
-- Uses `electron-store` to persist collections, variables, environments, and request history in JSON format
+- Uses `electron-store` to persist collections, variables, environments, request history, and scripts in JSON format
 - Store name: `api-collections` with default structure `{ collections: [] }`
 - IPC handlers for `store:get`, `store:set`, `settings:get`, and `settings:set` operations
-- Separate storage for collection data, environments, variables, theme preferences, language settings, and request history
+- Separate storage for collection data, environments, variables, theme preferences, language settings, request history, and scripts
 - **Environment Storage:** Environments stored with structure `{ items: [], activeEnvironmentId: null }`
+- **Script Storage:** Scripts stored per endpoint with structure `{ preRequestScript: '', testScript: '' }`
 - **Important:** Repository layer includes fallback handling for packaged apps where store may return `undefined` on first run
 - All store access methods validate data types and auto-initialize with defaults if needed
 
@@ -280,8 +336,10 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - **Import menu** with context menu (OpenAPI, Postman Collection, Postman Environment)
 - **Workspace tabs** for managing multiple concurrent requests
 - Environment selector dropdown for quick switching between environments
-- Tabbed interface for request configuration (Path Params, Query Params, Headers, Body, Auth)
-- Tabbed response display (Body, Headers, Cookies, Performance)
+- Tabbed interface for request configuration (Path Params, Query Params, Headers, Body, Auth, Scripts)
+- **Scripts tab** with sub-tabs for pre-request and test scripts with inline editor
+- Tabbed response display (Body, Headers, Cookies, Performance, Scripts)
+- **Scripts response tab** showing console logs and test results with pass/fail indicators
 - Context menus for collection management (rename, delete, export code in multiple languages)
 - Request history panel with search, timestamp, and replay functionality
 - Authentication panel supporting multiple auth methods (Bearer, Basic, API Key, OAuth2, Digest)
@@ -319,6 +377,12 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - **Keyboard Shortcuts Pattern**: Centralized keyboard event handling with platform detection, context awareness, and categorized help system
 - **Import Pattern**: Unified collection import supporting both OpenAPI (schema-based) and Postman (example-based) formats with consistent folder organization
 - **Workspace Tab Pattern**: Multi-tab state management with per-tab isolation and persistent state across sessions
+- **Script Execution Pattern**: Sandboxed script execution in main process with IPC communication for security
+  - Pre-request scripts modify request config before sending
+  - Test scripts validate responses and extract data
+  - Environment variable integration for script-driven state management
+  - Auto-save functionality with debouncing for inline script editing
+  - Console output and test results collected and displayed in UI
 
 ## Common Issues & Solutions
 
