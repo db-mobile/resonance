@@ -150,6 +150,12 @@ export async function handleSendRequest() {
     }
 
     let url = urlInput.value.trim();
+
+    // Auto-prepend https:// if no protocol is specified
+    if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {
+        url = `https://${url}`;
+    }
+
     const method = methodSelect.value;
     let body = undefined;
 
@@ -529,6 +535,12 @@ export async function handleGenerateCurl() {
     }
 
     let url = urlInput.value.trim();
+
+    // Auto-prepend https:// if no protocol is specified
+    if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {
+        url = `https://${url}`;
+    }
+
     const method = methodSelect.value;
     let body = undefined;
 
