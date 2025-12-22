@@ -81,6 +81,7 @@
     "headers": "Encabezados",
     "authorization": "Autorización",
     "body": "Cuerpo",
+    "scripts": "Scripts",
     "response_body": "Cuerpo",
     "response_headers": "Encabezados"
   },

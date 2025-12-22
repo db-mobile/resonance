@@ -174,9 +174,19 @@ export class WorkspaceTabStateManager {
         // This ensures variable substitution uses the correct collection context
         if (endpoint) {
             window.currentEndpoint = endpoint;
+
+            // Load scripts for this endpoint
+            if (window.inlineScriptManager && endpoint.collectionId && endpoint.endpointId) {
+                await window.inlineScriptManager.loadScripts(endpoint.collectionId, endpoint.endpointId);
+            }
         } else if (Object.prototype.hasOwnProperty.call(tab, 'endpoint')) {
             // Tab explicitly has no endpoint (e.g., manually created tab)
             window.currentEndpoint = null;
+
+            // Clear scripts when no endpoint
+            if (window.inlineScriptManager) {
+                window.inlineScriptManager.clear();
+            }
         }
         // If tab doesn't have endpoint property at all (old tab format),
         // leave window.currentEndpoint as-is for backwards compatibility

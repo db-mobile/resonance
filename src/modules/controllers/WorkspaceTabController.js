@@ -101,6 +101,11 @@ export class WorkspaceTabController {
             // Clear UI for new tab
             await this.stateManager.restoreTabState(newTab);
 
+            // Clear scripts for new tab (no endpoint selected)
+            if (window.scriptController) {
+                window.scriptController.clearScripts();
+            }
+
             return newTab;
         } catch (error) {
             console.error('Error creating new tab:', error);
@@ -142,6 +147,18 @@ export class WorkspaceTabController {
             // Update UI
             this.tabBar.setActiveTab(tabId);
             await this.stateManager.restoreTabState(tab);
+
+            // Load scripts for this tab's endpoint, or clear if no endpoint
+            if (window.scriptController) {
+                if (tab.endpoint && tab.endpoint.collectionId && tab.endpoint.endpointId) {
+                    await window.scriptController.loadScriptsForEndpoint(
+                        tab.endpoint.collectionId,
+                        tab.endpoint.endpointId
+                    );
+                } else {
+                    window.scriptController.clearScripts();
+                }
+            }
         } catch (error) {
             console.error('Error switching tab:', error);
         }
@@ -497,6 +514,11 @@ export class WorkspaceTabController {
             if (tab) {
                 await this.stateManager.restoreTabState(tab);
                 this.tabBar.updateTab(targetTabId, { name: tabName, isModified: false });
+            }
+
+            // Load scripts for this endpoint
+            if (window.scriptController && endpoint.collectionId && endpoint.id) {
+                await window.scriptController.loadScriptsForEndpoint(endpoint.collectionId, endpoint.id);
             }
         } catch (error) {
             console.error('Error loading endpoint:', error);

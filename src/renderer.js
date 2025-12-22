@@ -11,6 +11,7 @@ import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInpu
 
 import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl, setUrlUpdating } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
+import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest, handleCancelRequest, handleGenerateCurl } from './modules/apiHandler.js';
 import { loadCollections, importOpenApiFile, importPostmanCollection, importPostmanEnvironment, initializeBodyTracking } from './modules/collectionManager.js';
@@ -39,6 +40,11 @@ import { WorkspaceTabBar } from './modules/ui/WorkspaceTabBar.js';
 import { WorkspaceTabController } from './modules/controllers/WorkspaceTabController.js';
 import { WorkspaceTabStateManager } from './modules/WorkspaceTabStateManager.js';
 import { ResponseContainerManager } from './modules/ResponseContainerManager.js';
+import { ScriptController } from './modules/controllers/ScriptController.js';
+import { ScriptService } from './modules/services/ScriptService.js';
+import { ScriptRepository } from './modules/storage/ScriptRepository.js';
+import { InlineScriptManager } from './modules/ui/InlineScriptManager.js';
+import { ScriptConsolePanel } from './modules/ui/ScriptConsolePanel.js';
 import { MockServerRepository } from './modules/storage/MockServerRepository.js';
 import { MockServerService } from './modules/services/MockServerService.js';
 import { MockServerController } from './modules/controllers/MockServerController.js';
@@ -77,6 +83,26 @@ environmentController = new EnvironmentController(
     environmentService,
     environmentManager,
     environmentSelector
+);
+
+// Initialize script system
+const scriptRepository = new ScriptRepository(window.electronAPI);
+const scriptService = new ScriptService(
+    scriptRepository,
+    environmentService,
+    statusDisplayAdapter
+);
+const inlineScriptManager = new InlineScriptManager();
+// Initialize script manager event listeners
+inlineScriptManager.initialize();
+// Expose globally for workspace tab restoration
+window.inlineScriptManager = inlineScriptManager;
+// ScriptConsolePanel will be initialized per workspace tab, so pass null for now
+const scriptConsolePanel = new ScriptConsolePanel(null);
+const scriptController = new ScriptController(
+    scriptService,
+    inlineScriptManager,
+    scriptConsolePanel
 );
 
 // Initialize settings modal with all managers
@@ -297,40 +323,64 @@ function initKeyboardShortcuts() {
         category: 'Help'
     });
 
-    // Tab Switching
+    // Workspace Tab Switching (Ctrl/Cmd+1-9 to switch to specific workspace tabs)
+    for (let i = 1; i <= 9; i++) {
+        keyboardShortcuts.register(`Digit${i}`, {
+            ctrl: true,
+            handler: async () => {
+                if (workspaceTabController) {
+                    const tabs = await workspaceTabController.service.getAllTabs();
+                    if (tabs.length >= i) {
+                        await workspaceTabController.switchTab(tabs[i - 1].id);
+                    }
+                }
+            },
+            description: `Switch to workspace tab ${i}`,
+            category: 'Workspace Tabs'
+        });
+    }
+
+    // Request Tab Switching (Alt+1-6 for request sub-tabs)
     keyboardShortcuts.register('Digit1', {
-        ctrl: true,
+        alt: true,
         handler: () => activateTab('request', 'path-params'),
         description: 'Switch to Path Params tab',
-        category: 'Tabs'
+        category: 'Request Tabs'
     });
 
     keyboardShortcuts.register('Digit2', {
-        ctrl: true,
+        alt: true,
         handler: () => activateTab('request', 'query-params'),
         description: 'Switch to Query Params tab',
-        category: 'Tabs'
+        category: 'Request Tabs'
     });
 
     keyboardShortcuts.register('Digit3', {
-        ctrl: true,
+        alt: true,
         handler: () => activateTab('request', 'headers'),
         description: 'Switch to Headers tab',
-        category: 'Tabs'
+        category: 'Request Tabs'
     });
 
     keyboardShortcuts.register('Digit4', {
-        ctrl: true,
-        handler: () => activateTab('request', 'body'),
-        description: 'Switch to Body tab',
-        category: 'Tabs'
+        alt: true,
+        handler: () => activateTab('request', 'authorization'),
+        description: 'Switch to Authorization tab',
+        category: 'Request Tabs'
     });
 
     keyboardShortcuts.register('Digit5', {
-        ctrl: true,
-        handler: () => activateTab('request', 'auth'),
-        description: 'Switch to Auth tab',
-        category: 'Tabs'
+        alt: true,
+        handler: () => activateTab('request', 'body'),
+        description: 'Switch to Body tab',
+        category: 'Request Tabs'
+    });
+
+    keyboardShortcuts.register('Digit6', {
+        alt: true,
+        handler: () => activateTab('request', 'scripts'),
+        description: 'Switch to Scripts tab',
+        category: 'Request Tabs'
     });
 
     // Workspace Tab shortcuts
@@ -475,6 +525,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.historyController = historyController;
     window.environmentController = environmentController;
     window.workspaceTabController = workspaceTabController;
+    window.scriptController = scriptController;
     window.setUrlUpdating = setUrlUpdating;
 
     // Initialize environment selector
@@ -494,6 +545,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initialize tab listeners AFTER workspace tabs are created
     initTabListeners();
+
+    // Initialize script sub-tabs
+    initializeScriptSubTabs();
 
     // Activate default response tab
     activateTab('response', 'response-body');

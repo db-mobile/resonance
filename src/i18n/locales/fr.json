@@ -81,6 +81,7 @@
     "headers": "En-têtes",
     "authorization": "Autorisation",
     "body": "Corps",
+    "scripts": "Scripts",
     "response_body": "Corps",
     "response_headers": "En-têtes"
   },

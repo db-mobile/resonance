@@ -81,6 +81,7 @@
     "headers": "Header",
     "authorization": "Autorisierung",
     "body": "Body",
+    "scripts": "Skripte",
     "response_body": "Body",
     "response_headers": "Header"
   },

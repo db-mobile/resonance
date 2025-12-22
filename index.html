@@ -167,6 +167,14 @@
                             data-i18n="tabs.body">
                         Body
                     </button>
+                    <button class="tab-button"
+                            data-tab="scripts"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="scripts"
+                            data-i18n="tabs.scripts">
+                        Scripts
+                    </button>
                 </nav>
 
                 <div class="tab-content active" id="path-params" role="tabpanel" aria-labelledby="path-params-tab">
@@ -226,6 +234,138 @@
                               placeholder='{"title": "foo", "body": "bar", "userId": 1}'
                               aria-label="Request Body JSON"></textarea>
                 </div>
+
+                <div class="tab-content" id="scripts" role="tabpanel" aria-labelledby="scripts-tab">
+                    <div class="scripts-container">
+                        <!-- Script Sub-tabs Navigation -->
+                        <nav class="script-sub-tabs" role="tablist" aria-label="Script Sections">
+                            <button class="script-sub-tab active"
+                                    data-script-tab="pre-request"
+                                    role="tab"
+                                    aria-selected="true"
+                                    aria-controls="script-pre-request">
+                                Pre-request
+                            </button>
+                            <button class="script-sub-tab"
+                                    data-script-tab="test"
+                                    role="tab"
+                                    aria-selected="false"
+                                    aria-controls="script-test">
+                                Test
+                            </button>
+                            <button class="script-sub-tab"
+                                    data-script-tab="api-reference"
+                                    role="tab"
+                                    aria-selected="false"
+                                    aria-controls="script-api-reference">
+                                API Reference
+                            </button>
+                        </nav>
+
+                        <!-- Pre-request Script Tab -->
+                        <div class="script-tab-panel active" id="script-pre-request" role="tabpanel">
+                            <textarea id="pre-request-script"
+                                      class="script-textarea"
+                                      placeholder="// Modify request before sending&#10;request.headers['X-Custom-Header'] = 'value';&#10;environment.set('timestamp', Date.now());"
+                                      aria-label="Pre-request Script"></textarea>
+                        </div>
+
+                        <!-- Test Script Tab -->
+                        <div class="script-tab-panel" id="script-test" role="tabpanel">
+                            <textarea id="test-script"
+                                      class="script-textarea"
+                                      placeholder="// Validate response and extract data&#10;expect(response.status).toBe(200);&#10;expect(response.body.id).toBeDefined();&#10;environment.set('userId', response.body.id);"
+                                      aria-label="Test Script"></textarea>
+                        </div>
+
+                        <!-- API Reference Tab -->
+                        <div class="script-tab-panel" id="script-api-reference" role="tabpanel">
+                            <div class="api-reference-content">
+                                <div class="api-reference-section">
+                                    <h4>Pre-request Script APIs</h4>
+                                    <p class="api-section-description">Execute code before sending the request to modify headers, set variables, or perform setup.</p>
+                                    <div class="api-list">
+                                        <div class="api-item">
+                                            <code>request.url</code>
+                                            <span>The request URL (string)</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>request.method</code>
+                                            <span>HTTP method (GET, POST, etc.)</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>request.headers</code>
+                                            <span>Request headers object - can be modified</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>request.body</code>
+                                            <span>Request body content</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>environment.get(name)</code>
+                                            <span>Get an environment variable</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>environment.set(name, value)</code>
+                                            <span>Set an environment variable</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>console.log(...)</code>
+                                            <span>Log messages to the Scripts tab in response</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="api-reference-section">
+                                    <h4>Test Script APIs</h4>
+                                    <p class="api-section-description">Run tests and assertions after receiving the response to validate data and extract values.</p>
+                                    <div class="api-list">
+                                        <div class="api-item">
+                                            <code>response.status</code>
+                                            <span>HTTP status code (number)</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>response.statusText</code>
+                                            <span>HTTP status text (OK, Not Found, etc.)</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>response.headers</code>
+                                            <span>Response headers object</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>response.body</code>
+                                            <span>Parsed response body (JSON object)</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toBe(expected)</code>
+                                            <span>Assert strict equality</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toEqual(expected)</code>
+                                            <span>Assert deep equality</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toBeDefined()</code>
+                                            <span>Assert value is not undefined</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toBeTruthy()</code>
+                                            <span>Assert value is truthy</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toContain(item)</code>
+                                            <span>Assert array/string contains item</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toBeGreaterThan(n)</code>
+                                            <span>Assert value is greater than n</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- Resizer Handle -->
@@ -277,6 +417,13 @@
                                 aria-selected="false"
                                 aria-controls="response-performance">
                             Performance
+                        </button>
+                        <button class="tab-button"
+                                data-tab="response-scripts"
+                                role="tab"
+                                aria-selected="false"
+                                aria-controls="response-scripts">
+                            Scripts
                         </button>
                     </nav>
 

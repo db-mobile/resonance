@@ -20,6 +20,13 @@ A clean and minimal API client with excellent user experience built with Electro
   - Node.js (axios), Go (net/http), PHP (cURL), Ruby (net/http), Java (HttpClient)
 
 ### Advanced Features
+- **Scripts & Automation**: Pre-request and test scripts with JavaScript execution
+  - **Pre-request Scripts**: Modify requests dynamically (headers, body, auth signatures)
+  - **Test Scripts**: Validate responses with assertions and extract data
+  - Rich assertion API (`expect()`) for automated testing
+  - Environment variable integration for request chaining
+  - Console logging for debugging with timestamps
+  - Sandboxed execution with 10-second timeout for security
 - **GraphQL Support**: Dedicated GraphQL query editor with syntax highlighting
 - **Workspace Tabs**: Multiple concurrent request tabs with independent state and persistent storage
 - **Performance Metrics**: Detailed request timing breakdown (DNS, TCP, TLS, TTFB, download)
@@ -122,9 +129,10 @@ npm run dist:dir
 2. **Create Environments**: Set up environments (Development, Staging, Production) with environment-specific variables
 3. **Set Variables**: Define reusable variables like API keys and base URLs within each environment
 4. **Switch Environments**: Use the environment selector dropdown to quickly switch between different API contexts
-5. **Make Requests**: Select endpoints from the collections sidebar and configure path params, query params, headers, body, and auth
-6. **View Responses**: Examine response data in the tabbed viewer (Body, Headers, Cookies, Performance)
-7. **Export Code**: Generate request code in your preferred language for documentation or automation
+5. **Make Requests**: Select endpoints from the collections sidebar and configure path params, query params, headers, body, auth, and scripts
+6. **Add Scripts (Optional)**: Write pre-request scripts to modify requests dynamically or test scripts to validate responses
+7. **View Responses**: Examine response data in the tabbed viewer (Body, Headers, Cookies, Performance, Scripts)
+8. **Export Code**: Generate request code in your preferred language for documentation or automation
 
 ### Environment Management
 
@@ -211,6 +219,78 @@ The mock server is perfect for:
 - Simulating network latency and slow responses
 - API prototyping and demonstrations
 
+### Scripts & Testing
+
+Automate your API testing and workflows with pre-request and test scripts written in JavaScript.
+
+**Getting Started with Scripts**
+1. Select an endpoint from your collections
+2. Click the **Scripts** tab in the request configuration area
+3. Write your scripts in the two available sub-tabs:
+   - **Pre-request Script**: Runs before the request is sent
+   - **Test Script**: Runs after receiving the response
+4. Scripts auto-save after 1 second of inactivity
+5. View script output in the **Scripts** response tab (console logs and test results)
+
+**Pre-request Script Examples**
+
+Add dynamic authentication headers:
+```javascript
+const apiKey = environment.get('API_KEY');
+request.headers['Authorization'] = `Bearer ${apiKey}`;
+console.log('Added auth header');
+```
+
+Generate timestamps and signatures:
+```javascript
+const timestamp = Date.now();
+request.headers['X-Timestamp'] = timestamp.toString();
+request.headers['X-Signature'] = btoa(`${request.method}:${timestamp}`);
+```
+
+**Test Script Examples**
+
+Validate response and extract data:
+```javascript
+// Verify status code
+expect(response.status).toBe(200);
+
+// Validate response structure
+expect(response.body.user).toBeDefined();
+expect(response.body.user.email).toMatch(/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/);
+
+// Extract token for next request
+const token = response.body.token;
+environment.set('AUTH_TOKEN', token);
+console.log('Token saved for subsequent requests');
+```
+
+Check performance:
+```javascript
+expect(response.status).toBe(200);
+expect(response.timings.total).toBeLessThan(1000);
+console.log('Response time:', response.timings.total, 'ms');
+```
+
+**Available APIs**
+
+Scripts have access to powerful APIs:
+- `request` - Modify URL, method, headers, body, query params, path params
+- `response` (test only) - Access status, headers, body, cookies, timings
+- `environment` - Get/set/delete environment variables
+- `console` - Log messages (log, info, warn, error)
+- `expect()` - Rich assertion library (toBe, toEqual, toContain, toHaveProperty, toMatch, etc.)
+
+**Common Use Cases**
+- Request chaining (login → extract token → use in next request)
+- Dynamic authentication signature generation
+- Automated response validation and testing
+- Data extraction from responses
+- Performance testing and validation
+- Pagination handling with state management
+
+For comprehensive documentation with more examples, troubleshooting, and API reference, see `SCRIPTS.md` in the repository.
+
 ### Themes
 
 Switch between themes in Settings:
@@ -242,14 +322,22 @@ Resonance includes comprehensive keyboard shortcuts to speed up your workflow. P
 - `Ctrl/Cmd+,` - Open settings
 - `Ctrl/Cmd+/` or `Shift+/` - Show keyboard shortcuts help
 
-### Tab Switching
-- `Ctrl/Cmd+1` - Switch to Path Params tab
-- `Ctrl/Cmd+2` - Switch to Query Params tab
-- `Ctrl/Cmd+3` - Switch to Headers tab
-- `Ctrl/Cmd+4` - Switch to Body tab
-- `Ctrl/Cmd+5` - Switch to Auth tab
+### Workspace Tabs
+- `Ctrl/Cmd+T` - Create new workspace tab
+- `Ctrl/Cmd+W` - Close current workspace tab
+- `Ctrl/Cmd+Tab` - Switch to next workspace tab
+- `Ctrl/Cmd+Shift+Tab` - Switch to previous workspace tab
+- `Ctrl/Cmd+1` through `Ctrl/Cmd+9` - Switch to workspace tab 1-9
 
-**Note:** On macOS, use `Cmd` instead of `Ctrl`. Shortcuts are platform-aware and automatically adapt.
+### Request Tabs
+- `Alt+1` - Switch to Path Params tab
+- `Alt+2` - Switch to Query Params tab
+- `Alt+3` - Switch to Headers tab
+- `Alt+4` - Switch to Authorization tab
+- `Alt+5` - Switch to Body tab
+- `Alt+6` - Switch to Scripts tab
+
+**Note:** On macOS, use `Cmd` instead of `Ctrl` for the main modifier. On macOS, `Alt` is displayed as `⌥` (Option). Shortcuts are platform-aware and automatically adapt.
 
 ## Architecture
 
@@ -266,22 +354,26 @@ src/
 │   ├── openApiParser.js        # OpenAPI file import
 │   ├── postmanParser.js        # Postman collection & environment import
 │   ├── digestAuthHandler.js    # Digest authentication
-│   └── proxyHandlers.js        # Proxy configuration
+│   ├── proxyHandlers.js        # Proxy configuration
+│   ├── scriptExecutor.js       # Sandboxed script execution engine
+│   ├── scriptHandlers.js       # Script execution IPC handlers
+│   └── mockServerHandler.js    # Mock server HTTP handling
 ├── renderer.js          # Renderer process coordinator
 ├── preload.js           # Secure context bridge
 ├── style.css           # Global styles
 ├── modules/            # Modular renderer components
-│   ├── controllers/    # MVC controllers (Collection, Environment, History, Proxy, WorkspaceTab)
-│   ├── services/       # Business logic services
-│   ├── storage/        # Data persistence repositories
-│   ├── ui/            # UI components (dialogs, renderers, selectors)
+│   ├── controllers/    # MVC controllers (Collection, Environment, History, Script, Proxy, WorkspaceTab, MockServer)
+│   ├── services/       # Business logic services (Script, Environment, Collection, etc.)
+│   ├── storage/        # Data persistence repositories (Script, Environment, Collection, etc.)
+│   ├── ui/            # UI components (dialogs, renderers, selectors, script editors)
 │   ├── variables/     # Variable processing and templating
 │   ├── schema/        # OpenAPI schema handling
 │   ├── codeGenerator.js       # Multi-language code export
 │   ├── cookieParser.js        # Cookie parsing and display
 │   ├── performanceMetrics.js  # Performance timing visualization
+│   ├── scriptSubTabs.js       # Script editor sub-tabs management
 │   ├── graphqlEditor.bundle.js # GraphQL editor
-│   └── [20+ other modules]
+│   └── [25+ other modules]
 ├── themes/            # Theme CSS files
 └── i18n/             # Internationalization (5 languages)
 ```
@@ -399,13 +491,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Keyboard shortcuts for all major actions
 - [x] Mock server with custom responses and delays
 - [x] Collection export (OpenAPI format)
+- [x] Pre-request and test scripts with JavaScript execution
+- [x] Automated testing framework with rich assertion API
+- [x] Request chaining with environment variable integration
 
 ### Planned
-- [ ] Pre/post-request scripts & testing framework
 - [ ] WebSocket support
-- [ ] Request chaining and assertions
 - [ ] Response comparison and diff view
 - [ ] gRPC support
+- [ ] Collection runner for batch execution
 - [ ] Plugin system for extensions
 - [ ] Team collaboration features
 

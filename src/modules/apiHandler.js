@@ -1,7 +1,6 @@
 import { urlInput, methodSelect, bodyInput, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, responseCookiesDisplay, responsePerformanceDisplay, languageSelector } from './domElements.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
-import { activateTab } from './tabManager.js'; // To ensure response tab is active
 import { saveAllRequestModifications } from './collectionManager.js';
 import { VariableProcessor } from './variables/VariableProcessor.js';
 import { VariableRepository } from './storage/VariableRepository.js';
@@ -289,7 +288,8 @@ export async function handleSendRequest() {
     }
 
     // Define requestConfig outside try block so it's accessible in catch block
-    const requestConfig = {
+    // Note: using let instead of const to allow pre-request scripts to modify the config
+    let requestConfig = {
         method,
         url,
         headers,
@@ -298,8 +298,6 @@ export async function handleSendRequest() {
 
     try {
         setRequestInProgress(true);
-
-        activateTab('response', 'response-body');
 
         await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -326,6 +324,21 @@ export async function handleSendRequest() {
 
         if (authData.authConfig) {
             requestConfig.auth = authData.authConfig;
+        }
+
+        // Execute pre-request script if exists
+        if (window.currentEndpoint && window.scriptController) {
+            try {
+                requestConfig = await window.scriptController.executePreRequest(
+                    window.currentEndpoint.collectionId,
+                    window.currentEndpoint.endpointId,
+                    requestConfig
+                );
+            } catch (error) {
+                console.error('Pre-request script error:', error);
+                updateStatusDisplay(`Pre-request script error: ${error.message}`, null);
+                // Continue anyway (non-blocking)
+            }
         }
 
         const result = await window.electronAPI.sendApiRequest(requestConfig);
@@ -402,6 +415,21 @@ export async function handleSendRequest() {
             // Add to history
             if (window.historyController) {
                 await window.historyController.addHistoryEntry(requestConfig, result, window.currentEndpoint);
+            }
+
+            // Execute test script if exists
+            if (window.currentEndpoint && window.scriptController) {
+                try {
+                    await window.scriptController.executeTest(
+                        window.currentEndpoint.collectionId,
+                        window.currentEndpoint.endpointId,
+                        requestConfig,
+                        result
+                    );
+                } catch (error) {
+                    console.error('Test script error:', error);
+                    // Non-blocking
+                }
             }
         } else if (result.cancelled) {
             updateStatusDisplay('Request cancelled', null);

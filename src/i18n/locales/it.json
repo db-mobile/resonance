@@ -81,6 +81,7 @@
     "headers": "Intestazioni",
     "authorization": "Autorizzazione",
     "body": "Corpo",
+    "scripts": "Script",
     "response_body": "Corpo",
     "response_headers": "Intestazioni"
   },

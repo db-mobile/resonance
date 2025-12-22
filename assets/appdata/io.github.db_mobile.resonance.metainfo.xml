@@ -94,6 +94,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.7.0" date="2025-12-23">
+      <description>
+        <p>New features introduced</p>
+        <ul>
+          <li>Introduce Pre-request and test scripts</li>
+          <li>Improve UI</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.4" date="2025-12-15">
       <description>
         <p>Stabilization release</p>
