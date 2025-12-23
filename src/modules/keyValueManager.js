@@ -164,41 +164,49 @@ export function updateQueryParamsFromUrl() {
 
         queryParamsList.innerHTML = '';
 
-        if (questionMarkIndex >= 0) {
-            const queryString = urlString.substring(questionMarkIndex + 1);
+        if (questionMarkIndex < 0) {
+            addKeyValueRow(queryParamsList);
+            return;
+        }
 
-            // Parse query string manually to preserve variable placeholders like {{variableName}}
-            // URLSearchParams doesn't handle unencoded braces correctly
-            if (queryString) {
-                const pairs = queryString.split('&');
-                let hasParams = false;
+        const queryString = urlString.substring(questionMarkIndex + 1);
 
-                for (const pair of pairs) {
-                    const equalIndex = pair.indexOf('=');
-                    if (equalIndex >= 0) {
-                        const key = pair.substring(0, equalIndex);
-                        const value = pair.substring(equalIndex + 1);
+        if (!queryString) {
+            addKeyValueRow(queryParamsList);
+            return;
+        }
 
-                        // Decode URL-encoded values but preserve {{...}} patterns
-                        const decodedKey = decodeURIComponent(key);
-                        const decodedValue = decodeURIComponent(value);
+        // Parse query string manually to preserve variable placeholders like {{variableName}}
+        // URLSearchParams doesn't handle unencoded braces correctly
+        const pairs = queryString.split('&');
+        let hasParams = false;
 
-                        addKeyValueRow(queryParamsList, decodedKey, decodedValue);
-                        hasParams = true;
-                    } else if (pair.trim()) {
-                        // Key without value
-                        addKeyValueRow(queryParamsList, decodeURIComponent(pair), '');
-                        hasParams = true;
-                    }
-                }
-
-                if (!hasParams) {
-                    addKeyValueRow(queryParamsList);
-                }
-            } else {
-                addKeyValueRow(queryParamsList);
+        for (const pair of pairs) {
+            // Skip empty pairs
+            if (!pair.trim()) {
+                continue;
             }
-        } else {
+
+            const equalIndex = pair.indexOf('=');
+
+            if (equalIndex >= 0) {
+                const key = pair.substring(0, equalIndex);
+                const value = pair.substring(equalIndex + 1);
+
+                // Decode URL-encoded values but preserve {{...}} patterns
+                const decodedKey = decodeURIComponent(key);
+                const decodedValue = decodeURIComponent(value);
+
+                addKeyValueRow(queryParamsList, decodedKey, decodedValue);
+                hasParams = true;
+            } else {
+                // Key without value
+                addKeyValueRow(queryParamsList, decodeURIComponent(pair), '');
+                hasParams = true;
+            }
+        }
+
+        if (!hasParams) {
             addKeyValueRow(queryParamsList);
         }
     } catch (error) {

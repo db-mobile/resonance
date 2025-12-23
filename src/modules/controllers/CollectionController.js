@@ -848,64 +848,32 @@ export class CollectionController {
 
                 // Update the endpoint's path in the collection for sidebar display
                 try {
-                    const url = urlInput.value;
-
-                    // Extract path from URL (remove baseUrl variables and domain if present)
-                    let path = url;
-
-                    // Remove {{baseUrl}} if present
-                    path = path.replace(/\{\{baseUrl\}\}/g, '');
-
-                    // If it's a full URL, extract just the pathname (without query string)
-                    if (path.match(/^https?:\/\//)) {
-                        const urlObj = new URL(path);
-                        path = urlObj.pathname;
-                    } else {
-                        // If it's not a full URL, remove query string if present
-                        const queryIndex = path.indexOf('?');
-                        if (queryIndex !== -1) {
-                            path = path.substring(0, queryIndex);
-                        }
-                    }
+                    const path = this._normalizePath(urlInput.value);
 
                     // Update the endpoint in the collection
                     const collections = await this.repository.getAll();
                     const collection = collections.find(c => c.id === collectionId);
 
-                    if (collection) {
-                        // Track all found endpoints to handle duplicates
-                        const foundLocations = [];
-
-                        // Search for endpoint in top-level endpoints
-                        const topLevelEndpoint = collection.endpoints?.find(e => e.id === endpointId);
-                        if (topLevelEndpoint) {
-                            foundLocations.push({ endpoint: topLevelEndpoint });
-                        }
-
-                        // ALWAYS search in folders too (to handle duplicates)
-                        if (collection.folders) {
-                            for (const folder of collection.folders) {
-                                if (folder.endpoints) {
-                                    const folderEndpoint = folder.endpoints.find(e => e.id === endpointId);
-                                    if (folderEndpoint) {
-                                        foundLocations.push({ endpoint: folderEndpoint });
-                                    }
-                                }
-                            }
-                        }
-
-                        if (foundLocations.length > 0) {
-                            // Update endpoint in ALL locations where it was found
-                            foundLocations.forEach(({ endpoint }) => {
-                                endpoint.path = path;
-                            });
-
-                            await this.repository.save(collections);
-
-                            // Refresh the collection tree display
-                            await this.loadCollectionsWithExpansionState();
-                        }
+                    if (!collection) {
+                        return;
                     }
+
+                    // Find all locations where the endpoint exists (handles duplicates)
+                    const foundLocations = this._findAllEndpointLocations(collection, endpointId);
+
+                    if (foundLocations.length === 0) {
+                        return;
+                    }
+
+                    // Update endpoint in ALL locations where it was found
+                    foundLocations.forEach(({ endpoint }) => {
+                        endpoint.path = path;
+                    });
+
+                    await this.repository.save(collections);
+
+                    // Refresh the collection tree display
+                    await this.loadCollectionsWithExpansionState();
                 } catch (error) {
                     console.error('Error updating endpoint path in collection:', error);
                 }
@@ -951,61 +919,69 @@ export class CollectionController {
             this.statusDisplay.update('Request saved', null);
 
             // Update the current workspace tab state to reflect the saved changes
-            if (window.workspaceTabController) {
-                const activeTab = await window.workspaceTabController.getActiveTab();
-                if (activeTab && activeTab.request) {
-                    // Update the tab's request data with all saved changes
-                    const updatedRequest = {};
-                    let hasChanges = false;
-
-                    // Update URL
-                    if (urlInput && urlInput.value && activeTab.request.url !== urlInput.value) {
-                        updatedRequest.url = urlInput.value;
-                        hasChanges = true;
-                    }
-
-                    // Update path params
-                    if (pathParamsList) {
-                        updatedRequest.pathParams = pathParams;
-                        hasChanges = true;
-                    }
-
-                    // Update query params
-                    if (queryParamsList) {
-                        updatedRequest.queryParams = queryParams;
-                        hasChanges = true;
-                    }
-
-                    // Update headers
-                    if (headersList) {
-                        updatedRequest.headers = headers;
-                        hasChanges = true;
-                    }
-
-                    // Update body
-                    if (bodyInput) {
-                        updatedRequest.body = bodyInput.value;
-                        hasChanges = true;
-                    }
-
-                    // Update auth config
-                    if (authConfig) {
-                        updatedRequest.authType = authConfig.type || 'none';
-                        updatedRequest.authConfig = authConfig.config || {};
-                        hasChanges = true;
-                    }
-
-                    // Update the tab in the service to persist the changes
-                    if (hasChanges) {
-                        const activeTabId = await window.workspaceTabController.service.getActiveTabId();
-                        if (activeTabId) {
-                            await window.workspaceTabController.service.updateTab(activeTabId, {
-                                request: updatedRequest
-                            });
-                        }
-                    }
-                }
+            if (!window.workspaceTabController) {
+                return;
             }
+
+            const activeTab = await window.workspaceTabController.getActiveTab();
+            if (!activeTab || !activeTab.request) {
+                return;
+            }
+
+            // Update the tab's request data with all saved changes
+            const updatedRequest = {};
+            let hasChanges = false;
+
+            // Update URL
+            if (urlInput && urlInput.value && activeTab.request.url !== urlInput.value) {
+                updatedRequest.url = urlInput.value;
+                hasChanges = true;
+            }
+
+            // Update path params
+            if (pathParamsList) {
+                updatedRequest.pathParams = pathParams;
+                hasChanges = true;
+            }
+
+            // Update query params
+            if (queryParamsList) {
+                updatedRequest.queryParams = queryParams;
+                hasChanges = true;
+            }
+
+            // Update headers
+            if (headersList) {
+                updatedRequest.headers = headers;
+                hasChanges = true;
+            }
+
+            // Update body
+            if (bodyInput) {
+                updatedRequest.body = bodyInput.value;
+                hasChanges = true;
+            }
+
+            // Update auth config
+            if (authConfig) {
+                updatedRequest.authType = authConfig.type || 'none';
+                updatedRequest.authConfig = authConfig.config || {};
+                hasChanges = true;
+            }
+
+            // Update the tab in the service to persist the changes
+            if (!hasChanges) {
+                return;
+            }
+
+            const activeTabId = await window.workspaceTabController.service.getActiveTabId();
+            if (!activeTabId) {
+                return;
+            }
+
+            await window.workspaceTabController.service.updateTab(activeTabId, {
+                request: updatedRequest
+            });
         } catch (error) {
             console.error('Error saving request modifications:', error);
             this.statusDisplay.update(`Error saving request: ${error.message}`, null);
@@ -1234,19 +1210,7 @@ export class CollectionController {
                 return;
             }
 
-            let endpoint = null;
-            if (collection.endpoints) {
-                endpoint = collection.endpoints.find(ep => ep.id === lastSelected.endpointId);
-            }
-
-            if (!endpoint && collection.folders) {
-                for (const folder of collection.folders) {
-                    if (folder.endpoints) {
-                        endpoint = folder.endpoints.find(ep => ep.id === lastSelected.endpointId);
-                        if (endpoint) {break;}
-                    }
-                }
-            }
+            const endpoint = this._findEndpointInCollection(collection, lastSelected.endpointId);
 
             if (!endpoint) {
                 console.warn('Last selected endpoint not found, clearing saved selection');
@@ -1261,5 +1225,99 @@ export class CollectionController {
         } catch (error) {
             console.error('Error restoring last selected request:', error);
         }
+    }
+
+    /**
+     * Normalizes a URL by extracting the path component
+     * Removes {{baseUrl}} variables and strips domain/query strings
+     *
+     * @private
+     * @param {string} url - The URL to normalize
+     * @returns {string} The normalized path
+     */
+    _normalizePath(url) {
+        let path = url;
+
+        // Remove {{baseUrl}} if present
+        path = path.replace(/\{\{baseUrl\}\}/g, '');
+
+        // If it's a full URL, extract just the pathname (without query string)
+        if (path.match(/^https?:\/\//)) {
+            const urlObj = new URL(path);
+            path = urlObj.pathname;
+        } else {
+            // If it's not a full URL, remove query string if present
+            const queryIndex = path.indexOf('?');
+            if (queryIndex !== -1) {
+                path = path.substring(0, queryIndex);
+            }
+        }
+
+        return path;
+    }
+
+    /**
+     * Finds all locations of an endpoint in a collection
+     * Searches both top-level endpoints and endpoints within folders
+     *
+     * @private
+     * @param {Object} collection - The collection to search
+     * @param {string} endpointId - The endpoint ID to find
+     * @returns {Array<Object>} Array of objects with endpoint references
+     */
+    _findAllEndpointLocations(collection, endpointId) {
+        const foundLocations = [];
+
+        // Search for endpoint in top-level endpoints
+        const topLevelEndpoint = collection.endpoints?.find(e => e.id === endpointId);
+        if (topLevelEndpoint) {
+            foundLocations.push({ endpoint: topLevelEndpoint });
+        }
+
+        // Search in folders
+        if (collection.folders) {
+            for (const folder of collection.folders) {
+                if (folder.endpoints) {
+                    const folderEndpoint = folder.endpoints.find(e => e.id === endpointId);
+                    if (folderEndpoint) {
+                        foundLocations.push({ endpoint: folderEndpoint });
+                    }
+                }
+            }
+        }
+
+        return foundLocations;
+    }
+
+    /**
+     * Finds an endpoint in a collection (top-level or in folders)
+     *
+     * @private
+     * @param {Object} collection - The collection to search
+     * @param {string} endpointId - The endpoint ID to find
+     * @returns {Object|null} The endpoint object or null if not found
+     */
+    _findEndpointInCollection(collection, endpointId) {
+        // Search in top-level endpoints first
+        if (collection.endpoints) {
+            const endpoint = collection.endpoints.find(ep => ep.id === endpointId);
+            if (endpoint) {
+                return endpoint;
+            }
+        }
+
+        // Search in folders
+        if (collection.folders) {
+            for (const folder of collection.folders) {
+                if (folder.endpoints) {
+                    const endpoint = folder.endpoints.find(ep => ep.id === endpointId);
+                    if (endpoint) {
+                        return endpoint;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 }
