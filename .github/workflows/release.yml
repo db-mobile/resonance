@@ -11,7 +11,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        node-version: [20.x, 22.x]
 
     steps:
     - name: Checkout code
@@ -39,7 +39,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20.x'
+        node-version: '22.x'
         cache: 'npm'
 
     - name: Install dependencies
@@ -48,7 +48,7 @@ jobs:
     - name: Run linting
       run: npm run lint
 
-  build:
+  build-linux:
     needs: [test, lint]
     runs-on: ubuntu-latest
 
@@ -59,16 +59,19 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20.x'
+        node-version: '22.x'
         cache: 'npm'
 
     - name: Install dependencies
       run: npm ci
 
-    - name: Build release artifacts
+    - name: Build application
+      run: npm run build
+
+    - name: Build Linux release artifacts
       run: npm run dist:linux
 
-    - name: Upload artifacts
+    - name: Upload Linux artifacts
       uses: actions/upload-artifact@v4
       with:
         name: release-linux
@@ -77,8 +80,39 @@ jobs:
           dist/*.AppImage
         retention-days: 7
 
+  build-mac:
+    needs: [test, lint]
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build application
+      run: npm run build
+
+    - name: Build Mac release artifacts
+      run: npm run dist:mac
+
+    - name: Upload Mac artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-mac
+        path: |
+          dist/*.dmg
+        retention-days: 7
+
   release:
-    needs: [build]
+    needs: [build-linux, build-mac]
     runs-on: ubuntu-latest
     permissions:
       contents: write
