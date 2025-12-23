@@ -63,7 +63,7 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - `copyHandler.js` - Handles copying responses and request data to clipboard
 - `curlGenerator.js` - Generates cURL commands from requests (legacy, now part of codeGenerator)
 - `domElements.js` - Centralized DOM element references and exports
-- `graphqlEditor.bundle.js` - GraphQL query editor with syntax support
+- `graphqlEditor.bundle.js` - GraphQL query editor (planned feature, not yet integrated into UI)
 - `httpVersionManager.js` - Manages HTTP protocol version selection
 - `keyboardShortcuts.js` - Manages keyboard shortcuts with platform-aware bindings and help dialog
 - `keyValueManager.js` - Manages key-value input pairs (headers, query params, path params)
@@ -147,7 +147,7 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - Automatically extract and store collection variables
 - Convert nested folder structures to flat organization by path segment
 - Full authentication mapping (Bearer, Basic, API Key, OAuth2, Digest)
-- Support for all Postman body modes (raw, urlencoded, formdata, GraphQL)
+- Support for Postman body modes (raw, urlencoded, formdata)
 
 #### Variable System
 - Template variable support using `{{ variableName }}` syntax
@@ -261,7 +261,7 @@ For detailed documentation, examples, and troubleshooting, see `SCRIPTS.md`.
 - **Multi-Language Code Generation**: Export requests in 9 languages via `codeGenerator.js`
   - cURL, Python (requests), JavaScript (Fetch), JavaScript (Axios)
   - Node.js (axios), Go (net/http), PHP (cURL), Ruby (net/http), Java (HttpClient)
-- **GraphQL Support**: Dedicated GraphQL query editor with syntax support
+- **GraphQL Support (Planned)**: Dedicated GraphQL query editor (component built but UI integration pending)
 - **Workspace Tabs**: Multiple concurrent request tabs with independent state
   - Save and restore tab state across sessions
   - Switch between tabs with keyboard shortcuts (Ctrl/Cmd+1-9)

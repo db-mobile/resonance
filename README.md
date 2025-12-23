@@ -27,7 +27,6 @@ A clean and minimal API client with excellent user experience built with Electro
   - Environment variable integration for request chaining
   - Console logging for debugging with timestamps
   - Sandboxed execution with 10-second timeout for security
-- **GraphQL Support**: Dedicated GraphQL query editor with syntax highlighting
 - **Workspace Tabs**: Multiple concurrent request tabs with independent state and persistent storage
 - **Performance Metrics**: Detailed request timing breakdown (DNS, TCP, TLS, TTFB, download)
 - **Cookie Management**: Parse and display response cookies with full attribute support
@@ -188,7 +187,7 @@ Import your existing Postman collections:
 - Automatically extracts collection variables
 - Import Postman environments to recreate your workflow
 - Full authentication mapping (Bearer, Basic, API Key, OAuth2, Digest)
-- Supports all body modes (raw, urlencoded, formdata, GraphQL)
+- Supports body modes (raw, urlencoded, formdata)
 
 ### Mock Server
 
@@ -372,8 +371,7 @@ src/
 │   ├── cookieParser.js        # Cookie parsing and display
 │   ├── performanceMetrics.js  # Performance timing visualization
 │   ├── scriptSubTabs.js       # Script editor sub-tabs management
-│   ├── graphqlEditor.bundle.js # GraphQL editor
-│   └── [25+ other modules]
+│   └── [26+ other modules]
 ├── themes/            # Theme CSS files
 └── i18n/             # Internationalization (5 languages)
 ```
@@ -477,7 +475,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Postman collection import (v2.0 & v2.1)
 - [x] Postman environment import
 - [x] Multi-language code generation (9 languages)
-- [x] GraphQL support with dedicated editor
 - [x] Workspace tabs for concurrent requests
 - [x] Performance metrics and timing breakdown
 - [x] Cookie management and display
@@ -496,6 +493,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Request chaining with environment variable integration
 
 ### Planned
+- [ ] GraphQL support with dedicated query editor
 - [ ] WebSocket support
 - [ ] Response comparison and diff view
 - [ ] gRPC support
