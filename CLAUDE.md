@@ -14,6 +14,7 @@ Resonance is an Electron-based API client application that provides a clean and 
 ### Building and Packaging
 - `npm run dist` - Create distributables for all platforms using electron-builder
 - `npm run dist:linux` - Create Linux-specific distributables
+- `npm run dist:mac` - Create macOS DMG distributables (x64 and arm64)
 - `npm run dist:dir` - Create directory distribution (unpacked)
 - **Note:** Application uses ASAR packaging (`asar: true` in electron-builder config)
 
