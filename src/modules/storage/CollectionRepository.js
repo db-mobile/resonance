@@ -23,6 +23,7 @@ export class CollectionRepository {
         this.electronAPI = electronAPI;
         this.COLLECTIONS_KEY = 'collections';
         this.MODIFIED_BODIES_KEY = 'modifiedRequestBodies';
+        this.GRAPHQL_DATA_KEY = 'graphqlData';
     }
 
     /**
@@ -556,6 +557,48 @@ export class CollectionRepository {
         } catch (error) {
             console.error('Error clearing last selected request:', error);
             throw new Error(`Failed to clear last selected request: ${error.message}`);
+        }
+    }
+
+    /**
+     * Saves GraphQL data (query + variables) for an endpoint
+     *
+     * @async
+     * @param {string} collectionId - The ID of the collection
+     * @param {string} endpointId - The ID of the endpoint
+     * @param {Object} data - GraphQL data { mode: 'graphql', query: '', variables: '' }
+     * @returns {Promise<void>}
+     * @throws {Error} If save operation fails
+     */
+    async saveGraphQLData(collectionId, endpointId, data) {
+        try {
+            const graphqlData = await this._getObjectFromStore(this.GRAPHQL_DATA_KEY);
+            const key = `${collectionId}_${endpointId}`;
+            graphqlData[key] = data;
+            await this.electronAPI.store.set(this.GRAPHQL_DATA_KEY, graphqlData);
+        } catch (error) {
+            console.error('Error saving GraphQL data:', error);
+            throw new Error(`Failed to save GraphQL data: ${error.message}`);
+        }
+    }
+
+    /**
+     * Retrieves GraphQL data for an endpoint
+     *
+     * @async
+     * @param {string} collectionId - The ID of the collection
+     * @param {string} endpointId - The ID of the endpoint
+     * @returns {Promise<Object|null>} GraphQL data or null if not found
+     * @throws {Error} If retrieval operation fails
+     */
+    async getGraphQLData(collectionId, endpointId) {
+        try {
+            const graphqlData = await this._getObjectFromStore(this.GRAPHQL_DATA_KEY);
+            const key = `${collectionId}_${endpointId}`;
+            return graphqlData[key] || null;
+        } catch (error) {
+            console.error('Error getting GraphQL data:', error);
+            return null;
         }
     }
 }

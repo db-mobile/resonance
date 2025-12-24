@@ -121,8 +121,14 @@ class OpenApiParser {
                         parameters: this._parseParameters(methodValue.parameters || []),
                         requestBody: this.schemaProcessor.parseRequestBody(methodValue.requestBody),
                         headers: {},
-                        security: this._parseSecurity(methodValue.security, openApiSpec)
+                        security: this._parseSecurity(methodValue.security, openApiSpec),
+                        bodyMode: 'json' // default to JSON mode
                     };
+
+                    // Detect GraphQL endpoint from OpenAPI metadata
+                    if (this._isGraphQLEndpoint(pathKey, methodValue)) {
+                        endpoint.bodyMode = 'graphql';
+                    }
 
                     const basePath = this._extractBasePath(pathKey);
 
@@ -404,6 +410,36 @@ class OpenApiParser {
         }
 
         return collection;
+    }
+
+    /**
+     * Detect if endpoint is a GraphQL endpoint based on metadata
+     *
+     * @private
+     * @param {string} path - The endpoint path
+     * @param {Object} operation - The operation object
+     * @returns {boolean} True if GraphQL endpoint is detected
+     */
+    _isGraphQLEndpoint(path, operation) {
+        // Check path contains /graphql
+        if (path.toLowerCase().includes('/graphql')) {
+            return true;
+        }
+
+        // Check Content-Type for application/graphql
+        if (operation.requestBody && operation.requestBody.content) {
+            if (operation.requestBody.content['application/graphql']) {
+                return true;
+            }
+        }
+
+        // Check description mentions GraphQL
+        const description = (operation.description || operation.summary || '').toLowerCase();
+        if (description.includes('graphql')) {
+            return true;
+        }
+
+        return false;
     }
 }
 

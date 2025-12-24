@@ -1,4 +1,4 @@
-import { urlInput, methodSelect, bodyInput, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, responseCookiesDisplay, responsePerformanceDisplay, languageSelector } from './domElements.js';
+import { urlInput, methodSelect, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, responseCookiesDisplay, responsePerformanceDisplay, languageSelector } from './domElements.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { saveAllRequestModifications } from './collectionManager.js';
@@ -13,9 +13,17 @@ import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
 import { ResponseEditor } from './responseEditor.bundle.js';
 import { extractCookies, formatCookiesAsHtml } from './cookieParser.js';
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
+import { getRequestBodyContent } from './requestBodyHelper.js';
 
 // Initialize CodeMirror editor for response display
 let responseEditor = null;
+
+// GraphQL body manager instance (set by renderer)
+let graphqlBodyManager = null;
+
+export function setGraphQLBodyManager(manager) {
+    graphqlBodyManager = manager;
+}
 
 // Helper function to get variable service with environment support
 function getVariableService() {
@@ -261,11 +269,9 @@ export async function handleSendRequest() {
         url = urlWithoutQuery;
     }
 
-    if (['POST', 'PUT', 'PATCH'].includes(method) && bodyInput.value.trim()) {
+    // Handle request body (supports JSON and GraphQL modes)
+    if (['POST', 'PUT', 'PATCH'].includes(method)) {
         try {
-            let bodyText = bodyInput.value.trim();
-
-            // Always try to substitute variables in body (collection + environment or just environment)
             const variableService = getVariableService();
             let variables = {};
 
@@ -276,11 +282,53 @@ export async function handleSendRequest() {
             }
 
             const processor = new VariableProcessor();
-            bodyText = processor.processTemplate(bodyText, variables);
 
-            body = JSON.parse(bodyText);
+            // Check if GraphQL mode is active
+            if (graphqlBodyManager && graphqlBodyManager.isGraphQLMode()) {
+                // GraphQL mode: construct { query, variables } body
+                let queryText = graphqlBodyManager.getGraphQLQuery().trim();
+                let variablesText = graphqlBodyManager.getGraphQLVariables().trim();
+
+                // Apply variable substitution to query and variables
+                queryText = processor.processTemplate(queryText, variables);
+                variablesText = processor.processTemplate(variablesText, variables);
+
+                // Parse variables JSON
+                let parsedVariables = {};
+                if (variablesText) {
+                    try {
+                        parsedVariables = JSON.parse(variablesText);
+                    } catch (e) {
+                        updateStatusDisplay(`Invalid GraphQL Variables JSON: ${e.message}`, null);
+                        clearResponseDisplay();
+                        responseHeadersDisplay.textContent = '';
+                        return;
+                    }
+                }
+
+                // Construct GraphQL request body
+                body = {
+                    query: queryText,
+                    variables: parsedVariables
+                };
+            } else {
+                // JSON mode: existing behavior
+                let bodyText = getRequestBodyContent().trim();
+                if (bodyText) {
+                    bodyText = processor.processTemplate(bodyText, variables);
+
+                    try {
+                        body = JSON.parse(bodyText);
+                    } catch (e) {
+                        updateStatusDisplay(`Invalid Body JSON: ${e.message}`, null);
+                        clearResponseDisplay();
+                        responseHeadersDisplay.textContent = '';
+                        return;
+                    }
+                }
+            }
         } catch (e) {
-            updateStatusDisplay(`Invalid Body JSON: ${e.message}`, null);
+            updateStatusDisplay(`Error processing request body: ${e.message}`, null);
             clearResponseDisplay();
             responseHeadersDisplay.textContent = '';
             return;
@@ -670,9 +718,9 @@ export async function handleGenerateCurl() {
         url = urlWithoutQuery;
     }
 
-    if (['POST', 'PUT', 'PATCH'].includes(method) && bodyInput.value.trim()) {
+    if (['POST', 'PUT', 'PATCH'].includes(method) && getRequestBodyContent().trim()) {
         try {
-            let bodyText = bodyInput.value.trim();
+            let bodyText = getRequestBodyContent().trim();
 
             // Always try to substitute variables in body (collection + environment or just environment)
             const variableService = getVariableService();

@@ -21,6 +21,36 @@ export const methodSelect = document.getElementById('method-select');
 export const bodyInput = document.getElementById('body-input');
 
 /**
+ * Request body CodeMirror editor container
+ * @const {HTMLElement}
+ */
+export const bodyEditorContainer = document.getElementById('body-editor-container');
+
+/**
+ * GraphQL query editor container
+ * @const {HTMLElement}
+ */
+export const graphqlQueryEditor = document.getElementById('graphql-query-editor');
+
+/**
+ * GraphQL variables editor container
+ * @const {HTMLElement}
+ */
+export const graphqlVariablesEditor = document.getElementById('graphql-variables-editor');
+
+/**
+ * GraphQL format button
+ * @const {HTMLButtonElement}
+ */
+export const graphqlFormatBtn = document.getElementById('graphql-format-btn');
+
+/**
+ * Body mode select dropdown
+ * @const {HTMLSelectElement}
+ */
+export const bodyModeSelect = document.getElementById('body-mode-select');
+
+/**
  * cURL export button
  * @const {HTMLButtonElement}
  */

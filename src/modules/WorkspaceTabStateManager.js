@@ -14,10 +14,12 @@ const _log = logger.scope('WorkspaceTabStateManager');
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
 import { formatCookiesAsHtml } from './cookieParser.js';
 import { activateTab } from './tabManager.js';
+import { setRequestBodyContent, getRequestBodyContent } from './requestBodyHelper.js';
 
 export class WorkspaceTabStateManager {
     constructor(domElements) {
         this.dom = domElements;
+        this.graphqlBodyManager = domElements.graphqlBodyManager || null;
     }
 
     /**
@@ -35,6 +37,17 @@ export class WorkspaceTabStateManager {
         // Capture active response tab
         const activeResponseTab = this._getActiveResponseTab();
 
+        // Capture body based on mode (JSON or GraphQL)
+        const isGraphQLMode = this.graphqlBodyManager && this.graphqlBodyManager.isGraphQLMode();
+        const bodyData = isGraphQLMode ? {
+            mode: 'graphql',
+            query: this.graphqlBodyManager.getGraphQLQuery(),
+            variables: this.graphqlBodyManager.getGraphQLVariables()
+        } : {
+            mode: 'json',
+            content: getRequestBodyContent() || ''
+        };
+
         return {
             request: {
                 url: this.dom.urlInput?.value || '',
@@ -42,7 +55,7 @@ export class WorkspaceTabStateManager {
                 pathParams,
                 queryParams,
                 headers,
-                body: this.dom.bodyInput?.value || '',
+                body: bodyData,
                 authType: authConfig.type || 'none',
                 authConfig: authConfig.config || {}
             },
@@ -111,8 +124,24 @@ export class WorkspaceTabStateManager {
             this.dom.methodSelect.value = request.method || 'GET';
         }
 
-        if (this.dom.bodyInput) {
-            this.dom.bodyInput.value = request.body || '';
+        // Restore body based on mode (GraphQL or JSON)
+        if (request.body && typeof request.body === 'object' && request.body.mode) {
+            if (request.body.mode === 'graphql' && this.graphqlBodyManager) {
+                this.graphqlBodyManager.setGraphQLModeEnabled(true);
+                this.graphqlBodyManager.setGraphQLQuery(request.body.query || '');
+                this.graphqlBodyManager.setGraphQLVariables(request.body.variables || '');
+            } else {
+                if (this.graphqlBodyManager) {
+                    this.graphqlBodyManager.setGraphQLModeEnabled(false);
+                }
+                setRequestBodyContent(request.body.content || '');
+            }
+        } else {
+            // Legacy format: body is a string
+            if (this.graphqlBodyManager) {
+                this.graphqlBodyManager.setGraphQLModeEnabled(false);
+            }
+            setRequestBodyContent(typeof request.body === 'string' ? request.body : '');
         }
 
         // Restore path params
@@ -320,7 +349,7 @@ export class WorkspaceTabStateManager {
                 pathParams: {},
                 queryParams: {},
                 headers: { 'Content-Type': 'application/json' },
-                body: '',
+                body: { mode: 'json', content: '' },
                 authType: 'none',
                 authConfig: {}
             },

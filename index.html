@@ -228,11 +228,52 @@
                 </div>
 
                 <div class="tab-content" id="body" role="tabpanel" aria-labelledby="body-tab">
-                    <h3>Request Body</h3>
-                    <textarea id="body-input"
-                              class="body-textarea"
-                              placeholder='{"title": "foo", "body": "bar", "userId": 1}'
-                              aria-label="Request Body JSON"></textarea>
+                    <div class="body-header">
+                        <h3>Request Body</h3>
+                        <div class="body-mode-selector-container">
+                            <select id="body-mode-select" class="body-mode-select" aria-label="Body Mode">
+                                <option value="json">JSON</option>
+                                <option value="graphql">GraphQL</option>
+                            </select>
+                            <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="2 4 6 8 10 4"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- JSON Mode (existing) -->
+                    <div class="body-mode-panel active" id="body-json-section" data-mode="json">
+                        <textarea id="body-input"
+                                  class="body-textarea"
+                                  placeholder='{"title": "foo", "body": "bar", "userId": 1}'
+                                  aria-label="Request Body JSON"
+                                  style="display: none;"></textarea>
+                        <div id="body-editor-container" class="body-editor-container"></div>
+                    </div>
+
+                    <!-- GraphQL Mode (new) -->
+                    <div class="body-mode-panel" id="body-graphql-section" data-mode="graphql">
+                        <div class="graphql-container">
+                            <!-- Query Editor -->
+                            <div class="graphql-query-section">
+                                <div class="graphql-section-header">
+                                    <label for="graphql-query-editor">Query</label>
+                                    <button id="graphql-format-btn" class="btn-secondary btn-sm" title="Format Query">
+                                        Format
+                                    </button>
+                                </div>
+                                <div id="graphql-query-editor" class="graphql-editor"></div>
+                            </div>
+
+                            <!-- Variables Section -->
+                            <div class="graphql-variables-section">
+                                <div class="graphql-section-header">
+                                    <label for="graphql-variables-editor">Variables</label>
+                                </div>
+                                <div id="graphql-variables-editor" class="graphql-editor"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="tab-content" id="scripts" role="tabpanel" aria-labelledby="scripts-tab">
