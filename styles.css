@@ -340,12 +340,18 @@ section h2 {
 }
 
 .code-block {
-    background-color: var(--text-primary);
+    background-color: #212529;
     color: #f8f9fa;
     padding: 1.5rem;
     border-radius: 8px;
     text-align: left;
     overflow-x: auto;
+}
+
+@media (prefers-color-scheme: dark) {
+    .code-block {
+        background-color: #1e1e1e;
+    }
 }
 
 .code-block code {
