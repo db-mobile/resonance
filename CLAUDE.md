@@ -63,7 +63,9 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - `copyHandler.js` - Handles copying responses and request data to clipboard
 - `curlGenerator.js` - Generates cURL commands from requests (legacy, now part of codeGenerator)
 - `domElements.js` - Centralized DOM element references and exports
-- `graphqlEditor.bundle.js` - GraphQL query editor with syntax support
+- `graphqlBodyManager.js` - Manages GraphQL body mode with query and variables editors
+- `graphqlEditor.bundle.js` - CodeMirror-based GraphQL query editor with syntax highlighting
+- `jsonEditor.bundle.js` - CodeMirror-based JSON editor for GraphQL variables
 - `httpVersionManager.js` - Manages HTTP protocol version selection
 - `keyboardShortcuts.js` - Manages keyboard shortcuts with platform-aware bindings and help dialog
 - `keyValueManager.js` - Manages key-value input pairs (headers, query params, path params)
@@ -147,7 +149,7 @@ The codebase follows a sophisticated modular pattern with MVC-like separation:
 - Automatically extract and store collection variables
 - Convert nested folder structures to flat organization by path segment
 - Full authentication mapping (Bearer, Basic, API Key, OAuth2, Digest)
-- Support for all Postman body modes (raw, urlencoded, formdata, GraphQL)
+- Support for Postman body modes (raw, urlencoded, formdata)
 
 #### Variable System
 - Template variable support using `{{ variableName }}` syntax
@@ -261,7 +263,13 @@ For detailed documentation, examples, and troubleshooting, see `SCRIPTS.md`.
 - **Multi-Language Code Generation**: Export requests in 9 languages via `codeGenerator.js`
   - cURL, Python (requests), JavaScript (Fetch), JavaScript (Axios)
   - Node.js (axios), Go (net/http), PHP (cURL), Ruby (net/http), Java (HttpClient)
-- **GraphQL Support**: Dedicated GraphQL query editor with syntax support
+- **GraphQL Support**: Full GraphQL query support with dedicated editors
+  - Dropdown selector to switch between JSON and GraphQL body modes
+  - Separate query editor with GraphQL syntax highlighting
+  - Variables editor with JSON syntax highlighting and validation
+  - Query formatting with format button
+  - Auto-save functionality for queries and variables
+  - Lazy loading of editors for optimal performance
 - **Workspace Tabs**: Multiple concurrent request tabs with independent state
   - Save and restore tab state across sessions
   - Switch between tabs with keyboard shortcuts (Ctrl/Cmd+1-9)
@@ -338,6 +346,9 @@ For detailed documentation, examples, and troubleshooting, see `SCRIPTS.md`.
 - **Workspace tabs** for managing multiple concurrent requests
 - Environment selector dropdown for quick switching between environments
 - Tabbed interface for request configuration (Path Params, Query Params, Headers, Body, Auth, Scripts)
+- **Body tab** with dropdown selector to switch between JSON and GraphQL modes
+  - JSON mode: CodeMirror editor with JSON syntax highlighting
+  - GraphQL mode: Separate editors for query and variables with syntax highlighting
 - **Scripts tab** with sub-tabs for pre-request and test scripts with inline editor
 - Tabbed response display (Body, Headers, Cookies, Performance, Scripts)
 - **Scripts response tab** showing console logs and test results with pass/fail indicators

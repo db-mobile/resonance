@@ -26,6 +26,7 @@ export class WorkspaceTabController {
         this.tabBar = tabBar;
         this.stateManager = stateManager;
         this.responseContainerManager = responseContainerManager;
+        this.isRestoringState = false; // Flag to prevent marking tabs as modified during restoration
 
         // Bind tab bar event handlers
         this.tabBar.onTabSwitch = (tabId) => this.switchTab(tabId);
@@ -99,7 +100,9 @@ export class WorkspaceTabController {
             this.tabBar.render(tabs, activeTabId);
 
             // Clear UI for new tab
+            this.isRestoringState = true;
             await this.stateManager.restoreTabState(newTab);
+            this.isRestoringState = false;
 
             // Clear scripts for new tab (no endpoint selected)
             if (window.scriptController) {
@@ -146,7 +149,11 @@ export class WorkspaceTabController {
 
             // Update UI
             this.tabBar.setActiveTab(tabId);
+
+            // Set flag to prevent marking tab as modified during restoration
+            this.isRestoringState = true;
             await this.stateManager.restoreTabState(tab);
+            this.isRestoringState = false;
 
             // Load scripts for this tab's endpoint, or clear if no endpoint
             if (window.scriptController) {
@@ -195,7 +202,9 @@ export class WorkspaceTabController {
 
                 const newActiveTab = tabs.find(t => t.id === result.newActiveTabId);
                 if (newActiveTab) {
+                    this.isRestoringState = true;
                     await this.stateManager.restoreTabState(newActiveTab);
+                    this.isRestoringState = false;
                 }
             }
         } catch (error) {
@@ -269,7 +278,9 @@ export class WorkspaceTabController {
             // Restore tab state
             const activeTab = remainingTabs.find(t => t.id === tabId);
             if (activeTab) {
+                this.isRestoringState = true;
                 await this.stateManager.restoreTabState(activeTab);
+                this.isRestoringState = false;
             }
         } catch (error) {
             console.error('Error closing other tabs:', error);
@@ -512,7 +523,9 @@ export class WorkspaceTabController {
             // Restore state to UI
             const tab = await this.service.getActiveTab();
             if (tab) {
+                this.isRestoringState = true;
                 await this.stateManager.restoreTabState(tab);
+                this.isRestoringState = false;
                 this.tabBar.updateTab(targetTabId, { name: tabName, isModified: false });
             }
 

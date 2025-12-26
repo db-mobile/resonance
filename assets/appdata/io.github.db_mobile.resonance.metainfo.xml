@@ -94,6 +94,22 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+  <release version="1.8.0" date="2025-12-27">
+      <description>
+        <p>New features introduced</p>
+        <ul>
+          <li>Introduce GraphQL support</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.7.1" date="2025-12-23">
+      <description>
+        <p>Stabilization release</p>
+        <ul>
+          <li>Improve stability and fix bugs</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.7.0" date="2025-12-23">
       <description>
         <p>New features introduced</p>

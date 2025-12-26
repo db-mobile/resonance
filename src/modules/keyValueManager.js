@@ -229,7 +229,7 @@ export function initKeyValueListeners() {
         if (event.target.classList.contains('key-input') ||
             event.target.classList.contains('value-input')) {
             debounceAutoSave(() => autoSavePathParams());
-            if (window.workspaceTabController) {
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
                 window.workspaceTabController.markCurrentTabModified();
             }
         }
@@ -240,7 +240,7 @@ export function initKeyValueListeners() {
             event.target.classList.contains('value-input')) {
             updateUrlFromQueryParams();
             debounceAutoSave(() => autoSaveQueryParams());
-            if (window.workspaceTabController) {
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
                 window.workspaceTabController.markCurrentTabModified();
             }
         }
@@ -250,7 +250,7 @@ export function initKeyValueListeners() {
         if (event.target.classList.contains('key-input') ||
             event.target.classList.contains('value-input')) {
             debounceAutoSave(() => autoSaveHeaders());
-            if (window.workspaceTabController) {
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
                 window.workspaceTabController.markCurrentTabModified();
             }
         }

@@ -117,8 +117,14 @@ class PostmanParser {
                 header: {}
             },
             headers: this._parseHeaders(request.header),
-            requestBody: this._parseBody(request.body)
+            requestBody: this._parseBody(request.body),
+            bodyMode: 'json' // default to JSON mode
         };
+
+        // Detect if this is a GraphQL endpoint (from Postman body mode)
+        if (request.body && request.body.mode === 'graphql') {
+            endpoint.bodyMode = 'graphql';
+        }
 
         if (request.auth) {
             endpoint.security = this._parseAuth(request.auth);

@@ -19,6 +19,14 @@ A clean and minimal API client with excellent user experience built with Electro
   - cURL, Python (requests), JavaScript (Fetch), JavaScript (Axios)
   - Node.js (axios), Go (net/http), PHP (cURL), Ruby (net/http), Java (HttpClient)
 
+### GraphQL Support
+- **Full GraphQL Integration**: Dedicated editors for GraphQL queries and testing
+  - Dropdown selector to switch between JSON and GraphQL body modes
+  - GraphQL query editor with syntax highlighting
+  - Variables editor with JSON syntax highlighting and validation
+  - Query formatting with format button
+  - Auto-save functionality for queries and variables
+
 ### Advanced Features
 - **Scripts & Automation**: Pre-request and test scripts with JavaScript execution
   - **Pre-request Scripts**: Modify requests dynamically (headers, body, auth signatures)
@@ -27,7 +35,6 @@ A clean and minimal API client with excellent user experience built with Electro
   - Environment variable integration for request chaining
   - Console logging for debugging with timestamps
   - Sandboxed execution with 10-second timeout for security
-- **GraphQL Support**: Dedicated GraphQL query editor with syntax highlighting
 - **Workspace Tabs**: Multiple concurrent request tabs with independent state and persistent storage
 - **Performance Metrics**: Detailed request timing breakdown (DNS, TCP, TLS, TTFB, download)
 - **Cookie Management**: Parse and display response cookies with full attribute support
@@ -188,7 +195,7 @@ Import your existing Postman collections:
 - Automatically extracts collection variables
 - Import Postman environments to recreate your workflow
 - Full authentication mapping (Bearer, Basic, API Key, OAuth2, Digest)
-- Supports all body modes (raw, urlencoded, formdata, GraphQL)
+- Supports body modes (raw, urlencoded, formdata)
 
 ### Mock Server
 
@@ -291,6 +298,54 @@ Scripts have access to powerful APIs:
 
 For comprehensive documentation with more examples, troubleshooting, and API reference, see `SCRIPTS.md` in the repository.
 
+### GraphQL Queries
+
+Resonance supports GraphQL queries with dedicated editors for queries and variables.
+
+**Using GraphQL Mode**
+1. Navigate to the **Body** tab in the request configuration area
+2. Use the dropdown selector at the top to switch from **JSON** to **GraphQL**
+3. Write your GraphQL query in the query editor
+4. Add variables in the variables editor (optional)
+5. Click the **Format** button to auto-format your query
+6. Send the request to see results
+
+**Query Editor Example**
+```graphql
+query GetUser($userId: ID!) {
+  user(id: $userId) {
+    id
+    name
+    email
+    posts {
+      id
+      title
+      content
+    }
+  }
+}
+```
+
+**Variables Editor Example**
+```json
+{
+  "userId": "123"
+}
+```
+
+**Features**
+- **Syntax Highlighting**: Full GraphQL syntax highlighting in the query editor
+- **Variables Support**: Separate JSON editor for GraphQL variables with validation
+- **Auto-Format**: Format button to automatically format your GraphQL queries
+- **Auto-Save**: Queries and variables are automatically saved as you type
+- **Variable Templating**: Use environment variables in GraphQL queries and variables with `{{ variableName }}` syntax
+
+**Combined with Scripts**
+GraphQL works seamlessly with pre-request and test scripts:
+- Use pre-request scripts to modify GraphQL queries dynamically
+- Use test scripts to validate GraphQL response structure
+- Extract data from GraphQL responses and save to environment variables
+
 ### Themes
 
 Switch between themes in Settings:
@@ -372,8 +427,7 @@ src/
 │   ├── cookieParser.js        # Cookie parsing and display
 │   ├── performanceMetrics.js  # Performance timing visualization
 │   ├── scriptSubTabs.js       # Script editor sub-tabs management
-│   ├── graphqlEditor.bundle.js # GraphQL editor
-│   └── [25+ other modules]
+│   └── [26+ other modules]
 ├── themes/            # Theme CSS files
 └── i18n/             # Internationalization (5 languages)
 ```
@@ -477,7 +531,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Postman collection import (v2.0 & v2.1)
 - [x] Postman environment import
 - [x] Multi-language code generation (9 languages)
-- [x] GraphQL support with dedicated editor
 - [x] Workspace tabs for concurrent requests
 - [x] Performance metrics and timing breakdown
 - [x] Cookie management and display
@@ -494,6 +547,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Pre-request and test scripts with JavaScript execution
 - [x] Automated testing framework with rich assertion API
 - [x] Request chaining with environment variable integration
+- [x] GraphQL support with dedicated query and variables editors
 
 ### Planned
 - [ ] WebSocket support

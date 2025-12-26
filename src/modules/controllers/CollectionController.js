@@ -15,6 +15,7 @@ import { RenameDialog } from '../ui/RenameDialog.js';
 import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 import { VariableManager } from '../ui/VariableManager.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
+import { setRequestBodyContent, getRequestBodyContent } from '../requestBodyHelper.js';
 
 /**
  * Controller for coordinating collection operations between UI and services
@@ -696,7 +697,7 @@ export class CollectionController {
                     const formElements = this.getFormElements();
                     formElements.urlInput.value = '';
                     formElements.methodSelect.value = 'GET';
-                    formElements.bodyInput.value = '';
+                    setRequestBodyContent('');
                     this.service.clearKeyValueList(formElements.pathParamsList);
                     this.service.clearKeyValueList(formElements.headersList);
                     this.service.clearKeyValueList(formElements.queryParamsList);
@@ -958,7 +959,22 @@ export class CollectionController {
 
             // Update body
             if (bodyInput) {
-                updatedRequest.body = bodyInput.value;
+                // Check if GraphQL mode is enabled
+                const graphqlBodyManager = window.domElements?.graphqlBodyManager;
+                const isGraphQLMode = graphqlBodyManager && graphqlBodyManager.isGraphQLMode();
+
+                if (isGraphQLMode) {
+                    updatedRequest.body = {
+                        mode: 'graphql',
+                        query: graphqlBodyManager.getGraphQLQuery(),
+                        variables: graphqlBodyManager.getGraphQLVariables()
+                    };
+                } else {
+                    updatedRequest.body = {
+                        mode: 'json',
+                        content: getRequestBodyContent()
+                    };
+                }
                 hasChanges = true;
             }
 
@@ -1042,11 +1058,13 @@ export class CollectionController {
                 );
             }
 
-            if (formElements.bodyInput && formElements.bodyInput.value) {
-                formElements.bodyInput.value = await this.variableService.processTemplate(
-                    formElements.bodyInput.value, 
+            const currentBody = getRequestBodyContent();
+            if (currentBody) {
+                const processedBody = await this.variableService.processTemplate(
+                    currentBody,
                     collectionId
                 );
+                setRequestBodyContent(processedBody);
             }
 
             if (formElements.headersList) {
@@ -1096,11 +1114,13 @@ export class CollectionController {
      */
     async processFormVariablesExceptUrl(collectionId, formElements) {
         try {
-            if (formElements.bodyInput && formElements.bodyInput.value) {
-                formElements.bodyInput.value = await this.variableService.processTemplate(
-                    formElements.bodyInput.value, 
+            const currentBody = getRequestBodyContent();
+            if (currentBody) {
+                const processedBody = await this.variableService.processTemplate(
+                    currentBody,
                     collectionId
                 );
+                setRequestBodyContent(processedBody);
             }
 
             if (formElements.headersList) {

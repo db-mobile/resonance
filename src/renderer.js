@@ -7,13 +7,14 @@
  * in the renderer process. This is the entry point for the Electron renderer.
  */
 
-import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, pathParamsList, queryParamsList, headersList, authTypeSelect, responseBodyContainer, statusDisplay, responseHeadersDisplay, responseCookiesDisplay } from './modules/domElements.js';
+import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, bodyEditorContainer, pathParamsList, queryParamsList, headersList, authTypeSelect, responseBodyContainer, statusDisplay, responseHeadersDisplay, responseCookiesDisplay } from './modules/domElements.js';
 
 import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl, setUrlUpdating } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
-import { handleSendRequest, handleCancelRequest, handleGenerateCurl } from './modules/apiHandler.js';
+import { handleSendRequest, handleCancelRequest, handleGenerateCurl, setGraphQLBodyManager } from './modules/apiHandler.js';
+import { GraphQLBodyManager } from './modules/graphqlBodyManager.js';
 import { loadCollections, importOpenApiFile, importPostmanCollection, importPostmanEnvironment, initializeBodyTracking } from './modules/collectionManager.js';
 import { ThemeManager, SettingsModal } from './modules/themeManager.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
@@ -50,6 +51,7 @@ import { MockServerService } from './modules/services/MockServerService.js';
 import { MockServerController } from './modules/controllers/MockServerController.js';
 import { MockServerDialog } from './modules/ui/MockServerDialog.js';
 import { CollectionRepository } from './modules/storage/CollectionRepository.js';
+import { RequestBodyEditor } from './modules/requestBodyEditor.bundle.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
@@ -105,6 +107,21 @@ const scriptController = new ScriptController(
     scriptConsolePanel
 );
 
+// Initialize GraphQL body manager
+const graphqlBodyManager = new GraphQLBodyManager({
+    bodyInput,
+    graphqlQueryEditor: document.getElementById('graphql-query-editor'),
+    graphqlVariablesEditor: document.getElementById('graphql-variables-editor'),
+    graphqlFormatBtn: document.getElementById('graphql-format-btn')
+});
+graphqlBodyManager.initialize();
+
+// Make available to apiHandler
+setGraphQLBodyManager(graphqlBodyManager);
+
+// Make available globally for workspace tab state manager
+window.graphqlBodyManager = graphqlBodyManager;
+
 // Initialize settings modal with all managers
 const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager, proxyController);
 
@@ -137,7 +154,8 @@ const workspaceTabStateManager = new WorkspaceTabStateManager({
     responseBodyContainer,
     statusDisplay,
     responseHeadersDisplay,
-    responseCookiesDisplay
+    responseCookiesDisplay,
+    graphqlBodyManager
 });
 const workspaceTabController = new WorkspaceTabController(
     workspaceTabService,
@@ -543,6 +561,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initialize workspace tabs
     await workspaceTabController.initialize();
 
+    // Initialize request body editor
+    let requestBodyEditor = null;
+    let isInitializingEditor = false; // Flag to prevent marking tab as modified during init
+    if (bodyEditorContainer) {
+        requestBodyEditor = new RequestBodyEditor(bodyEditorContainer);
+
+        // Make globally available
+        window.requestBodyEditor = requestBodyEditor;
+
+        // Set up change callback to keep textarea in sync (for backward compatibility)
+        requestBodyEditor.onChange((content) => {
+            if (bodyInput) {
+                bodyInput.value = content;
+            }
+            // Mark workspace tab as modified (but not during initialization or state restoration)
+            if (window.workspaceTabController &&
+                !isInitializingEditor &&
+                !window.workspaceTabController.isRestoringState) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
+
+        // Sync editor with textarea content (restored by workspace tab initialization)
+        // Use flag to prevent marking tab as modified during this sync
+        if (bodyInput && bodyInput.value) {
+            isInitializingEditor = true;
+            requestBodyEditor.setContent(bodyInput.value);
+            // Use setTimeout to ensure flag is cleared after any async updates
+            setTimeout(() => {
+                isInitializingEditor = false;
+            }, 0);
+        }
+    }
+
     // Initialize tab listeners AFTER workspace tabs are created
     initTabListeners();
 
@@ -567,7 +619,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Track changes to mark tabs as modified
     if (urlInput) {
         urlInput.addEventListener('input', () => {
-            if (window.workspaceTabController) {
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
                 window.workspaceTabController.markCurrentTabModified();
             }
         });
@@ -575,7 +627,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (bodyInput) {
         bodyInput.addEventListener('input', () => {
-            if (window.workspaceTabController) {
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
                 window.workspaceTabController.markCurrentTabModified();
             }
         });
@@ -583,7 +635,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (methodSelect) {
         methodSelect.addEventListener('change', () => {
-            if (window.workspaceTabController) {
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
                 window.workspaceTabController.markCurrentTabModified();
             }
         });

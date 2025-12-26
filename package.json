@@ -1,6 +1,6 @@
 {
   "name": "resonance",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "description": "Resonance - A clean and minimal API client with excellent user experience",
   "license": "MIT",
   "author": "Dennis Blümer <dennis.bluemer@ducart.de>",
@@ -21,6 +21,7 @@
     "dist": "electron-builder",
     "dist:linux": "electron-builder --linux",
     "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
     "dist:dir": "electron-builder --dir"
   },
   "devDependencies": {
@@ -52,6 +53,7 @@
     "@lezer/highlight": "^1.2.3",
     "assert-plus": "^1.0.0",
     "axios": "^1.10.0",
+    "cm6-graphql": "^0.2.1",
     "codemirror": "^6.0.2",
     "electron-log": "^5.4.3",
     "electron-squirrel-startup": "^1.0.1",
@@ -100,14 +102,30 @@
       "target": [
         {
           "target": "dmg",
+          "arch": "universal"
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "./assets/icons/icon.icns"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
           "arch": [
             "x64",
             "arm64"
           ]
         }
       ],
-      "category": "public.app-category.developer-tools",
-      "icon": "./assets/icons/icon.icns"
+      "icon": "./assets/icons/icon_256x256.png"
     }
   }
 }

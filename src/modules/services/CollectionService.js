@@ -3,6 +3,8 @@
  * @module services/CollectionService
  */
 
+import { setRequestBodyContent, getRequestBodyContent } from '../requestBodyHelper.js';
+
 /**
  * Service for managing API collection business logic
  *
@@ -637,25 +639,48 @@ export class CollectionService {
      * @private
      * @param {Object} collection - The collection object
      * @param {Object} endpoint - The endpoint object
-     * @param {Object} formElements - Form element references
+     * @param {Object} _formElements - Form element references (unused, kept for API compatibility)
      * @returns {Promise<void>}
      */
-    async populateRequestBody(collection, endpoint, formElements) {
-        const persistedBody = await this.repository.getModifiedRequestBody(collection.id, endpoint.id);
-        
-        if (persistedBody) {
-            formElements.bodyInput.value = persistedBody;
-        } else if (endpoint.requestBody) {
-            const generatedBody = this.generateRequestBody(endpoint.requestBody);
-            formElements.bodyInput.value = generatedBody;
-        } else if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-            formElements.bodyInput.value = JSON.stringify({ 'data': 'example' }, null, 2);
-        } else {
-            formElements.bodyInput.value = '';
-        }
+    async populateRequestBody(collection, endpoint, _formElements) {
+        // Check if this endpoint has GraphQL data
+        const graphqlData = await this.repository.getGraphQLData(collection.id, endpoint.id);
 
-        const key = `${collection.id}_${endpoint.id}`;
-        this.originalBodyValues.set(key, formElements.bodyInput.value);
+        if (graphqlData && graphqlData.mode === 'graphql') {
+            // Switch to GraphQL mode and populate GraphQL editors
+            if (window.graphqlBodyManager) {
+                window.graphqlBodyManager.setGraphQLModeEnabled(true);
+                window.graphqlBodyManager.setGraphQLQuery(graphqlData.query || '');
+                window.graphqlBodyManager.setGraphQLVariables(graphqlData.variables || '');
+            }
+
+            const key = `${collection.id}_${endpoint.id}`;
+            this.originalBodyValues.set(key, graphqlData.query || '');
+        } else {
+            // Switch to JSON mode and populate JSON editor
+            if (window.graphqlBodyManager) {
+                window.graphqlBodyManager.setGraphQLModeEnabled(false);
+            }
+
+            const persistedBody = await this.repository.getModifiedRequestBody(collection.id, endpoint.id);
+
+            let bodyContent;
+            if (persistedBody) {
+                bodyContent = persistedBody;
+            } else if (endpoint.requestBody) {
+                bodyContent = this.generateRequestBody(endpoint.requestBody);
+            } else if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
+                bodyContent = JSON.stringify({ 'data': 'example' }, null, 2);
+            } else {
+                bodyContent = '';
+            }
+
+            // Set the body content in both textarea and CodeMirror editor
+            setRequestBodyContent(bodyContent);
+
+            const key = `${collection.id}_${endpoint.id}`;
+            this.originalBodyValues.set(key, bodyContent);
+        }
     }
 
     /**
@@ -698,24 +723,73 @@ export class CollectionService {
      * @private
      * @param {string} collectionId - The collection ID
      * @param {string} endpointId - The endpoint ID
-     * @param {HTMLTextAreaElement} bodyInput - The body input element
+     * @param {HTMLTextAreaElement} _bodyInput - The body input element (unused, kept for API compatibility)
      * @returns {Promise<void>}
      */
-    async saveRequestBodyModification(collectionId, endpointId, bodyInput) {
+    async saveRequestBodyModification(collectionId, endpointId, _bodyInput) {
         try {
-            if (!bodyInput || !bodyInput.value.trim()) {
-                return;
-            }
+            // Check if we're in GraphQL mode
+            if (window.graphqlBodyManager && window.graphqlBodyManager.isGraphQLMode()) {
+                const query = window.graphqlBodyManager.getGraphQLQuery();
+                const variables = window.graphqlBodyManager.getGraphQLVariables();
 
-            const currentBody = bodyInput.value.trim();
-            const key = `${collectionId}_${endpointId}`;
-            const originalBody = this.originalBodyValues.get(key);
+                // Save GraphQL data
+                await this.saveGraphQLData(collectionId, endpointId, query, variables);
+            } else {
+                // JSON mode - save as regular request body
+                const currentBody = getRequestBodyContent().trim();
+                if (!currentBody) {
+                    return;
+                }
 
-            if (originalBody && currentBody !== originalBody) {
-                await this.repository.saveModifiedRequestBody(collectionId, endpointId, currentBody);
+                const key = `${collectionId}_${endpointId}`;
+                const originalBody = this.originalBodyValues.get(key);
+
+                if (originalBody && currentBody !== originalBody) {
+                    await this.repository.saveModifiedRequestBody(collectionId, endpointId, currentBody);
+                }
             }
         } catch (error) {
             console.error('Error saving request body modification:', error);
+        }
+    }
+
+    /**
+     * Saves GraphQL mode and content for an endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {string} query - GraphQL query
+     * @param {string} variables - GraphQL variables JSON
+     * @returns {Promise<void>}
+     */
+    async saveGraphQLData(collectionId, endpointId, query, variables) {
+        try {
+            await this.repository.saveGraphQLData(collectionId, endpointId, {
+                mode: 'graphql',
+                query,
+                variables
+            });
+        } catch (error) {
+            console.error('Error saving GraphQL data:', error);
+        }
+    }
+
+    /**
+     * Gets saved GraphQL data for an endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<Object|null>} GraphQL data or null if not found
+     */
+    async getGraphQLData(collectionId, endpointId) {
+        try {
+            return await this.repository.getGraphQLData(collectionId, endpointId);
+        } catch (error) {
+            console.error('Error getting GraphQL data:', error);
+            return null;
         }
     }
 

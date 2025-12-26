@@ -82,7 +82,7 @@ jobs:
 
   build-mac:
     needs: [test, lint]
-    runs-on: macos-latest
+    runs-on: macos-14
 
     steps:
     - name: Checkout code
@@ -111,8 +111,40 @@ jobs:
           dist/*.dmg
         retention-days: 7
 
+  build-windows:
+    needs: [test, lint]
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build application
+      run: npm run build
+
+    - name: Build Windows release artifacts
+      run: npm run dist:win
+
+    - name: Upload Windows artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-windows
+        path: |
+          dist/*.exe
+          dist/*.zip
+        retention-days: 7
+
   release:
-    needs: [build-linux, build-mac]
+    needs: [build-linux, build-mac, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -154,11 +186,36 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release create "${{ github.ref_name }}" \
-          --title "Release ${{ github.ref_name }}" \
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+        REPO="${{ github.repository }}"
+        TAG="${{ github.ref_name }}"
+        BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
+
+        gh release create "$TAG" \
+          --title "Release $TAG" \
           --notes "## What's Changed
 
         ${{ steps.changelog.outputs.CHANGELOG }}
 
-        **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.previous_tag.outputs.PREVIOUS_TAG }}...${{ github.ref_name }}" \
+        ---
+
+        ## Downloads
+
+        ### Linux
+        - [AppImage (x64)](${BASE_URL}/Resonance-${VERSION}.AppImage)
+        - [AppImage (arm64)](${BASE_URL}/Resonance-${VERSION}-arm64.AppImage)
+        - [Zip (x64)](${BASE_URL}/resonance-${VERSION}.zip)
+        - [Zip (arm64)](${BASE_URL}/resonance-${VERSION}-arm64.zip)
+
+        ### macOS
+        - [DMG (universal)](${BASE_URL}/Resonance-${VERSION}-universal.dmg)
+
+        ### Windows
+        - [Installer (x64)](${BASE_URL}/Resonance.Setup.${VERSION}.exe)
+        - [Portable (x64)](${BASE_URL}/resonance-${VERSION}-win.zip)
+        - [Portable (arm64)](${BASE_URL}/resonance-${VERSION}-arm64-win.zip)
+
+        ---
+
+        **Full Changelog**: https://github.com/${REPO}/compare/${{ steps.previous_tag.outputs.PREVIOUS_TAG }}...$TAG" \
           artifacts/**/*

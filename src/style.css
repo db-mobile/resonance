@@ -903,6 +903,7 @@ body {
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
   margin-bottom: var(--space-1);
+  flex-shrink: 0;
 }
 
 /* Key-Value Pairs */
@@ -977,6 +978,141 @@ body {
   color: var(--text-tertiary);
 }
 
+/* Request Body Editor Container */
+.body-editor-container {
+  width: 100%;
+  flex: 1;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Body Header (for title and mode selector) */
+.body-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+  gap: var(--space-3);
+}
+
+.body-header h3 {
+  margin: 0;
+}
+
+/* Body Mode Selector (JSON/GraphQL dropdown) */
+.body-mode-selector-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.body-mode-select {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  padding-right: calc(var(--space-5) + 14px);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  min-width: 120px;
+}
+
+.body-mode-select:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--border-medium);
+}
+
+.body-mode-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-alpha);
+}
+
+.body-mode-selector-container .select-arrow {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-secondary);
+  width: 10px;
+  height: 10px;
+}
+
+/* Body Mode Panels */
+.body-mode-panel {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.body-mode-panel.active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* GraphQL Container */
+.graphql-container {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-4);
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-2);
+}
+
+.graphql-query-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.graphql-variables-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.graphql-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+  flex-shrink: 0;
+}
+
+.graphql-section-header label {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+/* GraphQL Editor (CodeMirror container) */
+.graphql-editor {
+  flex: 1;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Format button */
+.btn-sm {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-xs);
+}
+
 /* Scripts Tab */
 .scripts-container {
   display: flex;
@@ -1014,7 +1150,10 @@ body {
 
 .script-sub-tab.active {
   color: var(--color-primary);
+  background: var(--bg-white);
   border-bottom-color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: 0 -2px 0 0 var(--color-primary) inset;
 }
 
 /* Script Tab Panels */

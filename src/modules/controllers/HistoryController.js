@@ -6,6 +6,7 @@
 import { HistoryService } from '../services/HistoryService.js';
 import { HistoryRenderer } from '../ui/HistoryRenderer.js';
 import { updateUrlFromQueryParams } from '../keyValueManager.js';
+import { setRequestBodyContent } from '../requestBodyHelper.js';
 
 /**
  * Controller for coordinating request history operations between UI and services
@@ -78,7 +79,6 @@ export class HistoryController {
             // Load the historical request into the form
             const urlInput = document.getElementById('url-input');
             const methodSelect = document.getElementById('method-select');
-            const bodyInput = document.getElementById('body-input');
             const headersList = document.getElementById('headers-list');
             const queryParamsList = document.getElementById('query-params-list');
             const pathParamsList = document.getElementById('path-params-list');
@@ -95,10 +95,10 @@ export class HistoryController {
             }
 
             // Set body if present
-            if (bodyInput && historyEntry.request.body) {
-                bodyInput.value = JSON.stringify(historyEntry.request.body, null, 2);
-            } else if (bodyInput) {
-                bodyInput.value = '';
+            if (historyEntry.request.body) {
+                setRequestBodyContent(JSON.stringify(historyEntry.request.body, null, 2));
+            } else {
+                setRequestBodyContent('');
             }
 
             // Clear existing key-value lists
