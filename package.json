@@ -21,6 +21,7 @@
     "dist": "electron-builder",
     "dist:linux": "electron-builder --linux",
     "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
     "dist:dir": "electron-builder --dir"
   },
   "devDependencies": {
@@ -105,6 +106,25 @@
       ],
       "category": "public.app-category.developer-tools",
       "icon": "./assets/icons/icon.icns"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "./assets/icons/icon_256x256.png"
     }
   }
 }

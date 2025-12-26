@@ -62,10 +62,10 @@ jobs:
 
   build:
     runs-on: ${{ matrix.os }}
-    
+
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-14, windows-latest]
     
     steps:
     - name: Checkout code
@@ -91,7 +91,7 @@ jobs:
       with:
         name: build-${{ matrix.os }}
         path: dist/
-        retention-days: 30
+        retention-days: 7
 
   security:
     runs-on: ubuntu-latest
