@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Resonance - A clean and minimal API client with excellent user experience">
+    <meta name="keywords" content="API client, REST client, OpenAPI, Postman, Electron, API testing">
+    <meta name="author" content="Dennis Blümer">
+    <title>Resonance - API Client</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="logo">
+                <img src="assets/icons/icon.svg" alt="Resonance Logo" class="logo-img">
+                <span class="logo-text">Resonance</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#screenshots">Screenshots</a></li>
+                <li><a href="#download">Download</a></li>
+                <li><a href="https://github.com/db-mobile/resonance" target="_blank">GitHub</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="container">
+                <h1>Resonance</h1>
+                <p class="tagline">A clean and minimal API client with excellent user experience</p>
+                <div class="hero-buttons">
+                    <a href="#download" class="btn btn-primary">Download Now</a>
+                    <a href="https://github.com/db-mobile/resonance" class="btn btn-secondary" target="_blank">View on GitHub</a>
+                </div>
+                <div class="version-badge" id="version-badge">Loading version...</div>
+            </div>
+        </section>
+
+        <section id="features" class="features">
+            <div class="container">
+                <h2>Features</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">📦</div>
+                        <h3>Collection Import</h3>
+                        <p>Import OpenAPI 3.0 specs and Postman collections (v2.0/v2.1) with intelligent parsing and example generation</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔧</div>
+                        <h3>Scripts & Automation</h3>
+                        <p>Pre-request and test scripts with JavaScript execution, rich assertion API, and environment integration</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🌐</div>
+                        <h3>Environment Management</h3>
+                        <p>Organize variables into environments with quick switching, import/export, and template syntax support</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔐</div>
+                        <h3>Authentication</h3>
+                        <p>Bearer Token, Basic Auth, API Key, OAuth 2.0, and Digest Auth with secure credential storage</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">💻</div>
+                        <h3>Code Generation</h3>
+                        <p>Export requests in 9 languages: cURL, Python, JavaScript, Node.js, Go, PHP, Ruby, and Java</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🚀</div>
+                        <h3>Mock Server</h3>
+                        <p>Built-in HTTP mock server with automatic response generation from OpenAPI schemas and custom responses</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h3>Performance Metrics</h3>
+                        <p>Detailed timing breakdown including DNS, TCP, TLS, TTFB, and download time visualization</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🎨</div>
+                        <h3>Themes & i18n</h3>
+                        <p>Multiple themes (light, dark, system, blueprint) and support for 5 languages</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⌨️</div>
+                        <h3>Keyboard Shortcuts</h3>
+                        <p>Comprehensive shortcuts for all actions with platform-aware bindings and help dialog</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📝</div>
+                        <h3>GraphQL Support</h3>
+                        <p>Dedicated GraphQL query editor with syntax highlighting and schema support</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🗂️</div>
+                        <h3>Workspace Tabs</h3>
+                        <p>Multiple concurrent request tabs with independent state and persistent storage across sessions</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔒</div>
+                        <h3>Secure Architecture</h3>
+                        <p>Context isolation, sandboxed execution, secure IPC communication, and ASAR packaging</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="screenshots" class="screenshots">
+            <div class="container">
+                <h2>Screenshots</h2>
+                <div class="screenshots-grid">
+                    <div class="screenshot-item">
+                        <img src="assets/screenshots/main_window.png" alt="Main Interface" loading="lazy">
+                        <p>Main interface with request configuration</p>
+                    </div>
+                    <div class="screenshot-item">
+                        <img src="assets/screenshots/environment.png" alt="Environment Management" loading="lazy">
+                        <p>Environment management dialog</p>
+                    </div>
+                    <div class="screenshot-item">
+                        <img src="assets/screenshots/mock_server.png" alt="Mock Server" loading="lazy">
+                        <p>Mock server with request logging</p>
+                    </div>
+                    <div class="screenshot-item">
+                        <img src="assets/screenshots/settings.png" alt="Settings" loading="lazy">
+                        <p>Settings with theme selection</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="download" class="download">
+            <div class="container">
+                <h2>Download</h2>
+                <p class="download-subtitle">Available for Linux and macOS</p>
+                <div class="download-grid">
+                    <div class="download-card">
+                        <h3>Linux</h3>
+                        <p>AppImage and ZIP available for x64 and ARM64</p>
+                        <a href="https://github.com/db-mobile/resonance/releases/latest" class="btn btn-download" target="_blank">Download for Linux</a>
+                    </div>
+                    <div class="download-card">
+                        <h3>macOS</h3>
+                        <p>DMG installer for Intel and Apple Silicon</p>
+                        <a href="https://github.com/db-mobile/resonance/releases/latest" class="btn btn-download" target="_blank">Download for macOS</a>
+                    </div>
+                </div>
+                <div class="source-download">
+                    <p>Or build from source:</p>
+                    <div class="code-block">
+                        <code>git clone https://github.com/db-mobile/resonance.git
+cd resonance
+npm install
+npm start</code>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="tech-stack">
+            <div class="container">
+                <h2>Built With</h2>
+                <div class="tech-grid">
+                    <div class="tech-item">
+                        <span class="tech-name">Electron</span>
+                        <span class="tech-version">v35.0.0</span>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-name">Axios</span>
+                        <span class="tech-version">v1.10.0</span>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-name">CodeMirror</span>
+                        <span class="tech-version">v6.x</span>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-name">esbuild</span>
+                        <span class="tech-version">v0.25.x</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Resonance</h4>
+                    <p>A clean and minimal API client</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Links</h4>
+                    <ul>
+                        <li><a href="https://github.com/db-mobile/resonance" target="_blank">GitHub Repository</a></li>
+                        <li><a href="https://github.com/db-mobile/resonance/releases" target="_blank">Releases</a></li>
+                        <li><a href="https://github.com/db-mobile/resonance/issues" target="_blank">Report Issues</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="https://github.com/db-mobile/resonance/blob/main/README.md" target="_blank">Documentation</a></li>
+                        <li><a href="https://github.com/db-mobile/resonance/blob/main/SCRIPTS.md" target="_blank">Scripts Guide</a></li>
+                        <li><a href="https://github.com/db-mobile/resonance/blob/main/LICENSE" target="_blank">License (MIT)</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Dennis Blümer. Licensed under MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
