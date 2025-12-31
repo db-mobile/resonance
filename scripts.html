@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Resonance Scripts Documentation - Pre-request and Test Scripts">
+    <meta name="keywords" content="API client, scripts, automation, testing, pre-request">
+    <meta name="author" content="Dennis Blümer">
+    <title>Using Scripts - Resonance API Client</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="logo">
+                <a href="index.html" style="display: flex; align-items: center; gap: 0.75rem; text-decoration: none; color: inherit;">
+                    <img src="assets/icons/icon.svg" alt="Resonance Logo" class="logo-img">
+                    <span class="logo-text">Resonance</span>
+                </a>
+            </div>
+            <ul class="nav-links">
+                <li><a href="index.html#features">Features</a></li>
+                <li><a href="index.html#screenshots">Screenshots</a></li>
+                <li><a href="index.html#download">Download</a></li>
+                <li><a href="https://github.com/db-mobile/resonance" target="_blank">GitHub</a></li>
+                <li><a href="documentation.html">Documentation</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="documentation">
+            <div class="container">
+                <div class="doc-layout">
+                    <!-- Left Navigation -->
+                    <aside class="doc-nav">
+                        <h3>Documentation</h3>
+                        <ul class="doc-nav-list">
+                            <li><a href="documentation.html">Getting Started</a></li>
+                            <li><a href="scripts.html" class="active">Using Scripts</a></li>
+                        </ul>
+                    </aside>
+
+                    <!-- Main Content -->
+                    <div class="doc-main">
+                        <h2>Using Scripts</h2>
+
+                        <div class="doc-section">
+                            <div class="doc-content">
+                                <p>Resonance includes a powerful scripting engine that allows you to automate workflows with JavaScript. You can write pre-request scripts to modify requests before they're sent, and test scripts to validate responses and extract data.</p>
+
+                                <h4>Overview</h4>
+                                <p>Scripts in Resonance run in a secure sandboxed environment with a 10-second timeout. They have access to a rich API for manipulating requests, validating responses, and managing environment variables.</p>
+
+                                <h4>Accessing Scripts</h4>
+                                <ol class="doc-list">
+                                    <li>Open the <strong>Scripts</strong> tab in the request configuration panel</li>
+                                    <li>Choose between <strong>Pre-request</strong> and <strong>Test</strong> sub-tabs</li>
+                                    <li>Write your JavaScript code in the editor</li>
+                                    <li>Scripts are auto-saved after 1 second of inactivity</li>
+                                    <li>View script output in the <strong>Scripts</strong> tab of the response panel</li>
+                                </ol>
+
+                                <h4>Pre-request Scripts</h4>
+                                <p>Pre-request scripts execute before sending the request. Use them to:</p>
+                                <ul class="doc-list">
+                                    <li>Modify request headers dynamically</li>
+                                    <li>Calculate authentication signatures or timestamps</li>
+                                    <li>Set or update environment variables</li>
+                                    <li>Modify query parameters or path parameters</li>
+                                    <li>Transform request body content</li>
+                                </ul>
+
+                                <h5>Pre-request Script Example: Add Timestamp</h5>
+                                <pre><code>// Add current timestamp to headers
+request.headers['X-Request-Time'] = new Date().toISOString();
+
+// Set timestamp in environment for use in other scripts
+environment.set('requestTimestamp', Date.now());
+
+console.log('Request timestamp:', request.headers['X-Request-Time']);</code></pre>
+
+                                <h5>Pre-request Script Example: Dynamic Authentication</h5>
+                                <pre><code>// Calculate HMAC signature for authentication
+const secret = environment.get('apiSecret');
+const timestamp = Date.now().toString();
+const payload = request.method + request.url + timestamp;
+
+// Note: This is a simplified example
+// In production, you would use proper cryptographic libraries
+const signature = btoa(secret + payload);
+
+request.headers['X-Signature'] = signature;
+request.headers['X-Timestamp'] = timestamp;
+
+console.log('Authentication headers added');</code></pre>
+
+                                <h4>Test Scripts</h4>
+                                <p>Test scripts execute after receiving the response. Use them to:</p>
+                                <ul class="doc-list">
+                                    <li>Validate response status codes and headers</li>
+                                    <li>Assert response body structure and content</li>
+                                    <li>Extract data from responses and save to environment variables</li>
+                                    <li>Chain requests by passing data between endpoints</li>
+                                    <li>Measure and validate performance metrics</li>
+                                </ul>
+
+                                <h5>Test Script Example: Response Validation</h5>
+                                <pre><code>// Validate status code
+expect(response.status).toBe(200);
+
+// Parse and validate response body
+const data = JSON.parse(response.body);
+expect(data).toBeDefined();
+expect(data.id).toBeDefined();
+expect(data.name).toBeTruthy();
+
+// Check response headers
+expect(response.headers['content-type']).toContain('application/json');
+
+console.log('All validations passed');</code></pre>
+
+                                <h5>Test Script Example: Data Extraction</h5>
+                                <pre><code>// Extract authentication token from login response
+const data = JSON.parse(response.body);
+
+if (data.token) {
+    // Save token to environment for use in subsequent requests
+    environment.set('authToken', data.token);
+    console.log('Token saved to environment');
+} else {
+    console.error('No token found in response');
+}
+
+// Extract user ID for next request
+if (data.userId) {
+    environment.set('currentUserId', data.userId);
+    console.log('User ID:', data.userId);
+}</code></pre>
+
+                                <h5>Test Script Example: Performance Testing</h5>
+                                <pre><code>// Validate response time
+expect(response.status).toBe(200);
+
+// Check if response was fast enough
+const maxResponseTime = 1000; // 1 second
+if (response.timings && response.timings.total) {
+    expect(response.timings.total).toBeLessThan(maxResponseTime);
+    console.log('Response time:', response.timings.total, 'ms');
+}
+
+// Validate response size
+const bodySize = response.body.length;
+console.log('Response size:', bodySize, 'bytes');</code></pre>
+
+                                <h4>Script APIs</h4>
+
+                                <h5>Pre-request Script APIs</h5>
+                                <div class="api-reference-content">
+                                    <div class="api-list">
+                                        <div class="api-item">
+                                            <code>request.url</code>
+                                            <span>The request URL (string). Can be modified.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>request.method</code>
+                                            <span>HTTP method (GET, POST, etc.). Can be modified.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>request.headers</code>
+                                            <span>Request headers object. Add, modify, or remove headers.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>request.body</code>
+                                            <span>Request body content (string). Can be modified.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>request.queryParams</code>
+                                            <span>Query parameters object. Add, modify, or remove parameters.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>request.pathParams</code>
+                                            <span>Path parameters object. Modify parameter values.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>environment.get(name)</code>
+                                            <span>Get an environment variable value.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>environment.set(name, value)</code>
+                                            <span>Set an environment variable.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>environment.delete(name)</code>
+                                            <span>Delete an environment variable.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>console.log(...args)</code>
+                                            <span>Log messages to the Scripts tab in response.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>console.info(...args)</code>
+                                            <span>Log info messages with timestamp.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>console.warn(...args)</code>
+                                            <span>Log warning messages.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>console.error(...args)</code>
+                                            <span>Log error messages.</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <h5>Test Script APIs</h5>
+                                <div class="api-reference-content">
+                                    <div class="api-list">
+                                        <div class="api-item">
+                                            <code>response.status</code>
+                                            <span>HTTP status code (number, e.g., 200, 404).</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>response.statusText</code>
+                                            <span>HTTP status text (e.g., "OK", "Not Found").</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>response.headers</code>
+                                            <span>Response headers object (read-only).</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>response.body</code>
+                                            <span>Response body as string. Parse with JSON.parse() if needed.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>response.cookies</code>
+                                            <span>Response cookies array.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>response.timings</code>
+                                            <span>Performance timing information object.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toBe(expected)</code>
+                                            <span>Assert strict equality (===).</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toEqual(expected)</code>
+                                            <span>Assert deep equality for objects and arrays.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toBeDefined()</code>
+                                            <span>Assert value is not undefined.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toBeNull()</code>
+                                            <span>Assert value is null.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toBeTruthy()</code>
+                                            <span>Assert value is truthy.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toBeFalsy()</code>
+                                            <span>Assert value is falsy.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toContain(item)</code>
+                                            <span>Assert array/string contains item/substring.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toHaveProperty(key)</code>
+                                            <span>Assert object has property.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toBeGreaterThan(n)</code>
+                                            <span>Assert value is greater than n.</span>
+                                        </div>
+                                        <div class="api-item">
+                                            <code>expect(value).toBeLessThan(n)</code>
+                                            <span>Assert value is less than n.</span>
+                                        </div>
+                                    </div>
+                                    <p style="margin-top: 1rem;"><strong>Note:</strong> All test script APIs also have access to the environment and console APIs from pre-request scripts.</p>
+                                </div>
+
+                                <h4>Common Use Cases</h4>
+
+                                <h5>Request Chaining</h5>
+                                <p>Use scripts to chain requests together by extracting data from one response and using it in the next request:</p>
+                                <pre><code>// In the login request test script:
+const loginData = JSON.parse(response.body);
+environment.set('authToken', loginData.token);
+
+// In subsequent requests' pre-request script:
+const token = environment.get('authToken');
+request.headers['Authorization'] = `Bearer ${token}`;</code></pre>
+
+                                <h5>Dynamic Data Generation</h5>
+                                <pre><code>// Generate random data for testing
+const randomEmail = `test${Date.now()}@example.com`;
+const randomId = Math.floor(Math.random() * 10000);
+
+// Update request body
+const body = JSON.parse(request.body);
+body.email = randomEmail;
+body.id = randomId;
+request.body = JSON.stringify(body);
+
+console.log('Generated test data:', { email: randomEmail, id: randomId });</code></pre>
+
+                                <h5>Conditional Logic</h5>
+                                <pre><code>// Use different endpoints based on environment
+const env = environment.get('environmentName');
+
+if (env === 'production') {
+    request.url = request.url.replace('staging', 'api');
+    console.log('Using production endpoint');
+} else {
+    console.log('Using staging endpoint');
+}
+
+// Add debug header in non-production environments
+if (env !== 'production') {
+    request.headers['X-Debug'] = 'true';
+}</code></pre>
+
+                                <h4>Best Practices</h4>
+                                <ul class="doc-list">
+                                    <li><strong>Keep scripts simple:</strong> Complex logic should be moved to your backend or external tools</li>
+                                    <li><strong>Use console.log liberally:</strong> Debug output helps understand script execution</li>
+                                    <li><strong>Handle errors gracefully:</strong> Use try-catch blocks for operations that might fail</li>
+                                    <li><strong>Store secrets in environment variables:</strong> Never hardcode API keys or passwords in scripts</li>
+                                    <li><strong>Use descriptive variable names:</strong> Make scripts readable and maintainable</li>
+                                    <li><strong>Comment your code:</strong> Explain what complex scripts are doing</li>
+                                    <li><strong>Test incrementally:</strong> Build scripts step by step and test as you go</li>
+                                </ul>
+
+                                <h4>Security and Limitations</h4>
+                                <ul class="doc-list">
+                                    <li><strong>Sandboxed execution:</strong> Scripts run in a secure sandbox with no access to the file system, network, or system resources</li>
+                                    <li><strong>10-second timeout:</strong> Scripts that run longer than 10 seconds will be terminated</li>
+                                    <li><strong>No external modules:</strong> You cannot require() or import external libraries</li>
+                                    <li><strong>Limited APIs:</strong> Only the documented APIs are available (Date, Math, JSON, console, etc.)</li>
+                                    <li><strong>No async operations:</strong> Scripts execute synchronously; promises and async/await are not supported</li>
+                                </ul>
+
+                                <h4>Troubleshooting</h4>
+
+                                <h5>Script not executing</h5>
+                                <ul class="doc-list">
+                                    <li>Check the Scripts tab in the response panel for error messages</li>
+                                    <li>Ensure your script doesn't have syntax errors</li>
+                                    <li>Verify the script is saved (auto-save happens after 1 second)</li>
+                                </ul>
+
+                                <h5>Variables not available</h5>
+                                <ul class="doc-list">
+                                    <li>Ensure you have an active environment selected</li>
+                                    <li>Check that variable names are spelled correctly</li>
+                                    <li>Use console.log to verify environment.get() returns expected values</li>
+                                </ul>
+
+                                <h5>Assertions failing</h5>
+                                <ul class="doc-list">
+                                    <li>Log the actual values using console.log before asserting</li>
+                                    <li>Check response.body is being parsed correctly</li>
+                                    <li>Verify the API is returning the expected data structure</li>
+                                </ul>
+
+                                <h4>Next Steps</h4>
+                                <ul class="doc-list">
+                                    <li>Return to <a href="documentation.html">Getting Started</a> for basic usage</li>
+                                    <li>Check out <a href="index.html#features">Features</a> for all capabilities</li>
+                                    <li>Visit the <a href="https://github.com/db-mobile/resonance" target="_blank">GitHub repository</a> for updates</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Resonance</h4>
+                    <p>A clean and minimal API client</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Links</h4>
+                    <ul>
+                        <li><a href="https://github.com/db-mobile/resonance" target="_blank">GitHub Repository</a></li>
+                        <li><a href="https://github.com/db-mobile/resonance/releases" target="_blank">Releases</a></li>
+                        <li><a href="https://github.com/db-mobile/resonance/issues" target="_blank">Report Issues</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="documentation.html">Documentation</a></li>
+                        <li><a href="scripts.html">Using Scripts</a></li>
+                        <li><a href="https://github.com/db-mobile/resonance/blob/main/LICENSE" target="_blank">License (MIT)</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Dennis Blümer. Licensed under MIT License.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

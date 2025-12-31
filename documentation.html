@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Resonance Documentation - Getting Started Guide">
+    <meta name="keywords" content="API client, REST client, documentation, getting started, tutorial">
+    <meta name="author" content="Dennis Blümer">
+    <title>Documentation - Resonance API Client</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="logo">
+                <a href="index.html" style="display: flex; align-items: center; gap: 0.75rem; text-decoration: none; color: inherit;">
+                    <img src="assets/icons/icon.svg" alt="Resonance Logo" class="logo-img">
+                    <span class="logo-text">Resonance</span>
+                </a>
+            </div>
+            <ul class="nav-links">
+                <li><a href="index.html#features">Features</a></li>
+                <li><a href="index.html#screenshots">Screenshots</a></li>
+                <li><a href="index.html#download">Download</a></li>
+                <li><a href="https://github.com/db-mobile/resonance" target="_blank">GitHub</a></li>
+                <li><a href="documentation.html">Documentation</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section id="documentation" class="documentation">
+            <div class="container">
+                <div class="doc-layout">
+                    <!-- Left Navigation -->
+                    <aside class="doc-nav">
+                        <h3>Documentation</h3>
+                        <ul class="doc-nav-list">
+                            <li><a href="documentation.html" class="active">Getting Started</a></li>
+                            <li><a href="scripts.html">Using Scripts</a></li>
+                        </ul>
+                    </aside>
+
+                    <!-- Main Content -->
+                    <div class="doc-main">
+                        <h2>Getting Started</h2>
+
+                        <div class="doc-section">
+                    <h3>Getting Started</h3>
+
+                    <div class="doc-content">
+                        <h4>Installation</h4>
+                        <ol class="doc-list">
+                            <li>Download the appropriate installer for your platform from the <a href="index.html#download">Download</a> section</li>
+                            <li>Install Resonance:
+                                <ul>
+                                    <li><strong>Linux:</strong> Make the AppImage executable (<code>chmod +x Resonance*.AppImage</code>) and run it, or extract the ZIP file</li>
+                                    <li><strong>macOS:</strong> Open the DMG file and drag Resonance to your Applications folder</li>
+                                    <li><strong>Windows:</strong> Run the installer or use the portable version</li>
+                                </ul>
+                            </li>
+                            <li>Launch Resonance from your applications menu</li>
+                        </ol>
+
+                        <h4>Making Your First Request</h4>
+                        <ol class="doc-list">
+                            <li>Create a collection:
+                                <ul>
+                                    <li>Right-click in the empty collections area and select <strong>New Collection</strong></li>
+                                    <li>Enter a collection name and click <strong>Create</strong></li>
+                                </ul>
+                            </li>
+                            <li>Add a request to your collection:
+                                <ul>
+                                    <li>Right-click the collection and select <strong>New Request</strong></li>
+                                    <li>Or right-click in the empty collections area and select <strong>New Request</strong></li>
+                                </ul>
+                            </li>
+                            <li>Configure your request:
+                                <ul>
+                                    <li>Select the HTTP method (GET, POST, PUT, DELETE, etc.)</li>
+                                    <li>Enter the API URL (e.g., <code>https://api.example.com/users</code>)</li>
+                                    <li>Add headers, query parameters, or body data as needed in the tabs below</li>
+                                </ul>
+                            </li>
+                            <li>Click <strong>Send Request</strong> to execute the request</li>
+                            <li>View the response in the tabbed interface (Body, Headers, Cookies, Performance)</li>
+                        </ol>
+
+                        <h4>Importing Collections</h4>
+                        <p>Resonance supports importing from OpenAPI and Postman:</p>
+
+                        <div class="doc-subsection">
+                            <h5>Import OpenAPI/Swagger Spec</h5>
+                            <ol class="doc-list">
+                                <li>Click the <strong>Import</strong> button in the collections sidebar header</li>
+                                <li>Select <strong>OpenAPI Collection</strong> from the menu</li>
+                                <li>Choose your OpenAPI 3.0 YAML or JSON file</li>
+                                <li>Resonance will automatically:
+                                    <ul>
+                                        <li>Parse all endpoints from the specification</li>
+                                        <li>Generate example request bodies from schemas</li>
+                                        <li>Organize endpoints by path structure</li>
+                                        <li>Extract authentication requirements</li>
+                                    </ul>
+                                </li>
+                            </ol>
+                        </div>
+
+                        <div class="doc-subsection">
+                            <h5>Import Postman Collection</h5>
+                            <ol class="doc-list">
+                                <li>Click the <strong>Import</strong> button in the collections sidebar header</li>
+                                <li>Select <strong>Postman Collection</strong> from the menu</li>
+                                <li>Choose your Postman Collection v2.0 or v2.1 JSON file</li>
+                                <li>All request examples and authentication settings will be preserved</li>
+                            </ol>
+                        </div>
+
+                        <div class="doc-subsection">
+                            <h5>Import Postman Environment</h5>
+                            <ol class="doc-list">
+                                <li>Click the <strong>Import</strong> button in the collections sidebar header</li>
+                                <li>Select <strong>Postman Environment</strong> from the menu</li>
+                                <li>Choose your Postman Environment JSON file</li>
+                                <li>All variables will be imported into a new environment</li>
+                            </ol>
+                        </div>
+
+                        <h4>Using Environments and Variables</h4>
+                        <p>Environments help you manage different API configurations (development, staging, production):</p>
+
+                        <h5>Creating and Managing Environments</h5>
+                        <ol class="doc-list">
+                            <li>Click the <strong>environment selector dropdown</strong> in the collections sidebar</li>
+                            <li>Click <strong>Manage Environments...</strong> at the bottom of the dropdown</li>
+                            <li>In the Environment Manager dialog:
+                                <ul>
+                                    <li>Click <strong>Add Environment</strong> to create a new environment</li>
+                                    <li>Give it a name (e.g., "Development", "Staging", "Production")</li>
+                                    <li>Add variables with key-value pairs:
+                                        <ul>
+                                            <li><code>baseUrl</code> → <code>https://api-dev.example.com</code></li>
+                                            <li><code>apiKey</code> → <code>your-api-key</code></li>
+                                        </ul>
+                                    </li>
+                                    <li>Save the environment</li>
+                                </ul>
+                            </li>
+                        </ol>
+
+                        <h5>Switching Environments</h5>
+                        <ol class="doc-list">
+                            <li>Click the <strong>environment selector dropdown</strong> in the collections sidebar</li>
+                            <li>Select the environment you want to use from the list</li>
+                            <li>The active environment is marked with a checkmark</li>
+                        </ol>
+
+                        <h5>Using Variables in Requests</h5>
+                        <p>Once you have an active environment, use variables with double curly braces:</p>
+                        <ul class="doc-list">
+                            <li>In URLs: <code>{{baseUrl}}/users</code></li>
+                            <li>In headers: <code>X-API-Key: {{apiKey}}</code></li>
+                            <li>In request bodies: <code>{"token": "{{authToken}}"}</code></li>
+                            <li>Variables are substituted automatically when sending requests</li>
+                        </ul>
+
+                        <h4>Setting Up Authentication</h4>
+                        <p>Resonance supports multiple authentication methods:</p>
+                        <ol class="doc-list">
+                            <li>Open the <strong>Authorization</strong> tab in the request configuration panel</li>
+                            <li>Select your authentication type:
+                                <ul>
+                                    <li><strong>Bearer Token:</strong> Enter your JWT or access token</li>
+                                    <li><strong>Basic Auth:</strong> Provide username and password</li>
+                                    <li><strong>API Key:</strong> Configure header/query parameter name and value</li>
+                                    <li><strong>OAuth 2.0:</strong> Configure authorization flow parameters</li>
+                                    <li><strong>Digest Auth:</strong> Provide username and password for digest authentication</li>
+                                </ul>
+                            </li>
+                            <li>Use environment variables for sensitive credentials: <code>{{token}}</code></li>
+                            <li>Authentication settings are saved per endpoint</li>
+                        </ol>
+
+                        <h4>Using Workspace Tabs</h4>
+                        <p>Work on multiple requests simultaneously:</p>
+                        <ol class="doc-list">
+                            <li>Click the <strong>+</strong> button in the workspace tab bar to open a new tab</li>
+                            <li>Each tab maintains independent state (URL, method, headers, body, etc.)</li>
+                            <li>Switch between tabs using keyboard shortcuts (<code>Ctrl/Cmd+1</code> through <code>Ctrl/Cmd+9</code>)</li>
+                            <li>Close tabs with the <strong>x</strong> button or middle-click</li>
+                            <li>Tab state persists across application restarts</li>
+                        </ol>
+
+                        <h4>Working with Scripts</h4>
+                        <p>Automate workflows with pre-request and test scripts:</p>
+                        <ol class="doc-list">
+                            <li>Open the <strong>Scripts</strong> tab in the request panel</li>
+                            <li>Choose between <strong>Pre-request</strong> and <strong>Test</strong> sub-tabs</li>
+                            <li>Write JavaScript code to:
+                                <ul>
+                                    <li><strong>Pre-request:</strong> Modify headers, calculate signatures, set timestamps</li>
+                                    <li><strong>Test:</strong> Validate responses, extract data, save to environment</li>
+                                </ul>
+                            </li>
+                            <li>Example pre-request script:
+                                <pre><code>// Set current timestamp
+environment.set('timestamp', Date.now());
+
+// Add custom header
+request.headers['X-Request-Time'] = new Date().toISOString();</code></pre>
+                            </li>
+                            <li>Example test script:
+                                <pre><code>// Validate status code
+expect(response.status).toBe(200);
+
+// Extract token from response
+const data = JSON.parse(response.body);
+environment.set('authToken', data.token);
+
+// Log result
+console.log('Token saved:', data.token);</code></pre>
+                            </li>
+                            <li>View script output in the <strong>Scripts</strong> tab of the response panel</li>
+                        </ol>
+
+                        <h4>Using the Mock Server</h4>
+                        <p>Test API clients without a backend:</p>
+                        <ol class="doc-list">
+                            <li>Import an OpenAPI specification to enable mock responses</li>
+                            <li>Click the <strong>Mock Server</strong> icon in the toolbar</li>
+                            <li>Configure the mock server:
+                                <ul>
+                                    <li>Set the port (default: 3000)</li>
+                                    <li>Enable collections you want to mock</li>
+                                    <li>Add custom response delays per endpoint</li>
+                                    <li>Override default responses with custom JSON</li>
+                                </ul>
+                            </li>
+                            <li>Click <strong>Start Server</strong></li>
+                            <li>Point your API client to <code>http://localhost:3000</code></li>
+                            <li>View incoming requests in the request log</li>
+                        </ol>
+
+                        <h4>Keyboard Shortcuts</h4>
+                        <p>Speed up your workflow with keyboard shortcuts:</p>
+                        <ul class="doc-list">
+                            <li>Press <code>Ctrl/Cmd+/</code> to view all available shortcuts</li>
+                            <li>Common shortcuts:
+                                <ul>
+                                    <li><code>Ctrl/Cmd+Enter</code> - Send request</li>
+                                    <li><code>Ctrl/Cmd+S</code> - Save current endpoint</li>
+                                    <li><code>Ctrl/Cmd+1-9</code> - Switch workspace tabs</li>
+                                    <li><code>Ctrl/Cmd+T</code> - New workspace tab</li>
+                                    <li><code>Ctrl/Cmd+W</code> - Close current tab</li>
+                                    <li><code>Ctrl/Cmd+,</code> - Open settings</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                        <h4>Exporting Code</h4>
+                        <p>Generate code in your preferred language:</p>
+                        <ol class="doc-list">
+                            <li>Configure your request (URL, method, headers, body)</li>
+                            <li>Right-click on the endpoint or use the export button</li>
+                            <li>Select <strong>Export Code</strong></li>
+                            <li>Choose from 9 languages:
+                                <ul>
+                                    <li>cURL</li>
+                                    <li>Python (requests)</li>
+                                    <li>JavaScript (Fetch & Axios)</li>
+                                    <li>Node.js (axios)</li>
+                                    <li>Go (net/http)</li>
+                                    <li>PHP (cURL)</li>
+                                    <li>Ruby (net/http)</li>
+                                    <li>Java (HttpClient)</li>
+                                </ul>
+                            </li>
+                            <li>Copy the generated code to your clipboard</li>
+                        </ol>
+
+                        <h4>Next Steps</h4>
+                        <ul class="doc-list">
+                            <li>Explore the <a href="index.html#features">Features</a> section for advanced capabilities</li>
+                            <li>Read the <a href="scripts.html">Using Scripts</a> guide for detailed script documentation</li>
+                            <li>Check out <a href="index.html#screenshots">Screenshots</a> to see the interface in action</li>
+                            <li>Join the community on <a href="https://github.com/db-mobile/resonance" target="_blank">GitHub</a></li>
+                            <li>Report issues or request features in the <a href="https://github.com/db-mobile/resonance/issues" target="_blank">issue tracker</a></li>
+                        </ul>
+                    </div>
+                </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Resonance</h4>
+                    <p>A clean and minimal API client</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Links</h4>
+                    <ul>
+                        <li><a href="https://github.com/db-mobile/resonance" target="_blank">GitHub Repository</a></li>
+                        <li><a href="https://github.com/db-mobile/resonance/releases" target="_blank">Releases</a></li>
+                        <li><a href="https://github.com/db-mobile/resonance/issues" target="_blank">Report Issues</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="documentation.html">Documentation</a></li>
+                        <li><a href="scripts.html">Using Scripts</a></li>
+                        <li><a href="https://github.com/db-mobile/resonance/blob/main/LICENSE" target="_blank">License (MIT)</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Dennis Blümer. Licensed under MIT License.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

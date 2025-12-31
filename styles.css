@@ -452,6 +452,188 @@ footer {
     font-size: 0.9rem;
 }
 
+/* Documentation Section */
+.documentation {
+    background-color: var(--background);
+}
+
+.documentation .container {
+    max-width: 1400px;
+}
+
+.doc-layout {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    gap: 3rem;
+    align-items: start;
+}
+
+.doc-nav {
+    position: sticky;
+    top: 2rem;
+}
+
+.doc-nav h3 {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.doc-nav-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.doc-nav-list li {
+    margin-bottom: 0.5rem;
+}
+
+.doc-nav-list a {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.doc-nav-list a:hover {
+    background-color: var(--surface);
+    color: var(--primary-color);
+}
+
+.doc-nav-list a.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.doc-main {
+    min-width: 0;
+}
+
+.doc-section {
+    width: 100%;
+}
+
+.doc-section h3 {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 0.5rem;
+}
+
+.doc-content {
+    background-color: var(--surface);
+    padding: 2.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px var(--shadow);
+}
+
+.doc-content h4 {
+    font-size: 1.5rem;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+}
+
+.doc-content h4:first-child {
+    margin-top: 0;
+}
+
+.doc-content h5 {
+    font-size: 1.2rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--primary-color);
+}
+
+.doc-content p {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.8;
+}
+
+.doc-list {
+    margin-bottom: 1.5rem;
+    padding-left: 1.5rem;
+}
+
+.doc-list li {
+    margin-bottom: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.8;
+}
+
+.doc-list ul,
+.doc-list ol {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.doc-list code {
+    background-color: var(--background);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 0.9em;
+    color: var(--primary-color);
+    border: 1px solid var(--border-color);
+}
+
+.doc-subsection {
+    margin-top: 1.5rem;
+    padding-left: 1.5rem;
+    border-left: 3px solid var(--primary-color);
+}
+
+.doc-content pre {
+    background-color: #212529;
+    color: #f8f9fa;
+    padding: 1.25rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1rem 0 1.5rem 0;
+}
+
+@media (prefers-color-scheme: dark) {
+    .doc-content pre {
+        background-color: #1e1e1e;
+    }
+}
+
+.doc-content pre code {
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    background: none;
+    border: none;
+    padding: 0;
+    color: #f8f9fa;
+}
+
+.doc-content a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.doc-content a:hover {
+    color: var(--primary-dark);
+    text-decoration: underline;
+}
+
+.doc-content strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .hero h1 {
@@ -477,6 +659,48 @@ footer {
 
     section h2 {
         font-size: 2rem;
+    }
+
+    .doc-content {
+        padding: 1.5rem;
+    }
+
+    .doc-section h3 {
+        font-size: 1.5rem;
+    }
+
+    .doc-content h4 {
+        font-size: 1.25rem;
+    }
+
+    .doc-subsection {
+        padding-left: 1rem;
+    }
+
+    .doc-layout {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+
+    .doc-nav {
+        position: static;
+        border-bottom: 2px solid var(--border-color);
+        padding-bottom: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .doc-nav h3 {
+        font-size: 1.1rem;
+    }
+
+    .doc-nav-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .doc-nav-list li {
+        margin-bottom: 0;
     }
 }
 
