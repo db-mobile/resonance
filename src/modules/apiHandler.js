@@ -42,12 +42,8 @@ export function initResponseEditor() {
         // Set up callback to update dropdown when language changes
         responseEditor.onLanguageChange((languageType) => {
             if (languageSelector) {
-                // If manual override is not set, show as "auto"
-                if (responseEditor.manualLanguageOverride === null) {
-                    languageSelector.value = 'auto';
-                } else {
-                    languageSelector.value = languageType || 'text';
-                }
+                // Show the detected language type (e.g., 'json', 'xml', 'html')
+                languageSelector.value = languageType || 'text';
             }
         });
 
@@ -55,11 +51,7 @@ export function initResponseEditor() {
         if (languageSelector) {
             languageSelector.addEventListener('change', (e) => {
                 const selectedLanguage = e.target.value;
-                if (selectedLanguage === 'auto') {
-                    responseEditor.clearLanguageOverride();
-                } else {
-                    responseEditor.setLanguage(selectedLanguage);
-                }
+                responseEditor.setLanguage(selectedLanguage);
             });
         }
     }

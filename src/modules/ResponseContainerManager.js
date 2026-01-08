@@ -88,7 +88,6 @@ export class ResponseContainerManager {
                 <div class="response-body-toolbar">
                     <div class="language-selector-container">
                         <select class="language-selector" data-tab-id="${tabId}" aria-label="Syntax Highlighting Language" title="Syntax Highlighting">
-                            <option value="auto">Auto</option>
                             <option value="json">JSON</option>
                             <option value="xml">XML</option>
                             <option value="html">HTML</option>
@@ -136,11 +135,11 @@ export class ResponseContainerManager {
         const editor = new ResponseEditor(bodyContainer);
 
         // Set up callback to update dropdown when language changes
-        editor.onLanguageChange = (lang) => {
+        editor.onLanguageChange((lang) => {
             if (languageSelector) {
                 languageSelector.value = lang;
             }
-        };
+        });
 
         // Set up language selector change handler
         if (languageSelector) {
