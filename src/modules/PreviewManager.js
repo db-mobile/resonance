@@ -147,7 +147,7 @@ export class PreviewManager {
     }
 
     /**
-     * Update preview content
+     * Update preview content (only if currently in preview mode)
      * @param {string} tabId - Workspace tab ID
      * @param {string} content - Response content
      * @param {string} contentType - Content type or language
@@ -162,6 +162,23 @@ export class PreviewManager {
         if (this.isPreviewMode(tabId)) {
             container.renderer.render(content, contentType);
         }
+    }
+
+    /**
+     * Refresh preview content regardless of current view mode
+     * This ensures preview is always up-to-date when user switches to it
+     * @param {string} tabId - Workspace tab ID
+     * @param {string} content - Response content
+     * @param {string} contentType - Content type or language
+     */
+    refreshPreviewContent(tabId, content, contentType) {
+        const container = this.containers.get(tabId);
+        if (!container) {
+            return;
+        }
+
+        // Always update preview content, even if not currently visible
+        container.renderer.render(content, contentType);
     }
 
     /**

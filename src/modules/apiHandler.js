@@ -75,21 +75,20 @@ export function displayResponseWithLineNumbers(content, contentType = null) {
     if (containerElements && containerElements.editor) {
         containerElements.editor.setContent(content, contentType);
 
-        // Update preview if in preview mode
+        // Update preview management
         if (containerElements.previewManager && containerElements.tabId) {
             const language = containerElements.editor.currentLanguage;
 
             // Enable/disable preview button based on content type
             containerElements.previewManager.updateButtonState(containerElements.tabId, language);
 
-            // Update preview if currently in preview mode
-            if (containerElements.previewManager.isPreviewMode(containerElements.tabId)) {
-                if (containerElements.previewManager.isPreviewable(language)) {
-                    containerElements.previewManager.updatePreview(containerElements.tabId, content, language);
-                } else {
-                    // Auto-switch to code view for non-previewable content
-                    containerElements.previewManager.togglePreview(containerElements.tabId);
-                }
+            // Always update preview content if content is previewable, regardless of current view mode
+            // This ensures preview is ready when user switches to it
+            if (containerElements.previewManager.isPreviewable(language)) {
+                containerElements.previewManager.refreshPreviewContent(containerElements.tabId, content, language);
+            } else {
+                // Clear preview for non-previewable content
+                containerElements.previewManager.clearPreview(containerElements.tabId);
             }
         }
     } else {
