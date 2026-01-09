@@ -2,8 +2,8 @@
   <defs>
     <!-- Gradient for background shape -->
     <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1c71d8;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#155bb8;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#094185;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#073364;stop-opacity:1" />
     </linearGradient>
 
     <!-- Gradient for resonance waves -->
@@ -29,7 +29,7 @@
     </radialGradient>
   </defs>
 
-  <g transform="translate(64, 64) scale(0.875)">
+  <g transform="translate(100, 100) scale(0.804762)">
     <!-- Rounded rectangle background with gradient -->
     <path fill="url(#bgGradient)" d="M0 96C0 42.98 42.98 0 96 0H928C981.02 0 1024 42.98 1024 96V928C1024 981.02 981.02 1024 928 1024H96C42.98 1024 0 981.02 0 928Z"/>
 

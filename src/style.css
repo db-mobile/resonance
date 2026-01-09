@@ -3085,3 +3085,216 @@ body {
 .method-select-container .select-arrow {
   right: var(--space-2);
 }
+/* =======================
+   Preview Mode Styles
+   ======================= */
+
+/* Preview Mode Button Group */
+.preview-mode-buttons {
+    display: flex;
+    gap: 0;
+    margin-left: var(--space-2);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.preview-mode-btn {
+    background: var(--bg-primary);
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: var(--space-1) var(--space-2);
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--font-size-xs);
+    border-right: 1px solid var(--border-light);
+}
+
+.preview-mode-btn:last-child {
+    border-right: none;
+}
+
+.preview-mode-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.preview-mode-btn span {
+    font-weight: 500;
+}
+
+.preview-mode-btn:hover:not(:disabled) {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.preview-mode-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Active state */
+.preview-mode-btn.active {
+    background: var(--color-primary);
+    color: white;
+}
+
+.preview-mode-btn.active:hover {
+    background: var(--color-primary);
+    opacity: 0.9;
+}
+
+/* Preview Container */
+.response-preview-container {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    overflow: auto;
+    margin-bottom: 40px;
+    padding: var(--space-3);
+}
+
+/* Preview Empty State */
+.preview-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: var(--space-8);
+    color: var(--text-secondary);
+    width: 100%;
+}
+
+.preview-empty-icon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: var(--space-4);
+    opacity: 0.3;
+}
+
+.preview-empty-text {
+    font-size: var(--font-size-base);
+    margin-bottom: var(--space-2);
+}
+
+.preview-empty-subtext {
+    font-size: var(--font-size-sm);
+    color: var(--text-tertiary);
+}
+
+/* HTML Preview Iframe */
+.response-preview-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: white;
+}
+
+/* JSON Tree View */
+.json-tree {
+    font-family: 'Fira Code', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    width: 100%;
+}
+
+.json-tree-node {
+    display: inline-block;
+}
+
+.json-tree-line {
+    padding-left: 20px;
+}
+
+.json-tree-children {
+    padding-left: 20px;
+}
+
+.json-tree-key {
+    color: var(--color-property, #6f42c1);
+    font-weight: 500;
+}
+
+.json-tree-string {
+    color: var(--color-string, #22863a);
+}
+
+.json-tree-number {
+    color: var(--color-number, #005cc5);
+}
+
+.json-tree-boolean {
+    color: var(--color-boolean, #0184bc);
+}
+
+.json-tree-null {
+    color: var(--color-null, #999);
+}
+
+.json-tree-toggle {
+    cursor: pointer;
+    user-select: none;
+    display: inline-block;
+    width: 16px;
+    color: var(--text-secondary);
+    font-weight: normal;
+}
+
+.json-tree-toggle:hover {
+    color: var(--text-primary);
+}
+
+/* XML Tree View */
+.xml-tree {
+    font-family: 'Fira Code', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    width: 100%;
+}
+
+.xml-tree-node {
+    display: block;
+}
+
+.xml-tree-children {
+    padding-left: 20px;
+}
+
+.xml-tree-tag {
+    color: var(--color-tag, #22863a);
+}
+
+.xml-tree-attribute {
+    color: var(--color-attribute, #6f42c1);
+}
+
+.xml-tree-string {
+    color: var(--color-string, #22863a);
+}
+
+.xml-tree-text {
+    color: var(--text-primary);
+}
+
+.xml-tree-toggle {
+    cursor: pointer;
+    user-select: none;
+    display: inline-block;
+    width: 16px;
+    color: var(--text-secondary);
+    font-weight: normal;
+}
+
+.xml-tree-toggle:hover {
+    color: var(--text-primary);
+}

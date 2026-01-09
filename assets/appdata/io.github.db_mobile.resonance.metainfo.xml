@@ -11,7 +11,7 @@
 
   <description>
     <p>
-      Resonance is a clean and minimal API client application designed to provide an excellent
+      Resonance is a local-first, zero-account API client application designed to provide an excellent
       user experience for testing and interacting with web services. It offers a modern and intuitive
       interface for developers with powerful features for API development and testing.
     </p>
@@ -40,26 +40,26 @@
   <icon type="stock">io.github.db_mobile.resonance</icon>
 
   <branding>
-    <color type="primary" scheme_preference="light">#62a0ea</color>
-    <color type="primary" scheme_preference="dark">#1c71d8</color>
+    <color type="primary" scheme_preference="light">#f9f06b</color>
+    <color type="primary" scheme_preference="dark">#094185</color>
   </branding>
 
   <screenshots>
     <screenshot type="default">
       <caption>Main interface showing API request configuration</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v1.6.3/assets/screenshots/main_window.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v1.9.0/assets/screenshots/main_window.png</image>
     </screenshot>
     <screenshot>
       <caption>Environment management</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v1.6.3/assets/screenshots/environment.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v1.9.0/assets/screenshots/environment.png</image>
     </screenshot>
     <screenshot>
       <caption>Mock server</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v1.6.3/assets/screenshots/mock_server.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v1.9.0/assets/screenshots/mock_server.png</image>
     </screenshot>
     <screenshot>
       <caption>Settings modal in dark theme</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v1.6.3/assets/screenshots/settings.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v1.9.0/assets/screenshots/settings.png</image>
     </screenshot>
   </screenshots>
 
@@ -94,7 +94,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
-  <release version="1.8.0" date="2025-12-27">
+  <release version="1.9.0" date="2026-01-09">
+      <description>
+        <p>New features introduced</p>
+        <ul>
+          <li>Introduce response preview</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.8.0" date="2025-12-27">
       <description>
         <p>New features introduced</p>
         <ul>

@@ -48,6 +48,12 @@ export class WorkspaceTabStateManager {
             content: getRequestBodyContent() || ''
         };
 
+        // Capture preview mode state from active container
+        const containerElements = window.responseContainerManager?.getActiveElements();
+        const previewMode = containerElements?.previewManager
+            ? containerElements.previewManager.isPreviewMode(containerElements.tabId)
+            : false;
+
         return {
             request: {
                 url: this.dom.urlInput?.value || '',
@@ -67,7 +73,9 @@ export class WorkspaceTabStateManager {
                 method: window.currentEndpoint.method
             } : null,
             // Capture active response tab
-            activeResponseTab: activeResponseTab
+            activeResponseTab: activeResponseTab,
+            // Capture preview mode state
+            previewMode: previewMode
             // Response is captured when request completes (handled separately)
         };
     }
@@ -196,6 +204,17 @@ export class WorkspaceTabStateManager {
             await this._restoreResponse(response);
         } else {
             this._clearResponse();
+        }
+
+        // Restore preview mode if it was active
+        if (tab.previewMode) {
+            const containerElements = window.responseContainerManager?.getOrCreateContainer(tab.id);
+            if (containerElements?.previewManager) {
+                // Only toggle if not already in preview mode
+                if (!containerElements.previewManager.isPreviewMode(tab.id)) {
+                    containerElements.previewManager.togglePreview(tab.id);
+                }
+            }
         }
 
         // Store endpoint reference globally for compatibility with existing code

@@ -42,12 +42,8 @@ export function initResponseEditor() {
         // Set up callback to update dropdown when language changes
         responseEditor.onLanguageChange((languageType) => {
             if (languageSelector) {
-                // If manual override is not set, show as "auto"
-                if (responseEditor.manualLanguageOverride === null) {
-                    languageSelector.value = 'auto';
-                } else {
-                    languageSelector.value = languageType || 'text';
-                }
+                // Show the detected language type (e.g., 'json', 'xml', 'html')
+                languageSelector.value = languageType || 'text';
             }
         });
 
@@ -55,11 +51,7 @@ export function initResponseEditor() {
         if (languageSelector) {
             languageSelector.addEventListener('change', (e) => {
                 const selectedLanguage = e.target.value;
-                if (selectedLanguage === 'auto') {
-                    responseEditor.clearLanguageOverride();
-                } else {
-                    responseEditor.setLanguage(selectedLanguage);
-                }
+                responseEditor.setLanguage(selectedLanguage);
             });
         }
     }
@@ -82,6 +74,24 @@ export function displayResponseWithLineNumbers(content, contentType = null) {
 
     if (containerElements && containerElements.editor) {
         containerElements.editor.setContent(content, contentType);
+
+        // Update preview if in preview mode
+        if (containerElements.previewManager && containerElements.tabId) {
+            const language = containerElements.editor.currentLanguage;
+
+            // Enable/disable preview button based on content type
+            containerElements.previewManager.updateButtonState(containerElements.tabId, language);
+
+            // Update preview if currently in preview mode
+            if (containerElements.previewManager.isPreviewMode(containerElements.tabId)) {
+                if (containerElements.previewManager.isPreviewable(language)) {
+                    containerElements.previewManager.updatePreview(containerElements.tabId, content, language);
+                } else {
+                    // Auto-switch to code view for non-previewable content
+                    containerElements.previewManager.togglePreview(containerElements.tabId);
+                }
+            }
+        }
     } else {
         // Fallback to global editor
         initResponseEditor();
