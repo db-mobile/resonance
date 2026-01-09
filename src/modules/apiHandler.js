@@ -402,12 +402,22 @@ export async function handleSendRequest() {
         const result = await window.electronAPI.sendApiRequest(requestConfig);
 
         if (result.success) {
-            const formattedResponse = JSON.stringify(result.data, null, 2);
-
             // Extract content-type from response headers
             let contentType = null;
             if (result.headers && result.headers['content-type']) {
                 contentType = result.headers['content-type'];
+            }
+
+            // Format response based on content type
+            // For text-based formats (HTML, XML, plain text, etc.), use raw string
+            // For JSON and other structured data, use formatted JSON
+            let formattedResponse;
+            if (typeof result.data === 'string') {
+                // Already a string (HTML, XML, plain text, etc.) - use as-is
+                formattedResponse = result.data;
+            } else {
+                // Object or other data type - format as JSON
+                formattedResponse = JSON.stringify(result.data, null, 2);
             }
 
             // Display response body (currently uses global editor - TODO: make per-tab)

@@ -214,10 +214,39 @@ export class PreviewRenderer {
         const iframe = document.createElement('iframe');
         iframe.className = 'response-preview-iframe';
         iframe.setAttribute('sandbox', 'allow-same-origin');
-        iframe.srcdoc = content;
+
+        // Inject CSP to block images
+        const cspMeta = '<meta http-equiv="Content-Security-Policy" content="img-src \'none\';">';
+        const modifiedContent = this._injectCSP(content, cspMeta);
+
+        iframe.srcdoc = modifiedContent;
         iframe.style.cssText = 'width: 100%; height: 100%; border: none;';
 
         this.container.appendChild(iframe);
+    }
+
+    /**
+     * Inject CSP meta tag into HTML content
+     * @private
+     * @param {string} content - Original HTML content
+     * @param {string} cspMeta - CSP meta tag to inject
+     * @returns {string} Modified HTML content with CSP
+     */
+    _injectCSP(content, cspMeta) {
+        // Try to inject CSP into <head> if it exists
+        const headMatch = content.match(/<head[^>]*>/i);
+        if (headMatch) {
+            return content.replace(headMatch[0], `${headMatch[0]}\n${cspMeta}`);
+        }
+
+        // If no <head>, try to inject after <html>
+        const htmlMatch = content.match(/<html[^>]*>/i);
+        if (htmlMatch) {
+            return content.replace(htmlMatch[0], `${htmlMatch[0]}\n<head>${cspMeta}</head>`);
+        }
+
+        // If no <html> or <head>, wrap content with html/head/body
+        return `<!DOCTYPE html><html><head>${cspMeta}</head><body>${content}</body></html>`;
     }
 
     /**
