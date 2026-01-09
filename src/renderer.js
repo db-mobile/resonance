@@ -52,6 +52,7 @@ import { MockServerController } from './modules/controllers/MockServerController
 import { MockServerDialog } from './modules/ui/MockServerDialog.js';
 import { CollectionRepository } from './modules/storage/CollectionRepository.js';
 import { RequestBodyEditor } from './modules/requestBodyEditor.bundle.js';
+import { PreviewRepository } from './modules/storage/PreviewRepository.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
@@ -135,8 +136,11 @@ const mockServerDialog = new MockServerDialog(mockServerController);
 // Initialize history controller
 const historyController = new HistoryController(window.electronAPI);
 
+// Initialize preview repository
+const previewRepository = new PreviewRepository(window.electronAPI);
+
 // Initialize response container manager for multiple workspace tabs
-const responseContainerManager = new ResponseContainerManager();
+const responseContainerManager = new ResponseContainerManager(previewRepository);
 window.responseContainerManager = responseContainerManager;
 
 // Initialize workspace tab system

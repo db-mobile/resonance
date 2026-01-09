@@ -7,12 +7,15 @@
 
 import { ResponseEditor } from './responseEditor.bundle.js';
 import { attachCopyHandler } from './copyHandler.js';
+import { PreviewManager } from './PreviewManager.js';
 
 export class ResponseContainerManager {
-    constructor() {
+    constructor(previewRepository) {
         this.parentContainer = document.getElementById('workspace-response-container');
         this.containers = new Map(); // Map of tabId -> container elements + ResponseEditor instances
         this.activeTabId = null;
+        this.previewRepository = previewRepository;
+        this.previewManager = new PreviewManager(previewRepository);
     }
 
     /**
@@ -71,6 +74,11 @@ export class ResponseContainerManager {
             container.wrapper.parentNode.removeChild(container.wrapper);
         }
         this.containers.delete(tabId);
+
+        // Clean up preview manager
+        if (this.previewManager) {
+            this.previewManager.removeContainer(tabId);
+        }
     }
 
     /**
@@ -97,6 +105,22 @@ export class ResponseContainerManager {
                             <polyline points="2 4 6 8 10 4"></polyline>
                         </svg>
                     </div>
+                    <div class="preview-mode-buttons" data-tab-id="${tabId}">
+                        <button class="preview-mode-btn active" data-mode="code" data-tab-id="${tabId}" aria-label="Code View" title="Code View">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="16 18 22 12 16 6"></polyline>
+                                <polyline points="8 6 2 12 8 18"></polyline>
+                            </svg>
+                            <span>Code</span>
+                        </button>
+                        <button class="preview-mode-btn" data-mode="preview" data-tab-id="${tabId}" aria-label="Preview View" title="Preview View">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                            <span>Preview</span>
+                        </button>
+                    </div>
                     <button class="copy-response-btn" data-tab-id="${tabId}" aria-label="Copy Response" title="Copy Response Body">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -105,6 +129,7 @@ export class ResponseContainerManager {
                     </button>
                 </div>
                 <div class="response-body-container" data-tab-id="${tabId}" aria-live="polite"></div>
+                <div class="response-preview-container" data-tab-id="${tabId}" style="display: none;"></div>
             </div>
 
             <div id="response-headers-${tabId}" class="tab-content" role="tabpanel">
@@ -130,14 +155,26 @@ export class ResponseContainerManager {
 
         const bodyContainer = wrapper.querySelector('.response-body-container');
         const languageSelector = wrapper.querySelector('.language-selector');
+        const previewContainer = wrapper.querySelector('.response-preview-container');
+        const codeBtn = wrapper.querySelector('.preview-mode-btn[data-mode="code"]');
+        const previewBtn = wrapper.querySelector('.preview-mode-btn[data-mode="preview"]');
 
         // Create ResponseEditor instance for this tab
         const editor = new ResponseEditor(bodyContainer);
+
+        // Initialize PreviewManager for this tab
+        if (this.previewManager && previewContainer && codeBtn && previewBtn) {
+            this.previewManager.initializeForTab(tabId, previewContainer, bodyContainer, editor, codeBtn, previewBtn);
+        }
 
         // Set up callback to update dropdown when language changes
         editor.onLanguageChange((lang) => {
             if (languageSelector) {
                 languageSelector.value = lang;
+            }
+            // Update preview button state based on new language
+            if (this.previewManager) {
+                this.previewManager.updateButtonState(tabId, lang);
             }
         });
 
@@ -167,7 +204,11 @@ export class ResponseContainerManager {
             scriptsDisplay: wrapper.querySelector('.response-scripts-display'),
             languageSelector,
             copyBtn,
-            editor // Include editor instance
+            editor, // Include editor instance
+            previewContainer, // NEW
+            codeBtn, // NEW
+            previewBtn, // NEW
+            previewManager: this.previewManager // NEW
         };
     }
 }

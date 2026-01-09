@@ -74,6 +74,24 @@ export function displayResponseWithLineNumbers(content, contentType = null) {
 
     if (containerElements && containerElements.editor) {
         containerElements.editor.setContent(content, contentType);
+
+        // Update preview if in preview mode
+        if (containerElements.previewManager && containerElements.tabId) {
+            const language = containerElements.editor.currentLanguage;
+
+            // Enable/disable preview button based on content type
+            containerElements.previewManager.updateButtonState(containerElements.tabId, language);
+
+            // Update preview if currently in preview mode
+            if (containerElements.previewManager.isPreviewMode(containerElements.tabId)) {
+                if (containerElements.previewManager.isPreviewable(language)) {
+                    containerElements.previewManager.updatePreview(containerElements.tabId, content, language);
+                } else {
+                    // Auto-switch to code view for non-previewable content
+                    containerElements.previewManager.togglePreview(containerElements.tabId);
+                }
+            }
+        }
     } else {
         // Fallback to global editor
         initResponseEditor();

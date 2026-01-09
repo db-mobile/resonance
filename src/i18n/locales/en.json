@@ -217,5 +217,13 @@
     "status_code": "Status Code",
     "ok": "OK",
     "error_toggle_server": "Failed to toggle server"
+  },
+  "preview": {
+    "toggle": "Toggle Preview",
+    "toggle_code": "Show Code",
+    "toggle_preview": "Show Preview",
+    "not_available": "Preview not available for this content type",
+    "supported_formats": "Supported formats: HTML, JSON, XML",
+    "parse_error": "Failed to parse content for preview"
   }
 }
