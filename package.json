@@ -20,6 +20,7 @@
     "format:check": "prettier --check \"**/*.{js,json,md,css,html}\"",
     "dist": "electron-builder",
     "dist:linux": "electron-builder --linux",
+    "dist:snap": "electron-builder --linux snap -c.extraMetadata.name=db-mobile-resonance",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
     "dist:dir": "electron-builder --dir"
@@ -93,10 +94,29 @@
             "x64",
             "arm64"
           ]
+        },
+        {
+          "target": "snap",
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "category": "Development",
-      "icon": "./assets/icons/icon.svg"
+      "icon": "./assets/icons/icon_512x512.png"
+    },
+    "snap": {
+      "confinement": "strict",
+      "grade": "stable",
+      "title": "Resonance",
+      "summary": "Test and explore web services",
+      "description": "Resonane is a local-first, zero-account API client application designed to provide an excellent user experience for testing and interacting with web services. It offers a modern and intuitive interface for developers with powerful features for API development and testing.",
+      "category": "Development",
+      "allowNativeWayland": true,
+      "plugs": [
+        "default",
+        "network-bind"
+      ]
     },
     "mac": {
       "target": [

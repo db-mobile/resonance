@@ -76,14 +76,45 @@ A local-first, zero-account API client with excellent user experience built with
 
 ## Installation
 
-### Prerequisites
+### Package Managers
+
+#### Flathub (Linux)
+
+Install from Flathub:
+```bash
+flatpak install flathub io.github.db_mobile.resonance
+```
+
+Run the application:
+```bash
+flatpak run io.github.db_mobile.resonance
+```
+
+#### Snap (Linux)
+
+Install from Snap Store:
+```bash
+snap install db-mobile-resonance
+```
+
+#### Homebrew (macOS)
+
+Install via Homebrew:
+```bash
+brew tap db-mobile/resonance
+brew install --cask resonance
+```
+
+### From Source
+
+#### Prerequisites
 
 - **Node.js** v18.0.0 or higher (v20.x or later recommended)
 - **Git** (for cloning the repository)
 
 **Note:** npm comes bundled with Node.js and is the default package manager for this project.
 
-### From Source
+#### Building from Source
 
 1. Clone the repository:
 ```bash
@@ -96,7 +127,12 @@ cd resonance
 npm install
 ```
 
-3. Start the application:
+3. Build the application:
+```bash
+npm run build
+```
+
+4. Start the application:
 ```bash
 npm start
 ```
