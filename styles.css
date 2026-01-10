@@ -7,8 +7,8 @@
 
 :root {
     /* Flathub branding colors - light scheme */
-    --primary-color: #62a0ea;
-    --primary-dark: #3584e4;
+    --primary-color: #f9f06b;
+    --primary-dark: #094185;
     --secondary-color: #6c757d;
     --background: #ffffff;
     --surface: #f8f9fa;
@@ -18,14 +18,14 @@
     --shadow: rgba(0, 0, 0, 0.1);
     --shadow-lg: rgba(0, 0, 0, 0.15);
     --hero-gradient-start: #62a0ea;
-    --hero-gradient-end: #3584e4;
+    --hero-gradient-end: #094185;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
         /* Flathub branding colors - dark scheme */
         --primary-color: #1c71d8;
-        --primary-dark: #1a5fb4;
+        --primary-dark: #094185;
         --secondary-color: #9a9996;
         --background: #1e1e1e;
         --surface: #2d2d2d;
@@ -35,7 +35,7 @@
         --shadow: rgba(0, 0, 0, 0.3);
         --shadow-lg: rgba(0, 0, 0, 0.5);
         --hero-gradient-start: #1c71d8;
-        --hero-gradient-end: #1a5fb4;
+        --hero-gradient-end: #094185;
     }
 }
 
