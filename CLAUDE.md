@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-Resonance is an Electron-based API client application that provides a clean and minimal interface for testing APIs. The application supports OpenAPI/Swagger and Postman collection imports, variable templating with environments, multi-language code generation, and features a modern modular architecture with secure IPC communication between main and renderer processes.
+Resonance is an Electron-based API client application that provides a local-first, zero-account interface for testing APIs. The application supports OpenAPI/Swagger and Postman collection imports, variable templating with environments, multi-language code generation, and features a modern modular architecture with secure IPC communication between main and renderer processes.
 
 ## Development Commands
 

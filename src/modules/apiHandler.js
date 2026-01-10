@@ -75,21 +75,20 @@ export function displayResponseWithLineNumbers(content, contentType = null) {
     if (containerElements && containerElements.editor) {
         containerElements.editor.setContent(content, contentType);
 
-        // Update preview if in preview mode
+        // Update preview management
         if (containerElements.previewManager && containerElements.tabId) {
             const language = containerElements.editor.currentLanguage;
 
             // Enable/disable preview button based on content type
             containerElements.previewManager.updateButtonState(containerElements.tabId, language);
 
-            // Update preview if currently in preview mode
-            if (containerElements.previewManager.isPreviewMode(containerElements.tabId)) {
-                if (containerElements.previewManager.isPreviewable(language)) {
-                    containerElements.previewManager.updatePreview(containerElements.tabId, content, language);
-                } else {
-                    // Auto-switch to code view for non-previewable content
-                    containerElements.previewManager.togglePreview(containerElements.tabId);
-                }
+            // Always update preview content if content is previewable, regardless of current view mode
+            // This ensures preview is ready when user switches to it
+            if (containerElements.previewManager.isPreviewable(language)) {
+                containerElements.previewManager.refreshPreviewContent(containerElements.tabId, content, language);
+            } else {
+                // Clear preview for non-previewable content
+                containerElements.previewManager.clearPreview(containerElements.tabId);
             }
         }
     } else {
@@ -402,12 +401,22 @@ export async function handleSendRequest() {
         const result = await window.electronAPI.sendApiRequest(requestConfig);
 
         if (result.success) {
-            const formattedResponse = JSON.stringify(result.data, null, 2);
-
             // Extract content-type from response headers
             let contentType = null;
             if (result.headers && result.headers['content-type']) {
                 contentType = result.headers['content-type'];
+            }
+
+            // Format response based on content type
+            // For text-based formats (HTML, XML, plain text, etc.), use raw string
+            // For JSON and other structured data, use formatted JSON
+            let formattedResponse;
+            if (typeof result.data === 'string') {
+                // Already a string (HTML, XML, plain text, etc.) - use as-is
+                formattedResponse = result.data;
+            } else {
+                // Object or other data type - format as JSON
+                formattedResponse = JSON.stringify(result.data, null, 2);
             }
 
             // Display response body (currently uses global editor - TODO: make per-tab)

@@ -1,7 +1,7 @@
 {
   "name": "resonance",
-  "version": "1.9.0",
-  "description": "Resonance - A clean and minimal API client with excellent user experience",
+  "version": "1.9.1",
+  "description": "Resonance - A local-first, zero-account API client with excellent user experience",
   "license": "MIT",
   "author": "Dennis Blümer <dennis.bluemer@ducart.de>",
   "type": "module",

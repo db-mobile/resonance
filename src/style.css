@@ -3201,8 +3201,8 @@ body {
 /* JSON Tree View */
 .json-tree {
     font-family: 'Fira Code', 'Courier New', monospace;
-    font-size: 13px;
-    line-height: 1.6;
+    font-size: 12px;
+    line-height: 1.4;
     color: var(--text-primary);
     width: 100%;
 }
@@ -3212,11 +3212,15 @@ body {
 }
 
 .json-tree-line {
-    padding-left: 20px;
+    padding-left: 12px;
 }
 
 .json-tree-children {
-    padding-left: 20px;
+    padding-left: 12px;
+}
+
+.json-tree-inline {
+    display: inline;
 }
 
 .json-tree-key {
@@ -3244,7 +3248,7 @@ body {
     cursor: pointer;
     user-select: none;
     display: inline-block;
-    width: 16px;
+    width: 14px;
     color: var(--text-secondary);
     font-weight: normal;
 }

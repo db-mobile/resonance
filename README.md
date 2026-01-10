@@ -1,6 +1,6 @@
 # Resonance
 
-A clean and minimal API client with excellent user experience built with Electron.
+A local-first, zero-account API client with excellent user experience built with Electron.
 
 ![Resonance API Client](https://img.shields.io/badge/License-MIT-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-v35.0.0-brightgreen.svg)

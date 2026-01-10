@@ -69,9 +69,19 @@ export class PreviewRenderer {
             valueSpan.textContent = 'null';
             node.appendChild(valueSpan);
         } else if (Array.isArray(data)) {
-            this._buildArrayNode(node, data, level);
+            // Check if array should be rendered inline
+            if (this._shouldRenderInline(data)) {
+                this._buildInlineArray(node, data);
+            } else {
+                this._buildArrayNode(node, data, level);
+            }
         } else if (typeof data === 'object') {
-            this._buildObjectNode(node, data, level);
+            // Check if object should be rendered inline
+            if (this._shouldRenderInline(data)) {
+                this._buildInlineObject(node, data);
+            } else {
+                this._buildObjectNode(node, data, level);
+            }
         } else {
             // Primitive value
             const valueSpan = document.createElement('span');
@@ -81,6 +91,109 @@ export class PreviewRenderer {
         }
 
         return node;
+    }
+
+    /**
+     * Check if object/array should be rendered inline
+     * @private
+     * @param {Object|Array} data - Data to check
+     * @returns {boolean}
+     */
+    _shouldRenderInline(data) {
+        // Empty objects/arrays should be inline
+        if (Array.isArray(data) && data.length === 0) {
+            return true;
+        }
+        if (typeof data === 'object' && Object.keys(data).length === 0) {
+            return true;
+        }
+
+        // Check size and complexity
+        const entries = Array.isArray(data) ? data : Object.values(data);
+
+        // Inline if 3 or fewer items and all are primitives
+        if (entries.length <= 3) {
+            return entries.every(val =>
+                val === null ||
+                typeof val !== 'object'
+            );
+        }
+
+        return false;
+    }
+
+    /**
+     * Build inline object representation
+     * @private
+     */
+    _buildInlineObject(node, obj) {
+        node.className = 'json-tree-node json-tree-inline';
+
+        const entries = Object.entries(obj);
+        if (entries.length === 0) {
+            node.textContent = '{}';
+            return;
+        }
+
+        node.appendChild(document.createTextNode('{ '));
+
+        entries.forEach(([key, value], index) => {
+            const keySpan = document.createElement('span');
+            keySpan.className = 'json-tree-key';
+            keySpan.textContent = `"${key}"`;
+            node.appendChild(keySpan);
+
+            node.appendChild(document.createTextNode(': '));
+
+            const valueSpan = document.createElement('span');
+            if (value === null) {
+                valueSpan.className = 'json-tree-null';
+                valueSpan.textContent = 'null';
+            } else {
+                valueSpan.className = `json-tree-${typeof value}`;
+                valueSpan.textContent = JSON.stringify(value);
+            }
+            node.appendChild(valueSpan);
+
+            if (index < entries.length - 1) {
+                node.appendChild(document.createTextNode(', '));
+            }
+        });
+
+        node.appendChild(document.createTextNode(' }'));
+    }
+
+    /**
+     * Build inline array representation
+     * @private
+     */
+    _buildInlineArray(node, arr) {
+        node.className = 'json-tree-node json-tree-inline';
+
+        if (arr.length === 0) {
+            node.textContent = '[]';
+            return;
+        }
+
+        node.appendChild(document.createTextNode('[ '));
+
+        arr.forEach((value, index) => {
+            const valueSpan = document.createElement('span');
+            if (value === null) {
+                valueSpan.className = 'json-tree-null';
+                valueSpan.textContent = 'null';
+            } else {
+                valueSpan.className = `json-tree-${typeof value}`;
+                valueSpan.textContent = JSON.stringify(value);
+            }
+            node.appendChild(valueSpan);
+
+            if (index < arr.length - 1) {
+                node.appendChild(document.createTextNode(', '));
+            }
+        });
+
+        node.appendChild(document.createTextNode(' ]'));
     }
 
     /**
@@ -214,10 +327,39 @@ export class PreviewRenderer {
         const iframe = document.createElement('iframe');
         iframe.className = 'response-preview-iframe';
         iframe.setAttribute('sandbox', 'allow-same-origin');
-        iframe.srcdoc = content;
+
+        // Inject CSP to block images
+        const cspMeta = '<meta http-equiv="Content-Security-Policy" content="img-src \'none\';">';
+        const modifiedContent = this._injectCSP(content, cspMeta);
+
+        iframe.srcdoc = modifiedContent;
         iframe.style.cssText = 'width: 100%; height: 100%; border: none;';
 
         this.container.appendChild(iframe);
+    }
+
+    /**
+     * Inject CSP meta tag into HTML content
+     * @private
+     * @param {string} content - Original HTML content
+     * @param {string} cspMeta - CSP meta tag to inject
+     * @returns {string} Modified HTML content with CSP
+     */
+    _injectCSP(content, cspMeta) {
+        // Try to inject CSP into <head> if it exists
+        const headMatch = content.match(/<head[^>]*>/i);
+        if (headMatch) {
+            return content.replace(headMatch[0], `${headMatch[0]}\n${cspMeta}`);
+        }
+
+        // If no <head>, try to inject after <html>
+        const htmlMatch = content.match(/<html[^>]*>/i);
+        if (htmlMatch) {
+            return content.replace(htmlMatch[0], `${htmlMatch[0]}\n<head>${cspMeta}</head>`);
+        }
+
+        // If no <html> or <head>, wrap content with html/head/body
+        return `<!DOCTYPE html><html><head>${cspMeta}</head><body>${content}</body></html>`;
     }
 
     /**
