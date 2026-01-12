@@ -3,11 +3,12 @@
  * @module jsonEditor
  */
 
-import { EditorView, lineNumbers, placeholder } from '@codemirror/view';
+import { EditorView, lineNumbers, placeholder, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { json } from '@codemirror/lang-json';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
+import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
 
 // Define syntax highlighting style for JSON
 const highlightStyle = HighlightStyle.define([
@@ -37,6 +38,8 @@ export class JSONEditor {
     init() {
         const extensions = [
             lineNumbers(),
+            history(),
+            keymap.of([...defaultKeymap, ...historyKeymap]),
             EditorView.lineWrapping,
             json(),
             syntaxHighlighting(highlightStyle),

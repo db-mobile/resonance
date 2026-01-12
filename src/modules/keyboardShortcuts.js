@@ -105,21 +105,25 @@ class KeyboardShortcutsManager {
         const shift = event.shiftKey;
         const alt = event.altKey;
 
-        // Don't trigger shortcuts if user is typing in an input/textarea
-        // unless it's a specific input-safe shortcut
+        // Don't trigger shortcuts if user is typing in an input/textarea/contenteditable
+        // or CodeMirror editor, unless it's a specific input-safe shortcut
         const targetTag = event.target.tagName.toLowerCase();
-        const isInputField = targetTag === 'input' || targetTag === 'textarea';
+        const isContentEditable = event.target.isContentEditable;
+        const isCodeMirror = event.target.closest('.CodeMirror');
+        const isInputField = targetTag === 'input' ||
+                           targetTag === 'textarea' ||
+                           isContentEditable ||
+                           isCodeMirror;
 
         const shortcutKey = this._createShortcutKey(event.code, ctrl, shift, alt);
         const shortcut = this.shortcuts.get(shortcutKey);
 
         if (shortcut) {
-            // Some shortcuts work in input fields (like Ctrl+Enter to send, Ctrl+S to save)
-            // Check if we should skip based on context
-            const isInputSafeShortcut = shortcutKey.includes('enter') ||
-                                       shortcutKey.includes('escape') ||
-                                       shortcutKey.includes('ctrl+keys') ||
-                                       (ctrl && !isInputField);
+            // Some shortcuts work in input fields (like Ctrl+Enter to send, Ctrl+S to save, Escape to cancel)
+            // Only allow shortcuts that use Ctrl/Cmd modifier or Enter/Escape keys when in input fields
+            const isInputSafeShortcut = ctrl ||
+                                       shortcutKey.includes('enter') ||
+                                       shortcutKey.includes('escape');
 
             if (!isInputField || isInputSafeShortcut) {
                 if (shortcut.preventDefault) {
@@ -167,7 +171,7 @@ class KeyboardShortcutsManager {
 
         // Apply i18n if available
         if (window.i18n) {
-            window.i18n.updateDOM(overlay);
+            window.i18n.updateUI(overlay);
         }
 
         const closeBtn = overlay.querySelector('.close-shortcuts-btn');

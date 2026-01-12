@@ -3,11 +3,12 @@
  * @module graphqlEditor
  */
 
-import { EditorView, lineNumbers, placeholder } from '@codemirror/view';
+import { EditorView, lineNumbers, placeholder, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { graphql } from 'cm6-graphql';
+import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
 
 // Define syntax highlighting style for GraphQL
 const highlightStyle = HighlightStyle.define([
@@ -40,6 +41,8 @@ export class GraphQLEditor {
     init() {
         const extensions = [
             lineNumbers(),
+            history(),
+            keymap.of([...defaultKeymap, ...historyKeymap]),
             EditorView.lineWrapping,
             graphql(),
             syntaxHighlighting(highlightStyle),

@@ -103,13 +103,13 @@ export class I18nManager {
         return template.replace(/\{\{(\w+)\}\}/g, (match, key) => params[key] !== undefined ? params[key] : match);
     }
 
-    updateUI() {
+    updateUI(container = document) {
         // Update all elements with data-i18n attribute
-        const elements = document.querySelectorAll('[data-i18n]');
+        const elements = container.querySelectorAll('[data-i18n]');
         elements.forEach(element => {
             const key = element.getAttribute('data-i18n');
             const translation = this.t(key);
-            
+
             if (element.tagName === 'INPUT' && element.type === 'text') {
                 element.placeholder = translation;
             } else {
@@ -118,14 +118,14 @@ export class I18nManager {
         });
 
         // Update elements with data-i18n-title attribute (for tooltips)
-        const titleElements = document.querySelectorAll('[data-i18n-title]');
+        const titleElements = container.querySelectorAll('[data-i18n-title]');
         titleElements.forEach(element => {
             const key = element.getAttribute('data-i18n-title');
             element.title = this.t(key);
         });
 
         // Update aria-label attributes
-        const ariaElements = document.querySelectorAll('[data-i18n-aria]');
+        const ariaElements = container.querySelectorAll('[data-i18n-aria]');
         ariaElements.forEach(element => {
             const key = element.getAttribute('data-i18n-aria');
             element.setAttribute('aria-label', this.t(key));

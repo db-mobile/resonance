@@ -336,15 +336,6 @@ function initKeyboardShortcuts() {
         category: 'Help'
     });
 
-    keyboardShortcuts.register('Slash', {
-        shift: true,
-        handler: () => {
-            keyboardShortcuts.showHelp();
-        },
-        description: 'Show keyboard shortcuts (alternative)',
-        category: 'Help'
-    });
-
     // Workspace Tab Switching (Ctrl/Cmd+1-9 to switch to specific workspace tabs)
     for (let i = 1; i <= 9; i++) {
         keyboardShortcuts.register(`Digit${i}`, {
