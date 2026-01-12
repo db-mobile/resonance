@@ -24,12 +24,14 @@ class ApiRequestHandler {
      * @param {Object} store - Electron-store instance for settings retrieval
      * @param {Object} proxyHandler - ProxyHandler instance for proxy configuration
      * @param {Object} mockServerHandler - MockServerHandler instance for mock server routing
+     * @param {string} appVersion - Application version for User-Agent header
      */
-    constructor(store, proxyHandler, mockServerHandler = null) {
+    constructor(store, proxyHandler, mockServerHandler = null, appVersion = '1.0.0') {
         this.store = store;
         this.proxyHandler = proxyHandler;
         this.mockServerHandler = mockServerHandler;
         this.currentRequestController = null;
+        this.appVersion = appVersion;
     }
 
     /**
@@ -172,7 +174,10 @@ class ApiRequestHandler {
             const axiosConfig = {
                 method: requestOptions.method,
                 url: requestOptions.url,
-                headers: requestOptions.headers || {},
+                headers: {
+                    'User-Agent': `resonance/${this.appVersion}`,
+                    ...(requestOptions.headers || {})
+                },
                 signal: this.currentRequestController.signal,
 
                 transformResponse: [(data) => data]
