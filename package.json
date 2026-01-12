@@ -44,6 +44,7 @@
     "prettier": "^3.6.2"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.10.1",
     "@codemirror/lang-html": "^6.4.11",
     "@codemirror/lang-json": "^6.0.2",
     "@codemirror/lang-xml": "^6.1.0",

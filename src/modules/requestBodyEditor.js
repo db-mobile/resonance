@@ -1,8 +1,9 @@
-import { EditorView, lineNumbers } from '@codemirror/view';
+import { EditorView, lineNumbers, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { json } from '@codemirror/lang-json';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
+import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
 
 // Define syntax highlighting style
 const highlightStyle = HighlightStyle.define([
@@ -39,6 +40,8 @@ export class RequestBodyEditor {
             doc: '',
             extensions: [
                 lineNumbers(),
+                history(),
+                keymap.of([...defaultKeymap, ...historyKeymap]),
                 EditorView.editable.of(true), // Editable
                 EditorView.lineWrapping,
                 json(), // Always use JSON highlighting

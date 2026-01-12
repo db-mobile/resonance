@@ -68,7 +68,7 @@ class WindowManager {
             }
         });
 
-        this.mainWindow.setMenu(null);
+        //this.mainWindow.setMenu(null);
         this.mainWindow.loadFile('index.html');
 
         return this.mainWindow;
