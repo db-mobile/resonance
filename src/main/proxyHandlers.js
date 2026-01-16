@@ -18,10 +18,12 @@ class ProxyHandler {
      * Creates a ProxyHandler instance
      *
      * @param {Object} store - Electron-store instance for proxy settings persistence
+     * @param {string} appVersion - Application version for User-Agent header
      */
-    constructor(store) {
+    constructor(store, appVersion = '1.0.0') {
         this.store = store;
         this.PROXY_KEY = 'proxySettings';
+        this.appVersion = appVersion;
     }
 
     /**
@@ -136,7 +138,10 @@ class ProxyHandler {
                 method: 'GET',
                 timeout: settings.timeout || 10000,
                 proxy: proxyConfig,
-                validateStatus: (status) => status === 200
+                validateStatus: (status) => status === 200,
+                headers: {
+                    'User-Agent': `resonance/${this.appVersion}`
+                }
             };
 
             const startTime = Date.now();

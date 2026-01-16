@@ -87,7 +87,7 @@ try {
 }
 
 const windowManager = new WindowManager();
-const proxyHandler = new ProxyHandler(store);
+const proxyHandler = new ProxyHandler(store, app.getVersion());
 const storeHandler = new StoreHandler(store);
 const schemaProcessor = new SchemaProcessor();
 const openApiParser = new OpenApiParser(schemaProcessor, store);
@@ -96,7 +96,7 @@ const openApiExporter = new OpenApiExporter();
 const mockServerHandler = new MockServerHandler(store, schemaProcessor);
 const scriptExecutor = new ScriptExecutor(store);
 const scriptHandlers = new ScriptHandlers(store, scriptExecutor);
-const apiRequestHandler = new ApiRequestHandler(store, proxyHandler, mockServerHandler);
+const apiRequestHandler = new ApiRequestHandler(store, proxyHandler, mockServerHandler, app.getVersion());
 
 app.whenReady().then(() => {
     windowManager.createWindow();
