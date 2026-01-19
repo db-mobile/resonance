@@ -186,6 +186,11 @@ export async function handleSendRequest() {
         }
     });
 
+    // Create a single processor for the entire request to ensure dynamic variables
+    // (like {{$uuid}}) resolve consistently throughout the request
+    const processor = new VariableProcessor();
+    processor.clearDynamicCache(); // Ensure fresh dynamic values for each new request
+
     // Always try to substitute variables (collection + environment or just environment)
     try {
         const variableService = getVariableService();
@@ -206,8 +211,6 @@ export async function handleSendRequest() {
             // No endpoint loaded - use environment variables only
             variables = await variableService.getVariables();
         }
-
-        const processor = new VariableProcessor();
 
         // First, substitute variables in path param VALUES (so {{var}} in path params get replaced)
         const processedPathParams = {};
@@ -290,7 +293,7 @@ export async function handleSendRequest() {
                 variables = await variableService.getVariables();
             }
 
-            const processor = new VariableProcessor();
+            // Note: reusing the same processor from above to maintain consistent dynamic variable values
 
             // Check if GraphQL mode is active
             if (graphqlBodyManager && graphqlBodyManager.isGraphQLMode()) {
@@ -650,6 +653,11 @@ export async function handleGenerateCurl() {
         }
     });
 
+    // Create a single processor for the entire request to ensure dynamic variables
+    // (like {{$uuid}}) resolve consistently throughout the request
+    const processor = new VariableProcessor();
+    processor.clearDynamicCache(); // Ensure fresh dynamic values for each new request
+
     // Always try to substitute variables (collection + environment or just environment)
     try {
         const variableService = getVariableService();
@@ -670,8 +678,6 @@ export async function handleGenerateCurl() {
             // No endpoint loaded - use environment variables only
             variables = await variableService.getVariables();
         }
-
-        const processor = new VariableProcessor();
 
         // First, substitute variables in path param VALUES (so {{var}} in path params get replaced)
         const processedPathParams = {};
@@ -751,7 +757,7 @@ export async function handleGenerateCurl() {
                 variables = await variableService.getVariables();
             }
 
-            const processor = new VariableProcessor();
+            // Note: reusing the same processor from above to maintain consistent dynamic variable values
             bodyText = processor.processTemplate(bodyText, variables);
 
             body = JSON.parse(bodyText);

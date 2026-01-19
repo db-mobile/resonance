@@ -49,6 +49,7 @@ A local-first, zero-account API client with excellent user experience built with
 ### Environment & Variables
 - **Environment Management**: Organize variables into environments (Development, Staging, Production, etc.)
 - **Variable Templating**: Use `{{ variableName }}` syntax for dynamic values in URLs, headers, and request bodies
+- **Dynamic Variables**: Auto-generated values with `{{$variableName}}` syntax (UUID, timestamps, random strings, etc.)
 - **Environment Switching**: Quick dropdown selector to switch between different API contexts
 - **Import/Export**: Share environments with your team or backup as JSON files
 
@@ -203,6 +204,25 @@ Header: Authorization: Bearer {{ apiKey }}
 ```
 
 The values of `baseUrl` and `apiKey` will automatically change when you switch environments.
+
+### Dynamic Variables
+
+Dynamic variables use the `{{$variableName}}` syntax and generate values automatically at request time. They don't need to be defined in advance.
+
+| Variable | Description | Example Output |
+|----------|-------------|----------------|
+| `{{$uuid}}` | Random UUID v4 | `550e8400-e29b-41d4-a716-446655440000` |
+| `{{$timestamp}}` | Unix timestamp (seconds) | `1737129600` |
+| `{{$timestampMs}}` | Unix timestamp (milliseconds) | `1737129600000` |
+| `{{$isoTimestamp}}` | ISO 8601 formatted date | `2026-01-17T12:00:00.000Z` |
+| `{{$randomInt}}` | Random integer 0-1000 | `742` |
+| `{{$randomInt:min:max}}` | Random integer in range | `{{$randomInt:1:100}}` → `57` |
+| `{{$randomString}}` | Random 8-character string | `xK9mPq2R` |
+| `{{$randomString:N}}` | Random N-character string | `{{$randomString:16}}` → `xK9mPq2RaB3nLp8Y` |
+| `{{$randomEmail}}` | Random email address | `abc12345@example.com` |
+| `{{$randomName}}` | Random full name | `John Smith` |
+
+**Per-Request Consistency**: The same dynamic variable used multiple times within a single request will resolve to the same value. For example, using `{{$uuid}}` in both the URL and a header will produce identical UUIDs.
 
 ### Authentication
 
@@ -572,6 +592,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Cookie management and display
 - [x] Proxy support with authentication
 - [x] Variable templating system with environment support
+- [x] Dynamic variables (UUID, timestamps, random values)
 - [x] Multi-theme support (3 themes)
 - [x] Internationalization (5 languages)
 - [x] Authentication support (Bearer, Basic, API Key, OAuth2, Digest)

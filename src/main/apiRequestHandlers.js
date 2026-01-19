@@ -7,6 +7,7 @@ import axios from 'axios';
 import http from 'http';
 import https from 'https';
 import { handleDigestAuth } from './digestAuthHandler.js';
+import { createHTTP2Adapter } from 'axios-http2-adapter';
 
 /**
  * Handler for making HTTP API requests with detailed timing and metrics
@@ -24,12 +25,14 @@ class ApiRequestHandler {
      * @param {Object} store - Electron-store instance for settings retrieval
      * @param {Object} proxyHandler - ProxyHandler instance for proxy configuration
      * @param {Object} mockServerHandler - MockServerHandler instance for mock server routing
+     * @param {string} appVersion - Application version for User-Agent header
      */
-    constructor(store, proxyHandler, mockServerHandler = null) {
+    constructor(store, proxyHandler, mockServerHandler = null, appVersion = '1.0.0') {
         this.store = store;
         this.proxyHandler = proxyHandler;
         this.mockServerHandler = mockServerHandler;
         this.currentRequestController = null;
+        this.appVersion = appVersion;
     }
 
     /**
@@ -75,6 +78,71 @@ class ApiRequestHandler {
                 });
             }
         });
+    }
+
+    /**
+     * Creates HTTP/2 adapter with timing awareness
+     *
+     * Note: HTTP/2 uses multiplexed streams over persistent connections.
+     * Socket-level timings (DNS, TCP, TLS) only occur once per session,
+     * not per request, so they cannot be measured per-request.
+     *
+     * We can still capture:
+     * - TTFB (Time To First Byte): Request start to first response data
+     * - Total request time: Captured by handleApiRequest
+     *
+     * @private
+     * @param {Object} timings - Timings object to populate
+     * @param {number} startTime - Request start timestamp
+     * @returns {Function} Configured HTTP/2 adapter function
+     */
+    _createHttp2Adapter(timings, startTime) {
+        // Socket-level timings aren't available per-request in HTTP/2
+        // These only occur once when the session is established
+        timings.dnsLookup = 0;
+        timings.tcpConnection = 0;
+        timings.tlsHandshake = 0;
+
+        const adapter = createHTTP2Adapter();
+
+        // Wrap adapter to capture TTFB
+        return async (config) => {
+            try {
+                const response = await adapter(config);
+
+                // Capture time to first byte
+                if (!timings.firstByte) {
+                    timings.firstByte = Date.now() - startTime;
+                }
+
+                return response;
+            } catch (error) {
+                // Capture timing even on error
+                if (!timings.firstByte) {
+                    timings.firstByte = Date.now() - startTime;
+                }
+                throw error;
+            }
+        };
+    }
+
+    /**
+     * Determines if an error is HTTP/2 specific
+     *
+     * @private
+     * @param {Error} error - The error object
+     * @returns {boolean} True if error is HTTP/2-related
+     */
+    _isHttp2Error(error) {
+        const http2ErrorCodes = [
+            'ERR_HTTP2_',
+            'NGHTTP2_',
+            'HTTP2WRAPPER_'
+        ];
+
+        return http2ErrorCodes.some(code =>
+            error.code && error.code.includes(code)
+        );
     }
 
     /**
@@ -160,11 +228,13 @@ class ApiRequestHandler {
             total: 0
         };
 
+        let httpVersion = 'auto'; // Declare outside try block for catch block access
+
         try {
             this.currentRequestController = new AbortController();
 
             const settings = this.store.get('settings', {});
-            const httpVersion = settings.httpVersion || 'auto';
+            httpVersion = settings.httpVersion || 'auto';
             const requestTimeout = settings.requestTimeout !== undefined ? settings.requestTimeout : 0;
 
             const isHttps = requestOptions.url.startsWith('https://');
@@ -172,7 +242,10 @@ class ApiRequestHandler {
             const axiosConfig = {
                 method: requestOptions.method,
                 url: requestOptions.url,
-                headers: requestOptions.headers || {},
+                headers: {
+                    'User-Agent': `resonance/${this.appVersion}`,
+                    ...(requestOptions.headers || {})
+                },
                 signal: this.currentRequestController.signal,
 
                 transformResponse: [(data) => data]
@@ -182,18 +255,12 @@ class ApiRequestHandler {
                 axiosConfig.timeout = requestTimeout;
             }
 
-            switch (httpVersion) {
-                case 'http1':
-                    axiosConfig.httpVersion = '1.1';
-                    axiosConfig.http2 = false;
-                    break;
-                case 'http2':
-                    axiosConfig.http2 = true;
-                    break;
-                case 'auto':
-                default:
-                    break;
-            }
+            // Determine if we should use HTTP/2 adapter
+            const useHttp2Adapter = httpVersion === 'http2';
+
+            // For HTTP/1.x mode, use standard axios (no special config needed)
+            // For 'auto' mode, let axios negotiate automatically
+            // For 'http2' mode, we'll use the adapter (set below)
 
             if (this.proxyHandler) {
                 const proxyConfig = this.proxyHandler.getAxiosProxyConfig(requestOptions.url);
@@ -213,55 +280,58 @@ class ApiRequestHandler {
                 }
             }
 
-            const Agent = isHttps ? https.Agent : http.Agent;
-            const agent = new Agent({ keepAlive: false });
+            // Only set up socket timing for HTTP/1.x (not available for HTTP/2 adapter)
+            if (!useHttp2Adapter) {
+                const Agent = isHttps ? https.Agent : http.Agent;
+                const agent = new Agent({ keepAlive: false });
 
-            let socketAssigned = false;
-            let dnsStart = 0;
-            let tcpStart = 0;
-            let tlsStart = 0;
-            let firstByteReceived = false;
+                let socketAssigned = false;
+                let dnsStart = 0;
+                let tcpStart = 0;
+                let tlsStart = 0;
+                let firstByteReceived = false;
 
-            axiosConfig.httpAgent = !isHttps ? agent : undefined;
-            axiosConfig.httpsAgent = isHttps ? agent : undefined;
+                axiosConfig.httpAgent = !isHttps ? agent : undefined;
+                axiosConfig.httpsAgent = isHttps ? agent : undefined;
 
-            const originalCreateConnection = agent.createConnection;
-            agent.createConnection = function(options, callback) {
-                dnsStart = Date.now();
+                const originalCreateConnection = agent.createConnection;
+                agent.createConnection = function(options, callback) {
+                    dnsStart = Date.now();
 
-                const socket = originalCreateConnection.call(this, options, callback);
+                    const socket = originalCreateConnection.call(this, options, callback);
 
-                if (!socketAssigned) {
-                    socketAssigned = true;
+                    if (!socketAssigned) {
+                        socketAssigned = true;
 
-                    socket.once('lookup', () => {
-                        timings.dnsLookup = Date.now() - dnsStart;
-                        tcpStart = Date.now();
-                    });
+                        socket.once('lookup', () => {
+                            timings.dnsLookup = Date.now() - dnsStart;
+                            tcpStart = Date.now();
+                        });
 
-                    socket.once('connect', () => {
-                        timings.tcpConnection = Date.now() - tcpStart;
+                        socket.once('connect', () => {
+                            timings.tcpConnection = Date.now() - tcpStart;
+                            if (isHttps) {
+                                tlsStart = Date.now();
+                            }
+                        });
+
                         if (isHttps) {
-                            tlsStart = Date.now();
+                            socket.once('secureConnect', () => {
+                                timings.tlsHandshake = Date.now() - tlsStart;
+                            });
                         }
-                    });
 
-                    if (isHttps) {
-                        socket.once('secureConnect', () => {
-                            timings.tlsHandshake = Date.now() - tlsStart;
+                        socket.once('data', () => {
+                            if (!firstByteReceived) {
+                                firstByteReceived = true;
+                                timings.firstByte = Date.now() - startTime;
+                            }
                         });
                     }
 
-                    socket.once('data', () => {
-                        if (!firstByteReceived) {
-                            firstByteReceived = true;
-                            timings.firstByte = Date.now() - startTime;
-                        }
-                    });
-                }
-
-                return socket;
-            };
+                    return socket;
+                };
+            }
 
             startTime = Date.now();
             timings.startTime = startTime;
@@ -274,6 +344,12 @@ class ApiRequestHandler {
                     if (authHeader) {
                         config.headers = { ...config.headers, Authorization: authHeader };
                     }
+
+                    // Use HTTP/2 adapter for http2 mode
+                    if (useHttp2Adapter) {
+                        config.adapter = this._createHttp2Adapter(timings, startTime);
+                    }
+
                     return axios(config);
                 };
 
@@ -284,6 +360,11 @@ class ApiRequestHandler {
                     requestOptions.url
                 );
             } else {
+                // Use HTTP/2 adapter for http2 mode
+                if (useHttp2Adapter) {
+                    axiosConfig.adapter = this._createHttp2Adapter(timings, startTime);
+                }
+
                 response = await axios(axiosConfig);
             }
 
@@ -319,6 +400,15 @@ class ApiRequestHandler {
             };
         } catch (error) {
             console.error('API request error:', error);
+
+            // Log HTTP/2-specific errors for debugging
+            if (this._isHttp2Error(error)) {
+                console.warn('HTTP/2 protocol error detected:', {
+                    code: error.code,
+                    message: error.message,
+                    httpVersion: httpVersion
+                });
+            }
 
             timings.total = Date.now() - startTime;
             const ttfb = Date.now() - startTime;

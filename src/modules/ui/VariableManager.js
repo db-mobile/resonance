@@ -73,10 +73,27 @@ export class VariableManager {
             </div>
             
             <div style="margin-bottom: 16px; padding: 12px; background: var(--color-primary-light); border-radius: var(--radius-sm); border-left: 4px solid var(--color-primary);">
-                <p style="margin: 0; font-size: 14px; color: var(--text-primary);">
+                <p style="margin: 0 0 8px 0; font-size: 14px; color: var(--text-primary);">
                     <strong>Usage:</strong> Define variables here and use them in your requests with <code>{{ variableName }}</code> syntax.
-                    <br>Variables can be used in URLs, headers, query parameters, and request bodies.
+                    Variables can be used in URLs, headers, query parameters, and request bodies.
                 </p>
+                <details style="margin-top: 8px;">
+                    <summary style="cursor: pointer; font-size: 13px; color: var(--text-secondary); user-select: none;">
+                        <strong>Dynamic Variables</strong> - Auto-generated values (click to expand)
+                    </summary>
+                    <div style="margin-top: 8px; font-size: 12px; font-family: monospace; color: var(--text-secondary); line-height: 1.6;">
+                        <code>{{$uuid}}</code> - Random UUID<br>
+                        <code>{{$timestamp}}</code> - Unix timestamp (seconds)<br>
+                        <code>{{$timestampMs}}</code> - Unix timestamp (ms)<br>
+                        <code>{{$isoTimestamp}}</code> - ISO 8601 date<br>
+                        <code>{{$randomInt}}</code> - Random 0-1000<br>
+                        <code>{{$randomInt:1:100}}</code> - Random in range<br>
+                        <code>{{$randomString}}</code> - Random 8-char string<br>
+                        <code>{{$randomString:16}}</code> - Random N-char string<br>
+                        <code>{{$randomEmail}}</code> - Random email<br>
+                        <code>{{$randomName}}</code> - Random name
+                    </div>
+                </details>
             </div>
 
             <div id="variables-container" style="margin-bottom: 20px;">
