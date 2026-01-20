@@ -28,6 +28,78 @@ class OpenApiParser {
     }
 
     /**
+     * Validates an OpenAPI specification object
+     *
+     * Checks that the specification has the required structure including
+     * openapi version field and info object with title.
+     *
+     * @param {Object} openApiSpec - The OpenAPI specification to validate
+     * @returns {Object} Validation result with isValid boolean and error message if invalid
+     */
+    validateOpenApiSpec(openApiSpec) {
+        if (!openApiSpec || typeof openApiSpec !== 'object') {
+            return { isValid: false, error: 'OpenAPI specification must be an object' };
+        }
+
+        // Check for OpenAPI version (supports both OpenAPI 3.x and Swagger 2.x)
+        const hasOpenApiVersion = openApiSpec.openapi && typeof openApiSpec.openapi === 'string';
+        const hasSwaggerVersion = openApiSpec.swagger && typeof openApiSpec.swagger === 'string';
+
+        if (!hasOpenApiVersion && !hasSwaggerVersion) {
+            return {
+                isValid: false,
+                error: 'Missing OpenAPI/Swagger version. Expected "openapi" or "swagger" field'
+            };
+        }
+
+        // Validate OpenAPI 3.x version format
+        if (hasOpenApiVersion && !openApiSpec.openapi.match(/^3\.\d+\.\d+$/)) {
+            return {
+                isValid: false,
+                error: `Unsupported OpenAPI version "${openApiSpec.openapi}". Expected 3.x.x format`
+            };
+        }
+
+        // Validate Swagger 2.x version format
+        if (hasSwaggerVersion && !openApiSpec.swagger.match(/^2\.\d+$/)) {
+            return {
+                isValid: false,
+                error: `Unsupported Swagger version "${openApiSpec.swagger}". Expected 2.x format`
+            };
+        }
+
+        // Check for info object
+        if (!openApiSpec.info || typeof openApiSpec.info !== 'object') {
+            return { isValid: false, error: 'Missing or invalid "info" object in OpenAPI specification' };
+        }
+
+        // Check for paths object (optional but warn if missing)
+        if (openApiSpec.paths && typeof openApiSpec.paths !== 'object') {
+            return { isValid: false, error: '"paths" must be an object if provided' };
+        }
+
+        // Validate servers array if present
+        if (openApiSpec.servers !== undefined) {
+            if (!Array.isArray(openApiSpec.servers)) {
+                return { isValid: false, error: '"servers" must be an array if provided' };
+            }
+
+            // Validate each server has a url
+            for (let i = 0; i < openApiSpec.servers.length; i++) {
+                const server = openApiSpec.servers[i];
+                if (!server || typeof server !== 'object') {
+                    return { isValid: false, error: `Invalid server at index ${i}: must be an object` };
+                }
+                if (!server.url || typeof server.url !== 'string') {
+                    return { isValid: false, error: `Invalid server at index ${i}: missing or invalid "url" field` };
+                }
+            }
+        }
+
+        return { isValid: true };
+    }
+
+    /**
      * Converts an OpenAPI specification into a collection object
      *
      * Parses the OpenAPI spec and creates a structured collection with endpoints
@@ -37,9 +109,16 @@ class OpenApiParser {
      * @param {Object} openApiSpec - The parsed OpenAPI 3.0 specification object
      * @param {string} fileName - The original filename for fallback naming
      * @returns {Object} Collection object with endpoints, folders, and metadata
+     * @throws {Error} If the OpenAPI specification is invalid
      */
     parseOpenApiToCollection(openApiSpec, fileName) {
-        this.schemaProcessor.setCurrentSpec(openApiSpec);
+        // Validate spec before processing
+        const validation = this.validateOpenApiSpec(openApiSpec);
+        if (!validation.isValid) {
+            throw new Error(`Invalid OpenAPI specification: ${validation.error}`);
+        }
+
+        this.schemaProcessor.setOpenApiSpec(openApiSpec);
 
         const collection = {
             id: Date.now().toString(),

@@ -25,6 +25,115 @@ class PostmanParser {
     }
 
     /**
+     * Supported Postman collection schema URLs
+     * @private
+     * @type {string[]}
+     */
+    static SUPPORTED_SCHEMAS = [
+        'https://schema.getpostman.com/json/collection/v2.0.0/collection.json',
+        'https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
+    ];
+
+    /**
+     * Validates a Postman collection object
+     *
+     * Checks that the collection has the required structure including
+     * info object with name and schema, and items array.
+     *
+     * @param {Object} postmanCollection - The Postman collection to validate
+     * @returns {Object} Validation result with isValid boolean and error message if invalid
+     */
+    validatePostmanCollection(postmanCollection) {
+        if (!postmanCollection || typeof postmanCollection !== 'object') {
+            return { isValid: false, error: 'Postman collection must be an object' };
+        }
+
+        // Check for info object
+        if (!postmanCollection.info || typeof postmanCollection.info !== 'object') {
+            return { isValid: false, error: 'Missing or invalid "info" object in Postman collection' };
+        }
+
+        // Check for schema field (required for v2.x collections)
+        if (!postmanCollection.info.schema || typeof postmanCollection.info.schema !== 'string') {
+            return { isValid: false, error: 'Missing "info.schema" field. This may not be a valid Postman v2.x collection' };
+        }
+
+        // Validate schema version
+        if (!PostmanParser.SUPPORTED_SCHEMAS.includes(postmanCollection.info.schema)) {
+            return {
+                isValid: false,
+                error: `Unsupported Postman collection schema: "${postmanCollection.info.schema}". Supported schemas: v2.0.0, v2.1.0`
+            };
+        }
+
+        // Check for name (optional but should warn)
+        if (!postmanCollection.info.name || typeof postmanCollection.info.name !== 'string') {
+            console.warn('Postman collection is missing "info.name" field, will use filename as fallback');
+        }
+
+        // Validate item array if present
+        if (postmanCollection.item !== undefined) {
+            if (!Array.isArray(postmanCollection.item)) {
+                return { isValid: false, error: '"item" must be an array if provided' };
+            }
+        }
+
+        // Validate auth object if present
+        if (postmanCollection.auth !== undefined && postmanCollection.auth !== null) {
+            if (typeof postmanCollection.auth !== 'object') {
+                return { isValid: false, error: '"auth" must be an object if provided' };
+            }
+        }
+
+        // Validate variable array if present
+        if (postmanCollection.variable !== undefined) {
+            if (!Array.isArray(postmanCollection.variable)) {
+                return { isValid: false, error: '"variable" must be an array if provided' };
+            }
+        }
+
+        return { isValid: true };
+    }
+
+    /**
+     * Validates a Postman environment object
+     *
+     * Checks that the environment has the required structure including
+     * name and values array.
+     *
+     * @param {Object} postmanEnv - The Postman environment to validate
+     * @returns {Object} Validation result with isValid boolean and error message if invalid
+     */
+    validatePostmanEnvironment(postmanEnv) {
+        if (!postmanEnv || typeof postmanEnv !== 'object') {
+            return { isValid: false, error: 'Postman environment must be an object' };
+        }
+
+        // Check for name
+        if (!postmanEnv.name || typeof postmanEnv.name !== 'string') {
+            return { isValid: false, error: 'Missing or invalid "name" field in Postman environment' };
+        }
+
+        // Check for values array
+        if (!postmanEnv.values || !Array.isArray(postmanEnv.values)) {
+            return { isValid: false, error: 'Missing or invalid "values" array in Postman environment' };
+        }
+
+        // Validate each value entry
+        for (let i = 0; i < postmanEnv.values.length; i++) {
+            const value = postmanEnv.values[i];
+            if (!value || typeof value !== 'object') {
+                return { isValid: false, error: `Invalid value at index ${i}: must be an object` };
+            }
+            if (!value.key || typeof value.key !== 'string') {
+                return { isValid: false, error: `Invalid value at index ${i}: missing or invalid "key" field` };
+            }
+        }
+
+        return { isValid: true };
+    }
+
+    /**
      * Converts a Postman collection into a collection object
      *
      * Parses the Postman collection and creates a structured collection with endpoints
@@ -34,8 +143,15 @@ class PostmanParser {
      * @param {Object} postmanCollection - The parsed Postman collection object
      * @param {string} fileName - The original filename for fallback naming
      * @returns {Object} Collection object with endpoints, folders, and metadata
+     * @throws {Error} If the Postman collection is invalid
      */
     parsePostmanToCollection(postmanCollection, fileName) {
+        // Validate collection before processing
+        const validation = this.validatePostmanCollection(postmanCollection);
+        if (!validation.isValid) {
+            throw new Error(`Invalid Postman collection: ${validation.error}`);
+        }
+
         const collection = {
             id: Date.now().toString(),
             name: postmanCollection.info?.name || fileName,
@@ -475,10 +591,7 @@ class PostmanParser {
         const fileContent = await fs.readFile(filePath, 'utf8');
         const postmanCollection = JSON.parse(fileContent);
 
-        if (!postmanCollection.info || !postmanCollection.info.schema) {
-            throw new Error('Invalid Postman collection format: missing info.schema');
-        }
-
+        // Validation is now handled by parsePostmanToCollection with detailed error messages
         const collection = this.parsePostmanToCollection(postmanCollection, path.basename(filePath));
 
         const variables = this.extractVariables(postmanCollection);
@@ -537,8 +650,10 @@ class PostmanParser {
         const fileContent = await fs.readFile(filePath, 'utf8');
         const postmanEnv = JSON.parse(fileContent);
 
-        if (!postmanEnv.name || !postmanEnv.values) {
-            throw new Error('Invalid Postman environment format: missing name or values');
+        // Validate environment structure
+        const validation = this.validatePostmanEnvironment(postmanEnv);
+        if (!validation.isValid) {
+            throw new Error(`Invalid Postman environment: ${validation.error}`);
         }
 
         const variables = {};

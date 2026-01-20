@@ -1,3 +1,8 @@
+// Polyfill TextEncoder/TextDecoder for Node.js test environment
+import { TextEncoder, TextDecoder } from 'util';
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
+
 // Suppress console.error during tests for expected error handling
 const originalConsoleError = console.error;
 console.error = (...args) => {

@@ -53,6 +53,104 @@ class ApiRequestHandler {
     }
 
     /**
+     * Supported HTTP methods for API requests
+     * @private
+     * @type {string[]}
+     */
+    static VALID_HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+
+    /**
+     * Validates a URL string for HTTP/HTTPS requests
+     *
+     * Checks that the URL is a valid, well-formed HTTP or HTTPS URL.
+     * Rejects other protocols (file://, ftp://, etc.) for security.
+     *
+     * @param {string} url - The URL to validate
+     * @returns {Object} Validation result with isValid boolean and error message if invalid
+     */
+    validateUrl(url) {
+        if (!url || typeof url !== 'string') {
+            return { isValid: false, error: 'URL is required and must be a string' };
+        }
+
+        const trimmedUrl = url.trim();
+        if (trimmedUrl.length === 0) {
+            return { isValid: false, error: 'URL cannot be empty' };
+        }
+
+        try {
+            const urlObj = new URL(trimmedUrl);
+
+            // Only allow HTTP and HTTPS protocols
+            if (!['http:', 'https:'].includes(urlObj.protocol)) {
+                return {
+                    isValid: false,
+                    error: `Invalid protocol "${urlObj.protocol}". Only HTTP and HTTPS are supported`
+                };
+            }
+
+            // Validate hostname exists
+            if (!urlObj.hostname || urlObj.hostname.length === 0) {
+                return { isValid: false, error: 'URL must include a valid hostname' };
+            }
+
+            return { isValid: true };
+        } catch (error) {
+            return { isValid: false, error: `Invalid URL format: ${error.message}` };
+        }
+    }
+
+    /**
+     * Validates request options before making an API request
+     *
+     * Ensures all required fields are present and valid, including
+     * URL validation and HTTP method validation.
+     *
+     * @param {Object} requestOptions - The request options to validate
+     * @returns {Object} Validation result with isValid boolean and error message if invalid
+     */
+    validateRequestOptions(requestOptions) {
+        if (!requestOptions || typeof requestOptions !== 'object') {
+            return { isValid: false, error: 'Request options must be an object' };
+        }
+
+        // Validate URL
+        const urlValidation = this.validateUrl(requestOptions.url);
+        if (!urlValidation.isValid) {
+            return urlValidation;
+        }
+
+        // Validate HTTP method
+        if (!requestOptions.method || typeof requestOptions.method !== 'string') {
+            return { isValid: false, error: 'HTTP method is required' };
+        }
+
+        const method = requestOptions.method.toUpperCase();
+        if (!ApiRequestHandler.VALID_HTTP_METHODS.includes(method)) {
+            return {
+                isValid: false,
+                error: `Invalid HTTP method "${requestOptions.method}". Supported methods: ${ApiRequestHandler.VALID_HTTP_METHODS.join(', ')}`
+            };
+        }
+
+        // Validate headers if provided
+        if (requestOptions.headers !== undefined && requestOptions.headers !== null) {
+            if (typeof requestOptions.headers !== 'object' || Array.isArray(requestOptions.headers)) {
+                return { isValid: false, error: 'Headers must be an object' };
+            }
+        }
+
+        // Validate auth if provided
+        if (requestOptions.auth !== undefined && requestOptions.auth !== null) {
+            if (typeof requestOptions.auth !== 'object') {
+                return { isValid: false, error: 'Auth configuration must be an object' };
+            }
+        }
+
+        return { isValid: true };
+    }
+
+    /**
      * Creates a custom HTTP/HTTPS agent with DNS timing capture
      *
      * This method is currently unused but provides an alternative approach for
@@ -210,6 +308,28 @@ class ApiRequestHandler {
      * @returns {Promise<Object>} Response object with data, status, headers, and timing metrics
      */
     async handleApiRequest(requestOptions) {
+        // Validate request options before proceeding
+        const validation = this.validateRequestOptions(requestOptions);
+        if (!validation.isValid) {
+            return {
+                success: false,
+                message: validation.error,
+                status: null,
+                statusText: 'Validation Error',
+                data: null,
+                headers: {},
+                timings: {
+                    startTime: Date.now(),
+                    dnsLookup: 0,
+                    tcpConnection: 0,
+                    tlsHandshake: 0,
+                    firstByte: 0,
+                    download: 0,
+                    total: 0
+                }
+            };
+        }
+
         // Check if we should route to mock server
         const mockServerUrl = this._getMockServerUrl(requestOptions.method, requestOptions.url);
         if (mockServerUrl) {
