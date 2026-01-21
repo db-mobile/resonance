@@ -60,7 +60,7 @@ A local-first, zero-account API client with excellent user experience built with
 
 ### User Experience
 - **Keyboard Shortcuts**: Comprehensive shortcuts for all actions with platform-aware bindings (⌘/Ctrl)
-- **Multi-Theme Support**: Light, dark, system-adaptive, and blueprint themes
+- **Multi-Theme Support**: Light, dark, system-adaptive, and black (OLED) themes with 9 accent colors
 - **Internationalization**: Full support for English, German, Spanish, French, and Italian
 - **Syntax Highlighting**: CodeMirror-based response viewer with automatic language detection
 - **Resizable Panels**: Customizable workspace layout with draggable panel dividers
@@ -408,7 +408,14 @@ Switch between themes in Settings:
 - **Light**: Clean, bright interface
 - **Dark**: Easy on the eyes for low-light environments
 - **System**: Automatically matches your OS theme
-- **Blueprint**: Technical schematic-inspired design
+- **Black (OLED)**: True black theme optimized for OLED displays
+
+### Accent Colors
+
+Personalize your interface with 9 accent colors:
+- Green (default), Teal, Blue, Indigo, Purple, Yellow, Orange, Red, Pink
+
+Accent colors are applied to buttons, highlights, and interactive elements throughout the application.
 
 ## Keyboard Shortcuts
 
@@ -593,7 +600,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Proxy support with authentication
 - [x] Variable templating system with environment support
 - [x] Dynamic variables (UUID, timestamps, random values)
-- [x] Multi-theme support (3 themes)
+- [x] Multi-theme support (4 themes with 9 accent colors)
 - [x] Internationalization (5 languages)
 - [x] Authentication support (Bearer, Basic, API Key, OAuth2, Digest)
 - [x] Request history with search and replay

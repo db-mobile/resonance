@@ -1,24 +1,43 @@
 export class ThemeManager {
     constructor() {
         this.currentTheme = 'system';
+        this.currentAccent = 'green';
         this.currentThemeLink = null;
-        this.availableThemes = ['light', 'dark', 'system', 'blueprint'];
+        this.availableThemes = ['light', 'dark', 'system', 'black'];
+        this.availableAccents = ['green', 'teal', 'blue', 'indigo', 'purple', 'yellow', 'orange', 'red', 'pink'];
         this.init();
     }
 
     async init() {
         await this.loadSavedTheme();
+        await this.loadSavedAccent();
         await this.applyTheme(this.currentTheme);
+        this.applyAccent(this.currentAccent);
         this.setupSystemThemeListener();
     }
 
     async loadSavedTheme() {
         try {
-            const savedTheme = await window.electronAPI.store.get('theme');
+            let savedTheme = await window.electronAPI.store.get('theme');
+            // Migrate blueprint to black
+            if (savedTheme === 'blueprint') {
+                savedTheme = 'black';
+                await this.saveTheme('black');
+            }
             this.currentTheme = savedTheme || 'system';
         } catch (error) {
             console.error('Error loading saved theme:', error);
             this.currentTheme = 'system';
+        }
+    }
+
+    async loadSavedAccent() {
+        try {
+            const savedAccent = await window.electronAPI.store.get('accent');
+            this.currentAccent = savedAccent || 'green';
+        } catch (error) {
+            console.error('Error loading saved accent:', error);
+            this.currentAccent = 'green';
         }
     }
 
@@ -28,6 +47,37 @@ export class ThemeManager {
         } catch (error) {
             console.error('Error saving theme:', error);
         }
+    }
+
+    async saveAccent(accent) {
+        try {
+            await window.electronAPI.store.set('accent', accent);
+        } catch (error) {
+            console.error('Error saving accent:', error);
+        }
+    }
+
+    applyAccent(accent) {
+        document.documentElement.setAttribute('data-accent', accent);
+        this.currentAccent = accent;
+    }
+
+    async setAccent(accent) {
+        if (!this.availableAccents.includes(accent)) {
+            console.error(`Accent '${accent}' is not available`);
+            return;
+        }
+
+        this.applyAccent(accent);
+        await this.saveAccent(accent);
+    }
+
+    getAccent() {
+        return this.currentAccent;
+    }
+
+    getAvailableAccents() {
+        return [...this.availableAccents];
     }
 
     async loadThemeCSS(theme) {
@@ -191,11 +241,18 @@ export class SettingsModal {
                                     <option value="light" ${this.themeManager.getCurrentTheme() === 'light' ? 'selected' : ''} data-i18n="theme.light">Light</option>
                                     <option value="dark" ${this.themeManager.getCurrentTheme() === 'dark' ? 'selected' : ''} data-i18n="theme.dark">Dark</option>
                                     <option value="system" ${this.themeManager.getCurrentTheme() === 'system' ? 'selected' : ''} data-i18n="theme.system">System</option>
-                                    <option value="blueprint" ${this.themeManager.getCurrentTheme() === 'blueprint' ? 'selected' : ''} data-i18n="theme.blueprint">Blueprint</option>
+                                    <option value="black" ${this.themeManager.getCurrentTheme() === 'black' ? 'selected' : ''} data-i18n="theme.black">Black (OLED)</option>
                                 </select>
                                 <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="2 4 6 8 10 4"></polyline>
                                 </svg>
+                            </div>
+                        </div>
+
+                        <div class="settings-section">
+                            <h3 data-i18n="settings.accent_color">Accent Color</h3>
+                            <div class="accent-color-grid">
+                                ${this.createAccentButtons()}
                             </div>
                         </div>
                     
@@ -259,6 +316,33 @@ export class SettingsModal {
                 </div>
             </div>
         `;
+    }
+
+    createAccentButtons() {
+        const accents = this.themeManager.getAvailableAccents();
+        const currentAccent = this.themeManager.getAccent();
+
+        const accentColors = {
+            green: '#10b981',
+            teal: '#14b8a6',
+            blue: '#3b82f6',
+            indigo: '#6366f1',
+            purple: '#8b5cf6',
+            yellow: '#eab308',
+            orange: '#f97316',
+            red: '#ef4444',
+            pink: '#ec4899'
+        };
+
+        return accents.map(accent => `
+            <button type="button"
+                    class="accent-btn ${accent === currentAccent ? 'active' : ''}"
+                    data-accent="${accent}"
+                    style="--btn-color: ${accentColors[accent]}"
+                    aria-label="${accent} accent color"
+                    title="${accent.charAt(0).toUpperCase() + accent.slice(1)}">
+            </button>
+        `).join('');
     }
 
     async createProxySection() {
@@ -389,6 +473,19 @@ export class SettingsModal {
                 await this.themeManager.setTheme(e.target.value);
             });
         }
+
+        // Accent color button listeners
+        const accentButtons = overlay.querySelectorAll('.accent-btn');
+        accentButtons.forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const accent = btn.dataset.accent;
+                await this.themeManager.setAccent(accent);
+
+                // Update active state
+                accentButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
 
         if (this.i18nManager && languageSelect) {
             languageSelect.addEventListener('change', async (e) => {
