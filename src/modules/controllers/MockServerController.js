@@ -70,7 +70,6 @@ export class MockServerController {
             // Start server via service
             return await this.service.startServer(collections);
         } catch (error) {
-            console.error('Error starting mock server:', error);
             return {
                 success: false,
                 message: error.message || 'Failed to start mock server'
@@ -88,7 +87,6 @@ export class MockServerController {
         try {
             return await this.service.stopServer();
         } catch (error) {
-            console.error('Error stopping mock server:', error);
             return {
                 success: false,
                 message: error.message || 'Failed to stop mock server'
@@ -139,7 +137,6 @@ export class MockServerController {
                 message: 'Port updated successfully'
             };
         } catch (error) {
-            console.error('Error updating port:', error);
             return {
                 success: false,
                 message: error.message || 'Failed to update port'
@@ -163,7 +160,6 @@ export class MockServerController {
                 message: isEnabled ? 'Collection enabled' : 'Collection disabled'
             };
         } catch (error) {
-            console.error('Error toggling collection:', error);
             return {
                 success: false,
                 message: error.message || 'Failed to toggle collection'
@@ -196,7 +192,6 @@ export class MockServerController {
                 message: 'Delay updated successfully'
             };
         } catch (error) {
-            console.error('Error setting endpoint delay:', error);
             return {
                 success: false,
                 message: error.message || 'Failed to set delay'
@@ -219,7 +214,7 @@ export class MockServerController {
             if (typeof response === 'string' && response.trim()) {
                 try {
                     response = JSON.parse(response);
-                } catch (parseError) {
+                } catch {
                     return {
                         success: false,
                         message: 'Invalid JSON format'
@@ -233,7 +228,6 @@ export class MockServerController {
                 message: 'Custom response updated successfully'
             };
         } catch (error) {
-            console.error('Error setting custom response:', error);
             return {
                 success: false,
                 message: error.message || 'Failed to set custom response'
@@ -253,7 +247,6 @@ export class MockServerController {
         try {
             return await this.service.getCustomResponse(collectionId, endpointId);
         } catch (error) {
-            console.error('Error getting custom response:', error);
             return null;
         }
     }
@@ -270,7 +263,6 @@ export class MockServerController {
         try {
             return await this.service.getDefaultResponse(collectionId, endpointId);
         } catch (error) {
-            console.error('Error getting default response:', error);
             return null;
         }
     }
@@ -303,7 +295,6 @@ export class MockServerController {
                 message: 'Custom status code updated successfully'
             };
         } catch (error) {
-            console.error('Error setting custom status code:', error);
             return {
                 success: false,
                 message: error.message || 'Failed to set custom status code'
@@ -323,7 +314,6 @@ export class MockServerController {
         try {
             return await this.service.getCustomStatusCode(collectionId, endpointId);
         } catch (error) {
-            console.error('Error getting custom status code:', error);
             return null;
         }
     }
@@ -338,7 +328,6 @@ export class MockServerController {
         try {
             return await this.collectionRepository.getAll();
         } catch (error) {
-            console.error('Error getting collections:', error);
             return [];
         }
     }
@@ -368,7 +357,6 @@ export class MockServerController {
                 message: 'Logs cleared successfully'
             };
         } catch (error) {
-            console.error('Error clearing logs:', error);
             return {
                 success: false,
                 message: error.message || 'Failed to clear logs'

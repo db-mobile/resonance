@@ -12,7 +12,7 @@
 export default class ScriptHandlers {
     /**
      * Creates a ScriptHandlers instance
-     * @param {Object} store - electron-store instance
+     * @param {Object} store - store instance
      * @param {Object} scriptExecutor - ScriptExecutor instance
      */
     constructor(store, scriptExecutor) {

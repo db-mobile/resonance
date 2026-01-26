@@ -7,10 +7,10 @@
 export class PreviewRepository {
     /**
      * Creates a PreviewRepository instance
-     * @param {Object} electronAPI - The Electron IPC API bridge from preload script
+     * @param {Object} backendAPI - The backend IPC API bridge
      */
-    constructor(electronAPI) {
-        this.electronAPI = electronAPI;
+    constructor(backendAPI) {
+        this.backendAPI = backendAPI;
         this.storageKey = 'previewModes';
     }
 
@@ -21,13 +21,13 @@ export class PreviewRepository {
      */
     getPreviewMode(tabId) {
         try {
-            const modes = this.electronAPI.store.get(this.storageKey);
+            const modes = this.backendAPI.store.get(this.storageKey);
             if (!modes || typeof modes !== 'object') {
                 return false;
             }
             return Boolean(modes[tabId]);
         } catch (error) {
-            console.error('Error getting preview mode:', error);
+            void error;
             return false;
         }
     }
@@ -40,7 +40,7 @@ export class PreviewRepository {
     setPreviewMode(tabId, isPreviewMode) {
         try {
             // Get existing modes and create a clean plain object
-            const existingModes = this.electronAPI.store.get(this.storageKey);
+            const existingModes = this.backendAPI.store.get(this.storageKey);
             const modes = {};
 
             // Copy existing modes (only plain values)
@@ -56,9 +56,9 @@ export class PreviewRepository {
             modes[tabId] = Boolean(isPreviewMode);
 
             // Save clean object
-            this.electronAPI.store.set(this.storageKey, modes);
+            this.backendAPI.store.set(this.storageKey, modes);
         } catch (error) {
-            console.error('Error setting preview mode:', error);
+            void error;
         }
     }
 
@@ -68,7 +68,7 @@ export class PreviewRepository {
      */
     removePreviewMode(tabId) {
         try {
-            const existingModes = this.electronAPI.store.get(this.storageKey);
+            const existingModes = this.backendAPI.store.get(this.storageKey);
             const modes = {};
 
             // Copy existing modes except the one to remove
@@ -80,9 +80,9 @@ export class PreviewRepository {
                 });
             }
 
-            this.electronAPI.store.set(this.storageKey, modes);
+            this.backendAPI.store.set(this.storageKey, modes);
         } catch (error) {
-            console.error('Error removing preview mode:', error);
+            void error;
         }
     }
 
@@ -91,9 +91,9 @@ export class PreviewRepository {
      */
     clearAll() {
         try {
-            this.electronAPI.store.set(this.storageKey, {});
+            this.backendAPI.store.set(this.storageKey, {});
         } catch (error) {
-            console.error('Error clearing preview modes:', error);
+            void error;
         }
     }
 }

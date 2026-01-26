@@ -20,11 +20,12 @@ export class HistoryController {
     /**
      * Creates a HistoryController instance
      *
-     * @param {Object} electronAPI - The Electron IPC API bridge for storage operations
+     * @param {Object} backendAPI - The backend IPC API bridge for storage operations
      */
-    constructor(electronAPI) {
-        this.service = new HistoryService(electronAPI);
-        this.renderer = new HistoryRenderer(electronAPI, this.handleHistorySelect.bind(this));
+    constructor(backendAPI) {
+        this.service = new HistoryService(backendAPI);
+        this.repository = this.service.repository;
+        this.renderer = new HistoryRenderer(backendAPI, this.handleHistorySelect.bind(this));
     }
 
     /**
@@ -54,7 +55,7 @@ export class HistoryController {
             await this.service.createHistoryEntry(requestConfig, result, currentEndpoint);
             await this.renderer.refresh();
         } catch (error) {
-            console.error('Error adding history entry:', error);
+            void error;
         }
     }
 
@@ -141,7 +142,7 @@ export class HistoryController {
             window.currentEndpoint = null;
 
         } catch (error) {
-            console.error('Error loading history entry:', error);
+            void error;
         }
     }
 

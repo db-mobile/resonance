@@ -17,7 +17,7 @@ class MockServerHandler {
     /**
      * Creates a MockServerHandler instance
      *
-     * @param {Object} store - Electron-store instance for settings persistence
+     * @param {Object} store - Store instance for settings persistence
      * @param {Object} schemaProcessor - SchemaProcessor instance for response generation
      */
     constructor(store, schemaProcessor) {
@@ -64,16 +64,14 @@ class MockServerHandler {
 
             // Create HTTP server
             this.server = http.createServer((req, res) => {
-                this._handleRequest(req, res).catch(error => {
-                    console.error('Error handling request:', error);
+                this._handleRequest(req, res).catch(_error => {
                     res.writeHead(500, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Internal server error' }));
                 });
             });
 
             // Handle server errors
-            this.server.on('error', (error) => {
-                console.error('Mock server error:', error);
+            this.server.on('error', (_error) => {
                 this._cleanup();
             });
 
@@ -96,8 +94,6 @@ class MockServerHandler {
                 });
 
                 this.server.listen(this.port, 'localhost', () => {
-                    console.log(`Mock server started on http://localhost:${this.port}`);
-                    console.log(`Mocking ${this.endpoints.size} endpoints`);
                     resolve({
                         success: true,
                         message: `Server started on port ${this.port}`,
@@ -106,7 +102,6 @@ class MockServerHandler {
                 });
             });
         } catch (error) {
-            console.error('Error starting mock server:', error);
             this._cleanup();
             return {
                 success: false,
@@ -143,13 +138,11 @@ class MockServerHandler {
 
             this._cleanup();
 
-            console.log('Mock server stopped');
             return {
                 success: true,
                 message: 'Server stopped successfully'
             };
         } catch (error) {
-            console.error('Error stopping mock server:', error);
             this._cleanup();
             return {
                 success: false,
@@ -207,13 +200,11 @@ class MockServerHandler {
                 customStatusCodes: freshSettings.customStatusCodes || {}
             };
 
-            console.log('Mock server settings reloaded');
             return {
                 success: true,
                 message: 'Settings reloaded successfully'
             };
         } catch (error) {
-            console.error('Error reloading settings:', error);
             return {
                 success: false,
                 message: error.message || 'Failed to reload settings'
@@ -438,12 +429,11 @@ class MockServerHandler {
                 const exampleJson = this.schemaProcessor.generateExampleFromSchema(schema);
                 return JSON.parse(exampleJson);
             } catch (error) {
-                console.warn(`Error generating response from schema for ${endpoint.method} ${endpoint.path}:`, error);
+                void error;
             }
         }
 
         // Fallback response
-        console.warn(`No schema found for ${endpoint.method} ${endpoint.path}, using fallback`);
         return {
             message: 'Mock response',
             success: true,

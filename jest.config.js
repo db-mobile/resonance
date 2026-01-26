@@ -1,25 +1,17 @@
 export default {
   testEnvironment: 'jsdom',
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
+  testMatch: ['<rootDir>/tests/**/*.test.js'],
+  moduleFileExtensions: ['js', 'mjs', 'json'],
   transform: {
-    '^.+\\.js$': ['babel-jest', {
-      presets: [
-        ['@babel/preset-env', {
-          targets: {
-            node: 'current'
-          }
-        }]
-      ]
-    }]
+    '^.+\\.js$': 'babel-jest'
   },
-  moduleFileExtensions: ['js', 'json'],
-  testMatch: ['**/__tests__/**/*.js', '**/?(*.)+(spec|test).js'],
-  testPathIgnorePatterns: ['tests/e2e/'],
   collectCoverageFrom: [
     'src/**/*.js',
     '!src/main.js',
-    '!src/preload.js'
+    '!src/renderer.js'
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html']
+  coverageReporters: ['text', 'lcov', 'html'],
+  verbose: true
 };

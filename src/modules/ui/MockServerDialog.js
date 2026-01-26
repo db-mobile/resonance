@@ -206,7 +206,7 @@ export class MockServerDialog {
             // Update status
             await this.updateStatusDisplay(status);
         } catch (error) {
-            console.error('Error loading initial state:', error);
+            void error;
         }
     }
 
@@ -441,7 +441,6 @@ export class MockServerDialog {
 
             toggleBtn.disabled = false;
         } catch (error) {
-            console.error('Error toggling server:', error);
             const t = (key, fallback) => window.i18n ? window.i18n.t(key) || fallback : fallback;
             this.showAlert(error.message || t('mock_server.error_toggle_server', 'Failed to toggle server'));
         }
@@ -464,7 +463,7 @@ export class MockServerDialog {
                 portInput.value = settings.port;
             }
         } catch (error) {
-            console.error('Error updating port:', error);
+            void error;
         }
     }
 
@@ -487,7 +486,7 @@ export class MockServerDialog {
                 await this.renderCollections(collections, settings);
             }
         } catch (error) {
-            console.error('Error toggling collection:', error);
+            void error;
         }
     }
 
@@ -506,7 +505,7 @@ export class MockServerDialog {
                 this.showAlert(result.message);
             }
         } catch (error) {
-            console.error('Error setting delay:', error);
+            void error;
         }
     }
 
@@ -520,7 +519,7 @@ export class MockServerDialog {
             await this.controller.clearRequestLogs();
             await this.updateLogs();
         } catch (error) {
-            console.error('Error clearing logs:', error);
+            void error;
         }
     }
 
@@ -554,7 +553,7 @@ export class MockServerDialog {
             const status = await this.controller.getStatus();
             await this.updateStatusDisplay(status);
         } catch (error) {
-            console.error('Error updating status:', error);
+            void error;
         }
     }
 
@@ -601,7 +600,11 @@ export class MockServerDialog {
             const container = this.dialog.querySelector('#mock-server-logs');
             const t = (key, fallback) => window.i18n ? window.i18n.t(key) || fallback : fallback;
 
-            if (logs.length === 0) {
+            if (!container) {
+                return;
+            }
+
+            if (!logs || logs.length === 0) {
                 container.innerHTML = `
                     <div style="text-align: center; color: var(--text-secondary); padding: 40px 20px;">
                         ${t('mock_server.empty_logs', 'No requests logged yet.')}
@@ -611,7 +614,7 @@ export class MockServerDialog {
             }
 
             container.innerHTML = `
-                <table style="width: 100%; border-collapse: collapse;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
                     <thead>
                         <tr style="border-bottom: 1px solid var(--border-light);">
                             <th style="text-align: left; padding: 8px 4px; color: var(--text-secondary); font-weight: 500;">${t('mock_server.log_time', 'Time')}</th>
@@ -646,7 +649,7 @@ export class MockServerDialog {
                 </table>
             `;
         } catch (error) {
-            console.error('Error updating logs:', error);
+            void error;
         }
     }
 

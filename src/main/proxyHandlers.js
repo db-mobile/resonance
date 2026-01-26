@@ -17,7 +17,7 @@ class ProxyHandler {
     /**
      * Creates a ProxyHandler instance
      *
-     * @param {Object} store - Electron-store instance for proxy settings persistence
+     * @param {Object} store - Store instance for proxy settings persistence
      * @param {string} appVersion - Application version for User-Agent header
      */
     constructor(store, appVersion = '1.0.0') {
@@ -29,7 +29,7 @@ class ProxyHandler {
     /**
      * Retrieves proxy settings from persistent storage
      *
-     * Fetches proxy configuration from electron-store with automatic fallback
+     * Fetches proxy configuration from the store with automatic fallback
      * to defaults if settings are missing or invalid. Merges stored settings
      * with defaults to ensure all required fields are present.
      *
@@ -40,7 +40,6 @@ class ProxyHandler {
             const settings = this.store.get(this.PROXY_KEY);
 
             if (!settings || typeof settings !== 'object') {
-                console.warn('Proxy settings not found, returning defaults');
                 return this._getDefaultProxySettings();
             }
 
@@ -53,7 +52,6 @@ class ProxyHandler {
                 }
             };
         } catch (error) {
-            console.error('Error getting proxy settings:', error);
             return this._getDefaultProxySettings();
         }
     }
@@ -61,7 +59,7 @@ class ProxyHandler {
     /**
      * Saves proxy settings to persistent storage
      *
-     * Persists the provided proxy configuration to electron-store for use
+     * Persists the provided proxy configuration to the store for use
      * across application restarts.
      *
      * @param {Object} settings - Proxy configuration object to save
@@ -69,13 +67,8 @@ class ProxyHandler {
      * @throws {Error} If storage write fails
      */
     setProxySettings(settings) {
-        try {
-            this.store.set(this.PROXY_KEY, settings);
-            return settings;
-        } catch (error) {
-            console.error('Error saving proxy settings:', error);
-            throw error;
-        }
+        this.store.set(this.PROXY_KEY, settings);
+        return settings;
     }
 
     /**
@@ -164,7 +157,6 @@ class ProxyHandler {
             };
 
         } catch (error) {
-            console.error('Proxy connection test failed:', error);
 
             let errorMessage = 'Connection failed';
 
@@ -217,7 +209,6 @@ class ProxyHandler {
                 if (systemProxy) {
                     return systemProxy;
                 } 
-                    console.warn('System proxy is enabled but no system proxy configuration found');
                     return null;
                 
             }
@@ -237,7 +228,6 @@ class ProxyHandler {
 
             return proxyConfig;
         } catch (error) {
-            console.error('Error getting axios proxy config:', error);
             return null;
         }
     }
@@ -280,7 +270,6 @@ class ProxyHandler {
                 return false;
             });
         } catch (error) {
-            console.error('Error checking bypass list:', error);
             return false;
         }
     }
@@ -350,7 +339,6 @@ class ProxyHandler {
 
             return proxyConfig;
         } catch (error) {
-            console.error('Error parsing system proxy URL:', error);
             return null;
         }
     }

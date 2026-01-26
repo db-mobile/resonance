@@ -1,14 +1,14 @@
 /**
  * Integration tests for IPC communication
- * These tests verify the communication between main and renderer processes
+ * These tests verify the communication between Tauri backend and frontend
  */
 
 describe('IPC Integration Tests', () => {
-    let mockElectronAPI;
+    let mockIpcBridge;
 
     beforeEach(() => {
-        // Mock the electron API that would be exposed via preload script
-        mockElectronAPI = {
+        // Mock the IPC bridge that would be used for Tauri communication
+        mockIpcBridge = {
             sendApiRequest: jest.fn(),
             importCollection: jest.fn(),
             store: {
@@ -21,7 +21,7 @@ describe('IPC Integration Tests', () => {
             }
         };
         
-        global.electronAPI = mockElectronAPI;
+        global.ipcBridge = mockIpcBridge;
     });
 
     describe('API Request IPC', () => {
@@ -40,11 +40,11 @@ describe('IPC Integration Tests', () => {
                 headers: { 'content-type': 'application/json' }
             };
 
-            mockElectronAPI.sendApiRequest.mockResolvedValue(responseData);
+            mockIpcBridge.sendApiRequest.mockResolvedValue(responseData);
 
-            const result = await mockElectronAPI.sendApiRequest(requestData);
+            const result = await mockIpcBridge.sendApiRequest(requestData);
 
-            expect(mockElectronAPI.sendApiRequest).toHaveBeenCalledWith(requestData);
+            expect(mockIpcBridge.sendApiRequest).toHaveBeenCalledWith(requestData);
             expect(result).toEqual(responseData);
         });
 
@@ -59,9 +59,9 @@ describe('IPC Integration Tests', () => {
                 status: 0
             };
 
-            mockElectronAPI.sendApiRequest.mockResolvedValue(errorResponse);
+            mockIpcBridge.sendApiRequest.mockResolvedValue(errorResponse);
 
-            const result = await mockElectronAPI.sendApiRequest(requestData);
+            const result = await mockIpcBridge.sendApiRequest(requestData);
 
             expect(result).toEqual(errorResponse);
         });
@@ -92,11 +92,11 @@ describe('IPC Integration Tests', () => {
                 endpoints: 1
             };
 
-            mockElectronAPI.importCollection.mockResolvedValue(importResult);
+            mockIpcBridge.importCollection.mockResolvedValue(importResult);
 
-            const result = await mockElectronAPI.importCollection(collectionData);
+            const result = await mockIpcBridge.importCollection(collectionData);
 
-            expect(mockElectronAPI.importCollection).toHaveBeenCalledWith(collectionData);
+            expect(mockIpcBridge.importCollection).toHaveBeenCalledWith(collectionData);
             expect(result).toEqual(importResult);
         });
 
@@ -110,9 +110,9 @@ describe('IPC Integration Tests', () => {
                 error: 'Invalid OpenAPI specification'
             };
 
-            mockElectronAPI.importCollection.mockResolvedValue(errorResult);
+            mockIpcBridge.importCollection.mockResolvedValue(errorResult);
 
-            const result = await mockElectronAPI.importCollection(invalidCollectionData);
+            const result = await mockIpcBridge.importCollection(invalidCollectionData);
 
             expect(result).toEqual(errorResult);
         });
@@ -130,11 +130,11 @@ describe('IPC Integration Tests', () => {
                 ]
             };
 
-            mockElectronAPI.store.get.mockResolvedValue(storeData);
+            mockIpcBridge.store.get.mockResolvedValue(storeData);
 
-            const result = await mockElectronAPI.store.get('collections');
+            const result = await mockIpcBridge.store.get('collections');
 
-            expect(mockElectronAPI.store.get).toHaveBeenCalledWith('collections');
+            expect(mockIpcBridge.store.get).toHaveBeenCalledWith('collections');
             expect(result).toEqual(storeData);
         });
 
@@ -149,11 +149,11 @@ describe('IPC Integration Tests', () => {
                 ]
             };
 
-            mockElectronAPI.store.set.mockResolvedValue(true);
+            mockIpcBridge.store.set.mockResolvedValue(true);
 
-            const result = await mockElectronAPI.store.set('collections', storeData);
+            const result = await mockIpcBridge.store.set('collections', storeData);
 
-            expect(mockElectronAPI.store.set).toHaveBeenCalledWith('collections', storeData);
+            expect(mockIpcBridge.store.set).toHaveBeenCalledWith('collections', storeData);
             expect(result).toBe(true);
         });
     });
@@ -165,22 +165,22 @@ describe('IPC Integration Tests', () => {
                 language: 'en'
             };
 
-            mockElectronAPI.settings.get.mockResolvedValue(settings);
+            mockIpcBridge.settings.get.mockResolvedValue(settings);
 
-            const result = await mockElectronAPI.settings.get('theme');
+            const result = await mockIpcBridge.settings.get('theme');
 
-            expect(mockElectronAPI.settings.get).toHaveBeenCalledWith('theme');
+            expect(mockIpcBridge.settings.get).toHaveBeenCalledWith('theme');
             expect(result).toEqual(settings);
         });
 
         test('should set settings via IPC', async () => {
             const settingValue = 'light';
 
-            mockElectronAPI.settings.set.mockResolvedValue(true);
+            mockIpcBridge.settings.set.mockResolvedValue(true);
 
-            const result = await mockElectronAPI.settings.set('theme', settingValue);
+            const result = await mockIpcBridge.settings.set('theme', settingValue);
 
-            expect(mockElectronAPI.settings.set).toHaveBeenCalledWith('theme', settingValue);
+            expect(mockIpcBridge.settings.set).toHaveBeenCalledWith('theme', settingValue);
             expect(result).toBe(true);
         });
     });
@@ -188,16 +188,16 @@ describe('IPC Integration Tests', () => {
     describe('Error Handling', () => {
         test('should handle IPC timeout errors', async () => {
             const timeoutError = new Error('IPC timeout');
-            mockElectronAPI.sendApiRequest.mockRejectedValue(timeoutError);
+            mockIpcBridge.sendApiRequest.mockRejectedValue(timeoutError);
 
-            await expect(mockElectronAPI.sendApiRequest({})).rejects.toThrow('IPC timeout');
+            await expect(mockIpcBridge.sendApiRequest({})).rejects.toThrow('IPC timeout');
         });
 
         test('should handle IPC connection errors', async () => {
             const connectionError = new Error('IPC connection failed');
-            mockElectronAPI.store.get.mockRejectedValue(connectionError);
+            mockIpcBridge.store.get.mockRejectedValue(connectionError);
 
-            await expect(mockElectronAPI.store.get('test')).rejects.toThrow('IPC connection failed');
+            await expect(mockIpcBridge.store.get('test')).rejects.toThrow('IPC connection failed');
         });
     });
 });

@@ -107,7 +107,6 @@ export function activateTab(tabType, tabId) {
             contents = document.querySelectorAll('.response-display .tab-content');
         }
     } else {
-        console.warn('Unknown tab type:', tabType);
         return;
     }
 

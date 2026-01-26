@@ -1,46 +1,62 @@
 /**
  * Dark Theme
- * Automatically follows dark color scheme
+ * Hoppscotch-inspired minimal dark design
  */
 :root {
-  /* Text Colors - Optimized Contrast for Dark Background */
-  --text-primary: #E5E7EB;    /* Much lighter for better contrast */
-  --text-secondary: #D1D5DB;  /* Light gray for secondary text */
-  --text-tertiary: #9CA3AF;   /* Medium gray for tertiary text */
-  --text-disabled: #6B7280;   /* Darker for disabled state */
-  --text-inverse: #111827;    /* Dark text for light backgrounds */
+  /* Text Colors */
+  --text-primary: #e4e4e4;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #737373;
+  --text-disabled: #525252;
+  --text-inverse: #181818;
 
-  /* Background Colors - Rich Dark & Layered */
-  --bg-primary: #0F172A;      /* Very dark blue-gray */
-  --bg-secondary: #1E293B;    /* Slightly lighter blue-gray */
-  --bg-tertiary: #334155;     /* Medium blue-gray for cards */
-  --bg-overlay: rgba(15, 23, 42, 0.95);
-  --bg-glass: rgba(15, 23, 42, 0.8);
-  --bg-glass-strong: rgba(15, 23, 42, 0.9);
+  /* Background Colors - Hoppscotch Dark */
+  --bg-primary: #181818;
+  --bg-secondary: #1f1f1f;
+  --bg-tertiary: #272727;
+  --bg-overlay: rgba(24, 24, 24, 0.95);
+  --bg-glass: rgba(24, 24, 24, 0.8);
+  --bg-glass-strong: rgba(24, 24, 24, 0.9);
 
-  /* Border Colors - Subtle Dark Definition with Better Contrast */
-  --border-light: #334155;    /* Lighter than bg-tertiary */
-  --border-medium: #475569;   /* Medium contrast borders */
-  --border-strong: #64748B;   /* Strong contrast borders */
-  --border-focus: #3B82F6;    /* Blue focus ring */
-  --border-glass: rgba(100, 116, 139, 0.2);
+  /* Border Colors - Subtle */
+  --border-light: #2d2d2d;
+  --border-medium: #3d3d3d;
+  --border-strong: #525252;
+  --border-focus: var(--accent, #10b981);
+  --border-glass: rgba(45, 45, 45, 0.5);
 
-  /* Dark theme shadows - enhanced for depth */
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-  --shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
-  --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  /* Shadows - Minimal */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
+  --shadow-base: 0 2px 4px -1px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 16px -4px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 16px 32px -8px rgba(0, 0, 0, 0.5);
 
-  /* Dark theme accent colors - more vibrant backgrounds */
+  /* Status Colors - Dark mode variants */
   --color-success-light: rgba(16, 185, 129, 0.15);
-  --color-warning-light: rgba(245, 158, 11, 0.15);
+  --color-warning-light: rgba(234, 179, 8, 0.15);
   --color-error-light: rgba(239, 68, 68, 0.15);
   --color-primary-light: rgba(59, 130, 246, 0.15);
+
+  /* HTTP Method Colors */
+  --method-get-bg: rgba(34, 197, 94, 0.15);
+  --method-get-text: #4ade80;
+  --method-post-bg: rgba(59, 130, 246, 0.15);
+  --method-post-text: #60a5fa;
+  --method-put-bg: rgba(249, 115, 22, 0.15);
+  --method-put-text: #fb923c;
+  --method-delete-bg: rgba(239, 68, 68, 0.15);
+  --method-delete-text: #f87171;
+  --method-patch-bg: rgba(168, 85, 247, 0.15);
+  --method-patch-text: #c084fc;
 }
 
 /* Dark theme specific overrides */
+body {
+  background: var(--bg-primary);
+}
+
 input[type="text"],
 input[type="url"],
 input[type="email"],
@@ -50,7 +66,7 @@ textarea,
 select {
   background: var(--bg-secondary) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--border-medium) !important;
+  border: 1px solid var(--border-light) !important;
 }
 
 input[type="text"]:focus,
@@ -60,9 +76,9 @@ input[type="password"]:focus,
 input[type="number"]:focus,
 textarea:focus,
 select:focus {
-  background: var(--bg-tertiary) !important;
-  border-color: var(--border-focus) !important;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+  background: var(--bg-secondary) !important;
+  border-color: var(--accent, #10b981) !important;
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 16, 185, 129), 0.2) !important;
 }
 
 pre,
@@ -75,15 +91,15 @@ code {
 button {
   background: var(--bg-secondary) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--border-medium) !important;
+  border: 1px solid var(--border-light) !important;
 }
 
 button:hover {
   background: var(--bg-tertiary) !important;
-  border-color: var(--border-strong) !important;
+  border-color: var(--border-medium) !important;
 }
 
-/* Main Content Area Sections - Fix White Backgrounds in Dark Mode */
+/* Main Content Areas */
 .main-content-area,
 .request-builder,
 .request-url-section,
@@ -93,7 +109,11 @@ button:hover {
 .response-display,
 .tab-content,
 .key-value-list,
-.key-value-row,
+.key-value-row {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
 .collections-sidebar,
 .collections-container,
 .collections-list,
@@ -111,7 +131,7 @@ button:hover {
 .response-header,
 .sidebar-header,
 .collection-header {
-  background: var(--bg-tertiary) !important;
+  background: var(--bg-primary) !important;
   color: var(--text-primary) !important;
 }
 
@@ -122,6 +142,10 @@ h1, h2, h3, h4, h5, h6,
   color: var(--text-primary) !important;
 }
 
+label {
+  color: var(--text-secondary) !important;
+}
+
 #response-display,
 #response-headers-display {
   background: var(--bg-primary) !important;
@@ -129,54 +153,82 @@ h1, h2, h3, h4, h5, h6,
   border: 1px solid var(--border-light) !important;
 }
 
-/* Status Display for Dark Mode */
+/* Status Display */
 .status-display {
   background: var(--bg-tertiary) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--border-medium) !important;
+  border: 1px solid var(--border-light) !important;
   font-weight: 600 !important;
 }
 
 .status-success {
-  background: rgba(34, 197, 94, 0.2) !important;
-  color: #4ADE80 !important;
-  border-color: #22C55E !important;
+  background: var(--method-get-bg) !important;
+  color: var(--method-get-text) !important;
+  border-color: var(--method-get-text) !important;
 }
 
 .status-redirect {
-  background: rgba(245, 158, 11, 0.2) !important;
-  color: #FBBF24 !important;
-  border-color: #F59E0B !important;
+  background: var(--color-warning-light) !important;
+  color: #fbbf24 !important;
+  border-color: #f59e0b !important;
 }
 
 .status-client-error,
 .status-server-error {
-  background: rgba(239, 68, 68, 0.2) !important;
-  color: #F87171 !important;
-  border-color: #EF4444 !important;
+  background: var(--method-delete-bg) !important;
+  color: var(--method-delete-text) !important;
+  border-color: var(--method-delete-text) !important;
 }
 
 .status-info {
-  background: rgba(59, 130, 246, 0.2) !important;
-  color: #60A5FA !important;
-  border-color: #3B82F6 !important;
+  background: var(--method-post-bg) !important;
+  color: var(--method-post-text) !important;
+  border-color: var(--method-post-text) !important;
 }
 
-/* Resizer handles with more subtle hover effect for dark mode */
+/* Resizer handles */
+.resizer-handle,
+.horizontal-resizer-handle {
+  background: var(--bg-primary) !important;
+  border-color: var(--border-light) !important;
+}
+
 .resizer-handle:hover,
 .horizontal-resizer-handle:hover {
   background: var(--bg-tertiary) !important;
-  border-color: var(--border-strong) !important;
+  border-color: var(--border-medium) !important;
 }
 
-.resizer-handle.dragging,
-.horizontal-resizer-handle.dragging {
-  background: var(--bg-tertiary) !important;
-  border-color: var(--border-strong) !important;
+.resizer-handle .resizer-line,
+.horizontal-resizer-handle .horizontal-resizer-line {
+  background: var(--border-light) !important;
 }
 
 .resizer-handle:hover .resizer-line,
 .horizontal-resizer-handle:hover .horizontal-resizer-line {
-  background: var(--border-strong) !important;
-  opacity: 1 !important;
+  background: var(--border-medium) !important;
+}
+
+/* Scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-medium) var(--bg-secondary);
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
 }

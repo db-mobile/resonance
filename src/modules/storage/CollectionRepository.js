@@ -7,7 +7,7 @@
  * Repository for managing collection data persistence
  *
  * @class
- * @classdesc Handles all CRUD operations for collections in electron-store.
+ * @classdesc Handles all CRUD operations for collections in the persistent store.
  * Implements defensive programming with auto-initialization and validation
  * to ensure reliable operation in both development and packaged environments.
  * Also manages endpoint-specific data such as request bodies, headers, query
@@ -17,17 +17,17 @@ export class CollectionRepository {
     /**
      * Creates a CollectionRepository instance
      *
-     * @param {Object} electronAPI - The Electron IPC API bridge from preload script
+     * @param {Object} backendAPI - The backend IPC API bridge
      */
-    constructor(electronAPI) {
-        this.electronAPI = electronAPI;
+    constructor(backendAPI) {
+        this.backendAPI = backendAPI;
         this.COLLECTIONS_KEY = 'collections';
         this.MODIFIED_BODIES_KEY = 'modifiedRequestBodies';
         this.GRAPHQL_DATA_KEY = 'graphqlData';
     }
 
     /**
-     * Safely retrieves an object from electron-store with fallback handling
+     * Safely retrieves an object from the persistent store with fallback handling
      *
      * Implements defensive programming to handle packaged app environments where
      * store may return undefined on first run. Automatically initializes with
@@ -41,17 +41,15 @@ export class CollectionRepository {
      */
     async _getObjectFromStore(key, defaultValue = {}) {
         try {
-            let data = await this.electronAPI.store.get(key);
+            let data = await this.backendAPI.store.get(key);
 
             if (!data || typeof data !== 'object' || Array.isArray(data)) {
-                console.warn(`Store data for key "${key}" is invalid or undefined, initializing with default value`);
                 data = defaultValue;
-                await this.electronAPI.store.set(key, data);
+                await this.backendAPI.store.set(key, data);
             }
 
             return data;
         } catch (error) {
-            console.error(`Error getting data from store for key "${key}":`, error);
             return defaultValue;
         }
     }
@@ -67,17 +65,15 @@ export class CollectionRepository {
      */
     async getAll() {
         try {
-            const collections = await this.electronAPI.store.get(this.COLLECTIONS_KEY);
+            const collections = await this.backendAPI.store.get(this.COLLECTIONS_KEY);
 
             if (!Array.isArray(collections)) {
-                console.warn('Collections data is invalid or undefined, initializing with empty array');
-                await this.electronAPI.store.set(this.COLLECTIONS_KEY, []);
+                await this.backendAPI.store.set(this.COLLECTIONS_KEY, []);
                 return [];
             }
 
             return collections;
         } catch (error) {
-            console.error('Error loading collections:', error);
             throw new Error(`Failed to load collections: ${error.message}`);
         }
     }
@@ -92,9 +88,8 @@ export class CollectionRepository {
      */
     async save(collections) {
         try {
-            await this.electronAPI.store.set(this.COLLECTIONS_KEY, collections);
+            await this.backendAPI.store.set(this.COLLECTIONS_KEY, collections);
         } catch (error) {
-            console.error('Error saving collections:', error);
             throw new Error(`Failed to save collections: ${error.message}`);
         }
     }
@@ -125,7 +120,6 @@ export class CollectionRepository {
         let collections = await this.getAll();
 
         if (!Array.isArray(collections)) {
-            console.warn('Collections is not an array in add(), reinitializing');
             collections = [];
         }
 
@@ -188,7 +182,6 @@ export class CollectionRepository {
             const key = `${collectionId}_${endpointId}`;
             return modifiedBodies[key] || null;
         } catch (error) {
-            console.error('Error getting modified request body:', error);
             return null;
         }
     }
@@ -208,9 +201,8 @@ export class CollectionRepository {
             const modifiedBodies = await this._getObjectFromStore(this.MODIFIED_BODIES_KEY);
             const key = `${collectionId}_${endpointId}`;
             modifiedBodies[key] = body;
-            await this.electronAPI.store.set(this.MODIFIED_BODIES_KEY, modifiedBodies);
+            await this.backendAPI.store.set(this.MODIFIED_BODIES_KEY, modifiedBodies);
         } catch (error) {
-            console.error('Error saving modified request body:', error);
             throw new Error(`Failed to save modified request body: ${error.message}`);
         }
     }
@@ -229,7 +221,6 @@ export class CollectionRepository {
             const key = `${collectionId}_${endpointId}`;
             return persistedParams[key] || [];
         } catch (error) {
-            console.error('Error getting persisted path params:', error);
             return [];
         }
     }
@@ -249,9 +240,8 @@ export class CollectionRepository {
             const persistedParams = await this._getObjectFromStore('persistedPathParams');
             const key = `${collectionId}_${endpointId}`;
             persistedParams[key] = pathParams;
-            await this.electronAPI.store.set('persistedPathParams', persistedParams);
+            await this.backendAPI.store.set('persistedPathParams', persistedParams);
         } catch (error) {
-            console.error('Error saving persisted path params:', error);
             throw new Error(`Failed to save persisted path params: ${error.message}`);
         }
     }
@@ -270,7 +260,6 @@ export class CollectionRepository {
             const key = `${collectionId}_${endpointId}`;
             return persistedParams[key] || [];
         } catch (error) {
-            console.error('Error getting persisted query params:', error);
             return [];
         }
     }
@@ -290,9 +279,8 @@ export class CollectionRepository {
             const persistedParams = await this._getObjectFromStore('persistedQueryParams');
             const key = `${collectionId}_${endpointId}`;
             persistedParams[key] = queryParams;
-            await this.electronAPI.store.set('persistedQueryParams', persistedParams);
+            await this.backendAPI.store.set('persistedQueryParams', persistedParams);
         } catch (error) {
-            console.error('Error saving persisted query params:', error);
             throw new Error(`Failed to save persisted query params: ${error.message}`);
         }
     }
@@ -311,7 +299,6 @@ export class CollectionRepository {
             const key = `${collectionId}_${endpointId}`;
             return persistedHeaders[key] || [];
         } catch (error) {
-            console.error('Error getting persisted headers:', error);
             return [];
         }
     }
@@ -331,9 +318,8 @@ export class CollectionRepository {
             const persistedHeaders = await this._getObjectFromStore('persistedHeaders');
             const key = `${collectionId}_${endpointId}`;
             persistedHeaders[key] = headers;
-            await this.electronAPI.store.set('persistedHeaders', persistedHeaders);
+            await this.backendAPI.store.set('persistedHeaders', persistedHeaders);
         } catch (error) {
-            console.error('Error saving persisted headers:', error);
             throw new Error(`Failed to save persisted headers: ${error.message}`);
         }
     }
@@ -352,7 +338,6 @@ export class CollectionRepository {
             const key = `${collectionId}_${endpointId}`;
             return persistedAuthConfigs[key] || null;
         } catch (error) {
-            console.error('Error getting persisted auth config:', error);
             return null;
         }
     }
@@ -372,9 +357,8 @@ export class CollectionRepository {
             const persistedAuthConfigs = await this._getObjectFromStore('persistedAuthConfigs');
             const key = `${collectionId}_${endpointId}`;
             persistedAuthConfigs[key] = authConfig;
-            await this.electronAPI.store.set('persistedAuthConfigs', persistedAuthConfigs);
+            await this.backendAPI.store.set('persistedAuthConfigs', persistedAuthConfigs);
         } catch (error) {
-            console.error('Error saving persisted auth config:', error);
             throw new Error(`Failed to save persisted auth config: ${error.message}`);
         }
     }
@@ -393,7 +377,6 @@ export class CollectionRepository {
             const key = `${collectionId}_${endpointId}`;
             return persistedUrls[key] || null;
         } catch (error) {
-            console.error('Error getting persisted URL:', error);
             return null;
         }
     }
@@ -413,9 +396,8 @@ export class CollectionRepository {
             const persistedUrls = await this._getObjectFromStore('persistedUrls');
             const key = `${collectionId}_${endpointId}`;
             persistedUrls[key] = url;
-            await this.electronAPI.store.set('persistedUrls', persistedUrls);
+            await this.backendAPI.store.set('persistedUrls', persistedUrls);
         } catch (error) {
-            console.error('Error saving persisted URL:', error);
             throw new Error(`Failed to save persisted URL: ${error.message}`);
         }
     }
@@ -432,7 +414,6 @@ export class CollectionRepository {
         try {
             return await this._getObjectFromStore('collectionExpansionStates');
         } catch (error) {
-            console.error('Error getting collection expansion states:', error);
             return {};
         }
     }
@@ -447,9 +428,8 @@ export class CollectionRepository {
      */
     async saveCollectionExpansionStates(expansionStates) {
         try {
-            await this.electronAPI.store.set('collectionExpansionStates', expansionStates);
+            await this.backendAPI.store.set('collectionExpansionStates', expansionStates);
         } catch (error) {
-            console.error('Error saving collection expansion states:', error);
             throw new Error(`Failed to save collection expansion states: ${error.message}`);
         }
     }
@@ -473,34 +453,33 @@ export class CollectionRepository {
             const modifiedBodies = await this._getObjectFromStore(this.MODIFIED_BODIES_KEY);
             if (modifiedBodies[key]) {
                 delete modifiedBodies[key];
-                await this.electronAPI.store.set(this.MODIFIED_BODIES_KEY, modifiedBodies);
+                await this.backendAPI.store.set(this.MODIFIED_BODIES_KEY, modifiedBodies);
             }
 
             const persistedParams = await this._getObjectFromStore('persistedQueryParams');
             if (persistedParams[key]) {
                 delete persistedParams[key];
-                await this.electronAPI.store.set('persistedQueryParams', persistedParams);
+                await this.backendAPI.store.set('persistedQueryParams', persistedParams);
             }
 
             const persistedHeaders = await this._getObjectFromStore('persistedHeaders');
             if (persistedHeaders[key]) {
                 delete persistedHeaders[key];
-                await this.electronAPI.store.set('persistedHeaders', persistedHeaders);
+                await this.backendAPI.store.set('persistedHeaders', persistedHeaders);
             }
 
             const persistedAuthConfigs = await this._getObjectFromStore('persistedAuthConfigs');
             if (persistedAuthConfigs[key]) {
                 delete persistedAuthConfigs[key];
-                await this.electronAPI.store.set('persistedAuthConfigs', persistedAuthConfigs);
+                await this.backendAPI.store.set('persistedAuthConfigs', persistedAuthConfigs);
             }
 
             const persistedScripts = await this._getObjectFromStore('persistedScripts');
             if (persistedScripts[key]) {
                 delete persistedScripts[key];
-                await this.electronAPI.store.set('persistedScripts', persistedScripts);
+                await this.backendAPI.store.set('persistedScripts', persistedScripts);
             }
         } catch (error) {
-            console.error('Error deleting persisted endpoint data:', error);
             throw new Error(`Failed to delete persisted endpoint data: ${error.message}`);
         }
     }
@@ -515,10 +494,9 @@ export class CollectionRepository {
      */
     async getLastSelectedRequest() {
         try {
-            const lastSelected = await this.electronAPI.store.get('lastSelectedRequest');
+            const lastSelected = await this.backendAPI.store.get('lastSelectedRequest');
             return lastSelected || null;
         } catch (error) {
-            console.error('Error getting last selected request:', error);
             return null;
         }
     }
@@ -534,13 +512,12 @@ export class CollectionRepository {
      */
     async saveLastSelectedRequest(collectionId, endpointId) {
         try {
-            await this.electronAPI.store.set('lastSelectedRequest', {
+            await this.backendAPI.store.set('lastSelectedRequest', {
                 collectionId,
                 endpointId
             });
         } catch (error) {
-            console.error('Error saving last selected request:', error);
-            throw new Error(`Failed to save last selected request: ${error.message}`);
+            void error;
         }
     }
 
@@ -553,9 +530,8 @@ export class CollectionRepository {
      */
     async clearLastSelectedRequest() {
         try {
-            await this.electronAPI.store.set('lastSelectedRequest', null);
+            await this.backendAPI.store.set('lastSelectedRequest', null);
         } catch (error) {
-            console.error('Error clearing last selected request:', error);
             throw new Error(`Failed to clear last selected request: ${error.message}`);
         }
     }
@@ -575,9 +551,8 @@ export class CollectionRepository {
             const graphqlData = await this._getObjectFromStore(this.GRAPHQL_DATA_KEY);
             const key = `${collectionId}_${endpointId}`;
             graphqlData[key] = data;
-            await this.electronAPI.store.set(this.GRAPHQL_DATA_KEY, graphqlData);
+            await this.backendAPI.store.set(this.GRAPHQL_DATA_KEY, graphqlData);
         } catch (error) {
-            console.error('Error saving GraphQL data:', error);
             throw new Error(`Failed to save GraphQL data: ${error.message}`);
         }
     }
@@ -597,7 +572,6 @@ export class CollectionRepository {
             const key = `${collectionId}_${endpointId}`;
             return graphqlData[key] || null;
         } catch (error) {
-            console.error('Error getting GraphQL data:', error);
             return null;
         }
     }

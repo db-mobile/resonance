@@ -8,7 +8,7 @@
  *
  * @class
  * @classdesc Handles CRUD operations for proxy settings with comprehensive validation
- * in electron-store. Supports HTTP, HTTPS, SOCKS4, and SOCKS5 proxies with optional
+ * in the persistent store. Supports HTTP, HTTPS, SOCKS4, and SOCKS5 proxies with optional
  * authentication, bypass lists, and timeout configuration. Implements defensive
  * programming with auto-initialization and sanitization for packaged app compatibility.
  */
@@ -16,10 +16,10 @@ export class ProxyRepository {
     /**
      * Creates a ProxyRepository instance
      *
-     * @param {Object} electronAPI - The Electron IPC API bridge from preload script
+     * @param {Object} backendAPI - The backend IPC API bridge
      */
-    constructor(electronAPI) {
-        this.electronAPI = electronAPI;
+    constructor(backendAPI) {
+        this.backendAPI = backendAPI;
         this.PROXY_KEY = 'proxySettings';
     }
 
@@ -43,12 +43,11 @@ export class ProxyRepository {
      */
     async getProxySettings() {
         try {
-            const data = await this.electronAPI.store.get(this.PROXY_KEY);
+            const data = await this.backendAPI.store.get(this.PROXY_KEY);
 
             if (!data || typeof data !== 'object') {
-                console.warn('Proxy settings are invalid or undefined, initializing with defaults');
                 const defaultData = this._getDefaultProxySettings();
-                await this.electronAPI.store.set(this.PROXY_KEY, defaultData);
+                await this.backendAPI.store.set(this.PROXY_KEY, defaultData);
                 return defaultData;
             }
 
@@ -75,7 +74,6 @@ export class ProxyRepository {
 
             return validatedData;
         } catch (error) {
-            console.error('Error loading proxy settings:', error);
             throw new Error(`Failed to load proxy settings: ${error.message}`);
         }
     }
@@ -99,10 +97,9 @@ export class ProxyRepository {
             // Validate and sanitize settings
             const validatedSettings = this._validateSettings(settings);
 
-            await this.electronAPI.store.set(this.PROXY_KEY, validatedSettings);
+            await this.backendAPI.store.set(this.PROXY_KEY, validatedSettings);
             return validatedSettings;
         } catch (error) {
-            console.error('Error saving proxy settings:', error);
             throw new Error(`Failed to save proxy settings: ${error.message}`);
         }
     }
@@ -136,7 +133,6 @@ export class ProxyRepository {
 
             return await this.saveProxySettings(updatedSettings);
         } catch (error) {
-            console.error('Error updating proxy settings:', error);
             throw new Error(`Failed to update proxy settings: ${error.message}`);
         }
     }
@@ -151,10 +147,9 @@ export class ProxyRepository {
     async resetToDefaults() {
         try {
             const defaultSettings = this._getDefaultProxySettings();
-            await this.electronAPI.store.set(this.PROXY_KEY, defaultSettings);
+            await this.backendAPI.store.set(this.PROXY_KEY, defaultSettings);
             return defaultSettings;
         } catch (error) {
-            console.error('Error resetting proxy settings:', error);
             throw new Error(`Failed to reset proxy settings: ${error.message}`);
         }
     }
@@ -170,7 +165,6 @@ export class ProxyRepository {
             const settings = await this.getProxySettings();
             return settings.enabled === true;
         } catch (error) {
-            console.error('Error checking proxy enabled status:', error);
             return false;
         }
     }
@@ -189,7 +183,6 @@ export class ProxyRepository {
             await this.saveProxySettings(settings);
             return settings.enabled;
         } catch (error) {
-            console.error('Error toggling proxy:', error);
             throw new Error(`Failed to toggle proxy: ${error.message}`);
         }
     }

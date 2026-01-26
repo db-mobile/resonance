@@ -125,7 +125,10 @@ export class WorkspaceTabStateManager {
 
         // Restore request fields
         if (this.dom.urlInput) {
-            this.dom.urlInput.value = request.url || '';
+            // Only set URL if there's a saved value, otherwise keep the HTML default
+            if (request.url) {
+                this.dom.urlInput.value = request.url;
+            }
         }
 
         if (this.dom.methodSelect) {

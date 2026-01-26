@@ -94,6 +94,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.0.0" date="2026-01-26">
+      <description>
+        <p>Resonance reworked</p>
+        <ul>
+          <li>Fully reworked backend</li>
+          <li>Reworked themes</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.9.3" date="2026-01-19">
       <description>
         <p>Stabilization release</p>

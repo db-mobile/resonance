@@ -118,7 +118,6 @@ export class CodeSnippetDialog {
             commandDisplay.textContent = code;
         } catch (error) {
             commandDisplay.textContent = `Error generating code: ${error.message}`;
-            console.error('Code generation error:', error);
         }
     }
 
@@ -155,7 +154,6 @@ export class CodeSnippetDialog {
                     copyBtn.style.background = 'var(--color-primary)';
                 }, 2000);
             } catch (err) {
-                console.error('Failed to copy to clipboard:', err);
                 alert('Failed to copy to clipboard');
             }
         });

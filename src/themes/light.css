@@ -1,46 +1,62 @@
 /**
  * Light Theme
- * Clean and bright interface with strong contrast
+ * Hoppscotch-inspired clean, minimal design
  */
 :root {
-  /* Text Colors - Enhanced Contrast for Readability */
-  --text-primary: #111827;        /* Darker for better contrast (gray-900) */
-  --text-secondary: #374151;      /* Darker secondary text (gray-700) */
-  --text-tertiary: #6B7280;       /* Medium gray for tertiary text (gray-500) */
-  --text-disabled: #9CA3AF;       /* Light gray for disabled state (gray-400) */
-  --text-inverse: #FFFFFF;        /* White text for dark backgrounds */
+  /* Text Colors */
+  --text-primary: #18181b;
+  --text-secondary: #71717a;
+  --text-tertiary: #a1a1aa;
+  --text-disabled: #d4d4d8;
+  --text-inverse: #fafafa;
 
-  /* Background Colors - Clear Layering with Better Separation */
-  --bg-primary: #FFFFFF;          /* Pure white */
-  --bg-secondary: #F9FAFB;        /* Very light gray (gray-50) */
-  --bg-tertiary: #F3F4F6;         /* Light gray for cards (gray-100) */
+  /* Background Colors - Hoppscotch Light */
+  --bg-primary: #ffffff;
+  --bg-secondary: #fafafa;
+  --bg-tertiary: #f4f4f5;
   --bg-overlay: rgba(255, 255, 255, 0.95);
   --bg-glass: rgba(255, 255, 255, 0.8);
   --bg-glass-strong: rgba(255, 255, 255, 0.9);
 
-  /* Border Colors - Stronger Definition for Better Visibility */
-  --border-light: #E5E7EB;        /* Visible light borders (gray-200) */
-  --border-medium: #D1D5DB;       /* Medium borders (gray-300) */
-  --border-strong: #9CA3AF;       /* Strong borders (gray-400) */
-  --border-focus: #3B82F6;        /* Blue focus ring */
-  --border-glass: rgba(0, 0, 0, 0.1);
+  /* Border Colors - Subtle */
+  --border-light: #e4e4e7;
+  --border-medium: #d4d4d8;
+  --border-strong: #a1a1aa;
+  --border-focus: var(--accent, #10b981);
+  --border-glass: rgba(228, 228, 231, 0.5);
 
-  /* Light theme shadows - slightly stronger */
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.08);
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 1px 2px 0 rgba(0, 0, 0, 0.08);
-  --shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -1px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.12), 0 4px 6px -2px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.12), 0 10px 10px -5px rgba(0, 0, 0, 0.06);
-  --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
+  /* Shadows - Minimal */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  --shadow-base: 0 2px 4px -1px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 8px 16px -4px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 16px 32px -8px rgba(0, 0, 0, 0.1);
 
-  /* Light theme accent colors - vibrant for visibility */
-  --color-success-light: #D1FAE5;
-  --color-warning-light: #FEF3C7;
-  --color-error-light: #FEE2E2;
-  --color-primary-light: #DBEAFE;
+  /* Status Colors - Light mode variants */
+  --color-success-light: #dcfce7;
+  --color-warning-light: #fef3c7;
+  --color-error-light: #fee2e2;
+  --color-primary-light: #dbeafe;
+
+  /* HTTP Method Colors */
+  --method-get-bg: #dcfce7;
+  --method-get-text: #16a34a;
+  --method-post-bg: #dbeafe;
+  --method-post-text: #2563eb;
+  --method-put-bg: #ffedd5;
+  --method-put-text: #ea580c;
+  --method-delete-bg: #fee2e2;
+  --method-delete-text: #dc2626;
+  --method-patch-bg: #f3e8ff;
+  --method-patch-text: #9333ea;
 }
 
-/* Light theme specific overrides for better contrast */
+/* Light theme specific overrides */
+body {
+  background: var(--bg-primary);
+}
+
 input[type="text"],
 input[type="url"],
 input[type="email"],
@@ -50,7 +66,7 @@ textarea,
 select {
   background: var(--bg-primary) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--border-medium) !important;
+  border: 1px solid var(--border-light) !important;
 }
 
 input[type="text"]:focus,
@@ -61,8 +77,8 @@ input[type="number"]:focus,
 textarea:focus,
 select:focus {
   background: var(--bg-primary) !important;
-  border-color: var(--border-focus) !important;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+  border-color: var(--accent, #10b981) !important;
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 16, 185, 129), 0.1) !important;
 }
 
 pre,
@@ -75,15 +91,15 @@ code {
 button {
   background: var(--bg-secondary) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--border-medium) !important;
+  border: 1px solid var(--border-light) !important;
 }
 
 button:hover {
   background: var(--bg-tertiary) !important;
-  border-color: var(--border-strong) !important;
+  border-color: var(--border-medium) !important;
 }
 
-/* Main Content Area Sections - Clear Backgrounds with Strong Borders */
+/* Main Content Areas */
 .main-content-area {
   background: var(--bg-primary) !important;
   color: var(--text-primary) !important;
@@ -100,7 +116,6 @@ button:hover {
 .key-value-row {
   background: var(--bg-primary) !important;
   color: var(--text-primary) !important;
-  border-color: var(--border-medium) !important;
 }
 
 .collections-sidebar,
@@ -108,7 +123,6 @@ button:hover {
 .collections-list {
   background: var(--bg-secondary) !important;
   color: var(--text-primary) !important;
-  border-right: 1px solid var(--border-medium) !important;
 }
 
 .collections-empty,
@@ -117,7 +131,6 @@ button:hover {
 .endpoint-item {
   background: var(--bg-secondary) !important;
   color: var(--text-primary) !important;
-  border-color: var(--border-light) !important;
 }
 
 .tab-nav,
@@ -128,7 +141,6 @@ button:hover {
 .collection-header {
   background: var(--bg-tertiary) !important;
   color: var(--text-primary) !important;
-  border-color: var(--border-medium) !important;
 }
 
 h1, h2, h3, h4, h5, h6,
@@ -140,7 +152,6 @@ h1, h2, h3, h4, h5, h6,
 
 label {
   color: var(--text-secondary) !important;
-  font-weight: 500 !important;
 }
 
 #response-display,
@@ -150,59 +161,82 @@ label {
   border: 1px solid var(--border-light) !important;
 }
 
-/* Status Display for Light Mode - High Contrast */
+/* Status Display */
 .status-display {
   background: var(--bg-tertiary) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--border-medium) !important;
+  border: 1px solid var(--border-light) !important;
   font-weight: 600 !important;
 }
 
 .status-success {
-  background: #D1FAE5 !important;
-  color: #065F46 !important;
-  border-color: #10B981 !important;
+  background: var(--method-get-bg) !important;
+  color: var(--method-get-text) !important;
+  border-color: var(--method-get-text) !important;
 }
 
 .status-redirect {
-  background: #FEF3C7 !important;
-  color: #92400E !important;
-  border-color: #F59E0B !important;
+  background: var(--color-warning-light) !important;
+  color: #b45309 !important;
+  border-color: #f59e0b !important;
 }
 
 .status-client-error,
 .status-server-error {
-  background: #FEE2E2 !important;
-  color: #991B1B !important;
-  border-color: #EF4444 !important;
+  background: var(--method-delete-bg) !important;
+  color: var(--method-delete-text) !important;
+  border-color: var(--method-delete-text) !important;
 }
 
 .status-info {
-  background: #DBEAFE !important;
-  color: #1E40AF !important;
-  border-color: #3B82F6 !important;
+  background: var(--method-post-bg) !important;
+  color: var(--method-post-text) !important;
+  border-color: var(--method-post-text) !important;
 }
 
-/* Resizer handles with visible hover effect for light mode */
+/* Resizer handles */
 .resizer-handle,
 .horizontal-resizer-handle {
+  background: var(--bg-secondary) !important;
   border-color: var(--border-light) !important;
 }
 
 .resizer-handle:hover,
 .horizontal-resizer-handle:hover {
   background: var(--bg-tertiary) !important;
-  border-color: var(--border-strong) !important;
+  border-color: var(--border-medium) !important;
 }
 
-.resizer-handle.dragging,
-.horizontal-resizer-handle.dragging {
-  background: var(--bg-tertiary) !important;
-  border-color: var(--border-strong) !important;
+.resizer-handle .resizer-line,
+.horizontal-resizer-handle .horizontal-resizer-line {
+  background: var(--border-light) !important;
 }
 
 .resizer-handle:hover .resizer-line,
 .horizontal-resizer-handle:hover .horizontal-resizer-line {
-  background: var(--border-strong) !important;
-  opacity: 1 !important;
+  background: var(--border-medium) !important;
+}
+
+/* Scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-medium) var(--bg-secondary);
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
 }

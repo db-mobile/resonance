@@ -18,10 +18,11 @@ export class HistoryService {
     /**
      * Creates a HistoryService instance
      *
-     * @param {Object} electronAPI - The Electron IPC API bridge
+     * @param {Object} backendAPI - The backend IPC API bridge
      */
-    constructor(electronAPI) {
-        this.repository = new HistoryRepository(electronAPI);
+    constructor(backendAPI) {
+        this.repository = new HistoryRepository(backendAPI);
+        this.maxHistoryItems = 100;
     }
 
     /**

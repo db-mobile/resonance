@@ -67,7 +67,7 @@ export class WorkspaceTabController {
                 }
             }
         } catch (error) {
-            console.error('Error initializing workspace tabs:', error);
+            void error;
         }
     }
 
@@ -111,7 +111,7 @@ export class WorkspaceTabController {
 
             return newTab;
         } catch (error) {
-            console.error('Error creating new tab:', error);
+            console.error(error);
             throw error;
         }
     }
@@ -140,7 +140,6 @@ export class WorkspaceTabController {
             // Switch tab in service
             const tab = await this.service.switchTab(tabId);
             if (!tab) {
-                console.error('Tab not found:', tabId);
                 return;
             }
 
@@ -167,7 +166,7 @@ export class WorkspaceTabController {
                 }
             }
         } catch (error) {
-            console.error('Error switching tab:', error);
+            void error;
         }
     }
 
@@ -208,7 +207,7 @@ export class WorkspaceTabController {
                 }
             }
         } catch (error) {
-            console.error('Error closing tab:', error);
+            void error;
         }
     }
 
@@ -225,7 +224,7 @@ export class WorkspaceTabController {
             await this.service.renameTab(tabId, newName);
             this.tabBar.updateTab(tabId, { name: newName });
         } catch (error) {
-            console.error('Error renaming tab:', error);
+            void error;
         }
     }
 
@@ -248,7 +247,7 @@ export class WorkspaceTabController {
                 this.tabBar.render(tabs, activeTabId);
             }
         } catch (error) {
-            console.error('Error duplicating tab:', error);
+            void error;
         }
     }
 
@@ -283,7 +282,7 @@ export class WorkspaceTabController {
                 this.isRestoringState = false;
             }
         } catch (error) {
-            console.error('Error closing other tabs:', error);
+            void error;
         }
     }
 
@@ -303,7 +302,7 @@ export class WorkspaceTabController {
                 this.tabBar.updateTab(activeTabId, { isModified: true });
             }
         } catch (error) {
-            console.error('Error marking tab as modified:', error);
+            void error;
         }
     }
 
@@ -323,7 +322,7 @@ export class WorkspaceTabController {
                 this.tabBar.updateTab(activeTabId, { isModified: false });
             }
         } catch (error) {
-            console.error('Error marking tab as unmodified:', error);
+            void error;
         }
     }
 
@@ -355,7 +354,7 @@ export class WorkspaceTabController {
             await this.service.updateTab(activeTabId, { name: newName });
             this.tabBar.updateTab(activeTabId, { name: newName });
         } catch (error) {
-            console.error('Error updating tab name:', error);
+            void error;
         }
     }
 
@@ -534,7 +533,7 @@ export class WorkspaceTabController {
                 await window.scriptController.loadScriptsForEndpoint(endpoint.collectionId, endpoint.id);
             }
         } catch (error) {
-            console.error('Error loading endpoint:', error);
+            void error;
         }
     }
 
@@ -557,7 +556,7 @@ export class WorkspaceTabController {
             const currentState = await this.stateManager.captureCurrentState();
             await this.service.updateTab(activeTabId, currentState);
         } catch (error) {
-            console.error('Error saving current tab state:', error);
+            void error;
         }
     }
 

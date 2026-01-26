@@ -167,7 +167,7 @@ export class GraphQLEditor {
 
             this.setContent(formatted);
         } catch (error) {
-            console.error('Error formatting GraphQL query:', error);
+            void error;
         }
     }
 }

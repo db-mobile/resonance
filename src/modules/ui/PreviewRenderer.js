@@ -47,7 +47,7 @@ export class PreviewRenderer {
             const tree = this._buildJSONTree(data);
             tree.classList.add('json-tree');
             this.container.appendChild(tree);
-        } catch (e) {
+        } catch {
             this._renderError('Invalid JSON');
         }
     }
@@ -382,7 +382,7 @@ export class PreviewRenderer {
             const tree = this._buildXMLTree(xmlDoc.documentElement);
             tree.classList.add('xml-tree');
             this.container.appendChild(tree);
-        } catch (e) {
+        } catch {
             this._renderError('Invalid XML');
         }
     }

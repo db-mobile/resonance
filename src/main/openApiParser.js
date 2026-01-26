@@ -20,11 +20,83 @@ class OpenApiParser {
      * Creates an OpenApiParser instance
      *
      * @param {Object} schemaProcessor - Schema processor for handling OpenAPI schema references and request bodies
-     * @param {Object} store - Electron-store instance for persistent storage
+     * @param {Object} store - Store instance for persistent storage
      */
     constructor(schemaProcessor, store) {
         this.schemaProcessor = schemaProcessor;
         this.store = store;
+    }
+
+    /**
+     * Validates an OpenAPI specification object
+     *
+     * Checks that the specification has the required structure including
+     * openapi version field and info object with title.
+     *
+     * @param {Object} openApiSpec - The OpenAPI specification to validate
+     * @returns {Object} Validation result with isValid boolean and error message if invalid
+     */
+    validateOpenApiSpec(openApiSpec) {
+        if (!openApiSpec || typeof openApiSpec !== 'object') {
+            return { isValid: false, error: 'OpenAPI specification must be an object' };
+        }
+
+        // Check for OpenAPI version (supports both OpenAPI 3.x and Swagger 2.x)
+        const hasOpenApiVersion = openApiSpec.openapi && typeof openApiSpec.openapi === 'string';
+        const hasSwaggerVersion = openApiSpec.swagger && typeof openApiSpec.swagger === 'string';
+
+        if (!hasOpenApiVersion && !hasSwaggerVersion) {
+            return {
+                isValid: false,
+                error: 'Missing OpenAPI/Swagger version. Expected "openapi" or "swagger" field'
+            };
+        }
+
+        // Validate OpenAPI 3.x version format
+        if (hasOpenApiVersion && !openApiSpec.openapi.match(/^3\.\d+\.\d+$/)) {
+            return {
+                isValid: false,
+                error: `Unsupported OpenAPI version "${openApiSpec.openapi}". Expected 3.x.x format`
+            };
+        }
+
+        // Validate Swagger 2.x version format
+        if (hasSwaggerVersion && !openApiSpec.swagger.match(/^2\.\d+$/)) {
+            return {
+                isValid: false,
+                error: `Unsupported Swagger version "${openApiSpec.swagger}". Expected 2.x format`
+            };
+        }
+
+        // Check for info object
+        if (!openApiSpec.info || typeof openApiSpec.info !== 'object') {
+            return { isValid: false, error: 'Missing or invalid "info" object in OpenAPI specification' };
+        }
+
+        // Check for paths object (optional but warn if missing)
+        if (openApiSpec.paths && typeof openApiSpec.paths !== 'object') {
+            return { isValid: false, error: '"paths" must be an object if provided' };
+        }
+
+        // Validate servers array if present
+        if (openApiSpec.servers !== undefined) {
+            if (!Array.isArray(openApiSpec.servers)) {
+                return { isValid: false, error: '"servers" must be an array if provided' };
+            }
+
+            // Validate each server has a url
+            for (let i = 0; i < openApiSpec.servers.length; i++) {
+                const server = openApiSpec.servers[i];
+                if (!server || typeof server !== 'object') {
+                    return { isValid: false, error: `Invalid server at index ${i}: must be an object` };
+                }
+                if (!server.url || typeof server.url !== 'string') {
+                    return { isValid: false, error: `Invalid server at index ${i}: missing or invalid "url" field` };
+                }
+            }
+        }
+
+        return { isValid: true };
     }
 
     /**
@@ -37,9 +109,16 @@ class OpenApiParser {
      * @param {Object} openApiSpec - The parsed OpenAPI 3.0 specification object
      * @param {string} fileName - The original filename for fallback naming
      * @returns {Object} Collection object with endpoints, folders, and metadata
+     * @throws {Error} If the OpenAPI specification is invalid
      */
     parseOpenApiToCollection(openApiSpec, fileName) {
-        this.schemaProcessor.setCurrentSpec(openApiSpec);
+        // Validate spec before processing
+        const validation = this.validateOpenApiSpec(openApiSpec);
+        if (!validation.isValid) {
+            throw new Error(`Invalid OpenAPI specification: ${validation.error}`);
+        }
+
+        this.schemaProcessor.setOpenApiSpec(openApiSpec);
 
         const collection = {
             id: Date.now().toString(),
@@ -356,7 +435,7 @@ class OpenApiParser {
      * Imports an OpenAPI file and stores it as a collection
      *
      * Reads and parses OpenAPI files in JSON or YAML format, converts them to
-     * collections, and persists them to electron-store. Automatically initializes
+     * collections, and persists them to the store. Automatically initializes
      * storage if undefined (handles packaged app first-run scenarios). Also stores
      * the base URL as a collection variable if present.
      *
@@ -379,12 +458,11 @@ class OpenApiParser {
 
         let collections = this.store.get('collections');
         if (!Array.isArray(collections)) {
-            console.warn('Collections data is invalid or undefined (possible Flatpak sandbox issue), initializing with empty array');
             collections = [];
             try {
                 this.store.set('collections', collections);
             } catch (error) {
-                console.error('Unable to initialize collections in store:', error);
+                void error;
             }
         }
 
@@ -394,12 +472,11 @@ class OpenApiParser {
         if (collection.baseUrl) {
             let variables = this.store.get('collectionVariables');
             if (!variables || typeof variables !== 'object') {
-                console.warn('Collection variables data is invalid or undefined (possible Flatpak sandbox issue), initializing with empty object');
                 variables = {};
                 try {
                     this.store.set('collectionVariables', variables);
                 } catch (error) {
-                    console.error('Unable to initialize collectionVariables in store:', error);
+                    void error;
                 }
             }
             if (!variables[collection.id]) {

@@ -64,12 +64,7 @@ export class ProxyController {
      * @throws {Error} If retrieval fails
      */
     async getSettings() {
-        try {
-            return await this.service.getSettings();
-        } catch (error) {
-            console.error('Error getting proxy settings:', error);
-            throw error;
-        }
+        return this.service.getSettings();
     }
 
     /**
@@ -88,12 +83,7 @@ export class ProxyController {
      * @throws {Error} If update fails
      */
     async updateSettings(settings) {
-        try {
-            return await this.service.updateSettings(settings);
-        } catch (error) {
-            console.error('Error updating proxy settings:', error);
-            throw error;
-        }
+        return this.service.updateSettings(settings);
     }
 
     /**
@@ -104,12 +94,7 @@ export class ProxyController {
      * @throws {Error} If toggle fails
      */
     async toggleProxy() {
-        try {
-            return await this.service.toggleProxy();
-        } catch (error) {
-            console.error('Error toggling proxy:', error);
-            throw error;
-        }
+        return this.service.toggleProxy();
     }
 
     /**
@@ -120,12 +105,7 @@ export class ProxyController {
      * @throws {Error} If reset fails
      */
     async resetToDefaults() {
-        try {
-            return await this.service.resetToDefaults();
-        } catch (error) {
-            console.error('Error resetting proxy settings:', error);
-            throw error;
-        }
+        return this.service.resetToDefaults();
     }
 
     /**
@@ -139,29 +119,22 @@ export class ProxyController {
      * @throws {Error} If proxy is disabled, invalid, or connection fails
      */
     async testConnection() {
-        try {
-            const settings = await this.service.getSettings();
+        const settings = await this.service.getSettings();
 
-            if (!settings.enabled) {
-                throw new Error('Proxy is not enabled');
-            }
-
-            if (!settings.host || !settings.port) {
-                throw new Error('Proxy host and port are required');
-            }
-
-            const validationErrors = this.service.validateSettings(settings);
-            if (validationErrors.length > 0) {
-                throw new Error(validationErrors.join('; '));
-            }
-
-            const result = await window.electronAPI.proxySettings.test();
-
-            return result;
-        } catch (error) {
-            console.error('Error testing proxy connection:', error);
-            throw error;
+        if (!settings.enabled) {
+            throw new Error('Proxy is not enabled');
         }
+
+        if (!settings.host || !settings.port) {
+            throw new Error('Proxy host and port are required');
+        }
+
+        const validationErrors = this.service.validateSettings(settings);
+        if (validationErrors.length > 0) {
+            throw new Error(validationErrors.join('; '));
+        }
+
+        return window.backendAPI.proxySettings.test();
     }
 
     /**
@@ -174,7 +147,6 @@ export class ProxyController {
         try {
             return await this.service.isEnabled();
         } catch (error) {
-            console.error('Error checking proxy enabled status:', error);
             return false;
         }
     }
@@ -200,12 +172,7 @@ export class ProxyController {
      * @throws {Error} If adding fails
      */
     async addBypassDomain(domain) {
-        try {
-            return await this.service.addBypassDomain(domain);
-        } catch (error) {
-            console.error('Error adding bypass domain:', error);
-            throw error;
-        }
+        return this.service.addBypassDomain(domain);
     }
 
     /**
@@ -217,12 +184,7 @@ export class ProxyController {
      * @throws {Error} If removal fails
      */
     async removeBypassDomain(domain) {
-        try {
-            return await this.service.removeBypassDomain(domain);
-        } catch (error) {
-            console.error('Error removing bypass domain:', error);
-            throw error;
-        }
+        return this.service.removeBypassDomain(domain);
     }
 
     /**
@@ -238,7 +200,6 @@ export class ProxyController {
         try {
             return await this.service.getAxiosProxyConfig(url);
         } catch (error) {
-            console.error('Error getting axios proxy config:', error);
             return null;
         }
     }

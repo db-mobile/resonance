@@ -11,27 +11,26 @@ export class HttpVersionManager {
 
     async loadSavedVersion() {
         try {
-            const settings = await window.electronAPI.settings.get();
-            this.currentVersion = settings.httpVersion || 'auto';
+            this.httpVersionSelector = document.getElementById('http-version-selector');
+            this.setupEventListeners();
+            this.initializeDefaultVersion();
         } catch (error) {
-            console.error('Error loading saved HTTP version:', error);
-            this.currentVersion = 'auto';
+            void error;
         }
     }
 
     async saveVersion(version) {
         try {
-            const settings = await window.electronAPI.settings.get();
+            const settings = await window.backendAPI.settings.get();
             settings.httpVersion = version;
-            await window.electronAPI.settings.set(settings);
+            await window.backendAPI.settings.set(settings);
         } catch (error) {
-            console.error('Error saving HTTP version:', error);
+            void error;
         }
     }
 
     async setVersion(version) {
         if (!this.availableVersions.includes(version)) {
-            console.error(`HTTP version '${version}' is not available`);
             return;
         }
 

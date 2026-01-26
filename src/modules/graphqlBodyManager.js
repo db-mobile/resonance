@@ -79,12 +79,10 @@ export class GraphQLBodyManager {
      */
     initializeGraphQLEditor() {
         if (!this.graphqlEditorContainer) {
-            console.error('GraphQL query editor container not found');
             return;
         }
 
         if (!this.graphqlVariablesEditorContainer) {
-            console.error('GraphQL variables editor container not found');
             return;
         }
 
@@ -105,7 +103,7 @@ export class GraphQLBodyManager {
                 this.saveCurrentState();
             });
         } catch (error) {
-            console.error('Error initializing GraphQL editors:', error);
+            void error;
         }
     }
 

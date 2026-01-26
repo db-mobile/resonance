@@ -123,8 +123,10 @@
   "theme": {
     "light": "Claro",
     "dark": "Oscuro",
-    "system": "Sistema"
+    "system": "Sistema",
+    "black": "Negro (OLED)"
   },
+  "settings.accent_color": "Color de acento",
   "http_version": {
     "auto": "Automático",
     "http1": "HTTP/1.x",

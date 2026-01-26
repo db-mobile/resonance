@@ -10,21 +10,20 @@ export class TimeoutManager {
 
     async loadSavedTimeout() {
         try {
-            const settings = await window.electronAPI.settings.get();
+            const settings = await window.backendAPI.settings.get();
             this.currentTimeout = settings.requestTimeout !== undefined ? settings.requestTimeout : 0;
         } catch (error) {
-            console.error('Error loading saved timeout:', error);
             this.currentTimeout = 0;
         }
     }
 
     async saveTimeout(timeout) {
         try {
-            const settings = await window.electronAPI.settings.get();
+            const settings = await window.backendAPI.settings.get();
             settings.requestTimeout = timeout;
-            await window.electronAPI.settings.set(settings);
+            await window.backendAPI.settings.set(settings);
         } catch (error) {
-            console.error('Error saving timeout:', error);
+            void error;
         }
     }
 
@@ -32,7 +31,6 @@ export class TimeoutManager {
         // Validate timeout - must be a non-negative number
         const timeoutValue = parseInt(timeout, 10);
         if (isNaN(timeoutValue) || timeoutValue < 0) {
-            console.error('Invalid timeout value:', timeout);
             return;
         }
 

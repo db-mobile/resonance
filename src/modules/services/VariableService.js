@@ -48,7 +48,6 @@ export class VariableService {
             // No environment variables available
             return {};
         } catch (error) {
-            console.error('Error loading variables:', error);
             return {};
         }
     }
@@ -176,7 +175,6 @@ export class VariableService {
             const variables = await this.getVariablesForCollection(collectionId);
             return this.processor.processObject(request, variables);
         } catch (error) {
-            console.error('Error processing request variables:', error);
             return request;
         }
     }
@@ -194,7 +192,6 @@ export class VariableService {
             const variables = await this.getVariablesForCollection(collectionId);
             return this.processor.processTemplate(template, variables);
         } catch (error) {
-            console.error('Error processing template:', error);
             return template;
         }
     }
@@ -215,7 +212,6 @@ export class VariableService {
             const variables = await this.getVariablesForCollection(collectionId);
             return this.processor.getPreview(template, variables);
         } catch (error) {
-            console.error('Error getting template preview:', error);
             return { preview: template, missingVariables: [], foundVariables: [] };
         }
     }

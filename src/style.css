@@ -24,10 +24,30 @@
   --color-dark-800: #8A8F9F;
   --color-dark-900: #AAB0BF;
   
-  /* Accent Colors */
-  --color-primary: #3B82F6;
-  --color-primary-light: #DBEAFE;
-  --color-primary-dark: #1D4ED8;
+  /* Accent Colors - Configurable */
+  --accent-green: #10b981;
+  --accent-teal: #14b8a6;
+  --accent-blue: #3b82f6;
+  --accent-indigo: #6366f1;
+  --accent-purple: #8b5cf6;
+  --accent-yellow: #eab308;
+  --accent-orange: #f97316;
+  --accent-red: #ef4444;
+  --accent-pink: #ec4899;
+
+  /* Default accent (green like Hoppscotch) */
+  --accent: var(--accent-green);
+  --accent-rgb: 16, 185, 129;
+  --accent-light: rgba(16, 185, 129, 0.1);
+  --accent-medium: rgba(16, 185, 129, 0.2);
+
+  /* Legacy color-primary mapped to accent */
+  --color-primary: var(--accent);
+  --color-primary-light: var(--accent-light);
+  --color-primary-dark: var(--accent);
+  --color-primary-alpha: var(--accent-medium);
+
+  /* Semantic Colors */
   --color-success: #10B981;
   --color-success-light: #D1FAE5;
   --color-warning: #F59E0B;
@@ -35,6 +55,7 @@
   --color-error: #EF4444;
   --color-error-light: #FEE2E2;
   --color-purple: #8B5CF6;
+  --color-post: #3B82F6;
 
   /* Spacing Scale */
   --space-1: 0.25rem;
@@ -77,7 +98,7 @@
   --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  --shadow-focus: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  --shadow-focus: 0 0 0 3px var(--accent-light);
   
   /* Border Radius */
   --radius-xs: 0.125rem;   /* 2px - minimal rounding */
@@ -100,6 +121,70 @@
   --glass-blur: blur(20px);
 }
 
+/* Accent Color Selectors */
+[data-accent="green"] {
+  --accent: var(--accent-green);
+  --accent-rgb: 16, 185, 129;
+  --accent-light: rgba(16, 185, 129, 0.1);
+  --accent-medium: rgba(16, 185, 129, 0.2);
+}
+
+[data-accent="teal"] {
+  --accent: var(--accent-teal);
+  --accent-rgb: 20, 184, 166;
+  --accent-light: rgba(20, 184, 166, 0.1);
+  --accent-medium: rgba(20, 184, 166, 0.2);
+}
+
+[data-accent="blue"] {
+  --accent: var(--accent-blue);
+  --accent-rgb: 59, 130, 246;
+  --accent-light: rgba(59, 130, 246, 0.1);
+  --accent-medium: rgba(59, 130, 246, 0.2);
+}
+
+[data-accent="indigo"] {
+  --accent: var(--accent-indigo);
+  --accent-rgb: 99, 102, 241;
+  --accent-light: rgba(99, 102, 241, 0.1);
+  --accent-medium: rgba(99, 102, 241, 0.2);
+}
+
+[data-accent="purple"] {
+  --accent: var(--accent-purple);
+  --accent-rgb: 139, 92, 246;
+  --accent-light: rgba(139, 92, 246, 0.1);
+  --accent-medium: rgba(139, 92, 246, 0.2);
+}
+
+[data-accent="yellow"] {
+  --accent: var(--accent-yellow);
+  --accent-rgb: 234, 179, 8;
+  --accent-light: rgba(234, 179, 8, 0.1);
+  --accent-medium: rgba(234, 179, 8, 0.2);
+}
+
+[data-accent="orange"] {
+  --accent: var(--accent-orange);
+  --accent-rgb: 249, 115, 22;
+  --accent-light: rgba(249, 115, 22, 0.1);
+  --accent-medium: rgba(249, 115, 22, 0.2);
+}
+
+[data-accent="red"] {
+  --accent: var(--accent-red);
+  --accent-rgb: 239, 68, 68;
+  --accent-light: rgba(239, 68, 68, 0.1);
+  --accent-medium: rgba(239, 68, 68, 0.2);
+}
+
+[data-accent="pink"] {
+  --accent: var(--accent-pink);
+  --accent-rgb: 236, 72, 153;
+  --accent-light: rgba(236, 72, 153, 0.1);
+  --accent-medium: rgba(236, 72, 153, 0.2);
+}
+
 /* Reset and Base Styles */
 * {
   box-sizing: border-box;
@@ -112,7 +197,7 @@ body {
   font-size: var(--font-size-base);
   line-height: var(--line-height-normal);
   color: var(--text-primary);
-  background: linear-gradient(135deg, var(--color-gray-50) 0%, var(--color-gray-100) 100%);
+  background: var(--bg-primary, #ffffff);
   height: 100vh;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -412,7 +497,7 @@ body {
 }
 
 .endpoint-method.get { background: var(--color-success); }
-.endpoint-method.post { background: var(--color-primary); }
+.endpoint-method.post { background: var(--color-post); }
 .endpoint-method.put { background: var(--color-warning); }
 .endpoint-method.delete { background: var(--color-error); }
 .endpoint-method.patch { background: var(--color-purple); }
@@ -1875,9 +1960,9 @@ body {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   width: 600px;
-  height: 600px;
+  height: 700px;
   max-width: 90vw;
-  max-height: 85vh;
+  max-height: 90vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1966,6 +2051,49 @@ body {
 
 .http-version-select:hover {
   background: var(--bg-secondary);
+}
+
+/* Accent Color Selection */
+.accent-color-grid {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+}
+
+.accent-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  border: 2px solid transparent !important;
+  background: var(--btn-color) !important;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  padding: 0 !important;
+  position: relative;
+}
+
+.accent-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--btn-color) !important;
+}
+
+.accent-btn.active {
+  border-color: var(--text-primary) !important;
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--btn-color) !important;
+}
+
+.accent-btn.active::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .auth-type-section {

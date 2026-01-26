@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Resonance",
+  "version": "2.0.0",
+  "identifier": "io.github.db-mobile.resonance",
+  "build": {
+    "beforeDevCommand": "npm run build",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Resonance",
+        "width": 1000,
+        "height": 750,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' https: http: ws: wss:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "../assets/icons/icon_32x32.png",
+      "../assets/icons/icon_128x128.png",
+      "../assets/icons/icon_256x256.png",
+      "../assets/icons/icon.icns",
+      "../assets/icons/icon.ico"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "A local-first, zero-account API client",
+    "longDescription": "Resonance is a local-first, zero-account API client application designed to provide an excellent user experience for testing and interacting with web services.",
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": false
+      },
+      "deb": {
+        "depends": []
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.13"
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "nsis": {
+        "installerIcon": "../assets/icons/icon.ico",
+        "headerImage": null,
+        "sidebarImage": null,
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {}
+}

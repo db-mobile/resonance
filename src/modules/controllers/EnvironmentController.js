@@ -57,7 +57,7 @@ export class EnvironmentController {
                 this.selector.setActiveEnvironment(activeEnvironment);
             }
         } catch (error) {
-            console.error('Error loading active environment:', error);
+            void error;
         }
     }
 
@@ -99,7 +99,7 @@ export class EnvironmentController {
                 this.selector.setActiveEnvironment(environment);
             }
         } catch (error) {
-            console.error('Error handling environment switch:', error);
+            void error;
         }
     }
 
@@ -121,7 +121,7 @@ export class EnvironmentController {
             // Refresh selector dropdown
             await this.selector.refresh();
         } catch (error) {
-            console.error('Error handling environments change:', error);
+            void error;
         }
     }
 
@@ -137,7 +137,6 @@ export class EnvironmentController {
             await this.service.switchEnvironment(environmentId);
             return true;
         } catch (error) {
-            console.error('Error switching environment:', error);
             return false;
         }
     }
@@ -158,7 +157,7 @@ export class EnvironmentController {
                 await this.onEnvironmentsChanged();
             }
         } catch (error) {
-            console.error('Error opening environment manager:', error);
+            void error;
         }
     }
 
@@ -172,13 +171,8 @@ export class EnvironmentController {
      * @throws {Error} If creation fails
      */
     async createEnvironment(name, variables = {}) {
-        try {
-            const environment = await this.service.createEnvironment(name, variables);
-            return environment;
-        } catch (error) {
-            console.error('Error creating environment:', error);
-            throw error;
-        }
+        const environment = await this.service.createEnvironment(name, variables);
+        return environment;
     }
 
     /**
@@ -191,12 +185,7 @@ export class EnvironmentController {
      * @throws {Error} If update fails
      */
     async updateEnvironment(environmentId, updates) {
-        try {
-            return await this.service.updateEnvironment(environmentId, updates);
-        } catch (error) {
-            console.error('Error updating environment:', error);
-            throw error;
-        }
+        return this.service.updateEnvironment(environmentId, updates);
     }
 
     /**
@@ -208,12 +197,7 @@ export class EnvironmentController {
      * @throws {Error} If deletion fails
      */
     async deleteEnvironment(environmentId) {
-        try {
-            return await this.service.deleteEnvironment(environmentId);
-        } catch (error) {
-            console.error('Error deleting environment:', error);
-            throw error;
-        }
+        return this.service.deleteEnvironment(environmentId);
     }
 
     /**
@@ -227,12 +211,7 @@ export class EnvironmentController {
      * @throws {Error} If duplication fails
      */
     async duplicateEnvironment(environmentId) {
-        try {
-            return await this.service.duplicateEnvironment(environmentId);
-        } catch (error) {
-            console.error('Error duplicating environment:', error);
-            throw error;
-        }
+        return this.service.duplicateEnvironment(environmentId);
     }
 
     /**
@@ -245,7 +224,6 @@ export class EnvironmentController {
         try {
             return await this.service.getAllEnvironments();
         } catch (error) {
-            console.error('Error getting all environments:', error);
             return [];
         }
     }
@@ -260,7 +238,6 @@ export class EnvironmentController {
         try {
             return await this.service.getActiveEnvironment();
         } catch (error) {
-            console.error('Error getting active environment:', error);
             return null;
         }
     }
@@ -275,7 +252,6 @@ export class EnvironmentController {
         try {
             return await this.service.getActiveEnvironmentVariables();
         } catch (error) {
-            console.error('Error getting active environment variables:', error);
             return {};
         }
     }
@@ -289,24 +265,19 @@ export class EnvironmentController {
      * @throws {Error} If export fails
      */
     async exportEnvironment(environmentId) {
-        try {
-            const data = await this.service.exportEnvironment(environmentId);
-            const json = JSON.stringify(data, null, 2);
+        const data = await this.service.exportEnvironment(environmentId);
+        const json = JSON.stringify(data, null, 2);
 
-            // Create blob and download
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${data.name.replace(/[^a-z0-9]/gi, '_')}_environment.json`;
-            a.click();
-            URL.revokeObjectURL(url);
+        // Create blob and download
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${data.name.replace(/[^a-z0-9]/gi, '_')}_environment.json`;
+        a.click();
+        URL.revokeObjectURL(url);
 
-            return true;
-        } catch (error) {
-            console.error('Error exporting environment:', error);
-            throw error;
-        }
+        return true;
     }
 
     /**
@@ -317,24 +288,19 @@ export class EnvironmentController {
      * @throws {Error} If export fails
      */
     async exportAllEnvironments() {
-        try {
-            const data = await this.service.exportAllEnvironments();
-            const json = JSON.stringify(data, null, 2);
+        const data = await this.service.exportAllEnvironments();
+        const json = JSON.stringify(data, null, 2);
 
-            // Create blob and download
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `resonance_environments_${Date.now()}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
+        // Create blob and download
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `resonance_environments_${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
 
-            return true;
-        } catch (error) {
-            console.error('Error exporting all environments:', error);
-            throw error;
-        }
+        return true;
     }
 
     /**
@@ -348,38 +314,32 @@ export class EnvironmentController {
      * @throws {Error} If import fails
      */
     async importEnvironments(merge = false) {
-        try {
-            // Create file input
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.json';
+        // Create file input
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
 
-            return new Promise((resolve) => {
-                input.onchange = async (e) => {
-                    try {
-                        const file = e.target.files[0];
-                        if (!file) {
-                            resolve(false);
-                            return;
-                        }
-
-                        const text = await file.text();
-                        const data = JSON.parse(text);
-
-                        await this.service.importEnvironments(data, merge);
-                        resolve(true);
-                    } catch (error) {
-                        console.error('Error importing environments:', error);
-                        alert(`Error importing environments: ${error.message}`);
+        return new Promise((resolve) => {
+            input.onchange = async (e) => {
+                try {
+                    const file = e.target.files[0];
+                    if (!file) {
                         resolve(false);
+                        return;
                     }
-                };
 
-                input.click();
-            });
-        } catch (error) {
-            console.error('Error importing environments:', error);
-            throw error;
-        }
+                    const text = await file.text();
+                    const data = JSON.parse(text);
+
+                    await this.service.importEnvironments(data, merge);
+                    resolve(true);
+                } catch (error) {
+                    alert(`Error importing environments: ${error.message}`);
+                    resolve(false);
+                }
+            };
+
+            input.click();
+        });
     }
 }

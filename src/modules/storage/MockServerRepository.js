@@ -8,17 +8,17 @@
  *
  * @class
  * @classdesc Handles CRUD operations for mock server settings with comprehensive validation
- * in electron-store. Supports port configuration, enabled collections, and per-endpoint delays.
+ * in the persistent store. Supports port configuration, enabled collections, and per-endpoint delays.
  * Implements defensive programming with auto-initialization for packaged app compatibility.
  */
 export class MockServerRepository {
     /**
      * Creates a MockServerRepository instance
      *
-     * @param {Object} electronAPI - The Electron IPC API bridge from preload script
+     * @param {Object} backendAPI - The backend IPC API bridge
      */
-    constructor(electronAPI) {
-        this.electronAPI = electronAPI;
+    constructor(backendAPI) {
+        this.backendAPI = backendAPI;
         this.SETTINGS_KEY = 'mockServer';
     }
 
@@ -39,12 +39,11 @@ export class MockServerRepository {
      */
     async getSettings() {
         try {
-            const data = await this.electronAPI.store.get(this.SETTINGS_KEY);
+            const data = await this.backendAPI.store.get(this.SETTINGS_KEY);
 
             if (!data || typeof data !== 'object') {
-                console.warn('Mock server settings are invalid or undefined, initializing with defaults');
                 const defaultData = this._getDefaultSettings();
-                await this.electronAPI.store.set(this.SETTINGS_KEY, defaultData);
+                await this.backendAPI.store.set(this.SETTINGS_KEY, defaultData);
                 return defaultData;
             }
 
@@ -76,7 +75,6 @@ export class MockServerRepository {
 
             return validatedData;
         } catch (error) {
-            console.error('Error loading mock server settings:', error);
             throw new Error(`Failed to load mock server settings: ${error.message}`);
         }
     }
@@ -100,10 +98,9 @@ export class MockServerRepository {
             // Validate and sanitize settings
             const validatedSettings = this._validateSettings(settings);
 
-            await this.electronAPI.store.set(this.SETTINGS_KEY, validatedSettings);
+            await this.backendAPI.store.set(this.SETTINGS_KEY, validatedSettings);
             return validatedSettings;
         } catch (error) {
-            console.error('Error saving mock server settings:', error);
             throw new Error(`Failed to save mock server settings: ${error.message}`);
         }
     }
@@ -153,7 +150,6 @@ export class MockServerRepository {
 
             return await this.saveSettings(updatedSettings);
         } catch (error) {
-            console.error('Error updating mock server settings:', error);
             throw new Error(`Failed to update mock server settings: ${error.message}`);
         }
     }
@@ -186,7 +182,6 @@ export class MockServerRepository {
 
             return await this.saveSettings(settings);
         } catch (error) {
-            console.error('Error setting endpoint delay:', error);
             throw new Error(`Failed to set endpoint delay: ${error.message}`);
         }
     }
@@ -205,7 +200,6 @@ export class MockServerRepository {
             const key = `${collectionId}_${endpointId}`;
             return settings.endpointDelays[key] || 0;
         } catch (error) {
-            console.error('Error getting endpoint delay:', error);
             return 0;
         }
     }
@@ -234,7 +228,6 @@ export class MockServerRepository {
 
             return await this.saveSettings(settings);
         } catch (error) {
-            console.error('Error setting custom response:', error);
             throw new Error(`Failed to set custom response: ${error.message}`);
         }
     }
@@ -253,7 +246,6 @@ export class MockServerRepository {
             const key = `${collectionId}_${endpointId}`;
             return settings.customResponses[key] || null;
         } catch (error) {
-            console.error('Error getting custom response:', error);
             return null;
         }
     }
@@ -282,7 +274,6 @@ export class MockServerRepository {
 
             return await this.saveSettings(settings);
         } catch (error) {
-            console.error('Error setting custom status code:', error);
             throw new Error(`Failed to set custom status code: ${error.message}`);
         }
     }
@@ -301,7 +292,6 @@ export class MockServerRepository {
             const key = `${collectionId}_${endpointId}`;
             return settings.customStatusCodes[key] || null;
         } catch (error) {
-            console.error('Error getting custom status code:', error);
             return null;
         }
     }
@@ -329,7 +319,6 @@ export class MockServerRepository {
 
             return await this.saveSettings(settings);
         } catch (error) {
-            console.error('Error toggling collection:', error);
             throw new Error(`Failed to toggle collection: ${error.message}`);
         }
     }
@@ -346,7 +335,6 @@ export class MockServerRepository {
             const settings = await this.getSettings();
             return settings.enabledCollections.includes(collectionId);
         } catch (error) {
-            console.error('Error checking collection enabled status:', error);
             return false;
         }
     }
@@ -361,10 +349,9 @@ export class MockServerRepository {
     async resetToDefaults() {
         try {
             const defaultSettings = this._getDefaultSettings();
-            await this.electronAPI.store.set(this.SETTINGS_KEY, defaultSettings);
+            await this.backendAPI.store.set(this.SETTINGS_KEY, defaultSettings);
             return defaultSettings;
         } catch (error) {
-            console.error('Error resetting mock server settings:', error);
             throw new Error(`Failed to reset mock server settings: ${error.message}`);
         }
     }

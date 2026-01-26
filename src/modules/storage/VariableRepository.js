@@ -7,7 +7,7 @@
  * Repository for managing collection variable persistence
  *
  * @class
- * @classdesc Handles CRUD operations for collection-scoped variables in electron-store.
+ * @classdesc Handles CRUD operations for collection-scoped variables in the persistent store.
  * Variables are stored per collection and used for template substitution in requests.
  * Implements defensive programming with validation and auto-initialization.
  *
@@ -18,10 +18,10 @@ export class VariableRepository {
     /**
      * Creates a VariableRepository instance
      *
-     * @param {Object} electronAPI - The Electron IPC API bridge from preload script
+     * @param {Object} backendAPI - The backend IPC API bridge
      */
-    constructor(electronAPI) {
-        this.electronAPI = electronAPI;
+    constructor(backendAPI) {
+        this.backendAPI = backendAPI;
         this.VARIABLES_KEY = 'collectionVariables';
     }
 
@@ -36,17 +36,15 @@ export class VariableRepository {
      */
     async getAllVariables() {
         try {
-            const variables = await this.electronAPI.store.get(this.VARIABLES_KEY);
+            const variables = await this.backendAPI.store.get(this.VARIABLES_KEY);
 
             if (!variables || typeof variables !== 'object' || Array.isArray(variables)) {
-                console.warn('Variables data is invalid or undefined, initializing with empty object');
-                await this.electronAPI.store.set(this.VARIABLES_KEY, {});
+                await this.backendAPI.store.set(this.VARIABLES_KEY, {});
                 return {};
             }
 
             return variables;
         } catch (error) {
-            console.error('Error loading variables:', error);
             throw new Error(`Failed to load variables: ${error.message}`);
         }
     }
@@ -64,7 +62,6 @@ export class VariableRepository {
             const allVariables = await this.getAllVariables();
             return allVariables[collectionId] || {};
         } catch (error) {
-            console.error('Error loading collection variables:', error);
             throw new Error(`Failed to load collection variables: ${error.message}`);
         }
     }
@@ -84,9 +81,8 @@ export class VariableRepository {
         try {
             const allVariables = await this.getAllVariables();
             allVariables[collectionId] = variables;
-            await this.electronAPI.store.set(this.VARIABLES_KEY, allVariables);
+            await this.backendAPI.store.set(this.VARIABLES_KEY, allVariables);
         } catch (error) {
-            console.error('Error saving collection variables:', error);
             throw new Error(`Failed to save collection variables: ${error.message}`);
         }
     }
@@ -107,7 +103,6 @@ export class VariableRepository {
             variables[name] = value;
             await this.setVariablesForCollection(collectionId, variables);
         } catch (error) {
-            console.error('Error setting variable:', error);
             throw new Error(`Failed to set variable: ${error.message}`);
         }
     }
@@ -127,7 +122,6 @@ export class VariableRepository {
             delete variables[name];
             await this.setVariablesForCollection(collectionId, variables);
         } catch (error) {
-            console.error('Error deleting variable:', error);
             throw new Error(`Failed to delete variable: ${error.message}`);
         }
     }
@@ -146,9 +140,8 @@ export class VariableRepository {
         try {
             const allVariables = await this.getAllVariables();
             delete allVariables[collectionId];
-            await this.electronAPI.store.set(this.VARIABLES_KEY, allVariables);
+            await this.backendAPI.store.set(this.VARIABLES_KEY, allVariables);
         } catch (error) {
-            console.error('Error deleting collection variables:', error);
             throw new Error(`Failed to delete collection variables: ${error.message}`);
         }
     }
@@ -166,7 +159,6 @@ export class VariableRepository {
             const variables = await this.getVariablesForCollection(collectionId);
             return variables[name];
         } catch (error) {
-            console.error('Error getting variable:', error);
             return undefined;
         }
     }

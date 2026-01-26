@@ -8,6 +8,7 @@ export default [
             'dist/**',
             'coverage/**',
             'node_modules/**',
+            'src-tauri/target/**',
             '**/*.bundle.js',
             'build.js',
             '*.html',
@@ -88,7 +89,7 @@ export default [
 
     // Main process (Node.js environment)
     {
-        files: ['src/main.js', 'src/main/**/*.js', 'preload.js'],
+        files: ['src/main.js', 'src/main/**/*.js'],
         languageOptions: {
             globals: {
                 ...globals.node,
@@ -103,13 +104,31 @@ export default [
         }
     },
 
-    // Renderer process (Browser + Electron environment)
+    // Services (Node.js environment)
+    {
+        files: ['src/services/**/*.js'],
+        languageOptions: {
+            globals: {
+                ...globals.node,
+                __dirname: 'readonly',
+                __filename: 'readonly',
+                process: 'readonly',
+                Buffer: 'readonly',
+                console: 'readonly'
+            }
+        },
+        rules: {
+            'no-console': 'off'
+        }
+    },
+
+    // Renderer process (Browser environment)
     {
         files: ['src/renderer.js', 'src/modules/**/*.js', 'src/i18n/**/*.js'],
         languageOptions: {
             globals: {
                 ...globals.browser,
-                electronAPI: 'readonly',
+                backendAPI: 'readonly',
                 window: 'readonly',
                 document: 'readonly',
                 console: 'readonly',
@@ -118,20 +137,6 @@ export default [
                 fetch: 'readonly',
                 CustomEvent: 'readonly'
             }
-        }
-    },
-
-    // Preload script (mixed environment)
-    {
-        files: ['src/preload.js'],
-        languageOptions: {
-            globals: {
-                ...globals.node,
-                window: 'readonly'
-            }
-        },
-        rules: {
-            'no-console': 'off'
         }
     },
 

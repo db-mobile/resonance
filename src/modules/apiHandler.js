@@ -14,6 +14,8 @@ import { ResponseEditor } from './responseEditor.bundle.js';
 import { extractCookies, formatCookiesAsHtml } from './cookieParser.js';
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
 import { getRequestBodyContent } from './requestBodyHelper.js';
+import { MockServerRepository } from './storage/MockServerRepository.js';
+import { MockServerService } from './services/MockServerService.js';
 
 // Initialize CodeMirror editor for response display
 let responseEditor = null;
@@ -27,12 +29,19 @@ export function setGraphQLBodyManager(manager) {
 
 // Helper function to get variable service with environment support
 function getVariableService() {
-    const variableRepository = new VariableRepository(window.electronAPI);
-    const environmentRepository = new EnvironmentRepository(window.electronAPI);
+    const variableRepository = new VariableRepository(window.backendAPI);
+    const environmentRepository = new EnvironmentRepository(window.backendAPI);
     const variableProcessor = new VariableProcessor();
     const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
 
     return new VariableService(variableRepository, variableProcessor, statusDisplayAdapter, environmentRepository);
+}
+
+// Helper function to get mock server service
+function getMockServerService() {
+    const mockServerRepository = new MockServerRepository(window.backendAPI);
+    const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
+    return new MockServerService(mockServerRepository, statusDisplayAdapter);
 }
 
 export function initResponseEditor() {
@@ -129,7 +138,7 @@ function setRequestInProgress(inProgress) {
 
 export async function handleCancelRequest() {
     try {
-        const result = await window.electronAPI.cancelApiRequest();
+        const result = await window.backendAPI.cancelApiRequest();
 
         if (result.success) {
             updateStatusDisplay('Request cancelled', null);
@@ -151,7 +160,6 @@ export async function handleCancelRequest() {
             }
         }
     } catch (error) {
-        console.error('Error cancelling request:', error);
         updateStatusDisplay('Error cancelling request', null);
         updateResponseTime(null);
         updateResponseSize(null);
@@ -165,7 +173,12 @@ export async function handleSendRequest() {
         await saveAllRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
     }
 
-    let url = urlInput.value.trim();
+    // Get URL from input - fall back to default attribute if value was cleared
+    let url = urlInput?.value?.trim() || '';
+    if (!url && urlInput) {
+        // Fall back to the default value attribute if the current value is empty
+        url = urlInput.getAttribute('value') || '';
+    }
 
     const method = methodSelect.value;
     let body = undefined;
@@ -198,7 +211,7 @@ export async function handleSendRequest() {
 
         if (window.currentEndpoint) {
             // Get collection-specific variables + environment variables
-            const collectionRepository = new CollectionRepository(window.electronAPI);
+            const collectionRepository = new CollectionRepository(window.backendAPI);
             const collection = await collectionRepository.getById(window.currentEndpoint.collectionId);
 
             if (collection && collection.defaultHeaders) {
@@ -252,7 +265,6 @@ export async function handleSendRequest() {
         Object.assign(queryParams, processedQueryParams);
 
     } catch (error) {
-        console.error('Error processing variables:', error);
         updateStatusDisplay(`Variable processing error: ${error.message}`, null);
         return;
     }
@@ -279,6 +291,46 @@ export async function handleSendRequest() {
         url = `${urlWithoutQuery}?${queryString}`;
     } else {
         url = urlWithoutQuery;
+    }
+
+    // Check if mock server should be used for this request
+    if (window.currentEndpoint) {
+        try {
+            const mockServerService = getMockServerService();
+            const { shouldUseMock, mockBaseUrl } = await mockServerService.shouldUseMockServer(window.currentEndpoint.collectionId);
+            
+            if (shouldUseMock && mockBaseUrl) {
+                // Get the endpoint path from the collection
+                const collectionRepository = new CollectionRepository(window.backendAPI);
+                const collection = await collectionRepository.getById(window.currentEndpoint.collectionId);
+                
+                if (collection) {
+                    // Find the endpoint in the collection
+                    let endpoint = collection.endpoints?.find(e => e.id === window.currentEndpoint.endpointId);
+                    
+                    // Also check folders if not found at top level
+                    if (!endpoint && collection.folders) {
+                        for (const folder of collection.folders) {
+                            endpoint = folder.endpoints?.find(e => e.id === window.currentEndpoint.endpointId);
+                            if (endpoint) { break; }
+                        }
+                    }
+                    
+                    if (endpoint && endpoint.path) {
+                        // Replace path parameters in the endpoint path
+                        let mockPath = endpoint.path;
+                        for (const [key, value] of Object.entries(pathParams)) {
+                            mockPath = mockPath.replace(`{${key}}`, value);
+                        }
+                        
+                        // Build mock URL with query string
+                        url = queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`;
+                    }
+                }
+            }
+        } catch (error) {
+            // Continue with original URL if mock server check fails
+        }
     }
 
     // Handle request body (supports JSON and GraphQL modes)
@@ -347,13 +399,29 @@ export async function handleSendRequest() {
         }
     }
 
+    // Get HTTP version and timeout settings
+    let httpVersion = 'auto';
+    let timeout = 30000; // Default 30 seconds
+    try {
+        const settings = await window.backendAPI.settings.get();
+        httpVersion = settings.httpVersion || 'auto';
+        // TimeoutManager saves as requestTimeout, store default uses timeout
+        // 0 means no timeout - pass null to backend to disable timeout
+        const savedTimeout = settings.requestTimeout ?? settings.timeout;
+        timeout = savedTimeout === 0 ? null : (savedTimeout ?? 30000);
+    } catch (e) {
+        void e;
+    }
+
     // Define requestConfig outside try block so it's accessible in catch block
     // Note: using let instead of const to allow pre-request scripts to modify the config
     let requestConfig = {
         method,
         url,
         headers,
-        body
+        body,
+        httpVersion,
+        timeout
     };
 
     try {
@@ -395,13 +463,12 @@ export async function handleSendRequest() {
                     requestConfig
                 );
             } catch (error) {
-                console.error('Pre-request script error:', error);
                 updateStatusDisplay(`Pre-request script error: ${error.message}`, null);
                 // Continue anyway (non-blocking)
             }
         }
 
-        const result = await window.electronAPI.sendApiRequest(requestConfig);
+        const result = await window.backendAPI.sendApiRequest(requestConfig);
 
         if (result.success) {
             // Extract content-type from response headers
@@ -497,7 +564,6 @@ export async function handleSendRequest() {
                         result
                     );
                 } catch (error) {
-                    console.error('Test script error:', error);
                     // Non-blocking
                 }
             }
@@ -525,7 +591,6 @@ export async function handleSendRequest() {
         }
 
     } catch (error) {
-        console.error('Full error object:', error);
 
         const status = error.status || null;
         const statusText = error.statusText || '';
@@ -616,7 +681,6 @@ export async function handleSendRequest() {
         updateStatusDisplay(statusDisplayText, status);
         updateResponseTime(error.ttfb);
         updateResponseSize(error.size);
-        console.error('API Error (via IPC):', error);
 
         // Add error to history
         if (window.historyController) {
@@ -665,7 +729,7 @@ export async function handleGenerateCurl() {
 
         if (window.currentEndpoint) {
             // Get collection-specific variables + environment variables
-            const collectionRepository = new CollectionRepository(window.electronAPI);
+            const collectionRepository = new CollectionRepository(window.backendAPI);
             const collection = await collectionRepository.getById(window.currentEndpoint.collectionId);
 
             if (collection && collection.defaultHeaders) {
@@ -719,7 +783,6 @@ export async function handleGenerateCurl() {
         Object.assign(queryParams, processedQueryParams);
 
     } catch (error) {
-        console.error('Error processing variables:', error);
         updateStatusDisplay(`Variable processing error: ${error.message}`, null);
         return;
     }

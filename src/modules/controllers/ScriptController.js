@@ -33,7 +33,6 @@ export class ScriptController {
         try {
             await this.scriptManager.loadScripts(collectionId, endpointId);
         } catch (error) {
-            console.error('Error loading scripts:', error);
             this._showError('Failed to load scripts', error.message);
         }
     }
@@ -80,7 +79,6 @@ export class ScriptController {
             return modifiedRequest;
 
         } catch (error) {
-            console.error('Error executing pre-request script:', error);
             this._showError('Pre-request script error', error.message);
             return requestConfig;
         }
@@ -118,7 +116,6 @@ export class ScriptController {
             return result;
 
         } catch (error) {
-            console.error('Error executing test script:', error);
             this._showError('Test script error', error.message);
             return null;
         }
@@ -132,10 +129,10 @@ export class ScriptController {
      */
     _showScriptError(title, errors) {
         const errorMessage = Array.isArray(errors) ? errors.join('\n') : errors;
-        console.error(`${title}:`, errorMessage);
 
         // Could show in status bar or toast notification
         // For now, just log to console
+        console.error(title, errorMessage);
     }
 
     /**
@@ -145,9 +142,9 @@ export class ScriptController {
      * @param {string} message - Error message
      */
     _showError(title, message) {
-        console.error(`${title}:`, message);
 
         // Could show in status bar or toast notification
         // For now, just log to console
+        console.error(title, message);
     }
 }

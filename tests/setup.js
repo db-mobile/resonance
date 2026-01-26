@@ -1,5 +1,8 @@
-// Mock Electron modules
-global.window = {};
+// Mock Tauri API
+global.window = {
+  __TAURI__: true
+};
+
 global.document = {
   getElementById: jest.fn(),
   createElement: jest.fn(),
@@ -8,8 +11,13 @@ global.document = {
   querySelectorAll: jest.fn(() => [])
 };
 
-// Mock IPC
-global.electronAPI = {
+// Mock Tauri invoke API (used by ipcBridge)
+global.__TAURI_INTERNALS__ = {
+  invoke: jest.fn()
+};
+
+// Mock IPC Bridge (Tauri-compatible)
+global.ipcBridge = {
   sendApiRequest: jest.fn(),
   importCollection: jest.fn(),
   store: {

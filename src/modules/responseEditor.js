@@ -135,7 +135,7 @@ export class ResponseEditor {
             try {
                 JSON.parse(trimmed);
                 return { extension: json(), type: 'json' };
-            } catch (e) {
+            } catch {
                 // Not valid JSON
             }
         }

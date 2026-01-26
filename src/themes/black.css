@@ -1,0 +1,234 @@
+/**
+ * Black Theme (OLED)
+ * Pure black design optimized for OLED screens
+ */
+:root {
+  /* Text Colors */
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+  --text-disabled: #52525b;
+  --text-inverse: #000000;
+
+  /* Background Colors - Pure Black */
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-tertiary: #171717;
+  --bg-overlay: rgba(0, 0, 0, 0.95);
+  --bg-glass: rgba(0, 0, 0, 0.8);
+  --bg-glass-strong: rgba(0, 0, 0, 0.9);
+
+  /* Border Colors - Minimal */
+  --border-light: #27272a;
+  --border-medium: #3f3f46;
+  --border-strong: #52525b;
+  --border-focus: var(--accent, #10b981);
+  --border-glass: rgba(39, 39, 42, 0.5);
+
+  /* Shadows - Very subtle */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.5);
+  --shadow-base: 0 2px 4px -1px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px -2px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 16px -4px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 16px 32px -8px rgba(0, 0, 0, 0.6);
+
+  /* Status Colors - OLED optimized */
+  --color-success-light: rgba(16, 185, 129, 0.12);
+  --color-warning-light: rgba(234, 179, 8, 0.12);
+  --color-error-light: rgba(239, 68, 68, 0.12);
+  --color-primary-light: rgba(59, 130, 246, 0.12);
+
+  /* HTTP Method Colors */
+  --method-get-bg: rgba(34, 197, 94, 0.12);
+  --method-get-text: #4ade80;
+  --method-post-bg: rgba(59, 130, 246, 0.12);
+  --method-post-text: #60a5fa;
+  --method-put-bg: rgba(249, 115, 22, 0.12);
+  --method-put-text: #fb923c;
+  --method-delete-bg: rgba(239, 68, 68, 0.12);
+  --method-delete-text: #f87171;
+  --method-patch-bg: rgba(168, 85, 247, 0.12);
+  --method-patch-text: #c084fc;
+}
+
+/* Black theme specific overrides */
+body {
+  background: var(--bg-primary);
+}
+
+input[type="text"],
+input[type="url"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea,
+select {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+input[type="text"]:focus,
+input[type="url"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+  background: var(--bg-secondary) !important;
+  border-color: var(--accent, #10b981) !important;
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 16, 185, 129), 0.2) !important;
+}
+
+pre,
+code {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+button {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+button:hover {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-medium) !important;
+}
+
+/* Main Content Areas */
+.main-content-area,
+.request-builder,
+.request-url-section,
+.request-config,
+.response-area,
+.response-content,
+.response-display,
+.tab-content,
+.key-value-list,
+.key-value-row {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.collections-sidebar,
+.collections-container,
+.collections-list,
+.collections-empty,
+.collection-item,
+.collection-endpoints,
+.endpoint-item {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.tab-nav,
+.response-tabs,
+.tab-button,
+.response-header,
+.sidebar-header,
+.collection-header {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+h1, h2, h3, h4, h5, h6,
+.response-title,
+.sidebar-title,
+.collection-name {
+  color: var(--text-primary) !important;
+}
+
+label {
+  color: var(--text-secondary) !important;
+}
+
+#response-display,
+#response-headers-display {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+/* Status Display */
+.status-display {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-light) !important;
+  font-weight: 600 !important;
+}
+
+.status-success {
+  background: var(--method-get-bg) !important;
+  color: var(--method-get-text) !important;
+  border-color: var(--method-get-text) !important;
+}
+
+.status-redirect {
+  background: var(--color-warning-light) !important;
+  color: #fbbf24 !important;
+  border-color: #f59e0b !important;
+}
+
+.status-client-error,
+.status-server-error {
+  background: var(--method-delete-bg) !important;
+  color: var(--method-delete-text) !important;
+  border-color: var(--method-delete-text) !important;
+}
+
+.status-info {
+  background: var(--method-post-bg) !important;
+  color: var(--method-post-text) !important;
+  border-color: var(--method-post-text) !important;
+}
+
+/* Resizer handles */
+.resizer-handle,
+.horizontal-resizer-handle {
+  background: var(--bg-primary) !important;
+  border-color: var(--border-light) !important;
+}
+
+.resizer-handle:hover,
+.horizontal-resizer-handle:hover {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-medium) !important;
+}
+
+.resizer-handle .resizer-line,
+.horizontal-resizer-handle .horizontal-resizer-line {
+  background: var(--border-light) !important;
+}
+
+.resizer-handle:hover .resizer-line,
+.horizontal-resizer-handle:hover .horizontal-resizer-line {
+  background: var(--border-medium) !important;
+}
+
+/* Scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-medium) var(--bg-primary);
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}

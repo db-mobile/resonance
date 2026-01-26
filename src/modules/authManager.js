@@ -346,7 +346,7 @@ export class AuthManager {
                 if (config.token) {
                     authData.headers['Authorization'] = `Bearer ${config.token}`;
                 } else {
-                    console.warn('Bearer token is empty or undefined');
+                    void config;
                 }
                 break;
 

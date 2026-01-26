@@ -66,7 +66,6 @@ export class WorkspaceTabService {
                 activeTabId
             };
         } catch (error) {
-            console.error('Error initializing workspace tabs:', error);
             this.statusDisplay?.updateStatus('Error initializing workspace tabs', null);
             throw error;
         }
@@ -121,7 +120,6 @@ export class WorkspaceTabService {
             this._notifyListeners('tab-created', newTab);
             return newTab;
         } catch (error) {
-            console.error('Error creating tab:', error);
             this.statusDisplay?.updateStatus('Error creating tab', null);
             throw error;
         }
@@ -148,7 +146,6 @@ export class WorkspaceTabService {
             this._notifyListeners('tab-switched', tab);
             return tab;
         } catch (error) {
-            console.error('Error switching tab:', error);
             this.statusDisplay?.updateStatus('Error switching tab', null);
             throw error;
         }
@@ -172,7 +169,6 @@ export class WorkspaceTabService {
             const tabIndex = tabs.findIndex(t => t.id === tabId);
 
             if (tabIndex === -1) {
-                console.warn('Tab not found:', tabId);
                 return null;
             }
 
@@ -204,7 +200,6 @@ export class WorkspaceTabService {
             this._notifyListeners('tab-closed', result);
             return result;
         } catch (error) {
-            console.error('Error closing tab:', error);
             this.statusDisplay?.updateStatus('Error closing tab', null);
             throw error;
         }
@@ -221,16 +216,11 @@ export class WorkspaceTabService {
      * @fires WorkspaceTabService#tab-updated
      */
     async updateTab(tabId, updates) {
-        try {
-            const updatedTab = await this.repository.updateTab(tabId, updates);
-            if (updatedTab) {
-                this._notifyListeners('tab-updated', updatedTab);
-            }
-            return updatedTab;
-        } catch (error) {
-            console.error('Error updating tab:', error);
-            throw error;
+        const updatedTab = await this.repository.updateTab(tabId, updates);
+        if (updatedTab) {
+            this._notifyListeners('tab-updated', updatedTab);
         }
+        return updatedTab;
     }
 
     /**
@@ -251,7 +241,6 @@ export class WorkspaceTabService {
             }
             return updatedTab;
         } catch (error) {
-            console.error('Error renaming tab:', error);
             this.statusDisplay?.updateStatus('Error renaming tab', null);
             throw error;
         }
@@ -272,7 +261,6 @@ export class WorkspaceTabService {
         try {
             const tab = await this.repository.getTabById(tabId);
             if (!tab) {
-                console.warn('Tab not found:', tabId);
                 return null;
             }
 
@@ -288,7 +276,6 @@ export class WorkspaceTabService {
             this._notifyListeners('tab-duplicated', newTab);
             return newTab;
         } catch (error) {
-            console.error('Error duplicating tab:', error);
             this.statusDisplay?.updateStatus('Error duplicating tab', null);
             throw error;
         }
@@ -370,7 +357,7 @@ export class WorkspaceTabService {
             try {
                 listener(event, data);
             } catch (error) {
-                console.error('Error in tab listener:', error);
+                void error;
             }
         });
     }
