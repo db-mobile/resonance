@@ -56,7 +56,7 @@ export class InlineScriptManager {
         this.currentEndpointId = endpointId;
 
         try {
-            const scripts = await window.electronAPI.scripts.get(collectionId, endpointId);
+            const scripts = await window.backendAPI.scripts.get(collectionId, endpointId);
 
             if (this.preRequestTextarea) {
                 this.preRequestTextarea.value = scripts.preRequestScript || '';
@@ -66,7 +66,7 @@ export class InlineScriptManager {
                 this.testScriptTextarea.value = scripts.testScript || '';
             }
         } catch (error) {
-            console.error('Error loading scripts:', error);
+            void error;
         }
     }
 
@@ -116,13 +116,13 @@ export class InlineScriptManager {
         };
 
         try {
-            await window.electronAPI.scripts.save(
+            await window.backendAPI.scripts.save(
                 this.currentCollectionId,
                 this.currentEndpointId,
                 scripts
             );
         } catch (error) {
-            console.error('Error saving scripts:', error);
+            void error;
         }
     }
 

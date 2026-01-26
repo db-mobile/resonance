@@ -1,77 +1,81 @@
 # CLAUDE.md
 
-## Project Overview
-Resonance is an Electron-based API client for testing APIs with OpenAPI/Postman import, variable templating, multi-language code generation, and a modular MVC architecture.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Development Commands
-- `npm start` - Development mode
-- `npm run build` - Build with esbuild
-- `npm run dist` - Package for all platforms (uses ASAR)
-- `npm test` - Run Jest tests
-- `npm run lint` - Lint (must pass before commits)
+## Project Overview
+
+Resonance is a local-first, zero-account API client built with Tauri v2.0.0. It's a cross-platform desktop application (Linux, macOS, Windows) for REST/GraphQL testing, OpenAPI/Postman import, mock server, scripting, and environment management.
+
+## Build Commands
+
+```bash
+npm run dev              # Start dev server with hot reload (Tauri dev mode)
+npm run build            # Build frontend assets (esbuild bundling)
+npm run build:tauri      # Build production application
+```
+
+## Testing
+
+```bash
+npm test                 # Run Jest tests
+npm test -- --testPathPattern="VariableService"  # Run single test file
+npm run test:coverage    # Generate coverage report
+```
+
+## Code Quality
+
+```bash
+npm run lint             # Run ESLint
+npm run lint:fix         # Auto-fix ESLint issues
+npm run format           # Format with Prettier
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check   # Check Rust formatting
+cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings  # Lint Rust
+```
 
 ## Architecture
 
-### Process Structure
-- **Main Process** (`src/main.js`, `src/main/`)
-  - Electron entry point with modular handlers
-  - HTTP requests via axios for security
-  - IPC handlers for store, requests, scripts, mock server
-  - Sandboxed script execution (10s timeout)
-  - Uses `electron-store` for persistence, `js-yaml` for OpenAPI parsing
+### Frontend (Vanilla JavaScript)
+- **Entry Point**: `src/renderer.js` - orchestrates all modules
+- **IPC Bridge**: `src/modules/ipcBridge.js` - abstraction layer for Tauri IPC, use `window.electronAPI.*`
+- **Bundled Editors**: CodeMirror v6 editors in `src/modules/*.bundle.js`
 
-- **Renderer Process** (`src/renderer.js`)
-  - UI orchestrator importing modular components
-  - ES6 modules throughout
+### Backend (Rust)
+- **Entry Point**: `src-tauri/src/main.rs`
+- **Commands**: `src-tauri/src/commands/` - IPC handlers for HTTP requests, mock server, scripts, storage
 
-- **Preload** (`preload.js`)
-  - CommonJS, exposes safe APIs via `contextBridge`
-  - Path: Uses `__dirname` for ASAR compatibility
+### Module Organization
+```
+src/modules/
+├── controllers/    # MVC controllers - coordinate services and UI
+├── services/       # Business logic with event emission
+├── storage/        # Repository pattern for data persistence
+├── ui/             # UI components and dialogs
+├── variables/      # Variable processor ({{ varName }}) and dynamic variables ({{$uuid}})
+└── schema/         # OpenAPI schema handling
+```
 
-### Module Organization (`src/modules/`)
-Follows MVC pattern with layered separation:
+### Key Patterns
 
-- **Layers:**
-  - `controllers/` - UI coordination (Collection, Environment, History, MockServer, Proxy, Script, WorkspaceTab)
-  - `services/` - Business logic with validation
-  - `storage/` - Data persistence via `electron-store` (includes `_getObjectFromStore()` fallback helper)
-  - `ui/` - Reusable dialogs and renderers
-  - `variables/` - Variable templating (`{{ variableName }}` syntax)
-  - `schema/` - OpenAPI schema processing
+1. **Observer Pattern**: Services emit change events (e.g., 'environment-switched') that controllers listen to with `.addChangeListener(callback)`
 
-- **Core Modules:** `domElements.js`, `apiHandler.js`, `authManager.js`, `codeGenerator.js`, `keyboardShortcuts.js`, `themeManager.js`, CodeMirror editors
+2. **Dependency Injection**: Controllers/services receive dependencies via constructors
 
-### Key Features
-- **Collections:** Import OpenAPI 3.0 (YAML/JSON) and Postman v2.x (collections/environments)
-- **Variables:** Environment-scoped templating with `{{ }}` syntax
-- **Auth:** Bearer, Basic, API Key, OAuth2, Digest
-- **Scripts:** Pre-request and test scripts with sandboxed execution, `expect()` assertions, environment integration (see `SCRIPTS.md`)
-- **Mock Server:** Local HTTP server with OpenAPI schema-generated responses
-- **Code Gen:** Export to 9 languages (cURL, Python, JS, Node, Go, PHP, Ruby, Java)
-- **GraphQL:** Dedicated query/variables editors with syntax highlighting
-- **Workspace Tabs:** Multi-tab state with persistence
-- **i18n:** 5 languages (EN, DE, ES, FR, IT) via `data-i18n` attributes
-- **Themes:** Light, dark, system, blueprint via CSS custom properties
+3. **Repository Pattern**: Repositories validate data, auto-initialize defaults, and use defensive programming
 
-### Data Persistence
-`electron-store` with IPC handlers (`store:get/set`, `settings:get/set`):
-- Collections: `{ collections: [] }`
-- Environments: `{ items: [], activeEnvironmentId: null }`
-- Scripts: `{ preRequestScript: '', testScript: '' }` per endpoint
-- Repository layer validates/auto-initializes on undefined values
+4. **Variable System**:
+   - Static: `{{ variableName }}` - resolved from environments
+   - Dynamic: `{{$uuid}}`, `{{$timestamp}}`, etc. - generated at request time
 
-## Key Patterns
-- **Modules:** ES6 in renderer/main (via `type: "module"`), CommonJS in preload
-- **Architecture:** Repository → Service → Controller pattern with defensive programming
-- **IPC:** Renderer → Preload → Main → External APIs
-- **Security:** `contextIsolation: true`, `nodeIntegration: false`, ASAR packaging
-- **DOM:** Centralized element refs in `domElements.js`
-- **Events:** Observer pattern for environment changes, modular event handling
-- **Auto-save:** 1s debounce for scripts and GraphQL editors
+### Adding New Features
 
-## Common Issues
+1. Create modules in appropriate `src/modules/` subdirectories
+2. Export from index files
+3. Import and initialize in `renderer.js`
+4. For backend functionality: add Tauri commands in `src-tauri/src/commands/` and register in `main.rs`
 
-### Packaged Apps (ASAR)
-1. **Store returns undefined:** Repository `_getObjectFromStore()` auto-initializes
-2. **Preload paths:** Use `__dirname` (not `app.getAppPath()`)
-3. **Resource paths:** Use `app.isPackaged` check, `process.resourcesPath` for assets
+## ESLint Rules (Enforced)
+
+- `prefer-const`, `no-var`, `eqeqeq: always`, `curly: all` - all errors
+- `no-eval`, `no-implied-eval` - errors
+- Unused variables prefixed with `_` are ignored
+- `max-depth: 4`, `max-nested-callbacks: 3` - warnings

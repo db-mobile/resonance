@@ -155,7 +155,7 @@ export class RequestBodyEditor {
             const formatted = JSON.stringify(parsed, null, 2);
             this.setContent(formatted);
             return true;
-        } catch (e) {
+        } catch {
             // Invalid JSON, don't format
             return false;
         }

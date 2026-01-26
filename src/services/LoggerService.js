@@ -9,8 +9,24 @@
  * - Works in both main and renderer processes
  */
 
-import log from 'electron-log';
-import path from 'path';
+const log = {
+    transports: {
+        console: { level: 'info', format: '{text}' },
+        file: {
+            level: 'info',
+            maxSize: 0,
+            format: '{text}',
+            resolvePathFn: null,
+            getFile: () => ({ path: '' })
+        }
+    },
+    variables: {},
+    error: (message) => console.error(message),
+    warn: (message) => console.warn(message),
+    info: (message) => console.info(message),
+    debug: (message) => console.debug(message),
+    verbose: (message) => console.debug(message)
+};
 
 class LoggerService {
     constructor() {
@@ -52,7 +68,7 @@ class LoggerService {
 
         // Set custom log path if provided
         if (logPath) {
-            log.transports.file.resolvePathFn = () => path.join(logPath, 'resonance.log');
+            log.transports.file.resolvePathFn = () => logPath;
         }
 
         // Configure console transport

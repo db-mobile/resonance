@@ -77,21 +77,75 @@ jobs:
         node-version: '22.x'
         cache: 'npm'
 
+    - name: Install Rust stable
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Rust cache
+      uses: swatinem/rust-cache@v2
+      with:
+        workspaces: './src-tauri -> target'
+
+    - name: Install Linux dependencies
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
     - name: Install dependencies
       run: npm ci
 
-    - name: Build application
+    - name: Build frontend
       run: npm run build
 
-    - name: Package application
-      run: npm run dist:dir
+    - name: Build Tauri application
+      run: npm run build:tauri
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
         name: build-${{ matrix.os }}
-        path: dist/
+        path: src-tauri/target/release/bundle/
         retention-days: 7
+
+  rust-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust stable
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy, rustfmt
+
+    - name: Rust cache
+      uses: swatinem/rust-cache@v2
+      with:
+        workspaces: './src-tauri -> target'
+
+    - name: Install Linux dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build frontend
+      run: npm run build
+
+    - name: Check formatting
+      run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+    - name: Run clippy
+      run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
   security:
     runs-on: ubuntu-latest
@@ -114,4 +168,3 @@ jobs:
     
     - name: Run dependency check
       run: npx audit-ci --moderate
-

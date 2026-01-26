@@ -8,7 +8,6 @@ async function copyToClipboard(text) {
         await navigator.clipboard.writeText(text);
         return true;
     } catch (error) {
-        console.error('Failed to copy to clipboard:', error);
         return false;
     }
 }
@@ -51,7 +50,6 @@ export async function handleCopyResponse(button, tabId) {
     // Get the response container manager from the window
     const { responseContainerManager } = window;
     if (!responseContainerManager) {
-        console.error('ResponseContainerManager not found');
         showCopyFeedback(button, false);
         return;
     }
@@ -59,7 +57,6 @@ export async function handleCopyResponse(button, tabId) {
     // Get the container elements for this tab
     const containerElements = responseContainerManager.getOrCreateContainer(tabId);
     if (!containerElements) {
-        console.error('Container elements not found for tab:', tabId);
         showCopyFeedback(button, false);
         return;
     }

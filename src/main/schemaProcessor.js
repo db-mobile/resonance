@@ -26,7 +26,7 @@ class SchemaProcessor {
      * @param {Object} spec - The OpenAPI specification object
      * @returns {void}
      */
-    setCurrentSpec(spec) {
+    setOpenApiSpec(spec) {
         this.currentOpenApiSpec = spec;
     }
 

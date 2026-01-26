@@ -25,7 +25,7 @@ class AssertionError extends Error {
 export default class ScriptExecutor {
     /**
      * Creates a ScriptExecutor instance
-     * @param {Object} store - electron-store instance for environment access
+     * @param {Object} store - store instance for environment access
      */
     constructor(store) {
         this.store = store;
@@ -270,7 +270,7 @@ export default class ScriptExecutor {
                 if (typeof arg === 'object') {
                     try {
                         return JSON.stringify(arg, null, 2);
-                    } catch (e) {
+                    } catch {
                         return String(arg);
                     }
                 }

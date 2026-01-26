@@ -2,7 +2,7 @@
  * Logger - Renderer process logging utility
  *
  * This module provides a simple, scoped logging interface for the renderer process.
- * It uses electron-log through the preload script's exposed API.
+ * It uses the exposed backend logging API.
  *
  * Usage:
  *   import logger from './modules/logger.js';
@@ -25,11 +25,11 @@ function scope(scopeName) {
     };
 
     return {
-        error: (message, meta) => window.electronAPI.logger.error(scopeName, message, formatMeta(meta)),
-        warn: (message, meta) => window.electronAPI.logger.warn(scopeName, message, formatMeta(meta)),
-        info: (message, meta) => window.electronAPI.logger.info(scopeName, message, formatMeta(meta)),
-        debug: (message, meta) => window.electronAPI.logger.debug(scopeName, message, formatMeta(meta)),
-        verbose: (message, meta) => window.electronAPI.logger.verbose(scopeName, message, formatMeta(meta))
+        error: (message, meta) => window.backendAPI.logger.error(scopeName, message, formatMeta(meta)),
+        warn: (message, meta) => window.backendAPI.logger.warn(scopeName, message, formatMeta(meta)),
+        info: (message, meta) => window.backendAPI.logger.info(scopeName, message, formatMeta(meta)),
+        debug: (message, meta) => window.backendAPI.logger.debug(scopeName, message, formatMeta(meta)),
+        verbose: (message, meta) => window.backendAPI.logger.verbose(scopeName, message, formatMeta(meta))
     };
 }
 
@@ -37,11 +37,11 @@ function scope(scopeName) {
  * Root logger (without scope)
  */
 const rootLogger = {
-    error: (message, meta) => window.electronAPI.logger.error('App', message, meta),
-    warn: (message, meta) => window.electronAPI.logger.warn('App', message, meta),
-    info: (message, meta) => window.electronAPI.logger.info('App', message, meta),
-    debug: (message, meta) => window.electronAPI.logger.debug('App', message, meta),
-    verbose: (message, meta) => window.electronAPI.logger.verbose('App', message, meta),
+    error: (message, meta) => window.backendAPI.logger.error('App', message, meta),
+    warn: (message, meta) => window.backendAPI.logger.warn('App', message, meta),
+    info: (message, meta) => window.backendAPI.logger.info('App', message, meta),
+    debug: (message, meta) => window.backendAPI.logger.debug('App', message, meta),
+    verbose: (message, meta) => window.backendAPI.logger.verbose('App', message, meta),
     scope
 };
 

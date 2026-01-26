@@ -169,7 +169,7 @@ export class EnvironmentManager {
                 await this.selectEnvironment(envToSelect);
             }
         } catch (error) {
-            console.error('Error loading environments:', error);
+            void error;
         }
     }
 
@@ -306,7 +306,7 @@ export class EnvironmentManager {
             // Load variables
             this.loadVariables(environment.variables);
         } catch (error) {
-            console.error('Error loading environment details:', error);
+            void error;
         }
     }
 
@@ -534,7 +534,6 @@ export class EnvironmentManager {
             const variables = { ...environment.variables, [name]: value };
             await this.service.updateEnvironment(this.currentEnvironmentId, { variables });
         } catch (error) {
-            console.error('Error setting variable:', error);
             this.showAlert(error.message);
         }
     }
@@ -554,7 +553,6 @@ export class EnvironmentManager {
             delete variables[name];
             await this.service.updateEnvironment(this.currentEnvironmentId, { variables });
         } catch (error) {
-            console.error('Error deleting variable:', error);
             this.showAlert(error.message);
         }
     }

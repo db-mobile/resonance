@@ -19,15 +19,14 @@ let collectionController = null;
  *
  * @private
  * @returns {CollectionController} The initialized controller
- * @throws {Error} If electronAPI is not available
+ * @throws {Error} If backendAPI is not available
  */
 function initializeController() {
     if (!collectionController) {
-        if (!window.electronAPI) {
-            console.error('electronAPI is not available. Ensure preload script is loaded.');
-            throw new Error('electronAPI is not available');
+        if (!window.backendAPI) {
+            throw new Error('backendAPI is not available');
         }
-        collectionController = new CollectionController(window.electronAPI, updateStatusDisplay);
+        collectionController = new CollectionController(window.backendAPI, updateStatusDisplay);
         window.collectionService = collectionController.service;
     }
     return collectionController;
@@ -179,7 +178,6 @@ export async function restoreLastSelectedRequest() {
  * @returns {null}
  */
 export function generatePlaceholderBody(_requestBody) {
-    console.warn('generatePlaceholderBody is deprecated. Schema processing is now handled by SchemaProcessor class.');
     return null;
 }
 
@@ -191,10 +189,9 @@ export function generatePlaceholderBody(_requestBody) {
  * @returns {null}
  */
 export function generateExampleFromSchema(_schema) {
-    console.warn('generateExampleFromSchema is deprecated. Schema processing is now handled by SchemaProcessor class.');
     return null;
 }
 
-if (typeof window !== 'undefined' && window.electronAPI) {
+if (typeof window !== 'undefined' && window.backendAPI) {
     initializeController();
 }

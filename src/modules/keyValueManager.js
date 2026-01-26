@@ -140,7 +140,6 @@ export function updateUrlFromQueryParams() {
             isUpdatingUrlFromQueryParams = false;
         }, 0);
     } catch (error) {
-        console.error('Error updating URL from query params:', error);
         isUpdatingUrlFromQueryParams = false;
     }
 }
@@ -210,7 +209,6 @@ export function updateQueryParamsFromUrl() {
             addKeyValueRow(queryParamsList);
         }
     } catch (error) {
-        console.error('Error updating query params from URL:', error);
         if (queryParamsList.children.length === 0) {
             addKeyValueRow(queryParamsList);
         }

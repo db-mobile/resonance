@@ -100,7 +100,6 @@ function createMetric(label, value) {
  */
 export function displayPerformanceMetrics(container, timings, size) {
     if (!container) {
-        console.error('Performance metrics container not found');
         return;
     }
 

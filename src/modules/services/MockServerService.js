@@ -69,7 +69,7 @@ export class MockServerService {
             try {
                 callback(event);
             } catch (error) {
-                console.error('Error in mock server change listener:', error);
+                void error;
             }
         });
     }
@@ -104,7 +104,7 @@ export class MockServerService {
             }
 
             // Call IPC to start server in main process
-            const result = await window.electronAPI.mockServer.start(settings, enabledCollections);
+            const result = await window.backendAPI.mockServer.start(settings, enabledCollections);
 
             if (result.success) {
                 this.statusDisplay.update(`Mock server started on port ${result.port}`, null);
@@ -144,7 +144,7 @@ export class MockServerService {
      */
     async stopServer() {
         try {
-            const result = await window.electronAPI.mockServer.stop();
+            const result = await window.backendAPI.mockServer.stop();
 
             if (result.success) {
                 this.statusDisplay.update('Mock server stopped', null);
@@ -179,14 +179,48 @@ export class MockServerService {
      */
     async getStatus() {
         try {
-            return await window.electronAPI.mockServer.status();
+            return await window.backendAPI.mockServer.status();
         } catch (error) {
-            console.error('Error getting mock server status:', error);
             return {
                 running: false,
                 port: null,
                 requestCount: 0
             };
+        }
+    }
+
+    /**
+     * Checks if requests should be routed through the mock server
+     * 
+     * Returns mock server URL if:
+     * 1. Mock server is running
+     * 2. The collection is enabled for mocking
+     *
+     * @async
+     * @param {string} collectionId - Collection ID to check
+     * @returns {Promise<{shouldUseMock: boolean, mockBaseUrl: string|null}>}
+     */
+    async shouldUseMockServer(collectionId) {
+        try {
+            const [status, settings] = await Promise.all([
+                this.getStatus(),
+                this.getSettings()
+            ]);
+
+            if (!status.running) {
+                return { shouldUseMock: false, mockBaseUrl: null };
+            }
+
+            if (!settings.enabledCollections.includes(collectionId)) {
+                return { shouldUseMock: false, mockBaseUrl: null };
+            }
+
+            return {
+                shouldUseMock: true,
+                mockBaseUrl: `http://localhost:${status.port}`
+            };
+        } catch (error) {
+            return { shouldUseMock: false, mockBaseUrl: null };
         }
     }
 
@@ -199,9 +233,8 @@ export class MockServerService {
      */
     async getRequestLogs(limit = 20) {
         try {
-            return await window.electronAPI.mockServer.logs(limit);
+            return await window.backendAPI.mockServer.logs(limit);
         } catch (error) {
-            console.error('Error getting request logs:', error);
             return [];
         }
     }
@@ -213,12 +246,7 @@ export class MockServerService {
      * @returns {Promise<Object>} Result object
      */
     async clearRequestLogs() {
-        try {
-            return await window.electronAPI.mockServer.clearLogs();
-        } catch (error) {
-            console.error('Error clearing request logs:', error);
-            throw error;
-        }
+        return window.backendAPI.mockServer.clearLogs();
     }
 
     /**
@@ -338,7 +366,6 @@ export class MockServerService {
         try {
             return await this.repository.getCustomResponse(collectionId, endpointId);
         } catch (error) {
-            console.error('Error getting custom response:', error);
             return null;
         }
     }
@@ -393,7 +420,6 @@ export class MockServerService {
         try {
             return await this.repository.getCustomStatusCode(collectionId, endpointId);
         } catch (error) {
-            console.error('Error getting custom status code:', error);
             return null;
         }
     }
@@ -502,11 +528,10 @@ export class MockServerService {
         try {
             const status = await this.getStatus();
             if (status.running) {
-                await window.electronAPI.mockServer.reloadSettings();
+                await window.backendAPI.mockServer.reloadSettings();
             }
         } catch (error) {
             // Silently fail - settings will be picked up on next server start
-            console.warn('Failed to reload mock server settings:', error);
         }
     }
 }

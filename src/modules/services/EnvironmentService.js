@@ -70,7 +70,7 @@ export class EnvironmentService {
             try {
                 callback(event);
             } catch (error) {
-                console.error('Error in environment change listener:', error);
+                void error;
             }
         });
     }
@@ -102,7 +102,6 @@ export class EnvironmentService {
         try {
             return await this.repository.getActiveEnvironment();
         } catch (error) {
-            console.error('Error getting active environment:', error);
             return null;
         }
     }
@@ -117,7 +116,6 @@ export class EnvironmentService {
         try {
             return await this.repository.getActiveEnvironmentId();
         } catch (error) {
-            console.error('Error getting active environment ID:', error);
             return null;
         }
     }
@@ -321,7 +319,6 @@ export class EnvironmentService {
         try {
             return await this.repository.getActiveEnvironmentVariables();
         } catch (error) {
-            console.error('Error getting active environment variables:', error);
             return {};
         }
     }

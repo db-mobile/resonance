@@ -7,7 +7,7 @@
  * Repository for managing request history persistence
  *
  * @class
- * @classdesc Handles CRUD operations for request/response history in electron-store.
+ * @classdesc Handles CRUD operations for request/response history in the persistent store.
  * Maintains a limited history of API requests with timestamps, supporting replay
  * and search functionality. Implements defensive programming with validation and
  * auto-initialization for packaged app compatibility.
@@ -16,16 +16,16 @@ export class HistoryRepository {
     /**
      * Creates a HistoryRepository instance
      *
-     * @param {Object} electronAPI - The Electron IPC API bridge from preload script
+     * @param {Object} backendAPI - The backend IPC API bridge
      */
-    constructor(electronAPI) {
-        this.electronAPI = electronAPI;
+    constructor(backendAPI) {
+        this.backendAPI = backendAPI;
         this.HISTORY_KEY = 'requestHistory';
         this.MAX_HISTORY_ITEMS = 100; // Limit history to prevent excessive storage
     }
 
     /**
-     * Safely retrieves an array from electron-store with fallback handling
+     * Safely retrieves an array from the persistent store with fallback handling
      *
      * Implements defensive programming to handle packaged app environments where
      * store may return undefined on first run. Automatically initializes with
@@ -39,17 +39,15 @@ export class HistoryRepository {
      */
     async _getArrayFromStore(key, defaultValue = []) {
         try {
-            let data = await this.electronAPI.store.get(key);
+            let data = await this.backendAPI.store.get(key);
 
             if (!Array.isArray(data)) {
-                console.warn(`Store data for key "${key}" is invalid or undefined, initializing with default value`);
                 data = defaultValue;
-                await this.electronAPI.store.set(key, data);
+                await this.backendAPI.store.set(key, data);
             }
 
             return data;
         } catch (error) {
-            console.error(`Error getting data from store for key "${key}":`, error);
             return defaultValue;
         }
     }
@@ -69,7 +67,6 @@ export class HistoryRepository {
             // Return sorted by timestamp descending (newest first)
             return history.sort((a, b) => b.timestamp - a.timestamp);
         } catch (error) {
-            console.error('Error loading history:', error);
             throw new Error(`Failed to load history: ${error.message}`);
         }
     }
@@ -94,7 +91,6 @@ export class HistoryRepository {
             let history = await this._getArrayFromStore(this.HISTORY_KEY);
 
             if (!Array.isArray(history)) {
-                console.warn('History is not an array in add(), reinitializing');
                 history = [];
             }
 
@@ -106,10 +102,9 @@ export class HistoryRepository {
                 history = history.slice(0, this.MAX_HISTORY_ITEMS);
             }
 
-            await this.electronAPI.store.set(this.HISTORY_KEY, history);
+            await this.backendAPI.store.set(this.HISTORY_KEY, history);
             return historyEntry;
         } catch (error) {
-            console.error('Error adding history entry:', error);
             throw new Error(`Failed to add history entry: ${error.message}`);
         }
     }
@@ -126,7 +121,6 @@ export class HistoryRepository {
             const history = await this.getAll();
             return history.find(entry => entry.id === id);
         } catch (error) {
-            console.error('Error getting history entry by id:', error);
             return null;
         }
     }
@@ -143,10 +137,9 @@ export class HistoryRepository {
         try {
             const history = await this._getArrayFromStore(this.HISTORY_KEY);
             const updatedHistory = history.filter(entry => entry.id !== id);
-            await this.electronAPI.store.set(this.HISTORY_KEY, updatedHistory);
+            await this.backendAPI.store.set(this.HISTORY_KEY, updatedHistory);
             return true;
         } catch (error) {
-            console.error('Error deleting history entry:', error);
             throw new Error(`Failed to delete history entry: ${error.message}`);
         }
     }
@@ -160,10 +153,9 @@ export class HistoryRepository {
      */
     async clear() {
         try {
-            await this.electronAPI.store.set(this.HISTORY_KEY, []);
+            await this.backendAPI.store.set(this.HISTORY_KEY, []);
             return true;
         } catch (error) {
-            console.error('Error clearing history:', error);
             throw new Error(`Failed to clear history: ${error.message}`);
         }
     }
@@ -182,7 +174,6 @@ export class HistoryRepository {
                 entry.request.collectionId === collectionId
             );
         } catch (error) {
-            console.error('Error getting history by collection:', error);
             return [];
         }
     }
@@ -209,7 +200,6 @@ export class HistoryRepository {
                 return urlMatch || methodMatch || statusMatch;
             });
         } catch (error) {
-            console.error('Error searching history:', error);
             return [];
         }
     }

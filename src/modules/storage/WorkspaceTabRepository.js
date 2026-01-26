@@ -11,7 +11,7 @@ const _log = logger.scope('WorkspaceTabRepository');
  * Repository for managing workspace tab persistence
  *
  * @class
- * @classdesc Handles persistence of workspace tabs (multiple request tabs) in electron-store.
+ * @classdesc Handles persistence of workspace tabs (multiple request tabs) in the persistent store.
  * Each tab contains complete request/response state including URL, method, headers, body,
  * query params, authentication config, and response data. Implements defensive programming
  * with deep cloning to avoid reference issues and auto-initialization for packaged apps.
@@ -21,10 +21,10 @@ export class WorkspaceTabRepository {
     /**
      * Creates a WorkspaceTabRepository instance
      *
-     * @param {Object} electronAPI - The Electron IPC API bridge from preload script
+     * @param {Object} backendAPI - The backend IPC API bridge
      */
-    constructor(electronAPI) {
-        this.electronAPI = electronAPI;
+    constructor(backendAPI) {
+        this.backendAPI = backendAPI;
         this.STORE_KEY = 'workspace-tabs';
         this.ACTIVE_TAB_KEY = 'active-tab-id';
     }
@@ -40,7 +40,7 @@ export class WorkspaceTabRepository {
      */
     async getTabs() {
         try {
-            const data = await this.electronAPI.store.get(this.STORE_KEY);
+            const data = await this.backendAPI.store.get(this.STORE_KEY);
 
             // Validate and initialize if needed
             if (!data || !Array.isArray(data)) {
@@ -52,7 +52,6 @@ export class WorkspaceTabRepository {
             // Deep clone to avoid reference issues
             return JSON.parse(JSON.stringify(data));
         } catch (error) {
-            console.error('Error getting workspace tabs:', error);
             const defaultTabs = [this._createDefaultTab()];
             await this.saveTabs(defaultTabs);
             return defaultTabs;
@@ -68,15 +67,10 @@ export class WorkspaceTabRepository {
      * @throws {Error} If tabs is not an array or save fails
      */
     async saveTabs(tabs) {
-        try {
-            if (!Array.isArray(tabs)) {
-                throw new Error('Tabs must be an array');
-            }
-            await this.electronAPI.store.set(this.STORE_KEY, tabs);
-        } catch (error) {
-            console.error('Error saving workspace tabs:', error);
-            throw error;
+        if (!Array.isArray(tabs)) {
+            throw new Error('Tabs must be an array');
         }
+        await this.backendAPI.store.set(this.STORE_KEY, tabs);
     }
 
     /**
@@ -87,10 +81,9 @@ export class WorkspaceTabRepository {
      */
     async getActiveTabId() {
         try {
-            const activeId = await this.electronAPI.store.get(this.ACTIVE_TAB_KEY);
+            const activeId = await this.backendAPI.store.get(this.ACTIVE_TAB_KEY);
             return activeId || null;
         } catch (error) {
-            console.error('Error getting active tab ID:', error);
             return null;
         }
     }
@@ -104,12 +97,7 @@ export class WorkspaceTabRepository {
      * @throws {Error} If save fails
      */
     async setActiveTabId(tabId) {
-        try {
-            await this.electronAPI.store.set(this.ACTIVE_TAB_KEY, tabId);
-        } catch (error) {
-            console.error('Error setting active tab ID:', error);
-            throw error;
-        }
+        await this.backendAPI.store.set(this.ACTIVE_TAB_KEY, tabId);
     }
 
     /**

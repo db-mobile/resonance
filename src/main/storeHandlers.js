@@ -1,13 +1,13 @@
 /**
- * @fileoverview Electron store handler with fallback support for packaged apps
+ * @fileoverview Store handler with fallback support for packaged apps
  * @module main/storeHandlers
  */
 
 /**
- * Handles electron-store operations with defensive fallback handling
+ * Handles persistent store operations with defensive fallback handling
  *
  * @class
- * @classdesc Provides safe access to electron-store with automatic fallback to
+ * @classdesc Provides safe access to the persistent store with automatic fallback to
  * default values when store returns undefined (common in packaged apps on first run).
  * Implements defensive programming patterns for robust data persistence.
  */
@@ -15,10 +15,10 @@ class StoreHandler {
     /**
      * Creates a StoreHandler instance
      *
-     * @param {Store} store - The electron-store instance
+     * @param {Store} store - The store instance
      */
     constructor(store) {
-        /** @type {Store} The electron-store instance */
+        /** @type {Store} The store instance */
         this.store = store;
     }
 
@@ -36,13 +36,11 @@ class StoreHandler {
             const value = this.store.get(key);
 
             if (value === undefined) {
-                console.warn(`Store returned undefined for key "${key}", returning default value`);
                 return this._getDefaultForKey(key);
             }
 
             return value;
         } catch (error) {
-            console.error(`Error getting store value for key "${key}":`, error);
             return this._getDefaultForKey(key);
         }
     }

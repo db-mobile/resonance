@@ -33,7 +33,6 @@ export class ScriptService {
         try {
             return await this.repository.getScripts(collectionId, endpointId);
         } catch (error) {
-            console.error('Error getting scripts:', error);
             return {
                 preRequestScript: '',
                 testScript: ''
@@ -52,7 +51,6 @@ export class ScriptService {
         try {
             await this.repository.saveScripts(collectionId, endpointId, scripts);
         } catch (error) {
-            console.error('Error saving scripts:', error);
             throw new Error(`Failed to save scripts: ${error.message}`);
         }
     }
@@ -90,7 +88,7 @@ export class ScriptService {
             };
 
             // Execute script via IPC
-            const result = await window.electronAPI.scripts.executePreRequest(scriptData);
+            const result = await window.backendAPI.scripts.executePreRequest(scriptData);
 
             // Apply environment changes if any
             if (result.modifiedEnvironment && Object.keys(result.modifiedEnvironment).length > 0) {
@@ -104,7 +102,6 @@ export class ScriptService {
             };
 
         } catch (error) {
-            console.error('Error executing pre-request script:', error);
             return {
                 modifiedRequest: requestConfig,
                 result: {
@@ -161,7 +158,7 @@ export class ScriptService {
             };
 
             // Execute script via IPC
-            const result = await window.electronAPI.scripts.executeTest(scriptData);
+            const result = await window.backendAPI.scripts.executeTest(scriptData);
 
             // Apply environment changes if any
             if (result.modifiedEnvironment && Object.keys(result.modifiedEnvironment).length > 0) {
@@ -171,7 +168,6 @@ export class ScriptService {
             return result;
 
         } catch (error) {
-            console.error('Error executing test script:', error);
             return {
                 success: false,
                 logs: [],
@@ -191,7 +187,6 @@ export class ScriptService {
         try {
             const activeEnv = await this.environmentService.getActiveEnvironment();
             if (!activeEnv) {
-                console.warn('No active environment to apply changes to');
                 return;
             }
 
@@ -207,7 +202,6 @@ export class ScriptService {
             }
 
         } catch (error) {
-            console.error('Error applying environment changes:', error);
             // Non-fatal - log and continue
         }
     }

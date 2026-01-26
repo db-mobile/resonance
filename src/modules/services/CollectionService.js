@@ -135,8 +135,7 @@ export class CollectionService {
         try {
             this.statusDisplay.update('Exporting collection...', null);
 
-            // Call IPC handler via electronAPI
-            const result = await window.electronAPI.collections.exportOpenApi(collectionId, format);
+            const result = await window.backendAPI.collections.exportOpenApi(collectionId, format);
 
             if (result.cancelled) {
                 this.statusDisplay.update('Export cancelled', null);
@@ -591,7 +590,6 @@ export class CollectionService {
                 }, 0);
             }
         } catch (error) {
-            console.error('Error updating URL with query params:', error);
             if (typeof window !== 'undefined' && window.setUrlUpdating) {
                 window.setUrlUpdating(false);
             }
@@ -683,6 +681,10 @@ export class CollectionService {
         }
     }
 
+    async saveRequestBodyModification(collectionId, endpointId, _bodyInput) {
+        await this.saveModifiedRequestBody(collectionId, endpointId);
+    }
+
     /**
      * Generates request body from OpenAPI schema or examples
      *
@@ -723,10 +725,9 @@ export class CollectionService {
      * @private
      * @param {string} collectionId - The collection ID
      * @param {string} endpointId - The endpoint ID
-     * @param {HTMLTextAreaElement} _bodyInput - The body input element (unused, kept for API compatibility)
      * @returns {Promise<void>}
      */
-    async saveRequestBodyModification(collectionId, endpointId, _bodyInput) {
+    async saveModifiedRequestBody(collectionId, endpointId) {
         try {
             // Check if we're in GraphQL mode
             if (window.graphqlBodyManager && window.graphqlBodyManager.isGraphQLMode()) {
@@ -750,7 +751,7 @@ export class CollectionService {
                 }
             }
         } catch (error) {
-            console.error('Error saving request body modification:', error);
+            void error;
         }
     }
 
@@ -772,7 +773,7 @@ export class CollectionService {
                 variables
             });
         } catch (error) {
-            console.error('Error saving GraphQL data:', error);
+            void error;
         }
     }
 
@@ -788,7 +789,6 @@ export class CollectionService {
         try {
             return await this.repository.getGraphQLData(collectionId, endpointId);
         } catch (error) {
-            console.error('Error getting GraphQL data:', error);
             return null;
         }
     }
@@ -808,7 +808,7 @@ export class CollectionService {
             const pathParams = this.parseKeyValuePairs(formElements.pathParamsList);
             await this.repository.savePersistedPathParams(collectionId, endpointId, pathParams);
         } catch (error) {
-            console.error('Error saving path parameters:', error);
+            void error;
         }
     }
 
@@ -827,7 +827,7 @@ export class CollectionService {
             const queryParams = this.parseKeyValuePairs(formElements.queryParamsList);
             await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParams);
         } catch (error) {
-            console.error('Error saving query parameters:', error);
+            void error;
         }
     }
 
@@ -846,7 +846,7 @@ export class CollectionService {
             const headers = this.parseKeyValuePairs(formElements.headersList);
             await this.repository.savePersistedHeaders(collectionId, endpointId, headers);
         } catch (error) {
-            console.error('Error saving headers:', error);
+            void error;
         }
     }
 
@@ -866,7 +866,7 @@ export class CollectionService {
                 await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
             }
         } catch (error) {
-            console.error('Error saving auth config:', error);
+            void error;
         }
     }
 
@@ -897,7 +897,7 @@ export class CollectionService {
                 }
             }
         } catch (error) {
-            console.error('Error loading auth config:', error);
+            void error;
         }
     }
 

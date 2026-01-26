@@ -434,7 +434,7 @@ export class CollectionRenderer {
             const currentState = this.getExpansionState();
             await this.repository.saveCollectionExpansionStates(currentState);
         } catch (error) {
-            console.error('Error saving expansion state:', error);
+            void error;
         }
     }
 
@@ -456,7 +456,7 @@ export class CollectionRenderer {
             const savedState = await this.repository.getCollectionExpansionStates();
             this.restoreExpansionState(savedState);
         } catch (error) {
-            console.error('Error loading expansion state:', error);
+            void error;
         }
     }
 

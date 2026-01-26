@@ -4,8 +4,11 @@
  *
  * Initializes and coordinates all UI modules, controllers, services, and repositories.
  * Sets up event listeners, keyboard shortcuts, and manages the application lifecycle
- * in the renderer process. This is the entry point for the Electron renderer.
+ * in the renderer process.
  */
+
+// Import ipcBridge first to set up window.backendAPI before any other modules
+import './modules/ipcBridge.js';
 
 import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, bodyEditorContainer, pathParamsList, queryParamsList, headersList, authTypeSelect, responseBodyContainer, statusDisplay, responseHeadersDisplay, responseCookiesDisplay } from './modules/domElements.js';
 
@@ -62,17 +65,18 @@ const timeoutManager = new TimeoutManager();
 const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
 
 // Initialize proxy system
-const proxyRepository = new ProxyRepository(window.electronAPI);
+const proxyRepository = new ProxyRepository(window.backendAPI);
 const proxyService = new ProxyService(proxyRepository, statusDisplayAdapter);
 const proxyController = new ProxyController(proxyService);
 
 // Initialize environment system
-const environmentRepository = new EnvironmentRepository(window.electronAPI);
+const environmentRepository = new EnvironmentRepository(window.backendAPI);
 const environmentService = new EnvironmentService(environmentRepository, statusDisplayAdapter);
 const environmentManager = new EnvironmentManager(environmentService);
 
 // Create environment controller first
-let environmentController; // eslint-disable-line prefer-const
+// eslint-disable-next-line prefer-const
+let environmentController;
 
 // Create environment selector with callbacks that will use the controller
 const environmentSelector = new EnvironmentSelector(
@@ -89,7 +93,7 @@ environmentController = new EnvironmentController(
 );
 
 // Initialize script system
-const scriptRepository = new ScriptRepository(window.electronAPI);
+const scriptRepository = new ScriptRepository(window.backendAPI);
 const scriptService = new ScriptService(
     scriptRepository,
     environmentService,
@@ -127,24 +131,24 @@ window.graphqlBodyManager = graphqlBodyManager;
 const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager, proxyController);
 
 // Initialize mock server system
-const collectionRepository = new CollectionRepository(window.electronAPI);
-const mockServerRepository = new MockServerRepository(window.electronAPI);
+const collectionRepository = new CollectionRepository(window.backendAPI);
+const mockServerRepository = new MockServerRepository(window.backendAPI);
 const mockServerService = new MockServerService(mockServerRepository, statusDisplayAdapter);
 const mockServerController = new MockServerController(mockServerService, collectionRepository);
 const mockServerDialog = new MockServerDialog(mockServerController);
 
 // Initialize history controller
-const historyController = new HistoryController(window.electronAPI);
+const historyController = new HistoryController(window.backendAPI);
 
 // Initialize preview repository
-const previewRepository = new PreviewRepository(window.electronAPI);
+const previewRepository = new PreviewRepository(window.backendAPI);
 
 // Initialize response container manager for multiple workspace tabs
 const responseContainerManager = new ResponseContainerManager(previewRepository);
 window.responseContainerManager = responseContainerManager;
 
 // Initialize workspace tab system
-const workspaceTabRepository = new WorkspaceTabRepository(window.electronAPI);
+const workspaceTabRepository = new WorkspaceTabRepository(window.backendAPI);
 const workspaceTabService = new WorkspaceTabService(workspaceTabRepository, statusDisplayAdapter);
 const workspaceTabBar = new WorkspaceTabBar('workspace-tab-bar-container');
 const workspaceTabStateManager = new WorkspaceTabStateManager({
@@ -663,6 +667,6 @@ window.addEventListener('beforeunload', async (_e) => {
             await workspaceTabService.updateTab(activeTabId, currentState);
         }
     } catch (error) {
-        console.error('Error saving tab state before unload:', error);
+        void error;
     }
 });

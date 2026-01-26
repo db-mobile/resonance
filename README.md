@@ -1,10 +1,10 @@
 # Resonance
 
-A local-first, zero-account API client with excellent user experience built with Electron.
+A local-first, zero-account API client with excellent user experience built with Tauri.
 
 ![Resonance API Client](https://img.shields.io/badge/License-MIT-blue.svg)
-![Electron](https://img.shields.io/badge/Electron-v35.0.0-brightgreen.svg)
-![Node.js](https://img.shields.io/badge/Node.js-Latest-green.svg)
+![Tauri](https://img.shields.io/badge/Tauri-v2.0.0-brightgreen.svg)
+![Rust](https://img.shields.io/badge/Rust-Latest-orange.svg)
 
 ## Features
 
@@ -28,7 +28,7 @@ A local-first, zero-account API client with excellent user experience built with
   - Auto-save functionality for queries and variables
 
 ### Advanced Features
-- **Scripts & Automation**: Pre-request and test scripts with JavaScript execution
+- **Scripts & Automation**: Pre-request and test scripts with JavaScript execution (powered by Boa Engine)
   - **Pre-request Scripts**: Modify requests dynamically (headers, body, auth signatures)
   - **Test Scripts**: Validate responses with assertions and extract data
   - Rich assertion API (`expect()`) for automated testing
@@ -39,7 +39,7 @@ A local-first, zero-account API client with excellent user experience built with
 - **Performance Metrics**: Detailed request timing breakdown (DNS, TCP, TLS, TTFB, download)
 - **Cookie Management**: Parse and display response cookies with full attribute support
 - **Request History**: Complete request/response history with search and replay capability
-- **Proxy Support**: HTTP/HTTPS proxy configuration with authentication and bypass lists
+- **Proxy Support**: HTTP/HTTPS/SOCKS proxy configuration with authentication and bypass lists
 - **Mock Server**: Local HTTP mock server for testing API clients without a backend
   - Generate responses from OpenAPI schemas automatically
   - Configure custom response bodies and delays per endpoint
@@ -60,16 +60,17 @@ A local-first, zero-account API client with excellent user experience built with
 
 ### User Experience
 - **Keyboard Shortcuts**: Comprehensive shortcuts for all actions with platform-aware bindings (⌘/Ctrl)
-- **Multi-Theme Support**: Light, dark, system-adaptive, and blueprint themes
+- **Multi-Theme Support**: Light, dark, system-adaptive, and black (OLED) themes with 9 accent colors
 - **Internationalization**: Full support for English, German, Spanish, French, and Italian
 - **Syntax Highlighting**: CodeMirror-based response viewer with automatic language detection
 - **Resizable Panels**: Customizable workspace layout with draggable panel dividers
 
 ### Technical Features
-- **HTTP Version Control**: Support for HTTP/1.1, HTTP/2, and HTTP/3
+- **HTTP Version Control**: Support for HTTP/1.1 and HTTP/2
 - **Request Timeouts**: Configurable timeout settings per request
-- **Secure Architecture**: Context isolation, secure IPC, and ASAR packaging
+- **Secure Architecture**: Tauri's secure IPC, CSP policies, and native system integration
 - **Persistent Storage**: Auto-save for collections, variables, environments, settings, and history
+- **Lightweight**: ~15MB bundle size, ~50MB memory usage (vs ~150MB/~200MB for Electron)
 
 ## Screenshots
 
@@ -82,11 +83,13 @@ A local-first, zero-account API client with excellent user experience built with
 #### Flathub (Linux)
 
 Install from Flathub:
+
 ```bash
 flatpak install flathub io.github.db_mobile.resonance
 ```
 
 Run the application:
+
 ```bash
 flatpak run io.github.db_mobile.resonance
 ```
@@ -94,6 +97,7 @@ flatpak run io.github.db_mobile.resonance
 #### Snap (Linux)
 
 Install from Snap Store:
+
 ```bash
 snap install db-mobile-resonance
 ```
@@ -101,6 +105,7 @@ snap install db-mobile-resonance
 #### Homebrew (macOS)
 
 Install via Homebrew:
+
 ```bash
 brew tap db-mobile/resonance
 brew install --cask resonance
@@ -110,10 +115,13 @@ brew install --cask resonance
 
 #### Prerequisites
 
-- **Node.js** v18.0.0 or higher (v20.x or later recommended)
+- **Node.js** v20.0.0 or higher
+- **Rust** (latest stable) - [Install Rust](https://www.rust-lang.org/tools/install)
 - **Git** (for cloning the repository)
-
-**Note:** npm comes bundled with Node.js and is the default package manager for this project.
+- **Platform-specific dependencies**:
+  - **Linux**: `sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev`
+  - **macOS**: Xcode Command Line Tools (`xcode-select --install`)
+  - **Windows**: Microsoft Visual Studio C++ Build Tools
 
 #### Building from Source
 
@@ -128,39 +136,24 @@ cd resonance
 npm install
 ```
 
-3. Build the application:
+3. Start the application in development mode:
 ```bash
-npm run build
-```
-
-4. Start the application:
-```bash
-npm start
+npm run dev
 ```
 
 ### Build for Distribution
 
-Build the application:
+Build the application for production:
 ```bash
-npm run build
+npm run build:tauri
 ```
 
-Create distributables for all platforms:
-```bash
-npm run dist
-```
+The built application will be in `src-tauri/target/release/bundle/`.
 
-Create Linux-specific distributables:
-```bash
-npm run dist:linux
-```
-
-Create directory distribution (unpacked):
-```bash
-npm run dist:dir
-```
-
-**Note:** The application uses ASAR packaging for improved performance and security. Builds are created using electron-builder.
+**Note:** Tauri creates native installers for each platform:
+- **Linux**: AppImage, .deb
+- **macOS**: .app, .dmg
+- **Windows**: .msi, .exe
 
 ## Usage
 
@@ -408,7 +401,14 @@ Switch between themes in Settings:
 - **Light**: Clean, bright interface
 - **Dark**: Easy on the eyes for low-light environments
 - **System**: Automatically matches your OS theme
-- **Blueprint**: Technical schematic-inspired design
+- **Black (OLED)**: True black theme optimized for OLED displays
+
+### Accent Colors
+
+Personalize your interface with 9 accent colors:
+- Green (default), Teal, Blue, Indigo, Purple, Yellow, Orange, Red, Pink
+
+Accent colors are applied to buttons, highlights, and interactive elements throughout the application.
 
 ## Keyboard Shortcuts
 
@@ -456,21 +456,7 @@ Resonance includes comprehensive keyboard shortcuts to speed up your workflow. P
 
 ```
 src/
-├── main.js              # Main Electron process entry point
-├── main/                # Main process modules
-│   ├── windowManager.js        # Window lifecycle management
-│   ├── apiRequestHandlers.js   # HTTP request handling
-│   ├── storeHandlers.js        # Data persistence with fallbacks
-│   ├── schemaProcessor.js      # OpenAPI schema processing
-│   ├── openApiParser.js        # OpenAPI file import
-│   ├── postmanParser.js        # Postman collection & environment import
-│   ├── digestAuthHandler.js    # Digest authentication
-│   ├── proxyHandlers.js        # Proxy configuration
-│   ├── scriptExecutor.js       # Sandboxed script execution engine
-│   ├── scriptHandlers.js       # Script execution IPC handlers
-│   └── mockServerHandler.js    # Mock server HTTP handling
 ├── renderer.js          # Renderer process coordinator
-├── preload.js           # Secure context bridge
 ├── style.css           # Global styles
 ├── modules/            # Modular renderer components
 │   ├── controllers/    # MVC controllers (Collection, Environment, History, Script, Proxy, WorkspaceTab, MockServer)
@@ -479,6 +465,7 @@ src/
 │   ├── ui/            # UI components (dialogs, renderers, selectors, script editors)
 │   ├── variables/     # Variable processing and templating
 │   ├── schema/        # OpenAPI schema handling
+│   ├── ipcBridge.js   # Tauri IPC compatibility layer
 │   ├── codeGenerator.js       # Multi-language code export
 │   ├── cookieParser.js        # Cookie parsing and display
 │   ├── performanceMetrics.js  # Performance timing visualization
@@ -486,41 +473,49 @@ src/
 │   └── [26+ other modules]
 ├── themes/            # Theme CSS files
 └── i18n/             # Internationalization (5 languages)
+
+src-tauri/
+├── Cargo.toml         # Rust dependencies
+├── tauri.conf.json    # Tauri configuration
+└── src/
+    ├── main.rs        # Application entry point
+    └── commands/      # IPC command handlers
+        ├── api_request.rs    # HTTP request handling with reqwest
+        ├── proxy.rs          # Proxy configuration
+        ├── mock_server.rs    # Mock server with Axum
+        ├── scripts.rs        # JavaScript execution with Boa Engine
+        ├── store.rs          # Data persistence
+        └── import_export.rs  # OpenAPI/Postman parsing
 ```
 
 ### Key Technologies
 
-- **Electron** (v35.0.0): Cross-platform desktop app framework
-- **Axios** (v1.10.0): HTTP client for API requests
+- **Tauri** (v2.0.0): Cross-platform desktop app framework with Rust backend
+- **Rust**: Backend language for performance and security
+- **reqwest** (v0.12): Async HTTP client with HTTP/2, SOCKS proxy support
+- **Axum** (v0.7): Mock server HTTP framework
+- **Boa Engine** (v0.19): JavaScript engine for script execution
 - **CodeMirror** (v6.x): Advanced syntax highlighting and code editing
-- **electron-store** (v10.1.0): Persistent configuration storage
-- **js-yaml** (v4.1.0): YAML parsing for OpenAPI specs
-- **electron-window-state** (v5.0.3): Window state management
+- **tauri-plugin-store**: Persistent configuration storage
+- **serde_yaml**: YAML parsing for OpenAPI specs
 - **esbuild** (v0.25.x): Fast JavaScript bundler
-- **electron-builder** (v26.0.x): Application packaging
 - **Jest** (v30.0.x): Testing framework
 
 ### Security Features
 
-- Context isolation enabled
-- Node.js integration disabled in renderer
-- Secure IPC communication via contextBridge
-- Preload script for safe API exposure using `__dirname` for reliable path resolution
-- Electron Forge fuses for additional security:
-  - RunAsNode disabled
-  - Cookie encryption enabled
-  - ASAR integrity validation enabled
-  - Only load app from ASAR in production
+- Tauri's secure IPC communication
+- Content Security Policy (CSP) enforcement
+- Native system integration without Node.js in renderer
+- Sandboxed JavaScript execution for scripts
+- Minimal attack surface with Rust backend
 
 ## Development
 
 ### Scripts
 
-- `npm start` - Start development server
-- `npm run build` - Build the application
-- `npm run dist` - Create distributables for all platforms
-- `npm run dist:linux` - Create Linux-specific distributables
-- `npm run dist:dir` - Create directory distribution (unpacked)
+- `npm run dev` - Start development server with hot reload
+- `npm run build` - Build frontend assets
+- `npm run build:tauri` - Build production application
 - `npm test` - Run tests with Jest
 - `npm run test:watch` - Run tests in watch mode
 - `npm run test:coverage` - Run tests with coverage report
@@ -537,13 +532,15 @@ The application follows a modular MVC-like architecture:
 - **Views**: UI components and renderers
 - **Controllers**: Coordination between models and views
 - **Services**: Business logic and API interactions
+- **Commands**: Rust backend IPC handlers
 
 ### Adding New Features
 
 1. Create modules in appropriate `src/modules/` subdirectories
 2. Export functionality from index files
 3. Import and initialize in `renderer.js`
-4. Add IPC handlers in `main.js` if needed
+4. Add Tauri commands in `src-tauri/src/commands/` if backend functionality is needed
+5. Register commands in `src-tauri/src/main.rs`
 
 ## Contributing
 
@@ -557,18 +554,19 @@ We welcome contributions! Please follow these guidelines:
 
 ### Code Style
 
-- Use ES6 modules in renderer process
-- Use ES6 modules in main process (since v1.0.0)
-- Use CommonJS in preload script only
+- Use ES6 modules in frontend code
+- Use Rust idioms in backend code
 - Follow existing patterns and conventions
 - Maintain security best practices
-- Add JSDoc comments for public APIs
+- Add JSDoc comments for public JavaScript APIs
+- Add Rustdoc comments for public Rust APIs
 - Use defensive programming in repository layer (validate data types, handle undefined)
 - **Code Quality Tools**:
-  - ESLint for code linting and quality checks
+  - ESLint for JavaScript linting and quality checks
   - Prettier for consistent code formatting
   - Run `npm run lint` before committing
   - Use `npm run format` to auto-format code
+  - Run `cargo clippy` for Rust linting
 
 ## License
 
@@ -590,10 +588,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Workspace tabs for concurrent requests
 - [x] Performance metrics and timing breakdown
 - [x] Cookie management and display
-- [x] Proxy support with authentication
+- [x] Proxy support with authentication (HTTP/HTTPS/SOCKS)
 - [x] Variable templating system with environment support
 - [x] Dynamic variables (UUID, timestamps, random values)
-- [x] Multi-theme support (3 themes)
+- [x] Multi-theme support (4 themes with 9 accent colors)
 - [x] Internationalization (5 languages)
 - [x] Authentication support (Bearer, Basic, API Key, OAuth2, Digest)
 - [x] Request history with search and replay
@@ -601,10 +599,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Keyboard shortcuts for all major actions
 - [x] Mock server with custom responses and delays
 - [x] Collection export (OpenAPI format)
-- [x] Pre-request and test scripts with JavaScript execution
+- [x] Pre-request and test scripts with JavaScript execution (Boa Engine)
 - [x] Automated testing framework with rich assertion API
 - [x] Request chaining with environment variable integration
 - [x] GraphQL support with dedicated query and variables editors
+- [x] Tauri v2 migration for smaller bundle and better performance
 
 ### Planned
 - [ ] WebSocket support
@@ -616,7 +615,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- Built with [Electron](https://electronjs.org/)
+- Built with [Tauri](https://tauri.app/)
 - Inspired by modern API development tools
 
 ---

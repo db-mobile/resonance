@@ -4,7 +4,7 @@
  */
 
 /**
- * Repository for managing script persistence using electron-store
+ * Repository for managing script persistence using the persistent store
  * Follows the established {collectionId}_{endpointId} key pattern
  *
  * @class
@@ -13,10 +13,10 @@
 export class ScriptRepository {
     /**
      * Creates a ScriptRepository instance
-     * @param {Object} electronAPI - The Electron API bridge from preload
+     * @param {Object} backendAPI - The backend IPC API bridge
      */
-    constructor(electronAPI) {
-        this.electronAPI = electronAPI;
+    constructor(backendAPI) {
+        this.backendAPI = backendAPI;
         this.SCRIPTS_KEY = 'persistedScripts';
     }
 
@@ -54,7 +54,7 @@ export class ScriptRepository {
             testScript: scriptData.testScript || ''
         };
 
-        await this.electronAPI.store.set(this.SCRIPTS_KEY, scripts);
+        await this.backendAPI.store.set(this.SCRIPTS_KEY, scripts);
     }
 
     /**
@@ -69,7 +69,7 @@ export class ScriptRepository {
 
         delete scripts[key];
 
-        await this.electronAPI.store.set(this.SCRIPTS_KEY, scripts);
+        await this.backendAPI.store.set(this.SCRIPTS_KEY, scripts);
     }
 
     /**
@@ -89,7 +89,7 @@ export class ScriptRepository {
      * @returns {Promise<Object>} The store value or default
      */
     async _getObjectFromStore(key, defaultValue = {}) {
-        const value = await this.electronAPI.store.get(key);
+        const value = await this.backendAPI.store.get(key);
 
         // Handle undefined (packaged apps) or invalid values
         if (value === undefined || value === null || typeof value !== 'object') {

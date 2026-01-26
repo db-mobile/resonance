@@ -1,13 +1,39 @@
-node_modules
+# Dependencies
+node_modules/
 
-out
-dist
-data
+# Build outputs
+dist/
+target/
+*.bundle.js
+*.bundle.js.map
 
-.idea
+# Tauri
+src-tauri/target/
+src-tauri/gen/
 
-.vscode
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
-# Build artifacts
-src/modules/*.bundle.js
-src/modules/*.bundle.js.map
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Test coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.temp

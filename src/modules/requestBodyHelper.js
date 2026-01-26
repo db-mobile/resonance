@@ -67,7 +67,7 @@ export function formatRequestBodyJSON() {
         const formatted = JSON.stringify(parsed, null, 2);
         bodyInput.value = formatted;
         return true;
-    } catch (e) {
+    } catch {
         return false;
     }
 }

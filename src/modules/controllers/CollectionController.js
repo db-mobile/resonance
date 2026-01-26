@@ -30,12 +30,13 @@ export class CollectionController {
     /**
      * Creates a CollectionController instance
      *
-     * @param {Object} electronAPI - The Electron IPC API bridge for storage operations
+     * @param {Object} backendAPI - The backend IPC API bridge for storage operations
      * @param {Function} updateStatusDisplay - Callback function to update status display UI
      */
-    constructor(electronAPI, updateStatusDisplay) {
-        this.repository = new CollectionRepository(electronAPI);
-        this.variableRepository = new VariableRepository(electronAPI);
+    constructor(backendAPI, updateStatusDisplay) {
+        this.backendAPI = backendAPI;
+        this.repository = new CollectionRepository(backendAPI);
+        this.variableRepository = new VariableRepository(backendAPI);
         this.schemaProcessor = new SchemaProcessor();
         this.variableProcessor = new VariableProcessor();
         this.statusDisplay = new StatusDisplayAdapter(updateStatusDisplay);
@@ -76,7 +77,6 @@ export class CollectionController {
             await this.renderCollections(collections);
             return collections;
         } catch (error) {
-            console.error('Error in loadCollections:', error);
             return [];
         }
     }
@@ -93,7 +93,6 @@ export class CollectionController {
             await this.renderCollections(collections, true); // Preserve expansion state
             return collections;
         } catch (error) {
-            console.error('Error in loadCollectionsWithExpansionState:', error);
             return [];
         }
     }
@@ -177,7 +176,7 @@ export class CollectionController {
                 this.renderer.setActiveEndpoint(collection.id, endpoint.id);
             }
         } catch (error) {
-            console.error('Error loading endpoint:', error);
+            void error;
         }
     }
 
@@ -303,7 +302,7 @@ export class CollectionController {
                 await this.loadCollections(); // Refresh display
             }
         } catch (error) {
-            console.error('Error renaming collection:', error);
+            void error;
         }
     }
 
@@ -333,7 +332,7 @@ export class CollectionController {
                 // }
             }
         } catch (error) {
-            console.error('Error managing variables:', error);
+            void error;
         }
     }
 
@@ -354,7 +353,7 @@ export class CollectionController {
                 await this.loadCollectionsWithExpansionState();
             }
         } catch (error) {
-            console.error('Error creating new request:', error);
+            void error;
         }
     }
 
@@ -374,7 +373,7 @@ export class CollectionController {
                 await this.loadCollections();
             }
         } catch (error) {
-            console.error('Error creating new collection:', error);
+            void error;
         }
     }
 
@@ -398,7 +397,7 @@ export class CollectionController {
                 }
             }
         } catch (error) {
-            console.error('Error creating new request and collection:', error);
+            void error;
         }
     }
 
@@ -613,7 +612,7 @@ export class CollectionController {
                 await this.variableService.cleanupCollectionVariables(collection.id);
                 await this.loadCollections();
             } catch (error) {
-                console.error('Error deleting collection:', error);
+                void error;
             }
         }
     }
@@ -631,7 +630,7 @@ export class CollectionController {
         try {
             await this.service.exportCollectionAsOpenApi(collection.id, 'json');
         } catch (error) {
-            console.error('Error exporting collection as OpenAPI JSON:', error);
+            void error;
         }
     }
 
@@ -648,7 +647,7 @@ export class CollectionController {
         try {
             await this.service.exportCollectionAsOpenApi(collection.id, 'yaml');
         } catch (error) {
-            console.error('Error exporting collection as OpenAPI YAML:', error);
+            void error;
         }
     }
 
@@ -710,7 +709,7 @@ export class CollectionController {
 
                 await this.loadCollectionsWithExpansionState();
             } catch (error) {
-                console.error('Error deleting request:', error);
+                void error;
             }
         }
     }
@@ -726,7 +725,7 @@ export class CollectionController {
      */
     async importOpenApiFile() {
         try {
-            const collection = await window.electronAPI.collections.importOpenApiFile();
+            const collection = await window.backendAPI.collections.importOpenApiFile();
 
             if (collection) {
                 await this.loadCollections();
@@ -736,7 +735,6 @@ export class CollectionController {
                 return null;
 
         } catch (error) {
-            console.error('Error importing collection:', error);
             this.statusDisplay.update(`Import error: ${error.message}`, null);
             throw error;
         }
@@ -754,7 +752,7 @@ export class CollectionController {
      */
     async importPostmanCollection() {
         try {
-            const result = await window.electronAPI.collections.importPostmanCollection();
+            const result = await window.backendAPI.collections.importPostmanCollection();
 
             if (result) {
                 await this.loadCollections();
@@ -765,7 +763,6 @@ export class CollectionController {
                 return null;
 
         } catch (error) {
-            console.error('Error importing Postman collection:', error);
             this.statusDisplay.update(`Import error: ${error.message}`, null);
             throw error;
         }
@@ -783,17 +780,11 @@ export class CollectionController {
      */
     async importPostmanEnvironment() {
         try {
-            const environment = await window.electronAPI.collections.importPostmanEnvironment();
+            const environment = await window.backendAPI.collections.importPostmanEnvironment();
 
             if (environment) {
                 if (window.environmentController) {
-                    await window.environmentController.createEnvironment(
-                        environment.name,
-                        environment.variables
-                    );
-                    this.statusDisplay.update('Postman environment imported successfully', null);
-                } else {
-                    console.warn('Environment controller not available, environment data returned without creating');
+                    await window.environmentController.handleImportEnvironment(environment);
                 }
                 return environment;
             }
@@ -801,7 +792,6 @@ export class CollectionController {
                 return null;
 
         } catch (error) {
-            console.error('Error importing Postman environment:', error);
             this.statusDisplay.update(`Import error: ${error.message}`, null);
             throw error;
         }
@@ -876,7 +866,7 @@ export class CollectionController {
                     // Refresh the collection tree display
                     await this.loadCollectionsWithExpansionState();
                 } catch (error) {
-                    console.error('Error updating endpoint path in collection:', error);
+                    void error;
                 }
             }
 
@@ -999,7 +989,6 @@ export class CollectionController {
                 request: updatedRequest
             });
         } catch (error) {
-            console.error('Error saving request modifications:', error);
             this.statusDisplay.update(`Error saving request: ${error.message}`, null);
             throw error;
         }
@@ -1097,7 +1086,7 @@ export class CollectionController {
                 });
             }
         } catch (error) {
-            console.error('Error processing form variables:', error);
+            void error;
         }
     }
 
@@ -1153,7 +1142,7 @@ export class CollectionController {
                 });
             }
         } catch (error) {
-            console.error('Error processing form variables (except URL):', error);
+            void error;
         }
     }
 
@@ -1225,7 +1214,6 @@ export class CollectionController {
 
             const collection = await this.repository.getById(lastSelected.collectionId);
             if (!collection) {
-                console.warn('Last selected collection not found, clearing saved selection');
                 await this.repository.clearLastSelectedRequest();
                 return;
             }
@@ -1233,7 +1221,6 @@ export class CollectionController {
             const endpoint = this._findEndpointInCollection(collection, lastSelected.endpointId);
 
             if (!endpoint) {
-                console.warn('Last selected endpoint not found, clearing saved selection');
                 await this.repository.clearLastSelectedRequest();
                 return;
             }
@@ -1243,7 +1230,7 @@ export class CollectionController {
 
             this.renderer.setActiveEndpoint(collection.id, endpoint.id);
         } catch (error) {
-            console.error('Error restoring last selected request:', error);
+            void error;
         }
     }
 

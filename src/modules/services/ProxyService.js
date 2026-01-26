@@ -67,7 +67,7 @@ export class ProxyService {
             try {
                 callback(event);
             } catch (error) {
-                console.error('Error in proxy change listener:', error);
+                void error;
             }
         });
     }
@@ -80,12 +80,7 @@ export class ProxyService {
      * @throws {Error} If retrieval fails
      */
     async getSettings() {
-        try {
-            return await this.repository.getProxySettings();
-        } catch (error) {
-            console.error('Error getting proxy settings:', error);
-            throw error;
-        }
+        return this.repository.getProxySettings();
     }
 
     /**
@@ -197,7 +192,6 @@ export class ProxyService {
         try {
             return await this.repository.isProxyEnabled();
         } catch (error) {
-            console.error('Error checking proxy enabled status:', error);
             return false;
         }
     }
@@ -236,7 +230,6 @@ export class ProxyService {
                 return false;
             });
         } catch (error) {
-            console.error('Error checking bypass list:', error);
             return false;
         }
     }
@@ -275,7 +268,6 @@ export class ProxyService {
 
             return proxyConfig;
         } catch (error) {
-            console.error('Error getting axios proxy config:', error);
             return null;
         }
     }

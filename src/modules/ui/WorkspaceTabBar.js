@@ -30,7 +30,6 @@ export class WorkspaceTabBar {
     render(tabs, activeTabId) {
         this.container = document.getElementById(this.containerId);
         if (!this.container) {
-            console.error(`Container ${this.containerId} not found`);
             return;
         }
 

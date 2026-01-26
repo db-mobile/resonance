@@ -150,7 +150,7 @@ export class DigestAuthHandler {
         try {
             const urlObj = new URL(url);
             return urlObj.pathname + urlObj.search;
-        } catch (error) {
+        } catch {
             const match = url.match(/https?:\/\/[^/]+(\/.*)/);
             return match ? match[1] : '/';
         }

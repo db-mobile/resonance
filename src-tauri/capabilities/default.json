@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schemas.tauri.app/capabilities/2",
+  "identifier": "default",
+  "description": "Default capabilities for Resonance",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:webview:default",
+    "store:default",
+    "dialog:default",
+    "fs:default",
+    "shell:default",
+    "window-state:default"
+  ]
+}

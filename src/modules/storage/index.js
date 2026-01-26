@@ -7,7 +7,7 @@
  * Repository layer for data persistence
  *
  * This module exports all repository classes that handle CRUD operations for
- * electron-store. Each repository implements defensive programming patterns with:
+ * the persistent store. Each repository implements defensive programming patterns with:
  * - Auto-initialization for packaged app compatibility
  * - Validation and sanitization of stored data
  * - Graceful degradation when store returns undefined

@@ -135,7 +135,6 @@ export class CurlDialog {
                     copyBtn.style.background = 'var(--color-primary)';
                 }, 2000);
             } catch (err) {
-                console.error('Failed to copy to clipboard:', err);
                 alert('Failed to copy to clipboard');
             }
         });

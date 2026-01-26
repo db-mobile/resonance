@@ -50,7 +50,6 @@ export class ScriptConsolePanel {
     initialize() {
         const container = this._getActiveContainer();
         if (!container) {
-            console.warn('ScriptConsolePanel: No container found');
             return;
         }
 
@@ -136,7 +135,6 @@ export class ScriptConsolePanel {
         // Always get fresh container reference (in case of tab switching)
         const container = this._getActiveContainer();
         if (!container) {
-            console.error('ScriptConsolePanel: Could not find active container');
             return;
         }
 
@@ -145,7 +143,6 @@ export class ScriptConsolePanel {
 
         const content = container.querySelector('.script-console-content');
         if (!content) {
-            console.error('ScriptConsolePanel: Could not find .script-console-content in container');
             return;
         }
 

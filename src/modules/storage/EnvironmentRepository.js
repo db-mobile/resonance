@@ -8,7 +8,7 @@
  *
  * @class
  * @classdesc Handles CRUD operations for environments and active environment tracking
- * in electron-store. Environments provide variable scoping for different contexts
+ * in the persistent store. Environments provide variable scoping for different contexts
  * (Development, Staging, Production, etc.). Implements defensive programming with
  * validation, auto-initialization, and duplicate name detection. Ensures at least
  * one environment always exists and is active.
@@ -17,10 +17,10 @@ export class EnvironmentRepository {
     /**
      * Creates an EnvironmentRepository instance
      *
-     * @param {Object} electronAPI - The Electron IPC API bridge from preload script
+     * @param {Object} backendAPI - The backend IPC API bridge
      */
-    constructor(electronAPI) {
-        this.electronAPI = electronAPI;
+    constructor(backendAPI) {
+        this.backendAPI = backendAPI;
         this.ENVIRONMENTS_KEY = 'environments';
     }
 
@@ -38,26 +38,23 @@ export class EnvironmentRepository {
      */
     async getAllEnvironments() {
         try {
-            const data = await this.electronAPI.store.get(this.ENVIRONMENTS_KEY);
+            const data = await this.backendAPI.store.get(this.ENVIRONMENTS_KEY);
 
             if (!data || typeof data !== 'object') {
-                console.warn('Environments data is invalid or undefined, initializing with defaults');
                 const defaultData = this._getDefaultEnvironments();
-                await this.electronAPI.store.set(this.ENVIRONMENTS_KEY, defaultData);
+                await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, defaultData);
                 return defaultData;
             }
 
             // Validate structure
             if (!Array.isArray(data.items)) {
-                console.warn('Environments items array is missing, initializing');
                 const defaultData = this._getDefaultEnvironments();
-                await this.electronAPI.store.set(this.ENVIRONMENTS_KEY, defaultData);
+                await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, defaultData);
                 return defaultData;
             }
 
             return data;
         } catch (error) {
-            console.error('Error loading environments:', error);
             throw new Error(`Failed to load environments: ${error.message}`);
         }
     }
@@ -75,7 +72,6 @@ export class EnvironmentRepository {
             const data = await this.getAllEnvironments();
             return data.activeEnvironmentId || (data.items[0]?.id);
         } catch (error) {
-            console.error('Error getting active environment ID:', error);
             return null;
         }
     }
@@ -101,10 +97,9 @@ export class EnvironmentRepository {
             }
 
             data.activeEnvironmentId = environmentId;
-            await this.electronAPI.store.set(this.ENVIRONMENTS_KEY, data);
+            await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data);
             return true;
         } catch (error) {
-            console.error('Error setting active environment:', error);
             throw new Error(`Failed to set active environment: ${error.message}`);
         }
     }
@@ -121,7 +116,6 @@ export class EnvironmentRepository {
             const data = await this.getAllEnvironments();
             return data.items.find(env => env.id === environmentId);
         } catch (error) {
-            console.error('Error getting environment by ID:', error);
             return null;
         }
     }
@@ -138,7 +132,6 @@ export class EnvironmentRepository {
             if (!activeId) {return null;}
             return await this.getEnvironmentById(activeId);
         } catch (error) {
-            console.error('Error getting active environment:', error);
             return null;
         }
     }
@@ -171,11 +164,10 @@ export class EnvironmentRepository {
             };
 
             data.items.push(newEnvironment);
-            await this.electronAPI.store.set(this.ENVIRONMENTS_KEY, data);
+            await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data);
 
             return newEnvironment;
         } catch (error) {
-            console.error('Error creating environment:', error);
             throw new Error(`Failed to create environment: ${error.message}`);
         }
     }
@@ -217,10 +209,9 @@ export class EnvironmentRepository {
                 id: environmentId // Preserve ID
             };
 
-            await this.electronAPI.store.set(this.ENVIRONMENTS_KEY, data);
+            await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data);
             return data.items[index];
         } catch (error) {
-            console.error('Error updating environment:', error);
             throw new Error(`Failed to update environment: ${error.message}`);
         }
     }
@@ -258,10 +249,9 @@ export class EnvironmentRepository {
                 data.activeEnvironmentId = data.items[0].id;
             }
 
-            await this.electronAPI.store.set(this.ENVIRONMENTS_KEY, data);
+            await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data);
             return true;
         } catch (error) {
-            console.error('Error deleting environment:', error);
             throw new Error(`Failed to delete environment: ${error.message}`);
         }
     }
@@ -289,7 +279,6 @@ export class EnvironmentRepository {
                 { ...environment.variables }
             );
         } catch (error) {
-            console.error('Error duplicating environment:', error);
             throw new Error(`Failed to duplicate environment: ${error.message}`);
         }
     }
@@ -307,7 +296,6 @@ export class EnvironmentRepository {
             const activeEnv = await this.getActiveEnvironment();
             return activeEnv?.variables || {};
         } catch (error) {
-            console.error('Error getting active environment variables:', error);
             return {};
         }
     }
@@ -353,7 +341,6 @@ export class EnvironmentRepository {
         try {
             return await this.getAllEnvironments();
         } catch (error) {
-            console.error('Error exporting environments:', error);
             throw new Error(`Failed to export environments: ${error.message}`);
         }
     }
@@ -406,10 +393,9 @@ export class EnvironmentRepository {
                 }
             }
 
-            await this.electronAPI.store.set(this.ENVIRONMENTS_KEY, data);
+            await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data);
             return true;
         } catch (error) {
-            console.error('Error importing environments:', error);
             throw new Error(`Failed to import environments: ${error.message}`);
         }
     }

@@ -1,4 +1,40 @@
 import esbuild from 'esbuild';
+import fs from 'fs';
+import path from 'path';
+
+// Ensure dist directory exists
+if (!fs.existsSync('dist')) {
+    fs.mkdirSync('dist', { recursive: true });
+}
+if (!fs.existsSync('dist/src/modules')) {
+    fs.mkdirSync('dist/src/modules', { recursive: true });
+}
+if (!fs.existsSync('dist/assets')) {
+    fs.mkdirSync('dist/assets', { recursive: true });
+}
+
+// Copy static files to dist
+function copyRecursive(src, dest) {
+    if (!fs.existsSync(src)) return;
+    
+    if (fs.statSync(src).isDirectory()) {
+        if (!fs.existsSync(dest)) {
+            fs.mkdirSync(dest, { recursive: true });
+        }
+        for (const file of fs.readdirSync(src)) {
+            copyRecursive(path.join(src, file), path.join(dest, file));
+        }
+    } else {
+        fs.copyFileSync(src, dest);
+    }
+}
+
+// Copy index.html and assets
+fs.copyFileSync('index.html', 'dist/index.html');
+copyRecursive('assets', 'dist/assets');
+copyRecursive('src', 'dist/src');
+
+console.log('✓ Static files copied to dist/');
 
 // Build the responseEditor module and its dependencies
 await esbuild.build({

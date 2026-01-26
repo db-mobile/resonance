@@ -19,7 +19,6 @@ export class EnvironmentSelector {
     initialize(containerId) {
         this.container = document.getElementById(containerId);
         if (!this.container) {
-            console.error(`Environment selector container ${containerId} not found`);
             return;
         }
 
@@ -151,7 +150,7 @@ export class EnvironmentSelector {
             // Position dropdown
             this.positionDropdown();
         } catch (error) {
-            console.error('Error opening environment dropdown:', error);
+            void error;
         }
     }
 
@@ -187,7 +186,7 @@ export class EnvironmentSelector {
                 await this.onEnvironmentSwitch(environmentId);
             }
         } catch (error) {
-            console.error('Error selecting environment:', error);
+            void error;
         }
     }
 
@@ -217,7 +216,7 @@ export class EnvironmentSelector {
                 this.setActiveEnvironment(activeEnvironment);
             }
         } catch (error) {
-            console.error('Error refreshing environment selector:', error);
+            void error;
         }
     }
 

@@ -29,21 +29,20 @@ export class I18nManager {
 
     async getSavedLanguage() {
         try {
-            const settings = await window.electronAPI.settings.get();
+            const settings = await window.backendAPI.settings.get();
             return settings.language || 'en';
         } catch (error) {
-            console.warn('Could not load saved language:', error);
             return 'en';
         }
     }
 
     async saveLanguage(language) {
         try {
-            const settings = await window.electronAPI.settings.get() || {};
+            const settings = await window.backendAPI.settings.get() || {};
             settings.language = language;
-            await window.electronAPI.settings.set(settings);
+            await window.backendAPI.settings.set(settings);
         } catch (error) {
-            console.error('Could not save language:', error);
+            void error;
         }
     }
 
@@ -60,7 +59,6 @@ export class I18nManager {
             this.translations = await response.json();
             this.currentLanguage = language;
         } catch (error) {
-            console.error('Error loading language:', error);
             if (language !== this.fallbackLanguage) {
                 // Fall back to default language
                 await this.loadLanguage(this.fallbackLanguage);
@@ -91,7 +89,6 @@ export class I18nManager {
         }
         
         if (value === undefined) {
-            console.warn(`Translation missing for key: ${key}`);
             return key;
         }
         

@@ -18,12 +18,14 @@ export class HistoryRenderer {
     /**
      * Creates a HistoryRenderer instance
      *
-     * @param {Object} electronAPI - Electron IPC API bridge
+     * @param {Object} backendAPI - Backend IPC API bridge
      * @param {Function} onHistorySelect - Callback when history item is selected for replay
      */
-    constructor(electronAPI, onHistorySelect) {
-        this.service = new HistoryService(electronAPI);
+    constructor(backendAPI, onHistorySelect) {
+        this.service = new HistoryService(backendAPI);
         this.onHistorySelect = onHistorySelect;
+        this.historyRepository = this.service.repository;
+        this.historyItems = [];
         this.container = document.getElementById('history-list');
         this.searchInput = document.getElementById('history-search-input');
         this.clearAllBtn = document.getElementById('clear-all-history-btn');
