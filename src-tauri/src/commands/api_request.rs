@@ -1,10 +1,13 @@
 use reqwest::{Client, Method, RequestBuilder, Response};
+use rustls::ClientConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::State;
+use tokio::net::TcpStream;
 use tokio::sync::oneshot;
+use tokio_rustls::TlsConnector;
 use uuid::Uuid;
 
 use super::proxy::ProxyState;
@@ -246,28 +249,59 @@ pub async fn send_api_request(
         });
     }
 
-    // Perform DNS lookup separately to measure timing
-    let dns_start = Instant::now();
-    let dns_duration = if let Ok(url) = url::Url::parse(&request_options.url) {
-        if let Some(host) = url.host_str() {
-            let port = url.port_or_known_default().unwrap_or(80);
-            let lookup_addr = format!("{}:{}", host, port);
-            let result = tokio::net::lookup_host(lookup_addr).await;
-            match result {
-                Ok(_) => dns_start.elapsed().as_millis() as u64,
-                Err(_) => 0,
-            }
-        } else {
-            0
-        }
-    } else {
-        0
-    };
-    timings.dns_lookup = dns_duration;
-
-    // Track connection timing and determine if HTTPS
-    let connect_start = Instant::now();
+    // Parse URL once for reuse
+    let parsed_url = url::Url::parse(&request_options.url).ok();
     let is_https = request_options.url.starts_with("https://");
+
+    // Measure DNS, TCP, and TLS timings by probing the connection
+    if let Some(ref url) = parsed_url {
+        if let Some(host) = url.host_str() {
+            let port = url
+                .port_or_known_default()
+                .unwrap_or(if is_https { 443 } else { 80 });
+            let lookup_addr = format!("{}:{}", host, port);
+
+            // DNS lookup timing
+            let dns_start = Instant::now();
+            let addrs: Vec<_> = match tokio::net::lookup_host(&lookup_addr).await {
+                Ok(iter) => iter.collect(),
+                Err(_) => vec![],
+            };
+            timings.dns_lookup = dns_start.elapsed().as_millis() as u64;
+
+            // TCP connection timing (connect to first resolved address)
+            if let Some(addr) = addrs.first() {
+                let tcp_start = Instant::now();
+                if let Ok(stream) = TcpStream::connect(addr).await {
+                    timings.tcp_connection = tcp_start.elapsed().as_millis() as u64;
+
+                    // TLS handshake timing (only for HTTPS)
+                    if is_https {
+                        let tls_start = Instant::now();
+                        let root_store = rustls::RootCertStore::from_iter(
+                            webpki_roots::TLS_SERVER_ROOTS.iter().cloned(),
+                        );
+                        let config = ClientConfig::builder()
+                            .with_root_certificates(root_store)
+                            .with_no_client_auth();
+                        let connector = TlsConnector::from(Arc::new(config));
+                        let server_name =
+                            match rustls::pki_types::ServerName::try_from(host.to_string()) {
+                                Ok(name) => name,
+                                Err(_) => {
+                                    // Can't measure TLS if server name is invalid
+                                    rustls::pki_types::ServerName::try_from("localhost".to_string())
+                                        .unwrap()
+                                }
+                            };
+                        if connector.connect(server_name, stream).await.is_ok() {
+                            timings.tls_handshake = tls_start.elapsed().as_millis() as u64;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // Build client with optional proxy and HTTP version
     // Use timeout from request options: None means no timeout, Some(0) also means no timeout
@@ -368,7 +402,7 @@ pub async fn send_api_request(
                                             Ok(auth_header) => {
                                                 // Retry with digest auth
                                                 let retry_result = build_request(Some(auth_header)).send().await;
-                                                return process_response(retry_result, &mut timings, start_time, connect_start, is_https, &state).await;
+                                                return process_response(retry_result, &mut timings, start_time, &state).await;
                                             }
                                             Err(e) => {
                                                 let _ = e;
@@ -380,10 +414,10 @@ pub async fn send_api_request(
                         }
                     }
 
-                    process_response(Ok(response), &mut timings, start_time, connect_start, is_https, &state).await
+                    process_response(Ok(response), &mut timings, start_time, &state).await
                 }
                 Err(e) => {
-                    process_response(Err(e), &mut timings, start_time, connect_start, is_https, &state).await
+                    process_response(Err(e), &mut timings, start_time, &state).await
                 }
             }
         }
@@ -412,8 +446,6 @@ async fn process_response(
     result: Result<Response, reqwest::Error>,
     timings: &mut RequestTimings,
     start_time: Instant,
-    connect_start: Instant,
-    is_https: bool,
     state: &State<'_, RequestState>,
 ) -> Result<ApiResponse, String> {
     match result {
@@ -438,27 +470,6 @@ async fn process_response(
 
             timings.download = start_time.elapsed().as_millis() as u64 - timings.first_byte;
             timings.total = start_time.elapsed().as_millis() as u64;
-
-            // Estimate TCP and TLS timing from connection phase
-            // Connection time = time from connect_start to first_byte minus server processing
-            let connection_overhead = connect_start.elapsed().as_millis() as u64;
-            if connection_overhead > 0 && timings.first_byte > 0 {
-                // For HTTPS, split connection time between TCP and TLS (roughly 40/60 split typical)
-                // For HTTP, all connection time is TCP
-                if is_https {
-                    // Estimate: TCP handshake is typically faster than TLS
-                    let estimated_tcp = (connection_overhead as f64 * 0.35) as u64;
-                    let estimated_tls = connection_overhead.saturating_sub(estimated_tcp);
-                    if timings.tcp_connection == 0 {
-                        timings.tcp_connection = estimated_tcp;
-                    }
-                    if timings.tls_handshake == 0 {
-                        timings.tls_handshake = estimated_tls;
-                    }
-                } else if timings.tcp_connection == 0 {
-                    timings.tcp_connection = connection_overhead;
-                }
-            }
 
             // Try to parse as JSON first, fall back to raw text
             let data: Option<serde_json::Value> = serde_json::from_slice(&bytes).ok();

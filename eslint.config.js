@@ -87,22 +87,6 @@ export default [
         }
     },
 
-    // Main process (Node.js environment)
-    {
-        files: ['src/main.js', 'src/main/**/*.js'],
-        languageOptions: {
-            globals: {
-                ...globals.node,
-                __dirname: 'readonly',
-                __filename: 'readonly',
-                process: 'readonly',
-                Buffer: 'readonly'
-            }
-        },
-        rules: {
-            'no-console': 'off' // Allow console in main process
-        }
-    },
 
     // Services (Node.js environment)
     {
