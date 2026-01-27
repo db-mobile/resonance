@@ -413,7 +413,7 @@ export class CollectionService {
      */
     populateUrlAndMethod(collection, endpoint, formElements) {
         let fullUrl = endpoint.path;
-        if (collection.baseUrl) {
+        if (collection.baseUrl && !endpoint.path.includes('{{baseUrl}}')) {
             fullUrl = `{{baseUrl}}${  endpoint.path}`;
         }
 

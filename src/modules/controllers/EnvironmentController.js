@@ -304,6 +304,27 @@ export class EnvironmentController {
     }
 
     /**
+     * Handles importing a Postman environment
+     *
+     * Creates a new environment from the imported Postman environment data.
+     *
+     * @async
+     * @param {Object} environment - The imported environment data
+     * @param {string} environment.name - Environment name
+     * @param {Object} environment.variables - Environment variables
+     * @returns {Promise<Object>} The created environment object
+     * @throws {Error} If import fails
+     */
+    async handleImportEnvironment(environment) {
+        const created = await this.service.createEnvironment(
+            environment.name,
+            environment.variables || {}
+        );
+        await this.onEnvironmentsChanged();
+        return created;
+    }
+
+    /**
      * Imports environments from a JSON file
      *
      * Shows file picker dialog and imports environments with optional merge.

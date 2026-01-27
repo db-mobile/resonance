@@ -294,7 +294,13 @@ export class CollectionRenderer {
 
         const pathSpan = document.createElement('span');
         pathSpan.className = 'endpoint-path';
-        pathSpan.textContent = endpoint.path;
+        // Strip {{baseUrl}} and query parameters from display path for cleaner sidebar
+        let displayPath = endpoint.path.replace(/^\{\{baseUrl\}\}/, '');
+        const queryIndex = displayPath.indexOf('?');
+        if (queryIndex !== -1) {
+            displayPath = displayPath.substring(0, queryIndex);
+        }
+        pathSpan.textContent = displayPath;
 
         endpointDiv.appendChild(methodSpan);
         endpointDiv.appendChild(pathSpan);

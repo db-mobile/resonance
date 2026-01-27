@@ -400,8 +400,9 @@ export class WorkspaceTabController {
                 fullUrl = endpoint.persistedUrl;
             } else {
                 // Construct URL with {{baseUrl}} if collection has a baseUrl
+                // but only if path doesn't already contain {{baseUrl}}
                 fullUrl = endpoint.path;
-                if (endpoint.collectionBaseUrl) {
+                if (endpoint.collectionBaseUrl && !endpoint.path.includes('{{baseUrl}}')) {
                     fullUrl = `{{baseUrl}}${  endpoint.path}`;
                 }
 
