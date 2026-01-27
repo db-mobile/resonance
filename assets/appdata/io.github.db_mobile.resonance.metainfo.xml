@@ -94,6 +94,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.0.1" date="2026-01-27">
+      <description>
+        <p>Feature stabilization</p>
+        <ul>
+          <li>Improved performance metrics</li>
+          <li>Improved Postman collection import</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.0.0" date="2026-01-26">
       <description>
         <p>Resonance reworked</p>

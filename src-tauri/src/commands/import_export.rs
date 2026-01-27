@@ -1011,11 +1011,45 @@ fn extract_postman_body(body: Option<&Value>) -> Option<Value> {
 fn extract_postman_url(url: Option<&Value>) -> String {
     let raw_url = match url {
         Some(Value::String(s)) => s.clone(),
-        Some(Value::Object(obj)) => obj
-            .get("raw")
-            .and_then(|r| r.as_str())
-            .unwrap_or("/")
-            .to_string(),
+        Some(Value::Object(obj)) => {
+            // Prefer "raw" field if available
+            if let Some(raw) = obj.get("raw").and_then(|r| r.as_str()) {
+                raw.to_string()
+            } else {
+                // Fallback: construct URL from host and path arrays
+                let host = obj
+                    .get("host")
+                    .and_then(|h| h.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str())
+                            .collect::<Vec<_>>()
+                            .join(".")
+                    })
+                    .unwrap_or_default();
+
+                let path = obj
+                    .get("path")
+                    .and_then(|p| p.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str())
+                            .collect::<Vec<_>>()
+                            .join("/")
+                    })
+                    .unwrap_or_default();
+
+                if host.is_empty() && path.is_empty() {
+                    "/".to_string()
+                } else if host.is_empty() {
+                    format!("/{}", path)
+                } else if path.is_empty() {
+                    host
+                } else {
+                    format!("{}/{}", host, path)
+                }
+            }
+        }
         _ => "/".to_string(),
     };
 
