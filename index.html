@@ -157,12 +157,13 @@
                 </div>
                 <div class="source-download">
                     <p>Or build from source:</p>
+                    <p>Building the Tauri app requires system dependencies. See: <a href="https://tauri.app/start/prerequisites/" target="_blank">Tauri prerequisites</a></p>
                     <div class="code-block">
                         <code>git clone https://github.com/db-mobile/resonance.git
 cd resonance
 npm install
 npm run build
-npm start</code>
+cd src-tauri && cargo build --release</code>
                     </div>
                 </div>
             </div>
@@ -173,12 +174,12 @@ npm start</code>
                 <h2>Built With</h2>
                 <div class="tech-grid">
                     <div class="tech-item">
-                        <span class="tech-name">Electron</span>
-                        <span class="tech-version">v35.0.0</span>
+                        <span class="tech-name">Tauri</span>
+                        <span class="tech-version">v2.x</span>
                     </div>
                     <div class="tech-item">
-                        <span class="tech-name">Axios</span>
-                        <span class="tech-version">v1.10.0</span>
+                        <span class="tech-name">reqwest</span>
+                        <span class="tech-version">Rust crate</span>
                     </div>
                     <div class="tech-item">
                         <span class="tech-name">CodeMirror</span>
