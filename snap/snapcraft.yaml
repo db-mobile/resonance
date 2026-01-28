@@ -74,7 +74,7 @@ parts:
       cd $CRAFT_PART_SRC
       npm ci
       npm run build
-      npm run build:tauri
+      npm run build:tauri -- --no-bundle
 
       # Install the binary
       mkdir -p $CRAFT_PART_INSTALL/usr/bin
