@@ -5,9 +5,10 @@ import { xml } from '@codemirror/lang-xml';
 import { html } from '@codemirror/lang-html';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
+import { oneDark, oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 
-// Define syntax highlighting style
-const highlightStyle = HighlightStyle.define([
+// Light theme syntax highlighting style
+const lightHighlightStyle = HighlightStyle.define([
     { tag: tags.keyword, color: '#d73a49' },
     { tag: tags.atom, color: '#0184bc' },
     { tag: tags.bool, color: '#0184bc' },
@@ -25,6 +26,21 @@ const highlightStyle = HighlightStyle.define([
 ]);
 
 /**
+ * Detect if dark mode is active
+ * @returns {boolean}
+ */
+function isDarkMode() {
+    const theme = document.documentElement.getAttribute('data-theme');
+    if (theme === 'dark' || theme === 'black') {
+        return true;
+    }
+    if (theme === 'system') {
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+}
+
+/**
  * ResponseEditor - Manages CodeMirror editor for response display
  * Provides syntax highlighting for JSON, XML, and HTML with line numbers
  */
@@ -40,6 +56,59 @@ export class ResponseEditor {
     }
 
     /**
+     * Get theme extensions based on current color scheme
+     * @returns {Array} Array of theme extensions
+     */
+    getThemeExtensions() {
+        const baseTheme = EditorView.theme({
+            '&': {
+                height: '100%',
+                fontSize: '13px',
+                backgroundColor: 'var(--bg-primary)'
+            },
+            '.cm-scroller': {
+                fontFamily: '"Fira Code", "Courier New", monospace',
+                overflow: 'auto'
+            },
+            '.cm-gutters': {
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-secondary)',
+                border: 'none',
+                paddingRight: '8px'
+            },
+            '.cm-lineNumbers .cm-gutterElement': {
+                padding: '0 8px 0 4px',
+                minWidth: '40px'
+            },
+            '.cm-content': {
+                color: 'var(--text-primary)',
+                caretColor: 'var(--text-primary)',
+                padding: '4px 0'
+            },
+            '.cm-line': {
+                padding: '0 8px'
+            },
+            '.cm-activeLine': {
+                backgroundColor: 'var(--bg-secondary)'
+            },
+            '.cm-activeLineGutter': {
+                backgroundColor: 'var(--bg-secondary)'
+            }
+        });
+
+        if (isDarkMode()) {
+            return [
+                syntaxHighlighting(oneDarkHighlightStyle),
+                baseTheme
+            ];
+        }
+        return [
+            syntaxHighlighting(lightHighlightStyle),
+            baseTheme
+        ];
+    }
+
+    /**
      * Initialize the CodeMirror editor
      */
     init() {
@@ -49,36 +118,7 @@ export class ResponseEditor {
                 lineNumbers(),
                 EditorView.editable.of(false), // Read-only
                 EditorView.lineWrapping,
-                syntaxHighlighting(highlightStyle),
-                EditorView.theme({
-                    '&': {
-                        height: '100%',
-                        fontSize: '13px',
-                        backgroundColor: 'var(--bg-primary)'
-                    },
-                    '.cm-scroller': {
-                        fontFamily: '"Fira Code", "Courier New", monospace',
-                        overflow: 'auto'
-                    },
-                    '.cm-gutters': {
-                        backgroundColor: 'var(--bg-secondary)',
-                        color: 'var(--text-secondary)',
-                        border: 'none',
-                        paddingRight: '8px'
-                    },
-                    '.cm-lineNumbers .cm-gutterElement': {
-                        padding: '0 8px 0 4px',
-                        minWidth: '40px'
-                    },
-                    '.cm-content': {
-                        color: 'var(--text-primary)',
-                        caretColor: 'var(--text-primary)',
-                        padding: '4px 0'
-                    },
-                    '.cm-line': {
-                        padding: '0 8px'
-                    }
-                })
+                ...this.getThemeExtensions()
             ]
         });
 
@@ -203,36 +243,7 @@ export class ResponseEditor {
             lineNumbers(),
             EditorView.editable.of(false),
             EditorView.lineWrapping,
-            syntaxHighlighting(highlightStyle),
-            EditorView.theme({
-                '&': {
-                    height: '100%',
-                    fontSize: '13px',
-                    backgroundColor: 'var(--bg-primary)'
-                },
-                '.cm-scroller': {
-                    fontFamily: '"Fira Code", "Courier New", monospace',
-                    overflow: 'auto'
-                },
-                '.cm-gutters': {
-                    backgroundColor: 'var(--bg-secondary)',
-                    color: 'var(--text-secondary)',
-                    border: 'none',
-                    paddingRight: '8px'
-                },
-                '.cm-lineNumbers .cm-gutterElement': {
-                    padding: '0 8px 0 4px',
-                    minWidth: '40px'
-                },
-                '.cm-content': {
-                    color: 'var(--text-primary)',
-                    caretColor: 'var(--text-primary)',
-                    padding: '4px 0'
-                },
-                '.cm-line': {
-                    padding: '0 8px'
-                }
-            })
+            ...this.getThemeExtensions()
         ];
 
         // Add language extension if specified

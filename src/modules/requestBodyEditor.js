@@ -4,9 +4,10 @@ import { json } from '@codemirror/lang-json';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
+import { oneDark, oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 
-// Define syntax highlighting style
-const highlightStyle = HighlightStyle.define([
+// Light theme syntax highlighting style
+const lightHighlightStyle = HighlightStyle.define([
     { tag: tags.keyword, color: '#d73a49' },
     { tag: tags.atom, color: '#0184bc' },
     { tag: tags.bool, color: '#0184bc' },
@@ -21,6 +22,21 @@ const highlightStyle = HighlightStyle.define([
 ]);
 
 /**
+ * Detect if dark mode is active
+ * @returns {boolean}
+ */
+function isDarkMode() {
+    const theme = document.documentElement.getAttribute('data-theme');
+    if (theme === 'dark' || theme === 'black') {
+        return true;
+    }
+    if (theme === 'system') {
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+}
+
+/**
  * RequestBodyEditor - Manages CodeMirror editor for request body input
  * Provides syntax highlighting for JSON with line numbers and editing capability
  */
@@ -30,6 +46,66 @@ export class RequestBodyEditor {
         this.view = null;
         this.changeCallback = null;
         this.init();
+    }
+
+    /**
+     * Get theme extensions based on current color scheme
+     * @returns {Array} Array of theme extensions
+     */
+    getThemeExtensions() {
+        const baseTheme = EditorView.theme({
+            '&': {
+                height: '100%',
+                fontSize: '13px',
+                backgroundColor: 'var(--bg-primary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '4px'
+            },
+            '&.cm-focused': {
+                outline: '2px solid var(--primary-color)',
+                outlineOffset: '1px'
+            },
+            '.cm-scroller': {
+                fontFamily: '"Fira Code", "Courier New", monospace',
+                overflow: 'auto'
+            },
+            '.cm-gutters': {
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-secondary)',
+                border: 'none',
+                borderRight: '1px solid var(--border-color)',
+                paddingRight: '8px'
+            },
+            '.cm-lineNumbers .cm-gutterElement': {
+                padding: '0 8px 0 4px',
+                minWidth: '40px'
+            },
+            '.cm-content': {
+                color: 'var(--text-primary)',
+                caretColor: 'var(--text-primary)',
+                padding: '4px 0'
+            },
+            '.cm-line': {
+                padding: '0 8px'
+            },
+            '.cm-activeLine': {
+                backgroundColor: 'var(--bg-secondary)'
+            },
+            '.cm-activeLineGutter': {
+                backgroundColor: 'var(--bg-secondary)'
+            }
+        });
+
+        if (isDarkMode()) {
+            return [
+                syntaxHighlighting(oneDarkHighlightStyle),
+                baseTheme
+            ];
+        }
+        return [
+            syntaxHighlighting(lightHighlightStyle),
+            baseTheme
+        ];
     }
 
     /**
@@ -45,55 +121,13 @@ export class RequestBodyEditor {
                 EditorView.editable.of(true), // Editable
                 EditorView.lineWrapping,
                 json(), // Always use JSON highlighting
-                syntaxHighlighting(highlightStyle),
                 EditorView.updateListener.of((update) => {
                     // Call change callback if content changed
                     if (update.docChanged && this.changeCallback) {
                         this.changeCallback(this.getContent());
                     }
                 }),
-                EditorView.theme({
-                    '&': {
-                        height: '100%',
-                        fontSize: '13px',
-                        backgroundColor: 'var(--bg-primary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '4px'
-                    },
-                    '&.cm-focused': {
-                        outline: '2px solid var(--primary-color)',
-                        outlineOffset: '1px'
-                    },
-                    '.cm-scroller': {
-                        fontFamily: '"Fira Code", "Courier New", monospace',
-                        overflow: 'auto'
-                    },
-                    '.cm-gutters': {
-                        backgroundColor: 'var(--bg-secondary)',
-                        color: 'var(--text-secondary)',
-                        border: 'none',
-                        borderRight: '1px solid var(--border-color)',
-                        paddingRight: '8px'
-                    },
-                    '.cm-lineNumbers .cm-gutterElement': {
-                        padding: '0 8px 0 4px',
-                        minWidth: '40px'
-                    },
-                    '.cm-content': {
-                        color: 'var(--text-primary)',
-                        caretColor: 'var(--text-primary)',
-                        padding: '4px 0'
-                    },
-                    '.cm-line': {
-                        padding: '0 8px'
-                    },
-                    '.cm-activeLine': {
-                        backgroundColor: 'var(--bg-secondary)'
-                    },
-                    '.cm-activeLineGutter': {
-                        backgroundColor: 'var(--bg-secondary)'
-                    }
-                })
+                ...this.getThemeExtensions()
             ]
         });
 
