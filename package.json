@@ -1,6 +1,6 @@
 {
   "name": "resonance",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Resonance - A local-first, zero-account API client with excellent user experience",
   "license": "MIT",
   "engines": {
