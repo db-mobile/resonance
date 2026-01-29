@@ -12,6 +12,8 @@
     "dev": "tauri dev",
     "build": "node build.js",
     "build:tauri": "tauri build",
+    "icons:regen": "bash scripts/regenerate-icons.sh",
+    "icons:regen:no-build": "bash scripts/regenerate-icons.sh --no-build",
     "tauri": "tauri",
     "test": "jest",
     "test:watch": "jest --watch",
