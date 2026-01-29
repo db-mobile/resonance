@@ -13,16 +13,16 @@ import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 
 // Light theme syntax highlighting style for GraphQL
 const lightHighlightStyle = HighlightStyle.define([
-    { tag: tags.keyword, color: '#d73a49' },
-    { tag: tags.propertyName, color: '#6f42c1' },
-    { tag: tags.string, color: '#22863a' },
-    { tag: tags.number, color: '#005cc5' },
-    { tag: tags.bool, color: '#0184bc' },
-    { tag: tags.null, color: '#0184bc' },
-    { tag: tags.punctuation, color: '#24292e' },
-    { tag: tags.bracket, color: '#24292e' },
-    { tag: tags.typeName, color: '#6f42c1' },
-    { tag: tags.variableName, color: '#e36209' },
+    { tag: tags.keyword, color: '#b91c1c' },
+    { tag: tags.propertyName, color: '#6d28d9' },
+    { tag: tags.string, color: '#15803d' },
+    { tag: tags.number, color: '#1d4ed8' },
+    { tag: tags.bool, color: '#0369a1' },
+    { tag: tags.null, color: '#0369a1' },
+    { tag: tags.punctuation, color: '#0f172a' },
+    { tag: tags.bracket, color: '#0f172a' },
+    { tag: tags.typeName, color: '#6d28d9' },
+    { tag: tags.variableName, color: '#b45309' },
 ]);
 
 /**
