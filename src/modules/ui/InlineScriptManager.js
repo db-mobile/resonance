@@ -100,6 +100,14 @@ export class InlineScriptManager {
         }, 1000); // Save after 1 second of no typing
     }
 
+    async flushPendingSave() {
+        if (this.saveTimeout) {
+            clearTimeout(this.saveTimeout);
+            this.saveTimeout = null;
+            await this.saveScripts();
+        }
+    }
+
     /**
      * Save current scripts
      * @async

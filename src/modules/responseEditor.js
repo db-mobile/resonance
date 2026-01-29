@@ -5,24 +5,40 @@ import { xml } from '@codemirror/lang-xml';
 import { html } from '@codemirror/lang-html';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
+import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 
-// Define syntax highlighting style
-const highlightStyle = HighlightStyle.define([
-    { tag: tags.keyword, color: '#d73a49' },
-    { tag: tags.atom, color: '#0184bc' },
-    { tag: tags.bool, color: '#0184bc' },
-    { tag: tags.null, color: '#0184bc' },
-    { tag: tags.number, color: '#005cc5' },
-    { tag: tags.string, color: '#22863a' },
-    { tag: tags.propertyName, color: '#6f42c1' },
-    { tag: tags.comment, color: '#6a737d', fontStyle: 'italic' },
-    { tag: tags.operator, color: '#d73a49' },
-    { tag: tags.punctuation, color: '#24292e' },
-    { tag: tags.bracket, color: '#24292e' },
-    { tag: tags.tagName, color: '#22863a' },
-    { tag: tags.attributeName, color: '#6f42c1' },
-    { tag: tags.attributeValue, color: '#032f62' },
+// Light theme syntax highlighting style
+const lightHighlightStyle = HighlightStyle.define([
+    { tag: tags.keyword, color: '#b91c1c' },
+    { tag: tags.atom, color: '#0369a1' },
+    { tag: tags.bool, color: '#0369a1' },
+    { tag: tags.null, color: '#0369a1' },
+    { tag: tags.number, color: '#1d4ed8' },
+    { tag: tags.string, color: '#15803d' },
+    { tag: tags.propertyName, color: '#6d28d9' },
+    { tag: tags.comment, color: '#475569', fontStyle: 'italic' },
+    { tag: tags.operator, color: '#b91c1c' },
+    { tag: tags.punctuation, color: '#0f172a' },
+    { tag: tags.bracket, color: '#0f172a' },
+    { tag: tags.tagName, color: '#15803d' },
+    { tag: tags.attributeName, color: '#6d28d9' },
+    { tag: tags.attributeValue, color: '#1e3a8a' },
 ]);
+
+/**
+ * Detect if dark mode is active
+ * @returns {boolean}
+ */
+function isDarkMode() {
+    const theme = document.documentElement.getAttribute('data-theme');
+    if (theme === 'dark' || theme === 'black') {
+        return true;
+    }
+    if (theme === 'system') {
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+}
 
 /**
  * ResponseEditor - Manages CodeMirror editor for response display
@@ -40,6 +56,59 @@ export class ResponseEditor {
     }
 
     /**
+     * Get theme extensions based on current color scheme
+     * @returns {Array} Array of theme extensions
+     */
+    getThemeExtensions() {
+        const baseTheme = EditorView.theme({
+            '&': {
+                height: '100%',
+                fontSize: '13px',
+                backgroundColor: 'var(--bg-primary)'
+            },
+            '.cm-scroller': {
+                fontFamily: '"Fira Code", "Courier New", monospace',
+                overflow: 'auto'
+            },
+            '.cm-gutters': {
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-secondary)',
+                border: 'none',
+                paddingRight: '8px'
+            },
+            '.cm-lineNumbers .cm-gutterElement': {
+                padding: '0 8px 0 4px',
+                minWidth: '40px'
+            },
+            '.cm-content': {
+                color: 'var(--text-primary)',
+                caretColor: 'var(--text-primary)',
+                padding: '4px 0'
+            },
+            '.cm-line': {
+                padding: '0 8px'
+            },
+            '.cm-activeLine': {
+                backgroundColor: 'var(--bg-secondary)'
+            },
+            '.cm-activeLineGutter': {
+                backgroundColor: 'var(--bg-secondary)'
+            }
+        });
+
+        if (isDarkMode()) {
+            return [
+                syntaxHighlighting(oneDarkHighlightStyle),
+                baseTheme
+            ];
+        }
+        return [
+            syntaxHighlighting(lightHighlightStyle),
+            baseTheme
+        ];
+    }
+
+    /**
      * Initialize the CodeMirror editor
      */
     init() {
@@ -49,36 +118,7 @@ export class ResponseEditor {
                 lineNumbers(),
                 EditorView.editable.of(false), // Read-only
                 EditorView.lineWrapping,
-                syntaxHighlighting(highlightStyle),
-                EditorView.theme({
-                    '&': {
-                        height: '100%',
-                        fontSize: '13px',
-                        backgroundColor: 'var(--bg-primary)'
-                    },
-                    '.cm-scroller': {
-                        fontFamily: '"Fira Code", "Courier New", monospace',
-                        overflow: 'auto'
-                    },
-                    '.cm-gutters': {
-                        backgroundColor: 'var(--bg-secondary)',
-                        color: 'var(--text-secondary)',
-                        border: 'none',
-                        paddingRight: '8px'
-                    },
-                    '.cm-lineNumbers .cm-gutterElement': {
-                        padding: '0 8px 0 4px',
-                        minWidth: '40px'
-                    },
-                    '.cm-content': {
-                        color: 'var(--text-primary)',
-                        caretColor: 'var(--text-primary)',
-                        padding: '4px 0'
-                    },
-                    '.cm-line': {
-                        padding: '0 8px'
-                    }
-                })
+                ...this.getThemeExtensions()
             ]
         });
 
@@ -203,36 +243,7 @@ export class ResponseEditor {
             lineNumbers(),
             EditorView.editable.of(false),
             EditorView.lineWrapping,
-            syntaxHighlighting(highlightStyle),
-            EditorView.theme({
-                '&': {
-                    height: '100%',
-                    fontSize: '13px',
-                    backgroundColor: 'var(--bg-primary)'
-                },
-                '.cm-scroller': {
-                    fontFamily: '"Fira Code", "Courier New", monospace',
-                    overflow: 'auto'
-                },
-                '.cm-gutters': {
-                    backgroundColor: 'var(--bg-secondary)',
-                    color: 'var(--text-secondary)',
-                    border: 'none',
-                    paddingRight: '8px'
-                },
-                '.cm-lineNumbers .cm-gutterElement': {
-                    padding: '0 8px 0 4px',
-                    minWidth: '40px'
-                },
-                '.cm-content': {
-                    color: 'var(--text-primary)',
-                    caretColor: 'var(--text-primary)',
-                    padding: '4px 0'
-                },
-                '.cm-line': {
-                    padding: '0 8px'
-                }
-            })
+            ...this.getThemeExtensions()
         ];
 
         // Add language extension if specified

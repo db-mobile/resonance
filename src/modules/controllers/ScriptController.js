@@ -53,8 +53,22 @@ export class ScriptController {
      */
     async executePreRequest(collectionId, endpointId, requestConfig) {
         try {
-            // Get scripts
-            const scripts = await this.service.getScripts(collectionId, endpointId);
+            // Flush pending debounce-save so latest edits are available
+            if (this.scriptManager?.flushPendingSave) {
+                await this.scriptManager.flushPendingSave();
+            }
+
+            // Prefer current editor scripts if they belong to this endpoint; otherwise fall back to persisted scripts
+            let scripts;
+            if (
+                this.scriptManager?.currentCollectionId === collectionId &&
+                this.scriptManager?.currentEndpointId === endpointId &&
+                this.scriptManager?.getCurrentScripts
+            ) {
+                scripts = this.scriptManager.getCurrentScripts();
+            } else {
+                scripts = await this.service.getScripts(collectionId, endpointId);
+            }
 
             if (!scripts.preRequestScript || scripts.preRequestScript.trim() === '') {
                 return requestConfig;
@@ -94,8 +108,22 @@ export class ScriptController {
      */
     async executeTest(collectionId, endpointId, requestConfig, response) {
         try {
-            // Get scripts
-            const scripts = await this.service.getScripts(collectionId, endpointId);
+            // Flush pending debounce-save so latest edits are available
+            if (this.scriptManager?.flushPendingSave) {
+                await this.scriptManager.flushPendingSave();
+            }
+
+            // Prefer current editor scripts if they belong to this endpoint; otherwise fall back to persisted scripts
+            let scripts;
+            if (
+                this.scriptManager?.currentCollectionId === collectionId &&
+                this.scriptManager?.currentEndpointId === endpointId &&
+                this.scriptManager?.getCurrentScripts
+            ) {
+                scripts = this.scriptManager.getCurrentScripts();
+            } else {
+                scripts = await this.service.getScripts(collectionId, endpointId);
+            }
 
             if (!scripts.testScript || scripts.testScript.trim() === '') {
                 return null;

@@ -66,6 +66,14 @@ export function initResponseEditor() {
     }
 }
 
+async function isTabCurrentlyActive(tabId) {
+    if (!tabId || !window.workspaceTabController) {
+        return true;
+    }
+    const activeTabId = await window.workspaceTabController.service.getActiveTabId();
+    return activeTabId === tabId;
+}
+
 /**
  * Get the current response body content from the editor
  * @returns {string}
@@ -78,8 +86,14 @@ export function getResponseBodyContent() {
 }
 
 export function displayResponseWithLineNumbers(content, contentType = null) {
+    return displayResponseWithLineNumbersForTab(content, contentType, null);
+}
+
+export function displayResponseWithLineNumbersForTab(content, contentType = null, tabId = null) {
     // Use per-tab editor if available, otherwise fall back to global editor
-    const containerElements = window.responseContainerManager?.getActiveElements();
+    const containerElements = tabId
+        ? window.responseContainerManager?.getOrCreateContainer(tabId)
+        : window.responseContainerManager?.getActiveElements();
 
     if (containerElements && containerElements.editor) {
         containerElements.editor.setContent(content, contentType);
@@ -110,8 +124,14 @@ export function displayResponseWithLineNumbers(content, contentType = null) {
 }
 
 export function clearResponseDisplay() {
+    return clearResponseDisplayForTab(null);
+}
+
+export function clearResponseDisplayForTab(tabId = null) {
     // Use per-tab editor if available, otherwise fall back to global editor
-    const containerElements = window.responseContainerManager?.getActiveElements();
+    const containerElements = tabId
+        ? window.responseContainerManager?.getOrCreateContainer(tabId)
+        : window.responseContainerManager?.getActiveElements();
 
     if (containerElements && containerElements.editor) {
         containerElements.editor.clear();
@@ -138,16 +158,24 @@ function setRequestInProgress(inProgress) {
 
 export async function handleCancelRequest() {
     try {
+        const requestTabId = window.workspaceTabController
+            ? await window.workspaceTabController.service.getActiveTabId()
+            : null;
+
         const result = await window.backendAPI.cancelApiRequest();
 
         if (result.success) {
-            updateStatusDisplay('Request cancelled', null);
-            updateResponseTime(null);
-            updateResponseSize(null);
-            displayResponseWithLineNumbers('Request was cancelled by user');
+            if (await isTabCurrentlyActive(requestTabId)) {
+                updateStatusDisplay('Request cancelled', null);
+                updateResponseTime(null);
+                updateResponseSize(null);
+            }
+            displayResponseWithLineNumbersForTab('Request was cancelled by user', null, requestTabId);
 
             // Use per-tab elements if available
-            const containerElements = window.responseContainerManager?.getActiveElements();
+            const containerElements = requestTabId
+            ? window.responseContainerManager?.getOrCreateContainer(requestTabId)
+            : window.responseContainerManager?.getActiveElements();
             if (containerElements) {
                 if (containerElements.headersDisplay) {containerElements.headersDisplay.textContent = '';}
                 if (containerElements.cookiesDisplay) {containerElements.cookiesDisplay.innerHTML = '';}
@@ -424,6 +452,12 @@ export async function handleSendRequest() {
         timeout
     };
 
+    // Capture the originating workspace tab at send time.
+    // This prevents async completion from writing into whatever tab happens to be active later.
+    const requestTabId = window.workspaceTabController
+        ? await window.workspaceTabController.service.getActiveTabId()
+        : null;
+
     try {
         setRequestInProgress(true);
 
@@ -433,10 +467,12 @@ export async function handleSendRequest() {
             void responseBodyContainer.parentElement.offsetHeight; // Force reflow
         }
 
-        displayResponseWithLineNumbers('Sending request...');
+        displayResponseWithLineNumbersForTab('Sending request...', null, requestTabId);
 
         // Clear response displays using per-tab elements if available
-        const containerElements = window.responseContainerManager?.getActiveElements();
+        const containerElements = requestTabId
+            ? window.responseContainerManager?.getOrCreateContainer(requestTabId)
+            : window.responseContainerManager?.getActiveElements();
         if (containerElements) {
             if (containerElements.headersDisplay) {containerElements.headersDisplay.textContent = '';}
             if (containerElements.cookiesDisplay) {containerElements.cookiesDisplay.innerHTML = '';}
@@ -448,7 +484,9 @@ export async function handleSendRequest() {
             if (responsePerformanceDisplay) {clearPerformanceMetrics(responsePerformanceDisplay);}
         }
 
-        updateStatusDisplay('Status: Sending...', null);
+        if (await isTabCurrentlyActive(requestTabId)) {
+            updateStatusDisplay('Status: Sending...', null);
+        }
 
         if (authData.authConfig) {
             requestConfig.auth = authData.authConfig;
@@ -490,10 +528,12 @@ export async function handleSendRequest() {
             }
 
             // Display response body (currently uses global editor - TODO: make per-tab)
-            displayResponseWithLineNumbers(formattedResponse, contentType);
+            displayResponseWithLineNumbersForTab(formattedResponse, contentType, requestTabId);
 
             // Get active workspace tab's response container elements for headers/cookies/performance
-            const containerElements = window.responseContainerManager?.getActiveElements();
+            const containerElements = requestTabId
+                ? window.responseContainerManager?.getOrCreateContainer(requestTabId)
+                : window.responseContainerManager?.getActiveElements();
 
             if (containerElements) {
                 // Write headers to workspace tab's container
@@ -525,9 +565,8 @@ export async function handleSendRequest() {
 
             // Save response data to workspace tab
             if (window.workspaceTabController) {
-                const activeTabId = await window.workspaceTabController.service.getActiveTabId();
-                if (activeTabId) {
-                    await window.workspaceTabController.service.updateTab(activeTabId, {
+                if (requestTabId) {
+                    await window.workspaceTabController.service.updateTab(requestTabId, {
                         response: {
                             data: result.data,
                             headers: result.headers || {},
@@ -540,13 +579,18 @@ export async function handleSendRequest() {
                         },
                         isModified: false
                     });
-                    await window.workspaceTabController.markCurrentTabUnmodified();
+                    await window.workspaceTabController.service.setTabModified(requestTabId, false);
+                    if (window.workspaceTabController.tabBar?.updateTab) {
+                        window.workspaceTabController.tabBar.updateTab(requestTabId, { isModified: false });
+                    }
                 }
             }
 
-            updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
-            updateResponseTime(result.ttfb);
-            updateResponseSize(result.size);
+            if (await isTabCurrentlyActive(requestTabId)) {
+                updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
+                updateResponseTime(result.ttfb);
+                updateResponseSize(result.size);
+            }
             setRequestInProgress(false);
 
             // Add to history
@@ -568,13 +612,17 @@ export async function handleSendRequest() {
                 }
             }
         } else if (result.cancelled) {
-            updateStatusDisplay('Request cancelled', null);
-            updateResponseTime(null);
-            updateResponseSize(null);
-            displayResponseWithLineNumbers('Request was cancelled');
+            if (await isTabCurrentlyActive(requestTabId)) {
+                updateStatusDisplay('Request cancelled', null);
+                updateResponseTime(null);
+                updateResponseSize(null);
+            }
+            displayResponseWithLineNumbersForTab('Request was cancelled', null, requestTabId);
 
             // Use per-tab elements if available
-            const containerElements = window.responseContainerManager?.getActiveElements();
+            const containerElements = requestTabId
+                ? window.responseContainerManager?.getOrCreateContainer(requestTabId)
+                : window.responseContainerManager?.getActiveElements();
             if (containerElements) {
                 if (containerElements.headersDisplay) {containerElements.headersDisplay.textContent = '';}
                 if (containerElements.cookiesDisplay) {containerElements.cookiesDisplay.innerHTML = '';}
@@ -617,10 +665,12 @@ export async function handleSendRequest() {
             contentType = error.headers['content-type'];
         }
 
-        displayResponseWithLineNumbers(errorContent, contentType);
+        displayResponseWithLineNumbersForTab(errorContent, contentType, requestTabId);
 
         // Get active workspace tab's response container elements
-        const containerElements = window.responseContainerManager?.getActiveElements();
+        const containerElements = requestTabId
+            ? window.responseContainerManager?.getOrCreateContainer(requestTabId)
+            : window.responseContainerManager?.getActiveElements();
 
         if (error.headers && Object.keys(error.headers).length > 0) {
             try {
@@ -678,13 +728,29 @@ export async function handleSendRequest() {
             statusDisplayText = `${status}${statusText ? ` ${statusText}` : ''}`;
         }
 
-        updateStatusDisplay(statusDisplayText, status);
-        updateResponseTime(error.ttfb);
-        updateResponseSize(error.size);
+        if (await isTabCurrentlyActive(requestTabId)) {
+            updateStatusDisplay(statusDisplayText, status);
+            updateResponseTime(error.ttfb);
+            updateResponseSize(error.size);
+        }
 
         // Add error to history
         if (window.historyController) {
             await window.historyController.addHistoryEntry(requestConfig, error, window.currentEndpoint);
+        }
+
+        // Execute test script for error responses as well (e.g. assert 400/401/etc)
+        if (window.currentEndpoint && window.scriptController) {
+            try {
+                await window.scriptController.executeTest(
+                    window.currentEndpoint.collectionId,
+                    window.currentEndpoint.endpointId,
+                    requestConfig,
+                    error
+                );
+            } catch (e) {
+                // Non-blocking
+            }
         }
     } finally {
         setRequestInProgress(false);

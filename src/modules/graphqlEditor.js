@@ -9,20 +9,36 @@ import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { graphql } from 'cm6-graphql';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
+import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 
-// Define syntax highlighting style for GraphQL
-const highlightStyle = HighlightStyle.define([
-    { tag: tags.keyword, color: '#d73a49' },
-    { tag: tags.propertyName, color: '#6f42c1' },
-    { tag: tags.string, color: '#22863a' },
-    { tag: tags.number, color: '#005cc5' },
-    { tag: tags.bool, color: '#0184bc' },
-    { tag: tags.null, color: '#0184bc' },
-    { tag: tags.punctuation, color: '#24292e' },
-    { tag: tags.bracket, color: '#24292e' },
-    { tag: tags.typeName, color: '#6f42c1' },
-    { tag: tags.variableName, color: '#e36209' },
+// Light theme syntax highlighting style for GraphQL
+const lightHighlightStyle = HighlightStyle.define([
+    { tag: tags.keyword, color: '#b91c1c' },
+    { tag: tags.propertyName, color: '#6d28d9' },
+    { tag: tags.string, color: '#15803d' },
+    { tag: tags.number, color: '#1d4ed8' },
+    { tag: tags.bool, color: '#0369a1' },
+    { tag: tags.null, color: '#0369a1' },
+    { tag: tags.punctuation, color: '#0f172a' },
+    { tag: tags.bracket, color: '#0f172a' },
+    { tag: tags.typeName, color: '#6d28d9' },
+    { tag: tags.variableName, color: '#b45309' },
 ]);
+
+/**
+ * Detect if dark mode is active
+ * @returns {boolean}
+ */
+function isDarkMode() {
+    const theme = document.documentElement.getAttribute('data-theme');
+    if (theme === 'dark' || theme === 'black') {
+        return true;
+    }
+    if (theme === 'system') {
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+}
 
 /**
  * GraphQLEditor - CodeMirror editor for GraphQL queries
@@ -36,6 +52,59 @@ export class GraphQLEditor {
     }
 
     /**
+     * Get theme extensions based on current color scheme
+     * @returns {Array} Array of theme extensions
+     */
+    getThemeExtensions() {
+        const baseTheme = EditorView.theme({
+            '&': {
+                height: '100%',
+                fontSize: '13px',
+                backgroundColor: 'var(--bg-primary)'
+            },
+            '.cm-scroller': {
+                fontFamily: '"Fira Code", "Courier New", monospace',
+                overflow: 'auto'
+            },
+            '.cm-gutters': {
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-secondary)',
+                border: 'none',
+                paddingRight: '8px'
+            },
+            '.cm-content': {
+                color: 'var(--text-primary)',
+                caretColor: 'var(--text-primary)',
+                padding: '4px 0'
+            },
+            '.cm-line': {
+                padding: '0 8px'
+            },
+            '.cm-placeholder': {
+                color: 'var(--text-tertiary)',
+                fontStyle: 'italic'
+            },
+            '.cm-activeLine': {
+                backgroundColor: 'var(--bg-secondary)'
+            },
+            '.cm-activeLineGutter': {
+                backgroundColor: 'var(--bg-secondary)'
+            }
+        });
+
+        if (isDarkMode()) {
+            return [
+                syntaxHighlighting(oneDarkHighlightStyle),
+                baseTheme
+            ];
+        }
+        return [
+            syntaxHighlighting(lightHighlightStyle),
+            baseTheme
+        ];
+    }
+
+    /**
      * Initialize the CodeMirror editor
      */
     init() {
@@ -45,7 +114,6 @@ export class GraphQLEditor {
             keymap.of([...defaultKeymap, ...historyKeymap]),
             EditorView.lineWrapping,
             graphql(),
-            syntaxHighlighting(highlightStyle),
             placeholder('query {\n  user(id: 1) {\n    name\n    email\n  }\n}'),
             EditorView.updateListener.of((update) => {
                 // Call change callback if content changed
@@ -53,35 +121,7 @@ export class GraphQLEditor {
                     this.changeCallback(this.getContent());
                 }
             }),
-            EditorView.theme({
-                '&': {
-                    height: '100%',
-                    fontSize: '13px',
-                    backgroundColor: 'var(--bg-primary)'
-                },
-                '.cm-scroller': {
-                    fontFamily: '"Fira Code", "Courier New", monospace',
-                    overflow: 'auto'
-                },
-                '.cm-gutters': {
-                    backgroundColor: 'var(--bg-secondary)',
-                    color: 'var(--text-secondary)',
-                    border: 'none',
-                    paddingRight: '8px'
-                },
-                '.cm-content': {
-                    color: 'var(--text-primary)',
-                    caretColor: 'var(--text-primary)',
-                    padding: '4px 0'
-                },
-                '.cm-line': {
-                    padding: '0 8px'
-                },
-                '.cm-placeholder': {
-                    color: 'var(--text-tertiary)',
-                    fontStyle: 'italic'
-                }
-            })
+            ...this.getThemeExtensions()
         ];
 
         const state = EditorState.create({
