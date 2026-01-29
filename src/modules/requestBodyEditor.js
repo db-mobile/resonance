@@ -4,7 +4,7 @@ import { json } from '@codemirror/lang-json';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
-import { oneDark, oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
+import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 
 // Light theme syntax highlighting style
 const lightHighlightStyle = HighlightStyle.define([

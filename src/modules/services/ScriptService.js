@@ -135,6 +135,13 @@ export class ScriptService {
             // Get active environment variables
             const environmentVariables = await this.environmentService.getActiveEnvironmentVariables();
 
+            const status = response?.status ?? response?.statusCode ?? response?.status_code ?? null;
+            const statusText = response?.statusText ?? response?.status_text ?? response?.statusMessage ?? '';
+            const headers = response?.headers || {};
+            const body = response?.data ?? response?.body ?? null;
+            const timings = response?.timings || {};
+            const cookies = response?.cookies || [];
+
             // Prepare script execution data
             const scriptData = {
                 script,
@@ -147,12 +154,12 @@ export class ScriptService {
                     pathParams: requestConfig.pathParams || {}
                 },
                 response: {
-                    status: response.status,
-                    statusText: response.statusText,
-                    headers: response.headers || {},
-                    body: response.data,
-                    timings: response.timings || {},
-                    cookies: response.cookies || []
+                    status,
+                    statusText,
+                    headers,
+                    body,
+                    timings,
+                    cookies
                 },
                 environment: environmentVariables || {}
             };

@@ -5,7 +5,7 @@ import { xml } from '@codemirror/lang-xml';
 import { html } from '@codemirror/lang-html';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
-import { oneDark, oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
+import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 
 // Light theme syntax highlighting style
 const lightHighlightStyle = HighlightStyle.define([

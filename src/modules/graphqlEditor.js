@@ -9,7 +9,7 @@ import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { graphql } from 'cm6-graphql';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
-import { oneDark, oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
+import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 
 // Light theme syntax highlighting style for GraphQL
 const lightHighlightStyle = HighlightStyle.define([

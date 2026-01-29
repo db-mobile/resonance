@@ -686,6 +686,20 @@ export async function handleSendRequest() {
         if (window.historyController) {
             await window.historyController.addHistoryEntry(requestConfig, error, window.currentEndpoint);
         }
+
+        // Execute test script for error responses as well (e.g. assert 400/401/etc)
+        if (window.currentEndpoint && window.scriptController) {
+            try {
+                await window.scriptController.executeTest(
+                    window.currentEndpoint.collectionId,
+                    window.currentEndpoint.endpointId,
+                    requestConfig,
+                    error
+                );
+            } catch (e) {
+                // Non-blocking
+            }
+        }
     } finally {
         setRequestInProgress(false);
     }
