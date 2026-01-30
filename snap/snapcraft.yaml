@@ -58,6 +58,7 @@ parts:
       - build-essential
     stage-packages:
       - libwebkit2gtk-4.1-0
+      - webkit2gtk-driver
       - libayatana-appindicator3-1
       - librsvg2-2
       - libssl3
