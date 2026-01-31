@@ -31,16 +31,16 @@
 
   <!-- Rounded rectangle background with gradient -->
   <rect x="100" y="100" width="824" height="824" rx="63.384615" fill="url(#bgGradient)"/>
-
+  
   <!-- Outer resonance waves (yellow/gold) -->
-  <circle cx="512" cy="512" r="318" fill="none" stroke="url(#waveGradient1)" stroke-width="56" stroke-linecap="round" opacity="0.95" stroke-dasharray="299.70 199.80" stroke-dashoffset="399.60"/>
-
+  <circle cx="512" cy="512" r="318" fill="none" stroke="url(#waveGradient1)" stroke-width="50" stroke-linecap="round" opacity="0.95" stroke-dasharray="299.70 199.80" stroke-dashoffset="399.60"/>
+  
   <!-- Middle resonance waves (white) -->
-  <circle cx="512" cy="512" r="232" fill="none" stroke="url(#waveGradient2)" stroke-width="44" stroke-linecap="round" opacity="0.9" stroke-dasharray="218.70 145.80" stroke-dashoffset="291.60" transform="rotate(45 512 512)"/>
-
+  <circle cx="512" cy="512" r="232" fill="none" stroke="url(#waveGradient2)" stroke-width="40" stroke-linecap="round" opacity="0.9" stroke-dasharray="218.70 145.80" stroke-dashoffset="291.60" transform="rotate(45 512 512)"/>
+  
   <!-- Inner resonance waves (light blue) -->
-  <circle cx="512" cy="512" r="152" fill="none" stroke="url(#waveGradient3)" stroke-width="36" stroke-linecap="round" opacity="0.95" stroke-dasharray="143.24 95.49" stroke-dashoffset="190.99"/>
-
+  <circle cx="512" cy="512" r="152" fill="none" stroke="url(#waveGradient3)" stroke-width="32" stroke-linecap="round" opacity="0.95" stroke-dasharray="143.24 95.49" stroke-dashoffset="190.99"/>
+  
   <!-- Center circle with gradient -->
   <circle cx="512" cy="512" r="84" fill="url(#centerGradient)"/>
 </svg>
