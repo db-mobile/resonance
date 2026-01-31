@@ -1979,6 +1979,13 @@ body {
   flex-shrink: 0;
 }
 
+.settings-app-version {
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1;
+  user-select: text;
+}
+
 .settings-header h2 {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
@@ -2009,6 +2016,14 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.settings-footer {
+  padding: var(--space-2) var(--space-6);
+  border-top: 1px solid var(--border-light);
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .settings-section {

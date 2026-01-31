@@ -4,6 +4,7 @@ mod commands;
 
 use commands::{
     api_request::{cancel_api_request, send_api_request, RequestState},
+    app::app_get_version,
     import_export::{
         export_openapi, import_openapi_file, import_postman_collection, import_postman_environment,
     },
@@ -26,6 +27,8 @@ fn main() {
         .manage(RequestState::default())
         .manage(ProxyState::default())
         .invoke_handler(tauri::generate_handler![
+            // App
+            app_get_version,
             // Store
             store_get,
             store_set,
