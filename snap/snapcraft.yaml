@@ -1,5 +1,5 @@
 name: db-mobile-resonance
-base: core24
+base: core22
 version: '2.0.3'
 title: Resonance
 summary: Test and explore web services
@@ -25,28 +25,67 @@ grade: stable
 confinement: strict
 icon: assets/icons/icon_256x256.png
 
-platforms:
-  amd64:
-    build-on: [amd64]
+contact: mailto:dennis.bluemer@ducart.de
+license: MIT
+website: https://db-mobile.github.io/resonance
+source-code: https://github.com/db-mobile/resonance
+issues: https://github.com/db-mobile/resonance/issues
+
+layout:
+  /usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/webkit2gtk-4.1:
+    bind: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/webkit2gtk-4.1
+  /usr/share/libdrm:
+    bind: $SNAP/graphics/libdrm
+  /usr/share/drirc.d:
+    symlink: $SNAP/graphics/drirc.d
+  /usr/share/X11/XErrorDB:
+    symlink: $SNAP/graphics/X11/XErrorDB
+  /usr/share/X11/locale:
+    symlink: $SNAP/graphics/X11/locale
+
+architectures:
+  - build-on: [amd64]
     build-for: [amd64]
-  arm64:
-    build-on: [arm64]
+  - build-on: [arm64]
     build-for: [arm64]
 
 apps:
   db-mobile-resonance:
+    command-chain:
+      - bin/graphics-core22-wrapper
     command: usr/bin/resonance
     desktop: usr/share/applications/io.github.db_mobile.resonance.desktop
-    extensions:
-      - gnome
+    extensions: [gnome]
     plugs:
+      - graphics-core22
+      - desktop
+      - desktop-legacy
+      - x11
+      - wayland
+      - opengl
+      - gsettings
       - network
       - network-bind
 
+package-repositories:
+  - type: apt
+    components: [main]
+    suites: [noble]
+    key-id: 78E1918602959B9C59103100F1831DDAFC42E99D
+    url: http://ppa.launchpad.net/snappy-dev/snapcraft-daily/ubuntu
+
+plugs:
+  graphics-core22:
+    interface: content
+    target: $SNAP/graphics
+    default-provider: mesa-core22
+
 parts:
   db-mobile-resonance:
-    plugin: nil
-    source: .
+    plugin: dump
+    build-snaps:
+      - node/20/stable
+      - rustup/latest/stable
     build-packages:
       - curl
       - wget
@@ -56,43 +95,25 @@ parts:
       - librsvg2-dev
       - libwebkit2gtk-4.1-dev
       - build-essential
+      - libxdo-dev
+      - dpkg
     stage-packages:
       - libwebkit2gtk-4.1-0
-      - webkit2gtk-driver
       - libayatana-appindicator3-1
-      - librsvg2-2
       - libssl3
+      - libproxy1v5
+    source: .
     override-build: |
-      # Install Node.js
-      curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-      apt-get install -y nodejs
+      set -eu
+      rustup default stable
+      npm install
+      npm run tauri build -- --bundles deb
+      dpkg -x src-tauri/target/release/bundle/deb/*.deb $SNAPCRAFT_PART_INSTALL/
 
-      # Install Rust
-      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-      export PATH="$HOME/.cargo/bin:$PATH"
-
-      # Build the application
-      cd $CRAFT_PART_SRC
-      npm ci
-      npm run build
-      npm run build:tauri -- --no-bundle
-
-      # Install the binary
-      mkdir -p $CRAFT_PART_INSTALL/usr/bin
-      cp src-tauri/target/release/resonance $CRAFT_PART_INSTALL/usr/bin/
-
-      # Install desktop file
       mkdir -p $CRAFT_PART_INSTALL/usr/share/applications
-      cat > $CRAFT_PART_INSTALL/usr/share/applications/io.github.db_mobile.resonance.desktop << EOF
-      [Desktop Entry]
-      Name=Resonance
-      Comment=A local-first, zero-account API client
-      Exec=resonance
-      Icon=\${SNAP}/usr/share/icons/hicolor/256x256/apps/io.github.db_mobile.resonance.png
-      Type=Application
-      Categories=Development;Network;
-      StartupNotify=true
-      EOF
+      cp assets/desktop/io.github.db_mobile.resonance.desktop $CRAFT_PART_INSTALL/usr/share/applications/io.github.db_mobile.resonance.desktop
+      sed -i 's/^Exec=.*/Exec=resonance/' $CRAFT_PART_INSTALL/usr/share/applications/io.github.db_mobile.resonance.desktop
+      sed -i 's/^Icon=.*/Icon=io.github.db_mobile.resonance/' $CRAFT_PART_INSTALL/usr/share/applications/io.github.db_mobile.resonance.desktop
 
       # Install icons
       mkdir -p $CRAFT_PART_INSTALL/usr/share/icons/hicolor/32x32/apps
@@ -104,6 +125,13 @@ parts:
       cp assets/icons/icon_256x256.png $CRAFT_PART_INSTALL/usr/share/icons/hicolor/256x256/apps/io.github.db_mobile.resonance.png
       cp assets/icons/icon_512x512.png $CRAFT_PART_INSTALL/usr/share/icons/hicolor/512x512/apps/io.github.db_mobile.resonance.png
 
-      # Install metainfo
-      mkdir -p $CRAFT_PART_INSTALL/usr/share/metainfo
-      cp assets/appdata/io.github.db_mobile.resonance.metainfo.xml $CRAFT_PART_INSTALL/usr/share/metainfo/
+  graphics-core22:
+    after: [db-mobile-resonance]
+    source: https://github.com/canonical/gpu-snap.git
+    plugin: dump
+    override-prime: |
+      craftctl default
+      ${CRAFT_PART_SRC}/bin/graphics-core22-cleanup mesa-core22 nvidia-core22
+      mkdir -p "${CRAFT_PRIME}/graphics"
+    prime:
+      - bin/graphics-core22-wrapper
