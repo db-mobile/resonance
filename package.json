@@ -1,6 +1,6 @@
 {
   "name": "resonance",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Resonance - A local-first, zero-account API client with excellent user experience",
   "license": "MIT",
   "engines": {
@@ -12,6 +12,8 @@
     "dev": "tauri dev",
     "build": "node build.js",
     "build:tauri": "tauri build",
+    "icons:regen": "bash scripts/regenerate-icons.sh",
+    "icons:regen:no-build": "bash scripts/regenerate-icons.sh --no-build",
     "tauri": "tauri",
     "test": "jest",
     "test:watch": "jest --watch",

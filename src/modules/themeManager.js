@@ -222,6 +222,18 @@ export class SettingsModal {
         const modal = await this.createModal();
         document.body.appendChild(modal);
 
+        const appVersionDisplay = modal.querySelector('#settings-app-version');
+        if (appVersionDisplay) {
+            try {
+                const version = await window.backendAPI?.app?.getVersion?.();
+                if (version) {
+                    appVersionDisplay.textContent = `v${version}`;
+                }
+            } catch (error) {
+                void error;
+            }
+        }
+
         const firstSelect = modal.querySelector('select[name="theme"]');
         if (firstSelect) {firstSelect.focus();}
     }
@@ -307,9 +319,14 @@ export class SettingsModal {
                             </div>
                             <p class="form-input-hint" data-i18n="settings.timeout_description">Set to 0 for no timeout</p>
                         </div>
+
                     </div>
 
                     ${showProxyTab ? `<div class="settings-tab-content" data-tab-content="proxy">${proxySection}</div>` : ''}
+                </div>
+
+                <div class="settings-footer">
+                    <span id="settings-app-version" class="settings-app-version"></span>
                 </div>
             </div>
         `;

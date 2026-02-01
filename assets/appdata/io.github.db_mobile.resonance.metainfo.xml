@@ -40,8 +40,8 @@
   <icon type="stock">io.github.db_mobile.resonance</icon>
 
   <branding>
-    <color type="primary" scheme_preference="light">#f9f06b</color>
-    <color type="primary" scheme_preference="dark">#094185</color>
+    <color type="primary" scheme_preference="light">#2b6cbf</color>
+    <color type="primary" scheme_preference="dark">#123056</color>
   </branding>
 
   <screenshots>
@@ -94,6 +94,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.0.3" date="2026-02-01">
+      <description>
+        <p>Feature stabilization</p>
+        <ul>
+          <li>Update dependencies</li>
+          <li>Add version info in UI</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.0.2" date="2026-01-29">
       <description>
         <p>Feature stabilization</p>

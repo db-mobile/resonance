@@ -19,6 +19,9 @@ if (isTauri) {
     const invoke = window.__TAURI_INTERNALS__.invoke;
     
     api = {
+        app: {
+            getVersion: () => invoke('app_get_version')
+        },
         logger: {
             error: (_scope, _message, _meta) => {
                 void _scope;
