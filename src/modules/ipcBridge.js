@@ -59,7 +59,21 @@ if (isTauri) {
             importOpenApiFile: () => invoke('import_openapi_file'),
             importPostmanCollection: () => invoke('import_postman_collection'),
             importPostmanEnvironment: () => invoke('import_postman_environment'),
-            exportOpenApi: (collectionId, format) => invoke('export_openapi', { collectionId, format })
+            exportOpenApi: (collectionId, format) => invoke('export_openapi', { collectionId, format }),
+            exportPostman: (collectionId) => invoke('export_postman', { collectionId })
+        },
+        grpc: {
+            listServices: (target, useTls = false) => invoke('grpc_reflection_list_services', { target, useTls }),
+            listMethods: (target, serviceName, useTls = false) => invoke('grpc_reflection_list_methods', { target, serviceName, useTls }),
+            invokeUnary: (request) => invoke('grpc_invoke_unary', { request }),
+            getInputSkeleton: (target, fullMethod, useTls = false) => invoke('grpc_get_input_skeleton', { target, fullMethod, useTls }),
+            // Proto file support
+            selectProtoFile: () => invoke('grpc_select_proto_file'),
+            parseProtoFile: (protoPath, includePaths = null) => invoke('grpc_parse_proto_file', { protoPath, includePaths }),
+            protoGetInputSkeleton: (protoPath, fullMethod) => invoke('grpc_proto_get_input_skeleton', { protoPath, fullMethod }),
+            protoInvokeUnary: (protoPath, request) => invoke('grpc_proto_invoke_unary', { protoPath, request }),
+            listLoadedProtos: () => invoke('grpc_list_loaded_protos'),
+            unloadProto: (protoPath) => invoke('grpc_unload_proto', { protoPath })
         },
         settings: {
             get: () => invoke('settings_get'),

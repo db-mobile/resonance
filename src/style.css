@@ -3400,3 +3400,127 @@ body {
 .json-tree-boolean { color: var(--color-boolean, #0184bc); }
 .json-tree-null { color: var(--color-null, #999); }
 .xml-tree-text { color: var(--text-primary); }
+
+/* gRPC Mode Styles */
+.grpc-url-section {
+    display: flex;
+    flex: 1;
+    gap: 8px;
+    align-items: center;
+}
+
+.grpc-badge {
+    background: var(--accent-purple, #8b5cf6);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.grpc-url-section input[type="text"] {
+    flex: 1;
+    min-width: 200px;
+}
+
+.grpc-url-section label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.grpc-url-section .status-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.grpc-url-section .status-text:not(:empty) {
+    padding-left: 8px;
+}
+
+/* gRPC Source Section Styles (Connection + Proto in one row) */
+.grpc-source-section {
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.grpc-source-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.grpc-source-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.grpc-source-divider {
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 0 4px;
+}
+
+.grpc-tls-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.grpc-tls-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.grpc-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 8px 0 0 0;
+}
+
+.proto-file-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.proto-file-controls .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.proto-filename {
+    font-size: 13px;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+}
+
+.proto-status {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.proto-status-loaded {
+    color: var(--color-success, #22c55e);
+}

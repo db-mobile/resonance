@@ -16,6 +16,8 @@ import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanc
 import { getRequestBodyContent } from './requestBodyHelper.js';
 import { MockServerRepository } from './storage/MockServerRepository.js';
 import { MockServerService } from './services/MockServerService.js';
+import { isGrpcMode } from './requestModeManager.js';
+import { handleGrpcSend } from './grpcHandler.js';
 
 // Initialize CodeMirror editor for response display
 let responseEditor = null;
@@ -197,6 +199,11 @@ export async function handleCancelRequest() {
 }
 
 export async function handleSendRequest() {
+    // Check if we're in gRPC mode - delegate to gRPC handler
+    if (isGrpcMode()) {
+        return handleGrpcSend();
+    }
+    
     if (window.currentEndpoint) {
         await saveAllRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
     }

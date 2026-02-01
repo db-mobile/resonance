@@ -82,6 +82,9 @@
     "authorization": "Autorización",
     "body": "Cuerpo",
     "scripts": "Scripts",
+    "grpc": "gRPC",
+    "grpc_message": "Mensaje",
+    "grpc_metadata": "Metadatos",
     "response_body": "Cuerpo",
     "response_headers": "Encabezados"
   },

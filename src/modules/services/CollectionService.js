@@ -143,7 +143,38 @@ export class CollectionService {
             }
 
             if (result.success) {
-                this.statusDisplay.update(`Collection exported successfully to ${format.toUpperCase()}`, null);
+                let message = `Collection exported successfully to ${format.toUpperCase()}`;
+                if (result.skipped && result.skipped.count > 0) {
+                    message = `${message} (${result.skipped.count} items skipped)`;
+                }
+                this.statusDisplay.update(message, null);
+                return result;
+            }
+
+            throw new Error('Export failed');
+        } catch (error) {
+            this.statusDisplay.update(`Export error: ${error.message}`, null);
+            throw error;
+        }
+    }
+
+    async exportCollectionAsPostman(collectionId) {
+        try {
+            this.statusDisplay.update('Exporting collection...', null);
+
+            const result = await window.backendAPI.collections.exportPostman(collectionId);
+
+            if (result.cancelled) {
+                this.statusDisplay.update('Export cancelled', null);
+                return { success: false, cancelled: true };
+            }
+
+            if (result.success) {
+                let message = 'Collection exported successfully to Postman';
+                if (result.skipped && result.skipped.count > 0) {
+                    message = `${message} (${result.skipped.count} items skipped)`;
+                }
+                this.statusDisplay.update(message, null);
                 return result;
             }
 
@@ -221,11 +252,14 @@ export class CollectionService {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }
 
+            const isGrpc = requestData.protocol === 'grpc';
+
             const newEndpoint = {
                 id: this.generateEndpointId(collection),
                 name: requestData.name,
-                method: requestData.method,
-                path: requestData.path,
+                protocol: isGrpc ? 'grpc' : 'http',
+                method: isGrpc ? 'GRPC' : requestData.method,
+                path: isGrpc ? requestData.fullMethod : requestData.path,
                 description: '',
                 parameters: {
                     query: {},
@@ -240,7 +274,7 @@ export class CollectionService {
             collection.endpoints.push(newEndpoint);
 
             if (collection.folders && collection.folders.length > 0) {
-                const basePath = this.extractBasePath(requestData.path);
+                const basePath = this.extractBasePath(isGrpc ? '/grpc' : requestData.path);
                 
                 let targetFolder = collection.folders.find(folder => folder.name === basePath);
                 
@@ -257,6 +291,15 @@ export class CollectionService {
             }
 
             await this.repository.update(collectionId, collection);
+
+            if (isGrpc) {
+                await this.repository.saveGrpcData(collectionId, newEndpoint.id, {
+                    target: requestData.target || '',
+                    service: requestData.service || '',
+                    fullMethod: requestData.fullMethod || '',
+                    requestJson: requestData.requestJson || '{}'
+                });
+            }
             
             this.statusDisplay.update(`Added new request: ${requestData.name}`, null);
             return newEndpoint;

@@ -10,7 +10,7 @@
 // Import ipcBridge first to set up window.backendAPI before any other modules
 import './modules/ipcBridge.js';
 
-import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, bodyEditorContainer, pathParamsList, queryParamsList, headersList, authTypeSelect, responseBodyContainer, statusDisplay, responseHeadersDisplay, responseCookiesDisplay } from './modules/domElements.js';
+import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, bodyEditorContainer, pathParamsList, queryParamsList, headersList, authTypeSelect, responseBodyContainer, statusDisplay, responseHeadersDisplay, responseCookiesDisplay, grpcTargetInput, grpcServiceSelect, grpcMethodSelect, grpcBodyInput, grpcBodyEditorContainer } from './modules/domElements.js';
 
 import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl, setUrlUpdating } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
@@ -18,6 +18,8 @@ import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest, handleCancelRequest, handleGenerateCurl, setGraphQLBodyManager } from './modules/apiHandler.js';
 import { GraphQLBodyManager } from './modules/graphqlBodyManager.js';
+import { initGrpcUI, setGrpcMetadata, setGrpcTls } from './modules/grpcHandler.js';
+import { initRequestModeManager } from './modules/requestModeManager.js';
 import { loadCollections, importOpenApiFile, importPostmanCollection, importPostmanEnvironment, initializeBodyTracking } from './modules/collectionManager.js';
 import { ThemeManager, SettingsModal } from './modules/themeManager.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
@@ -163,7 +165,11 @@ const workspaceTabStateManager = new WorkspaceTabStateManager({
     statusDisplay,
     responseHeadersDisplay,
     responseCookiesDisplay,
-    graphqlBodyManager
+    graphqlBodyManager,
+    grpcTargetInput,
+    grpcServiceSelect,
+    grpcMethodSelect,
+    grpcBodyInput
 });
 const workspaceTabController = new WorkspaceTabController(
     workspaceTabService,
@@ -463,6 +469,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     sendRequestBtn.addEventListener('click', handleSendRequest);
     cancelRequestBtn.addEventListener('click', handleCancelRequest);
 
+    initGrpcUI();
+    initRequestModeManager();
+
     // Import menu for OpenAPI and Postman formats
     const importMenu = new ContextMenu();
     importCollectionBtn.addEventListener('click', (event) => {
@@ -544,6 +553,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.workspaceTabController = workspaceTabController;
     window.scriptController = scriptController;
     window.setUrlUpdating = setUrlUpdating;
+    window.setGrpcMetadata = setGrpcMetadata;
+    window.setGrpcTls = setGrpcTls;
 
     // Initialize environment selector
     environmentSelector.initialize('environment-selector-container');
@@ -590,6 +601,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Use setTimeout to ensure flag is cleared after any async updates
             setTimeout(() => {
                 isInitializingEditor = false;
+            }, 0);
+        }
+    }
+
+    // Initialize gRPC body editor
+    let grpcBodyEditor = null;
+    let isInitializingGrpcEditor = false;
+    if (grpcBodyEditorContainer) {
+        grpcBodyEditor = new RequestBodyEditor(grpcBodyEditorContainer);
+        window.grpcBodyEditor = grpcBodyEditor;
+
+        grpcBodyEditor.onChange((content) => {
+            if (grpcBodyInput) {
+                grpcBodyInput.value = content;
+            }
+            if (window.workspaceTabController &&
+                !isInitializingGrpcEditor &&
+                !window.workspaceTabController.isRestoringState) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
+
+        if (grpcBodyInput && grpcBodyInput.value) {
+            isInitializingGrpcEditor = true;
+            grpcBodyEditor.setContent(grpcBodyInput.value);
+            setTimeout(() => {
+                isInitializingGrpcEditor = false;
             }, 0);
         }
     }

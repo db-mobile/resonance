@@ -90,6 +90,33 @@ export function initTabListeners() {
  * activateTab('response', 'response-body');
  * activateTab('request', 'headers');
  */
+/**
+ * Switch response tabs visibility based on protocol (HTTP vs gRPC)
+ * Shows HTTP tabs (Headers, Cookies, Performance, Scripts) for HTTP requests
+ * Shows gRPC tabs (Metadata, Trailers) for gRPC requests
+ *
+ * @param {string} protocol - 'http' or 'grpc'
+ * @returns {void}
+ */
+export function setResponseTabsForProtocol(protocol) {
+    const httpTabs = document.querySelectorAll('.response-tabs .tab-button[data-protocol="http"]');
+    const grpcTabs = document.querySelectorAll('.response-tabs .tab-button[data-protocol="grpc"]');
+
+    if (protocol === 'grpc') {
+        httpTabs.forEach(tab => tab.style.display = 'none');
+        grpcTabs.forEach(tab => tab.style.display = '');
+    } else {
+        httpTabs.forEach(tab => tab.style.display = '');
+        grpcTabs.forEach(tab => tab.style.display = 'none');
+    }
+
+    // If the currently active tab is now hidden, switch to Body tab
+    const activeTab = document.querySelector('.response-tabs .tab-button.active');
+    if (activeTab && activeTab.style.display === 'none') {
+        activateTab('response', 'response-body');
+    }
+}
+
 export function activateTab(tabType, tabId) {
     let buttons;
     let contents;

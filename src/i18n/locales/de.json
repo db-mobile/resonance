@@ -82,6 +82,9 @@
     "authorization": "Autorisierung",
     "body": "Body",
     "scripts": "Skripte",
+    "grpc": "gRPC",
+    "grpc_message": "Nachricht",
+    "grpc_metadata": "Metadaten",
     "response_body": "Body",
     "response_headers": "Header"
   },

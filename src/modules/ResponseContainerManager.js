@@ -136,8 +136,16 @@ export class ResponseContainerManager {
                 <pre class="response-headers-display" data-tab-id="${tabId}" aria-live="polite"></pre>
             </div>
 
+            <div id="response-metadata-${tabId}" class="tab-content" role="tabpanel">
+                <pre class="response-metadata-display" data-tab-id="${tabId}" aria-live="polite"></pre>
+            </div>
+
             <div id="response-cookies-${tabId}" class="tab-content" role="tabpanel">
                 <div class="response-cookies-display" data-tab-id="${tabId}" aria-live="polite"></div>
+            </div>
+
+            <div id="response-trailers-${tabId}" class="tab-content" role="tabpanel">
+                <pre class="response-trailers-display" data-tab-id="${tabId}" aria-live="polite"></pre>
             </div>
 
             <div id="response-performance-${tabId}" class="tab-content" role="tabpanel">
@@ -199,16 +207,18 @@ export class ResponseContainerManager {
             tabId,
             bodyContainer,
             headersDisplay: wrapper.querySelector('.response-headers-display'),
+            metadataDisplay: wrapper.querySelector('.response-metadata-display'),
             cookiesDisplay: wrapper.querySelector('.response-cookies-display'),
+            trailersDisplay: wrapper.querySelector('.response-trailers-display'),
             performanceDisplay: wrapper.querySelector('.response-performance-display'),
             scriptsDisplay: wrapper.querySelector('.response-scripts-display'),
             languageSelector,
             copyBtn,
-            editor, // Include editor instance
-            previewContainer, // NEW
-            codeBtn, // NEW
-            previewBtn, // NEW
-            previewManager: this.previewManager // NEW
+            editor,
+            previewContainer,
+            codeBtn,
+            previewBtn,
+            previewManager: this.previewManager
         };
     }
 }
