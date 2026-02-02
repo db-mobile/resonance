@@ -36,7 +36,7 @@ function addMetadataRow(key = '', value = '') {
     li.innerHTML = `
         <input type="text" class="key-input" placeholder="Key" value="${key}">
         <input type="text" class="value-input" placeholder="Value" value="${value}">
-        <button type="button" class="btn btn-danger btn-xs remove-row-btn" aria-label="Remove">Remove</button>
+        <button type="button" class="btn-xs btn-danger remove-row-btn" aria-label="Remove">Remove</button>
     `;
     li.querySelector('.remove-row-btn').addEventListener('click', () => li.remove());
     grpcMetadataList.appendChild(li);
@@ -323,7 +323,7 @@ export async function loadProtoFile(protoPath, includePaths = null) {
  */
 export function clearProtoFile() {
     if (loadedProtoPath) {
-        window.backendAPI.grpc.unloadProto(loadedProtoPath).catch(() => {});
+        window.backendAPI.grpc.unloadProto(loadedProtoPath).catch(() => { /* ignore unload errors */ });
     }
     protoFileMode = false;
     loadedProtoPath = null;

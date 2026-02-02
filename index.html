@@ -35,7 +35,7 @@
                             <line x1="6" y1="18" x2="6.01" y2="18"></line>
                         </svg>
                     </button>
-                    <button id="import-collection-btn" class="btn btn-primary btn-sm"
+                    <button id="import-collection-btn" class="btn-sm btn-primary"
                             data-i18n-title="sidebar.import"
                             data-i18n-aria="sidebar.import"
                             data-i18n="sidebar.import">
@@ -205,7 +205,7 @@
                     <h3>Path Parameters</h3>
                     <div id="path-params-list" class="key-value-list" role="group" aria-label="Path Parameters">
                     </div>
-                    <button id="add-path-param-btn" class="btn btn-secondary btn-sm" aria-label="Add Path Parameter">
+                    <button id="add-path-param-btn" class="btn-sm btn-secondary" aria-label="Add Path Parameter">
                         + Add Path Param
                     </button>
                 </div>
@@ -214,7 +214,7 @@
                     <h3>Query Parameters</h3>
                     <div id="query-params-list" class="key-value-list" role="group" aria-label="Query Parameters">
                     </div>
-                    <button id="add-query-param-btn" class="btn btn-secondary btn-sm" aria-label="Add Query Parameter">
+                    <button id="add-query-param-btn" class="btn-sm btn-secondary" aria-label="Add Query Parameter">
                         + Add Query Param
                     </button>
                 </div>
@@ -223,7 +223,7 @@
                     <h3>Headers</h3>
                     <div id="headers-list" class="key-value-list" role="group" aria-label="Request Headers">
                     </div>
-                    <button id="add-header-btn" class="btn btn-secondary btn-sm" aria-label="Add Header">
+                    <button id="add-header-btn" class="btn-sm btn-secondary" aria-label="Add Header">
                         + Add Header
                     </button>
                 </div>
@@ -282,7 +282,7 @@
                             <div class="graphql-section-header">
                                 <label for="graphql-query-editor">Query</label>
                                 <div class="graphql-section-actions">
-                                    <button id="graphql-format-btn" class="btn-secondary btn-sm" title="Format Query">
+                                    <button id="graphql-format-btn" class="btn-sm btn-secondary" title="Format Query">
                                         Format
                                     </button>
                                 </div>
@@ -313,11 +313,12 @@
                         <div class="grpc-source-row">
                             <!-- Reflection Connection -->
                             <div class="grpc-source-item">
-                                <label class="grpc-tls-label">
+                                <label class="toggle-switch">
                                     <input type="checkbox" id="grpc-tls-checkbox" aria-label="Use TLS">
+                                    <span class="toggle-track"></span>
                                     <span>TLS</span>
                                 </label>
-                                <button id="grpc-connect-btn" class="btn btn-secondary btn-sm" aria-label="Connect via Reflection">
+                                <button id="grpc-connect-btn" class="btn-sm btn-secondary" aria-label="Connect via Reflection">
                                     Connect
                                 </button>
                                 <span id="grpc-connection-status" class="status-text"></span>
@@ -327,14 +328,14 @@
                             
                             <!-- Proto File -->
                             <div class="grpc-source-item">
-                                <button id="grpc-load-proto-btn" class="btn btn-secondary btn-sm" aria-label="Load Proto File">
+                                <button id="grpc-load-proto-btn" class="btn-sm btn-secondary" aria-label="Load Proto File">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                                         <polyline points="14 2 14 8 20 8"></polyline>
                                     </svg>
                                     Load .proto
                                 </button>
-                                <button id="grpc-clear-proto-btn" class="btn btn-secondary btn-sm" aria-label="Clear Proto" style="display: none;">
+                                <button id="grpc-clear-proto-btn" class="btn-sm btn-secondary" aria-label="Clear Proto" style="display: none;">
                                     Clear
                                 </button>
                                 <span id="grpc-proto-filename" class="proto-filename"></span>
@@ -354,7 +355,7 @@
                 <div class="tab-content" id="grpc-message" role="tabpanel" aria-labelledby="grpc-message-tab">
                     <h3 style="display: flex; justify-content: space-between; align-items: center;">
                         <span>Request JSON</span>
-                        <button type="button" id="grpc-generate-skeleton-btn" class="btn btn-secondary btn-sm">Generate</button>
+                        <button type="button" id="grpc-generate-skeleton-btn" class="btn-sm btn-secondary">Generate</button>
                     </h3>
                     <textarea id="grpc-body-input" class="body-textarea" aria-label="gRPC Request JSON" placeholder="{}" style="display: none;"></textarea>
                     <div id="grpc-body-editor-container" class="body-editor-container"></div>
@@ -363,7 +364,7 @@
                 <div class="tab-content" id="grpc-metadata" role="tabpanel" aria-labelledby="grpc-metadata-tab">
                     <h3>Metadata</h3>
                     <ul id="grpc-metadata-list" class="key-value-list" aria-label="gRPC Metadata"></ul>
-                    <button type="button" id="grpc-add-metadata-btn" class="btn btn-secondary btn-sm">+ Add Metadata</button>
+                    <button type="button" id="grpc-add-metadata-btn" class="btn-sm btn-secondary">+ Add Metadata</button>
                 </div>
 
                 <div class="tab-content" id="scripts" role="tabpanel" aria-labelledby="scripts-tab">

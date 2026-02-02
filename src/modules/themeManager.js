@@ -395,16 +395,18 @@ export class SettingsModal {
         return `
             <div class="settings-section proxy-settings-section">
                 <div class="settings-section-header">
-                    <label class="proxy-toggle">
+                    <label class="toggle-switch">
                         <input type="checkbox" name="proxyEnabled" ${settings.enabled ? 'checked' : ''}>
+                        <span class="toggle-track"></span>
                         <span data-i18n="settings.proxy_enabled">Enable Proxy</span>
                     </label>
                 </div>
 
                 <div class="proxy-settings-content" style="display: ${settings.enabled ? 'block' : 'none'}">
                     <div class="proxy-row">
-                        <label class="proxy-system-toggle">
+                        <label class="toggle-switch proxy-system-toggle">
                             <input type="checkbox" name="proxyUseSystem" ${settings.useSystemProxy ? 'checked' : ''}>
+                            <span class="toggle-track"></span>
                             <span data-i18n="settings.proxy_use_system">Use System Proxy</span>
                         </label>
                         <p class="proxy-field-help" data-i18n="settings.proxy_use_system_help">Automatically detect and use system proxy settings</p>
@@ -440,8 +442,9 @@ export class SettingsModal {
                     </div>
 
                     <div class="proxy-row">
-                        <label class="proxy-auth-toggle">
+                        <label class="toggle-switch">
                             <input type="checkbox" name="proxyAuthEnabled" ${settings.auth?.enabled ? 'checked' : ''}>
+                            <span class="toggle-track"></span>
                             <span data-i18n="settings.proxy_auth">Authentication</span>
                         </label>
                     </div>
@@ -520,7 +523,7 @@ export class SettingsModal {
         const accentButtons = overlay.querySelectorAll('.accent-btn');
         accentButtons.forEach(btn => {
             btn.addEventListener('click', async () => {
-                const accent = btn.dataset.accent;
+                const { accent } = btn.dataset;
                 await this.themeManager.setAccent(accent);
 
                 // Update active state

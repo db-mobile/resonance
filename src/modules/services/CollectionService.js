@@ -1011,7 +1011,7 @@ export class CollectionService {
         valueInput.value = value;
 
         const removeBtn = document.createElement('button');
-        removeBtn.className = 'btn btn-danger btn-xs remove-row-btn';
+        removeBtn.className = 'btn-xs btn-danger remove-row-btn';
         removeBtn.textContent = 'Remove';
 
         row.appendChild(keyInput);

@@ -250,8 +250,11 @@ body {
   margin: 0;
 }
 
-/* Button System */
-.btn {
+/* Button System - Three standalone size classes: btn, btn-sm, btn-xs */
+/* Each size class includes full base styling. Variants only modify colors/borders. */
+
+/* Base button variables (shared by all sizes) */
+.btn, .btn-sm, .btn-xs {
   --btn-bg: transparent;
   --btn-bg-hover: var(--bg-secondary);
   --btn-color: var(--text-primary);
@@ -266,8 +269,6 @@ body {
   gap: var(--space-1);
   font-weight: var(--font-weight-medium);
   border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-4);
-  font-size: var(--font-size-sm);
   cursor: pointer;
   transition: all var(--transition-base);
   white-space: nowrap;
@@ -277,16 +278,29 @@ body {
   box-shadow: var(--btn-shadow);
 }
 
-.btn:hover:not(:disabled) {
+/* Size-specific padding and font */
+.btn { padding: var(--space-2) var(--space-4); font-size: var(--font-size-sm); }
+.btn-sm { padding: var(--space-1) var(--space-3); font-size: var(--font-size-xs); }
+.btn-xs { padding: var(--space-1) var(--space-2); font-size: var(--font-size-xs); }
+
+/* Hover states for all sizes */
+.btn:hover:not(:disabled),
+.btn-sm:hover:not(:disabled),
+.btn-xs:hover:not(:disabled) {
   background: var(--btn-bg-hover);
   color: var(--btn-color-hover);
   border-color: var(--btn-border-hover);
   box-shadow: var(--btn-shadow-hover);
 }
 
-.btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+/* Disabled state for all sizes */
+.btn:disabled, .btn-sm:disabled, .btn-xs:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 
-/* Filled Variants */
+/* Variant: Primary (filled) */
 .btn-primary {
   --btn-bg: var(--color-primary);
   --btn-bg-hover: var(--color-primary-dark);
@@ -298,6 +312,7 @@ body {
 .btn-primary:hover:not(:disabled) { transform: translateY(-1px); }
 .btn-primary:active { transform: translateY(0); }
 
+/* Variant: Danger (filled) */
 .btn-danger {
   --btn-bg: var(--color-error);
   --btn-bg-hover: #DC2626;
@@ -309,6 +324,7 @@ body {
 .btn-danger:hover:not(:disabled) { transform: translateY(-1px); }
 .btn-danger:active { transform: translateY(0); }
 
+/* Variant: Secondary */
 .btn-secondary {
   --btn-bg: var(--bg-secondary);
   --btn-bg-hover: var(--bg-tertiary);
@@ -317,24 +333,21 @@ body {
   --btn-border-hover: var(--border-medium);
 }
 
-/* Outline Variants */
+/* Variant: Outline */
 .btn-outline {
   --btn-border: var(--border-light);
   --btn-border-hover: var(--border-medium);
   --btn-bg-hover: var(--bg-secondary);
 }
 
+/* Variant: Outline Primary */
 .btn-outline-primary {
   --btn-border: var(--color-primary);
   --btn-color: var(--color-primary);
   --btn-bg-hover: var(--color-primary-light);
 }
 
-/* Ghost & Icon */
-.btn-ghost {
-  --btn-color: var(--text-secondary);
-}
-
+/* Variant: Icon (square, minimal padding) */
 .btn-icon {
   --btn-color: var(--text-secondary);
   padding: var(--space-1);
@@ -342,6 +355,7 @@ body {
 }
 .btn-icon.active { background: var(--bg-tertiary); color: var(--text-primary); }
 
+/* Variant: Icon Bordered */
 .btn-icon-bordered {
   --btn-border: var(--border-medium);
   --btn-border-hover: var(--border-strong);
@@ -350,10 +364,6 @@ body {
   width: 28px;
   height: 28px;
 }
-
-/* Sizes */
-.btn-xs { font-size: var(--font-size-xs); padding: var(--space-1) var(--space-2); }
-.btn-sm { font-size: var(--font-size-xs); padding: var(--space-1) var(--space-3); }
 
 /* Form Controls */
 .form-input { width: 100%; padding: var(--space-3) var(--space-4); border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-white); color: var(--text-primary); font-size: var(--font-size-sm); font-family: var(--font-family-mono); transition: all var(--transition-base); }
@@ -1180,16 +1190,6 @@ body {
 .body-mode-panel.active {
   display: flex;
   flex-direction: column;
-}
-
-/* GraphQL Container */
-.graphql-container {
-  display: flex;
-  flex-direction: row;
-  gap: var(--space-4);
-  flex: 1;
-  min-height: 0;
-  padding: var(--space-2);
 }
 
 .graphql-query-section {
@@ -2973,17 +2973,58 @@ body {
   margin-bottom: var(--space-4);
 }
 
-.proxy-toggle {
+/* Toggle Switch - Shared Component */
+.toggle-switch {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   cursor: pointer;
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
+  user-select: none;
 }
 
-.proxy-toggle input[type="checkbox"] {
-  cursor: pointer;
+.toggle-switch input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-switch .toggle-track {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  background-color: var(--border-light);
+  border-radius: 9px;
+  transition: background-color var(--transition-base);
+  flex-shrink: 0;
+}
+
+.toggle-switch .toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background-color: #FFFFFF;
+  border-radius: 50%;
+  transition: transform var(--transition-base);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggle-switch input[type="checkbox"]:checked + .toggle-track {
+  background-color: var(--accent);
+}
+
+.toggle-switch input[type="checkbox"]:checked + .toggle-track::after {
+  transform: translateX(14px);
+}
+
+.toggle-switch input[type="checkbox"]:focus-visible + .toggle-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .proxy-settings-content {
@@ -3065,18 +3106,6 @@ body {
   margin-top: var(--space-1);
 }
 
-.proxy-auth-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-
-.proxy-auth-toggle input[type="checkbox"] {
-  cursor: pointer;
-}
 
 .proxy-auth-fields {
   margin-top: var(--space-2);
@@ -3177,20 +3206,11 @@ body {
   margin-top: 0;
 }
 
-/* Proxy system toggle */
+/* Proxy system toggle - overrides */
 .proxy-system-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
-  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
   margin-bottom: var(--space-2);
-}
-
-.proxy-system-toggle input[type="checkbox"] {
-  cursor: pointer;
 }
 
 .proxy-manual-settings {
@@ -3472,38 +3492,11 @@ body {
     padding: 0 4px;
 }
 
-.grpc-tls-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    color: var(--text-primary);
-    cursor: pointer;
-}
-
-.grpc-tls-label input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-}
 
 .grpc-hint {
     font-size: 12px;
     color: var(--text-secondary);
     margin: 8px 0 0 0;
-}
-
-.proto-file-controls {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-}
-
-.proto-file-controls .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
 }
 
 .proto-filename {

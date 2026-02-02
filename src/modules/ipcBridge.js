@@ -16,7 +16,7 @@ let api;
 if (isTauri) {
     // Tauri runtime - use the injected __TAURI_INTERNALS__.invoke
     
-    const invoke = window.__TAURI_INTERNALS__.invoke;
+    const { invoke } = window.__TAURI_INTERNALS__;
     
     api = {
         app: {
