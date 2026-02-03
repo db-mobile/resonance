@@ -41,6 +41,7 @@
     "manage_variables": "Variablen verwalten",
     "export_openapi_json": "Als OpenAPI exportieren (JSON)",
     "export_openapi_yaml": "Als OpenAPI exportieren (YAML)",
+    "export_postman": "Als Postman exportieren",
     "rename_collection": "Sammlung umbenennen",
     "delete_collection": "Sammlung löschen",
     "delete_request": "Anfrage löschen"

@@ -462,7 +462,9 @@ export class CollectionService {
 
         if (endpoint.parameters?.path) {
             Object.entries(endpoint.parameters.path).forEach(([key, _param]) => {
-                fullUrl = fullUrl.replace(`{${key}}`, `{{${key}}}`);
+                const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const singleBraceParamRegex = new RegExp(`(?<!\\{)\\{${escapedKey}\\}(?!\\})`, 'g');
+                fullUrl = fullUrl.replace(singleBraceParamRegex, `{{${key}}}`);
             });
         }
 

@@ -155,6 +155,21 @@ export class WorkspaceTabStateManager {
         if (request.protocol === 'grpc') {
             // Set UI to gRPC mode
             setRequestMode(RequestMode.GRPC);
+            activateTab('request', 'grpc');
+
+            const ensureGrpcTabActive = () => {
+                const activeBtn = document.querySelector('.request-config .tab-nav .tab-button.active');
+                const isActiveVisible = activeBtn && activeBtn.style.display !== 'none';
+                if (!isActiveVisible) {
+                    activateTab('request', 'grpc');
+                }
+            };
+
+            if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+                window.requestAnimationFrame(ensureGrpcTabActive);
+            } else {
+                setTimeout(ensureGrpcTabActive, 0);
+            }
             
             if (this.dom.grpcTargetInput) {
                 this.dom.grpcTargetInput.value = request.grpc?.target || '';

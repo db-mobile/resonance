@@ -12,7 +12,7 @@ fn get_default_for_key(key: &str) -> Value {
         "requestHistory" => serde_json::json!([]),
         "workspaceTabs" => serde_json::json!([]),
         "activeWorkspaceTabId" => Value::Null,
-        "theme" => serde_json::json!("dark"),
+        "theme" => serde_json::json!("system"),
         "accentColor" => serde_json::json!("blue"),
         "proxySettings" => serde_json::json!({
             "enabled": false,
@@ -31,7 +31,7 @@ fn get_default_for_key(key: &str) -> Value {
         "settings" => serde_json::json!({
             "httpVersion": "auto",
             "timeout": 30000,
-            "theme": "dark",
+            "theme": "system",
             "accentColor": "blue",
             "language": "en"
         }),
@@ -72,7 +72,7 @@ pub async fn settings_get(app: AppHandle) -> Result<Value, String> {
         Ok(serde_json::json!({
             "httpVersion": "auto",
             "timeout": 30000,
-            "theme": "dark",
+            "theme": "system",
             "accentColor": "blue",
             "language": "en"
         }))
@@ -84,19 +84,4 @@ pub async fn settings_get(app: AppHandle) -> Result<Value, String> {
 #[tauri::command]
 pub async fn settings_set(app: AppHandle, settings: Value) -> Result<(), String> {
     store_set(app, "settings".to_string(), settings).await
-}
-
-#[allow(dead_code)]
-#[tauri::command]
-pub async fn migrate_electron_store(app: AppHandle, electron_data: Value) -> Result<(), String> {
-    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
-
-    if let Value::Object(map) = electron_data {
-        for (key, value) in map {
-            store.set(key, value);
-        }
-    }
-
-    store.save().map_err(|e| e.to_string())?;
-    Ok(())
 }
