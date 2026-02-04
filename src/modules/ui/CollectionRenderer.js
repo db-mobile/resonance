@@ -301,6 +301,10 @@ export class CollectionRenderer {
         if (queryIndex !== -1) {
             displayPath = displayPath.substring(0, queryIndex);
         }
+        // For gRPC or when path is empty, show the endpoint name instead
+        if (!displayPath && endpoint.name) {
+            displayPath = endpoint.name;
+        }
         pathSpan.textContent = displayPath;
 
         endpointDiv.appendChild(methodSpan);

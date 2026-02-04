@@ -24,6 +24,7 @@ export class CollectionRepository {
         this.COLLECTIONS_KEY = 'collections';
         this.MODIFIED_BODIES_KEY = 'modifiedRequestBodies';
         this.GRAPHQL_DATA_KEY = 'graphqlData';
+        this.GRPC_DATA_KEY = 'grpcData';
     }
 
     /**
@@ -479,6 +480,12 @@ export class CollectionRepository {
                 delete persistedScripts[key];
                 await this.backendAPI.store.set('persistedScripts', persistedScripts);
             }
+
+            const grpcData = await this._getObjectFromStore(this.GRPC_DATA_KEY);
+            if (grpcData[key]) {
+                delete grpcData[key];
+                await this.backendAPI.store.set(this.GRPC_DATA_KEY, grpcData);
+            }
         } catch (error) {
             throw new Error(`Failed to delete persisted endpoint data: ${error.message}`);
         }
@@ -564,13 +571,33 @@ export class CollectionRepository {
      * @param {string} collectionId - The ID of the collection
      * @param {string} endpointId - The ID of the endpoint
      * @returns {Promise<Object|null>} GraphQL data or null if not found
-     * @throws {Error} If retrieval operation fails
      */
     async getGraphQLData(collectionId, endpointId) {
         try {
             const graphqlData = await this._getObjectFromStore(this.GRAPHQL_DATA_KEY);
             const key = `${collectionId}_${endpointId}`;
             return graphqlData[key] || null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    async saveGrpcData(collectionId, endpointId, data) {
+        try {
+            const grpcData = await this._getObjectFromStore(this.GRPC_DATA_KEY);
+            const key = `${collectionId}_${endpointId}`;
+            grpcData[key] = data;
+            await this.backendAPI.store.set(this.GRPC_DATA_KEY, grpcData);
+        } catch (error) {
+            throw new Error(`Failed to save gRPC data: ${error.message}`);
+        }
+    }
+
+    async getGrpcData(collectionId, endpointId) {
+        try {
+            const grpcData = await this._getObjectFromStore(this.GRPC_DATA_KEY);
+            const key = `${collectionId}_${endpointId}`;
+            return grpcData[key] || null;
         } catch (error) {
             return null;
         }

@@ -108,7 +108,7 @@ class KeyboardShortcutsManager {
         // Don't trigger shortcuts if user is typing in an input/textarea/contenteditable
         // or CodeMirror editor, unless it's a specific input-safe shortcut
         const targetTag = event.target.tagName.toLowerCase();
-        const isContentEditable = event.target.isContentEditable;
+        const { isContentEditable } = event.target;
         const isCodeMirror = event.target.closest('.CodeMirror');
         const isInputField = targetTag === 'input' ||
                            targetTag === 'textarea' ||

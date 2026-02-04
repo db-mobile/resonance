@@ -393,6 +393,46 @@ export class WorkspaceTabController {
                 targetTabId = await this.service.getActiveTabId();
             }
 
+            if (endpoint.protocol === 'grpc') {
+                const grpcData = endpoint.grpcData || {};
+                const tabName = endpoint.name || 'gRPC Request';
+
+                await this.service.updateTab(targetTabId, {
+                    name: tabName,
+                    endpoint: {
+                        collectionId: endpoint.collectionId,
+                        endpointId: endpoint.id,
+                        protocol: 'grpc'
+                    },
+                    request: {
+                        protocol: 'grpc',
+                        grpc: {
+                            target: grpcData.target || '',
+                            service: grpcData.service || '',
+                            fullMethod: grpcData.fullMethod || endpoint.path || '',
+                            requestJson: grpcData.requestJson || '{}',
+                            metadata: grpcData.metadata || {},
+                            useTls: grpcData.useTls || false
+                        }
+                    },
+                    isModified: false
+                });
+
+                const tab = await this.service.getActiveTab();
+                if (tab) {
+                    this.isRestoringState = true;
+                    await this.stateManager.restoreTabState(tab);
+                    this.isRestoringState = false;
+                    this.tabBar.updateTab(targetTabId, { name: tabName, isModified: false });
+                }
+
+                if (window.scriptController && endpoint.collectionId && endpoint.id) {
+                    await window.scriptController.loadScriptsForEndpoint(endpoint.collectionId, endpoint.id);
+                }
+
+                return;
+            }
+
             // Use persisted URL if available, otherwise construct from endpoint
             let fullUrl;
             if (endpoint.persistedUrl) {
@@ -409,7 +449,9 @@ export class WorkspaceTabController {
                 // Replace path parameters with {{paramName}} format
                 if (endpoint.parameters?.path) {
                     Object.entries(endpoint.parameters.path).forEach(([key, _param]) => {
-                        fullUrl = fullUrl.replace(`{${key}}`, `{{${key}}}`);
+                        const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const singleBraceParamRegex = new RegExp(`(?<!\\{)\\{${escapedKey}\\}(?!\\})`, 'g');
+                        fullUrl = fullUrl.replace(singleBraceParamRegex, `{{${key}}}`);
                     });
                 }
             }
@@ -505,9 +547,11 @@ export class WorkspaceTabController {
                 name: tabName,
                 endpoint: {
                     collectionId: endpoint.collectionId,
-                    endpointId: endpoint.id
+                    endpointId: endpoint.id,
+                    protocol: 'http'
                 },
                 request: {
+                    protocol: 'http',
                     url: fullUrl,
                     method: endpoint.method,
                     pathParams: pathParams,

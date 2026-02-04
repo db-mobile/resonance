@@ -41,6 +41,7 @@
     "manage_variables": "Variablen verwalten",
     "export_openapi_json": "Als OpenAPI exportieren (JSON)",
     "export_openapi_yaml": "Als OpenAPI exportieren (YAML)",
+    "export_postman": "Als Postman exportieren",
     "rename_collection": "Sammlung umbenennen",
     "delete_collection": "Sammlung löschen",
     "delete_request": "Anfrage löschen"
@@ -82,6 +83,9 @@
     "authorization": "Autorisierung",
     "body": "Body",
     "scripts": "Skripte",
+    "grpc": "gRPC",
+    "grpc_message": "Nachricht",
+    "grpc_metadata": "Metadaten",
     "response_body": "Body",
     "response_headers": "Header"
   },

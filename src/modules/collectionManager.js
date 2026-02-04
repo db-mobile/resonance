@@ -38,7 +38,7 @@ function initializeController() {
  * @async
  * @returns {Promise<Array<Object>>} Array of collection objects
  */
-export async function loadCollections() {
+export function loadCollections() {
     const controller = initializeController();
     return controller.loadCollections();
 }
@@ -73,7 +73,7 @@ export async function loadEndpointIntoForm(collection, endpoint) {
  * @async
  * @returns {Promise<Object|null>} Imported collection or null if cancelled
  */
-export async function importOpenApiFile() {
+export function importOpenApiFile() {
     const controller = initializeController();
     return controller.importOpenApiFile();
 }
@@ -84,7 +84,7 @@ export async function importOpenApiFile() {
  * @async
  * @returns {Promise<Object|null>} Imported collection or null if cancelled
  */
-export async function importPostmanCollection() {
+export function importPostmanCollection() {
     const controller = initializeController();
     return controller.importPostmanCollection();
 }
@@ -95,7 +95,7 @@ export async function importPostmanCollection() {
  * @async
  * @returns {Promise<Object|null>} Environment object with name and variables, or null if cancelled
  */
-export async function importPostmanEnvironment() {
+export function importPostmanEnvironment() {
     const controller = initializeController();
     return controller.importPostmanEnvironment();
 }
@@ -142,7 +142,7 @@ export function initializeBodyTracking() {
  * @async
  * @returns {Promise<Object>} Variables object
  */
-export async function getCurrentCollectionVariables() {
+export function getCurrentCollectionVariables() {
     const controller = initializeController();
     return controller.getCurrentCollectionVariables();
 }
@@ -154,7 +154,7 @@ export async function getCurrentCollectionVariables() {
  * @param {Object} request - Request object to process
  * @returns {Promise<Object>} Processed request with variables substituted
  */
-export async function processRequestForVariables(request) {
+export function processRequestForVariables(request) {
     const controller = initializeController();
     return controller.processRequestForVariables(request);
 }
@@ -165,7 +165,7 @@ export async function processRequestForVariables(request) {
  * @async
  * @returns {Promise<void>}
  */
-export async function restoreLastSelectedRequest() {
+export function restoreLastSelectedRequest() {
     const controller = initializeController();
     return controller.restoreLastSelectedRequest();
 }

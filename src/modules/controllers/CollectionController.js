@@ -141,16 +141,20 @@ export class CollectionController {
                 }
 
                 // Load all persisted data if available
-                const persistedUrl = await this.repository.getPersistedUrl(collection.id, endpoint.id);
-                const persistedAuthConfig = await this.repository.getPersistedAuthConfig(collection.id, endpoint.id);
-                const persistedPathParams = await this.repository.getPersistedPathParams(collection.id, endpoint.id);
-                const persistedQueryParams = await this.repository.getPersistedQueryParams(collection.id, endpoint.id);
-                const persistedHeaders = await this.repository.getPersistedHeaders(collection.id, endpoint.id);
-                const persistedBody = await this.repository.getModifiedRequestBody(collection.id, endpoint.id);
+                const isGrpc = endpoint.protocol === 'grpc';
+
+                const persistedUrl = isGrpc ? null : await this.repository.getPersistedUrl(collection.id, endpoint.id);
+                const persistedAuthConfig = isGrpc ? null : await this.repository.getPersistedAuthConfig(collection.id, endpoint.id);
+                const persistedPathParams = isGrpc ? [] : await this.repository.getPersistedPathParams(collection.id, endpoint.id);
+                const persistedQueryParams = isGrpc ? [] : await this.repository.getPersistedQueryParams(collection.id, endpoint.id);
+                const persistedHeaders = isGrpc ? [] : await this.repository.getPersistedHeaders(collection.id, endpoint.id);
+                const persistedBody = isGrpc ? null : await this.repository.getModifiedRequestBody(collection.id, endpoint.id);
+                const grpcData = isGrpc ? await this.repository.getGrpcData(collection.id, endpoint.id) : null;
 
                 const endpointData = {
                     ...endpoint,
                     collectionId: collection.id,
+                    protocol: isGrpc ? 'grpc' : 'http',
                     collectionBaseUrl: collection.baseUrl,
                     collectionDefaultHeaders: collection.defaultHeaders,
                     path: endpoint.path,
@@ -161,7 +165,8 @@ export class CollectionController {
                     persistedPathParams: persistedPathParams,
                     persistedQueryParams: persistedQueryParams,
                     persistedHeaders: persistedHeaders,
-                    persistedBody: persistedBody
+                    persistedBody: persistedBody,
+                    grpcData: grpcData
                 };
                 await window.workspaceTabController.loadEndpoint(endpointData, false);
             } else {
@@ -215,6 +220,12 @@ export class CollectionController {
                 translationKey: 'context_menu.export_openapi_yaml',
                 icon: ContextMenu.createExportIcon(),
                 onClick: () => this.handleExportOpenApiYaml(collection)
+            },
+            {
+                label: 'Export as Postman',
+                translationKey: 'context_menu.export_postman',
+                icon: ContextMenu.createExportIcon(),
+                onClick: () => this.handleExportPostman(collection)
             },
             {
                 label: 'Rename Collection',
@@ -495,8 +506,15 @@ export class CollectionController {
                             <input type="text" id="request-name" data-i18n-placeholder="new_request.name_placeholder" placeholder="My Request" required>
                         </div>
                         <div class="form-group">
+                            <label for="request-protocol">Protocol:</label>
+                            <select id="request-protocol" class="form-select" required>
+                                <option value="http">HTTP</option>
+                                <option value="grpc">gRPC</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label for="request-method" data-i18n="new_request.method_label">Method:</label>
-                            <select id="request-method" required>
+                            <select id="request-method" class="form-select" required>
                                 <option value="GET">GET</option>
                                 <option value="POST">POST</option>
                                 <option value="PUT">PUT</option>
@@ -507,6 +525,10 @@ export class CollectionController {
                         <div class="form-group">
                             <label for="request-path" data-i18n="new_request.path_label">Path:</label>
                             <input type="text" id="request-path" data-i18n-placeholder="new_request.path_placeholder" placeholder="/api/endpoint" required>
+                        </div>
+                        <div class="form-group" id="grpc-target-group" style="display: none;">
+                            <label for="grpc-target">Target:</label>
+                            <input type="text" id="grpc-target" placeholder="localhost:50051">
                         </div>
                         <div class="form-buttons">
                             <button type="button" id="cancel-btn" data-i18n="new_request.cancel">Cancel</button>
@@ -524,8 +546,11 @@ export class CollectionController {
 
             const form = dialog.querySelector('#new-request-form');
             const nameInput = dialog.querySelector('#request-name');
+            const protocolSelect = dialog.querySelector('#request-protocol');
             const methodSelect = dialog.querySelector('#request-method');
             const pathInput = dialog.querySelector('#request-path');
+            const grpcTargetGroup = dialog.querySelector('#grpc-target-group');
+            const grpcTargetInput = dialog.querySelector('#grpc-target');
             const cancelBtn = dialog.querySelector('#cancel-btn');
 
             nameInput.focus();
@@ -539,19 +564,55 @@ export class CollectionController {
                 resolve(null);
             });
 
+            const updateProtocolUI = () => {
+                const isGrpc = protocolSelect.value === 'grpc';
+                methodSelect.parentElement.style.display = isGrpc ? 'none' : '';
+                pathInput.parentElement.style.display = isGrpc ? 'none' : '';
+                grpcTargetGroup.style.display = isGrpc ? '' : 'none';
+
+                if (isGrpc) {
+                    methodSelect.required = false;
+                    pathInput.required = false;
+                    grpcTargetInput.required = true;
+                } else {
+                    methodSelect.required = true;
+                    pathInput.required = true;
+                    grpcTargetInput.required = false;
+                }
+            };
+
+            protocolSelect.addEventListener('change', updateProtocolUI);
+            updateProtocolUI();
+
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
                 const name = nameInput.value.trim();
-                const method = methodSelect.value;
-                const path = pathInput.value.trim();
+                const protocol = protocolSelect.value;
 
-                if (name && method && path) {
-                    cleanup();
-                    resolve({
-                        name,
-                        method,
-                        path: path.startsWith('/') ? path : `/${  path}`
-                    });
+                if (protocol === 'grpc') {
+                    const target = grpcTargetInput.value.trim();
+                    if (name && target) {
+                        cleanup();
+                        resolve({
+                            name,
+                            protocol: 'grpc',
+                            target,
+                            fullMethod: '',
+                            requestJson: '{}'
+                        });
+                    }
+                } else {
+                    const method = methodSelect.value;
+                    const path = pathInput.value.trim();
+                    if (name && method && path) {
+                        cleanup();
+                        resolve({
+                            name,
+                            protocol: 'http',
+                            method,
+                            path: path.startsWith('/') ? path : `/${  path}`
+                        });
+                    }
                 }
             });
 
@@ -646,6 +707,14 @@ export class CollectionController {
     async handleExportOpenApiYaml(collection) {
         try {
             await this.service.exportCollectionAsOpenApi(collection.id, 'yaml');
+        } catch (error) {
+            void error;
+        }
+    }
+
+    async handleExportPostman(collection) {
+        try {
+            await this.service.exportCollectionAsPostman(collection.id);
         } catch (error) {
             void error;
         }
@@ -825,6 +894,59 @@ export class CollectionController {
             // Import parseKeyValuePairs from keyValueManager
             const { parseKeyValuePairs } = await import('../keyValueManager.js');
             const { authManager } = await import('../authManager.js');
+
+            const collections = await this.repository.getAll();
+            const collection = collections.find(c => c.id === collectionId);
+            if (!collection) {
+                return;
+            }
+            const endpointLocations = this._findAllEndpointLocations(collection, endpointId);
+            const endpoint = endpointLocations.length > 0 ? endpointLocations[0].endpoint : null;
+            const isGrpc = endpoint && endpoint.protocol === 'grpc';
+
+            if (isGrpc) {
+                const grpcTargetInput = document.getElementById('grpc-target-input');
+                const grpcServiceSelect = document.getElementById('grpc-service-select');
+                const grpcMethodSelect = document.getElementById('grpc-method-select');
+                const grpcBodyInput = document.getElementById('grpc-body-input');
+                const grpcMetadataList = document.getElementById('grpc-metadata-list');
+
+                const metadata = {};
+                if (grpcMetadataList) {
+                    grpcMetadataList.querySelectorAll('.key-value-row').forEach(row => {
+                        const key = row.querySelector('.key-input')?.value?.trim();
+                        const value = row.querySelector('.value-input')?.value || '';
+                        if (key) {
+                            metadata[key] = value;
+                        }
+                    });
+                }
+
+                const grpcTlsCheckbox = document.getElementById('grpc-tls-checkbox');
+
+                const requestJson = window.grpcBodyEditor
+                    ? window.grpcBodyEditor.getContent()
+                    : (grpcBodyInput?.value || '{}');
+
+                await this.repository.saveGrpcData(collectionId, endpointId, {
+                    target: grpcTargetInput?.value || '',
+                    service: grpcServiceSelect?.value || '',
+                    fullMethod: grpcMethodSelect?.value || endpoint.path || '',
+                    requestJson: requestJson || '{}',
+                    metadata,
+                    useTls: grpcTlsCheckbox?.checked || false
+                });
+
+                // Update endpoint.path for display (show fullMethod)
+                endpointLocations.forEach(({ endpoint: e }) => {
+                    e.path = grpcMethodSelect?.value || e.path;
+                });
+                await this.repository.save(collections);
+                await this.loadCollectionsWithExpansionState();
+
+                this.statusDisplay.update('Request saved', null);
+                return;
+            }
 
             // Get all form elements
             const urlInput = document.getElementById('url-input');

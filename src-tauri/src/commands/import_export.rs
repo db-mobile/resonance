@@ -9,6 +9,13 @@ use tokio::sync::oneshot;
 const STORE_FILE: &str = "resonance-store.json";
 const LAST_IMPORT_DIR_KEY: &str = "lastImportDirectory";
 
+fn is_http_method(method: &str) -> bool {
+    matches!(
+        method.to_ascii_uppercase().as_str(),
+        "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS"
+    )
+}
+
 /// Get the last used import directory from the store
 fn get_last_import_directory(app: &AppHandle) -> Option<std::path::PathBuf> {
     let store = app.store(STORE_FILE).ok()?;
@@ -1272,7 +1279,7 @@ pub async fn export_openapi(
     };
 
     // Convert to OpenAPI format
-    let openapi_spec = collection_to_openapi(collection);
+    let (openapi_spec, skipped) = collection_to_openapi(collection);
 
     let content = if format == "yaml" {
         serde_yaml::to_string(&openapi_spec).map_err(|e| e.to_string())?
@@ -1290,14 +1297,81 @@ pub async fn export_openapi(
     Ok(serde_json::json!({
         "success": true,
         "filePath": file_path.to_string_lossy(),
-        "format": format
+        "format": format,
+        "skipped": {
+            "count": skipped.len(),
+            "items": skipped
+        }
     }))
 }
 
-fn collection_to_openapi(collection: &Collection) -> Value {
+#[tauri::command]
+pub async fn export_postman(app: AppHandle, collection_id: String) -> Result<Value, String> {
+    // Get collection from store
+    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
+    let collections: Vec<Collection> = store
+        .get("collections")
+        .and_then(|v| serde_json::from_value(v).ok())
+        .unwrap_or_default();
+
+    let collection = collections
+        .iter()
+        .find(|c| c.id == collection_id)
+        .ok_or("Collection not found")?;
+
+    // Show save dialog
+    let (tx, rx) = oneshot::channel::<Option<FilePath>>();
+
+    let mut dialog = app
+        .dialog()
+        .file()
+        .set_file_name(format!("{}.postman_collection.json", collection.name))
+        .add_filter("Postman Collection", &["json"]);
+
+    // Set starting directory to last used location
+    if let Some(last_dir) = get_last_import_directory(&app) {
+        dialog = dialog.set_directory(last_dir);
+    }
+
+    dialog.save_file(move |file_path| {
+        let _ = tx.send(file_path);
+    });
+
+    let file_path = rx.await.map_err(|e| format!("Dialog error: {}", e))?;
+
+    let Some(path) = file_path else {
+        return Ok(serde_json::json!({ "success": false, "cancelled": true }));
+    };
+
+    let (postman_collection, skipped) = collection_to_postman(collection);
+    let content = serde_json::to_string_pretty(&postman_collection).map_err(|e| e.to_string())?;
+
+    let file_path = path.as_path().ok_or("Invalid file path")?;
+
+    // Save the directory for next time
+    save_last_import_directory(&app, file_path);
+
+    std::fs::write(file_path, content).map_err(|e| format!("Failed to write file: {}", e))?;
+
+    Ok(serde_json::json!({
+        "success": true,
+        "filePath": file_path.to_string_lossy(),
+        "skipped": {
+            "count": skipped.len(),
+            "items": skipped
+        }
+    }))
+}
+
+fn collection_to_openapi(collection: &Collection) -> (Value, Vec<String>) {
     let mut paths: HashMap<String, HashMap<String, Value>> = HashMap::new();
+    let mut skipped: Vec<String> = Vec::new();
 
     for endpoint in &collection.endpoints {
+        if !is_http_method(&endpoint.method) {
+            skipped.push(endpoint.name.clone());
+            continue;
+        }
         let method = endpoint.method.to_lowercase();
         let mut operation = serde_json::json!({
             "summary": endpoint.name,
@@ -1348,5 +1422,151 @@ fn collection_to_openapi(collection: &Collection) -> Value {
         spec["servers"] = serde_json::json!([{ "url": base_url }]);
     }
 
-    spec
+    (spec, skipped)
+}
+
+fn endpoint_to_postman_item(collection: &Collection, endpoint: &Endpoint) -> Value {
+    let url = if collection.base_url.is_some() {
+        format!("{{{{baseUrl}}}}{}", endpoint.path)
+    } else {
+        endpoint.path.clone()
+    };
+
+    let mut request = serde_json::json!({
+        "method": endpoint.method,
+        "url": url
+    });
+
+    if let Some(body) = &endpoint.request_body {
+        if let Some(example) = body.get("example").and_then(|v| v.as_str()) {
+            request["body"] = serde_json::json!({
+                "mode": "raw",
+                "raw": example
+            });
+        }
+    }
+
+    if let Some(security) = &endpoint.security {
+        if let Some(auth_type) = security.get("type").and_then(|v| v.as_str()) {
+            match auth_type {
+                "bearer" => {
+                    if let Some(token) = security
+                        .get("config")
+                        .and_then(|c| c.get("token"))
+                        .and_then(|v| v.as_str())
+                    {
+                        request["auth"] = serde_json::json!({
+                            "type": "bearer",
+                            "bearer": [{ "key": "token", "value": token, "type": "string" }]
+                        });
+                    }
+                }
+                "basic" => {
+                    let username = security
+                        .get("config")
+                        .and_then(|c| c.get("username"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let password = security
+                        .get("config")
+                        .and_then(|c| c.get("password"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    request["auth"] = serde_json::json!({
+                        "type": "basic",
+                        "basic": [
+                            { "key": "username", "value": username, "type": "string" },
+                            { "key": "password", "value": password, "type": "string" }
+                        ]
+                    });
+                }
+                "api-key" => {
+                    let key = security
+                        .get("config")
+                        .and_then(|c| c.get("key"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let value = security
+                        .get("config")
+                        .and_then(|c| c.get("value"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let location = security
+                        .get("config")
+                        .and_then(|c| c.get("location"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("header");
+                    request["auth"] = serde_json::json!({
+                        "type": "apikey",
+                        "apikey": [
+                            { "key": "key", "value": key, "type": "string" },
+                            { "key": "value", "value": value, "type": "string" },
+                            { "key": "in", "value": location, "type": "string" }
+                        ]
+                    });
+                }
+                _ => {}
+            }
+        }
+    }
+
+    serde_json::json!({
+        "name": endpoint.name,
+        "request": request
+    })
+}
+
+fn collection_to_postman(collection: &Collection) -> (Value, Vec<String>) {
+    let mut skipped: Vec<String> = Vec::new();
+
+    let mut items: Vec<Value> = Vec::new();
+
+    // Foldered endpoints
+    for folder in &collection.folders {
+        let mut folder_items: Vec<Value> = Vec::new();
+        for endpoint in &folder.endpoints {
+            if !is_http_method(&endpoint.method) {
+                skipped.push(format!("{}/{}", folder.name, endpoint.name));
+                continue;
+            }
+            folder_items.push(endpoint_to_postman_item(collection, endpoint));
+        }
+
+        if !folder_items.is_empty() {
+            items.push(serde_json::json!({
+                "name": folder.name,
+                "item": folder_items
+            }));
+        }
+    }
+
+    // Top-level endpoints
+    for endpoint in &collection.endpoints {
+        if !is_http_method(&endpoint.method) {
+            skipped.push(endpoint.name.clone());
+            continue;
+        }
+        items.push(endpoint_to_postman_item(collection, endpoint));
+    }
+
+    let mut variables: Vec<Value> = Vec::new();
+    if collection.base_url.is_some() {
+        variables.push(serde_json::json!({
+            "key": "baseUrl",
+            "value": collection.base_url.clone().unwrap_or_default(),
+            "type": "string"
+        }));
+    }
+
+    (
+        serde_json::json!({
+            "info": {
+                "name": collection.name,
+                "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+            },
+            "item": items,
+            "variable": variables
+        }),
+        skipped,
+    )
 }

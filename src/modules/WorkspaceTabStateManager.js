@@ -15,6 +15,7 @@ import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanc
 import { formatCookiesAsHtml } from './cookieParser.js';
 import { activateTab } from './tabManager.js';
 import { setRequestBodyContent, getRequestBodyContent } from './requestBodyHelper.js';
+import { setRequestMode, RequestMode } from './requestModeManager.js';
 
 export class WorkspaceTabStateManager {
     constructor(domElements) {
@@ -27,6 +28,32 @@ export class WorkspaceTabStateManager {
      * @returns {Promise<Object>}
      */
     async captureCurrentState() {
+        const { isGrpcMode } = await import('./requestModeManager.js');
+        
+        if (isGrpcMode()) {
+            const grpcRequestJson = window.grpcBodyEditor
+                ? window.grpcBodyEditor.getContent()
+                : (this.dom.grpcBodyInput?.value || '{}');
+            return {
+                request: {
+                    protocol: 'grpc',
+                    grpc: {
+                        target: this.dom.grpcTargetInput?.value || '',
+                        service: this.dom.grpcServiceSelect?.value || '',
+                        fullMethod: this.dom.grpcMethodSelect?.value || '',
+                        requestJson: grpcRequestJson || '{}'
+                    }
+                },
+                endpoint: window.currentEndpoint
+                    ? {
+                          collectionId: window.currentEndpoint.collectionId,
+                          endpointId: window.currentEndpoint.endpointId,
+                          protocol: 'grpc'
+                      }
+                    : null
+            };
+        }
+
         const pathParams = parseKeyValuePairs(this.dom.pathParamsList);
         const queryParams = parseKeyValuePairs(this.dom.queryParamsList);
         const headers = parseKeyValuePairs(this.dom.headersList);
@@ -56,6 +83,7 @@ export class WorkspaceTabStateManager {
 
         return {
             request: {
+                protocol: 'http',
                 url: this.dom.urlInput?.value || '',
                 method: this.dom.methodSelect?.value || 'GET',
                 pathParams,
@@ -107,6 +135,7 @@ export class WorkspaceTabStateManager {
         if (!tab.request) {
             // Initialize with empty request state
             tab.request = {
+                protocol: 'http',
                 url: '',
                 method: 'GET',
                 pathParams: {},
@@ -122,6 +151,52 @@ export class WorkspaceTabStateManager {
         const {request} = tab;
         const {response} = tab;
         const {endpoint} = tab;
+
+        if (request.protocol === 'grpc') {
+            // Set UI to gRPC mode
+            setRequestMode(RequestMode.GRPC);
+            activateTab('request', 'grpc');
+
+            const ensureGrpcTabActive = () => {
+                const activeBtn = document.querySelector('.request-config .tab-nav .tab-button.active');
+                const isActiveVisible = activeBtn && activeBtn.style.display !== 'none';
+                if (!isActiveVisible) {
+                    activateTab('request', 'grpc');
+                }
+            };
+
+            if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+                window.requestAnimationFrame(ensureGrpcTabActive);
+            } else {
+                setTimeout(ensureGrpcTabActive, 0);
+            }
+            
+            if (this.dom.grpcTargetInput) {
+                this.dom.grpcTargetInput.value = request.grpc?.target || '';
+            }
+            if (this.dom.grpcBodyInput) {
+                this.dom.grpcBodyInput.value = request.grpc?.requestJson || '{}';
+            }
+            if (window.grpcBodyEditor) {
+                window.grpcBodyEditor.setContent(request.grpc?.requestJson || '{}');
+            }
+            if (this.dom.grpcServiceSelect) {
+                this.dom.grpcServiceSelect.value = request.grpc?.service || '';
+            }
+            if (this.dom.grpcMethodSelect) {
+                this.dom.grpcMethodSelect.value = request.grpc?.fullMethod || '';
+            }
+            if (window.setGrpcMetadata) {
+                window.setGrpcMetadata(request.grpc?.metadata || {});
+            }
+            if (window.setGrpcTls) {
+                window.setGrpcTls(request.grpc?.useTls || false);
+            }
+            return;
+        }
+        
+        // Set UI to HTTP mode
+        setRequestMode(RequestMode.HTTP);
 
         // Restore request fields
         if (this.dom.urlInput) {
@@ -366,6 +441,7 @@ export class WorkspaceTabStateManager {
     createEmptyState() {
         return {
             request: {
+                protocol: 'http',
                 url: '',
                 method: 'GET',
                 pathParams: {},

@@ -5,8 +5,17 @@ mod commands;
 use commands::{
     api_request::{cancel_api_request, send_api_request, RequestState},
     app::app_get_version,
+    grpc_proto::{
+        grpc_list_loaded_protos, grpc_parse_proto_file, grpc_proto_get_input_skeleton,
+        grpc_proto_invoke_unary, grpc_select_proto_file, grpc_unload_proto, ProtoState,
+    },
+    grpc_reflection::{
+        grpc_get_input_skeleton, grpc_invoke_unary, grpc_reflection_list_methods,
+        grpc_reflection_list_services,
+    },
     import_export::{
-        export_openapi, import_openapi_file, import_postman_collection, import_postman_environment,
+        export_openapi, export_postman, import_openapi_file, import_postman_collection,
+        import_postman_environment,
     },
     mock_server::{
         mock_server_clear_logs, mock_server_logs, mock_server_reload_settings, mock_server_start,
@@ -26,6 +35,7 @@ fn main() {
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .manage(RequestState::default())
         .manage(ProxyState::default())
+        .manage(ProtoState::default())
         .invoke_handler(tauri::generate_handler![
             // App
             app_get_version,
@@ -46,6 +56,19 @@ fn main() {
             import_postman_collection,
             import_postman_environment,
             export_openapi,
+            export_postman,
+            // gRPC Reflection
+            grpc_reflection_list_services,
+            grpc_reflection_list_methods,
+            grpc_invoke_unary,
+            grpc_get_input_skeleton,
+            // gRPC Proto Files
+            grpc_select_proto_file,
+            grpc_parse_proto_file,
+            grpc_proto_get_input_skeleton,
+            grpc_proto_invoke_unary,
+            grpc_list_loaded_protos,
+            grpc_unload_proto,
             // Mock Server
             mock_server_start,
             mock_server_stop,

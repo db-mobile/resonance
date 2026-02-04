@@ -27,6 +27,15 @@ A local-first, zero-account API client with excellent user experience built with
   - Query formatting with format button
   - Auto-save functionality for queries and variables
 
+### gRPC Support
+- **Full gRPC Integration**: Native gRPC client with server reflection
+  - Automatic service and method discovery via gRPC reflection
+  - TLS support for secure connections
+  - Request metadata (headers) configuration
+  - Response metadata and trailers display
+  - JSON-based message editing with schema-generated skeletons
+  - Unary RPC support
+
 ### Advanced Features
 - **Scripts & Automation**: Pre-request and test scripts with JavaScript execution (powered by Boa Engine)
   - **Pre-request Scripts**: Modify requests dynamically (headers, body, auth signatures)
@@ -168,7 +177,7 @@ The built application will be in `src-tauri/target/release/bundle/`.
 4. **Switch Environments**: Use the environment selector dropdown to quickly switch between different API contexts
 5. **Make Requests**: Select endpoints from the collections sidebar and configure path params, query params, headers, body, auth, and scripts
 6. **Add Scripts (Optional)**: Write pre-request scripts to modify requests dynamically or test scripts to validate responses
-7. **View Responses**: Examine response data in the tabbed viewer (Body, Headers, Cookies, Performance, Scripts)
+7. **View Responses**: Examine response data in the tabbed viewer (Body, Headers, Cookies, Performance, Scripts for HTTP; Body, Metadata, Trailers for gRPC)
 8. **Export Code**: Generate request code in your preferred language for documentation or automation
 
 ### Environment Management
@@ -604,11 +613,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Request chaining with environment variable integration
 - [x] GraphQL support with dedicated query and variables editors
 - [x] Tauri v2 migration for smaller bundle and better performance
+- [x] gRPC support with server reflection and unary RPC
 
 ### Planned
 - [ ] WebSocket support
 - [ ] Response comparison and diff view
-- [ ] gRPC support
 - [ ] Collection runner for batch execution
 - [ ] Plugin system for extensions
 - [ ] Team collaboration features

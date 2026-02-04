@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package grpc.reflection.v1alpha;
+
+import "google/protobuf/descriptor.proto";
+
+option java_package = "io.grpc.reflection.v1alpha";
+option java_outer_classname = "ServerReflectionProto";
+
+service ServerReflection {
+  rpc ServerReflectionInfo(stream ServerReflectionRequest)
+      returns (stream ServerReflectionResponse);
+}
+
+message ServerReflectionRequest {
+  string host = 1;
+
+  oneof message_request {
+    string file_by_filename = 3;
+    string file_containing_symbol = 4;
+    string file_containing_extension = 5;
+    string all_extension_numbers_of_type = 6;
+    string list_services = 7;
+  }
+}
+
+message ExtensionRequest {
+  google.protobuf.FileDescriptorProto containing_type = 1;
+  int32 extension_number = 2;
+}
+
+message ServerReflectionResponse {
+  string valid_host = 1;
+
+  ServerReflectionRequest original_request = 2;
+
+  oneof message_response {
+    FileDescriptorResponse file_descriptor_response = 4;
+    ExtensionNumberResponse all_extension_numbers_response = 5;
+    ListServiceResponse list_services_response = 6;
+    ErrorResponse error_response = 7;
+  }
+}
+
+message FileDescriptorResponse {
+  repeated bytes file_descriptor_proto = 1;
+}
+
+message ExtensionNumberResponse {
+  string base_type_name = 1;
+  repeated int32 extension_number = 2;
+}
+
+message ListServiceResponse {
+  repeated ServiceResponse service = 1;
+}
+
+message ServiceResponse {
+  string name = 1;
+}
+
+message ErrorResponse {
+  int32 error_code = 1;
+  string error_message = 2;
+}

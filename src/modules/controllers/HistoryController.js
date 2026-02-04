@@ -191,7 +191,7 @@ export class HistoryController {
         row.innerHTML = `
             <input type="text" class="key-input" placeholder="Key">
             <input type="text" class="value-input" placeholder="Value">
-            <button type="button" class="btn btn-danger btn-xs" aria-label="Remove">×</button>
+            <button type="button" class="btn-xs btn-danger" aria-label="Remove">×</button>
         `;
 
         listElement.appendChild(row);

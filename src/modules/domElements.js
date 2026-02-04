@@ -199,3 +199,20 @@ export const authTypeSelect = document.getElementById('auth-type-select');
  * @const {HTMLElement}
  */
 export const authFieldsContainer = document.getElementById('auth-fields-container');
+
+export const grpcTargetInput = document.getElementById('grpc-target-input');
+export const grpcTlsCheckbox = document.getElementById('grpc-tls-checkbox');
+export const grpcConnectBtn = document.getElementById('grpc-connect-btn');
+export const grpcConnectionStatus = document.getElementById('grpc-connection-status');
+export const grpcServiceSelect = document.getElementById('grpc-service-select');
+export const grpcMethodSelect = document.getElementById('grpc-method-select');
+export const grpcBodyInput = document.getElementById('grpc-body-input');
+export const grpcBodyEditorContainer = document.getElementById('grpc-body-editor-container');
+export const grpcGenerateSkeletonBtn = document.getElementById('grpc-generate-skeleton-btn');
+export const grpcMetadataList = document.getElementById('grpc-metadata-list');
+export const grpcAddMetadataBtn = document.getElementById('grpc-add-metadata-btn');
+export const grpcSendBtn = document.getElementById('grpc-send-btn');
+export const grpcLoadProtoBtn = document.getElementById('grpc-load-proto-btn');
+export const grpcClearProtoBtn = document.getElementById('grpc-clear-proto-btn');
+export const grpcProtoFilename = document.getElementById('grpc-proto-filename');
+export const grpcProtoStatus = document.getElementById('grpc-proto-status');

@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "2.0.3"
+version = "2.1.0"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -9,6 +9,8 @@ edition = "2021"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+tonic-build = "0.11"
+protoc-bin-vendored = "3"
 
 [dependencies]
 tauri = { version = "2", features = [] }
@@ -21,6 +23,16 @@ tauri-plugin-window-state = "2"
 # HTTP client
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "http2", "gzip", "brotli", "socks"] }
 tokio = { version = "1", features = ["full"] }
+
+# gRPC client
+tonic = { version = "0.11", default-features = false, features = ["codegen", "prost", "transport", "tls", "tls-roots"] }
+prost = "0.12"
+prost-types = "0.12"
+tokio-stream = "0.1"
+prost-reflect = { version = "0.12", features = ["serde"] }
+bytes = "1"
+http = "0.2"
+base64 = "0.21"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -51,6 +63,10 @@ url = "2"
 md5 = "0.7"
 sha2 = "0.10"
 hex = "0.4"
+
+# Proto file parsing
+which = "6"
+protoc-bin-vendored = "3"
 
 # JavaScript engine for script execution
 boa_engine = "0.19"

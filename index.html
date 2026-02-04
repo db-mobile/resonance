@@ -35,7 +35,7 @@
                             <line x1="6" y1="18" x2="6.01" y2="18"></line>
                         </svg>
                     </button>
-                    <button id="import-collection-btn" class="btn btn-primary btn-sm"
+                    <button id="import-collection-btn" class="btn-sm btn-primary"
                             data-i18n-title="sidebar.import"
                             data-i18n-aria="sidebar.import"
                             data-i18n="sidebar.import">
@@ -152,20 +152,36 @@
                         Headers
                     </button>
                     <button class="tab-button"
-                            data-tab="authorization"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="authorization"
-                            data-i18n="tabs.authorization">
-                        Authorization
-                    </button>
-                    <button class="tab-button"
                             data-tab="body"
                             role="tab"
                             aria-selected="false"
                             aria-controls="body"
                             data-i18n="tabs.body">
                         Body
+                    </button>
+                    <button class="tab-button"
+                            data-tab="grpc"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="grpc"
+                            data-i18n="tabs.grpc">
+                        gRPC
+                    </button>
+                    <button class="tab-button"
+                            data-tab="grpc-message"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="grpc-message"
+                            data-i18n="tabs.grpc_message">
+                        Message
+                    </button>
+                    <button class="tab-button"
+                            data-tab="grpc-metadata"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="grpc-metadata"
+                            data-i18n="tabs.grpc_metadata">
+                        Metadata
                     </button>
                     <button class="tab-button"
                             data-tab="scripts"
@@ -175,14 +191,22 @@
                             data-i18n="tabs.scripts">
                         Scripts
                     </button>
+                    <button class="tab-button"
+                            data-tab="authorization"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="authorization"
+                            data-i18n="tabs.authorization">
+                        Authorization
+                    </button>
                 </nav>
 
                 <div class="tab-content active" id="path-params" role="tabpanel" aria-labelledby="path-params-tab">
                     <h3>Path Parameters</h3>
                     <div id="path-params-list" class="key-value-list" role="group" aria-label="Path Parameters">
                     </div>
-                    <button id="add-path-param-btn" class="btn btn-secondary btn-sm" aria-label="Add Path Parameter">
-                        Add Path Param
+                    <button id="add-path-param-btn" class="btn-sm btn-secondary" aria-label="Add Path Parameter">
+                        + Add Path Param
                     </button>
                 </div>
 
@@ -190,8 +214,8 @@
                     <h3>Query Parameters</h3>
                     <div id="query-params-list" class="key-value-list" role="group" aria-label="Query Parameters">
                     </div>
-                    <button id="add-query-param-btn" class="btn btn-secondary btn-sm" aria-label="Add Query Parameter">
-                        Add Query Param
+                    <button id="add-query-param-btn" class="btn-sm btn-secondary" aria-label="Add Query Parameter">
+                        + Add Query Param
                     </button>
                 </div>
 
@@ -199,8 +223,8 @@
                     <h3>Headers</h3>
                     <div id="headers-list" class="key-value-list" role="group" aria-label="Request Headers">
                     </div>
-                    <button id="add-header-btn" class="btn btn-secondary btn-sm" aria-label="Add Header">
-                        Add Header
+                    <button id="add-header-btn" class="btn-sm btn-secondary" aria-label="Add Header">
+                        + Add Header
                     </button>
                 </div>
 
@@ -252,28 +276,95 @@
                     </div>
 
                     <!-- GraphQL Mode (new) -->
-                    <div class="body-mode-panel" id="body-graphql-section" data-mode="graphql">
-                        <div class="graphql-container">
-                            <!-- Query Editor -->
-                            <div class="graphql-query-section">
-                                <div class="graphql-section-header">
-                                    <label for="graphql-query-editor">Query</label>
-                                    <button id="graphql-format-btn" class="btn-secondary btn-sm" title="Format Query">
+                    <div id="graphql-body-container" class="graphql-body-container" style="display: none;">
+                        <!-- Query Section -->
+                        <div class="graphql-query-section">
+                            <div class="graphql-section-header">
+                                <label for="graphql-query-editor">Query</label>
+                                <div class="graphql-section-actions">
+                                    <button id="graphql-format-btn" class="btn-sm btn-secondary" title="Format Query">
                                         Format
                                     </button>
                                 </div>
-                                <div id="graphql-query-editor" class="graphql-editor"></div>
                             </div>
+                            <div id="graphql-query-editor" class="graphql-editor"></div>
+                        </div>
 
-                            <!-- Variables Section -->
-                            <div class="graphql-variables-section">
-                                <div class="graphql-section-header">
-                                    <label for="graphql-variables-editor">Variables</label>
-                                </div>
-                                <div id="graphql-variables-editor" class="graphql-editor"></div>
+                        <!-- Variables Section -->
+                        <div class="graphql-variables-section">
+                            <div class="graphql-section-header">
+                                <label for="graphql-variables-editor">Variables</label>
                             </div>
+                            <div id="graphql-variables-editor" class="graphql-editor"></div>
                         </div>
                     </div>
+                </div>
+
+                <div class="tab-content" id="grpc" role="tabpanel" aria-labelledby="grpc-tab">
+                    <!-- Hidden elements for state management -->
+                    <div id="grpc-hidden-elements" style="display: none;">
+                        <input id="grpc-target-input" class="url-input" placeholder="localhost:50051" aria-label="gRPC Target">
+                        <!-- Deprecated: use main Send Request button instead -->
+                        <button id="grpc-send-btn" class="btn btn-primary" aria-label="Send gRPC">Send gRPC</button>
+                    </div>
+                    
+                    <!-- Connection & Proto File Row -->
+                    <div class="grpc-source-section">
+                        <div class="grpc-source-row">
+                            <!-- Reflection Connection -->
+                            <div class="grpc-source-item">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="grpc-tls-checkbox" aria-label="Use TLS">
+                                    <span class="toggle-track"></span>
+                                    <span>TLS</span>
+                                </label>
+                                <button id="grpc-connect-btn" class="btn-sm btn-secondary" aria-label="Connect via Reflection">
+                                    Connect
+                                </button>
+                                <span id="grpc-connection-status" class="status-text"></span>
+                            </div>
+                            
+                            <span class="grpc-source-divider">or</span>
+                            
+                            <!-- Proto File -->
+                            <div class="grpc-source-item">
+                                <button id="grpc-load-proto-btn" class="btn-sm btn-secondary" aria-label="Load Proto File">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                    </svg>
+                                    Load .proto
+                                </button>
+                                <button id="grpc-clear-proto-btn" class="btn-sm btn-secondary" aria-label="Clear Proto" style="display: none;">
+                                    Clear
+                                </button>
+                                <span id="grpc-proto-filename" class="proto-filename"></span>
+                                <span id="grpc-proto-status" class="proto-status"></span>
+                            </div>
+                        </div>
+                        <p class="grpc-hint">Use <strong>Connect</strong> to discover services via server reflection, or <strong>Load .proto</strong> to use a proto file directly.</p>
+                    </div>
+                    
+                    <h3>Service</h3>
+                    <select id="grpc-service-select" class="form-select" aria-label="gRPC Service"></select>
+                    
+                    <h3>Method</h3>
+                    <select id="grpc-method-select" class="form-select" aria-label="gRPC Method"></select>
+                </div>
+
+                <div class="tab-content" id="grpc-message" role="tabpanel" aria-labelledby="grpc-message-tab">
+                    <h3 style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Request JSON</span>
+                        <button type="button" id="grpc-generate-skeleton-btn" class="btn-sm btn-secondary">Generate</button>
+                    </h3>
+                    <textarea id="grpc-body-input" class="body-textarea" aria-label="gRPC Request JSON" placeholder="{}" style="display: none;"></textarea>
+                    <div id="grpc-body-editor-container" class="body-editor-container"></div>
+                </div>
+
+                <div class="tab-content" id="grpc-metadata" role="tabpanel" aria-labelledby="grpc-metadata-tab">
+                    <h3>Metadata</h3>
+                    <ul id="grpc-metadata-list" class="key-value-list" aria-label="gRPC Metadata"></ul>
+                    <button type="button" id="grpc-add-metadata-btn" class="btn-sm btn-secondary">+ Add Metadata</button>
                 </div>
 
                 <div class="tab-content" id="scripts" role="tabpanel" aria-labelledby="scripts-tab">
@@ -438,29 +529,51 @@
                                 aria-controls="response-body">
                             Body
                         </button>
-                        <button class="tab-button"
+                        <button class="tab-button response-tab-http"
                                 data-tab="response-headers"
+                                data-protocol="http"
                                 role="tab"
                                 aria-selected="false"
                                 aria-controls="response-headers">
                             Headers
                         </button>
-                        <button class="tab-button"
+                        <button class="tab-button response-tab-grpc"
+                                data-tab="response-metadata"
+                                data-protocol="grpc"
+                                role="tab"
+                                aria-selected="false"
+                                aria-controls="response-metadata"
+                                style="display: none;">
+                            Metadata
+                        </button>
+                        <button class="tab-button response-tab-http"
                                 data-tab="response-cookies"
+                                data-protocol="http"
                                 role="tab"
                                 aria-selected="false"
                                 aria-controls="response-cookies">
                             Cookies
                         </button>
-                        <button class="tab-button"
+                        <button class="tab-button response-tab-grpc"
+                                data-tab="response-trailers"
+                                data-protocol="grpc"
+                                role="tab"
+                                aria-selected="false"
+                                aria-controls="response-trailers"
+                                style="display: none;">
+                            Trailers
+                        </button>
+                        <button class="tab-button response-tab-http"
                                 data-tab="response-performance"
+                                data-protocol="http"
                                 role="tab"
                                 aria-selected="false"
                                 aria-controls="response-performance">
                             Performance
                         </button>
-                        <button class="tab-button"
+                        <button class="tab-button response-tab-http"
                                 data-tab="response-scripts"
+                                data-protocol="http"
                                 role="tab"
                                 aria-selected="false"
                                 aria-controls="response-scripts">

@@ -952,10 +952,10 @@ export class MockServerDialog {
 
         // Try to find response schema
         if (endpoint.responses?.['200']?.content?.['application/json']?.schema) {
-            schema = endpoint.responses['200'].content['application/json'].schema;
+            ({ schema } = endpoint.responses['200'].content['application/json']);
         } else if (['POST', 'PUT'].includes(endpoint.method.toUpperCase()) &&
                    endpoint.responses?.['201']?.content?.['application/json']?.schema) {
-            schema = endpoint.responses['201'].content['application/json'].schema;
+            ({ schema } = endpoint.responses['201'].content['application/json']);
         }
 
         // Return a basic example if no schema

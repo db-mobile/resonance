@@ -20,8 +20,9 @@
       <li>Import collections from OpenAPI 3.0 specifications and Postman collections</li>
       <li>Environment management with variable templating for different deployment contexts</li>
       <li>Multiple authentication methods including Bearer tokens, Basic Auth, API keys, OAuth 2.0, and Digest authentication</li>
-      <li>Generate code in 9 languages: cURL, Python, JavaScript, Node.js, Go, PHP, Ruby, and Java</li>
+      <li>Generate code snippets in 9 languages: cURL, Python, JavaScript (Fetch), JavaScript (Axios), Node.js, Go, PHP, Ruby, and Java</li>
       <li>GraphQL support with dedicated query editor and syntax highlighting</li>
+      <li>gRPC support for exploring and testing gRPC services</li>
       <li>Built-in mock server for testing without a backend, with custom responses and configurable delays</li>
       <li>Workspace tabs for managing multiple concurrent requests with independent state</li>
       <li>Request history with search and replay capability for easy debugging</li>
@@ -94,6 +95,14 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.1.0" date="2026-02-04">
+      <description>
+        <p>New features introduced</p>
+        <ul>
+          <li>gRPC support</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.0.3" date="2026-02-01">
       <description>
         <p>Feature stabilization</p>
