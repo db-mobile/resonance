@@ -16,24 +16,13 @@
                 <h2 class="sidebar-title" data-i18n="sidebar.collections">Collections</h2>
                 <div class="sidebar-actions">
                     <button id="history-toggle-btn" class="btn btn-icon" data-i18n-title="sidebar.history" data-i18n-aria="sidebar.history" title="History">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
+                        <span class="icon icon-16 icon-clock"></span>
                     </button>
                     <button id="settings-btn" class="btn btn-icon" data-i18n-title="header.settings" data-i18n-aria="header.settings">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="3"></circle>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                        </svg>
+                        <span class="icon icon-16 icon-gear"></span>
                     </button>
                     <button id="mock-server-btn" class="btn btn-icon" data-i18n-title="toolbar.mockServer" data-i18n-aria="toolbar.mockServer" title="Mock Server">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-                            <line x1="6" y1="6" x2="6.01" y2="6"></line>
-                            <line x1="6" y1="18" x2="6.01" y2="18"></line>
-                        </svg>
+                        <span class="icon icon-16 icon-mock-server"></span>
                     </button>
                     <button id="import-collection-btn" class="btn-sm btn-primary"
                             data-i18n-title="sidebar.import"
@@ -52,9 +41,7 @@
             <div class="collections-container">
                 <div id="collections-list" class="collections-list">
                     <div class="collections-empty">
-                        <svg class="collections-empty-icon" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 2L13.09 7.26L18 6L16.74 11.09L22 12L16.74 12.91L18 18L13.09 16.74L12 22L10.91 16.74L6 18L7.26 12.91L2 12L7.26 11.09L6 6L10.91 7.26L12 2Z"/>
-                        </svg>
+                        <span class="collections-empty-icon icon icon-64 icon-spark"></span>
                         <p class="collections-empty-text">No collections imported yet</p>
                         <p class="collections-empty-subtext">Import an OpenAPI collection to get started</p>
                     </div>
@@ -87,9 +74,7 @@
                             <option value="DELETE">DELETE</option>
                             <option value="PATCH">PATCH</option>
                         </select>
-                        <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="2 4 6 8 10 4"></polyline>
-                        </svg>
+                        <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                     </div>
                     
                     <input type="url"
@@ -116,10 +101,7 @@
                             class="btn btn-primary"
                             aria-label="Generate Code Snippet"
                             title="Generate Code Snippet (cURL, Python, JavaScript, etc.)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="4 17 10 11 4 5"></polyline>
-                            <line x1="12" y1="19" x2="20" y2="19"></line>
-                        </svg>
+                        <span class="icon icon-16 icon-curl"></span>
                     </button>
                 </div>
             </section>
@@ -241,9 +223,7 @@
                                 <option value="oauth2">OAuth 2.0</option>
                                 <option value="digest">Digest Auth</option>
                             </select>
-                            <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="2 4 6 8 10 4"></polyline>
-                            </svg>
+                            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                         </div>
                     </div>
                     <div id="auth-fields-container" class="auth-fields-container">
@@ -259,9 +239,7 @@
                                 <option value="json">JSON</option>
                                 <option value="graphql">GraphQL</option>
                             </select>
-                            <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="2 4 6 8 10 4"></polyline>
-                            </svg>
+                            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                         </div>
                     </div>
 
@@ -329,12 +307,9 @@
                             <!-- Proto File -->
                             <div class="grpc-source-item">
                                 <button id="grpc-load-proto-btn" class="btn-sm btn-secondary" aria-label="Load Proto File">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                                        <polyline points="14 2 14 8 20 8"></polyline>
-                                    </svg>
-                                    Load .proto
-                                </button>
+                                    <span class="icon icon-14 icon-file"></span>
+                                Load .proto
+                            </button>
                                 <button id="grpc-clear-proto-btn" class="btn-sm btn-secondary" aria-label="Clear Proto" style="display: none;">
                                     Clear
                                 </button>
@@ -603,16 +578,10 @@
                 <h2 class="sidebar-title" data-i18n="sidebar.history">History</h2>
                 <div class="sidebar-actions">
                     <button id="clear-all-history-btn" class="btn btn-icon-bordered" data-i18n-title="history.clear_all" data-i18n-aria="history.clear_all">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
+                        <span class="icon icon-16 icon-trash"></span>
                     </button>
                     <button id="close-history-btn" class="btn btn-icon-bordered" data-i18n-title="common.close" data-i18n-aria="common.close" title="Close">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
+                        <span class="icon icon-16 icon-x"></span>
                     </button>
                 </div>
             </div>
@@ -629,9 +598,7 @@
             <div class="history-container">
                 <div id="history-list" class="history-list">
                     <div class="history-empty">
-                        <svg class="history-empty-icon" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-                        </svg>
+                        <span class="history-empty-icon icon icon-64 icon-history"></span>
                         <p class="history-empty-text" data-i18n="history.empty">No request history</p>
                         <p class="history-empty-subtext" data-i18n="history.empty_subtext">Send a request to see it here</p>
                     </div>

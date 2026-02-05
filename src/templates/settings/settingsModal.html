@@ -1,0 +1,174 @@
+<template id="tpl-settings-modal">
+    <div class="settings-modal-overlay">
+        <div class="settings-modal">
+            <div class="settings-header">
+                <h2 data-i18n="settings.title">Settings</h2>
+                <button class="dialog-close-btn" aria-label="Close Settings" data-i18n-aria="settings.close">
+                    <span class="icon icon-20 icon-x"></span>
+                </button>
+            </div>
+
+            <div class="settings-tabs">
+                <button class="settings-tab active" data-tab="general" data-i18n="settings.tab_general">General</button>
+            </div>
+
+            <div class="settings-content">
+                <div class="settings-tab-content active" data-tab-content="general">
+                    <div data-role="language-section"></div>
+
+                    <div class="settings-section">
+                        <h3 data-i18n="settings.theme">Theme</h3>
+                        <div class="theme-select-container">
+                            <select class="select-base theme-select" name="theme">
+                                <option value="light" data-i18n="theme.light">Light</option>
+                                <option value="dark" data-i18n="theme.dark">Dark</option>
+                                <option value="system" data-i18n="theme.system">System</option>
+                                <option value="black" data-i18n="theme.black">Black (OLED)</option>
+                            </select>
+                            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 data-i18n="settings.accent_color">Accent Color</h3>
+                        <div class="accent-color-grid" data-role="accent-grid"></div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 data-i18n="settings.http_version">HTTP Version</h3>
+                        <div class="http-version-select-container">
+                            <select class="select-base http-version-select" name="httpVersion">
+                                <option value="auto" data-i18n="http_version.auto">Auto</option>
+                                <option value="http1" data-i18n="http_version.http1">HTTP/1.x</option>
+                                <option value="http2" data-i18n="http_version.http2">HTTP/2</option>
+                            </select>
+                            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 data-i18n="settings.request_timeout">Request Timeout</h3>
+                        <div class="form-input-container">
+                            <input type="number" class="form-input" name="requestTimeout" min="0" step="1000" placeholder="0">
+                            <span class="form-input-unit">ms</span>
+                        </div>
+                        <p class="form-input-hint" data-i18n="settings.timeout_description">Set to 0 for no timeout</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-footer">
+                <span id="settings-app-version" class="settings-app-version"></span>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-settings-proxy-tab">
+    <button class="settings-tab" data-tab="proxy" data-i18n="settings.tab_proxy">Proxy</button>
+</template>
+
+<template id="tpl-settings-proxy-content">
+    <div class="settings-tab-content" data-tab-content="proxy"></div>
+</template>
+
+<template id="tpl-language-section">
+    <div class="settings-section">
+        <h3 data-i18n="settings.language">Language</h3>
+        <div class="language-select-container">
+            <select class="select-base language-select" name="language"></select>
+            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-accent-button">
+    <button type="button" class="accent-btn" aria-label="accent color"></button>
+</template>
+
+<template id="tpl-proxy-section">
+    <div class="settings-section proxy-settings-section">
+        <div class="settings-section-header">
+            <label class="toggle-switch">
+                <input type="checkbox" name="proxyEnabled">
+                <span class="toggle-track"></span>
+                <span data-i18n="settings.proxy_enabled">Enable Proxy</span>
+            </label>
+        </div>
+
+        <div class="proxy-settings-content is-hidden">
+            <div class="proxy-row">
+                <label class="toggle-switch proxy-system-toggle">
+                    <input type="checkbox" name="proxyUseSystem">
+                    <span class="toggle-track"></span>
+                    <span data-i18n="settings.proxy_use_system">Use System Proxy</span>
+                </label>
+                <p class="proxy-field-help" data-i18n="settings.proxy_use_system_help">Automatically detect and use system proxy settings</p>
+            </div>
+
+            <div class="proxy-manual-settings">
+                <div class="proxy-row">
+                    <div class="proxy-field proxy-field-with-arrow">
+                        <label data-i18n="settings.proxy_type">Type</label>
+                        <div class="select-wrapper">
+                            <select name="proxyType" class="proxy-type-select">
+                                <option value="http">HTTP</option>
+                                <option value="https">HTTPS</option>
+                                <option value="socks4">SOCKS4</option>
+                                <option value="socks5">SOCKS5</option>
+                            </select>
+                            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="proxy-row">
+                    <div class="proxy-field proxy-field-grow">
+                        <label data-i18n="settings.proxy_host">Host</label>
+                        <input type="text" name="proxyHost" placeholder="proxy.example.com">
+                    </div>
+                    <div class="proxy-field proxy-field-port">
+                        <label data-i18n="settings.proxy_port">Port</label>
+                        <input type="number" name="proxyPort" min="1" max="65535">
+                    </div>
+                </div>
+
+                <div class="proxy-row">
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="proxyAuthEnabled">
+                        <span class="toggle-track"></span>
+                        <span data-i18n="settings.proxy_auth">Authentication</span>
+                    </label>
+                </div>
+
+                <div class="proxy-auth-fields is-hidden">
+                    <div class="proxy-row">
+                        <div class="proxy-field proxy-field-grow">
+                            <label data-i18n="settings.proxy_username">Username</label>
+                            <input type="text" name="proxyUsername" autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="proxy-row">
+                        <div class="proxy-field proxy-field-grow">
+                            <label data-i18n="settings.proxy_password">Password</label>
+                            <input type="password" name="proxyPassword" autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="proxy-row">
+                    <div class="proxy-field proxy-field-grow">
+                        <label data-i18n="settings.proxy_bypass">Bypass List (comma-separated)</label>
+                        <input type="text" name="proxyBypass" placeholder="localhost, *.internal.com">
+                        <p class="proxy-field-help">Domains to bypass proxy (supports wildcards: *.example.com)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="proxy-row proxy-actions">
+                <button type="button" class="proxy-test-btn" data-i18n="settings.proxy_test">Test Connection</button>
+                <span class="proxy-test-result"></span>
+            </div>
+        </div>
+    </div>
+</template>

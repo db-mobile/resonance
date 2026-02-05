@@ -11,6 +11,8 @@
  * and automatic positioning to stay within viewport bounds. Handles click
  * outside to dismiss and provides static helper methods for common icons.
  */
+import { templateLoader } from '../templateLoader.js';
+
 export class ContextMenu {
     /**
      * Creates a ContextMenu instance
@@ -73,22 +75,26 @@ export class ContextMenu {
      * @returns {HTMLDivElement} Menu item element
      */
     createMenuItem(item) {
-        const menuItem = document.createElement('div');
+        const fragment = templateLoader.cloneSync(
+            './src/templates/contextMenu/contextMenu.html',
+            'tpl-context-menu-item'
+        );
+        const menuItem = fragment.firstElementChild;
         menuItem.className = `context-menu-item ${item.className || ''}`;
 
-        if (item.icon) {
-            menuItem.innerHTML = `
-                <svg class="context-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    ${item.icon}
-                </svg>
-                <span ${item.translationKey ? `data-i18n="${item.translationKey}"` : ''}>${item.label}</span>
-            `;
+        const iconEl = menuItem.querySelector('[data-role="icon"]');
+        const labelEl = menuItem.querySelector('[data-role="label"]');
+
+        if (item.iconClass) {
+            iconEl.classList.add(item.iconClass);
         } else {
-            if (item.translationKey) {
-                menuItem.setAttribute('data-i18n', item.translationKey);
-            }
-            menuItem.textContent = item.label;
+            iconEl.remove();
         }
+
+        if (item.translationKey) {
+            labelEl.setAttribute('data-i18n', item.translationKey);
+        }
+        labelEl.textContent = item.label;
 
         if (item.onClick) {
             menuItem.addEventListener('click', (e) => {
@@ -185,10 +191,7 @@ export class ContextMenu {
      * @returns {string} SVG markup for rename icon
      */
     static createRenameIcon() {
-        return `
-            <path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M18.5 2.50023C18.8978 2.10243 19.4374 1.87891 20 1.87891C20.5626 1.87891 21.1022 2.10243 21.5 2.50023C21.8978 2.89804 22.1213 3.43762 22.1213 4.00023C22.1213 4.56284 21.8978 5.10243 21.5 5.50023L12 15.0002L8 16.0002L9 12.0002L18.5 2.50023Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        `;
+        return 'icon-pencil';
     }
 
     /**
@@ -198,10 +201,7 @@ export class ContextMenu {
      * @returns {string} SVG markup for delete icon
      */
     static createDeleteIcon() {
-        return `
-            <path d="M3 6H5H21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        `;
+        return 'icon-trash';
     }
 
     /**
@@ -211,10 +211,7 @@ export class ContextMenu {
      * @returns {string} SVG markup for variable icon
      */
     static createVariableIcon() {
-        return `
-            <path d="M12 2L3.09 8.26L4 21L12 17L20 21L20.91 8.26L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M8 11L10 13L16 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        `;
+        return 'icon-variable';
     }
 
     /**
@@ -224,10 +221,7 @@ export class ContextMenu {
      * @returns {string} SVG markup for new request icon
      */
     static createNewRequestIcon() {
-        return `
-            <path d="M12 5V19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        `;
+        return 'icon-plus';
     }
 
     /**
@@ -237,11 +231,7 @@ export class ContextMenu {
      * @returns {string} SVG markup for export icon
      */
     static createExportIcon() {
-        return `
-            <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        `;
+        return 'icon-export';
     }
 
     /**
@@ -250,10 +240,6 @@ export class ContextMenu {
      * @returns {string} SVG path markup
      */
     static createScriptIcon() {
-        return `
-            <path d="M7 8L3 11.6923L7 15.3846" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M17 8L21 11.6923L17 15.3846" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M14 4L10 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        `;
+        return 'icon-script';
     }
 }

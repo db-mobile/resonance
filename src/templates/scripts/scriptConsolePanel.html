@@ -1,0 +1,50 @@
+<template id="tpl-script-console-panel">
+    <div>
+        <div class="script-console-header">
+            <span class="script-console-title" data-role="title">Script Console</span>
+            <button class="clear-console-btn" data-role="clear">Clear</button>
+        </div>
+        <div class="script-console-content"></div>
+    </div>
+</template>
+
+<template id="tpl-script-console-empty">
+    <div class="script-console-empty" data-role="message"></div>
+</template>
+
+<template id="tpl-script-console-entry">
+    <div class="script-console-entry">
+        <span class="script-console-entry-icon" data-role="icon"></span>
+        <span class="script-console-entry-time" data-role="time"></span>
+        <span class="script-console-entry-message" data-role="message"></span>
+    </div>
+</template>
+
+<template id="tpl-script-console-summary">
+    <div class="script-console-summary" data-role="summary"></div>
+</template>
+
+<template id="tpl-script-console-summary-all-passed">
+    <span class="script-console-summary-success" data-role="text"></span>
+</template>
+
+<template id="tpl-script-console-summary-mixed">
+    <span class="script-console-summary-success" data-role="passed"></span>
+    <span data-role="comma">, </span>
+    <span class="script-console-summary-fail" data-role="failed"></span>
+</template>
+
+<template id="tpl-script-console-test-list">
+    <div class="script-console-test-list"></div>
+</template>
+
+<template id="tpl-script-console-test-item">
+    <div class="script-console-test-item">
+        <span class="script-console-test-icon" data-role="icon"></span>
+        <span data-role="message"></span>
+    </div>
+</template>
+
+<template id="tpl-script-console-separator">
+    <div class="script-console-separator" data-role="text"></div>
+</template>

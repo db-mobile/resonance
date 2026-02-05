@@ -1,0 +1,62 @@
+<template id="tpl-variable-manager-dialog">
+    <div>
+        <div class="variable-manager-header">
+            <h3 class="variable-manager-title" data-role="title"></h3>
+            <div class="variable-manager-actions">
+                <button id="add-variable-btn" class="btn-xs btn-outline-primary">+ Add Variable</button>
+                <button id="import-variables-btn" class="btn-xs btn-outline">Import</button>
+                <button id="export-variables-btn" class="btn-xs btn-outline">Export</button>
+            </div>
+        </div>
+
+        <div class="variable-manager-usage">
+            <p class="variable-manager-usage-text">
+                <strong>Usage:</strong> Define variables here and use them in your requests with <code>{{ variableName }}</code> syntax.
+                Variables can be used in URLs, headers, query parameters, and request bodies.
+            </p>
+            <details class="variable-manager-dynamic-details">
+                <summary class="variable-manager-dynamic-summary">
+                    <strong>Dynamic Variables</strong> - Auto-generated values (click to expand)
+                </summary>
+                <div class="variable-manager-dynamic-content">
+                    <code>{{$uuid}}</code> - Random UUID<br>
+                    <code>{{$timestamp}}</code> - Unix timestamp (seconds)<br>
+                    <code>{{$timestampMs}}</code> - Unix timestamp (ms)<br>
+                    <code>{{$isoTimestamp}}</code> - ISO 8601 date<br>
+                    <code>{{$randomInt}}</code> - Random 0-1000<br>
+                    <code>{{$randomInt:1:100}}</code> - Random in range<br>
+                    <code>{{$randomString}}</code> - Random 8-char string<br>
+                    <code>{{$randomString:16}}</code> - Random N-char string<br>
+                    <code>{{$randomEmail}}</code> - Random email<br>
+                    <code>{{$randomName}}</code> - Random name
+                </div>
+            </details>
+        </div>
+
+        <div id="variables-container" class="variable-manager-container"></div>
+
+        <div class="variable-manager-footer">
+            <button id="variables-cancel-btn" class="btn btn-outline">Cancel</button>
+            <button id="variables-save-btn" class="btn btn-primary">Save Variables</button>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-variable-manager-row">
+    <div class="variable-row">
+        <input type="text" class="variable-name" placeholder="Variable name">
+        <input type="text" class="variable-value" placeholder="Variable value">
+        <button class="remove-variable-btn">Remove</button>
+    </div>
+</template>
+
+<template id="tpl-variable-manager-import-dialog">
+    <div>
+        <h4 class="variable-manager-import-title">Import Variables</h4>
+        <textarea id="import-textarea" placeholder="Paste JSON object with variables..." class="variable-import-textarea"></textarea>
+        <div class="variable-manager-import-actions">
+            <button id="import-cancel" class="btn btn-outline">Cancel</button>
+            <button id="import-confirm" class="btn btn-primary">Import</button>
+        </div>
+    </div>
+</template>

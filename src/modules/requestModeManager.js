@@ -205,19 +205,15 @@ function createGrpcUrlSection() {
     grpcSection.id = 'grpc-url-section';
     grpcSection.className = 'grpc-url-section';
     grpcSection.style.display = 'none';
-    grpcSection.style.flex = '1';
-    grpcSection.style.gap = '8px';
-    grpcSection.style.alignItems = 'center';
     
     // gRPC badge
     const badge = document.createElement('span');
     badge.className = 'grpc-badge';
     badge.textContent = 'gRPC';
-    badge.style.cssText = 'background: var(--accent-color); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;';
     
     // Target input wrapper
     const targetWrapper = document.createElement('div');
-    targetWrapper.style.cssText = 'flex: 1; display: flex; align-items: center; gap: 8px;';
+    targetWrapper.className = 'grpc-target-wrapper';
     
     // Target input (reuse existing or create reference)
     const existingTarget = document.getElementById('grpc-target-input');

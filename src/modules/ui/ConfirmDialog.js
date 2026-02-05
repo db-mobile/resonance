@@ -11,6 +11,8 @@
  * Supports keyboard navigation (Enter/Escape/Tab), dangerous action styling,
  * and focus management for accessibility.
  */
+import { templateLoader } from '../templateLoader.js';
+
 export class ConfirmDialog {
     /**
      * Creates a ConfirmDialog instance
@@ -57,47 +59,35 @@ export class ConfirmDialog {
      */
     createDialog(message, options) {
         this.overlay = document.createElement('div');
-        this.overlay.className = 'confirm-dialog-overlay';
-        this.overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-        `;
+        this.overlay.className = 'confirm-dialog-overlay modal-overlay';
 
         const dialog = document.createElement('div');
-        dialog.className = 'confirm-dialog';
-        dialog.style.cssText = `
-            background: var(--bg-primary);
-            border-radius: var(--radius-xl);
-            padding: 24px;
-            min-width: 400px;
-            max-width: 500px;
-            box-shadow: var(--shadow-xl);
-            border: 1px solid var(--border-light);
-        `;
+        dialog.className = 'confirm-dialog modal-dialog modal-dialog--sm';
 
         const title = options.title || 'Confirm Action';
         const confirmText = options.confirmText || 'Confirm';
         const cancelText = options.cancelText || 'Cancel';
         const isDangerous = options.dangerous !== false; // Default to true for delete confirmations
 
-        dialog.innerHTML = `
-            <h3 style="margin: 0 0 16px 0; color: var(--text-primary);">${this.escapeHtml(title)}</h3>
-            <div style="margin-bottom: 24px;">
-                <p style="margin: 0; color: var(--text-primary); white-space: pre-wrap; line-height: 1.5;">${this.escapeHtml(message)}</p>
-            </div>
-            <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                <button id="confirm-cancel-btn" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: var(--radius-sm); cursor: pointer;">${this.escapeHtml(cancelText)}</button>
-                <button id="confirm-confirm-btn" style="padding: 8px 16px; border: none; background: ${isDangerous ? '#dc2626' : 'var(--color-primary)'}; color: white; border-radius: var(--radius-sm); cursor: pointer;">${this.escapeHtml(confirmText)}</button>
-            </div>
-        `;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/dialogs/confirmDialog.html',
+            'tpl-confirm-dialog'
+        );
+        dialog.appendChild(fragment);
+
+        const titleEl = dialog.querySelector('[data-role="title"]');
+        const messageEl = dialog.querySelector('[data-role="message"]');
+        const cancelTextEl = dialog.querySelector('[data-role="cancel-text"]');
+        const confirmTextEl = dialog.querySelector('[data-role="confirm-text"]');
+
+        if (titleEl) {titleEl.textContent = title;}
+        if (messageEl) {messageEl.textContent = message;}
+        if (cancelTextEl) {cancelTextEl.textContent = cancelText;}
+        if (confirmTextEl) {
+            confirmTextEl.textContent = confirmText;
+            confirmTextEl.classList.toggle('btn-danger', isDangerous);
+            confirmTextEl.classList.toggle('btn-primary', !isDangerous);
+        }
 
         this.overlay.appendChild(dialog);
         document.body.appendChild(this.overlay);

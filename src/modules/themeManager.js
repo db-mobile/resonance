@@ -1,3 +1,5 @@
+import { templateLoader } from './templateLoader.js';
+
 export class ThemeManager {
     constructor() {
         this.currentTheme = 'system';
@@ -239,128 +241,102 @@ export class SettingsModal {
     }
 
     async createModal() {
-        const overlay = document.createElement('div');
-        overlay.className = 'settings-modal-overlay';
-
-        const languageSection = this.i18nManager ? this.createLanguageSection() : '';
-        const proxySection = this.proxyController ? await this.createProxySection() : '';
+        const fragment = templateLoader.cloneSync(
+            './src/templates/settings/settingsModal.html',
+            'tpl-settings-modal'
+        );
+        const overlay = fragment.firstElementChild;
 
         const currentHttpVersion = this.httpVersionManager ? await this.httpVersionManager.getCurrentVersion() : 'auto';
         const currentTimeout = this.timeoutManager ? this.timeoutManager.getCurrentTimeout() : 0;
 
-        // Determine which tabs to show
-        const showProxyTab = !!this.proxyController;
+        // Set current theme selection
+        const themeSelect = overlay.querySelector('select[name="theme"]');
+        if (themeSelect) {
+            themeSelect.value = this.themeManager.getCurrentTheme();
+        }
 
-        overlay.innerHTML = `
-            <div class="settings-modal">
-                <div class="settings-header">
-                    <h2 data-i18n="settings.title">Settings</h2>
-                    <button class="settings-close-btn" aria-label="Close Settings" data-i18n-aria="settings.close">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
-                </div>
+        // Set current HTTP version selection
+        const httpVersionSelect = overlay.querySelector('select[name="httpVersion"]');
+        if (httpVersionSelect) {
+            httpVersionSelect.value = currentHttpVersion;
+        }
 
-                <div class="settings-tabs">
-                    <button class="settings-tab active" data-tab="general" data-i18n="settings.tab_general">General</button>
-                    ${showProxyTab ? '<button class="settings-tab" data-tab="proxy" data-i18n="settings.tab_proxy">Proxy</button>' : ''}
-                </div>
+        // Set current timeout value
+        const timeoutInput = overlay.querySelector('input[name="requestTimeout"]');
+        if (timeoutInput) {
+            timeoutInput.value = currentTimeout;
+        }
 
-                <div class="settings-content">
-                    <div class="settings-tab-content active" data-tab-content="general">
-                        ${languageSection}
-                        <div class="settings-section">
-                            <h3 data-i18n="settings.theme">Theme</h3>
-                            <div class="theme-select-container">
-                                <select class="select-base theme-select" name="theme">
-                                    <option value="light" ${this.themeManager.getCurrentTheme() === 'light' ? 'selected' : ''} data-i18n="theme.light">Light</option>
-                                    <option value="dark" ${this.themeManager.getCurrentTheme() === 'dark' ? 'selected' : ''} data-i18n="theme.dark">Dark</option>
-                                    <option value="system" ${this.themeManager.getCurrentTheme() === 'system' ? 'selected' : ''} data-i18n="theme.system">System</option>
-                                    <option value="black" ${this.themeManager.getCurrentTheme() === 'black' ? 'selected' : ''} data-i18n="theme.black">Black (OLED)</option>
-                                </select>
-                                <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="2 4 6 8 10 4"></polyline>
-                                </svg>
-                            </div>
-                        </div>
+        // Add language section if i18nManager is available
+        if (this.i18nManager) {
+            const languagePlaceholder = overlay.querySelector('[data-role="language-section"]');
+            if (languagePlaceholder) {
+                const langSection = this.createLanguageSectionDOM();
+                languagePlaceholder.replaceWith(langSection);
+            }
+        } else {
+            const languagePlaceholder = overlay.querySelector('[data-role="language-section"]');
+            if (languagePlaceholder) {
+                languagePlaceholder.remove();
+            }
+        }
 
-                        <div class="settings-section">
-                            <h3 data-i18n="settings.accent_color">Accent Color</h3>
-                            <div class="accent-color-grid">
-                                ${this.createAccentButtons()}
-                            </div>
-                        </div>
-                    
-                    <div class="settings-section">
-                        <h3 data-i18n="settings.http_version">HTTP Version</h3>
-                        <div class="http-version-select-container">
-                            <select class="select-base http-version-select" name="httpVersion">
-                                <option value="auto" ${currentHttpVersion === 'auto' ? 'selected' : ''} data-i18n="http_version.auto">Auto</option>
-                                <option value="http1" ${currentHttpVersion === 'http1' ? 'selected' : ''} data-i18n="http_version.http1">HTTP/1.x</option>
-                                <option value="http2" ${currentHttpVersion === 'http2' ? 'selected' : ''} data-i18n="http_version.http2">HTTP/2</option>
-                            </select>
-                            <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="2 4 6 8 10 4"></polyline>
-                            </svg>
-                        </div>
-                    </div>
+        // Add accent buttons
+        const accentGrid = overlay.querySelector('[data-role="accent-grid"]');
+        if (accentGrid) {
+            this.createAccentButtonsDOM(accentGrid);
+        }
 
-                        <div class="settings-section">
-                            <h3 data-i18n="settings.request_timeout">Request Timeout</h3>
-                            <div class="form-input-container">
-                                <input type="number" class="form-input" name="requestTimeout"
-                                       value="${currentTimeout}"
-                                       min="0"
-                                       step="1000"
-                                       placeholder="0">
-                                <span class="form-input-unit">ms</span>
-                            </div>
-                            <p class="form-input-hint" data-i18n="settings.timeout_description">Set to 0 for no timeout</p>
-                        </div>
+        // Add proxy tab if proxyController is available
+        if (this.proxyController) {
+            const tabsContainer = overlay.querySelector('.settings-tabs');
+            const proxyTabFragment = templateLoader.cloneSync(
+                './src/templates/settings/settingsModal.html',
+                'tpl-settings-proxy-tab'
+            );
+            tabsContainer.appendChild(proxyTabFragment);
 
-                    </div>
-
-                    ${showProxyTab ? `<div class="settings-tab-content" data-tab-content="proxy">${proxySection}</div>` : ''}
-                </div>
-
-                <div class="settings-footer">
-                    <span id="settings-app-version" class="settings-app-version"></span>
-                </div>
-            </div>
-        `;
+            const contentContainer = overlay.querySelector('.settings-content');
+            const proxyContentFragment = templateLoader.cloneSync(
+                './src/templates/settings/settingsModal.html',
+                'tpl-settings-proxy-content'
+            );
+            const proxyContent = proxyContentFragment.firstElementChild;
+            const proxySection = await this.createProxySectionDOM();
+            proxyContent.appendChild(proxySection);
+            contentContainer.appendChild(proxyContent);
+        }
 
         this.attachEventListeners(overlay);
         return overlay;
     }
 
-    createLanguageSection() {
-        if (!this.i18nManager) {return '';}
+    createLanguageSectionDOM() {
+        const fragment = templateLoader.cloneSync(
+            './src/templates/settings/settingsModal.html',
+            'tpl-language-section'
+        );
+        const section = fragment.firstElementChild;
 
         const languages = this.i18nManager.getSupportedLanguages();
         const currentLanguage = this.i18nManager.getCurrentLanguage();
+        const select = section.querySelector('select[name="language"]');
 
-        const languageOptions = Object.entries(languages).map(([code, name]) => `
-            <option value="${code}" ${currentLanguage === code ? 'selected' : ''}>${name}</option>
-        `).join('');
+        Object.entries(languages).forEach(([code, name]) => {
+            const option = document.createElement('option');
+            option.value = code;
+            option.textContent = name;
+            if (currentLanguage === code) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
 
-        return `
-            <div class="settings-section">
-                <h3 data-i18n="settings.language">Language</h3>
-                <div class="language-select-container">
-                    <select class="select-base language-select" name="language">
-                        ${languageOptions}
-                    </select>
-                    <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="2 4 6 8 10 4"></polyline>
-                    </svg>
-                </div>
-            </div>
-        `;
+        return section;
     }
 
-    createAccentButtons() {
+    createAccentButtonsDOM(container) {
         const accents = this.themeManager.getAvailableAccents();
         const currentAccent = this.themeManager.getAccent();
 
@@ -376,115 +352,103 @@ export class SettingsModal {
             pink: '#ec4899'
         };
 
-        return accents.map(accent => `
-            <button type="button"
-                    class="accent-btn ${accent === currentAccent ? 'active' : ''}"
-                    data-accent="${accent}"
-                    style="--btn-color: ${accentColors[accent]}"
-                    aria-label="${accent} accent color"
-                    title="${accent.charAt(0).toUpperCase() + accent.slice(1)}">
-            </button>
-        `).join('');
+        accents.forEach(accent => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'accent-btn';
+            if (accent === currentAccent) {
+                btn.classList.add('active');
+            }
+            btn.dataset.accent = accent;
+            btn.dataset.btnColor = accentColors[accent];
+            btn.setAttribute('aria-label', `${accent} accent color`);
+            btn.title = accent.charAt(0).toUpperCase() + accent.slice(1);
+            container.appendChild(btn);
+        });
     }
 
-    async createProxySection() {
-        if (!this.proxyController) {return '';}
+    async createProxySectionDOM() {
+        const fragment = templateLoader.cloneSync(
+            './src/templates/settings/settingsModal.html',
+            'tpl-proxy-section'
+        );
+        const section = fragment.firstElementChild;
 
         const settings = await this.proxyController.getSettings();
 
-        return `
-            <div class="settings-section proxy-settings-section">
-                <div class="settings-section-header">
-                    <label class="toggle-switch">
-                        <input type="checkbox" name="proxyEnabled" ${settings.enabled ? 'checked' : ''}>
-                        <span class="toggle-track"></span>
-                        <span data-i18n="settings.proxy_enabled">Enable Proxy</span>
-                    </label>
-                </div>
+        // Set enabled state
+        const enabledCheckbox = section.querySelector('input[name="proxyEnabled"]');
+        if (enabledCheckbox && settings.enabled) {
+            enabledCheckbox.checked = true;
+        }
 
-                <div class="proxy-settings-content" style="display: ${settings.enabled ? 'block' : 'none'}">
-                    <div class="proxy-row">
-                        <label class="toggle-switch proxy-system-toggle">
-                            <input type="checkbox" name="proxyUseSystem" ${settings.useSystemProxy ? 'checked' : ''}>
-                            <span class="toggle-track"></span>
-                            <span data-i18n="settings.proxy_use_system">Use System Proxy</span>
-                        </label>
-                        <p class="proxy-field-help" data-i18n="settings.proxy_use_system_help">Automatically detect and use system proxy settings</p>
-                    </div>
+        // Toggle visibility of proxy settings content
+        const proxyContent = section.querySelector('.proxy-settings-content');
+        if (proxyContent && settings.enabled) {
+            proxyContent.classList.remove('is-hidden');
+        }
 
-                    <div class="proxy-manual-settings" style="display: ${settings.useSystemProxy ? 'none' : 'block'}">
-                        <div class="proxy-row">
-                            <div class="proxy-field proxy-field-with-arrow">
-                                <label data-i18n="settings.proxy_type">Type</label>
-                                <div class="select-wrapper">
-                                    <select name="proxyType" class="proxy-type-select">
-                                        <option value="http" ${settings.type === 'http' ? 'selected' : ''}>HTTP</option>
-                                        <option value="https" ${settings.type === 'https' ? 'selected' : ''}>HTTPS</option>
-                                        <option value="socks4" ${settings.type === 'socks4' ? 'selected' : ''}>SOCKS4</option>
-                                        <option value="socks5" ${settings.type === 'socks5' ? 'selected' : ''}>SOCKS5</option>
-                                    </select>
-                                    <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="2 4 6 8 10 4"></polyline>
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
+        // Set use system proxy
+        const useSystemCheckbox = section.querySelector('input[name="proxyUseSystem"]');
+        if (useSystemCheckbox && settings.useSystemProxy) {
+            useSystemCheckbox.checked = true;
+        }
 
-                    <div class="proxy-row">
-                        <div class="proxy-field proxy-field-grow">
-                            <label data-i18n="settings.proxy_host">Host</label>
-                            <input type="text" name="proxyHost" value="${settings.host || ''}" placeholder="proxy.example.com">
-                        </div>
-                        <div class="proxy-field proxy-field-port">
-                            <label data-i18n="settings.proxy_port">Port</label>
-                            <input type="number" name="proxyPort" value="${settings.port}" min="1" max="65535">
-                        </div>
-                    </div>
+        // Toggle visibility of manual settings
+        const manualSettings = section.querySelector('.proxy-manual-settings');
+        if (manualSettings && settings.useSystemProxy) {
+            manualSettings.classList.add('is-hidden');
+        }
 
-                    <div class="proxy-row">
-                        <label class="toggle-switch">
-                            <input type="checkbox" name="proxyAuthEnabled" ${settings.auth?.enabled ? 'checked' : ''}>
-                            <span class="toggle-track"></span>
-                            <span data-i18n="settings.proxy_auth">Authentication</span>
-                        </label>
-                    </div>
+        // Set proxy type
+        const typeSelect = section.querySelector('select[name="proxyType"]');
+        if (typeSelect && settings.type) {
+            typeSelect.value = settings.type;
+        }
 
-                    <div class="proxy-auth-fields" style="display: ${settings.auth?.enabled ? 'block' : 'none'}">
-                        <div class="proxy-row">
-                            <div class="proxy-field proxy-field-grow">
-                                <label data-i18n="settings.proxy_username">Username</label>
-                                <input type="text" name="proxyUsername" value="${settings.auth?.username || ''}" autocomplete="off">
-                            </div>
-                        </div>
-                        <div class="proxy-row">
-                            <div class="proxy-field proxy-field-grow">
-                                <label data-i18n="settings.proxy_password">Password</label>
-                                <input type="password" name="proxyPassword" value="${settings.auth?.password || ''}" autocomplete="off">
-                            </div>
-                        </div>
-                    </div>
+        // Set host and port
+        const hostInput = section.querySelector('input[name="proxyHost"]');
+        if (hostInput) {
+            hostInput.value = settings.host || '';
+        }
+        const portInput = section.querySelector('input[name="proxyPort"]');
+        if (portInput) {
+            portInput.value = settings.port || '';
+        }
 
-                        <div class="proxy-row">
-                            <div class="proxy-field proxy-field-grow">
-                                <label data-i18n="settings.proxy_bypass">Bypass List (comma-separated)</label>
-                                <input type="text" name="proxyBypass" value="${(settings.bypassList || []).join(', ')}"
-                                       placeholder="localhost, *.internal.com">
-                                <p class="proxy-field-help">Domains to bypass proxy (supports wildcards: *.example.com)</p>
-                            </div>
-                        </div>
-                    </div>
+        // Set auth enabled
+        const authEnabledCheckbox = section.querySelector('input[name="proxyAuthEnabled"]');
+        if (authEnabledCheckbox && settings.auth?.enabled) {
+            authEnabledCheckbox.checked = true;
+        }
 
-                    <div class="proxy-row proxy-actions">
-                        <button type="button" class="proxy-test-btn" data-i18n="settings.proxy_test">Test Connection</button>
-                        <span class="proxy-test-result"></span>
-                    </div>
-                </div>
-            </div>
-        `;
+        // Toggle visibility of auth fields
+        const authFields = section.querySelector('.proxy-auth-fields');
+        if (authFields && settings.auth?.enabled) {
+            authFields.classList.remove('is-hidden');
+        }
+
+        // Set auth credentials
+        const usernameInput = section.querySelector('input[name="proxyUsername"]');
+        if (usernameInput) {
+            usernameInput.value = settings.auth?.username || '';
+        }
+        const passwordInput = section.querySelector('input[name="proxyPassword"]');
+        if (passwordInput) {
+            passwordInput.value = settings.auth?.password || '';
+        }
+
+        // Set bypass list
+        const bypassInput = section.querySelector('input[name="proxyBypass"]');
+        if (bypassInput) {
+            bypassInput.value = (settings.bypassList || []).join(', ');
+        }
+
+        return section;
     }
 
     attachEventListeners(overlay) {
-        const closeBtn = overlay.querySelector('.settings-close-btn');
+        const closeBtn = overlay.querySelector('.dialog-close-btn');
         const themeSelect = overlay.querySelector('select[name="theme"]');
         const languageSelect = overlay.querySelector('select[name="language"]');
         const httpVersionSelect = overlay.querySelector('select[name="httpVersion"]');
@@ -522,6 +486,9 @@ export class SettingsModal {
         // Accent color button listeners
         const accentButtons = overlay.querySelectorAll('.accent-btn');
         accentButtons.forEach(btn => {
+            if (btn.dataset.btnColor) {
+                btn.style.setProperty('--btn-color', btn.dataset.btnColor);
+            }
             btn.addEventListener('click', async () => {
                 const { accent } = btn.dataset;
                 await this.themeManager.setAccent(accent);
@@ -595,7 +562,7 @@ export class SettingsModal {
         // Toggle proxy settings visibility
         if (proxyEnabled && proxyContent) {
             proxyEnabled.addEventListener('change', async (e) => {
-                proxyContent.style.display = e.target.checked ? 'block' : 'none';
+                proxyContent.classList.toggle('is-hidden', !e.target.checked);
                 await this.saveProxySettings(overlay);
             });
         }
@@ -603,7 +570,7 @@ export class SettingsModal {
         // Toggle system proxy vs manual settings
         if (proxyUseSystem && proxyManualSettings) {
             proxyUseSystem.addEventListener('change', async (e) => {
-                proxyManualSettings.style.display = e.target.checked ? 'none' : 'block';
+                proxyManualSettings.classList.toggle('is-hidden', e.target.checked);
                 await this.saveProxySettings(overlay);
             });
         }
@@ -611,7 +578,7 @@ export class SettingsModal {
         // Toggle auth fields visibility
         if (proxyAuthEnabled && proxyAuthFields) {
             proxyAuthEnabled.addEventListener('change', async (e) => {
-                proxyAuthFields.style.display = e.target.checked ? 'block' : 'none';
+                proxyAuthFields.classList.toggle('is-hidden', !e.target.checked);
                 await this.saveProxySettings(overlay);
             });
         }

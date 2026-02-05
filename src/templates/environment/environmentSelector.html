@@ -1,0 +1,28 @@
+<template id="tpl-environment-selector">
+    <div class="environment-selector">
+        <button id="env-selector-btn" class="env-selector-button">
+            <span class="env-icon icon icon-16 icon-globe"></span>
+            <span id="env-selector-name" class="env-name">Loading...</span>
+            <span class="env-arrow icon icon-12 icon-chevron-down"></span>
+        </button>
+        <div id="env-selector-dropdown" class="env-dropdown is-hidden"></div>
+    </div>
+</template>
+
+<template id="tpl-env-dropdown-item">
+    <div class="env-dropdown-item">
+        <span class="env-dropdown-name" data-role="name"></span>
+        <span class="env-check icon icon-14 icon-check is-hidden" data-role="check"></span>
+    </div>
+</template>
+
+<template id="tpl-env-dropdown-separator">
+    <div class="env-dropdown-separator"></div>
+</template>
+
+<template id="tpl-env-manage-item">
+    <div class="env-dropdown-item env-manage-item">
+        <span class="icon icon-14 icon-gear env-manage-icon"></span>
+        <span class="env-dropdown-name" data-role="label">Manage Environments...</span>
+    </div>
+</template>

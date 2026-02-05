@@ -1,0 +1,145 @@
+<template id="tpl-mock-server-dialog">
+    <div>
+        <div class="mock-server-header">
+            <h3 class="mock-server-title" data-role="title"></h3>
+            <button id="mock-server-close-btn" class="dialog-close-btn" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="mock-server-status-section">
+            <div class="mock-server-status-row">
+                <span id="mock-server-status-indicator" class="mock-server-status-indicator">○</span>
+                <span id="mock-server-status-text" class="mock-server-status-text" data-role="status-stopped"></span>
+                <span id="mock-server-url" class="mock-server-url"></span>
+            </div>
+            <div class="mock-server-controls">
+                <button id="mock-server-toggle-btn" class="btn btn-primary mock-server-toggle-btn" data-role="start-server"></button>
+                <label class="mock-server-port-label">
+                    <span data-role="port-label"></span>
+                    <input type="number" id="mock-server-port-input" min="1024" max="65535" value="3000" class="mock-server-port-input" />
+                </label>
+            </div>
+        </div>
+
+        <div class="mock-server-main">
+            <div class="mock-server-column mock-server-column--collections">
+                <h4 class="mock-server-section-title" data-role="collections-heading"></h4>
+                <div id="mock-server-collections" class="mock-server-collections"></div>
+            </div>
+
+            <div class="mock-server-column">
+                <div class="mock-server-log-header">
+                    <h4 class="mock-server-section-title" data-role="request-log-heading"></h4>
+                    <button id="mock-server-clear-logs-btn" class="btn-xs btn-outline" data-role="clear"></button>
+                </div>
+                <div id="mock-server-logs" class="mock-server-logs"></div>
+            </div>
+        </div>
+
+        <div class="mock-server-footer">
+            <button id="mock-server-close-btn-2" class="btn btn-outline" data-role="close"></button>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-mock-server-empty-state">
+    <div class="mock-server-empty-state" data-role="content"></div>
+</template>
+
+<template id="tpl-mock-server-logs-empty">
+    <div class="mock-server-empty-state" data-role="content"></div>
+</template>
+
+<template id="tpl-mock-server-logs-table">
+    <table class="mock-server-logs-table">
+        <thead>
+            <tr class="mock-server-logs-row">
+                <th class="mock-server-logs-th" data-role="th-time"></th>
+                <th class="mock-server-logs-th" data-role="th-method"></th>
+                <th class="mock-server-logs-th" data-role="th-path"></th>
+                <th class="mock-server-logs-th" data-role="th-status"></th>
+                <th class="mock-server-logs-th mock-server-logs-th--right" data-role="th-time-ms"></th>
+            </tr>
+        </thead>
+        <tbody data-role="tbody"></tbody>
+    </table>
+</template>
+
+<template id="tpl-mock-server-logs-row">
+    <tr class="mock-server-logs-row">
+        <td class="mock-server-logs-td mock-server-logs-td--muted" data-role="time"></td>
+        <td class="mock-server-logs-td">
+            <span class="mock-server-logs-method" data-role="method"></span>
+        </td>
+        <td class="mock-server-logs-td mock-server-logs-path" data-role="path"></td>
+        <td class="mock-server-logs-td">
+            <span class="mock-server-logs-status" data-role="status"></span>
+        </td>
+        <td class="mock-server-logs-td mock-server-logs-td--muted mock-server-logs-td--right" data-role="time-ms"></td>
+    </tr>
+</template>
+
+<template id="tpl-mock-server-response-editor">
+    <div>
+        <div class="mock-server-response-editor-header">
+            <div>
+                <h3 class="mock-server-response-editor-title" data-role="title"></h3>
+                <p class="mock-server-response-editor-subtitle" data-role="subtitle"></p>
+            </div>
+            <button id="response-editor-close" class="dialog-close-btn" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="mock-server-notice is-hidden" data-role="custom-notice"></div>
+
+        <div class="mock-server-response-editor-form-row">
+            <div class="mock-server-response-editor-form-group">
+                <label class="mock-server-response-editor-label" data-role="delay-label"></label>
+                <input
+                    type="number"
+                    id="response-editor-delay"
+                    min="0"
+                    max="30000"
+                    class="mock-server-number-input"
+                />
+                <span class="mock-server-input-hint">(0-30000)</span>
+            </div>
+            <div class="mock-server-response-editor-form-group">
+                <label class="mock-server-response-editor-label" data-role="status-code-label"></label>
+                <input
+                    type="number"
+                    id="response-editor-status-code"
+                    min="100"
+                    max="599"
+                    class="mock-server-number-input"
+                />
+                <span class="mock-server-input-hint">(100-599)</span>
+            </div>
+        </div>
+
+        <div class="mock-server-response-editor-body">
+            <label class="mock-server-response-editor-label" data-role="body-label"></label>
+            <textarea
+                id="response-editor-textarea"
+                class="mock-server-response-editor-textarea"
+                spellcheck="false"
+            ></textarea>
+            <div id="response-editor-error" class="mock-server-response-editor-error"></div>
+        </div>
+
+        <div class="mock-server-response-editor-footer">
+            <button id="response-editor-reset" class="btn btn-outline" data-role="reset"></button>
+            <div class="mock-server-response-editor-footer-actions">
+                <button id="response-editor-cancel" class="btn btn-outline" data-role="cancel"></button>
+                <button id="response-editor-save" class="btn btn-primary" data-role="save"></button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-mock-server-alert">
+    <div>
+        <p class="mock-server-alert-message" data-role="message"></p>
+        <div class="mock-server-alert-actions">
+            <button id="alert-ok" class="btn btn-primary" data-role="ok"></button>
+        </div>
+    </div>
+</template>

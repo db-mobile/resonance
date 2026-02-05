@@ -1,0 +1,50 @@
+<template id="tpl-script-editor-dialog">
+    <div>
+        <div class="dialog-header">
+            <h3 class="dialog-title" data-role="title">Edit Scripts</h3>
+            <button id="script-editor-close" class="dialog-close-btn" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="script-tabs">
+            <button class="script-tab-btn active" data-tab="pre-request">Pre-request Script</button>
+            <button class="script-tab-btn" data-tab="test">Test Script</button>
+        </div>
+
+        <div class="script-tab-content is-active" data-tab="pre-request">
+            <textarea id="pre-request-script-editor" class="script-editor-textarea"></textarea>
+            <div class="script-editor-hint">
+                <strong>Available APIs:</strong> request, environment, console, Date, Math, JSON
+            </div>
+        </div>
+
+        <div class="script-tab-content" data-tab="test">
+            <textarea id="test-script-editor" class="script-editor-textarea"></textarea>
+            <div class="script-editor-hint">
+                <strong>Available APIs:</strong> request, response, environment, console, expect(), Date, Math, JSON
+            </div>
+        </div>
+
+        <details class="script-editor-docs">
+            <summary class="script-editor-docs-summary">API Documentation</summary>
+            <div class="script-editor-docs-content">
+                <h4 class="script-editor-docs-heading">Pre-request Script:</h4>
+                <code>request.headers['key'] = 'value';</code><br>
+                <code>environment.set('name', 'value');</code><br>
+                <code>console.log('message');</code><br>
+
+                <h4 class="script-editor-docs-heading script-editor-docs-heading--spaced">Test Script:</h4>
+                <code>expect(response.status).toBe(200);</code><br>
+                <code>expect(response.body.users).toBeDefined();</code><br>
+                <code>environment.set('userId', response.body.id);</code><br>
+
+                <h4 class="script-editor-docs-heading script-editor-docs-heading--spaced">Assertions:</h4>
+                <code>toBe, toEqual, toContain, toBeDefined, toBeTruthy, toBeFalsy, toBeGreaterThan, toBeLessThan</code>
+            </div>
+        </details>
+
+        <div class="script-editor-footer">
+            <button id="script-editor-cancel" class="btn btn-outline">Cancel</button>
+            <button id="script-editor-save" class="btn btn-primary">Save</button>
+        </div>
+    </div>
+</template>

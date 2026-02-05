@@ -33,6 +33,10 @@ export class PreviewManager {
             renderer
         });
 
+        // Default to showing code view. Preview will be rendered/shown on demand.
+        codeContainer.classList.remove('is-hidden');
+        previewContainer.classList.add('is-hidden');
+
         // Set up button event listeners
         codeBtn.addEventListener('click', () => {
             this.showCode(tabId);
@@ -62,8 +66,8 @@ export class PreviewManager {
         }
 
         // Switch to code view
-        container.previewContainer.style.display = 'none';
-        container.codeContainer.style.display = 'flex';
+        container.previewContainer.classList.add('is-hidden');
+        container.codeContainer.classList.remove('is-hidden');
 
         // Update button state
         this._updateButtonState(tabId, false);
@@ -88,8 +92,8 @@ export class PreviewManager {
         }
 
         // Switch to preview view
-        container.codeContainer.style.display = 'none';
-        container.previewContainer.style.display = 'flex';
+        container.codeContainer.classList.add('is-hidden');
+        container.previewContainer.classList.remove('is-hidden');
 
         // Update preview content
         const content = container.editor.getContent();

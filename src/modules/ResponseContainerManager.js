@@ -6,7 +6,8 @@
  */
 
 import { ResponseEditor } from './responseEditor.bundle.js';
-import { attachCopyHandler } from './copyHandler.js';
+import { templateLoader } from './templateLoader.js';
+import { attachCopyHandler, attachHeadersCopyHandler } from './copyHandler.js';
 import { PreviewManager } from './PreviewManager.js';
 
 export class ResponseContainerManager {
@@ -46,9 +47,9 @@ export class ResponseContainerManager {
 
         this.containers.forEach((container, id) => {
             if (id === tabId) {
-                container.wrapper.style.display = 'flex';
+                container.wrapper.classList.remove('is-hidden');
             } else {
-                container.wrapper.style.display = 'none';
+                container.wrapper.classList.add('is-hidden');
             }
         });
     }
@@ -86,78 +87,38 @@ export class ResponseContainerManager {
      * @private
      */
     _createContainer(tabId) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'workspace-tab-response';
+        const fragment = templateLoader.cloneSync(
+            './src/templates/response/responseContainer.html',
+            'tpl-response-container'
+        );
+        const wrapper = fragment.firstElementChild;
         wrapper.dataset.tabId = tabId;
-        wrapper.style.display = 'none';
 
-        wrapper.innerHTML = `
-            <div id="response-body-${tabId}" class="tab-content active" role="tabpanel">
-                <div class="response-body-toolbar">
-                    <div class="language-selector-container">
-                        <select class="language-selector" data-tab-id="${tabId}" aria-label="Syntax Highlighting Language" title="Syntax Highlighting">
-                            <option value="json">JSON</option>
-                            <option value="xml">XML</option>
-                            <option value="html">HTML</option>
-                            <option value="text">Plain Text</option>
-                        </select>
-                        <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="2 4 6 8 10 4"></polyline>
-                        </svg>
-                    </div>
-                    <div class="preview-mode-buttons" data-tab-id="${tabId}">
-                        <button class="preview-mode-btn active" data-mode="code" data-tab-id="${tabId}" aria-label="Code View" title="Code View">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="16 18 22 12 16 6"></polyline>
-                                <polyline points="8 6 2 12 8 18"></polyline>
-                            </svg>
-                            <span>Code</span>
-                        </button>
-                        <button class="preview-mode-btn" data-mode="preview" data-tab-id="${tabId}" aria-label="Preview View" title="Preview View">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                <circle cx="12" cy="12" r="3"></circle>
-                            </svg>
-                            <span>Preview</span>
-                        </button>
-                    </div>
-                    <button class="copy-response-btn" data-tab-id="${tabId}" aria-label="Copy Response" title="Copy Response Body">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                        </svg>
-                    </button>
-                </div>
-                <div class="response-body-container" data-tab-id="${tabId}" aria-live="polite"></div>
-                <div class="response-preview-container" data-tab-id="${tabId}" style="display: none;"></div>
-            </div>
+        // Set tab-specific IDs and data-tab-id attributes
+        const bodyPanel = wrapper.querySelector('[data-role="response-body"]');
+        bodyPanel.id = `response-body-${tabId}`;
+        wrapper.querySelector('[data-role="response-headers"]').id = `response-headers-${tabId}`;
+        wrapper.querySelector('[data-role="response-metadata"]').id = `response-metadata-${tabId}`;
+        wrapper.querySelector('[data-role="response-cookies"]').id = `response-cookies-${tabId}`;
+        wrapper.querySelector('[data-role="response-trailers"]').id = `response-trailers-${tabId}`;
+        wrapper.querySelector('[data-role="response-performance"]').id = `response-performance-${tabId}`;
+        wrapper.querySelector('[data-role="response-scripts"]').id = `response-scripts-${tabId}`;
 
-            <div id="response-headers-${tabId}" class="tab-content" role="tabpanel">
-                <pre class="response-headers-display" data-tab-id="${tabId}" aria-live="polite"></pre>
-            </div>
-
-            <div id="response-metadata-${tabId}" class="tab-content" role="tabpanel">
-                <pre class="response-metadata-display" data-tab-id="${tabId}" aria-live="polite"></pre>
-            </div>
-
-            <div id="response-cookies-${tabId}" class="tab-content" role="tabpanel">
-                <div class="response-cookies-display" data-tab-id="${tabId}" aria-live="polite"></div>
-            </div>
-
-            <div id="response-trailers-${tabId}" class="tab-content" role="tabpanel">
-                <pre class="response-trailers-display" data-tab-id="${tabId}" aria-live="polite"></pre>
-            </div>
-
-            <div id="response-performance-${tabId}" class="tab-content" role="tabpanel">
-                <div class="response-performance-display" data-tab-id="${tabId}" aria-live="polite">
-                    <p class="no-data">Send a request to see performance metrics</p>
-                </div>
-            </div>
-
-            <div id="response-scripts-${tabId}" class="tab-content" role="tabpanel">
-                <div class="script-console-container response-scripts-display" data-tab-id="${tabId}" aria-live="polite"></div>
-            </div>
-        `;
+        // Set data-tab-id on interactive elements
+        wrapper.querySelector('.language-selector').dataset.tabId = tabId;
+        wrapper.querySelector('.preview-mode-buttons').dataset.tabId = tabId;
+        wrapper.querySelectorAll('.preview-mode-btn').forEach(btn => btn.dataset.tabId = tabId);
+        wrapper.querySelector('.copy-response-btn').dataset.tabId = tabId;
+        const headersCopyBtn = wrapper.querySelector('.copy-headers-btn');
+        if (headersCopyBtn) { headersCopyBtn.dataset.tabId = tabId; }
+        wrapper.querySelector('.response-body-container').dataset.tabId = tabId;
+        wrapper.querySelector('.response-preview-container').dataset.tabId = tabId;
+        wrapper.querySelector('.response-headers-display').dataset.tabId = tabId;
+        wrapper.querySelector('.response-metadata-display').dataset.tabId = tabId;
+        wrapper.querySelector('.response-cookies-display').dataset.tabId = tabId;
+        wrapper.querySelector('.response-trailers-display').dataset.tabId = tabId;
+        wrapper.querySelector('.response-performance-display').dataset.tabId = tabId;
+        wrapper.querySelector('.response-scripts-display').dataset.tabId = tabId;
 
         this.parentContainer.appendChild(wrapper);
 
@@ -169,6 +130,11 @@ export class ResponseContainerManager {
 
         // Create ResponseEditor instance for this tab
         const editor = new ResponseEditor(bodyContainer);
+
+        // Create ResponseEditor instance for headers tab (JSON display)
+        const headersContainer = wrapper.querySelector('.response-headers-display');
+        const headersEditor = new ResponseEditor(headersContainer);
+        headersEditor.setContent('', 'application/json');
 
         // Initialize PreviewManager for this tab
         if (this.previewManager && previewContainer && codeBtn && previewBtn) {
@@ -202,11 +168,18 @@ export class ResponseContainerManager {
             attachCopyHandler(copyBtn, tabId);
         }
 
+        // Get the headers copy button and attach handler
+        const copyHeadersBtn = wrapper.querySelector('.copy-headers-btn');
+        if (copyHeadersBtn) {
+            attachHeadersCopyHandler(copyHeadersBtn, tabId);
+        }
+
         return {
             wrapper,
             tabId,
             bodyContainer,
-            headersDisplay: wrapper.querySelector('.response-headers-display'),
+            headersDisplay: headersContainer,
+            headersEditor,
             metadataDisplay: wrapper.querySelector('.response-metadata-display'),
             cookiesDisplay: wrapper.querySelector('.response-cookies-display'),
             trailersDisplay: wrapper.querySelector('.response-trailers-display'),

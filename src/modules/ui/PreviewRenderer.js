@@ -4,6 +4,8 @@
  * Renders response content in preview format based on content type.
  * Handles HTML (iframe), JSON (tree view), and XML (formatted tree).
  */
+import { templateLoader } from '../templateLoader.js';
+
 export class PreviewRenderer {
     constructor(containerElement) {
         this.container = containerElement;
@@ -333,7 +335,6 @@ export class PreviewRenderer {
         const modifiedContent = this._injectCSP(content, cspMeta);
 
         iframe.srcdoc = modifiedContent;
-        iframe.style.cssText = 'width: 100%; height: 100%; border: none;';
 
         this.container.appendChild(iframe);
     }
@@ -533,19 +534,12 @@ export class PreviewRenderer {
      * @private
      */
     _renderEmptyState() {
-        this.container.innerHTML = `
-            <div class="preview-empty-state">
-                <svg class="preview-empty-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
-                </svg>
-                <p class="preview-empty-text">Preview not available for this content type</p>
-                <p class="preview-empty-subtext">Supported formats: HTML, JSON, XML</p>
-            </div>
-        `;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/preview/previewRenderer.html',
+            'tpl-preview-empty'
+        );
+        this.container.innerHTML = '';
+        this.container.appendChild(fragment);
     }
 
     /**
@@ -553,16 +547,17 @@ export class PreviewRenderer {
      * @private
      */
     _renderError(message) {
-        this.container.innerHTML = `
-            <div class="preview-empty-state">
-                <svg class="preview-empty-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                <p class="preview-empty-text">${this._escapeHtml(message)}</p>
-            </div>
-        `;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/preview/previewRenderer.html',
+            'tpl-preview-error'
+        );
+        const el = fragment.firstElementChild;
+        const messageEl = el.querySelector('[data-role="message"]');
+        if (messageEl) {
+            messageEl.textContent = message;
+        }
+        this.container.innerHTML = '';
+        this.container.appendChild(el);
     }
 
     /**

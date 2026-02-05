@@ -10,6 +10,8 @@
  * @class
  * @classdesc Manages console output and test result display
  */
+import { templateLoader } from '../templateLoader.js';
+
 export class ScriptConsolePanel {
     /**
      * Creates a ScriptConsolePanel instance
@@ -58,22 +60,14 @@ export class ScriptConsolePanel {
             return;
         }
 
-        container.style.cssText = `
-            padding: 16px;
-            background: var(--bg-primary);
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            line-height: 1.5;
-        `;
+        container.classList.add('script-console-container');
 
-        container.innerHTML = `
-            <div class="script-console-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-light);">
-                <span style="font-weight: 500; color: var(--text-primary);">Script Console</span>
-                <button class="clear-console-btn" style="padding: 4px 12px; background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; font-size: 12px;">Clear</button>
-            </div>
-            <div class="script-console-content" style="color: var(--text-secondary);"></div>
-        `;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/scripts/scriptConsolePanel.html',
+            'tpl-script-console-panel'
+        );
+        container.innerHTML = '';
+        container.appendChild(fragment);
 
         // Setup event listener for clear button
         const clearBtn = container.querySelector('.clear-console-btn');
@@ -154,42 +148,66 @@ export class ScriptConsolePanel {
         const total = passed + failed;
 
         // Show summary
-        const summary = document.createElement('div');
-        summary.style.cssText = `
-            margin-bottom: 12px;
-            padding: 8px 12px;
-            background: var(--bg-secondary);
-            border-radius: var(--radius-sm);
-            font-weight: 500;
-            color: var(--text-primary);
-        `;
-
-        if (total === 0) {
-            summary.textContent = 'No tests run';
-        } else if (failed === 0) {
-            summary.innerHTML = `<span style="color: var(--color-success, #10b981);">✓ All tests passed (${total})</span>`;
-        } else {
-            summary.innerHTML = `<span style="color: var(--color-success, #10b981);">${passed} passed</span>, <span style="color: var(--color-error, #ef4444);">${failed} failed</span>`;
+        const summaryFragment = templateLoader.cloneSync(
+            './src/templates/scripts/scriptConsolePanel.html',
+            'tpl-script-console-summary'
+        );
+        const summary = summaryFragment.firstElementChild;
+        const summarySlot = summary.querySelector('[data-role="summary"]');
+        if (summarySlot) {
+            if (total === 0) {
+                summarySlot.textContent = 'No tests run';
+            } else if (failed === 0) {
+                const allPassedFragment = templateLoader.cloneSync(
+                    './src/templates/scripts/scriptConsolePanel.html',
+                    'tpl-script-console-summary-all-passed'
+                );
+                const allPassedEl = allPassedFragment.firstElementChild;
+                const allPassedTextEl = allPassedEl.querySelector('[data-role="text"]');
+                if (allPassedTextEl) {
+                    allPassedTextEl.textContent = `✓ All tests passed (${total})`;
+                }
+                summarySlot.appendChild(allPassedEl);
+            } else {
+                const mixedFragment = templateLoader.cloneSync(
+                    './src/templates/scripts/scriptConsolePanel.html',
+                    'tpl-script-console-summary-mixed'
+                );
+                const mixedEl = mixedFragment;
+                const passedEl = mixedEl.querySelector('[data-role="passed"]');
+                const failedEl = mixedEl.querySelector('[data-role="failed"]');
+                if (passedEl) {passedEl.textContent = `${passed} passed`;}
+                if (failedEl) {failedEl.textContent = `${failed} failed`;}
+                summarySlot.appendChild(mixedEl);
+            }
         }
 
         content.appendChild(summary);
 
         // Show test results
         if (result.testResults && result.testResults.length > 0) {
-            const testList = document.createElement('div');
-            testList.style.marginBottom = '12px';
+            const testListFragment = templateLoader.cloneSync(
+                './src/templates/scripts/scriptConsolePanel.html',
+                'tpl-script-console-test-list'
+            );
+            const testList = testListFragment.firstElementChild;
 
             result.testResults.forEach(test => {
-                const testItem = document.createElement('div');
-                testItem.style.cssText = `
-                    padding: 6px 12px;
-                    margin: 4px 0;
-                    border-left: 3px solid ${test.passed ? 'var(--color-success, #10b981)' : 'var(--color-error, #ef4444)'};
-                    background: var(--bg-secondary);
-                `;
+                const testItemFragment = templateLoader.cloneSync(
+                    './src/templates/scripts/scriptConsolePanel.html',
+                    'tpl-script-console-test-item'
+                );
+                const testItem = testItemFragment.firstElementChild;
+                testItem.style.setProperty('--script-console-accent', test.passed ? 'var(--color-success, #10b981)' : 'var(--color-error, #ef4444)');
 
-                const icon = test.passed ? '<span style="color: var(--color-success, #10b981);">✓</span>' : '<span style="color: var(--color-error, #ef4444);">✗</span>';
-                testItem.innerHTML = `${icon} ${this.escapeHtml(test.message)}`;
+                testItem.classList.toggle('is-passed', test.passed);
+                testItem.classList.toggle('is-failed', !test.passed);
+
+                const icon = test.passed ? '✓' : '✗';
+                const iconEl = testItem.querySelector('[data-role="icon"]');
+                const messageEl = testItem.querySelector('[data-role="message"]');
+                if (iconEl) {iconEl.textContent = icon;}
+                if (messageEl) {messageEl.textContent = test.message;}
 
                 testList.appendChild(testItem);
             });
@@ -199,15 +217,13 @@ export class ScriptConsolePanel {
 
         // Show console logs if any
         if (result.logs && result.logs.length > 0) {
-            const separator = document.createElement('div');
-            separator.style.cssText = `
-                margin: 16px 0 12px;
-                padding-bottom: 8px;
-                border-bottom: 1px solid var(--border-light);
-                font-weight: 500;
-                color: var(--text-primary);
-            `;
-            separator.textContent = 'Console Output';
+            const sepFragment = templateLoader.cloneSync(
+                './src/templates/scripts/scriptConsolePanel.html',
+                'tpl-script-console-separator'
+            );
+            const separator = sepFragment.firstElementChild;
+            const textEl = separator.querySelector('[data-role="text"]');
+            if (textEl) {textEl.textContent = 'Console Output';}
             content.appendChild(separator);
 
             result.logs.forEach(log => {
@@ -217,15 +233,14 @@ export class ScriptConsolePanel {
 
         // Show errors if any
         if (result.errors && result.errors.length > 0) {
-            const separator = document.createElement('div');
-            separator.style.cssText = `
-                margin: 16px 0 12px;
-                padding-bottom: 8px;
-                border-bottom: 1px solid var(--border-light);
-                font-weight: 500;
-                color: var(--color-error, #ef4444);
-            `;
-            separator.textContent = 'Errors';
+            const sepFragment = templateLoader.cloneSync(
+                './src/templates/scripts/scriptConsolePanel.html',
+                'tpl-script-console-separator'
+            );
+            const separator = sepFragment.firstElementChild;
+            separator.classList.add('script-console-separator--error');
+            const textEl = separator.querySelector('[data-role="text"]');
+            if (textEl) {textEl.textContent = 'Errors';}
             content.appendChild(separator);
 
             result.errors.forEach(error => {
@@ -243,38 +258,27 @@ export class ScriptConsolePanel {
      * @param {number} timestamp - Timestamp
      */
     appendEntry(content, level, message, timestamp) {
-        const entry = document.createElement('div');
-        entry.style.cssText = `
-            padding: 4px 8px;
-            margin: 2px 0;
-            border-left: 3px solid transparent;
-            white-space: pre-wrap;
-            word-break: break-word;
-            display: flex;
-            align-items: baseline;
-            gap: 8px;
-            font-size: 12px;
-        `;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/scripts/scriptConsolePanel.html',
+            'tpl-script-console-entry'
+        );
+        const entry = fragment.firstElementChild;
 
-        let color = 'var(--text-secondary)';
         let icon = 'ℹ';
-        let borderColor = 'var(--border-light)';
+        let levelClass = 'is-default';
 
         if (level === 'error') {
-            color = 'var(--color-error, #ef4444)';
-            borderColor = 'var(--color-error, #ef4444)';
             icon = '✗';
+            levelClass = 'is-error';
         } else if (level === 'warn') {
-            color = 'var(--color-warning, #f59e0b)';
-            borderColor = 'var(--color-warning, #f59e0b)';
             icon = '⚠';
+            levelClass = 'is-warn';
         } else if (level === 'info') {
-            color = 'var(--color-info, #3b82f6)';
-            borderColor = 'var(--color-info, #3b82f6)';
             icon = 'ℹ';
+            levelClass = 'is-info';
         }
 
-        entry.style.borderLeftColor = borderColor;
+        entry.classList.add(levelClass);
 
         const timeStr = new Date(timestamp).toLocaleTimeString('en-US', {
             hour12: false,
@@ -283,11 +287,12 @@ export class ScriptConsolePanel {
             second: '2-digit'
         });
 
-        entry.innerHTML = `
-            <span style="color: ${color}; flex-shrink: 0; width: 16px;">${icon}</span>
-            <span style="color: var(--text-tertiary); font-size: 10px; flex-shrink: 0; font-family: monospace;">${timeStr}</span>
-            <span style="color: var(--text-secondary); flex: 1;">${this.escapeHtml(message)}</span>
-        `;
+        const iconEl = entry.querySelector('[data-role="icon"]');
+        const timeEl = entry.querySelector('[data-role="time"]');
+        const messageEl = entry.querySelector('[data-role="message"]');
+        if (iconEl) {iconEl.textContent = icon;}
+        if (timeEl) {timeEl.textContent = timeStr;}
+        if (messageEl) {messageEl.textContent = message;}
 
         content.appendChild(entry);
     }
@@ -315,11 +320,17 @@ export class ScriptConsolePanel {
             return;
         }
 
-        content.innerHTML = `
-            <div style="text-align: center; padding: 32px; color: var(--text-tertiary);">
-                No script output yet. Console logs and test results will appear here.
-            </div>
-        `;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/scripts/scriptConsolePanel.html',
+            'tpl-script-console-empty'
+        );
+        const emptyEl = fragment.firstElementChild;
+        const messageEl = emptyEl.querySelector('[data-role="message"]');
+        if (messageEl) {
+            messageEl.textContent = 'No script output yet. Console logs and test results will appear here.';
+        }
+        content.innerHTML = '';
+        content.appendChild(emptyEl);
     }
 
     /**
@@ -334,7 +345,7 @@ export class ScriptConsolePanel {
      */
     toggle() {
         this.isVisible = !this.isVisible;
-        this.container.style.display = this.isVisible ? 'block' : 'none';
+        this.container.classList.toggle('is-hidden', !this.isVisible);
     }
 
     /**

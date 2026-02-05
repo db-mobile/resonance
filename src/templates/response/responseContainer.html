@@ -1,0 +1,63 @@
+<template id="tpl-response-container">
+    <div class="workspace-tab-response is-hidden">
+        <div class="tab-content active" role="tabpanel" data-role="response-body">
+            <div class="response-toolbar">
+                <div class="language-selector-container">
+                    <select class="language-selector" aria-label="Syntax Highlighting Language" title="Syntax Highlighting">
+                        <option value="json">JSON</option>
+                        <option value="xml">XML</option>
+                        <option value="html">HTML</option>
+                        <option value="text">Plain Text</option>
+                    </select>
+                    <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                </div>
+                <div class="preview-mode-buttons">
+                    <button class="preview-mode-btn active" data-mode="code" aria-label="Code View" title="Code View">
+                        <span class="icon icon-16 icon-code"></span>
+                        <span>Code</span>
+                    </button>
+                    <button class="preview-mode-btn" data-mode="preview" aria-label="Preview View" title="Preview View">
+                        <span class="icon icon-16 icon-eye"></span>
+                        <span>Preview</span>
+                    </button>
+                </div>
+                <button class="copy-response-btn" aria-label="Copy Response" title="Copy Response Body">
+                    <span class="icon icon-16 icon-copy"></span>
+                </button>
+            </div>
+            <div class="response-body-container" aria-live="polite"></div>
+            <div class="response-preview-container is-hidden"></div>
+        </div>
+
+        <div class="tab-content" role="tabpanel" data-role="response-headers">
+            <div class="response-toolbar">
+                <button class="copy-headers-btn" aria-label="Copy Headers" title="Copy Response Headers">
+                    <span class="icon icon-16 icon-copy"></span>
+                </button>
+            </div>
+            <div class="response-headers-display" aria-live="polite"></div>
+        </div>
+
+        <div class="tab-content" role="tabpanel" data-role="response-metadata">
+            <pre class="response-metadata-display" aria-live="polite"></pre>
+        </div>
+
+        <div class="tab-content" role="tabpanel" data-role="response-cookies">
+            <div class="response-cookies-display" aria-live="polite"></div>
+        </div>
+
+        <div class="tab-content" role="tabpanel" data-role="response-trailers">
+            <pre class="response-trailers-display" aria-live="polite"></pre>
+        </div>
+
+        <div class="tab-content" role="tabpanel" data-role="response-performance">
+            <div class="response-performance-display" aria-live="polite">
+                <p class="no-data">Send a request to see performance metrics</p>
+            </div>
+        </div>
+
+        <div class="tab-content" role="tabpanel" data-role="response-scripts">
+            <div class="script-console-container response-scripts-display" aria-live="polite"></div>
+        </div>
+    </div>
+</template>

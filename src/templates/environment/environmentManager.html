@@ -1,0 +1,111 @@
+<template id="tpl-environment-manager-dialog-content">
+    <div class="env-manager-header">
+        <h3 class="env-manager-title">Manage Environments</h3>
+        <div class="env-manager-header-actions">
+            <button id="env-import-btn" class="btn-xs btn-outline" title="Import Environments">
+                <span class="icon icon-14 icon-import"></span>
+                <span>Import</span>
+            </button>
+            <button id="env-export-all-btn" class="btn-xs btn-outline" title="Export All Environments">
+                <span class="icon icon-14 icon-export"></span>
+                <span>Export All</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="env-manager-main">
+        <div class="env-manager-sidebar">
+            <div class="env-manager-sidebar-header">
+                <h4 class="env-manager-section-title">ENVIRONMENTS</h4>
+                <button id="env-create-btn" class="btn-sm btn-outline-primary" title="Create New Environment">+</button>
+            </div>
+            <div id="env-list" class="env-manager-list"></div>
+        </div>
+
+        <div class="env-manager-details">
+            <div id="env-details" class="env-manager-details-scroll">
+                <div class="env-manager-empty-state">
+                    Select an environment to view and edit its variables
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="env-manager-footer">
+        <button id="env-close-btn" class="btn btn-outline">Close</button>
+    </div>
+</template>
+
+<template id="tpl-environment-manager-details">
+    <div class="env-manager-details-content">
+        <div class="env-manager-details-top">
+            <input type="text" id="env-name-input" class="env-manager-name-input" />
+            <div class="env-manager-details-actions">
+                <button id="env-set-active-btn" class="btn-xs btn-outline" title="Set as Active">
+                    <span class="icon icon-14 icon-check"></span>
+                    <span>Active</span>
+                </button>
+                <span class="env-manager-active-badge is-hidden">
+                    <span class="icon icon-14 icon-check"></span>
+                    <span>ACTIVE</span>
+                </span>
+                <button id="env-duplicate-btn" class="btn-xs btn-outline" title="Duplicate Environment">
+                    <span class="icon icon-14 icon-duplicate"></span>
+                </button>
+                <button id="env-export-btn" class="btn-xs btn-outline" title="Export Environment">
+                    <span class="icon icon-14 icon-export"></span>
+                </button>
+                <button id="env-delete-btn" class="btn-xs btn-outline env-danger-btn" title="Delete Environment">
+                    <span class="icon icon-14 icon-trash"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="env-manager-variables-section">
+            <div class="env-manager-variables-header">
+                <h4 class="env-manager-section-title env-manager-section-title--no-margin">VARIABLES</h4>
+                <button id="env-add-variable-btn" class="btn-sm btn-outline-primary" title="Add Variable">+ Add</button>
+            </div>
+            <div id="env-variables-container"></div>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-environment-manager-variable-row">
+    <div class="env-variable-row">
+        <input type="text" class="var-name-input" placeholder="Variable name" />
+        <input type="text" class="var-value-input" placeholder="Value" />
+        <button class="var-delete-btn">×</button>
+    </div>
+</template>
+
+<template id="tpl-environment-manager-input-dialog">
+    <div>
+        <h3 class="env-manager-dialog-title" data-role="title"></h3>
+        <p class="env-manager-dialog-message" data-role="message"></p>
+        <input type="text" id="input-dialog-input" class="env-manager-dialog-input" />
+        <div class="env-manager-dialog-actions">
+            <button id="input-dialog-cancel" class="btn btn-outline">Cancel</button>
+            <button id="input-dialog-ok" class="btn btn-primary">OK</button>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-environment-manager-alert-dialog">
+    <div>
+        <p class="env-manager-dialog-message env-manager-dialog-message--primary" data-role="message"></p>
+        <div class="env-manager-dialog-actions">
+            <button id="alert-dialog-ok" class="btn btn-primary">OK</button>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-environment-manager-confirm-dialog">
+    <div>
+        <p class="env-manager-dialog-message env-manager-dialog-message--primary" data-role="message"></p>
+        <div class="env-manager-dialog-actions">
+            <button id="confirm-dialog-cancel" class="btn btn-outline">Cancel</button>
+            <button id="confirm-dialog-ok" class="btn btn-primary">OK</button>
+        </div>
+    </div>
+</template>

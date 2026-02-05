@@ -11,7 +11,7 @@ import { StatusDisplayAdapter } from './interfaces/IStatusDisplay.js';
 import { authManager } from './authManager.js';
 import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
 import { ResponseEditor } from './responseEditor.bundle.js';
-import { extractCookies, formatCookiesAsHtml } from './cookieParser.js';
+import { extractCookies, renderCookies } from './cookieParser.js';
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
 import { getRequestBodyContent } from './requestBodyHelper.js';
 import { MockServerRepository } from './storage/MockServerRepository.js';
@@ -179,13 +179,13 @@ export async function handleCancelRequest() {
             ? window.responseContainerManager?.getOrCreateContainer(requestTabId)
             : window.responseContainerManager?.getActiveElements();
             if (containerElements) {
-                if (containerElements.headersDisplay) {containerElements.headersDisplay.textContent = '';}
-                if (containerElements.cookiesDisplay) {containerElements.cookiesDisplay.innerHTML = '';}
+                if (containerElements.headersEditor) {containerElements.headersEditor.setContent('', 'application/json');}
+                if (containerElements.cookiesDisplay) {renderCookies(containerElements.cookiesDisplay, []);}
                 if (containerElements.performanceDisplay) {clearPerformanceMetrics(containerElements.performanceDisplay);}
             } else {
                 // Fallback to global elements
                 if (responseHeadersDisplay) {responseHeadersDisplay.textContent = '';}
-                if (responseCookiesDisplay) {responseCookiesDisplay.innerHTML = '';}
+                if (responseCookiesDisplay) {renderCookies(responseCookiesDisplay, []);}
                 if (responsePerformanceDisplay) {clearPerformanceMetrics(responsePerformanceDisplay);}
             }
         }
@@ -481,13 +481,13 @@ export async function handleSendRequest() {
             ? window.responseContainerManager?.getOrCreateContainer(requestTabId)
             : window.responseContainerManager?.getActiveElements();
         if (containerElements) {
-            if (containerElements.headersDisplay) {containerElements.headersDisplay.textContent = '';}
-            if (containerElements.cookiesDisplay) {containerElements.cookiesDisplay.innerHTML = '';}
+            if (containerElements.headersEditor) {containerElements.headersEditor.setContent('', 'application/json');}
+            if (containerElements.cookiesDisplay) {renderCookies(containerElements.cookiesDisplay, []);}
             if (containerElements.performanceDisplay) {clearPerformanceMetrics(containerElements.performanceDisplay);}
         } else {
             // Fallback to global elements
             if (responseHeadersDisplay) {responseHeadersDisplay.textContent = '';}
-            if (responseCookiesDisplay) {responseCookiesDisplay.innerHTML = '';}
+            if (responseCookiesDisplay) {renderCookies(responseCookiesDisplay, []);}
             if (responsePerformanceDisplay) {clearPerformanceMetrics(responsePerformanceDisplay);}
         }
 
@@ -543,16 +543,18 @@ export async function handleSendRequest() {
                 : window.responseContainerManager?.getActiveElements();
 
             if (containerElements) {
-                // Write headers to workspace tab's container
+                // Write headers to workspace tab's container using CodeMirror
                 let headersString = '';
                 if (result.headers) {
                     headersString = JSON.stringify(result.headers, null, 2);
                 }
-                containerElements.headersDisplay.textContent = headersString || 'No response headers.';
+                if (containerElements.headersEditor) {
+                    containerElements.headersEditor.setContent(headersString || 'No response headers.', 'application/json');
+                }
 
                 // Parse and display cookies to workspace tab's container
                 const cookies = extractCookies(result.headers);
-                containerElements.cookiesDisplay.innerHTML = formatCookiesAsHtml(cookies);
+                renderCookies(containerElements.cookiesDisplay, cookies);
 
                 // Display performance metrics to workspace tab's container
                 displayPerformanceMetrics(containerElements.performanceDisplay, result.timings, result.size);
@@ -562,10 +564,12 @@ export async function handleSendRequest() {
                 if (result.headers) {
                     headersString = JSON.stringify(result.headers, null, 2);
                 }
-                responseHeadersDisplay.textContent = headersString || 'No response headers.';
+                if (responseHeadersDisplay) {
+                    responseHeadersDisplay.textContent = headersString || 'No response headers.';
+                }
 
                 const cookies = extractCookies(result.headers);
-                responseCookiesDisplay.innerHTML = formatCookiesAsHtml(cookies);
+                renderCookies(responseCookiesDisplay, cookies);
 
                 displayPerformanceMetrics(responsePerformanceDisplay, result.timings, result.size);
             }
@@ -631,13 +635,13 @@ export async function handleSendRequest() {
                 ? window.responseContainerManager?.getOrCreateContainer(requestTabId)
                 : window.responseContainerManager?.getActiveElements();
             if (containerElements) {
-                if (containerElements.headersDisplay) {containerElements.headersDisplay.textContent = '';}
-                if (containerElements.cookiesDisplay) {containerElements.cookiesDisplay.innerHTML = '';}
+                if (containerElements.headersEditor) {containerElements.headersEditor.setContent('', 'application/json');}
+                if (containerElements.cookiesDisplay) {renderCookies(containerElements.cookiesDisplay, []);}
                 if (containerElements.performanceDisplay) {clearPerformanceMetrics(containerElements.performanceDisplay);}
             } else {
                 // Fallback to global elements
                 if (responseHeadersDisplay) {responseHeadersDisplay.textContent = '';}
-                if (responseCookiesDisplay) {responseCookiesDisplay.innerHTML = '';}
+                if (responseCookiesDisplay) {renderCookies(responseCookiesDisplay, []);}
                 if (responsePerformanceDisplay) {clearPerformanceMetrics(responsePerformanceDisplay);}
             }
             setRequestInProgress(false);
@@ -682,14 +686,14 @@ export async function handleSendRequest() {
         if (error.headers && Object.keys(error.headers).length > 0) {
             try {
                 const headersText = JSON.stringify(error.headers, null, 2);
-                if (containerElements && containerElements.headersDisplay) {
-                    containerElements.headersDisplay.textContent = headersText;
+                if (containerElements && containerElements.headersEditor) {
+                    containerElements.headersEditor.setContent(headersText, 'application/json');
                 } else if (responseHeadersDisplay) {
                     responseHeadersDisplay.textContent = headersText;
                 }
             } catch {
-                if (containerElements && containerElements.headersDisplay) {
-                    containerElements.headersDisplay.textContent = 'Error parsing response headers.';
+                if (containerElements && containerElements.headersEditor) {
+                    containerElements.headersEditor.setContent('Error parsing response headers.', 'application/json');
                 } else if (responseHeadersDisplay) {
                     responseHeadersDisplay.textContent = 'Error parsing response headers.';
                 }
@@ -697,23 +701,22 @@ export async function handleSendRequest() {
 
             // Parse and display cookies from error response
             const cookies = extractCookies(error.headers);
-            const cookiesHtml = formatCookiesAsHtml(cookies);
             if (containerElements && containerElements.cookiesDisplay) {
-                containerElements.cookiesDisplay.innerHTML = cookiesHtml;
+                renderCookies(containerElements.cookiesDisplay, cookies);
             } else if (responseCookiesDisplay) {
-                responseCookiesDisplay.innerHTML = cookiesHtml;
+                renderCookies(responseCookiesDisplay, cookies);
             }
         } else {
-            if (containerElements && containerElements.headersDisplay) {
-                containerElements.headersDisplay.textContent = 'No headers available for error response.';
+            if (containerElements && containerElements.headersEditor) {
+                containerElements.headersEditor.setContent('No headers available for error response.', 'application/json');
             } else if (responseHeadersDisplay) {
                 responseHeadersDisplay.textContent = 'No headers available for error response.';
             }
 
             if (containerElements && containerElements.cookiesDisplay) {
-                containerElements.cookiesDisplay.innerHTML = '';
+                renderCookies(containerElements.cookiesDisplay, []);
             } else if (responseCookiesDisplay) {
-                responseCookiesDisplay.innerHTML = '';
+                renderCookies(responseCookiesDisplay, []);
             }
         }
 

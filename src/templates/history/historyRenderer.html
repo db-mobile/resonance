@@ -1,0 +1,29 @@
+<template id="tpl-history-empty">
+    <div class="history-empty">
+        <span class="history-empty-icon icon icon-64 icon-history"></span>
+        <p class="history-empty-text" data-i18n="history.empty">No request history</p>
+        <p class="history-empty-subtext" data-i18n="history.empty_subtext">Send a request to see it here</p>
+    </div>
+</template>
+
+<template id="tpl-history-item">
+    <div class="history-item" data-role="item">
+        <div class="history-item-header">
+            <span class="history-item-method" data-role="method"></span>
+            <span data-role="status-slot"></span>
+            <span class="history-item-time" data-role="time"></span>
+        </div>
+        <div class="history-item-url" data-role="url"></div>
+        <button class="history-item-delete" title="Delete from history" aria-label="Delete from history">
+            <span class="icon icon-14 icon-trash"></span>
+        </button>
+    </div>
+</template>
+
+<template id="tpl-history-status-badge">
+    <span class="history-item-status" data-role="status"></span>
+</template>
+
+<template id="tpl-history-status-error">
+    <span class="history-item-status history-item-error" data-role="status">Error</span>
+</template>

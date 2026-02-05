@@ -4,26 +4,26 @@
  */
 :root {
   /* Text Colors */
-  --text-primary: #e4e4e4;
-  --text-secondary: #a0a0a0;
-  --text-tertiary: #737373;
-  --text-disabled: #525252;
-  --text-inverse: #181818;
+  --text-primary: #f0f0f0;
+  --text-secondary: #b8b8b8;
+  --text-tertiary: #8a8a8a;
+  --text-disabled: #5c5c5c;
+  --text-inverse: #1a1a1a;
 
-  /* Background Colors - Hoppscotch Dark */
-  --bg-primary: #181818;
-  --bg-secondary: #1f1f1f;
-  --bg-tertiary: #272727;
-  --bg-overlay: rgba(24, 24, 24, 0.95);
-  --bg-glass: rgba(24, 24, 24, 0.8);
-  --bg-glass-strong: rgba(24, 24, 24, 0.9);
+  /* Background Colors - Improved Dark */
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #282828;
+  --bg-tertiary: #323232;
+  --bg-overlay: rgba(30, 30, 30, 0.95);
+  --bg-glass: rgba(30, 30, 30, 0.85);
+  --bg-glass-strong: rgba(30, 30, 30, 0.92);
 
-  /* Border Colors - Subtle */
-  --border-light: #2d2d2d;
-  --border-medium: #3d3d3d;
-  --border-strong: #525252;
+  /* Border Colors - More Visible */
+  --border-light: #3a3a3a;
+  --border-medium: #4a4a4a;
+  --border-strong: #606060;
   --border-focus: var(--accent, #10b981);
-  --border-glass: rgba(45, 45, 45, 0.5);
+  --border-glass: rgba(58, 58, 58, 0.6);
 
   /* Shadows - Minimal */
   --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
@@ -34,22 +34,22 @@
   --shadow-xl: 0 16px 32px -8px rgba(0, 0, 0, 0.5);
 
   /* Status Colors - Dark mode variants */
-  --color-success-light: rgba(16, 185, 129, 0.15);
-  --color-warning-light: rgba(234, 179, 8, 0.15);
-  --color-error-light: rgba(239, 68, 68, 0.15);
-  --color-primary-light: rgba(59, 130, 246, 0.15);
+  --color-success-light: rgba(16, 185, 129, 0.18);
+  --color-warning-light: rgba(234, 179, 8, 0.18);
+  --color-error-light: rgba(239, 68, 68, 0.18);
+  --color-primary-light: rgba(59, 130, 246, 0.18);
 
   /* HTTP Method Colors */
-  --method-get-bg: rgba(34, 197, 94, 0.15);
-  --method-get-text: #4ade80;
-  --method-post-bg: rgba(59, 130, 246, 0.15);
-  --method-post-text: #60a5fa;
-  --method-put-bg: rgba(249, 115, 22, 0.15);
-  --method-put-text: #fb923c;
-  --method-delete-bg: rgba(239, 68, 68, 0.15);
-  --method-delete-text: #f87171;
-  --method-patch-bg: rgba(168, 85, 247, 0.15);
-  --method-patch-text: #c084fc;
+  --method-get-bg: rgba(34, 197, 94, 0.18);
+  --method-get-text: #5ee98d;
+  --method-post-bg: rgba(59, 130, 246, 0.18);
+  --method-post-text: #74b3ff;
+  --method-put-bg: rgba(249, 115, 22, 0.18);
+  --method-put-text: #ffa352;
+  --method-delete-bg: rgba(239, 68, 68, 0.18);
+  --method-delete-text: #ff8585;
+  --method-patch-bg: rgba(168, 85, 247, 0.18);
+  --method-patch-text: #d4a5ff;
 
   /* Theme-specific overrides */
   --input-bg: var(--bg-secondary);

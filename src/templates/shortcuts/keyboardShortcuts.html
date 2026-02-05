@@ -1,0 +1,25 @@
+<template id="tpl-keyboard-shortcuts-overlay">
+    <div class="keyboard-shortcuts-overlay">
+        <div id="keyboard-shortcuts-dialog" class="modal-dialog">
+            <div class="keyboard-shortcuts-header">
+                <h2 data-i18n="shortcuts.title">Keyboard Shortcuts</h2>
+                <button id="close-shortcuts-btn" class="dialog-close-btn" aria-label="Close">×</button>
+            </div>
+            <div class="keyboard-shortcuts-content" data-role="content"></div>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-shortcuts-category">
+    <div class="shortcuts-category">
+        <h3 data-role="title"></h3>
+        <div class="shortcuts-list" data-role="list"></div>
+    </div>
+</template>
+
+<template id="tpl-shortcut-item">
+    <div class="shortcut-item">
+        <span class="shortcut-description" data-role="description"></span>
+        <kbd class="shortcut-keys" data-role="keys"></kbd>
+    </div>
+</template>

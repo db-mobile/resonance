@@ -74,18 +74,26 @@ button:hover {
 }
 
 /* Sidebar Areas */
-.collections-sidebar,
-.collections-container,
-.collections-list {
-  background: var(--sidebar-bg, var(--bg-secondary)) !important;
+.collections-sidebar {
+  background: var(--bg-glass) !important;
   color: var(--text-primary) !important;
 }
 
-.collections-empty,
+.collections-container,
+.collections-list {
+  background: transparent !important;
+  color: var(--text-primary) !important;
+}
+
+.collections-empty {
+  background: transparent !important;
+  color: var(--text-primary) !important;
+}
+
 .collection-item,
 .collection-endpoints,
 .endpoint-item {
-  background: var(--sidebar-bg, var(--bg-secondary)) !important;
+  background: transparent !important;
   color: var(--text-primary) !important;
 }
 

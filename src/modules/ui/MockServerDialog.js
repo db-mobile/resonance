@@ -3,6 +3,8 @@
  * @module ui/MockServerDialog
  */
 
+import { templateLoader } from '../templateLoader.js';
+
 /**
  * UI Dialog for managing mock server
  *
@@ -46,87 +48,63 @@ export class MockServerDialog {
     async createDialog() {
         // Create overlay
         this.dialog = document.createElement('div');
-        this.dialog.className = 'mock-server-overlay';
-        this.dialog.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-        `;
+        this.dialog.className = 'mock-server-overlay modal-overlay';
 
         const dialogContent = document.createElement('div');
-        dialogContent.className = 'mock-server-dialog';
-        dialogContent.style.cssText = `
-            background: var(--bg-primary);
-            border-radius: var(--radius-xl);
-            padding: 24px;
-            width: 90vw;
-            max-width: 1200px;
-            max-height: 85vh;
-            display: flex;
-            flex-direction: column;
-            box-shadow: var(--shadow-xl);
-            border: 1px solid var(--border-light);
-        `;
+        dialogContent.className = 'mock-server-dialog modal-dialog modal-dialog--mock-server';
 
         const t = (key, fallback) => window.i18n ? window.i18n.t(key) || fallback : fallback;
 
-        dialogContent.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h3 style="margin: 0; color: var(--text-primary);">${t('mock_server.title', 'Mock Server')}</h3>
-                <button id="mock-server-close-btn" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 24px; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;" aria-label="${t('mock_server.close', 'Close')}">&times;</button>
-            </div>
+        const fragment = templateLoader.cloneSync(
+            './src/templates/mockServer/mockServerDialog.html',
+            'tpl-mock-server-dialog'
+        );
+        dialogContent.appendChild(fragment);
 
-            <!-- Status Section -->
-            <div style="background: var(--bg-secondary); padding: 16px; border-radius: var(--radius-md); margin-bottom: 16px;">
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                    <span id="mock-server-status-indicator" style="font-size: 20px;">○</span>
-                    <span id="mock-server-status-text" style="color: var(--text-primary); font-weight: 500;">${t('mock_server.status_stopped', 'Stopped')}</span>
-                    <span id="mock-server-url" style="color: var(--text-secondary); font-size: 13px;"></span>
-                </div>
-                <div style="display: flex; gap: 12px; align-items: center;">
-                    <button id="mock-server-toggle-btn" style="padding: 8px 16px; border: none; background: var(--color-primary); color: white; border-radius: var(--radius-sm); cursor: pointer; font-weight: 500;">${t('mock_server.start_server', 'Start Server')}</button>
-                    <label style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 14px;">
-                        ${t('mock_server.port', 'Port')}:
-                        <input
-                            type="number"
-                            id="mock-server-port-input"
-                            min="1024"
-                            max="65535"
-                            value="3000"
-                            style="width: 100px; padding: 6px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-primary); color: var(--text-primary);"
-                        />
-                    </label>
-                </div>
-            </div>
+        const titleEl = dialogContent.querySelector('[data-role="title"]');
+        if (titleEl) {
+            titleEl.textContent = t('mock_server.title', 'Mock Server');
+        }
 
-            <div style="display: flex; gap: 16px; flex: 1; overflow: hidden;">
-                <!-- Collections Section -->
-                <div style="flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border-light); padding-right: 16px; overflow: hidden;">
-                    <h4 style="margin: 0 0 12px 0; font-size: 14px; color: var(--text-secondary);">${t('mock_server.collections_heading', 'COLLECTIONS TO MOCK')}</h4>
-                    <div id="mock-server-collections" style="flex: 1; overflow-y: auto;"></div>
-                </div>
+        const statusStoppedEl = dialogContent.querySelector('[data-role="status-stopped"]');
+        if (statusStoppedEl) {
+            statusStoppedEl.textContent = t('mock_server.status_stopped', 'Stopped');
+        }
 
-                <!-- Request Log Section -->
-                <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <h4 style="margin: 0; font-size: 14px; color: var(--text-secondary);">${t('mock_server.request_log_heading', 'REQUEST LOG')}</h4>
-                        <button id="mock-server-clear-logs-btn" style="padding: 4px 12px; border: 1px solid var(--border-light); background: transparent; color: var(--text-secondary); border-radius: var(--radius-sm); cursor: pointer; font-size: 12px;">${t('mock_server.clear', 'Clear')}</button>
-                    </div>
-                    <div id="mock-server-logs" style="flex: 1; overflow-y: auto; font-family: monospace; font-size: 12px;"></div>
-                </div>
-            </div>
+        const startServerEl = dialogContent.querySelector('[data-role="start-server"]');
+        if (startServerEl) {
+            startServerEl.textContent = t('mock_server.start_server', 'Start Server');
+        }
 
-            <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-light);">
-                <button id="mock-server-close-btn-2" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: var(--radius-sm); cursor: pointer;">${t('mock_server.close', 'Close')}</button>
-            </div>
-        `;
+        const portLabelEl = dialogContent.querySelector('[data-role="port-label"]');
+        if (portLabelEl) {
+            portLabelEl.textContent = `${t('mock_server.port', 'Port')}:`;
+        }
+
+        const collectionsHeadingEl = dialogContent.querySelector('[data-role="collections-heading"]');
+        if (collectionsHeadingEl) {
+            collectionsHeadingEl.textContent = t('mock_server.collections_heading', 'COLLECTIONS TO MOCK');
+        }
+
+        const requestLogHeadingEl = dialogContent.querySelector('[data-role="request-log-heading"]');
+        if (requestLogHeadingEl) {
+            requestLogHeadingEl.textContent = t('mock_server.request_log_heading', 'REQUEST LOG');
+        }
+
+        const clearEl = dialogContent.querySelector('[data-role="clear"]');
+        if (clearEl) {
+            clearEl.textContent = t('mock_server.clear', 'Clear');
+        }
+
+        const closeEl = dialogContent.querySelector('[data-role="close"]');
+        if (closeEl) {
+            closeEl.textContent = t('mock_server.close', 'Close');
+        }
+
+        const closeBtn = dialogContent.querySelector('#mock-server-close-btn');
+        if (closeBtn) {
+            closeBtn.setAttribute('aria-label', t('mock_server.close', 'Close'));
+        }
 
         this.dialog.appendChild(dialogContent);
         document.body.appendChild(this.dialog);
@@ -222,11 +200,26 @@ export class MockServerDialog {
         const t = (key, fallback) => window.i18n ? window.i18n.t(key) || fallback : fallback;
 
         if (collections.length === 0) {
-            container.innerHTML = `
-                <div style="text-align: center; color: var(--text-secondary); padding: 40px 20px;">
-                    ${t('mock_server.empty_collections', 'No collections available.<br>Import an OpenAPI or Postman collection first.')}
-                </div>
-            `;
+            const fragment = templateLoader.cloneSync(
+                './src/templates/mockServer/mockServerDialog.html',
+                'tpl-mock-server-empty-state'
+            );
+            const emptyEl = fragment.firstElementChild;
+            const contentEl = emptyEl.querySelector('[data-role="content"]');
+            if (contentEl) {
+                const raw = t('mock_server.empty_collections', 'No collections available.<br>Import an OpenAPI or Postman collection first.');
+                contentEl.innerHTML = '';
+                String(raw)
+                    .split(/<br\s*\/?\s*>/i)
+                    .forEach((part, idx) => {
+                        if (idx > 0) {
+                            contentEl.appendChild(document.createElement('br'));
+                        }
+                        contentEl.appendChild(document.createTextNode(part));
+                    });
+            }
+            container.innerHTML = '';
+            container.appendChild(emptyEl);
             return;
         }
 
@@ -237,23 +230,15 @@ export class MockServerDialog {
             const endpoints = collection.endpoints || [];
 
             const collectionDiv = document.createElement('div');
-            collectionDiv.style.cssText = `
-                margin-bottom: 16px;
-                border: 1px solid var(--border-light);
-                border-radius: var(--radius-sm);
-                padding: 12px;
-                background: var(--bg-secondary);
-            `;
+            collectionDiv.className = 'mock-server-collection';
 
-            // Collection header with checkbox
+            // Collection header with toggle switch
             const headerDiv = document.createElement('div');
-            headerDiv.style.cssText = `
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                margin-bottom: ${isEnabled && endpoints.length > 0 ? '12px' : '0'};
-                cursor: pointer;
-            `;
+            headerDiv.className = 'mock-server-collection-header';
+            headerDiv.classList.toggle('has-endpoints', Boolean(isEnabled && endpoints.length > 0));
+
+            const toggleLabel = document.createElement('label');
+            toggleLabel.className = 'toggle-switch';
 
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
@@ -264,87 +249,49 @@ export class MockServerDialog {
                 e.stopPropagation();
             });
 
-            const label = document.createElement('label');
-            label.style.cssText = `
-                flex: 1;
-                color: var(--text-primary);
-                font-weight: 500;
-                cursor: pointer;
-            `;
-            label.textContent = `${collection.name} (${endpoints.length} ${t('mock_server.endpoints', 'endpoints')})`;
-            label.addEventListener('click', () => checkbox.click());
+            const toggleTrack = document.createElement('span');
+            toggleTrack.className = 'toggle-track';
 
-            headerDiv.appendChild(checkbox);
-            headerDiv.appendChild(label);
+            const labelText = document.createElement('span');
+            labelText.className = 'mock-server-collection-label';
+            labelText.textContent = `${collection.name} (${endpoints.length} ${t('mock_server.endpoints', 'endpoints')})`;
+
+            toggleLabel.appendChild(checkbox);
+            toggleLabel.appendChild(toggleTrack);
+            toggleLabel.appendChild(labelText);
+            headerDiv.appendChild(toggleLabel);
             collectionDiv.appendChild(headerDiv);
 
             // Endpoints list (only show if enabled)
             if (isEnabled && endpoints.length > 0) {
                 const endpointsDiv = document.createElement('div');
-                endpointsDiv.style.cssText = `
-                    padding-left: 24px;
-                    border-left: 2px solid var(--border-light);
-                    margin-left: 8px;
-                `;
+                endpointsDiv.className = 'mock-server-endpoints';
 
                 // Determine how many endpoints to show (10 by default, or all if expanded)
                 const endpointsToShow = collection._showAllEndpoints ? endpoints : endpoints.slice(0, 10);
 
                 for (const endpoint of endpointsToShow) {
                     const endpointDiv = document.createElement('div');
-                    endpointDiv.style.cssText = `
-                        display: flex;
-                        align-items: center;
-                        gap: 12px;
-                        margin-bottom: 8px;
-                        font-size: 13px;
-                    `;
+                    endpointDiv.className = 'mock-server-endpoint';
 
                     const methodSpan = document.createElement('span');
-                    methodSpan.style.cssText = `
-                        display: inline-block;
-                        padding: 2px 6px;
-                        background: var(--color-primary-light);
-                        color: var(--color-primary);
-                        border-radius: var(--radius-sm);
-                        font-weight: 600;
-                        font-size: 11px;
-                        min-width: 45px;
-                        text-align: center;
-                    `;
+                    methodSpan.className = 'mock-server-endpoint-method';
                     methodSpan.textContent = endpoint.method.toUpperCase();
 
                     const pathSpan = document.createElement('span');
-                    pathSpan.style.cssText = `
-                        flex: 1;
-                        color: var(--text-secondary);
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        white-space: nowrap;
-                    `;
+                    pathSpan.className = 'mock-server-endpoint-path';
                     pathSpan.textContent = endpoint.path;
 
                     const editResponseBtn = document.createElement('button');
-                    editResponseBtn.style.cssText = `
-                        padding: 4px 8px;
-                        border: 1px solid var(--border-light);
-                        background: var(--bg-primary);
-                        color: var(--color-primary);
-                        border-radius: var(--radius-sm);
-                        cursor: pointer;
-                        font-size: 11px;
-                        margin-left: 8px;
-                        display: flex;
-                        align-items: center;
-                        gap: 4px;
-                    `;
-                    editResponseBtn.innerHTML = `
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                        </svg>
-                        <span>${t('mock_server.edit_response', 'Edit')}</span>
-                    `;
+                    editResponseBtn.className = 'mock-server-edit-response-btn';
+                    {
+                        const iconEl = document.createElement('span');
+                        iconEl.className = 'icon icon-12 icon-pencil';
+                        const labelEl = document.createElement('span');
+                        labelEl.textContent = t('mock_server.edit_response', 'Edit');
+                        editResponseBtn.appendChild(iconEl);
+                        editResponseBtn.appendChild(labelEl);
+                    }
                     editResponseBtn.title = t('mock_server.edit_response_tooltip', 'Edit custom response');
                     editResponseBtn.addEventListener('click', () => {
                         this.showResponseEditor(collection, endpoint);
@@ -359,24 +306,18 @@ export class MockServerDialog {
 
                 if (endpoints.length > 10 && !collection._showAllEndpoints) {
                     const moreDiv = document.createElement('div');
-                    moreDiv.style.cssText = `
-                        color: var(--color-primary);
-                        font-size: 12px;
-                        margin-top: 8px;
-                        cursor: pointer;
-                        display: flex;
-                        align-items: center;
-                        gap: 4px;
-                    `;
+                    moreDiv.className = 'mock-server-endpoints-toggle';
                     const showAllText = window.i18n ?
                         window.i18n.t('mock_server.show_all_endpoints', { count: endpoints.length }) || `Show all ${endpoints.length} endpoints` :
                         `Show all ${endpoints.length} endpoints`;
-                    moreDiv.innerHTML = `
-                        <span>${showAllText}</span>
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="2 4 6 8 10 4"></polyline>
-                        </svg>
-                    `;
+                    {
+                        const labelEl = document.createElement('span');
+                        labelEl.textContent = showAllText;
+                        const iconEl = document.createElement('span');
+                        iconEl.className = 'icon icon-12 icon-chevron-down';
+                        moreDiv.appendChild(labelEl);
+                        moreDiv.appendChild(iconEl);
+                    }
                     moreDiv.addEventListener('click', async () => {
                         collection._showAllEndpoints = true;
                         await this.renderCollections(collections, settings);
@@ -384,21 +325,15 @@ export class MockServerDialog {
                     endpointsDiv.appendChild(moreDiv);
                 } else if (endpoints.length > 10 && collection._showAllEndpoints) {
                     const lessDiv = document.createElement('div');
-                    lessDiv.style.cssText = `
-                        color: var(--color-primary);
-                        font-size: 12px;
-                        margin-top: 8px;
-                        cursor: pointer;
-                        display: flex;
-                        align-items: center;
-                        gap: 4px;
-                    `;
-                    lessDiv.innerHTML = `
-                        <span>${t('mock_server.show_less', 'Show less')}</span>
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="10 8 6 4 2 8"></polyline>
-                        </svg>
-                    `;
+                    lessDiv.className = 'mock-server-endpoints-toggle';
+                    {
+                        const labelEl = document.createElement('span');
+                        labelEl.textContent = t('mock_server.show_less', 'Show less');
+                        const iconEl = document.createElement('span');
+                        iconEl.className = 'icon icon-12 icon-chevron-up';
+                        lessDiv.appendChild(labelEl);
+                        lessDiv.appendChild(iconEl);
+                    }
                     lessDiv.addEventListener('click', async () => {
                         collection._showAllEndpoints = false;
                         await this.renderCollections(collections, settings);
@@ -572,19 +507,21 @@ export class MockServerDialog {
 
         if (status.running) {
             indicator.textContent = '●';
-            indicator.style.color = 'var(--color-success)';
+            indicator.classList.add('is-running');
             statusText.textContent = t('mock_server.status_running', 'Running');
             urlText.textContent = `http://localhost:${status.port}`;
             toggleBtn.textContent = t('mock_server.stop_server', 'Stop Server');
-            toggleBtn.style.background = 'var(--color-danger)';
+            toggleBtn.classList.remove('btn-primary');
+            toggleBtn.classList.add('btn-danger');
             portInput.disabled = true;
         } else {
             indicator.textContent = '○';
-            indicator.style.color = 'var(--text-secondary)';
+            indicator.classList.remove('is-running');
             statusText.textContent = t('mock_server.status_stopped', 'Stopped');
             urlText.textContent = '';
             toggleBtn.textContent = t('mock_server.start_server', 'Start Server');
-            toggleBtn.style.background = 'var(--color-primary)';
+            toggleBtn.classList.remove('btn-danger');
+            toggleBtn.classList.add('btn-primary');
             portInput.disabled = false;
         }
     }
@@ -605,49 +542,74 @@ export class MockServerDialog {
             }
 
             if (!logs || logs.length === 0) {
-                container.innerHTML = `
-                    <div style="text-align: center; color: var(--text-secondary); padding: 40px 20px;">
-                        ${t('mock_server.empty_logs', 'No requests logged yet.')}
-                    </div>
-                `;
+                const fragment = templateLoader.cloneSync(
+                    './src/templates/mockServer/mockServerDialog.html',
+                    'tpl-mock-server-logs-empty'
+                );
+                const emptyEl = fragment.firstElementChild;
+                const contentEl = emptyEl.querySelector('[data-role="content"]');
+                if (contentEl) {
+                    contentEl.textContent = t('mock_server.empty_logs', 'No requests logged yet.');
+                }
+                container.innerHTML = '';
+                container.appendChild(emptyEl);
                 return;
             }
 
-            container.innerHTML = `
-                <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                    <thead>
-                        <tr style="border-bottom: 1px solid var(--border-light);">
-                            <th style="text-align: left; padding: 8px 4px; color: var(--text-secondary); font-weight: 500;">${t('mock_server.log_time', 'Time')}</th>
-                            <th style="text-align: left; padding: 8px 4px; color: var(--text-secondary); font-weight: 500;">${t('mock_server.log_method', 'Method')}</th>
-                            <th style="text-align: left; padding: 8px 4px; color: var(--text-secondary); font-weight: 500;">${t('mock_server.log_path', 'Path')}</th>
-                            <th style="text-align: left; padding: 8px 4px; color: var(--text-secondary); font-weight: 500;">${t('mock_server.log_status', 'Status')}</th>
-                            <th style="text-align: right; padding: 8px 4px; color: var(--text-secondary); font-weight: 500;">${t('mock_server.log_time_ms', 'Time (ms)')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${logs.map(log => {
-                            const time = new Date(log.timestamp).toLocaleTimeString();
-                            const statusColor = log.responseStatus === 200 ? 'var(--color-success)' :
-                                              log.responseStatus === 404 ? 'var(--color-warning)' :
-                                              'var(--color-danger)';
+            const tableFragment = templateLoader.cloneSync(
+                './src/templates/mockServer/mockServerDialog.html',
+                'tpl-mock-server-logs-table'
+            );
+            const tableEl = tableFragment.firstElementChild;
+            const tbodyEl = tableEl.querySelector('[data-role="tbody"]');
 
-                            return `
-                                <tr style="border-bottom: 1px solid var(--border-light);">
-                                    <td style="padding: 8px 4px; color: var(--text-secondary);">${time}</td>
-                                    <td style="padding: 8px 4px;">
-                                        <span style="color: var(--color-primary); font-weight: 600;">${log.method}</span>
-                                    </td>
-                                    <td style="padding: 8px 4px; color: var(--text-primary); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.path}">${log.path}</td>
-                                    <td style="padding: 8px 4px;">
-                                        <span style="color: ${statusColor}; font-weight: 600;">${log.responseStatus}</span>
-                                    </td>
-                                    <td style="padding: 8px 4px; color: var(--text-secondary); text-align: right;">${log.responseTime}</td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            `;
+            const thTimeEl = tableEl.querySelector('[data-role="th-time"]');
+            const thMethodEl = tableEl.querySelector('[data-role="th-method"]');
+            const thPathEl = tableEl.querySelector('[data-role="th-path"]');
+            const thStatusEl = tableEl.querySelector('[data-role="th-status"]');
+            const thTimeMsEl = tableEl.querySelector('[data-role="th-time-ms"]');
+
+            if (thTimeEl) {thTimeEl.textContent = t('mock_server.log_time', 'Time');}
+            if (thMethodEl) {thMethodEl.textContent = t('mock_server.log_method', 'Method');}
+            if (thPathEl) {thPathEl.textContent = t('mock_server.log_path', 'Path');}
+            if (thStatusEl) {thStatusEl.textContent = t('mock_server.log_status', 'Status');}
+            if (thTimeMsEl) {thTimeMsEl.textContent = t('mock_server.log_time_ms', 'Time (ms)');}
+
+            logs.forEach(log => {
+                const rowFragment = templateLoader.cloneSync(
+                    './src/templates/mockServer/mockServerDialog.html',
+                    'tpl-mock-server-logs-row'
+                );
+                const rowEl = rowFragment.firstElementChild;
+
+                const time = new Date(log.timestamp).toLocaleTimeString();
+                const statusClass = log.responseStatus === 200 ? 'is-success' :
+                    log.responseStatus === 404 ? 'is-warning' :
+                        'is-danger';
+
+                const timeEl = rowEl.querySelector('[data-role="time"]');
+                const methodEl = rowEl.querySelector('[data-role="method"]');
+                const pathEl = rowEl.querySelector('[data-role="path"]');
+                const statusEl = rowEl.querySelector('[data-role="status"]');
+                const timeMsEl = rowEl.querySelector('[data-role="time-ms"]');
+
+                if (timeEl) {timeEl.textContent = time;}
+                if (methodEl) {methodEl.textContent = log.method;}
+                if (pathEl) {
+                    pathEl.textContent = log.path;
+                    pathEl.title = log.path;
+                }
+                if (statusEl) {
+                    statusEl.textContent = log.responseStatus;
+                    statusEl.classList.add(statusClass);
+                }
+                if (timeMsEl) {timeMsEl.textContent = log.responseTime;}
+
+                tbodyEl.appendChild(rowEl);
+            });
+
+            container.innerHTML = '';
+            container.appendChild(tableEl);
         } catch (error) {
             void error;
         }
@@ -661,36 +623,26 @@ export class MockServerDialog {
     showAlert(message) {
         const t = (key, fallback) => window.i18n ? window.i18n.t(key) || fallback : fallback;
         const overlay = document.createElement('div');
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10001;
-        `;
+        overlay.className = 'modal-overlay';
 
         const dialog = document.createElement('div');
-        dialog.style.cssText = `
-            background: var(--bg-primary);
-            border-radius: var(--radius-xl);
-            padding: 24px;
-            min-width: 400px;
-            max-width: 500px;
-            box-shadow: var(--shadow-xl);
-            border: 1px solid var(--border-light);
-        `;
+        dialog.className = 'modal-dialog modal-dialog--sm';
 
-        dialog.innerHTML = `
-            <p style="margin: 0 0 16px 0; color: var(--text-primary); font-size: 14px;">${this.escapeHtml(message)}</p>
-            <div style="display: flex; justify-content: flex-end;">
-                <button id="alert-ok" style="padding: 8px 16px; border: none; background: var(--color-primary); color: white; border-radius: var(--radius-sm); cursor: pointer;">${t('mock_server.ok', 'OK')}</button>
-            </div>
-        `;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/mockServer/mockServerDialog.html',
+            'tpl-mock-server-alert'
+        );
+        dialog.appendChild(fragment);
+
+        const messageEl = dialog.querySelector('[data-role="message"]');
+        if (messageEl) {
+            messageEl.textContent = message;
+        }
+
+        const okTextEl = dialog.querySelector('[data-role="ok"]');
+        if (okTextEl) {
+            okTextEl.textContent = t('mock_server.ok', 'OK');
+        }
 
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
@@ -734,105 +686,65 @@ export class MockServerDialog {
         const currentResponse = customResponse || defaultResponse;
 
         const overlay = document.createElement('div');
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10002;
-        `;
+        overlay.className = 'modal-overlay';
 
         const dialog = document.createElement('div');
-        dialog.style.cssText = `
-            background: var(--bg-primary);
-            border-radius: var(--radius-xl);
-            padding: 24px;
-            width: 90vw;
-            max-width: 800px;
-            max-height: 85vh;
-            display: flex;
-            flex-direction: column;
-            box-shadow: var(--shadow-xl);
-            border: 1px solid var(--border-light);
-        `;
+        dialog.className = 'modal-dialog modal-dialog--mock-server-response-editor';
 
-        dialog.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <div>
-                    <h3 style="margin: 0; color: var(--text-primary);">${t('mock_server.edit_response_title', 'Edit Response')}</h3>
-                    <p style="margin: 4px 0 0 0; color: var(--text-secondary); font-size: 13px;">${endpoint.method.toUpperCase()} ${endpoint.path}</p>
-                </div>
-                <button id="response-editor-close" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 24px; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;" aria-label="${t('mock_server.close', 'Close')}">&times;</button>
-            </div>
+        const fragment = templateLoader.cloneSync(
+            './src/templates/mockServer/mockServerDialog.html',
+            'tpl-mock-server-response-editor'
+        );
+        dialog.appendChild(fragment);
 
-            ${hasCustomResponse ? `
-                <div style="padding: 8px 12px; background: var(--color-primary-light, #e3f2fd); border-left: 3px solid var(--color-primary); border-radius: var(--radius-sm); margin-bottom: 12px; font-size: 13px; color: var(--text-primary);">
-                    ${t('mock_server.using_custom_response', 'Using custom response')}
-                </div>
-            ` : ''}
+        const titleEl = dialog.querySelector('[data-role="title"]');
+        if (titleEl) {
+            titleEl.textContent = t('mock_server.edit_response_title', 'Edit Response');
+        }
 
-            <div style="display: flex; gap: 24px; margin-bottom: 16px;">
-                <div style="flex: 1;">
-                    <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 14px; font-weight: 500;">
-                        ${t('mock_server.delay', 'Delay (ms)')}
-                    </label>
-                    <input
-                        type="number"
-                        id="response-editor-delay"
-                        min="0"
-                        max="30000"
-                        value="${currentDelay}"
-                        style="width: 150px; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-size: 13px;"
-                    />
-                    <span style="margin-left: 8px; color: var(--text-secondary); font-size: 12px;">(0-30000)</span>
-                </div>
-                <div style="flex: 1;">
-                    <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 14px; font-weight: 500;">
-                        ${t('mock_server.status_code', 'Status Code')}
-                    </label>
-                    <input
-                        type="number"
-                        id="response-editor-status-code"
-                        min="100"
-                        max="599"
-                        value="${currentStatusCode}"
-                        style="width: 150px; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-size: 13px;"
-                    />
-                    <span style="margin-left: 8px; color: var(--text-secondary); font-size: 12px;">(100-599)</span>
-                </div>
-            </div>
+        const subtitleEl = dialog.querySelector('[data-role="subtitle"]');
+        if (subtitleEl) {
+            subtitleEl.textContent = `${endpoint.method.toUpperCase()} ${endpoint.path}`;
+        }
 
-            <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
-                <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 14px; font-weight: 500;">
-                    ${t('mock_server.response_body', 'Response Body (JSON)')}
-                </label>
-                <textarea
-                    id="response-editor-textarea"
-                    style="flex: 1; padding: 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-family: 'Courier New', monospace; font-size: 13px; resize: none; min-height: 300px;"
-                    spellcheck="false"
-                >${JSON.stringify(currentResponse, null, 2)}</textarea>
-                <div id="response-editor-error" style="color: var(--color-danger); font-size: 12px; margin-top: 4px; min-height: 18px;"></div>
-            </div>
+        const closeBtn = dialog.querySelector('#response-editor-close');
+        if (closeBtn) {
+            closeBtn.setAttribute('aria-label', t('mock_server.close', 'Close'));
+        }
 
-            <div style="display: flex; gap: 8px; justify-content: space-between; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-light);">
-                <button id="response-editor-reset" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-secondary); border-radius: var(--radius-sm); cursor: pointer;">
-                    ${t('mock_server.reset_to_default', 'Reset to Default')}
-                </button>
-                <div style="display: flex; gap: 8px;">
-                    <button id="response-editor-cancel" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: var(--radius-sm); cursor: pointer;">
-                        ${t('common.cancel', 'Cancel')}
-                    </button>
-                    <button id="response-editor-save" style="padding: 8px 16px; border: none; background: var(--color-primary); color: white; border-radius: var(--radius-sm); cursor: pointer;">
-                        ${t('common.save', 'Save')}
-                    </button>
-                </div>
-            </div>
-        `;
+        const customNoticeEl = dialog.querySelector('[data-role="custom-notice"]');
+        if (customNoticeEl) {
+            customNoticeEl.classList.toggle('is-hidden', !hasCustomResponse);
+            if (hasCustomResponse) {
+                customNoticeEl.textContent = t('mock_server.using_custom_response', 'Using custom response');
+            }
+        }
+
+        const delayLabelEl = dialog.querySelector('[data-role="delay-label"]');
+        if (delayLabelEl) {
+            delayLabelEl.textContent = t('mock_server.delay', 'Delay (ms)');
+        }
+        const statusCodeLabelEl = dialog.querySelector('[data-role="status-code-label"]');
+        if (statusCodeLabelEl) {
+            statusCodeLabelEl.textContent = t('mock_server.status_code', 'Status Code');
+        }
+        const bodyLabelEl = dialog.querySelector('[data-role="body-label"]');
+        if (bodyLabelEl) {
+            bodyLabelEl.textContent = t('mock_server.response_body', 'Response Body (JSON)');
+        }
+
+        const resetTextEl = dialog.querySelector('[data-role="reset"]');
+        if (resetTextEl) {
+            resetTextEl.textContent = t('mock_server.reset_to_default', 'Reset to Default');
+        }
+        const cancelTextEl = dialog.querySelector('[data-role="cancel"]');
+        if (cancelTextEl) {
+            cancelTextEl.textContent = t('common.cancel', 'Cancel');
+        }
+        const saveTextEl = dialog.querySelector('[data-role="save"]');
+        if (saveTextEl) {
+            saveTextEl.textContent = t('common.save', 'Save');
+        }
 
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
@@ -844,7 +756,20 @@ export class MockServerDialog {
         const saveBtn = dialog.querySelector('#response-editor-save');
         const cancelBtn = dialog.querySelector('#response-editor-cancel');
         const resetBtn = dialog.querySelector('#response-editor-reset');
-        const closeBtn = dialog.querySelector('#response-editor-close');
+        const _closeBtn = dialog.querySelector('#response-editor-close');
+
+        if (delayInput) {
+            delayInput.value = String(currentDelay);
+        }
+        if (statusCodeInput) {
+            statusCodeInput.value = String(currentStatusCode);
+        }
+        if (textarea) {
+            textarea.value = JSON.stringify(currentResponse, null, 2);
+        }
+        if (errorDiv) {
+            errorDiv.textContent = '';
+        }
 
         const cleanup = () => {
             document.body.removeChild(overlay);
@@ -856,11 +781,9 @@ export class MockServerDialog {
                 JSON.parse(textarea.value);
                 errorDiv.textContent = '';
                 saveBtn.disabled = false;
-                saveBtn.style.opacity = '1';
             } catch (e) {
                 errorDiv.textContent = t('mock_server.invalid_json', `Invalid JSON: ${e.message}`);
                 saveBtn.disabled = true;
-                saveBtn.style.opacity = '0.5';
             }
         });
 
@@ -922,7 +845,7 @@ export class MockServerDialog {
         // Close handlers
         const closeHandler = () => cleanup();
         cancelBtn.addEventListener('click', closeHandler);
-        closeBtn.addEventListener('click', closeHandler);
+        _closeBtn.addEventListener('click', closeHandler);
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
                 closeHandler();
