@@ -38,6 +38,7 @@
   "context_menu": {
     "new_collection": "Nuova collezione",
     "new_request": "Nuova richiesta",
+    "import_curl": "Importa cURL",
     "manage_variables": "Gestisci variabili",
     "export_openapi_json": "Esporta come OpenAPI (JSON)",
     "export_openapi_yaml": "Esporta come OpenAPI (YAML)",
@@ -45,6 +46,22 @@
     "rename_collection": "Rinomina collezione",
     "delete_collection": "Elimina collezione",
     "delete_request": "Elimina richiesta"
+  },
+  "curl_import": {
+    "title": "Importa cURL",
+    "paste_curl": "Incolla comando cURL",
+    "preview": "Anteprima",
+    "method": "Metodo:",
+    "url": "URL:",
+    "headers": "Intestazioni:",
+    "body": "Corpo:",
+    "request_name": "Nome della richiesta",
+    "target_collection": "Importa nella collezione",
+    "new_collection": "Crea nuova collezione",
+    "collection_name": "Nome della nuova collezione",
+    "import": "Importa",
+    "error_invalid": "Comando cURL non valido",
+    "error_no_url": "Nessun URL trovato nel comando cURL"
   },
   "new_request": {
     "title": "Crea nuova richiesta",

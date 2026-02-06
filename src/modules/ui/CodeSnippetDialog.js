@@ -103,14 +103,15 @@ export class CodeSnippetDialog {
                 const code = commandDisplay.textContent;
                 await navigator.clipboard.writeText(code);
 
-                const buttonText = copyBtn.querySelector('span');
-                const originalText = buttonText.textContent;
-                buttonText.textContent = 'Copied!';
-                copyBtn.classList.add('is-copied');
+                const iconSpan = copyBtn.querySelector('.icon');
+                iconSpan.classList.remove('icon-copy');
+                iconSpan.classList.add('icon-check');
+                copyBtn.classList.add('copied');
 
                 setTimeout(() => {
-                    buttonText.textContent = originalText;
-                    copyBtn.classList.remove('is-copied');
+                    iconSpan.classList.remove('icon-check');
+                    iconSpan.classList.add('icon-copy');
+                    copyBtn.classList.remove('copied');
                 }, 2000);
             } catch (err) {
                 alert('Failed to copy to clipboard');

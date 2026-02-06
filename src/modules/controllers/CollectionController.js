@@ -14,6 +14,7 @@ import { ContextMenu } from '../ui/ContextMenu.js';
 import { RenameDialog } from '../ui/RenameDialog.js';
 import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 import { VariableManager } from '../ui/VariableManager.js';
+import { CurlImportDialog } from '../ui/CurlImportDialog.js';
 import { templateLoader } from '../templateLoader.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { setRequestBodyContent, getRequestBodyContent } from '../requestBodyHelper.js';
@@ -50,6 +51,7 @@ export class CollectionController {
         this.renameDialog = new RenameDialog();
         this.confirmDialog = new ConfirmDialog();
         this.variableManager = new VariableManager();
+        this.curlImportDialog = new CurlImportDialog();
         
         this.handleEndpointClick = this.handleEndpointClick.bind(this);
         this.handleContextMenu = this.handleContextMenu.bind(this);
@@ -64,6 +66,7 @@ export class CollectionController {
         this.handleNewRequestInEmptySpace = this.handleNewRequestInEmptySpace.bind(this);
         this.handleExportOpenApiJson = this.handleExportOpenApiJson.bind(this);
         this.handleExportOpenApiYaml = this.handleExportOpenApiYaml.bind(this);
+        this.handleImportCurl = this.handleImportCurl.bind(this);
     }
 
     /**
@@ -205,6 +208,12 @@ export class CollectionController {
                 onClick: () => this.handleNewRequest(collection)
             },
             {
+                label: 'Import cURL',
+                translationKey: 'context_menu.import_curl',
+                iconClass: ContextMenu.createImportIcon(),
+                onClick: () => this.handleImportCurl(collection)
+            },
+            {
                 label: 'Manage Variables',
                 translationKey: 'context_menu.manage_variables',
                 iconClass: ContextMenu.createVariableIcon(),
@@ -291,6 +300,12 @@ export class CollectionController {
                 translationKey: 'context_menu.new_request',
                 iconClass: ContextMenu.createNewRequestIcon(),
                 onClick: () => this.handleNewRequestInEmptySpace()
+            },
+            {
+                label: 'Import cURL',
+                translationKey: 'context_menu.import_curl',
+                iconClass: ContextMenu.createImportIcon(),
+                onClick: () => this.handleImportCurl(null)
             }
         ];
 
@@ -815,6 +830,86 @@ export class CollectionController {
         } catch (error) {
             this.statusDisplay.update(`Import error: ${error.message}`, null);
             throw error;
+        }
+    }
+
+    /**
+     * Handles cURL import from context menu
+     *
+     * Shows cURL import dialog and creates a new request in the specified collection.
+     * If no collection is specified, allows user to create a new collection.
+     *
+     * @async
+     * @param {Object|null} collection - Target collection or null to show collection picker
+     * @returns {Promise<void>}
+     */
+    async handleImportCurl(collection) {
+        try {
+            const collections = await this.service.loadCollections();
+            const targetCollectionId = collection ? collection.id : null;
+
+            const result = await this.curlImportDialog.show(collections, {
+                targetCollectionId
+            });
+
+            if (!result) {
+                return;
+            }
+
+            let targetCollection;
+
+            if (result.newCollectionName) {
+                targetCollection = await this.service.createCollection(result.newCollectionName);
+            } else {
+                targetCollection = collections.find(c => c.id === result.collectionId);
+                if (!targetCollection) {
+                    this.statusDisplay.update('Collection not found', null);
+                    return;
+                }
+            }
+
+            const requestData = {
+                name: result.endpoint.name,
+                method: result.endpoint.method,
+                path: result.endpoint.path,
+                protocol: 'http'
+            };
+
+            const newEndpoint = await this.service.addRequestToCollection(targetCollection.id, requestData);
+
+            if (result.endpoint.requestBody) {
+                await this.repository.saveModifiedRequestBody(
+                    targetCollection.id,
+                    newEndpoint.id,
+                    result.endpoint.requestBody.example
+                );
+            }
+
+            if (Object.keys(result.endpoint.headers).length > 0) {
+                const headers = Object.entries(result.endpoint.headers).map(([key, value]) => ({
+                    key,
+                    value
+                }));
+                await this.repository.savePersistedHeaders(targetCollection.id, newEndpoint.id, headers);
+            }
+
+            if (Object.keys(result.endpoint.parameters.query).length > 0) {
+                const queryParams = Object.entries(result.endpoint.parameters.query).map(([key, param]) => ({
+                    key,
+                    value: param.example || ''
+                }));
+                await this.repository.savePersistedQueryParams(targetCollection.id, newEndpoint.id, queryParams);
+            }
+
+            if (result.auth) {
+                await this.repository.savePersistedAuthConfig(targetCollection.id, newEndpoint.id, result.auth);
+            }
+
+            await this.loadCollections();
+            this.statusDisplay.update(`Imported cURL as "${result.endpoint.name}"`, null);
+
+        } catch (error) {
+            this.statusDisplay.update(`cURL import error: ${error.message}`, null);
         }
     }
 
