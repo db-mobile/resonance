@@ -95,6 +95,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.2.0" date="2026-02-06">
+      <description>
+        <p>New features introduced</p>
+        <ul>
+          <li>cURL request import</li>
+          <li>UI improvements</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.1.0" date="2026-02-04">
       <description>
         <p>New features introduced</p>
