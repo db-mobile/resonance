@@ -1,0 +1,18 @@
+<template id="tpl-curl-dialog">
+    <div>
+        <div class="dialog-header">
+            <h3 class="dialog-title">cURL Command</h3>
+            <button id="curl-close-btn" class="dialog-close-btn" aria-label="Close">&times;</button>
+        </div>
+        <div class="curl-dialog-body">
+            <pre id="curl-command-display" class="curl-dialog-command"></pre>
+        </div>
+        <div class="curl-dialog-footer">
+            <button id="curl-copy-btn" class="btn btn-primary curl-dialog-copy-btn">
+                <span class="icon icon-16 icon-copy"></span>
+                <span>Copy to Clipboard</span>
+            </button>
+            <button id="curl-close-bottom-btn" class="btn btn-outline">Close</button>
+        </div>
+    </div>
+</template>

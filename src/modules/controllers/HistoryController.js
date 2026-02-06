@@ -7,6 +7,7 @@ import { HistoryService } from '../services/HistoryService.js';
 import { HistoryRenderer } from '../ui/HistoryRenderer.js';
 import { updateUrlFromQueryParams } from '../keyValueManager.js';
 import { setRequestBodyContent } from '../requestBodyHelper.js';
+import { templateLoader } from '../templateLoader.js';
 
 /**
  * Controller for coordinating request history operations between UI and services
@@ -186,13 +187,11 @@ export class HistoryController {
     addKeyValueRow(listElement, key = '', value = '') {
         if (!listElement) {return;}
 
-        const row = document.createElement('div');
-        row.className = 'key-value-row';
-        row.innerHTML = `
-            <input type="text" class="key-input" placeholder="Key">
-            <input type="text" class="value-input" placeholder="Value">
-            <button type="button" class="btn-xs btn-danger" aria-label="Remove">×</button>
-        `;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/history/historyController.html',
+            'tpl-key-value-row'
+        );
+        const row = fragment.firstElementChild;
 
         listElement.appendChild(row);
 

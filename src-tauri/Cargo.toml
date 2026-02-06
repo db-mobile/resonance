@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "2.1.0"
+version = "2.2.0"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"

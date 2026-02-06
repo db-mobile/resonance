@@ -11,6 +11,8 @@
  * input validation, and auto-focus. Supports Enter/Escape shortcuts and preserves
  * special characters like template variables.
  */
+import { templateLoader } from '../templateLoader.js';
+
 export class RenameDialog {
     /**
      * Creates a RenameDialog instance
@@ -59,47 +61,28 @@ export class RenameDialog {
      */
     createDialog(currentName, options) {
         this.overlay = document.createElement('div');
-        this.overlay.className = 'rename-dialog-overlay';
-        this.overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-        `;
+        this.overlay.className = 'rename-dialog-overlay modal-overlay';
 
         const dialog = document.createElement('div');
-        dialog.className = 'rename-dialog';
-        dialog.style.cssText = `
-            background: var(--bg-primary);
-            border-radius: var(--radius-xl);
-            padding: 24px;
-            min-width: 400px;
-            box-shadow: var(--shadow-xl);
-            border: 1px solid var(--border-light);
-        `;
+        dialog.className = 'rename-dialog modal-dialog modal-dialog--sm';
 
         const title = options.title || 'Rename Collection';
         const label = options.label || 'Collection Name:';
         const confirmText = options.confirmText || 'Rename';
 
-        dialog.innerHTML = `
-            <h3 style="margin: 0 0 16px 0; color: var(--text-primary);">${title}</h3>
-            <div style="margin-bottom: 16px;">
-                <label for="rename-input" style="display: block; margin-bottom: 8px; color: var(--text-primary); font-weight: 500;">${label}</label>
-                <input type="text" id="rename-input"
-                       style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-size: 14px; box-sizing: border-box; background: var(--bg-secondary); color: var(--text-primary);">
-            </div>
-            <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                <button id="rename-cancel-btn" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: var(--radius-sm); cursor: pointer;">Cancel</button>
-                <button id="rename-confirm-btn" style="padding: 8px 16px; border: none; background: var(--color-primary); color: white; border-radius: var(--radius-sm); cursor: pointer;">${confirmText}</button>
-            </div>
-        `;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/dialogs/renameDialog.html',
+            'tpl-rename-dialog'
+        );
+        dialog.appendChild(fragment);
+
+        const titleEl = dialog.querySelector('[data-role="title"]');
+        const labelEl = dialog.querySelector('[data-role="label"]');
+        const confirmEl = dialog.querySelector('[data-role="confirm"]');
+
+        if (titleEl) {titleEl.textContent = title;}
+        if (labelEl) {labelEl.textContent = label;}
+        if (confirmEl) {confirmEl.textContent = confirmText;}
 
         this.overlay.appendChild(dialog);
         document.body.appendChild(this.overlay);

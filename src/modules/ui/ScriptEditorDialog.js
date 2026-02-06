@@ -10,6 +10,8 @@
  * @class
  * @classdesc Modal dialog for editing scripts with syntax highlighting and help
  */
+import { templateLoader } from '../templateLoader.js';
+
 export class ScriptEditorDialog {
     /**
      * Creates a ScriptEditorDialog instance
@@ -39,92 +41,30 @@ export class ScriptEditorDialog {
     createDialog() {
         // Create overlay
         this.overlay = document.createElement('div');
-        this.overlay.className = 'script-editor-overlay';
-        this.overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-        `;
+        this.overlay.className = 'script-editor-overlay modal-overlay';
 
         // Create dialog
         const dialog = document.createElement('div');
-        dialog.className = 'script-editor-dialog';
-        dialog.style.cssText = `
-            background: var(--bg-primary);
-            border-radius: var(--radius-xl);
-            padding: 24px;
-            width: 800px;
-            max-width: 90%;
-            height: 600px;
-            max-height: 80vh;
-            box-shadow: var(--shadow-xl);
-            border: 1px solid var(--border-light);
-            display: flex;
-            flex-direction: column;
-        `;
+        dialog.className = 'script-editor-dialog modal-dialog modal-dialog--script-editor';
 
-        dialog.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h3 style="margin: 0; color: var(--text-primary);">Edit Scripts</h3>
-                <button id="script-editor-close" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 24px; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;" aria-label="Close">&times;</button>
-            </div>
-
-            <div class="script-tabs" style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid var(--border-light);">
-                <button class="script-tab-btn active" data-tab="pre-request" style="padding: 8px 16px; background: none; border: none; border-bottom: 2px solid var(--color-primary); color: var(--color-primary); cursor: pointer; font-weight: 500;">
-                    Pre-request Script
-                </button>
-                <button class="script-tab-btn" data-tab="test" style="padding: 8px 16px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-secondary); cursor: pointer;">
-                    Test Script
-                </button>
-            </div>
-
-            <div class="script-tab-content" data-tab="pre-request" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-                <textarea id="pre-request-script-editor" style="width: 100%; flex: 1; padding: 12px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: var(--radius-sm); resize: none;">${this.escapeHtml(this.currentScripts.preRequestScript || '')}</textarea>
-                <div style="margin-top: 8px; padding: 8px; background: var(--bg-secondary); border-radius: var(--radius-sm); font-size: 12px; color: var(--text-secondary);">
-                    <strong>Available APIs:</strong> request, environment, console, Date, Math, JSON
-                </div>
-            </div>
-
-            <div class="script-tab-content" data-tab="test" style="flex: 1; display: none; flex-direction: column; overflow: hidden;">
-                <textarea id="test-script-editor" style="width: 100%; flex: 1; padding: 12px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: var(--radius-sm); resize: none;">${this.escapeHtml(this.currentScripts.testScript || '')}</textarea>
-                <div style="margin-top: 8px; padding: 8px; background: var(--bg-secondary); border-radius: var(--radius-sm); font-size: 12px; color: var(--text-secondary);">
-                    <strong>Available APIs:</strong> request, response, environment, console, expect(), Date, Math, JSON
-                </div>
-            </div>
-
-            <details style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-sm); font-size: 13px;">
-                <summary style="cursor: pointer; font-weight: 500; color: var(--text-primary);">API Documentation</summary>
-                <div style="margin-top: 12px; color: var(--text-secondary); line-height: 1.6;">
-                    <h4 style="margin: 8px 0; color: var(--text-primary);">Pre-request Script:</h4>
-                    <code>request.headers['key'] = 'value';</code><br>
-                    <code>environment.set('name', 'value');</code><br>
-                    <code>console.log('message');</code><br>
-
-                    <h4 style="margin: 16px 0 8px; color: var(--text-primary);">Test Script:</h4>
-                    <code>expect(response.status).toBe(200);</code><br>
-                    <code>expect(response.body.users).toBeDefined();</code><br>
-                    <code>environment.set('userId', response.body.id);</code><br>
-
-                    <h4 style="margin: 16px 0 8px; color: var(--text-primary);">Assertions:</h4>
-                    <code>toBe, toEqual, toContain, toBeDefined, toBeTruthy, toBeFalsy, toBeGreaterThan, toBeLessThan</code>
-                </div>
-            </details>
-
-            <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;">
-                <button id="script-editor-cancel" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: var(--radius-sm); cursor: pointer;">Cancel</button>
-                <button id="script-editor-save" style="padding: 8px 16px; border: none; background: var(--color-primary); color: white; border-radius: var(--radius-sm); cursor: pointer;">Save</button>
-            </div>
-        `;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/scripts/scriptEditorDialog.html',
+            'tpl-script-editor-dialog'
+        );
+        dialog.appendChild(fragment);
 
         this.overlay.appendChild(dialog);
         document.body.appendChild(this.overlay);
+
+        const preRequestEl = this.overlay.querySelector('#pre-request-script-editor');
+        const testEl = this.overlay.querySelector('#test-script-editor');
+
+        if (preRequestEl) {
+            preRequestEl.value = this.currentScripts.preRequestScript || '';
+        }
+        if (testEl) {
+            testEl.value = this.currentScripts.testScript || '';
+        }
 
         // Setup event listeners
         this.setupEventListeners();
@@ -183,12 +123,8 @@ export class ScriptEditorDialog {
         tabButtons.forEach(btn => {
             if (btn.dataset.tab === tabName) {
                 btn.classList.add('active');
-                btn.style.borderBottomColor = 'var(--color-primary)';
-                btn.style.color = 'var(--color-primary)';
             } else {
                 btn.classList.remove('active');
-                btn.style.borderBottomColor = 'transparent';
-                btn.style.color = 'var(--text-secondary)';
             }
         });
 
@@ -196,9 +132,9 @@ export class ScriptEditorDialog {
         const tabContents = this.overlay.querySelectorAll('.script-tab-content');
         tabContents.forEach(content => {
             if (content.dataset.tab === tabName) {
-                content.style.display = 'flex';
+                content.classList.add('is-active');
             } else {
-                content.style.display = 'none';
+                content.classList.remove('is-active');
             }
         });
     }

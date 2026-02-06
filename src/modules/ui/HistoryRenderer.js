@@ -5,6 +5,7 @@
 
 import { HistoryService } from '../services/HistoryService.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
+import { templateLoader } from '../templateLoader.js';
 
 /**
  * History sidebar UI renderer
@@ -95,20 +96,21 @@ export class HistoryRenderer {
         if (!this.container) {return;}
 
         if (historyItems.length === 0) {
-            this.container.innerHTML = `
-                <div class="history-empty">
-                    <svg class="history-empty-icon" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-                    </svg>
-                    <p class="history-empty-text" data-i18n="history.empty">No request history</p>
-                    <p class="history-empty-subtext" data-i18n="history.empty_subtext">Send a request to see it here</p>
-                </div>
-            `;
+            const fragment = templateLoader.cloneSync(
+                './src/templates/history/historyRenderer.html',
+                'tpl-history-empty'
+            );
+            this.container.innerHTML = '';
+            this.container.appendChild(fragment);
             return;
         }
 
-        const historyHTML = historyItems.map(entry => this.renderHistoryItem(entry)).join('');
-        this.container.innerHTML = historyHTML;
+        this.container.innerHTML = '';
+
+        historyItems.forEach(entry => {
+            const el = this.renderHistoryItem(entry);
+            this.container.appendChild(el);
+        });
 
         // Attach event listeners to history items
         historyItems.forEach(entry => {
@@ -137,26 +139,48 @@ export class HistoryRenderer {
         const timestamp = this.service.formatTimestamp(entry.timestamp);
         const url = this.service.truncateUrl(entry.request.url, 60);
 
-        const statusBadge = entry.response?.status
-            ? `<span class="history-item-status" style="color: ${statusColor}">${entry.response.status}</span>`
-            : '<span class="history-item-status history-item-error">Error</span>';
+        const fragment = templateLoader.cloneSync(
+            './src/templates/history/historyRenderer.html',
+            'tpl-history-item'
+        );
+        const itemEl = fragment.firstElementChild;
+        itemEl.dataset.historyId = entry.id;
 
-        return `
-            <div class="history-item" data-history-id="${entry.id}">
-                <div class="history-item-header">
-                    <span class="history-item-method" style="color: ${methodColor}">${entry.request.method}</span>
-                    ${statusBadge}
-                    <span class="history-item-time">${timestamp}</span>
-                </div>
-                <div class="history-item-url" title="${entry.request.url}">${url}</div>
-                <button class="history-item-delete" title="Delete from history" aria-label="Delete from history">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                </button>
-            </div>
-        `;
+        const methodEl = itemEl.querySelector('[data-role="method"]');
+        const statusSlotEl = itemEl.querySelector('[data-role="status-slot"]');
+        const timeEl = itemEl.querySelector('[data-role="time"]');
+        const urlEl = itemEl.querySelector('[data-role="url"]');
+
+        if (methodEl) {
+            methodEl.textContent = entry.request.method;
+            methodEl.style.setProperty('--history-method-color', methodColor);
+        }
+        if (timeEl) {timeEl.textContent = timestamp;}
+        if (urlEl) {
+            urlEl.textContent = url;
+            urlEl.title = entry.request.url;
+        }
+
+        if (statusSlotEl) {
+            if (entry.response?.status) {
+                const statusFragment = templateLoader.cloneSync(
+                    './src/templates/history/historyRenderer.html',
+                    'tpl-history-status-badge'
+                );
+                const statusEl = statusFragment.firstElementChild;
+                statusEl.textContent = entry.response.status;
+                statusEl.style.setProperty('--history-status-color', statusColor);
+                statusSlotEl.appendChild(statusEl);
+            } else {
+                const statusFragment = templateLoader.cloneSync(
+                    './src/templates/history/historyRenderer.html',
+                    'tpl-history-status-error'
+                );
+                statusSlotEl.appendChild(statusFragment);
+            }
+        }
+
+        return itemEl;
     }
 
     async handleDeleteEntry(id) {

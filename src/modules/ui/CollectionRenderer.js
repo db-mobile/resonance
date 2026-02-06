@@ -11,6 +11,8 @@
  * and manages expansion states, active selections, and user interactions. Supports
  * persistence of expansion state across sessions.
  */
+import { templateLoader } from '../templateLoader.js';
+
 export class CollectionRenderer {
     /**
      * Creates a CollectionRenderer instance
@@ -37,15 +39,12 @@ export class CollectionRenderer {
      * @returns {void}
      */
     renderEmptyState() {
-        this.container.innerHTML = `
-            <div class="collections-empty">
-                <svg class="collections-empty-icon" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2L13.09 7.26L18 6L16.74 11.09L22 12L16.74 12.91L18 18L13.09 16.74L12 22L10.91 16.74L6 18L7.26 12.91L2 12L7.26 11.09L6 6L10.91 7.26L12 2Z"/>
-                </svg>
-                <p class="collections-empty-text" data-i18n="sidebar.empty.title">No collections imported yet</p>
-                <p class="collections-empty-subtext" data-i18n="sidebar.empty.subtitle">Import an OpenAPI collection to get started</p>
-            </div>
-        `;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/collections/collectionRenderer.html',
+            'tpl-collections-empty'
+        );
+        this.container.innerHTML = '';
+        this.container.appendChild(fragment);
     }
 
     /**
@@ -176,10 +175,10 @@ export class CollectionRenderer {
 
         const toggleDiv = document.createElement('div');
         toggleDiv.className = 'collection-toggle';
-        toggleDiv.innerHTML = '▼';
+        toggleDiv.textContent = '▶';
 
-        headerDiv.appendChild(nameDiv);
         headerDiv.appendChild(toggleDiv);
+        headerDiv.appendChild(nameDiv);
 
         return headerDiv;
     }
@@ -243,10 +242,10 @@ export class CollectionRenderer {
 
         const folderToggle = document.createElement('div');
         folderToggle.className = 'folder-toggle';
-        folderToggle.innerHTML = '▼';
+        folderToggle.textContent = '▶';
 
-        folderHeader.appendChild(folderName);
         folderHeader.appendChild(folderToggle);
+        folderHeader.appendChild(folderName);
 
         const folderEndpoints = document.createElement('div');
         folderEndpoints.className = 'folder-endpoints';
@@ -345,14 +344,7 @@ export class CollectionRenderer {
             if (e.target.closest('.context-menu')) {
                 return;
             }
-            
-            const allCollections = document.querySelectorAll('.collection-item');
-            allCollections.forEach(item => {
-                if (item !== collectionDiv) {
-                    item.classList.remove('expanded');
-                }
-            });
-            
+
             collectionDiv.classList.toggle('expanded');
             
             await this.saveExpansionState();

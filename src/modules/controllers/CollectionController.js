@@ -14,6 +14,8 @@ import { ContextMenu } from '../ui/ContextMenu.js';
 import { RenameDialog } from '../ui/RenameDialog.js';
 import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 import { VariableManager } from '../ui/VariableManager.js';
+import { CurlImportDialog } from '../ui/CurlImportDialog.js';
+import { templateLoader } from '../templateLoader.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { setRequestBodyContent, getRequestBodyContent } from '../requestBodyHelper.js';
 
@@ -49,6 +51,7 @@ export class CollectionController {
         this.renameDialog = new RenameDialog();
         this.confirmDialog = new ConfirmDialog();
         this.variableManager = new VariableManager();
+        this.curlImportDialog = new CurlImportDialog();
         
         this.handleEndpointClick = this.handleEndpointClick.bind(this);
         this.handleContextMenu = this.handleContextMenu.bind(this);
@@ -63,6 +66,7 @@ export class CollectionController {
         this.handleNewRequestInEmptySpace = this.handleNewRequestInEmptySpace.bind(this);
         this.handleExportOpenApiJson = this.handleExportOpenApiJson.bind(this);
         this.handleExportOpenApiYaml = this.handleExportOpenApiYaml.bind(this);
+        this.handleImportCurl = this.handleImportCurl.bind(this);
     }
 
     /**
@@ -200,43 +204,49 @@ export class CollectionController {
             {
                 label: 'New Request',
                 translationKey: 'context_menu.new_request',
-                icon: ContextMenu.createNewRequestIcon(),
+                iconClass: ContextMenu.createNewRequestIcon(),
                 onClick: () => this.handleNewRequest(collection)
+            },
+            {
+                label: 'Import cURL',
+                translationKey: 'context_menu.import_curl',
+                iconClass: ContextMenu.createImportIcon(),
+                onClick: () => this.handleImportCurl(collection)
             },
             {
                 label: 'Manage Variables',
                 translationKey: 'context_menu.manage_variables',
-                icon: ContextMenu.createVariableIcon(),
+                iconClass: ContextMenu.createVariableIcon(),
                 onClick: () => this.handleVariables(collection)
             },
             {
                 label: 'Export as OpenAPI (JSON)',
                 translationKey: 'context_menu.export_openapi_json',
-                icon: ContextMenu.createExportIcon(),
+                iconClass: ContextMenu.createExportIcon(),
                 onClick: () => this.handleExportOpenApiJson(collection)
             },
             {
                 label: 'Export as OpenAPI (YAML)',
                 translationKey: 'context_menu.export_openapi_yaml',
-                icon: ContextMenu.createExportIcon(),
+                iconClass: ContextMenu.createExportIcon(),
                 onClick: () => this.handleExportOpenApiYaml(collection)
             },
             {
                 label: 'Export as Postman',
                 translationKey: 'context_menu.export_postman',
-                icon: ContextMenu.createExportIcon(),
+                iconClass: ContextMenu.createExportIcon(),
                 onClick: () => this.handleExportPostman(collection)
             },
             {
                 label: 'Rename Collection',
                 translationKey: 'context_menu.rename_collection',
-                icon: ContextMenu.createRenameIcon(),
+                iconClass: ContextMenu.createRenameIcon(),
                 onClick: () => this.handleRename(collection)
             },
             {
                 label: 'Delete Collection',
                 translationKey: 'context_menu.delete_collection',
-                icon: ContextMenu.createDeleteIcon(),
+                iconClass: ContextMenu.createDeleteIcon(),
                 className: 'context-menu-delete',
                 onClick: () => this.handleDelete(collection)
             }
@@ -260,7 +270,7 @@ export class CollectionController {
             {
                 label: 'Delete Request',
                 translationKey: 'context_menu.delete_request',
-                icon: ContextMenu.createDeleteIcon(),
+                iconClass: ContextMenu.createDeleteIcon(),
                 className: 'context-menu-delete',
                 onClick: () => this.handleDeleteRequest(collection, endpoint)
             }
@@ -282,14 +292,20 @@ export class CollectionController {
             {
                 label: 'New Collection',
                 translationKey: 'context_menu.new_collection',
-                icon: ContextMenu.createNewRequestIcon(),
+                iconClass: ContextMenu.createNewRequestIcon(),
                 onClick: () => this.handleNewCollection()
             },
             {
                 label: 'New Request',
                 translationKey: 'context_menu.new_request',
-                icon: ContextMenu.createNewRequestIcon(),
+                iconClass: ContextMenu.createNewRequestIcon(),
                 onClick: () => this.handleNewRequestInEmptySpace()
+            },
+            {
+                label: 'Import cURL',
+                translationKey: 'context_menu.import_curl',
+                iconClass: ContextMenu.createImportIcon(),
+                onClick: () => this.handleImportCurl(null)
             }
         ];
 
@@ -420,23 +436,11 @@ export class CollectionController {
      */
     async showNewCollectionDialog() {
         return new Promise((resolve) => {
-            const dialog = document.createElement('div');
-            dialog.className = 'new-request-dialog-overlay';
-            dialog.innerHTML = `
-                <div class="new-request-dialog">
-                    <h3 data-i18n="new_collection.title">Create New Collection</h3>
-                    <form id="new-collection-form">
-                        <div class="form-group">
-                            <label for="collection-name" data-i18n="new_collection.name_label">Collection Name:</label>
-                            <input type="text" id="collection-name" data-i18n-placeholder="new_collection.name_placeholder" placeholder="My Collection" required>
-                        </div>
-                        <div class="form-buttons">
-                            <button type="button" id="cancel-btn" data-i18n="new_collection.cancel">Cancel</button>
-                            <button type="submit" id="create-btn" data-i18n="new_collection.create">Create</button>
-                        </div>
-                    </form>
-                </div>
-            `;
+            const fragment = templateLoader.cloneSync(
+                './src/templates/collections/newDialogs.html',
+                'tpl-new-collection-dialog'
+            );
+            const dialog = fragment.firstElementChild;
 
             document.body.appendChild(dialog);
 
@@ -495,48 +499,11 @@ export class CollectionController {
      */
     async showNewRequestDialog() {
         return new Promise((resolve) => {
-            const dialog = document.createElement('div');
-            dialog.className = 'new-request-dialog-overlay';
-            dialog.innerHTML = `
-                <div class="new-request-dialog">
-                    <h3 data-i18n="new_request.title">Create New Request</h3>
-                    <form id="new-request-form">
-                        <div class="form-group">
-                            <label for="request-name" data-i18n="new_request.name_label">Request Name:</label>
-                            <input type="text" id="request-name" data-i18n-placeholder="new_request.name_placeholder" placeholder="My Request" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="request-protocol">Protocol:</label>
-                            <select id="request-protocol" class="form-select" required>
-                                <option value="http">HTTP</option>
-                                <option value="grpc">gRPC</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="request-method" data-i18n="new_request.method_label">Method:</label>
-                            <select id="request-method" class="form-select" required>
-                                <option value="GET">GET</option>
-                                <option value="POST">POST</option>
-                                <option value="PUT">PUT</option>
-                                <option value="DELETE">DELETE</option>
-                                <option value="PATCH">PATCH</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="request-path" data-i18n="new_request.path_label">Path:</label>
-                            <input type="text" id="request-path" data-i18n-placeholder="new_request.path_placeholder" placeholder="/api/endpoint" required>
-                        </div>
-                        <div class="form-group" id="grpc-target-group" style="display: none;">
-                            <label for="grpc-target">Target:</label>
-                            <input type="text" id="grpc-target" placeholder="localhost:50051">
-                        </div>
-                        <div class="form-buttons">
-                            <button type="button" id="cancel-btn" data-i18n="new_request.cancel">Cancel</button>
-                            <button type="submit" id="create-btn" data-i18n="new_request.create">Create</button>
-                        </div>
-                    </form>
-                </div>
-            `;
+            const fragment = templateLoader.cloneSync(
+                './src/templates/collections/newDialogs.html',
+                'tpl-new-request-dialog'
+            );
+            const dialog = fragment.firstElementChild;
 
             document.body.appendChild(dialog);
 
@@ -566,9 +533,9 @@ export class CollectionController {
 
             const updateProtocolUI = () => {
                 const isGrpc = protocolSelect.value === 'grpc';
-                methodSelect.parentElement.style.display = isGrpc ? 'none' : '';
-                pathInput.parentElement.style.display = isGrpc ? 'none' : '';
-                grpcTargetGroup.style.display = isGrpc ? '' : 'none';
+                methodSelect.parentElement.classList.toggle('is-hidden', isGrpc);
+                pathInput.parentElement.classList.toggle('is-hidden', isGrpc);
+                grpcTargetGroup.classList.toggle('is-hidden', !isGrpc);
 
                 if (isGrpc) {
                     methodSelect.required = false;
@@ -863,6 +830,86 @@ export class CollectionController {
         } catch (error) {
             this.statusDisplay.update(`Import error: ${error.message}`, null);
             throw error;
+        }
+    }
+
+    /**
+     * Handles cURL import from context menu
+     *
+     * Shows cURL import dialog and creates a new request in the specified collection.
+     * If no collection is specified, allows user to create a new collection.
+     *
+     * @async
+     * @param {Object|null} collection - Target collection or null to show collection picker
+     * @returns {Promise<void>}
+     */
+    async handleImportCurl(collection) {
+        try {
+            const collections = await this.service.loadCollections();
+            const targetCollectionId = collection ? collection.id : null;
+
+            const result = await this.curlImportDialog.show(collections, {
+                targetCollectionId
+            });
+
+            if (!result) {
+                return;
+            }
+
+            let targetCollection;
+
+            if (result.newCollectionName) {
+                targetCollection = await this.service.createCollection(result.newCollectionName);
+            } else {
+                targetCollection = collections.find(c => c.id === result.collectionId);
+                if (!targetCollection) {
+                    this.statusDisplay.update('Collection not found', null);
+                    return;
+                }
+            }
+
+            const requestData = {
+                name: result.endpoint.name,
+                method: result.endpoint.method,
+                path: result.endpoint.path,
+                protocol: 'http'
+            };
+
+            const newEndpoint = await this.service.addRequestToCollection(targetCollection.id, requestData);
+
+            if (result.endpoint.requestBody) {
+                await this.repository.saveModifiedRequestBody(
+                    targetCollection.id,
+                    newEndpoint.id,
+                    result.endpoint.requestBody.example
+                );
+            }
+
+            if (Object.keys(result.endpoint.headers).length > 0) {
+                const headers = Object.entries(result.endpoint.headers).map(([key, value]) => ({
+                    key,
+                    value
+                }));
+                await this.repository.savePersistedHeaders(targetCollection.id, newEndpoint.id, headers);
+            }
+
+            if (Object.keys(result.endpoint.parameters.query).length > 0) {
+                const queryParams = Object.entries(result.endpoint.parameters.query).map(([key, param]) => ({
+                    key,
+                    value: param.example || ''
+                }));
+                await this.repository.savePersistedQueryParams(targetCollection.id, newEndpoint.id, queryParams);
+            }
+
+            if (result.auth) {
+                await this.repository.savePersistedAuthConfig(targetCollection.id, newEndpoint.id, result.auth);
+            }
+
+            await this.loadCollections();
+            this.statusDisplay.update(`Imported cURL as "${result.endpoint.name}"`, null);
+
+        } catch (error) {
+            this.statusDisplay.update(`cURL import error: ${error.message}`, null);
         }
     }
 

@@ -1,0 +1,57 @@
+<template id="tpl-curl-import-dialog">
+    <div>
+        <div class="dialog-header">
+            <h3 class="dialog-title" data-i18n="curl_import.title">Import cURL</h3>
+            <button id="curl-import-close-btn" class="dialog-close-btn" aria-label="Close">&times;</button>
+        </div>
+        <div class="curl-import-dialog-body">
+            <div class="form-group">
+                <label for="curl-input" class="form-label" data-i18n="curl_import.paste_curl">Paste cURL command</label>
+                <textarea id="curl-input" class="form-textarea curl-input" rows="6" placeholder="curl -X GET https://api.example.com/users"></textarea>
+            </div>
+
+            <div id="curl-error-message" class="curl-error-message is-hidden"></div>
+
+            <div id="curl-preview-section" class="curl-preview-section is-hidden">
+                <h4 class="curl-preview-title" data-i18n="curl_import.preview">Preview</h4>
+                <div class="curl-preview-content">
+                    <div class="curl-preview-row">
+                        <span class="curl-preview-label" data-i18n="curl_import.method">Method:</span>
+                        <span id="preview-method" class="endpoint-method" data-method="get">GET</span>
+                    </div>
+                    <div class="curl-preview-row">
+                        <span class="curl-preview-label" data-i18n="curl_import.url">URL:</span>
+                        <span id="preview-url" class="curl-preview-url"></span>
+                    </div>
+                    <div class="curl-preview-row">
+                        <span class="curl-preview-label" data-i18n="curl_import.headers">Headers:</span>
+                        <span id="preview-headers"></span>
+                    </div>
+                    <div class="curl-preview-row">
+                        <span class="curl-preview-label" data-i18n="curl_import.body">Body:</span>
+                        <span id="preview-body" class="curl-preview-body"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="curl-request-name" class="form-label" data-i18n="curl_import.request_name">Request Name</label>
+                <input type="text" id="curl-request-name" class="form-input" placeholder="My Request">
+            </div>
+
+            <div class="form-group">
+                <label for="curl-import-collection" class="form-label" data-i18n="curl_import.target_collection">Import to Collection</label>
+                <select id="curl-import-collection" class="form-select"></select>
+            </div>
+
+            <div id="new-collection-group" class="form-group is-hidden">
+                <label for="new-collection-name" class="form-label" data-i18n="curl_import.collection_name">New Collection Name</label>
+                <input type="text" id="new-collection-name" class="form-input" placeholder="My Collection">
+            </div>
+        </div>
+        <div class="curl-import-dialog-footer">
+            <button id="curl-import-cancel-btn" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
+            <button id="curl-import-confirm-btn" class="btn btn-primary" disabled data-i18n="curl_import.import">Import</button>
+        </div>
+    </div>
+</template>

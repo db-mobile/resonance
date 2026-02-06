@@ -95,6 +95,86 @@ export function extractCookies(headers) {
 }
 
 /**
+ * Render cookies into a container element
+ * @param {HTMLElement} container - Target container
+ * @param {Array} cookies - Array of parsed cookie objects
+ * @returns {void}
+ */
+export function renderCookies(container, cookies) {
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = '';
+
+    if (!cookies || cookies.length === 0) {
+        const emptyEl = document.createElement('div');
+        emptyEl.className = 'cookies-empty';
+        emptyEl.textContent = 'No cookies in response';
+        container.appendChild(emptyEl);
+        return;
+    }
+
+    const table = document.createElement('table');
+    table.className = 'cookies-table';
+
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    ['Name', 'Value', 'Domain', 'Path', 'Expires', 'Max-Age', 'Flags'].forEach((label) => {
+        const th = document.createElement('th');
+        th.textContent = label;
+        headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+
+    cookies.forEach(cookie => {
+        const tr = document.createElement('tr');
+
+        const nameTd = document.createElement('td');
+        nameTd.className = 'cookie-name';
+        nameTd.textContent = cookie.name;
+        tr.appendChild(nameTd);
+
+        const valueTd = document.createElement('td');
+        valueTd.className = 'cookie-value';
+        valueTd.textContent = cookie.value;
+        tr.appendChild(valueTd);
+
+        const domainTd = document.createElement('td');
+        domainTd.textContent = cookie.domain ? cookie.domain : '-';
+        tr.appendChild(domainTd);
+
+        const pathTd = document.createElement('td');
+        pathTd.textContent = cookie.path ? cookie.path : '-';
+        tr.appendChild(pathTd);
+
+        const expiresTd = document.createElement('td');
+        expiresTd.textContent = cookie.expires ? cookie.expires : '-';
+        tr.appendChild(expiresTd);
+
+        const maxAgeTd = document.createElement('td');
+        maxAgeTd.textContent = cookie.maxAge ? cookie.maxAge : '-';
+        tr.appendChild(maxAgeTd);
+
+        const flagsTd = document.createElement('td');
+        const flags = [];
+        if (cookie.httpOnly) {flags.push('HttpOnly');}
+        if (cookie.secure) {flags.push('Secure');}
+        if (cookie.sameSite) {flags.push(`SameSite=${cookie.sameSite}`);}
+        flagsTd.textContent = flags.length > 0 ? flags.join(', ') : '-';
+        tr.appendChild(flagsTd);
+
+        tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    container.appendChild(table);
+}
+
+/**
  * Format cookies as HTML table
  * @param {Array} cookies - Array of parsed cookie objects
  * @returns {string} HTML string

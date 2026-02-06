@@ -11,6 +11,8 @@
  * API Key, OAuth2, and Digest authentication. Provides UI for configuring and
  * managing authentication credentials.
  */
+import { templateLoader } from './templateLoader.js';
+
 export class AuthManager {
     /**
      * Creates an AuthManager instance
@@ -101,22 +103,16 @@ export class AuthManager {
     renderBearerTokenFields() {
         const defaultToken = this.currentAuthConfig.config.token || '{{bearerToken}}';
 
-        const html = `
-            <div class="auth-field-group">
-                <label for="bearer-token">Token</label>
-                <input type="text"
-                       id="bearer-token"
-                       class="form-input"
-                       placeholder="Enter bearer token"
-                       value="${defaultToken}"
-                       aria-label="Bearer Token">
-                <small class="form-input-hint">The token will be sent in the Authorization header as "Bearer {token}". You can use variables like {{bearerToken}}.</small>
-            </div>
-        `;
-        this.authFieldsContainer.innerHTML = html;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/auth/authFields.html',
+            'tpl-auth-bearer'
+        );
+        this.authFieldsContainer.innerHTML = '';
+        this.authFieldsContainer.appendChild(fragment);
 
         const tokenInput = document.getElementById('bearer-token');
         if (tokenInput) {
+            tokenInput.value = defaultToken;
             this.currentAuthConfig.config.token = tokenInput.value;
 
             tokenInput.addEventListener('input', (e) => {
@@ -132,26 +128,12 @@ export class AuthManager {
      * @returns {void}
      */
     renderBasicAuthFields() {
-        const html = `
-            <div class="auth-field-group">
-                <label for="basic-username">Username</label>
-                <input type="text"
-                       id="basic-username"
-                       class="form-input"
-                       placeholder="Enter username"
-                       aria-label="Username">
-            </div>
-            <div class="auth-field-group">
-                <label for="basic-password">Password</label>
-                <input type="password"
-                       id="basic-password"
-                       class="form-input"
-                       placeholder="Enter password"
-                       aria-label="Password">
-            </div>
-            <small class="form-input-hint">Credentials will be base64 encoded and sent in the Authorization header</small>
-        `;
-        this.authFieldsContainer.innerHTML = html;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/auth/authFields.html',
+            'tpl-auth-basic'
+        );
+        this.authFieldsContainer.innerHTML = '';
+        this.authFieldsContainer.appendChild(fragment);
 
         const usernameInput = document.getElementById('basic-username');
         const passwordInput = document.getElementById('basic-password');
@@ -176,33 +158,12 @@ export class AuthManager {
      * @returns {void}
      */
     renderApiKeyFields() {
-        const html = `
-            <div class="auth-field-group">
-                <label for="api-key-name">Key Name</label>
-                <input type="text"
-                       id="api-key-name"
-                       class="form-input"
-                       placeholder="e.g., X-API-Key"
-                       aria-label="API Key Name">
-            </div>
-            <div class="auth-field-group">
-                <label for="api-key-value">Key Value</label>
-                <input type="text"
-                       id="api-key-value"
-                       class="form-input"
-                       placeholder="Enter API key"
-                       aria-label="API Key Value">
-            </div>
-            <div class="auth-field-group">
-                <label for="api-key-location">Add To</label>
-                <select id="api-key-location" class="form-select" aria-label="API Key Location">
-                    <option value="header">Header</option>
-                    <option value="query">Query Parameters</option>
-                </select>
-            </div>
-            <small class="form-input-hint">The API key will be added to the request as specified</small>
-        `;
-        this.authFieldsContainer.innerHTML = html;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/auth/authFields.html',
+            'tpl-auth-api-key'
+        );
+        this.authFieldsContainer.innerHTML = '';
+        this.authFieldsContainer.appendChild(fragment);
 
         const keyNameInput = document.getElementById('api-key-name');
         const keyValueInput = document.getElementById('api-key-value');
@@ -235,27 +196,12 @@ export class AuthManager {
      * @returns {void}
      */
     renderOAuth2Fields() {
-        const html = `
-            <div class="auth-field-group">
-                <label for="oauth2-token">Access Token</label>
-                <input type="text"
-                       id="oauth2-token"
-                       class="form-input"
-                       placeholder="Enter access token"
-                       aria-label="OAuth 2.0 Access Token">
-                <small class="form-input-hint">The token will be sent in the Authorization header as "Bearer {token}"</small>
-            </div>
-            <div class="auth-field-group">
-                <label for="oauth2-header-prefix">Header Prefix</label>
-                <input type="text"
-                       id="oauth2-header-prefix"
-                       class="form-input"
-                       placeholder="Bearer"
-                       value="Bearer"
-                       aria-label="OAuth 2.0 Header Prefix">
-            </div>
-        `;
-        this.authFieldsContainer.innerHTML = html;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/auth/authFields.html',
+            'tpl-auth-oauth2'
+        );
+        this.authFieldsContainer.innerHTML = '';
+        this.authFieldsContainer.appendChild(fragment);
 
         const tokenInput = document.getElementById('oauth2-token');
         const prefixInput = document.getElementById('oauth2-header-prefix');
@@ -270,7 +216,10 @@ export class AuthManager {
             prefixInput.addEventListener('input', (e) => {
                 this.currentAuthConfig.config.headerPrefix = e.target.value;
             });
-            this.currentAuthConfig.config.headerPrefix = 'Bearer';
+            if (!prefixInput.value) {
+                prefixInput.value = 'Bearer';
+            }
+            this.currentAuthConfig.config.headerPrefix = prefixInput.value;
         }
     }
 
@@ -281,26 +230,12 @@ export class AuthManager {
      * @returns {void}
      */
     renderDigestAuthFields() {
-        const html = `
-            <div class="auth-field-group">
-                <label for="digest-username">Username</label>
-                <input type="text"
-                       id="digest-username"
-                       class="form-input"
-                       placeholder="Enter username"
-                       aria-label="Digest Auth Username">
-            </div>
-            <div class="auth-field-group">
-                <label for="digest-password">Password</label>
-                <input type="password"
-                       id="digest-password"
-                       class="form-input"
-                       placeholder="Enter password"
-                       aria-label="Digest Auth Password">
-            </div>
-            <small class="form-input-hint">Digest authentication will be handled automatically by the HTTP client</small>
-        `;
-        this.authFieldsContainer.innerHTML = html;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/auth/authFields.html',
+            'tpl-auth-digest'
+        );
+        this.authFieldsContainer.innerHTML = '';
+        this.authFieldsContainer.appendChild(fragment);
 
         const usernameInput = document.getElementById('digest-username');
         const passwordInput = document.getElementById('digest-password');

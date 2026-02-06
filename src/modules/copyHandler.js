@@ -24,9 +24,7 @@ function showCopyFeedback(button, success) {
     if (success) {
         button.title = 'Copied!';
         button.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
+            <span class="icon icon-16 icon-check"></span>
         `;
         button.classList.add('copied');
     } else {
@@ -78,6 +76,39 @@ export async function handleCopyResponse(button, tabId) {
 }
 
 /**
+ * Handle copy button click for headers
+ * @param {HTMLElement} button - The copy button that was clicked
+ * @param {string} tabId - The workspace tab ID
+ */
+export async function handleCopyHeaders(button, tabId) {
+    const { responseContainerManager } = window;
+    if (!responseContainerManager) {
+        showCopyFeedback(button, false);
+        return;
+    }
+
+    const containerElements = responseContainerManager.getOrCreateContainer(tabId);
+    if (!containerElements) {
+        showCopyFeedback(button, false);
+        return;
+    }
+
+    const { headersEditor } = containerElements;
+    let textToCopy = '';
+    if (headersEditor) {
+        textToCopy = headersEditor.getContent();
+    }
+
+    if (!textToCopy || textToCopy.trim() === '' || textToCopy === 'No response headers.') {
+        showCopyFeedback(button, false);
+        return;
+    }
+
+    const success = await copyToClipboard(textToCopy);
+    showCopyFeedback(button, success);
+}
+
+/**
  * Attach copy handler to a copy button
  * @param {HTMLElement} button - The copy button element
  * @param {string} tabId - The workspace tab ID
@@ -86,6 +117,19 @@ export function attachCopyHandler(button, tabId) {
     if (button) {
         button.addEventListener('click', () => {
             handleCopyResponse(button, tabId);
+        });
+    }
+}
+
+/**
+ * Attach copy handler for headers button
+ * @param {HTMLElement} button - The copy button element
+ * @param {string} tabId - The workspace tab ID
+ */
+export function attachHeadersCopyHandler(button, tabId) {
+    if (button) {
+        button.addEventListener('click', () => {
+            handleCopyHeaders(button, tabId);
         });
     }
 }

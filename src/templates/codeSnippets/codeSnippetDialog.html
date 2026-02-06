@@ -1,0 +1,32 @@
+<template id="tpl-code-snippet-dialog">
+    <div>
+        <div class="dialog-header">
+            <h3 class="dialog-title">Code Snippet</h3>
+            <button id="code-snippet-close-btn" class="dialog-close-btn" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="code-snippet-language">
+            <label for="language-selector" class="code-snippet-language-label">Language:</label>
+            <div class="language-selector-container code-snippet-language-select-wrap">
+                <select id="language-selector" class="language-selector code-snippet-language-select" data-role="language-selector"></select>
+                <span class="select-arrow icon icon-12 icon-chevron-down code-snippet-language-arrow"></span>
+            </div>
+        </div>
+
+        <div class="code-snippet-body">
+            <pre id="code-snippet-display" class="code-snippet-display"></pre>
+        </div>
+
+        <div class="code-snippet-footer">
+            <button id="code-snippet-copy-btn" class="btn btn-primary code-snippet-copy-btn">
+                <span class="icon icon-16 icon-copy"></span>
+                <span>Copy to Clipboard</span>
+            </button>
+            <button id="code-snippet-close-bottom-btn" class="btn btn-outline">Close</button>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-code-snippet-language-option">
+    <option></option>
+</template>

@@ -2,6 +2,8 @@
  * Environment selector dropdown component
  * Displays active environment and allows quick switching
  */
+import { templateLoader } from '../templateLoader.js';
+
 export class EnvironmentSelector {
     constructor(environmentService, onEnvironmentSwitch, onManageClick) {
         this.service = environmentService;
@@ -30,24 +32,14 @@ export class EnvironmentSelector {
      * Render the selector
      */
     render() {
-        this.container.innerHTML = `
-            <div class="environment-selector">
-                <button id="env-selector-btn" class="env-selector-button">
-                    <svg class="env-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="2" y1="12" x2="22" y2="12"></line>
-                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                    </svg>
-                    <span id="env-selector-name" class="env-name">Loading...</span>
-                    <svg class="env-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                </button>
-                <div id="env-selector-dropdown" class="env-dropdown" style="display: none;"></div>
-            </div>
-        `;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/environment/environmentSelector.html',
+            'tpl-environment-selector'
+        );
+        this.container.innerHTML = '';
+        this.container.appendChild(fragment);
 
-        this.dropdown = document.getElementById('env-selector-dropdown');
+        this.dropdown = this.container.querySelector('#env-selector-dropdown');
     }
 
     /**
@@ -99,12 +91,17 @@ export class EnvironmentSelector {
 
             // Add environments
             environments.forEach(env => {
-                const item = document.createElement('div');
-                item.className = `env-dropdown-item${  env.id === activeEnvId ? ' active' : ''}`;
-                item.innerHTML = `
-                    <span class="env-dropdown-name">${this.escapeHtml(env.name)}</span>
-                    ${env.id === activeEnvId ? '<svg class="env-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
-                `;
+                const fragment = templateLoader.cloneSync(
+                    './src/templates/environment/environmentSelector.html',
+                    'tpl-env-dropdown-item'
+                );
+                const item = fragment.firstElementChild;
+                item.className = `env-dropdown-item${env.id === activeEnvId ? ' active' : ''}`;
+
+                const nameEl = item.querySelector('[data-role="name"]');
+                const checkEl = item.querySelector('[data-role="check"]');
+                if (nameEl) {nameEl.textContent = env.name;}
+                if (checkEl) {checkEl.classList.toggle('is-hidden', env.id !== activeEnvId);}
 
                 item.addEventListener('click', async (e) => {
                     e.stopPropagation();
@@ -118,20 +115,20 @@ export class EnvironmentSelector {
             });
 
             // Add separator
-            const separator = document.createElement('div');
-            separator.className = 'env-dropdown-separator';
-            this.dropdown.appendChild(separator);
+            {
+                const separatorFragment = templateLoader.cloneSync(
+                    './src/templates/environment/environmentSelector.html',
+                    'tpl-env-dropdown-separator'
+                );
+                this.dropdown.appendChild(separatorFragment);
+            }
 
             // Add manage button
-            const manageItem = document.createElement('div');
-            manageItem.className = 'env-dropdown-item env-manage-item';
-            manageItem.innerHTML = `
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                </svg>
-                <span class="env-dropdown-name">Manage Environments...</span>
-            `;
+            const manageFragment = templateLoader.cloneSync(
+                './src/templates/environment/environmentSelector.html',
+                'tpl-env-manage-item'
+            );
+            const manageItem = manageFragment.firstElementChild;
 
             manageItem.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -144,7 +141,7 @@ export class EnvironmentSelector {
             this.dropdown.appendChild(manageItem);
 
             // Show dropdown
-            this.dropdown.style.display = 'block';
+            this.dropdown.classList.remove('is-hidden');
             this.isOpen = true;
 
             // Position dropdown
@@ -159,7 +156,7 @@ export class EnvironmentSelector {
      */
     closeDropdown() {
         if (this.dropdown) {
-            this.dropdown.style.display = 'none';
+            this.dropdown.classList.add('is-hidden');
         }
         this.isOpen = false;
     }
@@ -172,9 +169,9 @@ export class EnvironmentSelector {
         if (!button) {return;}
 
         const rect = button.getBoundingClientRect();
-        this.dropdown.style.top = `${rect.bottom + 4}px`;
-        this.dropdown.style.left = `${rect.left}px`;
-        this.dropdown.style.minWidth = `${rect.width}px`;
+        this.dropdown.style.setProperty('--env-dropdown-top', `${rect.bottom + 4}px`);
+        this.dropdown.style.setProperty('--env-dropdown-left', `${rect.left}px`);
+        this.dropdown.style.setProperty('--env-dropdown-min-width', `${rect.width}px`);
     }
 
     /**

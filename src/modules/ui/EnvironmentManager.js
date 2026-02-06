@@ -2,6 +2,8 @@
  * UI Dialog for managing environments
  * Allows creating, editing, deleting, and duplicating environments
  */
+import { templateLoader } from '../templateLoader.js';
+
 export class EnvironmentManager {
     constructor(environmentService) {
         this.service = environmentService;
@@ -29,82 +31,21 @@ export class EnvironmentManager {
 
         // Create overlay
         this.dialog = document.createElement('div');
-        this.dialog.className = 'environment-manager-overlay';
-        this.dialog.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-        `;
+        this.dialog.className = 'environment-manager-overlay modal-overlay';
 
         const dialogContent = document.createElement('div');
-        dialogContent.className = 'environment-manager-dialog';
-        dialogContent.style.cssText = `
-            background: var(--bg-primary);
-            border-radius: var(--radius-xl);
-            padding: 24px;
-            width: 90vw;
-            max-width: 1000px;
-            max-height: 85vh;
-            display: flex;
-            flex-direction: column;
-            box-shadow: var(--shadow-xl);
-            border: 1px solid var(--border-light);
-        `;
+        dialogContent.className = 'environment-manager-dialog modal-dialog';
 
-        dialogContent.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-                <h3 style="margin: 0; color: var(--text-primary);">Manage Environments</h3>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button id="env-import-btn" class="btn-xs btn-outline" title="Import Environments">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="7 10 12 15 17 10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
-                        <span>Import</span>
-                    </button>
-                    <button id="env-export-all-btn" class="btn-xs btn-outline" title="Export All Environments">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="17 8 12 3 7 8"></polyline>
-                            <line x1="12" y1="3" x2="12" y2="15"></line>
-                        </svg>
-                        <span>Export All</span>
-                    </button>
-                </div>
-            </div>
-
-            <div style="display: flex; gap: 16px; flex: 1; overflow: hidden;">
-                <!-- Environment List -->
-                <div style="flex: 0 0 250px; display: flex; flex-direction: column; border-right: 1px solid var(--border-light); padding-right: 16px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <h4 style="margin: 0; font-size: 14px; color: var(--text-secondary);">ENVIRONMENTS</h4>
-                        <button id="env-create-btn" class="btn-sm btn-outline-primary" title="Create New Environment">+</button>
-                    </div>
-                    <div id="env-list" style="flex: 1; overflow-y: auto;"></div>
-                </div>
-
-                <!-- Environment Details -->
-                <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-                    <div id="env-details" style="flex: 1; overflow-y: auto;">
-                        <div style="text-align: center; color: var(--text-secondary); padding: 40px;">
-                            Select an environment to view and edit its variables
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-light);">
-                <button id="env-close-btn" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: var(--radius-sm); cursor: pointer;">Close</button>
-            </div>
-        `;
+        try {
+            const fragment = await templateLoader.clone(
+                './src/templates/environment/environmentManager.html',
+                'tpl-environment-manager-dialog-content'
+            );
+            dialogContent.appendChild(fragment);
+        } catch (error) {
+            void error;
+            return;
+        }
 
         this.dialog.appendChild(dialogContent);
         document.body.appendChild(this.dialog);
@@ -180,36 +121,19 @@ export class EnvironmentManager {
         const item = document.createElement('div');
         item.className = 'env-list-item';
         item.dataset.envId = environment.id;
-        item.style.cssText = `
-            padding: 10px 12px;
-            margin-bottom: 4px;
-            border-radius: var(--radius-sm);
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: ${this.currentEnvironmentId === environment.id ? 'var(--color-primary-light)' : 'transparent'};
-            border: 1px solid ${this.currentEnvironmentId === environment.id ? 'var(--color-primary)' : 'transparent'};
-        `;
+
+        if (this.currentEnvironmentId === environment.id) {
+            item.classList.add('is-selected');
+        }
 
         const nameSpan = document.createElement('span');
-        nameSpan.style.cssText = `
-            flex: 1;
-            color: var(--text-primary);
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        `;
+        nameSpan.className = 'env-list-item-name';
         nameSpan.textContent = environment.name;
 
         if (isActive) {
             const badge = document.createElement('span');
             badge.textContent = '✓';
-            badge.style.cssText = `
-                color: var(--color-success);
-                font-weight: bold;
-            `;
+            badge.className = 'env-list-item-active-badge';
             nameSpan.appendChild(badge);
         }
 
@@ -229,8 +153,7 @@ export class EnvironmentManager {
         // Update selection UI
         this.dialog.querySelectorAll('.env-list-item').forEach(item => {
             const isSelected = item.dataset.envId === environmentId;
-            item.style.background = isSelected ? 'var(--color-primary-light)' : 'transparent';
-            item.style.borderColor = isSelected ? 'var(--color-primary)' : 'transparent';
+            item.classList.toggle('is-selected', isSelected);
         });
 
         // Load environment details
@@ -252,47 +175,20 @@ export class EnvironmentManager {
             const isActive = environment.id === activeEnvId;
 
             const detailsContainer = this.dialog.querySelector('#env-details');
-            detailsContainer.innerHTML = `
-                <div style="margin-bottom: 20px;">
-                    <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
-                        <input
-                            type="text"
-                            id="env-name-input"
-                            style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-size: 16px; font-weight: 600;"
-                        />
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                            ${!isActive ? '<button id="env-set-active-btn" class="btn-xs btn-outline" title="Set as Active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Active</button>' : '<span style="color: var(--color-success); font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> ACTIVE</span>'}
-                            <button id="env-duplicate-btn" class="btn-xs btn-outline" title="Duplicate Environment">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                </svg>
-                            </button>
-                            <button id="env-export-btn" class="btn-xs btn-outline" title="Export Environment">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                    <polyline points="17 8 12 3 7 8"></polyline>
-                                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                                </svg>
-                            </button>
-                            <button id="env-delete-btn" class="btn-xs btn-outline env-danger-btn" title="Delete Environment">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="3 6 5 6 21 6"></polyline>
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
+            detailsContainer.innerHTML = '';
 
-                    <div style="margin-bottom: 16px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                            <h4 style="margin: 0; font-size: 14px; color: var(--text-secondary);">VARIABLES</h4>
-                            <button id="env-add-variable-btn" class="btn-sm btn-outline-primary" title="Add Variable">+ Add</button>
-                        </div>
-                        <div id="env-variables-container"></div>
-                    </div>
-                </div>
-            `;
+            const detailsFragment = await templateLoader.clone(
+                './src/templates/environment/environmentManager.html',
+                'tpl-environment-manager-details'
+            );
+            detailsContainer.appendChild(detailsFragment);
+
+            const setActiveBtn = detailsContainer.querySelector('#env-set-active-btn');
+            const activeBadge = detailsContainer.querySelector('.env-manager-active-badge');
+            if (setActiveBtn && activeBadge) {
+                setActiveBtn.classList.toggle('is-hidden', isActive);
+                activeBadge.classList.toggle('is-hidden', !isActive);
+            }
 
             // Set environment name directly via .value property to preserve special characters like {{ }}
             const nameInput = detailsContainer.querySelector('#env-name-input');
@@ -435,42 +331,24 @@ export class EnvironmentManager {
             container = this.dialog.querySelector('#env-variables-container');
         }
 
-        const row = document.createElement('div');
-        row.className = 'env-variable-row';
-        row.style.cssText = `
-            display: grid;
-            grid-template-columns: 1fr 2fr auto;
-            gap: 8px;
-            margin-bottom: 8px;
-            align-items: center;
-        `;
+        templateLoader
+            .clone('./src/templates/environment/environmentManager.html', 'tpl-environment-manager-variable-row')
+            .then((fragment) => {
+                const row = fragment.firstElementChild;
+                container.appendChild(fragment);
 
-        row.innerHTML = `
-            <input
-                type="text"
-                class="var-name-input"
-                placeholder="Variable name"
-                style="padding: 8px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-size: 13px;"
-            />
-            <input
-                type="text"
-                class="var-value-input"
-                placeholder="Value"
-                style="padding: 8px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-size: 13px;"
-            />
-            <button class="var-delete-btn" style="padding: 6px 10px; border: 1px solid var(--border-light); background: transparent; color: var(--text-secondary); border-radius: var(--radius-sm); cursor: pointer; font-size: 12px;">×</button>
-        `;
+                // Set values directly via .value property to preserve special characters like {{ }}
+                const nameInput = row.querySelector('.var-name-input');
+                const valueInput = row.querySelector('.var-value-input');
+                if (nameInput) {nameInput.value = name;}
+                if (valueInput) {valueInput.value = value;}
 
-        container.appendChild(row);
-
-        // Set values directly via .value property to preserve special characters like {{ }}
-        const nameInput = row.querySelector('.var-name-input');
-        const valueInput = row.querySelector('.var-value-input');
-        if (nameInput) {nameInput.value = name;}
-        if (valueInput) {valueInput.value = value;}
-
-        // Setup variable row event listeners
-        this.setupVariableRowListeners(row, name);
+                // Setup variable row event listeners
+                this.setupVariableRowListeners(row, name);
+            })
+            .catch((error) => {
+                void error;
+            });
     }
 
     /**
@@ -579,71 +457,54 @@ export class EnvironmentManager {
     showInputDialog(title, message, defaultValue = '') {
         return new Promise((resolve) => {
             const overlay = document.createElement('div');
-            overlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0, 0, 0, 0.5);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 10001;
-            `;
+            overlay.className = 'modal-overlay';
 
             const dialog = document.createElement('div');
-            dialog.style.cssText = `
-                background: var(--bg-primary);
-                border-radius: var(--radius-xl);
-                padding: 24px;
-                min-width: 400px;
-                box-shadow: var(--shadow-xl);
-                border: 1px solid var(--border-light);
-            `;
+            dialog.className = 'modal-dialog modal-dialog--sm';
 
-            dialog.innerHTML = `
-                <h3 style="margin: 0 0 16px 0; color: var(--text-primary);">${this.escapeHtml(title)}</h3>
-                <p style="margin: 0 0 16px 0; color: var(--text-secondary); font-size: 14px;">${this.escapeHtml(message)}</p>
-                <input
-                    type="text"
-                    id="input-dialog-input"
-                    style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); font-size: 14px; margin-bottom: 16px;"
-                />
-                <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                    <button id="input-dialog-cancel" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: var(--radius-sm); cursor: pointer;">Cancel</button>
-                    <button id="input-dialog-ok" style="padding: 8px 16px; border: none; background: var(--color-primary); color: white; border-radius: var(--radius-sm); cursor: pointer;">OK</button>
-                </div>
-            `;
+            templateLoader
+                .clone('./src/templates/environment/environmentManager.html', 'tpl-environment-manager-input-dialog')
+                .then((fragment) => {
+                    dialog.appendChild(fragment);
 
-            overlay.appendChild(dialog);
-            document.body.appendChild(overlay);
+                    const titleEl = dialog.querySelector('[data-role="title"]');
+                    const messageEl = dialog.querySelector('[data-role="message"]');
+                    if (titleEl) {titleEl.textContent = title;}
+                    if (messageEl) {messageEl.textContent = message;}
 
-            const input = dialog.querySelector('#input-dialog-input');
-            // Set value directly via .value property to preserve special characters like {{ }}
-            if (input) {input.value = defaultValue;}
-            const okBtn = dialog.querySelector('#input-dialog-ok');
-            const cancelBtn = dialog.querySelector('#input-dialog-cancel');
+                    overlay.appendChild(dialog);
+                    document.body.appendChild(overlay);
 
-            const cleanup = (value) => {
-                document.body.removeChild(overlay);
-                resolve(value);
-            };
+                    const input = dialog.querySelector('#input-dialog-input');
+                    // Set value directly via .value property to preserve special characters like {{ }}
+                    if (input) {input.value = defaultValue;}
+                    const okBtn = dialog.querySelector('#input-dialog-ok');
+                    const cancelBtn = dialog.querySelector('#input-dialog-cancel');
 
-            okBtn.addEventListener('click', () => cleanup(input.value.trim()));
-            cancelBtn.addEventListener('click', () => cleanup(null));
+                    const cleanup = (value) => {
+                        document.body.removeChild(overlay);
+                        resolve(value);
+                    };
 
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {cleanup(input.value.trim());}
-                if (e.key === 'Escape') {cleanup(null);}
-            });
+                    okBtn.addEventListener('click', () => cleanup(input.value.trim()));
+                    cancelBtn.addEventListener('click', () => cleanup(null));
 
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {cleanup(null);}
-            });
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {cleanup(input.value.trim());}
+                        if (e.key === 'Escape') {cleanup(null);}
+                    });
 
-            input.focus();
-            input.select();
+                    overlay.addEventListener('click', (e) => {
+                        if (e.target === overlay) {cleanup(null);}
+                    });
+
+                    input.focus();
+                    input.select();
+                })
+                .catch((error) => {
+                    void error;
+                    resolve(null);
+                });
         });
     }
 
@@ -652,58 +513,44 @@ export class EnvironmentManager {
      */
     showAlert(message) {
         const overlay = document.createElement('div');
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10001;
-        `;
+        overlay.className = 'modal-overlay';
 
         const dialog = document.createElement('div');
-        dialog.style.cssText = `
-            background: var(--bg-primary);
-            border-radius: var(--radius-xl);
-            padding: 24px;
-            min-width: 400px;
-            max-width: 500px;
-            box-shadow: var(--shadow-xl);
-            border: 1px solid var(--border-light);
-        `;
+        dialog.className = 'modal-dialog modal-dialog--sm';
 
-        dialog.innerHTML = `
-            <p style="margin: 0 0 16px 0; color: var(--text-primary); font-size: 14px;">${this.escapeHtml(message)}</p>
-            <div style="display: flex; justify-content: flex-end;">
-                <button id="alert-dialog-ok" style="padding: 8px 16px; border: none; background: var(--color-primary); color: white; border-radius: var(--radius-sm); cursor: pointer;">OK</button>
-            </div>
-        `;
+        templateLoader
+            .clone('./src/templates/environment/environmentManager.html', 'tpl-environment-manager-alert-dialog')
+            .then((fragment) => {
+                dialog.appendChild(fragment);
 
-        overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
+                const messageEl = dialog.querySelector('[data-role="message"]');
+                if (messageEl) {messageEl.textContent = message;}
 
-        const okBtn = dialog.querySelector('#alert-dialog-ok');
+                overlay.appendChild(dialog);
+                document.body.appendChild(overlay);
 
-        const cleanup = () => {
-            document.body.removeChild(overlay);
-        };
+                const okBtn = dialog.querySelector('#alert-dialog-ok');
 
-        okBtn.addEventListener('click', cleanup);
+                const cleanup = () => {
+                    document.body.removeChild(overlay);
+                };
 
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {cleanup();}
-        });
+                okBtn.addEventListener('click', cleanup);
 
-        document.addEventListener('keydown', function escapeHandler(e) {
-            if (e.key === 'Escape' || e.key === 'Enter') {
-                cleanup();
-                document.removeEventListener('keydown', escapeHandler);
-            }
-        });
+                overlay.addEventListener('click', (e) => {
+                    if (e.target === overlay) {cleanup();}
+                });
+
+                document.addEventListener('keydown', function escapeHandler(e) {
+                    if (e.key === 'Escape' || e.key === 'Enter') {
+                        cleanup();
+                        document.removeEventListener('keydown', escapeHandler);
+                    }
+                });
+            })
+            .catch((error) => {
+                void error;
+            });
     }
 
     /**
@@ -712,62 +559,48 @@ export class EnvironmentManager {
     showConfirmDialog(message) {
         return new Promise((resolve) => {
             const overlay = document.createElement('div');
-            overlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0, 0, 0, 0.5);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 10001;
-            `;
+            overlay.className = 'modal-overlay';
 
             const dialog = document.createElement('div');
-            dialog.style.cssText = `
-                background: var(--bg-primary);
-                border-radius: var(--radius-xl);
-                padding: 24px;
-                min-width: 400px;
-                max-width: 500px;
-                box-shadow: var(--shadow-xl);
-                border: 1px solid var(--border-light);
-            `;
+            dialog.className = 'modal-dialog modal-dialog--sm';
 
-            dialog.innerHTML = `
-                <p style="margin: 0 0 16px 0; color: var(--text-primary); font-size: 14px;">${this.escapeHtml(message)}</p>
-                <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                    <button id="confirm-dialog-cancel" style="padding: 8px 16px; border: 1px solid var(--border-light); background: transparent; color: var(--text-primary); border-radius: var(--radius-sm); cursor: pointer;">Cancel</button>
-                    <button id="confirm-dialog-ok" style="padding: 8px 16px; border: none; background: var(--color-primary); color: white; border-radius: var(--radius-sm); cursor: pointer;">OK</button>
-                </div>
-            `;
+            templateLoader
+                .clone('./src/templates/environment/environmentManager.html', 'tpl-environment-manager-confirm-dialog')
+                .then((fragment) => {
+                    dialog.appendChild(fragment);
 
-            overlay.appendChild(dialog);
-            document.body.appendChild(overlay);
+                    const messageEl = dialog.querySelector('[data-role="message"]');
+                    if (messageEl) {messageEl.textContent = message;}
 
-            const okBtn = dialog.querySelector('#confirm-dialog-ok');
-            const cancelBtn = dialog.querySelector('#confirm-dialog-cancel');
+                    overlay.appendChild(dialog);
+                    document.body.appendChild(overlay);
 
-            const cleanup = (value) => {
-                document.body.removeChild(overlay);
-                resolve(value);
-            };
+                    const okBtn = dialog.querySelector('#confirm-dialog-ok');
+                    const cancelBtn = dialog.querySelector('#confirm-dialog-cancel');
 
-            okBtn.addEventListener('click', () => cleanup(true));
-            cancelBtn.addEventListener('click', () => cleanup(false));
+                    const cleanup = (value) => {
+                        document.body.removeChild(overlay);
+                        resolve(value);
+                    };
 
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {cleanup(false);}
-            });
+                    okBtn.addEventListener('click', () => cleanup(true));
+                    cancelBtn.addEventListener('click', () => cleanup(false));
 
-            document.addEventListener('keydown', function escapeHandler(e) {
-                if (e.key === 'Escape') {
-                    cleanup(false);
-                    document.removeEventListener('keydown', escapeHandler);
-                }
-            });
+                    overlay.addEventListener('click', (e) => {
+                        if (e.target === overlay) {cleanup(false);}
+                    });
+
+                    document.addEventListener('keydown', function escapeHandler(e) {
+                        if (e.key === 'Escape') {
+                            cleanup(false);
+                            document.removeEventListener('keydown', escapeHandler);
+                        }
+                    });
+                })
+                .catch((error) => {
+                    void error;
+                    resolve(false);
+                });
         });
     }
 

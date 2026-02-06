@@ -3,6 +3,8 @@
  * @module ui/WorkspaceTabBar
  */
 
+import { templateLoader } from '../templateLoader.js';
+
 /**
  * WorkspaceTabBar
  *
@@ -121,12 +123,11 @@ export class WorkspaceTabBar {
         closeBtn.className = 'workspace-tab-close';
         closeBtn.setAttribute('aria-label', 'Close tab');
         closeBtn.title = 'Close tab';
-        closeBtn.innerHTML = `
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
-                <line x1="3" y1="3" x2="9" y2="9"></line>
-                <line x1="9" y1="3" x2="3" y2="9"></line>
-            </svg>
-        `;
+        {
+            const iconEl = document.createElement('span');
+            iconEl.className = 'icon icon-12 icon-x';
+            closeBtn.appendChild(iconEl);
+        }
 
         closeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -179,18 +180,14 @@ export class WorkspaceTabBar {
         btn.setAttribute('aria-label', `Scroll ${direction}`);
 
         if (direction === 'left') {
-            btn.innerHTML = `
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="7 2 3 6 7 10"></polyline>
-                </svg>
-            `;
+            const iconEl = document.createElement('span');
+            iconEl.className = 'icon icon-12 icon-chevron-left';
+            btn.appendChild(iconEl);
             btn.addEventListener('click', () => this._scrollTabs(-200));
         } else {
-            btn.innerHTML = `
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="5 2 9 6 5 10"></polyline>
-                </svg>
-            `;
+            const iconEl = document.createElement('span');
+            iconEl.className = 'icon icon-12 icon-chevron-right';
+            btn.appendChild(iconEl);
             btn.addEventListener('click', () => this._scrollTabs(200));
         }
 
@@ -250,12 +247,11 @@ export class WorkspaceTabBar {
         btn.className = 'workspace-tab-new';
         btn.setAttribute('aria-label', 'New tab');
         btn.title = 'New tab';
-        btn.innerHTML = `
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
-                <line x1="7" y1="3" x2="7" y2="11"></line>
-                <line x1="3" y1="7" x2="11" y2="7"></line>
-            </svg>
-        `;
+        {
+            const iconEl = document.createElement('span');
+            iconEl.className = 'icon icon-14 icon-plus';
+            btn.appendChild(iconEl);
+        }
 
         btn.addEventListener('click', () => {
             if (this.onTabCreate) {
@@ -275,13 +271,11 @@ export class WorkspaceTabBar {
         btn.className = 'workspace-tab-list-button';
         btn.setAttribute('aria-label', 'All tabs');
         btn.title = 'All tabs';
-        btn.innerHTML = `
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
-                <line x1="2" y1="4" x2="12" y2="4"></line>
-                <line x1="2" y1="7" x2="12" y2="7"></line>
-                <line x1="2" y1="10" x2="12" y2="10"></line>
-            </svg>
-        `;
+        {
+            const iconEl = document.createElement('span');
+            iconEl.className = 'icon icon-14 icon-menu';
+            btn.appendChild(iconEl);
+        }
 
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -414,13 +408,35 @@ export class WorkspaceTabBar {
         menu.style.left = `${event.pageX}px`;
         menu.style.top = `${event.pageY}px`;
 
+        const createMenuItemEl = (label, iconClass, disabled) => {
+            const fragment = templateLoader.cloneSync(
+                './src/templates/workspaceTabs/workspaceTabBar.html',
+                'tpl-workspace-tab-context-menu-item'
+            );
+            const el = fragment.firstElementChild;
+
+            const iconEl = el.querySelector('[data-role="icon"]');
+            const labelEl = el.querySelector('[data-role="label"]');
+
+            if (iconEl) {iconEl.classList.add(iconClass);}
+            if (labelEl) {labelEl.textContent = label;}
+            if (disabled) {el.classList.add('disabled');}
+
+            return el;
+        };
+
+        const createDividerEl = () => {
+            const fragment = templateLoader.cloneSync(
+                './src/templates/workspaceTabs/workspaceTabBar.html',
+                'tpl-workspace-tab-context-menu-divider'
+            );
+            return fragment.firstElementChild;
+        };
+
         const menuItems = [
             {
                 label: 'Rename',
-                icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                </svg>`,
+                iconClass: 'icon-pencil',
                 action: () => {
                     const tabEl = document.querySelector(`[data-tab-id="${tab.id}"]`);
                     if (tabEl) {
@@ -430,10 +446,7 @@ export class WorkspaceTabBar {
             },
             {
                 label: 'Duplicate',
-                icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>`,
+                iconClass: 'icon-duplicate',
                 action: () => {
                     if (this.onTabDuplicate) {
                         this.onTabDuplicate(tab.id);
@@ -442,11 +455,7 @@ export class WorkspaceTabBar {
             },
             {
                 label: 'Save',
-                icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                    <polyline points="7 3 7 8 15 8"></polyline>
-                </svg>`,
+                iconClass: 'icon-save',
                 action: async () => {
                     if (tab.endpoint && tab.endpoint.collectionId && tab.endpoint.endpointId) {
                         const { saveAllRequestModifications } = await import('../collectionManager.js');
@@ -461,10 +470,7 @@ export class WorkspaceTabBar {
             { divider: true },
             {
                 label: 'Close',
-                icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>`,
+                iconClass: 'icon-x',
                 action: () => {
                     if (this.onTabClose) {
                         this.onTabClose(tab.id);
@@ -473,10 +479,7 @@ export class WorkspaceTabBar {
             },
             {
                 label: 'Close Others',
-                icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>`,
+                iconClass: 'icon-x',
                 action: () => {
                     if (this.onCloseOthers) {
                         this.onCloseOthers(tab.id);
@@ -487,16 +490,9 @@ export class WorkspaceTabBar {
 
         menuItems.forEach(item => {
             if (item.divider) {
-                const divider = document.createElement('div');
-                divider.className = 'workspace-tab-context-menu-divider';
-                menu.appendChild(divider);
+                menu.appendChild(createDividerEl());
             } else {
-                const menuItem = document.createElement('div');
-                menuItem.className = 'workspace-tab-context-menu-item';
-                if (item.disabled) {
-                    menuItem.classList.add('disabled');
-                }
-                menuItem.innerHTML = `<span class="menu-icon">${item.icon}</span><span>${item.label}</span>`;
+                const menuItem = createMenuItemEl(item.label, item.iconClass, item.disabled);
                 menuItem.addEventListener('click', () => {
                     if (!item.disabled) {
                         item.action();

@@ -6,6 +6,8 @@
  * and a help dialog to display available shortcuts.
  */
 
+import { templateLoader } from './templateLoader.js';
+
 class KeyboardShortcutsManager {
     constructor() {
         this.shortcuts = new Map();
@@ -152,19 +154,16 @@ class KeyboardShortcutsManager {
     showHelp() {
         if (this.helpDialogVisible) {return;}
 
-        const overlay = document.createElement('div');
-        overlay.className = 'keyboard-shortcuts-overlay';
-        overlay.innerHTML = `
-            <div class="keyboard-shortcuts-dialog">
-                <div class="keyboard-shortcuts-header">
-                    <h2 data-i18n="shortcuts.title">Keyboard Shortcuts</h2>
-                    <button class="close-shortcuts-btn" aria-label="Close">×</button>
-                </div>
-                <div class="keyboard-shortcuts-content">
-                    ${this._generateHelpContent()}
-                </div>
-            </div>
-        `;
+        const fragment = templateLoader.cloneSync(
+            './src/templates/shortcuts/keyboardShortcuts.html',
+            'tpl-keyboard-shortcuts-overlay'
+        );
+        const overlay = fragment.firstElementChild;
+
+        const contentEl = overlay.querySelector('[data-role="content"]');
+        if (contentEl) {
+            this._renderHelpContent(contentEl);
+        }
 
         document.body.appendChild(overlay);
         this.helpDialogVisible = true;
@@ -174,8 +173,8 @@ class KeyboardShortcutsManager {
             window.i18n.updateUI(overlay);
         }
 
-        const closeBtn = overlay.querySelector('.close-shortcuts-btn');
-        const _dialog = overlay.querySelector('.keyboard-shortcuts-dialog');
+        const closeBtn = overlay.querySelector('#close-shortcuts-btn');
+        const _dialog = overlay.querySelector('#keyboard-shortcuts-dialog');
 
         const close = () => {
             overlay.remove();
@@ -200,28 +199,50 @@ class KeyboardShortcutsManager {
     /**
      * Generate HTML content for help dialog
      */
-    _generateHelpContent() {
-        let html = '';
+    _renderHelpContent(containerEl) {
+        containerEl.innerHTML = '';
 
         for (const [category, shortcutKeys] of this.categories) {
-            html += `<div class="shortcuts-category">
-                <h3 data-i18n="shortcuts.category.${category.toLowerCase().replace(/\s+/g, '_')}">${category}</h3>
-                <div class="shortcuts-list">`;
+            const categoryFragment = templateLoader.cloneSync(
+                './src/templates/shortcuts/keyboardShortcuts.html',
+                'tpl-shortcuts-category'
+            );
+            const categoryEl = categoryFragment.firstElementChild;
+
+            const titleEl = categoryEl.querySelector('[data-role="title"]');
+            const listEl = categoryEl.querySelector('[data-role="list"]');
+
+            if (titleEl) {
+                titleEl.textContent = category;
+                titleEl.setAttribute(
+                    'data-i18n',
+                    `shortcuts.category.${category.toLowerCase().replace(/\s+/g, '_')}`
+                );
+            }
 
             for (const key of shortcutKeys) {
                 const shortcut = this.shortcuts.get(key);
-                html += `
-                    <div class="shortcut-item">
-                        <span class="shortcut-description" data-i18n="shortcuts.${key.replace(/\+/g, '_')}">${shortcut.description}</span>
-                        <kbd class="shortcut-keys">${shortcut.displayKey}</kbd>
-                    </div>
-                `;
+                const itemFragment = templateLoader.cloneSync(
+                    './src/templates/shortcuts/keyboardShortcuts.html',
+                    'tpl-shortcut-item'
+                );
+                const itemEl = itemFragment.firstElementChild;
+
+                const descEl = itemEl.querySelector('[data-role="description"]');
+                const keysEl = itemEl.querySelector('[data-role="keys"]');
+                if (descEl) {
+                    descEl.textContent = shortcut.description;
+                    descEl.setAttribute('data-i18n', `shortcuts.${key.replace(/\+/g, '_')}`);
+                }
+                if (keysEl) {
+                    keysEl.textContent = shortcut.displayKey;
+                }
+
+                listEl.appendChild(itemEl);
             }
 
-            html += '</div></div>';
+            containerEl.appendChild(categoryEl);
         }
-
-        return html;
     }
 
     /**

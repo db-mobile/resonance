@@ -358,8 +358,15 @@ export class WorkspaceTabStateManager {
             clearResponseDisplay();
         }
 
-        // Restore response headers
-        if (this.dom.responseHeadersDisplay) {
+        // Restore response headers using CodeMirror if available
+        const containerElements = window.responseContainerManager?.getActiveElements();
+        if (containerElements?.headersEditor) {
+            if (response.headers && Object.keys(response.headers).length > 0) {
+                containerElements.headersEditor.setContent(JSON.stringify(response.headers, null, 2), 'application/json');
+            } else {
+                containerElements.headersEditor.setContent('No response headers.', 'application/json');
+            }
+        } else if (this.dom.responseHeadersDisplay) {
             if (response.headers && Object.keys(response.headers).length > 0) {
                 this.dom.responseHeadersDisplay.textContent = JSON.stringify(response.headers, null, 2);
             } else {
@@ -419,7 +426,10 @@ export class WorkspaceTabStateManager {
         updateResponseSize(null);
 
         // Clear response headers
-        if (this.dom.responseHeadersDisplay) {
+        const containerElements = window.responseContainerManager?.getActiveElements();
+        if (containerElements?.headersEditor) {
+            containerElements.headersEditor.setContent('', 'application/json');
+        } else if (this.dom.responseHeadersDisplay) {
             this.dom.responseHeadersDisplay.textContent = '';
         }
 
