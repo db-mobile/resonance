@@ -1,0 +1,293 @@
+<template id="tpl-runner-tab-content">
+    <div class="runner-panel">
+        <!-- Runner Header -->
+        <div class="runner-header">
+            <div class="runner-title-section">
+                <div class="runner-selector-wrapper">
+                    <div class="runner-selector" data-role="runner-selector">
+                        <input type="text" 
+                               class="runner-selector-input" 
+                               placeholder="Untitled Runner"
+                               data-role="runner-name"
+                               aria-label="Runner name"
+                               autocomplete="off">
+                        <button class="runner-selector-toggle" data-action="toggle-dropdown" aria-label="Select runner">
+                            <span class="icon icon-14 icon-chevron-down"></span>
+                        </button>
+                    </div>
+                    <div class="runner-selector-dropdown is-hidden" data-role="runner-dropdown">
+                        <div class="runner-dropdown-list" data-role="runner-list">
+                            <div class="runner-dropdown-empty">No saved runners</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="runner-header-actions">
+                    <button class="btn-sm btn-primary" data-action="new-runner" title="New Runner">
+                        <span class="icon icon-14 icon-plus"></span>
+                        <span data-i18n="runner.new">New</span>
+                    </button>
+                    <button class="btn-sm btn-outline" data-action="save-runner" title="Save Runner">
+                        <span class="icon icon-14 icon-save"></span>
+                        <span data-i18n="runner.save">Save</span>
+                    </button>
+                    <button class="btn-sm btn-outline runner-danger-btn" data-action="delete-runner" title="Delete Runner">
+                        <span class="icon icon-14 icon-trash"></span>
+                    </button>
+                </div>
+                <div class="runner-header-separator"></div>
+                <div class="runner-header-options">
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-option="stop-on-error" checked>
+                        <span class="toggle-track"></span>
+                        <span data-i18n="runner.stop_on_error">Stop on error</span>
+                    </label>
+                    <label class="runner-option-inline">
+                        <span data-i18n="runner.delay_between">Delay:</span>
+                        <input type="number" 
+                               class="runner-delay-input-sm" 
+                               data-option="delay" 
+                               value="0" 
+                               min="0" 
+                               max="10000"
+                               aria-label="Delay in milliseconds">
+                        <span>ms</span>
+                    </label>
+                </div>
+                <div class="runner-header-controls">
+                    <button class="btn btn-success" data-action="run" aria-label="Run Collection">
+                        <span class="icon icon-16 icon-play"></span>
+                        <span data-i18n="runner.run">Run</span>
+                    </button>
+                    <button class="btn btn-danger is-hidden" data-action="stop" aria-label="Stop Run">
+                        <span class="icon icon-16 icon-x"></span>
+                        <span data-i18n="runner.stop">Stop</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Runner Main Content -->
+        <div class="runner-main">
+            <!-- Left Panel: Request Selection -->
+            <div class="runner-selection-panel">
+                <div class="runner-panel-header">
+                    <h4 class="runner-section-title" data-i18n="runner.available_requests">Available Requests</h4>
+                </div>
+                <div class="runner-collection-tree" data-role="collection-tree">
+                    <div class="runner-empty-state">
+                        <span class="icon icon-20 icon-spark"></span>
+                        <p data-i18n="runner.no_collections">No collections available</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center Panel: Selected Requests -->
+            <div class="runner-requests-panel">
+                <div class="runner-panel-header">
+                    <h4 class="runner-section-title" data-i18n="runner.selected_requests">Selected Requests</h4>
+                    <span class="runner-request-count" data-role="request-count">0 requests</span>
+                </div>
+                <div class="runner-requests-list" data-role="requests-list">
+                    <div class="runner-empty-state">
+                        <span class="icon icon-20 icon-plus"></span>
+                        <p data-i18n="runner.add_requests_hint">Click requests from the left panel to add them</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</template>
+
+<template id="tpl-runner-script-modal">
+    <div class="modal-overlay modal-overlay--dim" data-role="script-modal-overlay">
+        <div class="modal-dialog modal-dialog--script-editor">
+            <div class="dialog-header">
+                <div class="runner-script-modal-title">
+                    <h3 class="dialog-title" data-i18n="runner.post_response_script">Post-Response Script</h3>
+                    <div class="runner-script-request-info">
+                        <span class="runner-script-method" data-role="script-method">GET</span>
+                        <span class="runner-script-path" data-role="script-path">/endpoint</span>
+                    </div>
+                </div>
+                <button class="dialog-close-btn" data-action="close" aria-label="Close">
+                    <span class="icon icon-16 icon-x"></span>
+                </button>
+            </div>
+            <div class="runner-script-modal-body">
+                <div class="runner-script-editor-container" data-role="script-editor-container"></div>
+            </div>
+            <div class="runner-script-modal-hint">
+                <strong>Available APIs:</strong> response, environment.set(), environment.get(), console.log()
+            </div>
+            <div class="runner-script-modal-footer">
+                <button class="btn btn-outline" data-action="cancel" data-i18n="common.cancel">Cancel</button>
+                <button class="btn btn-primary" data-action="save" data-i18n="common.save">Save</button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-runner-request-item">
+    <div class="runner-request-item" draggable="true">
+        <div class="runner-request-drag-handle">
+            <span class="icon icon-14 icon-menu"></span>
+        </div>
+        <div class="runner-request-info">
+            <span class="runner-request-method" data-role="method">GET</span>
+            <span class="runner-request-name" data-role="name">/endpoint</span>
+        </div>
+        <div class="runner-request-actions">
+            <button class="runner-request-edit-btn" data-action="edit-script" title="Edit post-response script">
+                <span class="icon icon-14 icon-script"></span>
+            </button>
+            <button class="runner-request-remove-btn" data-action="remove" title="Remove">
+                <span class="icon icon-14 icon-x"></span>
+            </button>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-runner-collection-item">
+    <div class="runner-collection-item">
+        <div class="runner-collection-header" data-role="collection-header">
+            <span class="icon icon-14 icon-chevron-right runner-collection-chevron"></span>
+            <span class="runner-collection-name" data-role="collection-name">Collection Name</span>
+        </div>
+        <div class="runner-collection-endpoints is-hidden" data-role="endpoints-container">
+        </div>
+    </div>
+</template>
+
+<template id="tpl-runner-endpoint-item">
+    <div class="runner-endpoint-item" data-role="endpoint">
+        <span class="runner-endpoint-method" data-role="method">GET</span>
+        <span class="runner-endpoint-name" data-role="name">/endpoint</span>
+        <button class="runner-endpoint-add-btn" data-action="add" title="Add to runner">
+            <span class="icon icon-14 icon-plus"></span>
+        </button>
+    </div>
+</template>
+
+<template id="tpl-runner-results-panel">
+    <div class="runner-results-resizer" data-role="results-resizer">
+        <div class="resizer-grip">
+            <div class="resizer-line"></div>
+            <div class="resizer-line"></div>
+            <div class="resizer-line"></div>
+        </div>
+    </div>
+    <div class="runner-results-container">
+        <div class="runner-results-header">
+            <h4 class="runner-section-title" data-i18n="runner.results">Results</h4>
+            <div class="runner-results-summary" data-role="summary">
+                <span class="runner-results-passed" data-role="passed">0 passed</span>
+                <span class="runner-results-failed" data-role="failed">0 failed</span>
+                <span class="runner-results-time" data-role="total-time">0ms</span>
+            </div>
+        </div>
+        <div class="runner-results-body">
+            <div class="runner-results-list-panel">
+                <div class="runner-results-list" data-role="results-list">
+                </div>
+            </div>
+            <div class="runner-results-detail-panel is-hidden" data-role="detail-panel">
+                <div class="runner-results-detail-header">
+                    <div class="runner-results-detail-info">
+                        <span class="runner-results-detail-method" data-role="detail-method">GET</span>
+                        <span class="runner-results-detail-name" data-role="detail-name">/endpoint</span>
+                        <span class="runner-results-detail-status" data-role="detail-status">200 OK</span>
+                        <span class="runner-results-detail-time" data-role="detail-time">0ms</span>
+                    </div>
+                </div>
+                <div class="runner-results-detail-tabs">
+                    <button class="runner-results-tab is-active" data-tab="body" data-i18n="runner.body">Body</button>
+                    <button class="runner-results-tab" data-tab="headers" data-i18n="runner.headers">Headers</button>
+                    <button class="runner-results-tab" data-tab="cookies" data-i18n="runner.cookies">Cookies</button>
+                </div>
+                <div class="runner-results-detail-content">
+                    <div class="runner-results-tab-content is-active" data-content="body">
+                        <pre class="runner-results-body-content" data-role="body-content"></pre>
+                    </div>
+                    <div class="runner-results-tab-content" data-content="headers">
+                        <table class="runner-results-headers-table" data-role="headers-table">
+                            <thead>
+                                <tr>
+                                    <th data-i18n="runner.header_name">Name</th>
+                                    <th data-i18n="runner.header_value">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody data-role="headers-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="runner-results-tab-content" data-content="cookies">
+                        <table class="runner-results-cookies-table" data-role="cookies-table">
+                            <thead>
+                                <tr>
+                                    <th data-i18n="runner.cookie_name">Name</th>
+                                    <th data-i18n="runner.cookie_value">Value</th>
+                                    <th data-i18n="runner.cookie_domain">Domain</th>
+                                    <th data-i18n="runner.cookie_path">Path</th>
+                                </tr>
+                            </thead>
+                            <tbody data-role="cookies-body"></tbody>
+                        </table>
+                        <div class="runner-results-no-cookies is-hidden" data-role="no-cookies">
+                            <span data-i18n="runner.no_cookies">No cookies in response</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-runner-result-item">
+    <div class="runner-result-item" data-role="result-item">
+        <div class="runner-result-header">
+            <span class="runner-result-status" data-role="status-icon">●</span>
+            <span class="runner-result-method" data-role="method">GET</span>
+            <span class="runner-result-name" data-role="name">/endpoint</span>
+            <span class="runner-result-status-code" data-role="status-code">200</span>
+            <span class="runner-result-time" data-role="time">0ms</span>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-runner-saved-list">
+    <div class="runner-saved-overlay">
+        <div class="runner-saved-dialog">
+            <div class="runner-saved-header">
+                <h3 data-i18n="runner.saved_runners">Saved Runners</h3>
+                <button class="runner-saved-close" data-action="close" aria-label="Close">
+                    <span class="icon icon-16 icon-x"></span>
+                </button>
+            </div>
+            <div class="runner-saved-list" data-role="saved-list">
+                <div class="runner-empty-state">
+                    <p data-i18n="runner.no_saved_runners">No saved runners yet</p>
+                </div>
+            </div>
+            <div class="runner-saved-footer">
+                <button class="btn btn-outline" data-action="close" data-i18n="common.close">Close</button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-runner-saved-item">
+    <div class="runner-saved-item">
+        <div class="runner-saved-item-info">
+            <span class="runner-saved-item-name" data-role="name">Runner Name</span>
+            <span class="runner-saved-item-meta" data-role="meta">3 requests • Last run: Never</span>
+        </div>
+        <div class="runner-saved-item-actions">
+            <button class="btn-sm btn-outline" data-action="load" title="Load">
+                <span class="icon icon-14 icon-import"></span>
+            </button>
+            <button class="btn-sm btn-outline runner-danger-btn" data-action="delete" title="Delete">
+                <span class="icon icon-14 icon-trash"></span>
+            </button>
+        </div>
+    </div>
+</template>

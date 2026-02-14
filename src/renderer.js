@@ -513,6 +513,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // Collection Runner button functionality
+    const runnerBtn = document.getElementById('runner-btn');
+    if (runnerBtn) {
+        runnerBtn.addEventListener('click', () => {
+            if (window.workspaceTabController) {
+                window.workspaceTabController.createRunnerTab();
+            }
+        });
+    }
+
     // History toggle functionality
     const historyToggleBtn = document.getElementById('history-toggle-btn');
     const historySidebar = document.getElementById('history-sidebar');

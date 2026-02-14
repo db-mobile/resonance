@@ -34,6 +34,24 @@ export class WorkspaceTabStateManager {
             const grpcRequestJson = window.grpcBodyEditor
                 ? window.grpcBodyEditor.getContent()
                 : (this.dom.grpcBodyInput?.value || '{}');
+            
+            // Capture metadata from UI
+            const metadata = {};
+            const grpcMetadataList = document.getElementById('grpc-metadata-list');
+            if (grpcMetadataList) {
+                grpcMetadataList.querySelectorAll('.key-value-row').forEach(row => {
+                    const key = row.querySelector('.key-input')?.value?.trim();
+                    const value = row.querySelector('.value-input')?.value || '';
+                    if (key) {
+                        metadata[key] = value;
+                    }
+                });
+            }
+            
+            // Capture TLS setting
+            const grpcTlsCheckbox = document.getElementById('grpc-tls-checkbox');
+            const useTls = grpcTlsCheckbox?.checked || false;
+            
             return {
                 request: {
                     protocol: 'grpc',
@@ -41,7 +59,9 @@ export class WorkspaceTabStateManager {
                         target: this.dom.grpcTargetInput?.value || '',
                         service: this.dom.grpcServiceSelect?.value || '',
                         fullMethod: this.dom.grpcMethodSelect?.value || '',
-                        requestJson: grpcRequestJson || '{}'
+                        requestJson: grpcRequestJson || '{}',
+                        metadata,
+                        useTls
                     }
                 },
                 endpoint: window.currentEndpoint
@@ -192,6 +212,11 @@ export class WorkspaceTabStateManager {
             if (window.setGrpcTls) {
                 window.setGrpcTls(request.grpc?.useTls || false);
             }
+            
+            // Set window.currentEndpoint for gRPC requests so Ctrl+S save works
+            if (endpoint) {
+                window.currentEndpoint = endpoint;
+            }
             return;
         }
         
@@ -200,10 +225,7 @@ export class WorkspaceTabStateManager {
 
         // Restore request fields
         if (this.dom.urlInput) {
-            // Only set URL if there's a saved value, otherwise keep the HTML default
-            if (request.url) {
-                this.dom.urlInput.value = request.url;
-            }
+            this.dom.urlInput.value = request.url || '';
         }
 
         if (this.dom.methodSelect) {

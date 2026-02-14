@@ -20,3 +20,4 @@ export { EnvironmentRepository } from './EnvironmentRepository.js';
 export { HistoryRepository } from './HistoryRepository.js';
 export { ProxyRepository } from './ProxyRepository.js';
 export { WorkspaceTabRepository } from './WorkspaceTabRepository.js';
+export { RunnerRepository } from './RunnerRepository.js';

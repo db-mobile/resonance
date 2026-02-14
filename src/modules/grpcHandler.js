@@ -387,6 +387,15 @@ export function initGrpcUI() {
         grpcClearProtoBtn.addEventListener('click', onClearProtoFile);
     }
 
+    // Mark tab as modified when TLS checkbox is toggled
+    if (grpcTlsCheckbox) {
+        grpcTlsCheckbox.addEventListener('change', () => {
+            if (window.workspaceTabController) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
+    }
+
     if (grpcTargetInput && !grpcTargetInput.value) {
         grpcTargetInput.value = lastTarget || 'grpcb.in:9000';
     }

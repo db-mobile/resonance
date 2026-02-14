@@ -597,14 +597,34 @@ fn setup_pm(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<()
         .unwrap_or(JsValue::undefined());
 
     let pm = ObjectInitializer::new(context)
-        .property(js_string!("environment"), environment, Attribute::all())
-        .property(js_string!("request"), request_obj, Attribute::all())
-        .property(js_string!("response"), response_obj, Attribute::all())
+        .property(
+            js_string!("environment"),
+            environment.clone(),
+            Attribute::all(),
+        )
+        .property(js_string!("request"), request_obj.clone(), Attribute::all())
+        .property(
+            js_string!("response"),
+            response_obj.clone(),
+            Attribute::all(),
+        )
         .function(test_fn, js_string!("test"), 2)
         .build();
 
     context
         .register_global_property(js_string!("pm"), pm, Attribute::all())
+        .map_err(|e| e.to_string())?;
+
+    // Also register environment, request, response as globals for convenience
+    // This allows scripts to use environment.set() instead of pm.environment.set()
+    context
+        .register_global_property(js_string!("environment"), environment, Attribute::all())
+        .map_err(|e| e.to_string())?;
+    context
+        .register_global_property(js_string!("request"), request_obj, Attribute::all())
+        .map_err(|e| e.to_string())?;
+    context
+        .register_global_property(js_string!("response"), response_obj, Attribute::all())
         .map_err(|e| e.to_string())?;
 
     Ok(())
