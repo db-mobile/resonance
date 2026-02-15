@@ -36,6 +36,15 @@ A local-first, zero-account API client with excellent user experience built with
   - JSON-based message editing with schema-generated skeletons
   - Unary RPC support
 
+### Collection Runner
+- **Batch Request Execution**: Run multiple requests sequentially with configurable options
+  - Select requests from any collection and arrange execution order
+  - Post-response scripts for variable chaining between requests
+  - Stop on error or continue execution options
+  - Configurable delay between requests
+  - Real-time progress tracking and detailed results
+  - Save and reload runner configurations
+
 ### Advanced Features
 - **Scripts & Automation**: Pre-request and test scripts with JavaScript execution (powered by Boa Engine)
   - **Pre-request Scripts**: Modify requests dynamically (headers, body, auth signatures)
@@ -614,11 +623,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] GraphQL support with dedicated query and variables editors
 - [x] Tauri v2 migration for smaller bundle and better performance
 - [x] gRPC support with server reflection and unary RPC
+- [x] Collection runner for batch request execution with variable chaining
 
 ### Planned
 - [ ] WebSocket support
 - [ ] Response comparison and diff view
-- [ ] Collection runner for batch execution
 - [ ] Plugin system for extensions
 - [ ] Team collaboration features
 

@@ -28,6 +28,9 @@ export class WorkspaceTabController {
         this.responseContainerManager = responseContainerManager;
         this.isRestoringState = false; // Flag to prevent marking tabs as modified during restoration
 
+        // Runner controllers map (tabId -> RunnerController)
+        this.runnerControllers = new Map();
+
         // Bind tab bar event handlers
         this.tabBar.onTabSwitch = (tabId) => this.switchTab(tabId);
         this.tabBar.onTabClose = (tabId) => this.closeTab(tabId);
@@ -35,6 +38,7 @@ export class WorkspaceTabController {
         this.tabBar.onTabRename = (tabId, newName) => this.renameTab(tabId, newName);
         this.tabBar.onTabDuplicate = (tabId) => this.duplicateTab(tabId);
         this.tabBar.onCloseOthers = (tabId) => this.closeOtherTabs(tabId);
+        this.tabBar.onRunnerTabCreate = () => this.createRunnerTab();
 
         // Listen to service changes
         this.service.addListener((event, data) => this._handleServiceEvent(event, data));
@@ -56,14 +60,21 @@ export class WorkspaceTabController {
             // Render tab bar
             this.tabBar.render(tabs, activeTabId);
 
-            // Show response container for active tab
+            // Restore active tab state to UI
             if (activeTabId) {
-                this.responseContainerManager.showContainer(activeTabId);
-
-                // Restore active tab state to UI
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab) {
-                    await this.stateManager.restoreTabState(activeTab);
+                    // Update UI based on tab type (runner vs request)
+                    this._updateUIForTabType(activeTab);
+
+                    if (activeTab.type === 'runner') {
+                        // Initialize runner tab
+                        await this._initializeRunnerTab(activeTabId);
+                    } else {
+                        // Show response container for request tab
+                        this.responseContainerManager.showContainer(activeTabId);
+                        await this.stateManager.restoreTabState(activeTab);
+                    }
                 }
             }
         } catch (error) {
@@ -91,6 +102,9 @@ export class WorkspaceTabController {
             const newTab = await this.service.createTab(options);
             await this.service.switchTab(newTab.id);
 
+            // Update UI based on tab type (switch from runner to request UI if needed)
+            this._updateUIForTabType(newTab);
+
             // Show response container for new tab
             this.responseContainerManager.showContainer(newTab.id);
 
@@ -113,6 +127,157 @@ export class WorkspaceTabController {
         } catch (error) {
             console.error(error);
             throw error;
+        }
+    }
+
+    /**
+     * Creates a new runner tab
+     *
+     * Creates a special tab type for the Collection Runner feature.
+     * Runner tabs have their own UI and don't use the standard request form.
+     *
+     * @async
+     * @returns {Promise<Object>} The newly created runner tab object
+     */
+    async createRunnerTab() {
+        try {
+            // Save current tab state before creating new one
+            await this._saveCurrentTabState();
+
+            const newTab = await this.service.createTab({
+                name: 'Collection Runner',
+                type: 'runner'
+            });
+            await this.service.switchTab(newTab.id);
+
+            // Re-render tab bar
+            const tabs = await this.service.getAllTabs();
+            const activeTabId = await this.service.getActiveTabId();
+            this.tabBar.render(tabs, activeTabId);
+
+            // Hide other runner containers before initializing the new one
+            this._updateUIForTabType(newTab);
+
+            // Initialize runner UI in the main content area
+            await this._initializeRunnerTab(newTab.id);
+
+            return newTab;
+        } catch (error) {
+            console.error('Error creating runner tab:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Initializes the runner tab UI
+     *
+     * @private
+     * @async
+     * @param {string} tabId - The runner tab ID
+     */
+    async _initializeRunnerTab(tabId) {
+        // Import RunnerController dynamically to avoid circular dependencies
+        const { RunnerController } = await import('./RunnerController.js');
+        const { loadCollections } = await import('../collectionManager.js');
+
+        // Create a container for the runner panel
+        const mainContentArea = document.getElementById('main-content-area');
+        if (!mainContentArea) {return;}
+
+        // Hide the standard request builder UI
+        const requestBuilder = mainContentArea.querySelector('.request-builder');
+        const requestConfig = mainContentArea.querySelector('.request-config');
+        const resizerHandle = mainContentArea.querySelector('.resizer-handle');
+        const responseArea = mainContentArea.querySelector('.response-area');
+
+        if (requestBuilder) {requestBuilder.classList.add('is-hidden');}
+        if (requestConfig) {requestConfig.classList.add('is-hidden');}
+        if (resizerHandle) {resizerHandle.classList.add('is-hidden');}
+        if (responseArea) {responseArea.classList.add('is-hidden');}
+
+        // Create runner container
+        let runnerContainer = document.getElementById(`runner-container-${tabId}`);
+        if (!runnerContainer) {
+            runnerContainer = document.createElement('div');
+            runnerContainer.id = `runner-container-${tabId}`;
+            runnerContainer.className = 'runner-container';
+            runnerContainer.style.flex = '1';
+            runnerContainer.style.display = 'flex';
+            runnerContainer.style.flexDirection = 'column';
+            runnerContainer.style.overflow = 'hidden';
+
+            // Insert after workspace tab bar
+            const tabBarContainer = document.getElementById('workspace-tab-bar-container');
+            if (tabBarContainer && tabBarContainer.nextSibling) {
+                mainContentArea.insertBefore(runnerContainer, tabBarContainer.nextSibling);
+            } else {
+                mainContentArea.appendChild(runnerContainer);
+            }
+        }
+
+        // Initialize runner controller
+        const runnerController = new RunnerController(
+            window.backendAPI,
+            async () => loadCollections()
+        );
+
+        await runnerController.initialize(runnerContainer);
+        this.runnerControllers.set(tabId, runnerController);
+    }
+
+    /**
+     * Cleans up runner tab resources
+     *
+     * @private
+     * @param {string} tabId - The runner tab ID
+     */
+    _cleanupRunnerTab(tabId) {
+        // Remove runner container
+        const runnerContainer = document.getElementById(`runner-container-${tabId}`);
+        if (runnerContainer) {
+            runnerContainer.remove();
+        }
+
+        // Remove controller reference
+        this.runnerControllers.delete(tabId);
+    }
+
+    /**
+     * Shows or hides runner/request UI based on tab type
+     *
+     * @private
+     * @param {Object} tab - The tab object
+     */
+    _updateUIForTabType(tab) {
+        const mainContentArea = document.getElementById('main-content-area');
+        if (!mainContentArea) {return;}
+
+        const requestBuilder = mainContentArea.querySelector('.request-builder');
+        const requestConfig = mainContentArea.querySelector('.request-config');
+        const resizerHandle = mainContentArea.querySelector('.resizer-handle');
+        const responseArea = mainContentArea.querySelector('.response-area');
+
+        // Hide all runner containers first
+        const runnerContainers = mainContentArea.querySelectorAll('[id^="runner-container-"]');
+        runnerContainers.forEach(c => c.classList.add('is-hidden'));
+
+        if (tab.type === 'runner') {
+            // Show runner UI, hide request UI
+            if (requestBuilder) {requestBuilder.classList.add('is-hidden');}
+            if (requestConfig) {requestConfig.classList.add('is-hidden');}
+            if (resizerHandle) {resizerHandle.classList.add('is-hidden');}
+            if (responseArea) {responseArea.classList.add('is-hidden');}
+
+            const runnerContainer = document.getElementById(`runner-container-${tab.id}`);
+            if (runnerContainer) {
+                runnerContainer.classList.remove('is-hidden');
+            }
+        } else {
+            // Show request UI, hide runner UI
+            if (requestBuilder) {requestBuilder.classList.remove('is-hidden');}
+            if (requestConfig) {requestConfig.classList.remove('is-hidden');}
+            if (resizerHandle) {resizerHandle.classList.remove('is-hidden');}
+            if (responseArea) {responseArea.classList.remove('is-hidden');}
         }
     }
 
@@ -143,11 +308,25 @@ export class WorkspaceTabController {
                 return;
             }
 
-            // Show response container for this workspace tab
-            this.responseContainerManager.showContainer(tabId);
+            // Update UI based on tab type (runner vs request)
+            this._updateUIForTabType(tab);
+
+            // Show response container for this workspace tab (only for request tabs)
+            if (tab.type !== 'runner') {
+                this.responseContainerManager.showContainer(tabId);
+            }
 
             // Update UI
             this.tabBar.setActiveTab(tabId);
+
+            // Handle runner tabs differently
+            if (tab.type === 'runner') {
+                // Initialize runner if not already done
+                if (!this.runnerControllers.has(tabId)) {
+                    await this._initializeRunnerTab(tabId);
+                }
+                return;
+            }
 
             // Set flag to prevent marking tab as modified during restoration
             this.isRestoringState = true;
@@ -183,6 +362,11 @@ export class WorkspaceTabController {
      */
     async closeTab(tabId) {
         try {
+            // Check if this is a runner tab and clean up
+            if (this.runnerControllers.has(tabId)) {
+                this._cleanupRunnerTab(tabId);
+            }
+
             const result = await this.service.closeTab(tabId);
             if (!result) {
                 return; // Could not close (last tab or not found)
@@ -195,19 +379,37 @@ export class WorkspaceTabController {
             const tabs = await this.service.getAllTabs();
             this.tabBar.render(tabs, result.newActiveTabId);
 
-            // If we switched to a different tab, show its container and restore state
+            // If we switched to a different tab, activate it
             if (result.newActiveTabId !== tabId) {
-                this.responseContainerManager.showContainer(result.newActiveTabId);
-
                 const newActiveTab = tabs.find(t => t.id === result.newActiveTabId);
                 if (newActiveTab) {
-                    this.isRestoringState = true;
-                    await this.stateManager.restoreTabState(newActiveTab);
-                    this.isRestoringState = false;
+                    await this._activateTab(newActiveTab);
                 }
             }
         } catch (error) {
             void error;
+        }
+    }
+
+    /**
+     * Activates a tab and restores its state
+     *
+     * @private
+     * @async
+     * @param {Object} tab - The tab to activate
+     */
+    async _activateTab(tab) {
+        this._updateUIForTabType(tab);
+
+        if (tab.type === 'runner') {
+            if (!this.runnerControllers.has(tab.id)) {
+                await this._initializeRunnerTab(tab.id);
+            }
+        } else {
+            this.responseContainerManager.showContainer(tab.id);
+            this.isRestoringState = true;
+            await this.stateManager.restoreTabState(tab);
+            this.isRestoringState = false;
         }
     }
 
@@ -399,6 +601,7 @@ export class WorkspaceTabController {
 
                 await this.service.updateTab(targetTabId, {
                     name: tabName,
+                    type: 'request',
                     endpoint: {
                         collectionId: endpoint.collectionId,
                         endpointId: endpoint.id,
@@ -420,6 +623,8 @@ export class WorkspaceTabController {
 
                 const tab = await this.service.getActiveTab();
                 if (tab) {
+                    this._updateUIForTabType(tab);
+                    this.responseContainerManager.showContainer(targetTabId);
                     this.isRestoringState = true;
                     await this.stateManager.restoreTabState(tab);
                     this.isRestoringState = false;
@@ -545,6 +750,7 @@ export class WorkspaceTabController {
             const tabName = endpoint.name || this.service.generateTabName(endpoint.method, endpoint.path);
             await this.service.updateTab(targetTabId, {
                 name: tabName,
+                type: 'request',
                 endpoint: {
                     collectionId: endpoint.collectionId,
                     endpointId: endpoint.id,
@@ -567,6 +773,8 @@ export class WorkspaceTabController {
             // Restore state to UI
             const tab = await this.service.getActiveTab();
             if (tab) {
+                this._updateUIForTabType(tab);
+                this.responseContainerManager.showContainer(targetTabId);
                 this.isRestoringState = true;
                 await this.stateManager.restoreTabState(tab);
                 this.isRestoringState = false;

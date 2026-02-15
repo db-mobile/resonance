@@ -9,3 +9,4 @@ export { EnvironmentService } from './EnvironmentService.js';
 export { HistoryService } from './HistoryService.js';
 export { ProxyService } from './ProxyService.js';
 export { WorkspaceTabService } from './WorkspaceTabService.js';
+export { RunnerService } from './RunnerService.js';

@@ -99,3 +99,19 @@ await esbuild.build({
     console.error('Build failed:', error);
     process.exit(1);
 });
+
+// Build the scriptEditor module and its dependencies
+await esbuild.build({
+    entryPoints: ['src/modules/scriptEditor.js'],
+    bundle: true,
+    format: 'esm',
+    outfile: 'dist/src/modules/scriptEditor.bundle.js',
+    platform: 'browser',
+    target: 'es2020',
+    sourcemap: true,
+}).then(() => {
+    console.log('✓ scriptEditor bundled successfully');
+}).catch((error) => {
+    console.error('Build failed:', error);
+    process.exit(1);
+});

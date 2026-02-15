@@ -788,12 +788,10 @@ export class CollectionService {
                     return;
                 }
 
-                const key = `${collectionId}_${endpointId}`;
-                const originalBody = this.originalBodyValues.get(key);
-
-                if (originalBody && currentBody !== originalBody) {
-                    await this.repository.saveModifiedRequestBody(collectionId, endpointId, currentBody);
-                }
+                // Always save the current body when explicitly called
+                // This ensures the body is persisted even when using workspace tabs
+                // where originalBodyValues may not be set
+                await this.repository.saveModifiedRequestBody(collectionId, endpointId, currentBody);
             }
         } catch (error) {
             void error;
