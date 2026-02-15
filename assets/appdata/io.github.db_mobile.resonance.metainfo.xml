@@ -23,6 +23,7 @@
       <li>Generate code snippets in 9 languages: cURL, Python, JavaScript (Fetch), JavaScript (Axios), Node.js, Go, PHP, Ruby, and Java</li>
       <li>GraphQL support with dedicated query editor and syntax highlighting</li>
       <li>gRPC support for exploring and testing gRPC services</li>
+      <li>Collection runner for batch request execution with variable chaining between requests</li>
       <li>Built-in mock server for testing without a backend, with custom responses and configurable delays</li>
       <li>Workspace tabs for managing multiple concurrent requests with independent state</li>
       <li>Request history with search and replay capability for easy debugging</li>
@@ -31,7 +32,7 @@
       <li>HTTP proxy support with authentication and bypass lists</li>
       <li>Protocol version control supporting HTTP/1.1, HTTP/2, and HTTP/3</li>
       <li>Comprehensive keyboard shortcuts for efficient workflow</li>
-      <li>Four theme options: light, dark, system-adaptive, and blueprint</li>
+      <li>Four theme options: light, dark, system-adaptive, and black (OLED)</li>
       <li>Available in English, German, Spanish, French, and Italian</li>
     </ul>
   </description>
@@ -95,6 +96,14 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.3.0" date="2026-02-15">
+      <description>
+        <p>New features introduced</p>
+        <ul>
+          <li>Collection runner</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.2.0" date="2026-02-06">
       <description>
         <p>New features introduced</p>

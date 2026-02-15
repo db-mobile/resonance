@@ -1,6 +1,6 @@
 name: db-mobile-resonance
 base: core22
-version: '2.2.0'
+version: '2.3.0'
 title: Resonance
 summary: Test and explore web services
 description: |
@@ -13,12 +13,14 @@ description: |
   - Multiple authentication methods (Bearer, Basic, API keys, OAuth 2.0, Digest)
   - Code generation in 9 languages
   - GraphQL support with dedicated query editor
+  - gRPC support with server reflection
+  - Collection runner for batch request execution with variable chaining
   - Built-in mock server for testing
   - Workspace tabs for managing multiple concurrent requests
   - Request history with search and replay
   - Performance metrics with detailed timing breakdown
   - HTTP proxy support
-  - Four theme options: light, dark, system-adaptive, and blueprint
+  - Four theme options: light, dark, system-adaptive, and black (OLED)
   - Available in English, German, Spanish, French, and Italian
 
 grade: stable
