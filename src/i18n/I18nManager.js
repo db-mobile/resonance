@@ -10,9 +10,10 @@ export class I18nManager {
         this.supportedLanguages = {
             'en': 'English',
             'de': 'Deutsch',
-            'fr': 'Français', 
+            'fr': 'Français',
             'it': 'Italiano',
-            'es': 'Español'
+            'es': 'Español',
+            'pt-BR': 'Português (Brasil)'
         };
     }
 
