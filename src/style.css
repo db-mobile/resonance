@@ -294,6 +294,14 @@ body {
    min-width: 700px;
  }
 
+ .modal-dialog--code-snippet > div {
+   display: flex;
+   flex-direction: column;
+   flex: 1;
+   min-height: 0;
+   overflow: hidden;
+ }
+
  .modal-dialog--variable-manager {
    min-width: 600px;
    max-width: 800px;
@@ -1348,6 +1356,7 @@ body {
    margin-bottom: 16px;
    flex: 1;
    overflow: auto;
+   min-height: 0;
  }
 
  .code-snippet-display {
