@@ -159,6 +159,12 @@ pub struct RequestOptions {
     /// Request timeout in milliseconds (defaults to 30000)
     #[serde(default)]
     pub timeout: Option<u64>,
+    /// Whether to verify SSL certificates (defaults to true)
+    #[serde(default)]
+    pub verify_ssl: Option<bool>,
+    /// Whether to follow HTTP redirects (defaults to true)
+    #[serde(default)]
+    pub follow_redirects: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -329,6 +335,16 @@ pub async fn send_api_request(
         _ => {
             // "auto" or unset - let ALPN negotiate
         }
+    }
+
+    // Disable SSL verification if requested (e.g. for self-signed certs in dev)
+    if request_options.verify_ssl == Some(false) {
+        client_builder = client_builder.danger_accept_invalid_certs(true);
+    }
+
+    // Disable redirect following if requested
+    if request_options.follow_redirects == Some(false) {
+        client_builder = client_builder.redirect(reqwest::redirect::Policy::none());
     }
 
     // Apply proxy settings if configured

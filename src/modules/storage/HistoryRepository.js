@@ -97,9 +97,18 @@ export class HistoryRepository {
             // Add new entry at the beginning
             history.unshift(historyEntry);
 
-            // Limit history size
-            if (history.length > this.MAX_HISTORY_ITEMS) {
-                history = history.slice(0, this.MAX_HISTORY_ITEMS);
+            // Limit history size — respect user-configured limit if set
+            let maxItems = this.MAX_HISTORY_ITEMS;
+            try {
+                const settings = await this.backendAPI.settings.get();
+                if (typeof settings.historyLimit === 'number' && settings.historyLimit >= 10) {
+                    maxItems = settings.historyLimit;
+                }
+            } catch (e) {
+                void e;
+            }
+            if (history.length > maxItems) {
+                history = history.slice(0, maxItems);
             }
 
             await this.backendAPI.store.set(this.HISTORY_KEY, history);

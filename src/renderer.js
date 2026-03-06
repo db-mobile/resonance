@@ -58,6 +58,7 @@ import { MockServerDialog } from './modules/ui/MockServerDialog.js';
 import { CollectionRepository } from './modules/storage/CollectionRepository.js';
 import { RequestBodyEditor } from './modules/requestBodyEditor.bundle.js';
 import { PreviewRepository } from './modules/storage/PreviewRepository.js';
+import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
@@ -574,6 +575,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initialize history controller
     await historyController.init();
+
+    // Initialize URL autocomplete from history
+    if (urlInput) {
+        const urlAutocomplete = new UrlAutocomplete(urlInput, historyController);
+        urlAutocomplete.init();
+    }
 
     // Initialize mock server controller
     await mockServerController.initialize();

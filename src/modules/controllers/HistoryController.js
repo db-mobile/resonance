@@ -87,9 +87,9 @@ export class HistoryController {
 
             // Set basic request info
             if (urlInput) {
-                // Extract URL without query params
-                const urlObj = new URL(historyEntry.request.url);
-                urlInput.value = `${urlObj.origin}${urlObj.pathname}`;
+                // Prefer rawUrl (preserves {{vars}}), strip any inline query params
+                const rawUrl = historyEntry.request.rawUrl || historyEntry.request.url;
+                urlInput.value = rawUrl.split('?')[0];
             }
 
             if (methodSelect) {

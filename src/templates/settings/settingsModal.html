@@ -54,6 +54,35 @@
                         </div>
                         <p class="form-input-hint" data-i18n="settings.timeout_description">Set to 0 for no timeout</p>
                     </div>
+
+                    <div class="settings-section">
+                        <h3 data-i18n="settings.ssl_verification">SSL Verification</h3>
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="verifySsl">
+                            <span class="toggle-track"></span>
+                            <span data-i18n="settings.ssl_verification_label">Verify SSL certificates</span>
+                        </label>
+                        <p class="form-input-hint" data-i18n="settings.ssl_verification_description">Disable for self-signed certificates in development environments.</p>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 data-i18n="settings.follow_redirects">Follow Redirects</h3>
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="followRedirects">
+                            <span class="toggle-track"></span>
+                            <span data-i18n="settings.follow_redirects_label">Automatically follow HTTP redirects</span>
+                        </label>
+                        <p class="form-input-hint" data-i18n="settings.follow_redirects_description">Disable to inspect redirect responses without following them.</p>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 data-i18n="settings.history_limit">History Limit</h3>
+                        <div class="form-input-container">
+                            <input type="number" class="form-input" name="historyLimit" min="10" max="10000" step="10" placeholder="100">
+                            <span class="form-input-unit" data-i18n="settings.history_limit_unit">entries</span>
+                        </div>
+                        <p class="form-input-hint" data-i18n="settings.history_limit_description">Maximum number of requests stored in history</p>
+                    </div>
                 </div>
             </div>
 

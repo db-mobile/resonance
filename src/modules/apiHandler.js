@@ -214,6 +214,8 @@ export async function handleSendRequest() {
         // Fall back to the default value attribute if the current value is empty
         url = urlInput.getAttribute('value') || '';
     }
+    // Preserve the raw (unresolved) URL so history can restore template variables
+    const rawUrl = url;
 
     const method = methodSelect.value;
     let body = undefined;
@@ -437,6 +439,8 @@ export async function handleSendRequest() {
     // Get HTTP version and timeout settings
     let httpVersion = 'auto';
     let timeout = 30000; // Default 30 seconds
+    let verifySsl = true;
+    let followRedirects = true;
     try {
         const settings = await window.backendAPI.settings.get();
         httpVersion = settings.httpVersion || 'auto';
@@ -444,6 +448,8 @@ export async function handleSendRequest() {
         // 0 means no timeout - pass null to backend to disable timeout
         const savedTimeout = settings.requestTimeout ?? settings.timeout;
         timeout = savedTimeout === 0 ? null : (savedTimeout ?? 30000);
+        verifySsl = settings.verifySsl !== false;
+        followRedirects = settings.followRedirects !== false;
     } catch (e) {
         void e;
     }
@@ -453,10 +459,13 @@ export async function handleSendRequest() {
     let requestConfig = {
         method,
         url,
+        rawUrl,
         headers,
         body,
         httpVersion,
-        timeout
+        timeout,
+        verifySsl,
+        followRedirects
     };
 
     // Capture the originating workspace tab at send time.

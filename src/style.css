@@ -294,6 +294,14 @@ body {
    min-width: 700px;
  }
 
+ .modal-dialog--code-snippet > div {
+   display: flex;
+   flex-direction: column;
+   flex: 1;
+   min-height: 0;
+   overflow: hidden;
+ }
+
  .modal-dialog--variable-manager {
    min-width: 600px;
    max-width: 800px;
@@ -1348,6 +1356,7 @@ body {
    margin-bottom: 16px;
    flex: 1;
    overflow: auto;
+   min-height: 0;
  }
 
  .code-snippet-display {
@@ -6256,4 +6265,85 @@ body {
 
 /* Play icon for runner */
 .icon-play { -webkit-mask-image: url('../assets/ui/play.svg'); mask-image: url('../assets/ui/play.svg'); }
+
+/* URL Autocomplete */
+.url-autocomplete-wrapper {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+
+.url-autocomplete-wrapper .url-input {
+  flex: unset;
+  width: 100%;
+}
+
+.url-autocomplete-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+  max-height: 320px;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: none;
+}
+
+.url-autocomplete-dropdown.visible {
+  display: block;
+}
+
+.url-autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.url-autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.url-autocomplete-item:hover,
+.url-autocomplete-item.active {
+  background: var(--bg-secondary);
+}
+
+.url-autocomplete-method {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family-mono);
+  min-width: 42px;
+  text-align: center;
+}
+
+/* Method color is set via inline style.color from HistoryService.getMethodColor() */
+
+.url-autocomplete-url {
+  flex: 1;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.url-autocomplete-time {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
 

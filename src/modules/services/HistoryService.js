@@ -67,6 +67,7 @@ export class HistoryService {
             request: {
                 method: requestConfig.method,
                 url: requestConfig.url,
+                rawUrl: requestConfig.rawUrl || requestConfig.url,
                 headers: requestConfig.headers || {},
                 body: requestConfig.body || null,
                 collectionId: currentEndpoint?.collectionId || null,
