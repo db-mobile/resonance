@@ -250,6 +250,18 @@ export class SettingsModal {
         const currentHttpVersion = this.httpVersionManager ? await this.httpVersionManager.getCurrentVersion() : 'auto';
         const currentTimeout = this.timeoutManager ? this.timeoutManager.getCurrentTimeout() : 0;
 
+        let currentVerifySsl = true;
+        let currentFollowRedirects = true;
+        let currentHistoryLimit = 100;
+        try {
+            const settings = await window.backendAPI.settings.get();
+            currentVerifySsl = settings.verifySsl !== false;
+            currentFollowRedirects = settings.followRedirects !== false;
+            currentHistoryLimit = settings.historyLimit || 100;
+        } catch (e) {
+            void e;
+        }
+
         // Set current theme selection
         const themeSelect = overlay.querySelector('select[name="theme"]');
         if (themeSelect) {
@@ -266,6 +278,22 @@ export class SettingsModal {
         const timeoutInput = overlay.querySelector('input[name="requestTimeout"]');
         if (timeoutInput) {
             timeoutInput.value = currentTimeout;
+        }
+
+        // Set SSL verification, follow redirects, history limit
+        const verifySslCheckbox = overlay.querySelector('input[name="verifySsl"]');
+        if (verifySslCheckbox) {
+            verifySslCheckbox.checked = currentVerifySsl;
+        }
+
+        const followRedirectsCheckbox = overlay.querySelector('input[name="followRedirects"]');
+        if (followRedirectsCheckbox) {
+            followRedirectsCheckbox.checked = currentFollowRedirects;
+        }
+
+        const historyLimitInput = overlay.querySelector('input[name="historyLimit"]');
+        if (historyLimitInput) {
+            historyLimitInput.value = currentHistoryLimit;
         }
 
         // Add language section if i18nManager is available
@@ -517,6 +545,48 @@ export class SettingsModal {
                 const timeout = parseInt(e.target.value, 10);
                 if (!isNaN(timeout) && timeout >= 0) {
                     await this.timeoutManager.setTimeout(timeout);
+                }
+            });
+        }
+
+        const verifySslCheckbox = overlay.querySelector('input[name="verifySsl"]');
+        if (verifySslCheckbox) {
+            verifySslCheckbox.addEventListener('change', async (e) => {
+                try {
+                    const settings = await window.backendAPI.settings.get();
+                    settings.verifySsl = e.target.checked;
+                    await window.backendAPI.settings.set(settings);
+                } catch (err) {
+                    void err;
+                }
+            });
+        }
+
+        const followRedirectsCheckbox = overlay.querySelector('input[name="followRedirects"]');
+        if (followRedirectsCheckbox) {
+            followRedirectsCheckbox.addEventListener('change', async (e) => {
+                try {
+                    const settings = await window.backendAPI.settings.get();
+                    settings.followRedirects = e.target.checked;
+                    await window.backendAPI.settings.set(settings);
+                } catch (err) {
+                    void err;
+                }
+            });
+        }
+
+        const historyLimitInput = overlay.querySelector('input[name="historyLimit"]');
+        if (historyLimitInput) {
+            historyLimitInput.addEventListener('change', async (e) => {
+                const limit = parseInt(e.target.value, 10);
+                if (!isNaN(limit) && limit >= 10) {
+                    try {
+                        const settings = await window.backendAPI.settings.get();
+                        settings.historyLimit = limit;
+                        await window.backendAPI.settings.set(settings);
+                    } catch (err) {
+                        void err;
+                    }
                 }
             });
         }
