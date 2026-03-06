@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+
+PackageIdentifier: db-mobile.Resonance
+PackageVersion: 2.4.0
+PackageLocale: en-US
+Publisher: db-mobile
+PublisherUrl: https://github.com/db-mobile
+PublisherSupportUrl: https://github.com/db-mobile/resonance/issues
+PackageName: Resonance
+PackageUrl: https://github.com/db-mobile/resonance
+License: MIT
+LicenseUrl: https://github.com/db-mobile/resonance/blob/main/LICENSE
+Copyright: Copyright (c) 2025 Dennis Blümer
+ShortDescription: Local-first, zero-account API client
+Description: Resonance is a local-first, zero-account API client for REST and GraphQL testing. It supports OpenAPI/Postman import, mock server, scripting, and environment management.
+Moniker: resonance
+Tags:
+  - api
+  - api-client
+  - rest
+  - graphql
+  - http
+  - developer-tools
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0

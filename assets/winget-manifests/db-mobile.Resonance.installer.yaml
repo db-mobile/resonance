@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
+
+PackageIdentifier: db-mobile.Resonance
+PackageVersion: 2.4.0
+InstallerType: nullsoft
+InstallModes:
+  - interactive
+  - silent
+InstallerSwitches:
+  Silent: /S
+  SilentWithProgress: /S
+UpgradeBehavior: install
+Installers:
+  - Architecture: x64
+    Scope: user
+    InstallerUrl: https://github.com/db-mobile/resonance/releases/download/v2.4.0/Resonance_2.4.0_x64-setup.exe
+    InstallerSha256: 0268818c19ca1a2fb94d8837a3e9991eb0539626faf3ed01be610481b58bad8a
+  - Architecture: arm64
+    Scope: user
+    InstallerUrl: https://github.com/db-mobile/resonance/releases/download/v2.4.0/Resonance_2.4.0_arm64-setup.exe
+    InstallerSha256: 15cc341ea70cef60a9475c27268685d3a8e026f38eac6a01ce9712d0e0db1195
+ManifestType: installer
+ManifestVersion: 1.9.0
