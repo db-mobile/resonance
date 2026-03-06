@@ -214,6 +214,8 @@ export async function handleSendRequest() {
         // Fall back to the default value attribute if the current value is empty
         url = urlInput.getAttribute('value') || '';
     }
+    // Preserve the raw (unresolved) URL so history can restore template variables
+    const rawUrl = url;
 
     const method = methodSelect.value;
     let body = undefined;
@@ -453,6 +455,7 @@ export async function handleSendRequest() {
     let requestConfig = {
         method,
         url,
+        rawUrl,
         headers,
         body,
         httpVersion,
