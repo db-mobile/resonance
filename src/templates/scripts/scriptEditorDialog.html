@@ -1,24 +1,24 @@
 <template id="tpl-script-editor-dialog">
-    <div>
+    <div class="u-flex u-flex-col u-flex-1 u-min-h-0">
         <div class="dialog-header">
             <h3 class="dialog-title" data-role="title">Edit Scripts</h3>
             <button id="script-editor-close" class="dialog-close-btn" aria-label="Close">&times;</button>
         </div>
 
-        <div class="script-tabs">
+        <div class="script-tabs u-flex u-gap-2">
             <button class="script-tab-btn active" data-tab="pre-request">Pre-request Script</button>
             <button class="script-tab-btn" data-tab="test">Test Script</button>
         </div>
 
-        <div class="script-tab-content is-active" data-tab="pre-request">
-            <textarea id="pre-request-script-editor" class="script-editor-textarea"></textarea>
+        <div class="script-tab-content is-active u-flex-1 u-min-h-0 u-overflow-hidden" data-tab="pre-request">
+            <textarea id="pre-request-script-editor" class="textarea-base script-editor-textarea"></textarea>
             <div class="script-editor-hint">
                 <strong>Available APIs:</strong> request, environment, console, Date, Math, JSON
             </div>
         </div>
 
-        <div class="script-tab-content" data-tab="test">
-            <textarea id="test-script-editor" class="script-editor-textarea"></textarea>
+        <div class="script-tab-content u-flex-1 u-min-h-0 u-overflow-hidden" data-tab="test">
+            <textarea id="test-script-editor" class="textarea-base script-editor-textarea"></textarea>
             <div class="script-editor-hint">
                 <strong>Available APIs:</strong> request, response, environment, console, expect(), Date, Math, JSON
             </div>
@@ -42,7 +42,7 @@
             </div>
         </details>
 
-        <div class="script-editor-footer">
+        <div class="dialog-footer dialog-footer--divided">
             <button id="script-editor-cancel" class="btn btn-outline">Cancel</button>
             <button id="script-editor-save" class="btn btn-primary">Save</button>
         </div>

@@ -1,8 +1,8 @@
 <template id="tpl-settings-modal">
-    <div class="settings-modal-overlay">
-        <div class="settings-modal">
-            <div class="settings-header">
-                <h2 data-i18n="settings.title">Settings</h2>
+    <div class="settings-modal-overlay modal-overlay">
+        <div class="settings-modal modal-dialog modal-dialog--settings u-flex u-flex-col">
+            <div class="settings-header u-flex u-items-center u-justify-between">
+                <h2 class="dialog-title" data-i18n="settings.title">Settings</h2>
                 <button class="dialog-close-btn" aria-label="Close Settings" data-i18n-aria="settings.close">
                     <span class="icon icon-20 icon-x"></span>
                 </button>
@@ -49,7 +49,7 @@
                     <div class="settings-section">
                         <h3 data-i18n="settings.request_timeout">Request Timeout</h3>
                         <div class="form-input-container">
-                            <input type="number" class="form-input" name="requestTimeout" min="0" step="1000" placeholder="0">
+                            <input type="number" class="input-base form-input" name="requestTimeout" min="0" step="1000" placeholder="0">
                             <span class="form-input-unit">ms</span>
                         </div>
                         <p class="form-input-hint" data-i18n="settings.timeout_description">Set to 0 for no timeout</p>
@@ -78,7 +78,7 @@
                     <div class="settings-section">
                         <h3 data-i18n="settings.history_limit">History Limit</h3>
                         <div class="form-input-container">
-                            <input type="number" class="form-input" name="historyLimit" min="10" max="10000" step="10" placeholder="100">
+                            <input type="number" class="input-base form-input" name="historyLimit" min="10" max="10000" step="10" placeholder="100">
                             <span class="form-input-unit" data-i18n="settings.history_limit_unit">entries</span>
                         </div>
                         <p class="form-input-hint" data-i18n="settings.history_limit_description">Maximum number of requests stored in history</p>
@@ -86,7 +86,7 @@
                 </div>
             </div>
 
-            <div class="settings-footer">
+            <div class="settings-footer u-flex u-justify-end">
                 <span id="settings-app-version" class="settings-app-version"></span>
             </div>
         </div>
@@ -117,7 +117,7 @@
 
 <template id="tpl-proxy-section">
     <div class="settings-section proxy-settings-section">
-        <div class="settings-section-header">
+        <div class="settings-section-header u-flex">
             <label class="toggle-switch">
                 <input type="checkbox" name="proxyEnabled">
                 <span class="toggle-track"></span>
@@ -126,7 +126,7 @@
         </div>
 
         <div class="proxy-settings-content is-hidden">
-            <div class="proxy-row">
+            <div class="proxy-row u-flex">
                 <label class="toggle-switch proxy-system-toggle">
                     <input type="checkbox" name="proxyUseSystem">
                     <span class="toggle-track"></span>
@@ -136,7 +136,7 @@
             </div>
 
             <div class="proxy-manual-settings">
-                <div class="proxy-row">
+                <div class="proxy-row u-flex">
                     <div class="proxy-field proxy-field-with-arrow">
                         <label data-i18n="settings.proxy_type">Type</label>
                         <div class="select-wrapper">
@@ -151,7 +151,7 @@
                     </div>
                 </div>
 
-                <div class="proxy-row">
+                <div class="proxy-row u-flex">
                     <div class="proxy-field proxy-field-grow">
                         <label data-i18n="settings.proxy_host">Host</label>
                         <input type="text" name="proxyHost" placeholder="proxy.example.com">
@@ -162,7 +162,7 @@
                     </div>
                 </div>
 
-                <div class="proxy-row">
+                <div class="proxy-row u-flex">
                     <label class="toggle-switch">
                         <input type="checkbox" name="proxyAuthEnabled">
                         <span class="toggle-track"></span>
@@ -171,13 +171,13 @@
                 </div>
 
                 <div class="proxy-auth-fields is-hidden">
-                    <div class="proxy-row">
+                    <div class="proxy-row u-flex">
                         <div class="proxy-field proxy-field-grow">
                             <label data-i18n="settings.proxy_username">Username</label>
                             <input type="text" name="proxyUsername" autocomplete="off">
                         </div>
                     </div>
-                    <div class="proxy-row">
+                    <div class="proxy-row u-flex">
                         <div class="proxy-field proxy-field-grow">
                             <label data-i18n="settings.proxy_password">Password</label>
                             <input type="password" name="proxyPassword" autocomplete="off">
@@ -185,7 +185,7 @@
                     </div>
                 </div>
 
-                <div class="proxy-row">
+                <div class="proxy-row u-flex">
                     <div class="proxy-field proxy-field-grow">
                         <label data-i18n="settings.proxy_bypass">Bypass List (comma-separated)</label>
                         <input type="text" name="proxyBypass" placeholder="localhost, *.internal.com">
@@ -194,7 +194,7 @@
                 </div>
             </div>
 
-            <div class="proxy-row proxy-actions">
+            <div class="proxy-row proxy-actions u-flex u-items-center">
                 <button type="button" class="proxy-test-btn" data-i18n="settings.proxy_test">Test Connection</button>
                 <span class="proxy-test-result"></span>
             </div>

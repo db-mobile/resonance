@@ -164,7 +164,7 @@ export class RunnerPanel {
 
         if (!this.collections || this.collections.length === 0) {
             this.dom.collectionTree.innerHTML = `
-                <div class="runner-empty-state">
+                <div class="empty-state-base runner-empty-state">
                     <span class="icon icon-20 icon-spark"></span>
                     <p>No collections available</p>
                 </div>
@@ -326,7 +326,7 @@ export class RunnerPanel {
 
         if (this.selectedRequests.length === 0) {
             this.dom.requestsList.innerHTML = `
-                <div class="runner-empty-state">
+                <div class="empty-state-base runner-empty-state">
                     <span class="icon icon-20 icon-plus"></span>
                     <p>Click requests from the left panel to add them</p>
                 </div>
@@ -728,7 +728,7 @@ export class RunnerPanel {
         if (!this.dom.runnerList) {return;}
 
         if (!runners || runners.length === 0) {
-            this.dom.runnerList.innerHTML = '<div class="runner-dropdown-empty">No saved runners</div>';
+            this.dom.runnerList.innerHTML = '<div class="runner-dropdown-empty dropdown-empty">No saved runners</div>';
             return;
         }
 
@@ -736,9 +736,9 @@ export class RunnerPanel {
             const requestCount = runner.requests?.length || 0;
             const isSelected = this.currentRunnerId === runner.id;
             return `
-                <div class="runner-dropdown-item ${isSelected ? 'is-selected' : ''}" data-runner-id="${runner.id}">
-                    <span class="runner-dropdown-item-name">${this._escapeHtml(runner.name)}</span>
-                    <span class="runner-dropdown-item-meta">${requestCount} requests</span>
+                <div class="runner-dropdown-item dropdown-item u-flex u-items-center u-justify-between ${isSelected ? 'is-selected is-active' : ''}" data-runner-id="${runner.id}">
+                    <span class="runner-dropdown-item-name dropdown-item-label">${this._escapeHtml(runner.name)}</span>
+                    <span class="runner-dropdown-item-meta dropdown-item-meta">${requestCount} requests</span>
                 </div>
             `;
         }).join('');

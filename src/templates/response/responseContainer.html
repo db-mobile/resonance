@@ -1,7 +1,7 @@
 <template id="tpl-response-container">
-    <div class="workspace-tab-response is-hidden">
+    <div class="workspace-tab-response u-flex u-flex-col is-hidden">
         <div class="tab-content active" role="tabpanel" data-role="response-body">
-            <div class="response-toolbar">
+            <div class="response-toolbar u-flex u-items-center">
                 <div class="language-selector-container">
                     <select class="language-selector" aria-label="Syntax Highlighting Language" title="Syntax Highlighting">
                         <option value="json">JSON</option>
@@ -25,17 +25,17 @@
                     <span class="icon icon-16 icon-copy"></span>
                 </button>
             </div>
-            <div class="response-body-container" aria-live="polite"></div>
-            <div class="response-preview-container is-hidden"></div>
+            <div class="response-body-container u-flex" aria-live="polite"></div>
+            <div class="response-preview-container u-flex is-hidden"></div>
         </div>
 
         <div class="tab-content" role="tabpanel" data-role="response-headers">
-            <div class="response-toolbar">
+            <div class="response-toolbar u-flex u-items-center">
                 <button class="copy-headers-btn" aria-label="Copy Headers" title="Copy Response Headers">
                     <span class="icon icon-16 icon-copy"></span>
                 </button>
             </div>
-            <div class="response-headers-display" aria-live="polite"></div>
+            <div class="response-headers-display u-flex" aria-live="polite"></div>
         </div>
 
         <div class="tab-content" role="tabpanel" data-role="response-metadata">

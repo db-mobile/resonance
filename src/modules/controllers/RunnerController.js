@@ -218,7 +218,7 @@ export class RunnerController {
         // Render runners
         if (runners.length === 0) {
             listContainer.innerHTML = `
-                <div class="runner-empty-state">
+                <div class="empty-state-base runner-empty-state">
                     <p>No saved runners yet</p>
                 </div>
             `;
@@ -280,7 +280,7 @@ export class RunnerController {
                 const listContainer = el.parentElement;
                 if (listContainer && listContainer.children.length === 0) {
                     listContainer.innerHTML = `
-                        <div class="runner-empty-state">
+                        <div class="empty-state-base runner-empty-state">
                             <p>No saved runners yet</p>
                         </div>
                     `;

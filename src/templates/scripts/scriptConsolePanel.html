@@ -1,6 +1,6 @@
 <template id="tpl-script-console-panel">
     <div>
-        <div class="script-console-header">
+        <div class="script-console-header u-flex u-items-center u-justify-between">
             <span class="script-console-title" data-role="title">Script Console</span>
             <button class="clear-console-btn" data-role="clear">Clear</button>
         </div>
@@ -9,11 +9,11 @@
 </template>
 
 <template id="tpl-script-console-empty">
-    <div class="script-console-empty" data-role="message"></div>
+    <div class="empty-state-base script-console-empty" data-role="message"></div>
 </template>
 
 <template id="tpl-script-console-entry">
-    <div class="script-console-entry">
+    <div class="script-console-entry u-flex u-items-baseline u-gap-2">
         <span class="script-console-entry-icon" data-role="icon"></span>
         <span class="script-console-entry-time" data-role="time"></span>
         <span class="script-console-entry-message" data-role="message"></span>

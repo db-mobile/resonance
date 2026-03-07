@@ -220,7 +220,7 @@ function createGrpcUrlSection() {
     const targetInput = document.createElement('input');
     targetInput.type = 'text';
     targetInput.id = 'grpc-url-target-input';
-    targetInput.className = 'url-input';
+    targetInput.className = 'input-base url-input';
     targetInput.placeholder = 'localhost:50051';
     targetInput.setAttribute('aria-label', 'gRPC Target');
     

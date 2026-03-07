@@ -79,7 +79,7 @@ A local-first, zero-account API client with excellent user experience built with
 ### User Experience
 - **Keyboard Shortcuts**: Comprehensive shortcuts for all actions with platform-aware bindings (⌘/Ctrl)
 - **Multi-Theme Support**: Light, dark, system-adaptive, and black (OLED) themes with 9 accent colors
-- **Internationalization**: Full support for English, German, Spanish, French, and Italian
+- **Internationalization**: Translations for English, Brazilian Portuguese, German, Spanish, French and Italian
 - **Syntax Highlighting**: CodeMirror-based response viewer with automatic language detection
 - **Resizable Panels**: Customizable workspace layout with draggable panel dividers
 

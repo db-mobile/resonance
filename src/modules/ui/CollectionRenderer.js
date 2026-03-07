@@ -167,7 +167,7 @@ export class CollectionRenderer {
      */
     createCollectionHeader(collection) {
         const headerDiv = document.createElement('div');
-        headerDiv.className = 'collection-header';
+        headerDiv.className = 'collection-header u-flex u-items-center';
 
         const nameDiv = document.createElement('div');
         nameDiv.className = 'collection-name';
@@ -234,7 +234,7 @@ export class CollectionRenderer {
         folderDiv.dataset.folderId = folder.id;
 
         const folderHeader = document.createElement('div');
-        folderHeader.className = 'folder-header';
+        folderHeader.className = 'folder-header u-flex u-items-center';
 
         const folderName = document.createElement('div');
         folderName.className = 'folder-name';
@@ -283,7 +283,7 @@ export class CollectionRenderer {
      */
     createEndpointElement(endpoint, collection, eventHandlers) {
         const endpointDiv = document.createElement('div');
-        endpointDiv.className = 'endpoint-item';
+        endpointDiv.className = 'endpoint-item u-flex u-items-center';
         endpointDiv.dataset.endpointId = endpoint.id;
         endpointDiv.dataset.collectionId = collection.id;
 

@@ -2,11 +2,11 @@
     <div class="runner-panel">
         <!-- Runner Header -->
         <div class="runner-header">
-            <div class="runner-title-section">
+            <div class="runner-title-section u-flex u-items-center u-justify-between">
                 <div class="runner-selector-wrapper">
-                    <div class="runner-selector" data-role="runner-selector">
+                    <div class="runner-selector u-flex u-items-center" data-role="runner-selector">
                         <input type="text" 
-                               class="runner-selector-input" 
+                               class="input-base runner-selector-input" 
                                placeholder="Untitled Runner"
                                data-role="runner-name"
                                aria-label="Runner name"
@@ -15,13 +15,13 @@
                             <span class="icon icon-14 icon-chevron-down"></span>
                         </button>
                     </div>
-                    <div class="runner-selector-dropdown is-hidden" data-role="runner-dropdown">
-                        <div class="runner-dropdown-list" data-role="runner-list">
-                            <div class="runner-dropdown-empty">No saved runners</div>
+                    <div class="runner-selector-dropdown dropdown-panel is-hidden" data-role="runner-dropdown">
+                        <div class="runner-dropdown-list dropdown-list" data-role="runner-list">
+                            <div class="runner-dropdown-empty dropdown-empty">No saved runners</div>
                         </div>
                     </div>
                 </div>
-                <div class="runner-header-actions">
+                <div class="runner-header-actions u-flex">
                     <button class="btn-sm btn-primary" data-action="new-runner" title="New Runner">
                         <span class="icon icon-14 icon-plus"></span>
                         <span data-i18n="runner.new">New</span>
@@ -35,16 +35,16 @@
                     </button>
                 </div>
                 <div class="runner-header-separator"></div>
-                <div class="runner-header-options">
+                <div class="runner-header-options u-flex u-items-center">
                     <label class="toggle-switch">
                         <input type="checkbox" data-option="stop-on-error" checked>
                         <span class="toggle-track"></span>
                         <span data-i18n="runner.stop_on_error">Stop on error</span>
                     </label>
-                    <label class="runner-option-inline">
+                    <label class="runner-option-inline u-flex u-items-center">
                         <span data-i18n="runner.delay_between">Delay:</span>
                         <input type="number" 
-                               class="runner-delay-input-sm" 
+                               class="input-base runner-delay-input-sm" 
                                data-option="delay" 
                                value="0" 
                                min="0" 
@@ -53,7 +53,7 @@
                         <span>ms</span>
                     </label>
                 </div>
-                <div class="runner-header-controls">
+                <div class="runner-header-controls u-flex">
                     <button class="btn btn-success" data-action="run" aria-label="Run Collection">
                         <span class="icon icon-16 icon-play"></span>
                         <span data-i18n="runner.run">Run</span>
@@ -70,11 +70,11 @@
         <div class="runner-main">
             <!-- Left Panel: Request Selection -->
             <div class="runner-selection-panel">
-                <div class="runner-panel-header">
+                <div class="runner-panel-header u-flex u-items-center u-justify-between">
                     <h4 class="runner-section-title" data-i18n="runner.available_requests">Available Requests</h4>
                 </div>
                 <div class="runner-collection-tree" data-role="collection-tree">
-                    <div class="runner-empty-state">
+                    <div class="empty-state-base runner-empty-state">
                         <span class="icon icon-20 icon-spark"></span>
                         <p data-i18n="runner.no_collections">No collections available</p>
                     </div>
@@ -83,12 +83,12 @@
 
             <!-- Center Panel: Selected Requests -->
             <div class="runner-requests-panel">
-                <div class="runner-panel-header">
+                <div class="runner-panel-header u-flex u-items-center u-justify-between">
                     <h4 class="runner-section-title" data-i18n="runner.selected_requests">Selected Requests</h4>
                     <span class="runner-request-count" data-role="request-count">0 requests</span>
                 </div>
                 <div class="runner-requests-list" data-role="requests-list">
-                    <div class="runner-empty-state">
+                    <div class="empty-state-base runner-empty-state">
                         <span class="icon icon-20 icon-plus"></span>
                         <p data-i18n="runner.add_requests_hint">Click requests from the left panel to add them</p>
                     </div>
@@ -103,9 +103,9 @@
     <div class="modal-overlay modal-overlay--dim" data-role="script-modal-overlay">
         <div class="modal-dialog modal-dialog--script-editor">
             <div class="dialog-header">
-                <div class="runner-script-modal-title">
+                <div class="runner-script-modal-title u-flex u-flex-col">
                     <h3 class="dialog-title" data-i18n="runner.post_response_script">Post-Response Script</h3>
-                    <div class="runner-script-request-info">
+                    <div class="runner-script-request-info u-flex u-items-center u-gap-2">
                         <span class="runner-script-method" data-role="script-method">GET</span>
                         <span class="runner-script-path" data-role="script-path">/endpoint</span>
                     </div>
@@ -120,7 +120,7 @@
             <div class="runner-script-modal-hint">
                 <strong>Available APIs:</strong> response, environment.set(), environment.get(), console.log()
             </div>
-            <div class="runner-script-modal-footer">
+            <div class="runner-script-modal-footer dialog-footer dialog-footer--divided">
                 <button class="btn btn-outline" data-action="cancel" data-i18n="common.cancel">Cancel</button>
                 <button class="btn btn-primary" data-action="save" data-i18n="common.save">Save</button>
             </div>
@@ -137,7 +137,7 @@
             <span class="runner-request-method" data-role="method">GET</span>
             <span class="runner-request-name" data-role="name">/endpoint</span>
         </div>
-        <div class="runner-request-actions">
+        <div class="runner-request-actions u-flex">
             <button class="runner-request-edit-btn" data-action="edit-script" title="Edit post-response script">
                 <span class="icon icon-14 icon-script"></span>
             </button>
@@ -150,7 +150,7 @@
 
 <template id="tpl-runner-collection-item">
     <div class="runner-collection-item">
-        <div class="runner-collection-header" data-role="collection-header">
+        <div class="runner-collection-header u-flex u-items-center u-gap-2" data-role="collection-header">
             <span class="icon icon-14 icon-chevron-right runner-collection-chevron"></span>
             <span class="runner-collection-name" data-role="collection-name">Collection Name</span>
         </div>
@@ -160,7 +160,7 @@
 </template>
 
 <template id="tpl-runner-endpoint-item">
-    <div class="runner-endpoint-item" data-role="endpoint">
+    <div class="runner-endpoint-item u-flex u-items-center u-gap-2" data-role="endpoint">
         <span class="runner-endpoint-method" data-role="method">GET</span>
         <span class="runner-endpoint-name" data-role="name">/endpoint</span>
         <button class="runner-endpoint-add-btn" data-action="add" title="Add to runner">
@@ -171,16 +171,16 @@
 
 <template id="tpl-runner-results-panel">
     <div class="runner-results-resizer" data-role="results-resizer">
-        <div class="resizer-grip">
+        <div class="resizer-grip u-flex u-items-center u-justify-center">
             <div class="resizer-line"></div>
             <div class="resizer-line"></div>
             <div class="resizer-line"></div>
         </div>
     </div>
     <div class="runner-results-container">
-        <div class="runner-results-header">
+        <div class="runner-results-header u-flex u-items-center u-justify-between">
             <h4 class="runner-section-title" data-i18n="runner.results">Results</h4>
-            <div class="runner-results-summary" data-role="summary">
+            <div class="runner-results-summary u-flex" data-role="summary">
                 <span class="runner-results-passed" data-role="passed">0 passed</span>
                 <span class="runner-results-failed" data-role="failed">0 failed</span>
                 <span class="runner-results-time" data-role="total-time">0ms</span>
@@ -193,7 +193,7 @@
             </div>
             <div class="runner-results-detail-panel is-hidden" data-role="detail-panel">
                 <div class="runner-results-detail-header">
-                    <div class="runner-results-detail-info">
+                    <div class="runner-results-detail-info u-flex u-items-center u-gap-2">
                         <span class="runner-results-detail-method" data-role="detail-method">GET</span>
                         <span class="runner-results-detail-name" data-role="detail-name">/endpoint</span>
                         <span class="runner-results-detail-status" data-role="detail-status">200 OK</span>
@@ -244,7 +244,7 @@
 
 <template id="tpl-runner-result-item">
     <div class="runner-result-item" data-role="result-item">
-        <div class="runner-result-header">
+        <div class="runner-result-header u-flex u-items-center u-gap-2">
             <span class="runner-result-status" data-role="status-icon">●</span>
             <span class="runner-result-method" data-role="method">GET</span>
             <span class="runner-result-name" data-role="name">/endpoint</span>
@@ -255,20 +255,20 @@
 </template>
 
 <template id="tpl-runner-saved-list">
-    <div class="runner-saved-overlay">
-        <div class="runner-saved-dialog">
-            <div class="runner-saved-header">
-                <h3 data-i18n="runner.saved_runners">Saved Runners</h3>
-                <button class="runner-saved-close" data-action="close" aria-label="Close">
+    <div class="runner-saved-overlay modal-overlay">
+        <div class="runner-saved-dialog modal-dialog modal-dialog--runner-saved">
+            <div class="dialog-header">
+                <h3 class="dialog-title" data-i18n="runner.saved_runners">Saved Runners</h3>
+                <button class="dialog-close-btn" data-action="close" aria-label="Close">
                     <span class="icon icon-16 icon-x"></span>
                 </button>
             </div>
             <div class="runner-saved-list" data-role="saved-list">
-                <div class="runner-empty-state">
+                <div class="empty-state-base runner-empty-state">
                     <p data-i18n="runner.no_saved_runners">No saved runners yet</p>
                 </div>
             </div>
-            <div class="runner-saved-footer">
+            <div class="runner-saved-footer dialog-footer dialog-footer--divided">
                 <button class="btn btn-outline" data-action="close" data-i18n="common.close">Close</button>
             </div>
         </div>
@@ -276,12 +276,12 @@
 </template>
 
 <template id="tpl-runner-saved-item">
-    <div class="runner-saved-item">
+    <div class="runner-saved-item u-flex u-items-center u-justify-between">
         <div class="runner-saved-item-info">
             <span class="runner-saved-item-name" data-role="name">Runner Name</span>
             <span class="runner-saved-item-meta" data-role="meta">3 requests • Last run: Never</span>
         </div>
-        <div class="runner-saved-item-actions">
+        <div class="runner-saved-item-actions u-flex">
             <button class="btn-sm btn-outline" data-action="load" title="Load">
                 <span class="icon icon-14 icon-import"></span>
             </button>
