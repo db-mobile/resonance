@@ -46,12 +46,12 @@ export class WorkspaceTabBar {
 
         // Create wrapper with tab bar
         const tabBar = document.createElement('div');
-        tabBar.className = 'workspace-tab-bar';
+        tabBar.className = 'workspace-tab-bar u-flex u-flex-1';
         this.tabBar = tabBar;
 
         // Create tabs container
         const tabsContainer = document.createElement('div');
-        tabsContainer.className = 'workspace-tabs-container';
+        tabsContainer.className = 'workspace-tabs-container u-flex';
 
         // Render individual tabs
         tabs.forEach(tab => {
@@ -99,7 +99,7 @@ export class WorkspaceTabBar {
      */
     _createTabElement(tab, isActive) {
         const tabEl = document.createElement('div');
-        tabEl.className = `workspace-tab${isActive ? ' active' : ''}${tab.isModified ? ' modified' : ''}`;
+        tabEl.className = `workspace-tab u-flex u-items-center${isActive ? ' active' : ''}${tab.isModified ? ' modified' : ''}`;
         tabEl.dataset.tabId = tab.id;
 
         // Tab name
@@ -244,7 +244,7 @@ export class WorkspaceTabBar {
      */
     _createNewTabButton() {
         const btn = document.createElement('button');
-        btn.className = 'workspace-tab-new';
+        btn.className = 'workspace-tab-new u-flex u-items-center u-justify-center';
         btn.setAttribute('aria-label', 'New tab');
         btn.title = 'New tab';
         {
@@ -268,7 +268,7 @@ export class WorkspaceTabBar {
      */
     _createTabListButton() {
         const btn = document.createElement('button');
-        btn.className = 'workspace-tab-list-button';
+        btn.className = 'workspace-tab-list-button u-flex u-items-center u-justify-center';
         btn.setAttribute('aria-label', 'All tabs');
         btn.title = 'All tabs';
         {
@@ -299,7 +299,7 @@ export class WorkspaceTabBar {
 
         // Create dropdown
         const dropdown = document.createElement('div');
-        dropdown.className = 'workspace-tab-list-dropdown visible';
+        dropdown.className = 'workspace-tab-list-dropdown dropdown-panel visible';
 
         // Position dropdown below button
         const rect = button.getBoundingClientRect();
@@ -309,7 +309,7 @@ export class WorkspaceTabBar {
         // Add tab items using current tabs
         this.tabs.forEach(tab => {
             const item = document.createElement('div');
-            item.className = `workspace-tab-list-item${tab.id === this.activeTabId ? ' active' : ''}`;
+            item.className = `workspace-tab-list-item dropdown-item${tab.id === this.activeTabId ? ' active is-active' : ''}`;
 
             // Add modified indicator if needed
             if (tab.isModified) {
@@ -320,7 +320,7 @@ export class WorkspaceTabBar {
 
             // Add tab name
             const name = document.createElement('span');
-            name.className = 'workspace-tab-list-item-name';
+            name.className = 'workspace-tab-list-item-name dropdown-item-label';
             name.textContent = tab.name;
             item.appendChild(name);
 
@@ -404,7 +404,7 @@ export class WorkspaceTabBar {
         }
 
         const menu = document.createElement('div');
-        menu.className = 'workspace-tab-context-menu';
+        menu.className = 'workspace-tab-context-menu dropdown-panel';
         menu.style.left = `${event.pageX}px`;
         menu.style.top = `${event.pageY}px`;
 

@@ -34,7 +34,7 @@ export class EnvironmentManager {
         this.dialog.className = 'environment-manager-overlay modal-overlay';
 
         const dialogContent = document.createElement('div');
-        dialogContent.className = 'environment-manager-dialog modal-dialog';
+        dialogContent.className = 'environment-manager-dialog modal-dialog modal-dialog--environment-manager';
 
         try {
             const fragment = await templateLoader.clone(

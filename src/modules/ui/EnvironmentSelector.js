@@ -96,7 +96,7 @@ export class EnvironmentSelector {
                     'tpl-env-dropdown-item'
                 );
                 const item = fragment.firstElementChild;
-                item.className = `env-dropdown-item${env.id === activeEnvId ? ' active' : ''}`;
+                item.className = `env-dropdown-item dropdown-item${env.id === activeEnvId ? ' active is-active' : ''}`;
 
                 const nameEl = item.querySelector('[data-role="name"]');
                 const checkEl = item.querySelector('[data-role="check"]');

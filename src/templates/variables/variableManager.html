@@ -1,8 +1,8 @@
 <template id="tpl-variable-manager-dialog">
-    <div>
-        <div class="variable-manager-header">
-            <h3 class="variable-manager-title" data-role="title"></h3>
-            <div class="variable-manager-actions">
+    <div class="dialog-stack">
+        <div class="variable-manager-header dialog-header u-items-center u-justify-between">
+            <h3 class="dialog-title" data-role="title"></h3>
+            <div class="variable-manager-actions u-flex">
                 <button id="add-variable-btn" class="btn-xs btn-outline-primary">+ Add Variable</button>
                 <button id="import-variables-btn" class="btn-xs btn-outline">Import</button>
                 <button id="export-variables-btn" class="btn-xs btn-outline">Export</button>
@@ -35,7 +35,7 @@
 
         <div id="variables-container" class="variable-manager-container"></div>
 
-        <div class="variable-manager-footer">
+        <div class="variable-manager-footer dialog-footer dialog-footer--divided">
             <button id="variables-cancel-btn" class="btn btn-outline">Cancel</button>
             <button id="variables-save-btn" class="btn btn-primary">Save Variables</button>
         </div>
@@ -44,17 +44,17 @@
 
 <template id="tpl-variable-manager-row">
     <div class="variable-row">
-        <input type="text" class="variable-name" placeholder="Variable name">
-        <input type="text" class="variable-value" placeholder="Variable value">
+        <input type="text" class="input-base variable-name" placeholder="Variable name">
+        <input type="text" class="input-base variable-value" placeholder="Variable value">
         <button class="remove-variable-btn">Remove</button>
     </div>
 </template>
 
 <template id="tpl-variable-manager-import-dialog">
-    <div>
-        <h4 class="variable-manager-import-title">Import Variables</h4>
-        <textarea id="import-textarea" placeholder="Paste JSON object with variables..." class="variable-import-textarea"></textarea>
-        <div class="variable-manager-import-actions">
+    <div class="dialog-stack">
+        <h4 class="dialog-title">Import Variables</h4>
+        <textarea id="import-textarea" placeholder="Paste JSON object with variables..." class="textarea-base variable-import-textarea"></textarea>
+        <div class="dialog-footer">
             <button id="import-cancel" class="btn btn-outline">Cancel</button>
             <button id="import-confirm" class="btn btn-primary">Import</button>
         </div>

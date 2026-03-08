@@ -1,7 +1,7 @@
 <template id="tpl-environment-manager-dialog-content">
-    <div class="env-manager-header">
-        <h3 class="env-manager-title">Manage Environments</h3>
-        <div class="env-manager-header-actions">
+    <div class="env-manager-header dialog-header u-items-center u-justify-between">
+        <h3 class="dialog-title">Manage Environments</h3>
+        <div class="env-manager-header-actions u-flex">
             <button id="env-import-btn" class="btn-xs btn-outline" title="Import Environments">
                 <span class="icon icon-14 icon-import"></span>
                 <span>Import</span>
@@ -13,7 +13,7 @@
         </div>
     </div>
 
-    <div class="env-manager-main">
+    <div class="env-manager-main u-flex u-gap-4">
         <div class="env-manager-sidebar">
             <div class="env-manager-sidebar-header">
                 <h4 class="env-manager-section-title">ENVIRONMENTS</h4>
@@ -24,23 +24,23 @@
 
         <div class="env-manager-details">
             <div id="env-details" class="env-manager-details-scroll">
-                <div class="env-manager-empty-state">
+                <div class="empty-state-base env-manager-empty-state">
                     Select an environment to view and edit its variables
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="env-manager-footer">
+    <div class="env-manager-footer dialog-footer dialog-footer--divided">
         <button id="env-close-btn" class="btn btn-outline">Close</button>
     </div>
 </template>
 
 <template id="tpl-environment-manager-details">
     <div class="env-manager-details-content">
-        <div class="env-manager-details-top">
-            <input type="text" id="env-name-input" class="env-manager-name-input" />
-            <div class="env-manager-details-actions">
+        <div class="env-manager-details-top u-flex u-flex-col u-gap-3">
+            <input type="text" id="env-name-input" class="input-base env-manager-name-input" />
+            <div class="env-manager-details-actions u-flex">
                 <button id="env-set-active-btn" class="btn-xs btn-outline" title="Set as Active">
                     <span class="icon icon-14 icon-check"></span>
                     <span>Active</span>
@@ -62,7 +62,7 @@
         </div>
 
         <div class="env-manager-variables-section">
-            <div class="env-manager-variables-header">
+            <div class="env-manager-variables-header u-flex u-items-center u-justify-between">
                 <h4 class="env-manager-section-title env-manager-section-title--no-margin">VARIABLES</h4>
                 <button id="env-add-variable-btn" class="btn-sm btn-outline-primary" title="Add Variable">+ Add</button>
             </div>
@@ -73,18 +73,18 @@
 
 <template id="tpl-environment-manager-variable-row">
     <div class="env-variable-row">
-        <input type="text" class="var-name-input" placeholder="Variable name" />
-        <input type="text" class="var-value-input" placeholder="Value" />
+        <input type="text" class="input-base var-name-input" placeholder="Variable name" />
+        <input type="text" class="input-base var-value-input" placeholder="Value" />
         <button class="var-delete-btn">×</button>
     </div>
 </template>
 
 <template id="tpl-environment-manager-input-dialog">
-    <div>
-        <h3 class="env-manager-dialog-title" data-role="title"></h3>
-        <p class="env-manager-dialog-message" data-role="message"></p>
-        <input type="text" id="input-dialog-input" class="env-manager-dialog-input" />
-        <div class="env-manager-dialog-actions">
+    <div class="dialog-stack">
+        <h3 class="dialog-title" data-role="title"></h3>
+        <p class="dialog-message" data-role="message"></p>
+        <input type="text" id="input-dialog-input" class="input-base field-input" />
+        <div class="dialog-footer">
             <button id="input-dialog-cancel" class="btn btn-outline">Cancel</button>
             <button id="input-dialog-ok" class="btn btn-primary">OK</button>
         </div>
@@ -92,18 +92,18 @@
 </template>
 
 <template id="tpl-environment-manager-alert-dialog">
-    <div>
-        <p class="env-manager-dialog-message env-manager-dialog-message--primary" data-role="message"></p>
-        <div class="env-manager-dialog-actions">
+    <div class="dialog-stack">
+        <p class="dialog-message dialog-message--primary" data-role="message"></p>
+        <div class="dialog-footer">
             <button id="alert-dialog-ok" class="btn btn-primary">OK</button>
         </div>
     </div>
 </template>
 
 <template id="tpl-environment-manager-confirm-dialog">
-    <div>
-        <p class="env-manager-dialog-message env-manager-dialog-message--primary" data-role="message"></p>
-        <div class="env-manager-dialog-actions">
+    <div class="dialog-stack">
+        <p class="dialog-message dialog-message--primary" data-role="message"></p>
+        <div class="dialog-footer">
             <button id="confirm-dialog-cancel" class="btn btn-outline">Cancel</button>
             <button id="confirm-dialog-ok" class="btn btn-primary">OK</button>
         </div>

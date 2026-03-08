@@ -1,52 +1,52 @@
 <template id="tpl-mock-server-dialog">
-    <div>
-        <div class="mock-server-header">
-            <h3 class="mock-server-title" data-role="title"></h3>
+    <div class="u-flex u-flex-col u-flex-1 u-min-h-0 u-overflow-hidden">
+        <div class="dialog-header">
+            <h3 class="dialog-title" data-role="title"></h3>
             <button id="mock-server-close-btn" class="dialog-close-btn" aria-label="Close">&times;</button>
         </div>
 
         <div class="mock-server-status-section">
-            <div class="mock-server-status-row">
+            <div class="u-flex u-items-center u-gap-3">
                 <span id="mock-server-status-indicator" class="mock-server-status-indicator">○</span>
                 <span id="mock-server-status-text" class="mock-server-status-text" data-role="status-stopped"></span>
                 <span id="mock-server-url" class="mock-server-url"></span>
             </div>
-            <div class="mock-server-controls">
+            <div class="mock-server-controls u-flex u-items-center u-gap-3">
                 <button id="mock-server-toggle-btn" class="btn btn-primary mock-server-toggle-btn" data-role="start-server"></button>
-                <label class="mock-server-port-label">
+                <label class="mock-server-port-label u-flex u-items-center u-gap-2">
                     <span data-role="port-label"></span>
-                    <input type="number" id="mock-server-port-input" min="1024" max="65535" value="3000" class="mock-server-port-input" />
+                    <input type="number" id="mock-server-port-input" min="1024" max="65535" value="3000" class="input-base field-input mock-server-port-input" />
                 </label>
             </div>
         </div>
 
-        <div class="mock-server-main">
-            <div class="mock-server-column mock-server-column--collections">
-                <h4 class="mock-server-section-title" data-role="collections-heading"></h4>
-                <div id="mock-server-collections" class="mock-server-collections"></div>
+        <div class="mock-server-main u-flex u-gap-4 u-flex-1 u-min-h-0 u-overflow-hidden">
+            <div class="mock-server-column--collections u-flex u-flex-col u-flex-1 u-min-h-0 u-overflow-hidden">
+                <h4 class="section-eyebrow mock-server-section-title" data-role="collections-heading"></h4>
+                <div id="mock-server-collections" class="u-flex-1 u-overflow-y-auto"></div>
             </div>
 
-            <div class="mock-server-column">
-                <div class="mock-server-log-header">
-                    <h4 class="mock-server-section-title" data-role="request-log-heading"></h4>
+            <div class="u-flex u-flex-col u-flex-1 u-min-h-0 u-overflow-hidden">
+                <div class="mock-server-log-header u-flex u-items-center u-justify-between">
+                    <h4 class="section-eyebrow mock-server-section-title" data-role="request-log-heading"></h4>
                     <button id="mock-server-clear-logs-btn" class="btn-xs btn-outline" data-role="clear"></button>
                 </div>
-                <div id="mock-server-logs" class="mock-server-logs"></div>
+                <div id="mock-server-logs" class="mock-server-logs u-flex-1 u-overflow-y-auto"></div>
             </div>
         </div>
 
-        <div class="mock-server-footer">
+        <div class="dialog-footer dialog-footer--divided">
             <button id="mock-server-close-btn-2" class="btn btn-outline" data-role="close"></button>
         </div>
     </div>
 </template>
 
 <template id="tpl-mock-server-empty-state">
-    <div class="mock-server-empty-state" data-role="content"></div>
+    <div class="empty-state-base mock-server-empty-state" data-role="content"></div>
 </template>
 
 <template id="tpl-mock-server-logs-empty">
-    <div class="mock-server-empty-state" data-role="content"></div>
+    <div class="empty-state-base mock-server-empty-state" data-role="content"></div>
 </template>
 
 <template id="tpl-mock-server-logs-table">
@@ -79,55 +79,55 @@
 </template>
 
 <template id="tpl-mock-server-response-editor">
-    <div>
-        <div class="mock-server-response-editor-header">
+    <div class="u-flex u-flex-col u-flex-1 u-min-h-0 u-overflow-hidden">
+        <div class="dialog-header">
             <div>
-                <h3 class="mock-server-response-editor-title" data-role="title"></h3>
-                <p class="mock-server-response-editor-subtitle" data-role="subtitle"></p>
+                <h3 class="dialog-title" data-role="title"></h3>
+                <p class="dialog-subtitle" data-role="subtitle"></p>
             </div>
             <button id="response-editor-close" class="dialog-close-btn" aria-label="Close">&times;</button>
         </div>
 
         <div class="mock-server-notice is-hidden" data-role="custom-notice"></div>
 
-        <div class="mock-server-response-editor-form-row">
-            <div class="mock-server-response-editor-form-group">
-                <label class="mock-server-response-editor-label" data-role="delay-label"></label>
+        <div class="field-row">
+            <div class="field-group">
+                <label class="field-label" data-role="delay-label"></label>
                 <input
                     type="number"
                     id="response-editor-delay"
                     min="0"
                     max="30000"
-                    class="mock-server-number-input"
+                    class="input-base field-input mock-server-number-input"
                 />
-                <span class="mock-server-input-hint">(0-30000)</span>
+                <span class="field-help mock-server-input-hint">(0-30000)</span>
             </div>
-            <div class="mock-server-response-editor-form-group">
-                <label class="mock-server-response-editor-label" data-role="status-code-label"></label>
+            <div class="field-group">
+                <label class="field-label" data-role="status-code-label"></label>
                 <input
                     type="number"
                     id="response-editor-status-code"
                     min="100"
                     max="599"
-                    class="mock-server-number-input"
+                    class="input-base field-input mock-server-number-input"
                 />
-                <span class="mock-server-input-hint">(100-599)</span>
+                <span class="field-help mock-server-input-hint">(100-599)</span>
             </div>
         </div>
 
-        <div class="mock-server-response-editor-body">
-            <label class="mock-server-response-editor-label" data-role="body-label"></label>
+        <div class="field-group u-flex u-flex-col u-flex-1 u-min-h-0 u-overflow-hidden">
+            <label class="field-label" data-role="body-label"></label>
             <textarea
                 id="response-editor-textarea"
-                class="mock-server-response-editor-textarea"
+                class="textarea-base mock-server-response-editor-textarea"
                 spellcheck="false"
             ></textarea>
-            <div id="response-editor-error" class="mock-server-response-editor-error"></div>
+            <div id="response-editor-error" class="field-error"></div>
         </div>
 
-        <div class="mock-server-response-editor-footer">
+        <div class="mock-server-response-editor-footer dialog-footer dialog-footer--divided u-items-center u-justify-between u-gap-2">
             <button id="response-editor-reset" class="btn btn-outline" data-role="reset"></button>
-            <div class="mock-server-response-editor-footer-actions">
+            <div class="u-flex u-gap-2">
                 <button id="response-editor-cancel" class="btn btn-outline" data-role="cancel"></button>
                 <button id="response-editor-save" class="btn btn-primary" data-role="save"></button>
             </div>
@@ -138,7 +138,7 @@
 <template id="tpl-mock-server-alert">
     <div>
         <p class="mock-server-alert-message" data-role="message"></p>
-        <div class="mock-server-alert-actions">
+        <div class="u-flex u-justify-end">
             <button id="alert-ok" class="btn btn-primary" data-role="ok"></button>
         </div>
     </div>
