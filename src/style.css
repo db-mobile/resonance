@@ -263,6 +263,7 @@ body {
 .u-items-start { align-items: flex-start; }
 .u-items-center { align-items: center; }
 .u-items-baseline { align-items: baseline; }
+.u-justify-center { justify-content: center; }
 .u-justify-between { justify-content: space-between; }
 .u-justify-end { justify-content: flex-end; }
 .u-gap-1 { gap: var(--space-1); }
