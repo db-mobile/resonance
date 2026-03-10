@@ -204,7 +204,6 @@
     "ctrl_keys": "Salva richiesta",
     "escape": "Annulla richiesta",
     "ctrl_keyl": "Metti il focus sulla barra URL",
-    "ctrl_keyb": "Attiva/disattiva barra collezioni",
     "ctrl_keyh": "Attiva/disattiva barra cronologia",
     "ctrl_keyk": "Genera comando cURL",
     "ctrl_keyo": "Importa collezione OpenAPI",

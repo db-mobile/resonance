@@ -119,7 +119,9 @@ export class I18nManager {
         const titleElements = container.querySelectorAll('[data-i18n-title]');
         titleElements.forEach(element => {
             const key = element.getAttribute('data-i18n-title');
-            element.title = this.t(key);
+            const shortcutHint = element.getAttribute('data-shortcut-hint');
+            const title = this.t(key);
+            element.title = shortcutHint ? `${title} (${shortcutHint})` : title;
         });
 
         // Update aria-label attributes

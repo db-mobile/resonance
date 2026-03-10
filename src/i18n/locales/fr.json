@@ -204,7 +204,6 @@
     "ctrl_keys": "Enregistrer la requête",
     "escape": "Annuler la requête",
     "ctrl_keyl": "Mettre le focus sur la barre d'URL",
-    "ctrl_keyb": "Basculer la barre de collections",
     "ctrl_keyh": "Basculer la barre d'historique",
     "ctrl_keyk": "Générer une commande cURL",
     "ctrl_keyo": "Importer une collection OpenAPI",

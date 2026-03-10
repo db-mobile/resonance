@@ -168,6 +168,7 @@
  .icon-script { -webkit-mask-image: url('../assets/ui/script.svg'); mask-image: url('../assets/ui/script.svg'); }
  .icon-variable { -webkit-mask-image: url('../assets/ui/variable.svg'); mask-image: url('../assets/ui/variable.svg'); }
  .icon-import { -webkit-mask-image: url('../assets/ui/import.svg'); mask-image: url('../assets/ui/import.svg'); }
+ .icon-keyboard { -webkit-mask-image: url('../assets/ui/keyboard.svg'); mask-image: url('../assets/ui/keyboard.svg'); }
 
 /* Accent Color Selectors */
 [data-accent="green"] {

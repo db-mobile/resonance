@@ -222,6 +222,7 @@ class KeyboardShortcutsManager {
 
             for (const key of shortcutKeys) {
                 const shortcut = this.shortcuts.get(key);
+                if (!shortcut) { continue; }
                 const itemFragment = templateLoader.cloneSync(
                     './src/templates/shortcuts/keyboardShortcuts.html',
                     'tpl-shortcut-item'
@@ -243,6 +244,20 @@ class KeyboardShortcutsManager {
 
             containerEl.appendChild(categoryEl);
         }
+    }
+
+    /**
+     * Look up the display string for a registered shortcut
+     * @param {string} key - Key code (e.g., 'Enter', 'KeyS')
+     * @param {boolean} ctrl - Requires Ctrl/Cmd
+     * @param {boolean} shift - Requires Shift
+     * @param {boolean} alt - Requires Alt
+     * @returns {string|null} Display string (e.g., 'Ctrl+Enter') or null if not found
+     */
+    lookupDisplayKey(key, ctrl = false, shift = false, alt = false) {
+        const shortcutKey = this._createShortcutKey(key, ctrl, shift, alt);
+        const shortcut = this.shortcuts.get(shortcutKey);
+        return shortcut ? shortcut.displayKey : null;
     }
 
     /**

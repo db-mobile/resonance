@@ -249,25 +249,6 @@ function initKeyboardShortcuts() {
         category: 'Navigation'
     });
 
-    keyboardShortcuts.register('KeyB', {
-        ctrl: true,
-        handler: () => {
-            const collectionsSidebar = document.getElementById('collections-sidebar');
-            const collectionResizerHandle = document.getElementById('collection-resizer-handle');
-            if (collectionsSidebar && collectionResizerHandle) {
-                const isVisible = collectionsSidebar.classList.contains('visible');
-                if (isVisible) {
-                    collectionsSidebar.classList.remove('visible');
-                    collectionResizerHandle.classList.remove('visible');
-                } else {
-                    collectionsSidebar.classList.add('visible');
-                    collectionResizerHandle.classList.add('visible');
-                }
-            }
-        },
-        description: 'Toggle collections sidebar',
-        category: 'Navigation'
-    });
 
     keyboardShortcuts.register('KeyH', {
         ctrl: true,
@@ -463,6 +444,37 @@ function initKeyboardShortcuts() {
         description: 'Switch to previous tab',
         category: 'Workspace Tabs'
     });
+
+    const keyboardShortcutsBtn = document.getElementById('keyboard-shortcuts-btn');
+    if (keyboardShortcutsBtn) {
+        keyboardShortcutsBtn.addEventListener('click', () => keyboardShortcuts.showHelp());
+    }
+}
+
+function applyShortcutHints() {
+    const hints = [
+        { id: 'send-request-btn', key: 'Enter', ctrl: true },
+        { id: 'cancel-request-btn', key: 'Escape' },
+        { id: 'curl-btn', key: 'KeyK', ctrl: true },
+        { id: 'import-collection-btn', key: 'KeyO', ctrl: true },
+        { id: 'history-toggle-btn', key: 'KeyH', ctrl: true },
+        { id: 'settings-btn', key: 'Comma', ctrl: true },
+    ];
+
+    for (const { id, key, ctrl = false } of hints) {
+        const el = document.getElementById(id);
+        if (!el) { continue; }
+        const display = keyboardShortcuts.lookupDisplayKey(key, ctrl);
+        if (!display) { continue; }
+        if (el.hasAttribute('data-i18n-title')) {
+            // Store on element so updateUI() re-applies after language changes
+            el.setAttribute('data-shortcut-hint', display);
+            el.title = `${el.title} (${display})`;
+        } else {
+            const currentTitle = el.title || el.getAttribute('aria-label') || '';
+            el.title = currentTitle ? `${currentTitle} (${display})` : display;
+        }
+    }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -669,6 +681,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initResizer();
     initializeCopyHandler();
     initKeyboardShortcuts();
+    applyShortcutHints();
 
     // Track changes to mark tabs as modified
     if (urlInput) {

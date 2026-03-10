@@ -204,7 +204,6 @@
     "ctrl_keys": "Save request",
     "escape": "Cancel request",
     "ctrl_keyl": "Focus URL bar",
-    "ctrl_keyb": "Toggle collections sidebar",
     "ctrl_keyh": "Toggle history sidebar",
     "ctrl_keyk": "Generate cURL command",
     "ctrl_keyo": "Import OpenAPI collection",
