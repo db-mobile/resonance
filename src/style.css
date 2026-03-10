@@ -168,6 +168,7 @@
  .icon-script { -webkit-mask-image: url('../assets/ui/script.svg'); mask-image: url('../assets/ui/script.svg'); }
  .icon-variable { -webkit-mask-image: url('../assets/ui/variable.svg'); mask-image: url('../assets/ui/variable.svg'); }
  .icon-import { -webkit-mask-image: url('../assets/ui/import.svg'); mask-image: url('../assets/ui/import.svg'); }
+ .icon-keyboard { -webkit-mask-image: url('../assets/ui/keyboard.svg'); mask-image: url('../assets/ui/keyboard.svg'); }
 
 /* Accent Color Selectors */
 [data-accent="green"] {
@@ -263,6 +264,7 @@ body {
 .u-items-start { align-items: flex-start; }
 .u-items-center { align-items: center; }
 .u-items-baseline { align-items: baseline; }
+.u-justify-center { justify-content: center; }
 .u-justify-between { justify-content: space-between; }
 .u-justify-end { justify-content: flex-end; }
 .u-gap-1 { gap: var(--space-1); }
@@ -3154,7 +3156,6 @@ body {
   position: relative;
   min-width: 200px;
   max-width: 600px;
-  transition: all var(--transition-base);
 }
 
 .history-sidebar.visible {

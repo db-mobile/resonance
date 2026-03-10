@@ -90,7 +90,7 @@ export default [
 
     // Services (Node.js environment)
     {
-        files: ['src/services/**/*.js'],
+        files: ['src/services/**/*.js', 'serve.js'],
         languageOptions: {
             globals: {
                 ...globals.node,

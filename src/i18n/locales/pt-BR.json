@@ -204,7 +204,6 @@
     "ctrl_keys": "Salvar requisição",
     "escape": "Cancelar requisição",
     "ctrl_keyl": "Focar barra de URL",
-    "ctrl_keyb": "Alternar painel de coleções",
     "ctrl_keyh": "Alternar painel de histórico",
     "ctrl_keyk": "Gerar comando cURL",
     "ctrl_keyo": "Importar coleção OpenAPI",
