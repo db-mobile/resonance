@@ -3155,7 +3155,6 @@ body {
   position: relative;
   min-width: 200px;
   max-width: 600px;
-  transition: all var(--transition-base);
 }
 
 .history-sidebar.visible {

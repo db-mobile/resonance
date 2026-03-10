@@ -223,8 +223,83 @@ export class HorizontalResizer {
     }
 }
 
+export class HistoryResizer {
+    constructor() {
+        this.isDragging = false;
+        this.startX = 0;
+        this.startSidebarWidth = 0;
+        this.minWidth = 200;
+        this.maxWidth = 600;
+
+        this.init();
+    }
+
+    init() {
+        this.resizerHandle = document.getElementById('history-resizer-handle');
+        this.sidebar = document.querySelector('.history-sidebar');
+
+        if (!this.resizerHandle || !this.sidebar) {
+            return;
+        }
+
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        this.resizerHandle.addEventListener('mousedown', this.startDrag.bind(this));
+        document.addEventListener('mousemove', this.drag.bind(this));
+        document.addEventListener('mouseup', this.endDrag.bind(this));
+
+        this.resizerHandle.addEventListener('selectstart', (e) => e.preventDefault());
+    }
+
+    startDrag(e) {
+        this.isDragging = true;
+        this.startX = e.clientX;
+        this.startSidebarWidth = this.sidebar.offsetWidth;
+
+        this.resizerHandle.classList.add('dragging');
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'col-resize';
+
+        e.preventDefault();
+    }
+
+    drag(e) {
+        if (!this.isDragging) {return;}
+
+        // History sidebar is on the right, so dragging left increases width
+        const deltaX = e.clientX - this.startX;
+        const newSidebarWidth = this.startSidebarWidth - deltaX;
+
+        if (newSidebarWidth < this.minWidth || newSidebarWidth > this.maxWidth) {
+            return;
+        }
+
+        this.sidebar.style.width = `${newSidebarWidth}px`;
+        this.sidebar.style.flex = `0 0 ${newSidebarWidth}px`;
+
+        e.preventDefault();
+    }
+
+    endDrag() {
+        if (!this.isDragging) {return;}
+
+        this.isDragging = false;
+        this.resizerHandle.classList.remove('dragging');
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+    }
+
+    reset() {
+        this.sidebar.style.width = '';
+        this.sidebar.style.flex = '';
+    }
+}
+
 export function initResizer() {
     const verticalResizer = new Resizer();
     const horizontalResizer = new HorizontalResizer();
-    return { verticalResizer, horizontalResizer };
+    const historyResizer = new HistoryResizer();
+    return { verticalResizer, horizontalResizer, historyResizer };
 }
