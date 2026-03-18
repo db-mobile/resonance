@@ -5,14 +5,14 @@ document.addEventListener('DOMContentLoaded', function() {
     fetch('https://api.github.com/repos/db-mobile/resonance/releases/latest')
         .then(response => response.json())
         .then(data => {
-            const version = data.tag_name || data.name || '1.7.1';
+            const version = data.tag_name || data.name || '2.5.0';
             // Remove 'v' prefix if present
             const cleanVersion = version.startsWith('v') ? version.substring(1) : version;
             versionBadge.textContent = `Version ${cleanVersion}`;
         })
         .catch(error => {
             console.error('Error fetching version:', error);
-            versionBadge.textContent = 'Version 1.7.1'; // Fallback to current version
+            versionBadge.textContent = 'Version 2.5.0'; // Fallback to current version
         });
 
     // Handle smooth scrolling for anchor links
