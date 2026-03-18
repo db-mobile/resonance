@@ -25,6 +25,38 @@ export class EnvironmentRepository {
     }
 
     /**
+     * Normalize environment shape for backward compatibility.
+     *
+     * @private
+     * @param {Object} environment
+     * @returns {Object}
+     */
+    _normalizeEnvironment(environment) {
+        return {
+            id: environment?.id,
+            name: environment?.name || 'Environment',
+            variables: environment?.variables && typeof environment.variables === 'object' ? environment.variables : {},
+            color: this._normalizeColor(environment?.color)
+        };
+    }
+
+    /**
+     * Normalize stored color values.
+     *
+     * @private
+     * @param {string|null|undefined} color
+     * @returns {string|null}
+     */
+    _normalizeColor(color) {
+        if (typeof color !== 'string') {
+            return null;
+        }
+
+        const trimmed = color.trim();
+        return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed.toUpperCase() : null;
+    }
+
+    /**
      * Retrieves all environments with validation and initialization
      *
      * Automatically initializes storage with default environment if undefined
@@ -53,7 +85,17 @@ export class EnvironmentRepository {
                 return defaultData;
             }
 
-            return data;
+            const normalizedData = {
+                ...data,
+                items: data.items.map(env => this._normalizeEnvironment(env))
+            };
+
+            const changed = JSON.stringify(normalizedData) !== JSON.stringify(data);
+            if (changed) {
+                await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, normalizedData);
+            }
+
+            return normalizedData;
         } catch (error) {
             throw new Error(`Failed to load environments: ${error.message}`);
         }
@@ -147,7 +189,7 @@ export class EnvironmentRepository {
      * @returns {Promise<Object>} The created environment object
      * @throws {Error} If name already exists or save fails
      */
-    async createEnvironment(name, variables = {}) {
+    async createEnvironment(name, variables = {}, color = null) {
         try {
             const data = await this.getAllEnvironments();
 
@@ -160,7 +202,8 @@ export class EnvironmentRepository {
             const newEnvironment = {
                 id: this._generateId(),
                 name: name,
-                variables: variables
+                variables: variables,
+                color: this._normalizeColor(color)
             };
 
             data.items.push(newEnvironment);
@@ -203,11 +246,11 @@ export class EnvironmentRepository {
             }
 
             // Update environment
-            data.items[index] = {
+            data.items[index] = this._normalizeEnvironment({
                 ...data.items[index],
                 ...updates,
                 id: environmentId // Preserve ID
-            };
+            });
 
             await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data);
             return data.items[index];
@@ -276,7 +319,8 @@ export class EnvironmentRepository {
 
             return await this.createEnvironment(
                 newName || `${environment.name} (Copy)`,
-                { ...environment.variables }
+                { ...environment.variables },
+                environment.color
             );
         } catch (error) {
             throw new Error(`Failed to duplicate environment: ${error.message}`);
@@ -323,7 +367,8 @@ export class EnvironmentRepository {
                 {
                     id: defaultEnvId,
                     name: 'Default',
-                    variables: {}
+                    variables: {},
+                    color: null
                 }
             ],
             activeEnvironmentId: defaultEnvId
@@ -372,16 +417,16 @@ export class EnvironmentRepository {
                 environmentsData.items.forEach(importedEnv => {
                     const exists = data.items.some(env => env.name === importedEnv.name);
                     if (!exists) {
-                        data.items.push({
+                        data.items.push(this._normalizeEnvironment({
                             ...importedEnv,
                             id: this._generateId() // Generate new ID
-                        });
+                        }));
                     }
                 });
             } else {
                 // Replace all environments
                 data = {
-                    items: environmentsData.items.map(env => ({
+                    items: environmentsData.items.map(env => this._normalizeEnvironment({
                         ...env,
                         id: this._generateId() // Generate new IDs
                     })),

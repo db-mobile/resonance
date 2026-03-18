@@ -15,7 +15,7 @@ use commands::{
     },
     import_export::{
         export_openapi, export_postman, import_openapi_file, import_postman_collection,
-        import_postman_environment,
+        import_postman_environment, save_json_export,
     },
     mock_server::{
         mock_server_clear_logs, mock_server_logs, mock_server_reload_settings, mock_server_start,
@@ -64,6 +64,7 @@ fn main() {
             import_postman_environment,
             export_openapi,
             export_postman,
+            save_json_export,
             // gRPC Reflection
             grpc_reflection_list_services,
             grpc_reflection_list_methods,

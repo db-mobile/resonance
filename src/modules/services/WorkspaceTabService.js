@@ -296,6 +296,19 @@ export class WorkspaceTabService {
     }
 
     /**
+     * Reorders tabs based on an ordered list of tab IDs
+     *
+     * @async
+     * @param {Array<string>} orderedTabIds - Tab IDs in the desired order
+     * @returns {Promise<void>}
+     * @fires WorkspaceTabService#tabs-reordered
+     */
+    async reorderTabs(orderedTabIds) {
+        await this.repository.reorderTabs(orderedTabIds);
+        this._notifyListeners('tabs-reordered', orderedTabIds);
+    }
+
+    /**
      * Generates a tab name from request details
      *
      * Extracts endpoint from URL path for display.

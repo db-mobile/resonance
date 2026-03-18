@@ -1,6 +1,7 @@
 <template id="tpl-environment-selector">
     <div class="environment-selector">
         <button id="env-selector-btn" class="env-selector-button">
+            <span class="env-active-indicator" data-role="active-indicator"></span>
             <span class="env-icon icon icon-16 icon-globe"></span>
             <span id="env-selector-name" class="env-name">Loading...</span>
             <span class="env-arrow icon icon-12 icon-chevron-down"></span>
@@ -11,6 +12,7 @@
 
 <template id="tpl-env-dropdown-item">
     <div class="env-dropdown-item dropdown-item">
+        <span class="env-color-indicator" data-role="color"></span>
         <span class="env-dropdown-name dropdown-item-label" data-role="name"></span>
         <span class="env-check icon icon-14 icon-check is-hidden" data-role="check"></span>
     </div>

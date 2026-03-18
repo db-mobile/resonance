@@ -40,6 +40,14 @@
     <div class="env-manager-details-content">
         <div class="env-manager-details-top u-flex u-flex-col u-gap-3">
             <input type="text" id="env-name-input" class="input-base env-manager-name-input" />
+            <div class="env-manager-color-row">
+                <label for="env-color-input" class="env-manager-color-label">Color</label>
+                <div class="env-manager-color-controls">
+                    <input type="color" id="env-color-input" class="env-manager-color-input" value="#4F46E5" />
+                    <span id="env-color-value" class="env-manager-color-value">None</span>
+                    <button id="env-color-clear-btn" type="button" class="btn-xs btn-outline">Clear</button>
+                </div>
+            </div>
             <div class="env-manager-details-actions u-flex">
                 <button id="env-set-active-btn" class="btn-xs btn-outline" title="Set as Active">
                     <span class="icon icon-14 icon-check"></span>

@@ -22,6 +22,8 @@ export class WorkspaceTabBar {
         this.onTabCreate = null;
         this.onTabRename = null;
         this.onTabDuplicate = null;
+        this.onTabReorder = null;
+        this.dragPreview = null;
     }
 
     /**
@@ -167,7 +169,94 @@ export class WorkspaceTabBar {
             this._showContextMenu(e, tab);
         });
 
+
+        // Drag and drop for reordering
+        tabEl.draggable = true;
+
+        tabEl.addEventListener('dragstart', (e) => {
+            tabEl.classList.add('is-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', tab.id);
+            this._setDragPreview(e, tab);
+        });
+
+        tabEl.addEventListener('dragend', () => {
+            tabEl.classList.remove('is-dragging');
+            this._removeDragPreview();
+        });
+
+        tabEl.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const dragging = tabEl.closest('.workspace-tabs-container')?.querySelector('.is-dragging');
+            if (dragging && dragging !== tabEl) {
+                const rect = tabEl.getBoundingClientRect();
+                const midX = rect.left + rect.width / 2;
+                if (e.clientX < midX) {
+                    tabEl.parentNode.insertBefore(dragging, tabEl);
+                } else {
+                    tabEl.parentNode.insertBefore(dragging, tabEl.nextSibling);
+                }
+            }
+        });
+
+        tabEl.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const container = tabEl.closest('.workspace-tabs-container');
+            if (container) {
+                const tabEls = container.querySelectorAll('.workspace-tab');
+                const newOrder = Array.from(tabEls).map(el => el.dataset.tabId);
+
+                if (this.tabs) {
+                    const tabMap = new Map(this.tabs.map(t => [t.id, t]));
+                    this.tabs = newOrder.map(id => tabMap.get(id)).filter(Boolean);
+                }
+
+                if (this.onTabReorder) {
+                    this.onTabReorder(newOrder);
+                }
+            }
+        });
+
         return tabEl;
+    }
+
+    /**
+     * Create and register a compact drag preview for the browser drag image.
+     * @private
+     */
+    _setDragPreview(event, tab) {
+        this._removeDragPreview();
+
+        const preview = document.createElement('div');
+        preview.className = `workspace-tab-drag-preview${tab.isModified ? ' modified' : ''}`;
+
+        if (tab.isModified) {
+            const indicator = document.createElement('span');
+            indicator.className = 'workspace-tab-modified-indicator';
+            preview.appendChild(indicator);
+        }
+
+        const name = document.createElement('span');
+        name.className = 'workspace-tab-drag-preview-name';
+        name.textContent = tab.name;
+        preview.appendChild(name);
+
+        document.body.appendChild(preview);
+
+        event.dataTransfer.setDragImage(preview, 18, 14);
+        this.dragPreview = preview;
+    }
+
+    /**
+     * Remove any previous drag preview element.
+     * @private
+     */
+    _removeDragPreview() {
+        if (this.dragPreview) {
+            this.dragPreview.remove();
+            this.dragPreview = null;
+        }
     }
 
     /**

@@ -43,6 +43,29 @@ export class EnvironmentSelector {
     }
 
     /**
+     * Build button styles for the active environment.
+     */
+    _applyActiveEnvironmentStyle(environment) {
+        const button = document.getElementById('env-selector-btn');
+        const indicator = this.container?.querySelector('[data-role="active-indicator"]');
+        if (!button || !indicator) {
+            return;
+        }
+
+        const hasColor = Boolean(environment?.color);
+        button.classList.toggle('has-color', hasColor);
+        indicator.classList.toggle('is-hidden', !hasColor);
+
+        if (hasColor) {
+            button.style.setProperty('--env-selected-color', environment.color);
+            indicator.style.setProperty('--env-indicator-color', environment.color);
+        } else {
+            button.style.removeProperty('--env-selected-color');
+            indicator.style.removeProperty('--env-indicator-color');
+        }
+    }
+
+    /**
      * Setup event listeners
      */
     setupEventListeners() {
@@ -100,8 +123,17 @@ export class EnvironmentSelector {
 
                 const nameEl = item.querySelector('[data-role="name"]');
                 const checkEl = item.querySelector('[data-role="check"]');
+                const colorEl = item.querySelector('[data-role="color"]');
                 if (nameEl) {nameEl.textContent = env.name;}
                 if (checkEl) {checkEl.classList.toggle('is-hidden', env.id !== activeEnvId);}
+                if (colorEl) {
+                    colorEl.classList.toggle('is-hidden', !env.color);
+                    if (env.color) {
+                        colorEl.style.setProperty('--env-indicator-color', env.color);
+                    } else {
+                        colorEl.style.removeProperty('--env-indicator-color');
+                    }
+                }
 
                 item.addEventListener('click', async (e) => {
                     e.stopPropagation();
@@ -196,6 +228,7 @@ export class EnvironmentSelector {
         if (nameSpan && environment) {
             nameSpan.textContent = environment.name;
         }
+        this._applyActiveEnvironmentStyle(environment);
     }
 
     /**

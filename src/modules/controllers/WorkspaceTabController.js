@@ -39,6 +39,7 @@ export class WorkspaceTabController {
         this.tabBar.onTabDuplicate = (tabId) => this.duplicateTab(tabId);
         this.tabBar.onCloseOthers = (tabId) => this.closeOtherTabs(tabId);
         this.tabBar.onRunnerTabCreate = () => this.createRunnerTab();
+        this.tabBar.onTabReorder = (orderedTabIds) => this.reorderTabs(orderedTabIds);
 
         // Listen to service changes
         this.service.addListener((event, data) => this._handleServiceEvent(event, data));
@@ -827,6 +828,21 @@ export class WorkspaceTabController {
     _handleServiceEvent(_event, _data) {
         // Can be extended to handle various service events
         // For now, most updates are handled directly in methods
+    }
+
+    /**
+     * Reorders tabs based on an ordered list of tab IDs
+     *
+     * @async
+     * @param {Array<string>} orderedTabIds - Tab IDs in the desired order
+     * @returns {Promise<void>}
+     */
+    async reorderTabs(orderedTabIds) {
+        try {
+            await this.service.reorderTabs(orderedTabIds);
+        } catch (error) {
+            void error;
+        }
     }
 
     /**
