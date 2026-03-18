@@ -62,6 +62,9 @@ if (isTauri) {
             exportOpenApi: (collectionId, format) => invoke('export_openapi', { collectionId, format }),
             exportPostman: (collectionId) => invoke('export_postman', { collectionId })
         },
+        environments: {
+            saveJsonExport: (defaultFileName, content) => invoke('save_json_export', { defaultFileName, content })
+        },
         grpc: {
             listServices: (target, useTls = false) => invoke('grpc_reflection_list_services', { target, useTls }),
             listMethods: (target, serviceName, useTls = false) => invoke('grpc_reflection_list_methods', { target, serviceName, useTls }),

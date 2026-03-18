@@ -3358,9 +3358,36 @@ body {
   transition: all var(--transition-base);
 }
 
+.env-selector-button.has-color {
+  background: color-mix(in srgb, var(--env-selected-color) 18%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--env-selected-color) 45%, var(--border-light));
+}
+
 .env-selector-button:hover {
   background: var(--bg-tertiary);
   border-color: var(--color-primary);
+}
+
+.env-selector-button.has-color:hover {
+  background: color-mix(in srgb, var(--env-selected-color) 24%, var(--bg-tertiary));
+  border-color: color-mix(in srgb, var(--env-selected-color) 55%, var(--border-light));
+}
+
+.env-active-indicator,
+.env-color-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: var(--env-indicator-color, transparent);
+  border: 1px solid color-mix(in srgb, var(--env-indicator-color, transparent) 65%, rgba(0, 0, 0, 0.25));
+}
+
+.env-active-indicator {
+  width: 12px;
+  height: 12px;
+  background: color-mix(in srgb, var(--env-indicator-color, var(--text-tertiary)) 85%, white);
+  border-color: color-mix(in srgb, var(--env-indicator-color, var(--border-light)) 60%, black);
 }
 
 .env-icon {
@@ -3394,6 +3421,9 @@ body {
 }
 
 .env-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   justify-content: space-between;
   font-size: 0.8125rem;
 }
@@ -3441,7 +3471,8 @@ body {
   border-radius: var(--radius-sm);
   cursor: pointer;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 8px;
   align-items: center;
   border: 1px solid transparent;
   transition: all var(--transition-base);
@@ -3478,6 +3509,44 @@ body {
 .env-danger-btn:hover {
   background: var(--color-error-light);
   border-color: var(--color-error);
+}
+
+.env-manager-color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.env-manager-color-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.env-manager-color-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.env-manager-color-input {
+  width: 2.25rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.env-manager-color-value {
+  min-width: 64px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
 }
 
 /* Environment Variable Row */

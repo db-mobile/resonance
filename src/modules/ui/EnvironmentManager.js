@@ -126,6 +126,12 @@ export class EnvironmentManager {
             item.classList.add('is-selected');
         }
 
+        const colorIndicator = document.createElement('span');
+        colorIndicator.className = `env-color-indicator${environment.color ? '' : ' is-hidden'}`;
+        if (environment.color) {
+            colorIndicator.style.setProperty('--env-indicator-color', environment.color);
+        }
+
         const nameSpan = document.createElement('span');
         nameSpan.className = 'env-list-item-name';
         nameSpan.textContent = environment.name;
@@ -137,6 +143,7 @@ export class EnvironmentManager {
             nameSpan.appendChild(badge);
         }
 
+        item.appendChild(colorIndicator);
         item.appendChild(nameSpan);
 
         item.addEventListener('click', () => this.selectEnvironment(environment.id));
@@ -196,6 +203,20 @@ export class EnvironmentManager {
                 nameInput.value = environment.name;
             }
 
+            const colorInput = detailsContainer.querySelector('#env-color-input');
+            const colorValue = detailsContainer.querySelector('#env-color-value');
+            const clearColorBtn = detailsContainer.querySelector('#env-color-clear-btn');
+            if (colorInput) {
+                colorInput.value = environment.color || '#4F46E5';
+                colorInput.dataset.savedColor = environment.color || '';
+            }
+            if (colorValue) {
+                colorValue.textContent = environment.color || 'None';
+            }
+            if (clearColorBtn) {
+                clearColorBtn.disabled = !environment.color;
+            }
+
             // Setup detail event listeners
             this.setupDetailEventListeners(environment);
 
@@ -216,6 +237,9 @@ export class EnvironmentManager {
         const exportBtn = this.dialog.querySelector('#env-export-btn');
         const deleteBtn = this.dialog.querySelector('#env-delete-btn');
         const addVariableBtn = this.dialog.querySelector('#env-add-variable-btn');
+        const colorInput = this.dialog.querySelector('#env-color-input');
+        const colorValue = this.dialog.querySelector('#env-color-value');
+        const clearColorBtn = this.dialog.querySelector('#env-color-clear-btn');
 
         // Name change
         if (nameInput) {
@@ -236,6 +260,64 @@ export class EnvironmentManager {
                 if (e.key === 'Enter') {
                     nameInput.blur();
                 }
+            });
+        }
+
+        const saveColor = async (nextColor) => {
+            try {
+                const color = nextColor || null;
+                await this.service.updateEnvironment(environment.id, { color });
+                if (colorInput) {
+                    colorInput.dataset.savedColor = color || '';
+                }
+                await this.loadEnvironments();
+                await this.loadEnvironmentDetails(environment.id);
+            } catch (error) {
+                this.showAlert(error.message);
+                if (colorInput) {
+                    colorInput.value = environment.color || '#4F46E5';
+                }
+                if (colorValue) {
+                    colorValue.textContent = environment.color || 'None';
+                }
+                if (clearColorBtn) {
+                    clearColorBtn.disabled = !environment.color;
+                }
+            }
+        };
+
+        if (colorInput) {
+            colorInput.addEventListener('input', () => {
+                if (colorValue) {
+                    colorValue.textContent = colorInput.value.toUpperCase();
+                }
+                if (clearColorBtn) {
+                    clearColorBtn.disabled = false;
+                }
+            });
+
+            colorInput.addEventListener('change', async () => {
+                const nextColor = colorInput.value.toUpperCase();
+                if (nextColor !== (colorInput.dataset.savedColor || '')) {
+                    await saveColor(nextColor);
+                }
+            });
+        }
+
+        if (clearColorBtn) {
+            clearColorBtn.addEventListener('click', async () => {
+                if (!environment.color) {
+                    return;
+                }
+
+                if (colorInput) {
+                    colorInput.value = '#4F46E5';
+                }
+                if (colorValue) {
+                    colorValue.textContent = 'None';
+                }
+                clearColorBtn.disabled = true;
+                await saveColor(null);
             });
         }
 
@@ -271,13 +353,11 @@ export class EnvironmentManager {
                 try {
                     const data = await this.service.exportEnvironment(environment.id);
                     const json = JSON.stringify(data, null, 2);
-                    const blob = new Blob([json], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `${environment.name.replace(/[^a-z0-9]/gi, '_')}_environment.json`;
-                    a.click();
-                    URL.revokeObjectURL(url);
+                    const filename = `${environment.name.replace(/[^a-z0-9]/gi, '_')}_environment.json`;
+                    await this.saveJsonExport(
+                        filename,
+                        json
+                    );
                 } catch (error) {
                     this.showAlert(error.message);
                 }
@@ -639,16 +719,28 @@ export class EnvironmentManager {
         try {
             const data = await this.service.exportAllEnvironments();
             const json = JSON.stringify(data, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `resonance_environments_${Date.now()}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
+            await this.saveJsonExport(
+                `resonance_environments_${Date.now()}.json`,
+                json
+            );
         } catch (error) {
             this.showAlert(error.message);
         }
+    }
+
+    /**
+     * Save JSON through the native backend when available.
+     */
+    async saveJsonExport(filename, json) {
+        if (window.backendAPI?.environments?.saveJsonExport) {
+            const result = await window.backendAPI.environments.saveJsonExport(filename, json);
+            if (result?.cancelled) {
+                return false;
+            }
+            return true;
+        }
+
+        throw new Error('Native export is not available in this runtime');
     }
 
     /**

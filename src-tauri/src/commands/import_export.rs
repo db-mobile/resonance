@@ -1363,6 +1363,46 @@ pub async fn export_postman(app: AppHandle, collection_id: String) -> Result<Val
     }))
 }
 
+#[tauri::command]
+pub async fn save_json_export(
+    app: AppHandle,
+    default_file_name: String,
+    content: String,
+) -> Result<Value, String> {
+    let (tx, rx) = oneshot::channel::<Option<FilePath>>();
+
+    let mut dialog = app
+        .dialog()
+        .file()
+        .set_file_name(default_file_name)
+        .add_filter("JSON Files", &["json"]);
+
+    if let Some(last_dir) = get_last_import_directory(&app) {
+        dialog = dialog.set_directory(last_dir);
+    }
+
+    dialog.save_file(move |file_path| {
+        let _ = tx.send(file_path);
+    });
+
+    let file_path = rx.await.map_err(|e| format!("Dialog error: {}", e))?;
+
+    let Some(path) = file_path else {
+        return Ok(serde_json::json!({ "success": false, "cancelled": true }));
+    };
+
+    let file_path = path.as_path().ok_or("Invalid file path")?;
+
+    save_last_import_directory(&app, file_path);
+
+    std::fs::write(file_path, content).map_err(|e| format!("Failed to write file: {}", e))?;
+
+    Ok(serde_json::json!({
+        "success": true,
+        "filePath": file_path.to_string_lossy()
+    }))
+}
+
 fn collection_to_openapi(collection: &Collection) -> (Value, Vec<String>) {
     let mut paths: HashMap<String, HashMap<String, Value>> = HashMap::new();
     let mut skipped: Vec<String> = Vec::new();

@@ -267,15 +267,10 @@ export class EnvironmentController {
     async exportEnvironment(environmentId) {
         const data = await this.service.exportEnvironment(environmentId);
         const json = JSON.stringify(data, null, 2);
-
-        // Create blob and download
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${data.name.replace(/[^a-z0-9]/gi, '_')}_environment.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+        await this._saveJsonExport(
+            `${data.name.replace(/[^a-z0-9]/gi, '_')}_environment.json`,
+            json
+        );
 
         return true;
     }
@@ -290,15 +285,30 @@ export class EnvironmentController {
     async exportAllEnvironments() {
         const data = await this.service.exportAllEnvironments();
         const json = JSON.stringify(data, null, 2);
+        await this._saveJsonExport(
+            `resonance_environments_${Date.now()}.json`,
+            json
+        );
 
-        // Create blob and download
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `resonance_environments_${Date.now()}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+        return true;
+    }
+
+    /**
+     * Save JSON through the native backend when available.
+     *
+     * @private
+     * @param {string} filename
+     * @param {string} json
+     */
+    async _saveJsonExport(filename, json) {
+        if (!window.backendAPI?.environments?.saveJsonExport) {
+            throw new Error('Native export is not available in this runtime');
+        }
+
+        const result = await window.backendAPI.environments.saveJsonExport(filename, json);
+        if (result?.cancelled) {
+            return false;
+        }
 
         return true;
     }
