@@ -96,6 +96,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.4.3" date="2026-03-18">
+      <description>
+        <p>UI improvements</p>
+        <ul>
+          <li>Reorderable workspace tabs</li>
+          <li>Color indicator for environments</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.4.2" date="2026-03-10">
       <description>
         <p>Feature stabilization</p>
