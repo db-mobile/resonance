@@ -247,6 +247,21 @@ export class WorkspaceTabRepository {
     }
 
     /**
+     * Reorders tabs based on an ordered list of tab IDs
+     *
+     * @async
+     * @param {Array<string>} orderedTabIds - Tab IDs in the desired order
+     * @returns {Promise<void>}
+     * @throws {Error} If save fails
+     */
+    async reorderTabs(orderedTabIds) {
+        const tabs = await this.getTabs();
+        const tabMap = new Map(tabs.map(t => [t.id, t]));
+        const reordered = orderedTabIds.map(id => tabMap.get(id)).filter(Boolean);
+        await this.saveTabs(reordered);
+    }
+
+    /**
      * Creates a default workspace tab
      *
      * Provides initial structure for new tabs with empty request/response data.
