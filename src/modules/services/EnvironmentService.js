@@ -168,7 +168,8 @@ export class EnvironmentService {
             this._notifyListeners({
                 type: 'environment-switched',
                 environmentId: environmentId,
-                environmentName: environment.name
+                environmentName: environment.name,
+                environmentColor: environment.color ?? null
             });
 
             return environment;

@@ -34,6 +34,7 @@ import { EnvironmentRepository } from './modules/storage/EnvironmentRepository.j
 import { EnvironmentService } from './modules/services/EnvironmentService.js';
 import { EnvironmentManager } from './modules/ui/EnvironmentManager.js';
 import { EnvironmentSelector } from './modules/ui/EnvironmentSelector.js';
+import { StatusBar } from './modules/ui/StatusBar.js';
 import { ContextMenu } from './modules/ui/ContextMenu.js';
 import { ProxyController } from './modules/controllers/ProxyController.js';
 import { ProxyRepository } from './modules/storage/ProxyRepository.js';
@@ -584,6 +585,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initialize environment controller and load active environment
     await environmentController.initialize();
+
+    // Initialize status bar
+    const statusBar = new StatusBar(environmentService);
+    statusBar.initialize();
 
     // Initialize history controller
     await historyController.init();

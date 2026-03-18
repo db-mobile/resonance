@@ -10,33 +10,45 @@
 <body>
     <!-- Main Layout -->
     <div class="main-layout">
+
+        <!-- App Body -->
+        <div class="app-body">
+
+        <!-- Activity Bar -->
+        <div class="activity-bar" role="navigation" aria-label="Main Navigation">
+            <div class="activity-bar-group">
+                <button id="keyboard-shortcuts-btn" class="activity-bar-btn" title="Keyboard Shortcuts (Ctrl+/)">
+                    <span class="icon icon-18 icon-keyboard"></span>
+                </button>
+                <button id="history-toggle-btn" class="activity-bar-btn"
+                        data-i18n-title="sidebar.history" data-i18n-aria="sidebar.history" title="History">
+                    <span class="icon icon-18 icon-clock"></span>
+                </button>
+                <button id="mock-server-btn" class="activity-bar-btn"
+                        data-i18n-title="toolbar.mockServer" data-i18n-aria="toolbar.mockServer" title="Mock Server">
+                    <span class="icon icon-18 icon-mock-server"></span>
+                </button>
+                <button id="runner-btn" class="activity-bar-btn"
+                        data-i18n-title="runner.title" data-i18n-aria="runner.title" title="Collection Runner">
+                    <span class="icon icon-18 icon-play"></span>
+                </button>
+                <button id="import-collection-btn" class="activity-bar-btn"
+                        data-i18n-title="sidebar.import" data-i18n-aria="sidebar.import" title="Import Collection">
+                    <span class="icon icon-18 icon-import"></span>
+                </button>
+            </div>
+            <div class="activity-bar-divider"></div>
+            <div class="activity-bar-spacer"></div>
+            <div class="activity-bar-group">
+                <button id="settings-btn" class="activity-bar-btn"
+                        data-i18n-title="header.settings" data-i18n-aria="header.settings" title="Settings">
+                    <span class="icon icon-18 icon-gear"></span>
+                </button>
+            </div>
+        </div>
+
         <!-- Collections Sidebar -->
         <aside class="collections-sidebar" role="complementary">
-            <div class="sidebar-header u-flex u-items-center u-justify-between">
-<div class="sidebar-actions u-flex u-items-center">
-                    <button id="keyboard-shortcuts-btn" class="btn btn-icon" title="Keyboard Shortcuts (Ctrl+/)">
-                        <span class="icon icon-16 icon-keyboard"></span>
-                    </button>
-                    <button id="history-toggle-btn" class="btn btn-icon" data-i18n-title="sidebar.history" data-i18n-aria="sidebar.history" title="History">
-                        <span class="icon icon-16 icon-clock"></span>
-                    </button>
-                    <button id="settings-btn" class="btn btn-icon" data-i18n-title="header.settings" data-i18n-aria="header.settings">
-                        <span class="icon icon-16 icon-gear"></span>
-                    </button>
-                    <button id="mock-server-btn" class="btn btn-icon" data-i18n-title="toolbar.mockServer" data-i18n-aria="toolbar.mockServer" title="Mock Server">
-                        <span class="icon icon-16 icon-mock-server"></span>
-                    </button>
-                    <button id="runner-btn" class="btn btn-icon" data-i18n-title="runner.title" data-i18n-aria="runner.title" title="Collection Runner">
-                        <span class="icon icon-16 icon-play"></span>
-                    </button>
-                    <button id="import-collection-btn" class="btn-sm btn-primary"
-                            data-i18n-title="sidebar.import"
-                            data-i18n-aria="sidebar.import"
-                            data-i18n="sidebar.import">
-                        Import
-                    </button>
-                </div>
-            </div>
 
             <!-- Environment Selector -->
             <div class="environment-section">
@@ -610,6 +622,22 @@
                 </div>
             </div>
         </aside>
+
+        </div><!-- /.app-body -->
+
+        <!-- Status Bar -->
+        <div class="status-bar" id="status-bar-container">
+            <div class="status-bar-left">
+                <span class="status-bar-item" id="status-bar-env">
+                    <span id="status-bar-env-dot" class="status-bar-env-dot"></span>
+                    <span class="icon icon-14 icon-globe"></span>
+                    <span id="status-bar-env-name">No Environment</span>
+                </span>
+            </div>
+            <div class="status-bar-right">
+                <span class="status-bar-version" id="status-bar-version"></span>
+            </div>
+        </div>
     </div>
 
     <script type="module" src="./src/renderer.js"></script>

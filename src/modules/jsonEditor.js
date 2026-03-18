@@ -9,7 +9,7 @@ import { json } from '@codemirror/lang-json';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
-import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
+import { isDarkMode, darkHighlighting } from './editorTheme.js';
 
 // Light theme syntax highlighting style for JSON
 const lightHighlightStyle = HighlightStyle.define([
@@ -21,21 +21,6 @@ const lightHighlightStyle = HighlightStyle.define([
     { tag: tags.punctuation, color: '#0f172a' },
     { tag: tags.bracket, color: '#0f172a' },
 ]);
-
-/**
- * Detect if dark mode is active
- * @returns {boolean}
- */
-function isDarkMode() {
-    const theme = document.documentElement.getAttribute('data-theme');
-    if (theme === 'dark' || theme === 'black') {
-        return true;
-    }
-    if (theme === 'system') {
-        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return false;
-}
 
 /**
  * JSONEditor - CodeMirror editor for editable JSON content
@@ -90,15 +75,9 @@ export class JSONEditor {
         });
 
         if (isDarkMode()) {
-            return [
-                syntaxHighlighting(oneDarkHighlightStyle),
-                baseTheme
-            ];
+            return [darkHighlighting, baseTheme];
         }
-        return [
-            syntaxHighlighting(lightHighlightStyle),
-            baseTheme
-        ];
+        return [syntaxHighlighting(lightHighlightStyle), baseTheme];
     }
 
     /**

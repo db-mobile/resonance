@@ -4,23 +4,23 @@
  */
 :root {
   /* Text Colors */
-  --text-primary: #f0f0f0;
-  --text-secondary: #b8b8b8;
-  --text-tertiary: #8a8a8a;
+  --text-primary: #f4f4f5;
+  --text-secondary: #c4c4cc;
+  --text-tertiary: #8e8e96;
   --text-disabled: #5c5c5c;
   --text-inverse: #1a1a1a;
 
   /* Background Colors - Improved Dark */
-  --bg-primary: #1e1e1e;
-  --bg-secondary: #282828;
-  --bg-tertiary: #323232;
+  --bg-primary: #0a0a0b;
+  --bg-secondary: #141416;
+  --bg-tertiary: #1c1c1f;
   --bg-overlay: rgba(30, 30, 30, 0.95);
   --bg-glass: rgba(30, 30, 30, 0.85);
   --bg-glass-strong: rgba(30, 30, 30, 0.92);
 
   /* Border Colors - More Visible */
-  --border-light: #3a3a3a;
-  --border-medium: #4a4a4a;
+  --border-light: #2a2a2e;
+  --border-medium: #3a3a3e;
   --border-strong: #606060;
   --border-focus: var(--accent, #10b981);
   --border-glass: rgba(58, 58, 58, 0.6);
@@ -61,4 +61,6 @@
   --scrollbar-track-bg: var(--bg-secondary);
   --focus-shadow-opacity: 0.2;
   --status-redirect-text: #fbbf24;
+  --activity-bar-bg: #0f0f11;
+  --bg-white: #18181b;
 }

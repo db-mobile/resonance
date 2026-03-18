@@ -5,7 +5,7 @@ import { xml } from '@codemirror/lang-xml';
 import { html } from '@codemirror/lang-html';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
-import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
+import { isDarkMode, darkHighlighting } from './editorTheme.js';
 
 // Light theme syntax highlighting style
 const lightHighlightStyle = HighlightStyle.define([
@@ -24,21 +24,6 @@ const lightHighlightStyle = HighlightStyle.define([
     { tag: tags.attributeName, color: '#6d28d9' },
     { tag: tags.attributeValue, color: '#1e3a8a' },
 ]);
-
-/**
- * Detect if dark mode is active
- * @returns {boolean}
- */
-function isDarkMode() {
-    const theme = document.documentElement.getAttribute('data-theme');
-    if (theme === 'dark' || theme === 'black') {
-        return true;
-    }
-    if (theme === 'system') {
-        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return false;
-}
 
 /**
  * ResponseEditor - Manages CodeMirror editor for response display
@@ -97,15 +82,9 @@ export class ResponseEditor {
         });
 
         if (isDarkMode()) {
-            return [
-                syntaxHighlighting(oneDarkHighlightStyle),
-                baseTheme
-            ];
+            return [darkHighlighting, baseTheme];
         }
-        return [
-            syntaxHighlighting(lightHighlightStyle),
-            baseTheme
-        ];
+        return [syntaxHighlighting(lightHighlightStyle), baseTheme];
     }
 
     /**
