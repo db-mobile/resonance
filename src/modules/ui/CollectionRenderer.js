@@ -47,6 +47,15 @@ export class CollectionRenderer {
         this.container.appendChild(fragment);
     }
 
+    renderSearchEmptyState() {
+        const fragment = templateLoader.cloneSync(
+            './src/templates/collections/collectionRenderer.html',
+            'tpl-collections-search-empty'
+        );
+        this.container.innerHTML = '';
+        this.container.appendChild(fragment);
+    }
+
     /**
      * Renders collections list with folders and endpoints
      *
@@ -61,16 +70,23 @@ export class CollectionRenderer {
      * @param {Function} [eventHandlers.onContextMenu] - Called on collection right-click
      * @param {Function} [eventHandlers.onEmptySpaceContextMenu] - Called on empty area right-click
      * @param {boolean} [preserveExpansionState=false] - Whether to preserve current expansion state
+     * @param {Object} [options={}] - Render options
+     * @param {boolean} [options.showSearchEmptyState=false] - Show empty search state instead of import state
+     * @param {boolean} [options.forceExpandAll=false] - Expand all visible collections and folders
      * @returns {Promise<void>}
      */
-    async renderCollections(collections, eventHandlers = {}, preserveExpansionState = false) {
+    async renderCollections(collections, eventHandlers = {}, preserveExpansionState = false, options = {}) {
         if (this.emptySpaceContextMenuHandler) {
             this.container.removeEventListener('contextmenu', this.emptySpaceContextMenuHandler);
             this.emptySpaceContextMenuHandler = null;
         }
 
         if (collections.length === 0) {
-            this.renderEmptyState();
+            if (options.showSearchEmptyState) {
+                this.renderSearchEmptyState();
+            } else {
+                this.renderEmptyState();
+            }
             if (window.i18n && window.i18n.updateUI) {
                 window.i18n.updateUI();
             }
@@ -113,7 +129,9 @@ export class CollectionRenderer {
             this.container.addEventListener('contextmenu', this.emptySpaceContextMenuHandler);
         }
 
-        if (preserveExpansionState) {
+        if (options.expandSearchResults) {
+            this.expandSearchResults(collections);
+        } else if (preserveExpansionState) {
             this.restoreExpansionState(expansionState);
         } else {
             await this.loadAndRestoreExpansionState();
@@ -126,6 +144,26 @@ export class CollectionRenderer {
         if (window.i18n && window.i18n.updateUI) {
             window.i18n.updateUI();
         }
+    }
+
+    expandSearchResults(collections) {
+        collections.forEach(collection => {
+            if (collection.__searchExpand) {
+                const collectionElement = this.container.querySelector(`.collection-item[data-collection-id="${collection.id}"]`);
+                collectionElement?.classList.add('expanded');
+            }
+
+            (collection.folders || []).forEach(folder => {
+                if (!folder.__searchExpand) {
+                    return;
+                }
+
+                const folderElement = this.container.querySelector(
+                    `.collection-item[data-collection-id="${collection.id}"] .folder-item[data-folder-id="${folder.id}"]`
+                );
+                folderElement?.classList.add('expanded');
+            });
+        });
     }
 
     /**

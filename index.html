@@ -54,6 +54,21 @@
             <div class="environment-section">
                 <div id="environment-selector-container"></div>
             </div>
+
+            <div class="sidebar-header collections-sidebar-header u-flex u-flex-col">
+                <h2 class="sidebar-title" data-i18n="sidebar.collections">Collections</h2>
+                <div class="collections-search">
+                    <div class="search-input-wrap">
+                        <span class="search-input-icon icon icon-16 icon-search" aria-hidden="true"></span>
+                        <input type="text"
+                               id="collections-search-input"
+                               class="input-base form-input compact search-input"
+                               placeholder="Search collections..."
+                               data-i18n-placeholder="sidebar.collections_search_placeholder"
+                               aria-label="Search collections">
+                    </div>
+                </div>
+            </div>
             
             <div class="collections-container u-flex u-flex-col">
                 <div id="collections-list" class="collections-list u-flex u-flex-col">
@@ -604,12 +619,15 @@
             </div>
 
             <div class="history-search">
-                <input type="text"
-                       id="history-search-input"
-                       class="input-base form-input compact"
-                       placeholder="Search history..."
-                       data-i18n-placeholder="history.search_placeholder"
-                       aria-label="Search history">
+                <div class="search-input-wrap">
+                    <span class="search-input-icon icon icon-16 icon-search" aria-hidden="true"></span>
+                    <input type="text"
+                           id="history-search-input"
+                           class="input-base form-input compact search-input"
+                           placeholder="Search history..."
+                           data-i18n-placeholder="history.search_placeholder"
+                           aria-label="Search history">
+                </div>
             </div>
 
             <div class="history-container">

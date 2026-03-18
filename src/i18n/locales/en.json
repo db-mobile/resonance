@@ -11,11 +11,16 @@
   },
   "sidebar": {
     "collections": "Collections",
+    "collections_search_placeholder": "Search collections...",
     "history": "History",
     "import": "Import",
     "empty": {
       "title": "No collections imported yet",
       "subtitle": "Import an OpenAPI or Postman collection to get started"
+    },
+    "search_empty": {
+      "title": "No matching collections",
+      "subtitle": "Try a different collection or request name"
     }
   },
   "import": {

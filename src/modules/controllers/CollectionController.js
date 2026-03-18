@@ -52,6 +52,9 @@ export class CollectionController {
         this.confirmDialog = new ConfirmDialog();
         this.variableManager = new VariableManager();
         this.curlImportDialog = new CurlImportDialog();
+        this.collectionsSearchInput = document.getElementById('collections-search-input');
+        this.allCollections = [];
+        this.searchQuery = '';
         
         this.handleEndpointClick = this.handleEndpointClick.bind(this);
         this.handleContextMenu = this.handleContextMenu.bind(this);
@@ -67,6 +70,9 @@ export class CollectionController {
         this.handleExportOpenApiJson = this.handleExportOpenApiJson.bind(this);
         this.handleExportOpenApiYaml = this.handleExportOpenApiYaml.bind(this);
         this.handleImportCurl = this.handleImportCurl.bind(this);
+        this.handleCollectionsSearch = this.handleCollectionsSearch.bind(this);
+
+        this.initializeCollectionsSearch();
     }
 
     /**
@@ -77,9 +83,9 @@ export class CollectionController {
      */
     async loadCollections() {
         try {
-            const collections = await this.service.loadCollections();
-            await this.renderCollections(collections);
-            return collections;
+            this.allCollections = await this.service.loadCollections();
+            await this.renderCollections(this.allCollections);
+            return this.allCollections;
         } catch (error) {
             return [];
         }
@@ -93,9 +99,9 @@ export class CollectionController {
      */
     async loadCollectionsWithExpansionState() {
         try {
-            const collections = await this.service.loadCollections();
-            await this.renderCollections(collections, true); // Preserve expansion state
-            return collections;
+            this.allCollections = await this.service.loadCollections();
+            await this.renderCollections(this.allCollections, true); // Preserve expansion state
+            return this.allCollections;
         } catch (error) {
             return [];
         }
@@ -110,6 +116,8 @@ export class CollectionController {
      * @returns {Promise<void>}
      */
     async renderCollections(collections, preserveExpansionState = false) {
+        const filteredCollections = this.filterCollections(collections, this.searchQuery);
+        const isSearching = this.searchQuery.length > 0;
         const eventHandlers = {
             onEndpointClick: this.handleEndpointClick,
             onContextMenu: this.handleContextMenu,
@@ -117,7 +125,89 @@ export class CollectionController {
             onEmptySpaceContextMenu: this.handleEmptySpaceContextMenu
         };
 
-        await this.renderer.renderCollections(collections, eventHandlers, preserveExpansionState);
+        await this.renderer.renderCollections(filteredCollections, eventHandlers, preserveExpansionState && !isSearching, {
+            showSearchEmptyState: isSearching && this.allCollections.length > 0,
+            expandSearchResults: isSearching
+        });
+    }
+
+    initializeCollectionsSearch() {
+        if (!this.collectionsSearchInput) {
+            return;
+        }
+
+        this.collectionsSearchInput.addEventListener('input', this.handleCollectionsSearch);
+    }
+
+    async handleCollectionsSearch() {
+        this.searchQuery = this.collectionsSearchInput.value.trim().toLowerCase();
+        await this.renderCollections(this.allCollections, true);
+    }
+
+    filterCollections(collections, query) {
+        if (!query) {
+            return collections;
+        }
+
+        return collections.reduce((filteredCollections, collection) => {
+            const filteredCollection = { ...collection };
+            const hasCollectionNameMatch = this.matchesSearchQuery(collection.name, query);
+            let hasNestedRequestMatch = false;
+
+            if (Array.isArray(collection.folders) && collection.folders.length > 0) {
+                filteredCollection.folders = collection.folders.reduce((filteredFolders, folder) => {
+                    const matchingEndpoints = (folder.endpoints || []).filter(endpoint => this.endpointMatchesQuery(endpoint, query));
+                    const hasFolderNameMatch = this.matchesSearchQuery(folder.name, query);
+
+                    if (hasFolderNameMatch) {
+                        filteredFolders.push({
+                            ...folder,
+                            __searchExpand: matchingEndpoints.length > 0
+                        });
+                    } else if (matchingEndpoints.length > 0) {
+                        filteredFolders.push({
+                            ...folder,
+                            endpoints: matchingEndpoints,
+                            __searchExpand: true
+                        });
+                        hasNestedRequestMatch = true;
+                    }
+
+                    if (matchingEndpoints.length > 0) {
+                        hasNestedRequestMatch = true;
+                    }
+
+                    return filteredFolders;
+                }, []);
+            } else {
+                filteredCollection.endpoints = (collection.endpoints || []).filter(endpoint => this.endpointMatchesQuery(endpoint, query));
+                hasNestedRequestMatch = filteredCollection.endpoints.length > 0;
+            }
+
+            const hasMatchingFolders = Array.isArray(filteredCollection.folders) && filteredCollection.folders.length > 0;
+            const hasMatchingEndpoints = Array.isArray(filteredCollection.endpoints) && filteredCollection.endpoints.length > 0;
+
+            if (hasCollectionNameMatch || hasMatchingFolders || hasMatchingEndpoints) {
+                filteredCollection.__searchExpand = hasNestedRequestMatch;
+                filteredCollections.push(filteredCollection);
+            }
+
+            return filteredCollections;
+        }, []);
+    }
+
+    endpointMatchesQuery(endpoint, query) {
+        return [
+            endpoint.name,
+            endpoint.path,
+            endpoint.method,
+            endpoint.summary,
+            endpoint.description
+        ].some(value => this.matchesSearchQuery(value, query));
+    }
+
+    matchesSearchQuery(value, query) {
+        return typeof value === 'string' && value.toLowerCase().includes(query);
     }
 
     /**
