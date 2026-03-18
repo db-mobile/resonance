@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Resonance Mock Server Documentation - Serve OpenAPI-backed mock responses locally">
+    <meta name="keywords" content="API client, mock server, OpenAPI, local testing, documentation">
+    <meta name="author" content="Dennis Blümer">
+    <title>Mock Server - Resonance</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="logo">
+                <a href="index.html" style="display: flex; align-items: center; gap: 0.75rem; text-decoration: none; color: inherit;">
+                    <img src="assets/icons/icon.svg" alt="Resonance Logo" class="logo-img">
+                    <span class="logo-text">Resonance</span>
+                </a>
+            </div>
+            <ul class="nav-links">
+                <li><a href="index.html#features">Features</a></li>
+                <li><a href="index.html#screenshots">Screenshots</a></li>
+                <li><a href="index.html#download">Download</a></li>
+                <li><a href="https://github.com/db-mobile/resonance" target="_blank">GitHub</a></li>
+                <li><a href="documentation.html">Documentation</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="documentation">
+            <div class="container">
+                <div class="doc-layout">
+                    <aside class="doc-nav">
+                        <h3>Documentation</h3>
+                        <ul class="doc-nav-list">
+                            <li><a href="documentation.html">Getting Started</a></li>
+                            <li><a href="scripts.html">Using Scripts</a></li>
+                            <li><a href="mock-server.html" class="active">Mock Server</a></li>
+                        </ul>
+                    </aside>
+
+                    <div class="doc-main">
+                        <h2>Mock Server</h2>
+
+                        <div class="doc-section">
+                            <div class="doc-content">
+                                <p>Resonance includes a built-in mock server for testing clients before a backend is ready. It can serve OpenAPI-derived responses locally, let you override payloads per endpoint, and record incoming requests while you iterate.</p>
+
+                                <h4>What It Does</h4>
+                                <ul class="doc-list">
+                                    <li>Serve mock responses from imported OpenAPI collections</li>
+                                    <li>Enable or disable collections individually</li>
+                                    <li>Override generated responses with custom bodies</li>
+                                    <li>Add per-endpoint delays to simulate slower services</li>
+                                    <li>Inspect incoming requests in a live request log</li>
+                                </ul>
+
+                                <h4>Before You Start</h4>
+                                <ol class="doc-list">
+                                    <li>Import an OpenAPI 3.0 specification into Resonance</li>
+                                    <li>Confirm the imported collection contains the endpoints you want to mock</li>
+                                    <li>Decide which local port the mock server should listen on</li>
+                                </ol>
+
+                                <h4>Starting the Mock Server</h4>
+                                <ol class="doc-list">
+                                    <li>Open Resonance and click the <strong>Mock Server</strong> action in the toolbar</li>
+                                    <li>Choose the port to bind, such as <code>3000</code></li>
+                                    <li>Select the collections you want to expose through the mock server</li>
+                                    <li>Review generated routes and response settings</li>
+                                    <li>Click <strong>Start Server</strong></li>
+                                    <li>Point your client or frontend to <code>http://localhost:&lt;port&gt;</code></li>
+                                </ol>
+
+                                <h4>How Responses Are Generated</h4>
+                                <p>When a route is backed by an imported OpenAPI definition, Resonance uses the available schema information to build mock responses. That makes it useful for early frontend integration and request/response contract validation.</p>
+                                <ul class="doc-list">
+                                    <li>Defined paths and methods become mockable routes</li>
+                                    <li>Schema-backed examples are generated from the specification when possible</li>
+                                    <li>Status codes and content types follow the configured mock response</li>
+                                    <li>Custom overrides take precedence over generated defaults</li>
+                                </ul>
+
+                                <h4>Customizing Endpoints</h4>
+                                <ol class="doc-list">
+                                    <li>Select a mocked endpoint from the mock server dialog</li>
+                                    <li>Adjust the response status if needed</li>
+                                    <li>Provide a custom JSON response body to replace the generated payload</li>
+                                    <li>Set an artificial delay to simulate network or backend latency</li>
+                                    <li>Save the endpoint configuration before restarting or refreshing the server</li>
+                                </ol>
+
+                                <h4>Testing Against the Mock Server</h4>
+                                <p>Once the server is running, use the mock base URL exactly as you would a real API.</p>
+                                <pre><code>GET http://localhost:3000/users
+POST http://localhost:3000/orders
+Authorization: Bearer {{token}}</code></pre>
+                                <ul class="doc-list">
+                                    <li>Use environments to switch between real and mocked base URLs</li>
+                                    <li>Pair the mock server with scripts to chain test data between requests</li>
+                                    <li>Use artificial delays to verify loading and retry states in your client</li>
+                                </ul>
+
+                                <h4>Request Log and Inspection</h4>
+                                <p>The request log helps verify that your application is calling the expected routes with the expected payloads.</p>
+                                <ul class="doc-list">
+                                    <li>Inspect incoming methods, URLs, and timestamps</li>
+                                    <li>Confirm query parameters and request bodies match your expectations</li>
+                                    <li>Use the log to spot missing headers, incorrect paths, or repeated calls</li>
+                                </ul>
+
+                                <h4>Typical Workflow</h4>
+                                <ol class="doc-list">
+                                    <li>Import an OpenAPI collection</li>
+                                    <li>Start the mock server on a local port</li>
+                                    <li>Switch your active environment to a mock base URL such as <code>http://localhost:3000</code></li>
+                                    <li>Run your frontend, tests, or external client against the mocked routes</li>
+                                    <li>Refine custom responses and delays until the behavior matches your scenario</li>
+                                </ol>
+
+                                <h4>Troubleshooting</h4>
+
+                                <h5>Server will not start</h5>
+                                <ul class="doc-list">
+                                    <li>Check whether another process is already using the configured port</li>
+                                    <li>Try a different local port and restart the mock server</li>
+                                    <li>Confirm at least one collection is enabled for mocking</li>
+                                </ul>
+
+                                <h5>Route returns an unexpected response</h5>
+                                <ul class="doc-list">
+                                    <li>Verify the OpenAPI operation exists for the method and path you are calling</li>
+                                    <li>Check whether a custom override is replacing the generated response</li>
+                                    <li>Review the selected status code and response body in the endpoint configuration</li>
+                                </ul>
+
+                                <h5>Client cannot connect</h5>
+                                <ul class="doc-list">
+                                    <li>Confirm the client is targeting <code>localhost</code> with the correct port</li>
+                                    <li>Verify the server is still running in Resonance</li>
+                                    <li>Check that local firewall or container networking is not blocking the port</li>
+                                </ul>
+
+                                <h4>Next Steps</h4>
+                                <ul class="doc-list">
+                                    <li>Return to <a href="documentation.html">Getting Started</a> for setup and request basics</li>
+                                    <li>Use <a href="scripts.html">Using Scripts</a> to automate flows against mocked endpoints</li>
+                                    <li>See the <a href="index.html#screenshots">Screenshots</a> section for the mock server interface</li>
+                                    <li>Track updates in the <a href="https://github.com/db-mobile/resonance" target="_blank">GitHub repository</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Resonance</h4>
+                    <p>A local-first desktop API client built with Tauri</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Links</h4>
+                    <ul>
+                        <li><a href="https://github.com/db-mobile/resonance" target="_blank">GitHub Repository</a></li>
+                        <li><a href="https://github.com/db-mobile/resonance/releases" target="_blank">Releases</a></li>
+                        <li><a href="https://github.com/db-mobile/resonance/issues" target="_blank">Report Issues</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="documentation.html">Documentation</a></li>
+                        <li><a href="scripts.html">Using Scripts</a></li>
+                        <li><a href="mock-server.html">Mock Server</a></li>
+                        <li><a href="https://github.com/db-mobile/resonance/blob/main/LICENSE" target="_blank">License (MIT)</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 Dennis Blümer. Licensed under MIT License.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
