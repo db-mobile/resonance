@@ -4,23 +4,23 @@
  */
 :root {
   /* Text Colors */
-  --text-primary: #18181b;
-  --text-secondary: #52525b;
-  --text-tertiary: #71717a;
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-tertiary: #6b7280;
   --text-disabled: #d4d4d8;
   --text-inverse: #fafafa;
 
   /* Background Colors - Hoppscotch Light */
-  --bg-primary: #ffffff;
-  --bg-secondary: #fafafa;
-  --bg-tertiary: #f4f4f5;
+  --bg-primary: #f8f9fc;
+  --bg-secondary: #f0f1f5;
+  --bg-tertiary: #e4e6ed;
   --bg-overlay: rgba(255, 255, 255, 0.95);
   --bg-glass: rgba(255, 255, 255, 0.8);
   --bg-glass-strong: rgba(255, 255, 255, 0.9);
 
   /* Border Colors - Subtle */
-  --border-light: #e4e4e7;
-  --border-medium: #d4d4d8;
+  --border-light: #d1d5e0;
+  --border-medium: #c4c8d4;
   --border-strong: #a1a1aa;
   --border-focus: var(--accent, #10b981);
   --border-glass: rgba(228, 228, 231, 0.5);
@@ -61,4 +61,6 @@
   --scrollbar-track-bg: var(--bg-secondary);
   --focus-shadow-opacity: 0.1;
   --status-redirect-text: #b45309;
+  --activity-bar-bg: #e8eaf0;
+  --bg-white: #ffffff;
 }

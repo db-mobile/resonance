@@ -9,7 +9,7 @@ import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { graphql } from 'cm6-graphql';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
-import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
+import { isDarkMode, darkHighlighting } from './editorTheme.js';
 
 // Light theme syntax highlighting style for GraphQL
 const lightHighlightStyle = HighlightStyle.define([
@@ -24,21 +24,6 @@ const lightHighlightStyle = HighlightStyle.define([
     { tag: tags.typeName, color: '#6d28d9' },
     { tag: tags.variableName, color: '#b45309' },
 ]);
-
-/**
- * Detect if dark mode is active
- * @returns {boolean}
- */
-function isDarkMode() {
-    const theme = document.documentElement.getAttribute('data-theme');
-    if (theme === 'dark' || theme === 'black') {
-        return true;
-    }
-    if (theme === 'system') {
-        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return false;
-}
 
 /**
  * GraphQLEditor - CodeMirror editor for GraphQL queries
@@ -93,15 +78,9 @@ export class GraphQLEditor {
         });
 
         if (isDarkMode()) {
-            return [
-                syntaxHighlighting(oneDarkHighlightStyle),
-                baseTheme
-            ];
+            return [darkHighlighting, baseTheme];
         }
-        return [
-            syntaxHighlighting(lightHighlightStyle),
-            baseTheme
-        ];
+        return [syntaxHighlighting(lightHighlightStyle), baseTheme];
     }
 
     /**

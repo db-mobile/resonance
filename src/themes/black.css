@@ -61,4 +61,6 @@
   --scrollbar-track-bg: var(--bg-primary);
   --focus-shadow-opacity: 0.2;
   --status-redirect-text: #fbbf24;
+  --activity-bar-bg: #000000;
+  --bg-white: #0a0a0a;
 }

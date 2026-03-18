@@ -9,7 +9,7 @@ import { javascript } from '@codemirror/lang-javascript';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
-import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
+import { isDarkMode, darkHighlighting } from './editorTheme.js';
 
 // Light theme syntax highlighting style for JavaScript
 const lightHighlightStyle = HighlightStyle.define([
@@ -25,21 +25,6 @@ const lightHighlightStyle = HighlightStyle.define([
     { tag: tags.function(tags.variableName), color: '#1d4ed8' },
     { tag: tags.comment, color: '#6b7280', fontStyle: 'italic' },
 ]);
-
-/**
- * Detect if dark mode is active
- * @returns {boolean}
- */
-function isDarkMode() {
-    const theme = document.documentElement.getAttribute('data-theme');
-    if (theme === 'dark' || theme === 'black') {
-        return true;
-    }
-    if (theme === 'system') {
-        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return false;
-}
 
 /**
  * ScriptEditor - CodeMirror editor for JavaScript code editing
@@ -94,15 +79,9 @@ export class ScriptEditor {
         });
 
         if (isDarkMode()) {
-            return [
-                syntaxHighlighting(oneDarkHighlightStyle),
-                baseTheme
-            ];
+            return [darkHighlighting, baseTheme];
         }
-        return [
-            syntaxHighlighting(lightHighlightStyle),
-            baseTheme
-        ];
+        return [syntaxHighlighting(lightHighlightStyle), baseTheme];
     }
 
     /**

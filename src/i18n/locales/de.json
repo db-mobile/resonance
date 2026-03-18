@@ -11,11 +11,16 @@
   },
   "sidebar": {
     "collections": "Sammlungen",
+    "collections_search_placeholder": "Sammlungen durchsuchen...",
     "history": "Verlauf",
     "import": "Importieren",
     "empty": {
       "title": "Noch keine Sammlungen importiert",
       "subtitle": "Importieren Sie eine OpenAPI- oder Postman-Sammlung zum Starten"
+    },
+    "search_empty": {
+      "title": "Keine passenden Sammlungen",
+      "subtitle": "Versuchen Sie einen anderen Sammlungs- oder Anfragenamen"
     }
   },
   "import": {

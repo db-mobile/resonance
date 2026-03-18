@@ -101,9 +101,7 @@ button:hover {
 .tab-nav,
 .response-tabs,
 .tab-button,
-.response-header,
-.sidebar-header,
-.collection-header {
+.response-header {
   background: var(--nav-bg, var(--bg-primary)) !important;
   color: var(--text-primary) !important;
 }
@@ -207,4 +205,29 @@ label {
 
 *::-webkit-scrollbar-thumb:hover {
   background: var(--border-strong);
+}
+
+/* Activity Bar & Status Bar — exempt from generic button overrides */
+.activity-bar-btn,
+.activity-bar-btn:hover,
+.activity-bar-btn.active {
+  border: none !important;
+}
+.activity-bar-btn {
+  background: transparent !important;
+  color: var(--text-tertiary) !important;
+}
+.activity-bar-btn:hover {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-secondary) !important;
+}
+.activity-bar-btn.active {
+  background: var(--accent-light) !important;
+  color: var(--accent) !important;
+}
+.activity-bar {
+  background: var(--activity-bar-bg) !important;
+}
+.status-bar {
+  background: var(--activity-bar-bg) !important;
 }
