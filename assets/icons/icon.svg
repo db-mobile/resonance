@@ -1,46 +1,56 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Gradient for background shape -->
     <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#094185;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#073364;stop-opacity:1" />
+      <stop offset="0%" stop-color="#094185" />
+      <stop offset="100%" stop-color="#073364" />
     </linearGradient>
-
-    <!-- Gradient for resonance waves -->
     <linearGradient id="waveGradient1" x1="0%" y1="50%" x2="100%" y2="50%">
-      <stop offset="0%" style="stop-color:#f6d32d;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#f9f06b;stop-opacity:1" />
+      <stop offset="0%" stop-color="#f6d32d" />
+      <stop offset="100%" stop-color="#f9f06b" />
     </linearGradient>
-
     <linearGradient id="waveGradient2" x1="0%" y1="50%" x2="100%" y2="50%">
-      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.9" />
-      <stop offset="100%" style="stop-color:#f6f5f4;stop-opacity:0.9" />
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.94" />
+      <stop offset="100%" stop-color="#f6f5f4" stop-opacity="0.9" />
     </linearGradient>
-
     <linearGradient id="waveGradient3" x1="0%" y1="50%" x2="100%" y2="50%">
-      <stop offset="0%" style="stop-color:#99c1f1;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#62a0ea;stop-opacity:1" />
+      <stop offset="0%" stop-color="#99c1f1" />
+      <stop offset="100%" stop-color="#62a0ea" />
     </linearGradient>
-
-    <!-- Gradient for center circle -->
-    <radialGradient id="centerGradient">
-      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#f6f5f4;stop-opacity:1" />
+    <radialGradient id="coreGradient" cx="50%" cy="45%" r="65%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f6f5f4" />
     </radialGradient>
   </defs>
 
-  <!-- Rounded rectangle background with gradient -->
-  <rect x="100" y="100" width="824" height="824" rx="63.384615" fill="url(#bgGradient)"/>
-  
-  <!-- Outer resonance waves (yellow/gold) -->
-  <circle cx="512" cy="512" r="318" fill="none" stroke="url(#waveGradient1)" stroke-width="50" stroke-linecap="round" opacity="0.95" stroke-dasharray="299.70 199.80" stroke-dashoffset="399.60"/>
-  
-  <!-- Middle resonance waves (white) -->
-  <circle cx="512" cy="512" r="232" fill="none" stroke="url(#waveGradient2)" stroke-width="40" stroke-linecap="round" opacity="0.9" stroke-dasharray="218.70 145.80" stroke-dashoffset="291.60" transform="rotate(45 512 512)"/>
-  
-  <!-- Inner resonance waves (light blue) -->
-  <circle cx="512" cy="512" r="152" fill="none" stroke="url(#waveGradient3)" stroke-width="32" stroke-linecap="round" opacity="0.95" stroke-dasharray="143.24 95.49" stroke-dashoffset="190.99"/>
-  
-  <!-- Center circle with gradient -->
-  <circle cx="512" cy="512" r="84" fill="url(#centerGradient)"/>
+  <rect x="100" y="100" width="824" height="824" rx="63.384615" fill="url(#bgGradient)" />
+
+  <g fill="none" stroke-linecap="round" transform="translate(512 512)">
+    <circle
+      r="288"
+      stroke="url(#waveGradient1)"
+      stroke-width="56"
+      stroke-dasharray="1165 645"
+      stroke-dashoffset="235"
+      transform="rotate(-28)"
+    />
+    <circle
+      r="208"
+      stroke="url(#waveGradient2)"
+      stroke-width="48"
+      stroke-dasharray="760 548"
+      stroke-dashoffset="146"
+      transform="rotate(34)"
+    />
+    <circle
+      r="132"
+      stroke="url(#waveGradient3)"
+      stroke-width="40"
+      stroke-dasharray="472 358"
+      stroke-dashoffset="82"
+      transform="rotate(-18)"
+    />
+  </g>
+
+  <circle cx="512" cy="512" r="92" fill="url(#coreGradient)" />
+  <circle cx="512" cy="512" r="22" fill="#073364" fill-opacity="0.12" />
 </svg>
