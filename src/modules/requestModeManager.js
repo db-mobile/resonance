@@ -1,5 +1,5 @@
 /**
- * @fileoverview Manages UI mode switching between HTTP and gRPC requests
+ * @fileoverview Manages UI mode switching between HTTP, WebSocket, and gRPC requests
  * @module modules/requestModeManager
  */
 
@@ -11,6 +11,7 @@ import { setResponseTabsForProtocol } from './tabManager.js';
  */
 export const RequestMode = {
     HTTP: 'http',
+    WEBSOCKET: 'websocket',
     GRPC: 'grpc'
 };
 
@@ -21,10 +22,16 @@ export const RequestMode = {
 let currentMode = RequestMode.HTTP;
 
 /**
- * HTTP-specific tab IDs that should be hidden in gRPC mode
+ * HTTP-only request tab IDs
  * @type {string[]}
  */
-const HTTP_ONLY_TABS = ['path-params', 'query-params', 'headers', 'body'];
+const HTTP_ONLY_TABS = ['path-params'];
+
+/**
+ * Request tab IDs shared by HTTP and WebSocket
+ * @type {string[]}
+ */
+const HTTP_AND_WEBSOCKET_TABS = ['query-params', 'headers', 'body'];
 
 /**
  * gRPC-specific tab IDs that should be hidden in HTTP mode
@@ -61,6 +68,14 @@ export function isGrpcMode() {
 }
 
 /**
+ * Check if current mode is WebSocket
+ * @returns {boolean}
+ */
+export function isWebSocketMode() {
+    return currentMode === RequestMode.WEBSOCKET;
+}
+
+/**
  * Check if current mode is HTTP
  * @returns {boolean}
  */
@@ -70,10 +85,10 @@ export function isHttpMode() {
 
 /**
  * Set the request mode and update UI accordingly
- * @param {string} mode - The mode to set (RequestMode.HTTP or RequestMode.GRPC)
+ * @param {string} mode - The mode to set
  */
 export function setRequestMode(mode) {
-    if (mode !== RequestMode.HTTP && mode !== RequestMode.GRPC) {
+    if (mode !== RequestMode.HTTP && mode !== RequestMode.WEBSOCKET && mode !== RequestMode.GRPC) {
         console.warn(`Invalid request mode: ${mode}, defaulting to HTTP`);
         mode = RequestMode.HTTP;
     }
@@ -92,7 +107,11 @@ export function setRequestMode(mode) {
 function updateUIForMode(mode) {
     const methodSelectContainer = document.querySelector('.method-select-container');
     const urlInput = document.getElementById('url-input');
+    const urlInputContainer = urlInput?.closest('.url-autocomplete-wrapper') || urlInput;
     const curlBtn = document.getElementById('curl-btn');
+    const bodyModeSelect = document.getElementById('body-mode-select');
+    const bodyModeContainer = bodyModeSelect?.closest('.body-mode-selector-container');
+    const bodyTitle = document.querySelector('#body h3');
     
     // Get all request config tab buttons
     const tabButtons = document.querySelectorAll('.request-config .tab-nav .tab-button');
@@ -102,8 +121,8 @@ function updateUIForMode(mode) {
         if (methodSelectContainer) {
             methodSelectContainer.style.display = 'none';
         }
-        if (urlInput) {
-            urlInput.style.display = 'none';
+        if (urlInputContainer) {
+            urlInputContainer.style.display = 'none';
         }
         if (curlBtn) {
             curlBtn.style.display = 'none';
@@ -111,30 +130,87 @@ function updateUIForMode(mode) {
         
         // Show gRPC target input in URL section
         showGrpcUrlSection(true);
+        showWebSocketUrlSection(false);
         
         // Update tab visibility - show gRPC tabs, hide HTTP-only tabs
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
-            if (HTTP_ONLY_TABS.includes(tabId) || HTTP_SHARED_TABS.includes(tabId)) {
+            if (HTTP_ONLY_TABS.includes(tabId) || HTTP_AND_WEBSOCKET_TABS.includes(tabId) || HTTP_SHARED_TABS.includes(tabId)) {
                 btn.style.display = 'none';
             } else if (GRPC_ONLY_TABS.includes(tabId) || SHARED_TABS.includes(tabId)) {
                 btn.style.display = '';
             }
         });
+
+        if (bodyModeSelect) {
+            bodyModeSelect.disabled = false;
+        }
+        if (bodyModeContainer) {
+            bodyModeContainer.style.display = '';
+        }
+        if (bodyTitle) {
+            bodyTitle.textContent = 'Request Body';
+        }
         
         // Activate gRPC tab if current tab is HTTP-only
         const activeTab = document.querySelector('.request-config .tab-nav .tab-button.active');
-        if (!activeTab || HTTP_ONLY_TABS.includes(activeTab.dataset.tab)) {
+        if (!activeTab
+            || HTTP_ONLY_TABS.includes(activeTab.dataset.tab)
+            || HTTP_AND_WEBSOCKET_TABS.includes(activeTab.dataset.tab)
+            || HTTP_SHARED_TABS.includes(activeTab.dataset.tab)) {
             activateTab('grpc');
         }
-        
+    } else if (mode === RequestMode.WEBSOCKET) {
+        if (methodSelectContainer) {
+            methodSelectContainer.style.display = 'none';
+        }
+        if (urlInputContainer) {
+            urlInputContainer.style.display = 'none';
+        }
+        if (curlBtn) {
+            curlBtn.style.display = 'none';
+        }
+
+        showGrpcUrlSection(false);
+        showWebSocketUrlSection(true);
+
+        tabButtons.forEach(btn => {
+            const tabId = btn.dataset.tab;
+            if (HTTP_ONLY_TABS.includes(tabId)
+                || GRPC_ONLY_TABS.includes(tabId)
+                || SHARED_TABS.includes(tabId)
+                || HTTP_SHARED_TABS.includes(tabId)) {
+                btn.style.display = 'none';
+            } else if (HTTP_AND_WEBSOCKET_TABS.includes(tabId)) {
+                btn.style.display = '';
+            }
+        });
+
+        if (bodyModeSelect) {
+            bodyModeSelect.value = 'json';
+            bodyModeSelect.disabled = true;
+        }
+        if (bodyModeContainer) {
+            bodyModeContainer.style.display = 'none';
+        }
+        if (window.graphqlBodyManager) {
+            window.graphqlBodyManager.setGraphQLModeEnabled(false);
+        }
+        if (bodyTitle) {
+            bodyTitle.textContent = 'Message';
+        }
+
+        const activeTab = document.querySelector('.request-config .tab-nav .tab-button.active');
+        if (!activeTab || activeTab.style.display === 'none') {
+            activateTab('body');
+        }
     } else {
         // Show HTTP-specific URL section elements
         if (methodSelectContainer) {
             methodSelectContainer.style.display = '';
         }
-        if (urlInput) {
-            urlInput.style.display = '';
+        if (urlInputContainer) {
+            urlInputContainer.style.display = '';
         }
         if (curlBtn) {
             curlBtn.style.display = '';
@@ -142,16 +218,30 @@ function updateUIForMode(mode) {
         
         // Hide gRPC target input from URL section
         showGrpcUrlSection(false);
+        showWebSocketUrlSection(false);
         
         // Update tab visibility - show HTTP tabs, hide gRPC-only tabs
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
             if (GRPC_ONLY_TABS.includes(tabId)) {
                 btn.style.display = 'none';
-            } else if (HTTP_ONLY_TABS.includes(tabId) || SHARED_TABS.includes(tabId) || HTTP_SHARED_TABS.includes(tabId)) {
+            } else if (HTTP_ONLY_TABS.includes(tabId)
+                || HTTP_AND_WEBSOCKET_TABS.includes(tabId)
+                || SHARED_TABS.includes(tabId)
+                || HTTP_SHARED_TABS.includes(tabId)) {
                 btn.style.display = '';
             }
         });
+
+        if (bodyModeSelect) {
+            bodyModeSelect.disabled = false;
+        }
+        if (bodyModeContainer) {
+            bodyModeContainer.style.display = '';
+        }
+        if (bodyTitle) {
+            bodyTitle.textContent = 'Request Body';
+        }
         
         // Activate path-params tab if current tab is gRPC-only
         const activeTab = document.querySelector('.request-config .tab-nav .tab-button.active');
@@ -191,6 +281,26 @@ function showGrpcUrlSection(show) {
 }
 
 /**
+ * Show or hide the WebSocket URL section elements
+ * @param {boolean} show
+ */
+function showWebSocketUrlSection(show) {
+    let websocketUrlSection = document.getElementById('websocket-url-section');
+
+    if (show) {
+        if (!websocketUrlSection) {
+            websocketUrlSection = createWebSocketUrlSection();
+        }
+        if (websocketUrlSection) {
+            syncWebSocketUrlInput();
+            websocketUrlSection.style.display = 'flex';
+        }
+    } else if (websocketUrlSection) {
+        websocketUrlSection.style.display = 'none';
+    }
+}
+
+/**
  * Create the gRPC URL section elements
  * @returns {HTMLElement}
  */
@@ -208,7 +318,7 @@ function createGrpcUrlSection() {
     
     // gRPC badge
     const badge = document.createElement('span');
-    badge.className = 'grpc-badge';
+    badge.className = 'protocol-url-badge protocol-url-badge-grpc';
     badge.textContent = 'gRPC';
     
     // Target input wrapper
@@ -229,6 +339,10 @@ function createGrpcUrlSection() {
         targetInput.value = existingTarget.value;
         targetInput.addEventListener('input', () => {
             existingTarget.value = targetInput.value;
+            // Mark tab as modified when gRPC target changes
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
         });
         existingTarget.addEventListener('input', () => {
             targetInput.value = existingTarget.value;
@@ -249,6 +363,73 @@ function createGrpcUrlSection() {
     }
     
     return grpcSection;
+}
+
+/**
+ * Create the WebSocket URL section elements
+ * @returns {HTMLElement}
+ */
+function createWebSocketUrlSection() {
+    const requestUrlSection = document.querySelector('.request-url-section');
+    if (!requestUrlSection) {
+        return null;
+    }
+
+    const websocketSection = document.createElement('div');
+    websocketSection.id = 'websocket-url-section';
+    websocketSection.className = 'grpc-url-section';
+    websocketSection.style.display = 'none';
+
+    const badge = document.createElement('span');
+    badge.className = 'protocol-url-badge protocol-url-badge-ws';
+    badge.textContent = 'WS';
+
+    const targetWrapper = document.createElement('div');
+    targetWrapper.className = 'grpc-target-wrapper';
+
+    const existingUrlInput = document.getElementById('url-input');
+    const urlInput = document.createElement('input');
+    urlInput.type = 'url';
+    urlInput.id = 'websocket-url-input';
+    urlInput.className = 'input-base url-input';
+    urlInput.placeholder = 'wss://echo.websocket.events';
+    urlInput.setAttribute('aria-label', 'WebSocket URL');
+
+    if (existingUrlInput) {
+        urlInput.value = existingUrlInput.value;
+        urlInput.addEventListener('input', () => {
+            existingUrlInput.value = urlInput.value;
+            // Mark tab as modified when WebSocket URL changes
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
+        existingUrlInput.addEventListener('input', () => {
+            urlInput.value = existingUrlInput.value;
+        });
+    }
+
+    targetWrapper.appendChild(urlInput);
+    websocketSection.appendChild(badge);
+    websocketSection.appendChild(targetWrapper);
+
+    const methodSelectContainer = document.querySelector('.method-select-container');
+    if (methodSelectContainer) {
+        methodSelectContainer.after(websocketSection);
+    } else {
+        requestUrlSection.prepend(websocketSection);
+    }
+
+    return websocketSection;
+}
+
+function syncWebSocketUrlInput() {
+    const existingUrlInput = document.getElementById('url-input');
+    const websocketUrlInput = document.getElementById('websocket-url-input');
+
+    if (existingUrlInput && websocketUrlInput) {
+        websocketUrlInput.value = existingUrlInput.value;
+    }
 }
 
 /**

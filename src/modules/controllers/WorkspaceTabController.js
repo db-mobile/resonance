@@ -34,7 +34,7 @@ export class WorkspaceTabController {
         // Bind tab bar event handlers
         this.tabBar.onTabSwitch = (tabId) => this.switchTab(tabId);
         this.tabBar.onTabClose = (tabId) => this.closeTab(tabId);
-        this.tabBar.onTabCreate = () => this.createNewTab();
+        this.tabBar.onTabCreate = (protocol) => this.createNewTab({ protocol });
         this.tabBar.onTabRename = (tabId, newName) => this.renameTab(tabId, newName);
         this.tabBar.onTabDuplicate = (tabId) => this.duplicateTab(tabId);
         this.tabBar.onCloseOthers = (tabId) => this.closeOtherTabs(tabId);
@@ -100,8 +100,44 @@ export class WorkspaceTabController {
             // Save current tab state before creating new one
             await this._saveCurrentTabState();
 
-            const newTab = await this.service.createTab(options);
+            const { protocol = 'http', ...tabOptions } = options;
+            let newTab = await this.service.createTab(tabOptions);
             await this.service.switchTab(newTab.id);
+
+            // Apply protocol-specific structure for non-HTTP protocols
+            if (protocol === 'websocket') {
+                await this.service.updateTab(newTab.id, {
+                    name: 'New WebSocket',
+                    request: {
+                        protocol: 'websocket',
+                        url: '',
+                        method: 'WS',
+                        pathParams: {},
+                        queryParams: {},
+                        headers: {},
+                        body: { mode: 'json', content: '' },
+                        authType: 'none',
+                        authConfig: {}
+                    }
+                });
+                newTab = await this.service.getActiveTab();
+            } else if (protocol === 'grpc') {
+                await this.service.updateTab(newTab.id, {
+                    name: 'New gRPC',
+                    request: {
+                        protocol: 'grpc',
+                        grpc: {
+                            target: '',
+                            service: '',
+                            fullMethod: '',
+                            requestJson: '{}',
+                            metadata: {},
+                            useTls: false
+                        }
+                    }
+                });
+                newTab = await this.service.getActiveTab();
+            }
 
             // Update UI based on tab type (switch from runner to request UI if needed)
             this._updateUIForTabType(newTab);
@@ -634,6 +670,62 @@ export class WorkspaceTabController {
 
                 if (window.scriptController && endpoint.collectionId && endpoint.id) {
                     await window.scriptController.loadScriptsForEndpoint(endpoint.collectionId, endpoint.id);
+                }
+
+                return;
+            }
+
+            if (endpoint.protocol === 'websocket') {
+                const queryParams = {};
+                if (endpoint.persistedQueryParams && endpoint.persistedQueryParams.length > 0) {
+                    endpoint.persistedQueryParams.forEach(param => {
+                        queryParams[param.key] = param.value;
+                    });
+                }
+
+                const headers = {};
+                if (endpoint.persistedHeaders && endpoint.persistedHeaders.length > 0) {
+                    endpoint.persistedHeaders.forEach(header => {
+                        headers[header.key] = header.value;
+                    });
+                }
+
+                const tabName = endpoint.name || 'WebSocket Request';
+                const fullUrl = endpoint.persistedUrl || endpoint.path || '';
+
+                await this.service.updateTab(targetTabId, {
+                    name: tabName,
+                    type: 'request',
+                    endpoint: {
+                        collectionId: endpoint.collectionId,
+                        endpointId: endpoint.id,
+                        protocol: 'websocket'
+                    },
+                    request: {
+                        protocol: 'websocket',
+                        url: fullUrl,
+                        method: 'WS',
+                        pathParams: {},
+                        queryParams,
+                        headers,
+                        body: {
+                            mode: 'json',
+                            content: endpoint.persistedBody || ''
+                        },
+                        authType: 'none',
+                        authConfig: {}
+                    },
+                    isModified: false
+                });
+
+                const tab = await this.service.getActiveTab();
+                if (tab) {
+                    this._updateUIForTabType(tab);
+                    this.responseContainerManager.showContainer(targetTabId);
+                    this.isRestoringState = true;
+                    await this.stateManager.restoreTabState(tab);
+                    this.isRestoringState = false;
+                    this.tabBar.updateTab(targetTabId, { name: tabName, isModified: false });
                 }
 
                 return;

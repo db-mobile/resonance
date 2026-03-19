@@ -38,7 +38,9 @@
   },
   "endpoint": {
     "delete_title": "Anfrage löschen",
-    "confirm_delete": "Sind Sie sicher, dass Sie die Anfrage \"{{name}}\" löschen möchten?\n\nDiese Aktion kann nicht rückgängig gemacht werden."
+    "confirm_delete": "Sind Sie sicher, dass Sie die Anfrage \"{{name}}\" löschen möchten?\n\nDiese Aktion kann nicht rückgängig gemacht werden.",
+    "rename_title": "Anfrage umbenennen",
+    "rename_label": "Anfragename:"
   },
   "context_menu": {
     "new_collection": "Neue Sammlung",
@@ -50,6 +52,7 @@
     "export_postman": "Als Postman exportieren",
     "rename_collection": "Sammlung umbenennen",
     "delete_collection": "Sammlung löschen",
+    "rename_request": "Anfrage umbenennen",
     "delete_request": "Anfrage löschen"
   },
   "curl_import": {
@@ -83,6 +86,18 @@
     "name_label": "Sammlungsname:",
     "name_placeholder": "Meine Sammlung",
     "create": "Erstellen",
+    "cancel": "Abbrechen"
+  },
+  "save_to_collection": {
+    "title": "In Sammlung speichern",
+    "name_label": "Anfragename:",
+    "name_placeholder": "Meine Anfrage",
+    "collection_label": "Sammlung:",
+    "select_collection": "Sammlung auswählen...",
+    "new_collection_name": "Name der neuen Sammlung:",
+    "new_collection_placeholder": "Meine Sammlung",
+    "create_new": "+ Neue Sammlung erstellen",
+    "save": "Speichern",
     "cancel": "Abbrechen"
   },
   "request": {
@@ -172,6 +187,7 @@
     "cancel": "Abbrechen",
     "save": "Speichern",
     "delete": "Löschen",
+    "rename": "Umbenennen",
     "edit": "Bearbeiten",
     "add": "Hinzufügen",
     "remove": "Entfernen",

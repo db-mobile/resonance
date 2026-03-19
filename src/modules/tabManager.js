@@ -95,7 +95,7 @@ export function initTabListeners() {
  * Shows HTTP tabs (Headers, Cookies, Performance, Scripts) for HTTP requests
  * Shows gRPC tabs (Metadata, Trailers) for gRPC requests
  *
- * @param {string} protocol - 'http' or 'grpc'
+ * @param {string} protocol - 'http', 'websocket', or 'grpc'
  * @returns {void}
  */
 export function setResponseTabsForProtocol(protocol) {
@@ -105,6 +105,9 @@ export function setResponseTabsForProtocol(protocol) {
     if (protocol === 'grpc') {
         httpTabs.forEach(tab => tab.classList.add('is-hidden'));
         grpcTabs.forEach(tab => tab.classList.remove('is-hidden'));
+    } else if (protocol === 'websocket') {
+        httpTabs.forEach(tab => tab.classList.add('is-hidden'));
+        grpcTabs.forEach(tab => tab.classList.add('is-hidden'));
     } else {
         httpTabs.forEach(tab => tab.classList.remove('is-hidden'));
         grpcTabs.forEach(tab => tab.classList.add('is-hidden'));

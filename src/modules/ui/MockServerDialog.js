@@ -228,6 +228,11 @@ export class MockServerDialog {
         for (const collection of collections) {
             const isEnabled = settings.enabledCollections.includes(collection.id);
             const endpoints = collection.endpoints || [];
+            const httpEndpoints = endpoints.filter(e => !['WS', 'GRPC'].includes(e.method?.toUpperCase()));
+
+            if (httpEndpoints.length === 0) {
+                continue;
+            }
 
             const collectionDiv = document.createElement('div');
             collectionDiv.className = 'mock-server-collection';
@@ -235,7 +240,7 @@ export class MockServerDialog {
             // Collection header with toggle switch
             const headerDiv = document.createElement('div');
             headerDiv.className = 'mock-server-collection-header u-flex u-items-center u-gap-2';
-            headerDiv.classList.toggle('has-endpoints', Boolean(isEnabled && endpoints.length > 0));
+            headerDiv.classList.toggle('has-endpoints', Boolean(isEnabled && httpEndpoints.length > 0));
 
             const toggleLabel = document.createElement('label');
             toggleLabel.className = 'toggle-switch';
@@ -254,7 +259,7 @@ export class MockServerDialog {
 
             const labelText = document.createElement('span');
             labelText.className = 'mock-server-collection-label';
-            labelText.textContent = `${collection.name} (${endpoints.length} ${t('mock_server.endpoints', 'endpoints')})`;
+            labelText.textContent = `${collection.name} (${httpEndpoints.length} ${t('mock_server.endpoints', 'endpoints')})`;
 
             toggleLabel.appendChild(checkbox);
             toggleLabel.appendChild(toggleTrack);
@@ -263,12 +268,12 @@ export class MockServerDialog {
             collectionDiv.appendChild(headerDiv);
 
             // Endpoints list (only show if enabled)
-            if (isEnabled && endpoints.length > 0) {
+            if (isEnabled && httpEndpoints.length > 0) {
                 const endpointsDiv = document.createElement('div');
                 endpointsDiv.className = 'mock-server-endpoints';
 
                 // Determine how many endpoints to show (10 by default, or all if expanded)
-                const endpointsToShow = collection._showAllEndpoints ? endpoints : endpoints.slice(0, 10);
+                const endpointsToShow = collection._showAllEndpoints ? httpEndpoints : httpEndpoints.slice(0, 10);
 
                 for (const endpoint of endpointsToShow) {
                     const endpointDiv = document.createElement('div');
@@ -305,12 +310,12 @@ export class MockServerDialog {
                     endpointsDiv.appendChild(endpointDiv);
                 }
 
-                if (endpoints.length > 10 && !collection._showAllEndpoints) {
+                if (httpEndpoints.length > 10 && !collection._showAllEndpoints) {
                     const moreDiv = document.createElement('div');
                     moreDiv.className = 'mock-server-endpoints-toggle u-flex u-items-center u-gap-1';
                     const showAllText = window.i18n ?
-                        window.i18n.t('mock_server.show_all_endpoints', { count: endpoints.length }) || `Show all ${endpoints.length} endpoints` :
-                        `Show all ${endpoints.length} endpoints`;
+                        window.i18n.t('mock_server.show_all_endpoints', { count: httpEndpoints.length }) || `Show all ${httpEndpoints.length} endpoints` :
+                        `Show all ${httpEndpoints.length} endpoints`;
                     {
                         const labelEl = document.createElement('span');
                         labelEl.textContent = showAllText;

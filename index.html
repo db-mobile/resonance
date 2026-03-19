@@ -246,8 +246,8 @@
                     <h3>Authorization</h3>
                     <div class="auth-type-section">
                         <label for="auth-type-select">Type</label>
-                        <div class="auth-type-select-container">
-                            <select id="auth-type-select" class="form-select" aria-label="Authorization Type">
+                        <div class="select-wrapper">
+                            <select id="auth-type-select" class="select-base" aria-label="Authorization Type">
                                 <option value="none">No Auth</option>
                                 <option value="bearer">Bearer Token</option>
                                 <option value="basic">Basic Auth</option>
@@ -286,7 +286,7 @@
                     </div>
 
                     <!-- GraphQL Mode (new) -->
-                    <div id="graphql-body-container" class="graphql-body-container" style="display: none;">
+                    <div class="body-mode-panel graphql-body-container" id="body-graphql-section" data-mode="graphql">
                         <!-- Query Section -->
                         <div class="graphql-query-section u-flex u-flex-col">
                             <div class="graphql-section-header u-flex u-items-center u-justify-between">
@@ -353,10 +353,16 @@
                     </div>
                     
                     <h3>Service</h3>
-                    <select id="grpc-service-select" class="form-select" aria-label="gRPC Service"></select>
+                    <div class="select-wrapper">
+                        <select id="grpc-service-select" class="select-base" aria-label="gRPC Service"></select>
+                        <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                    </div>
                     
                     <h3>Method</h3>
-                    <select id="grpc-method-select" class="form-select" aria-label="gRPC Method"></select>
+                    <div class="select-wrapper">
+                        <select id="grpc-method-select" class="select-base" aria-label="gRPC Method"></select>
+                        <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                    </div>
                 </div>
 
                 <div class="tab-content" id="grpc-message" role="tabpanel" aria-labelledby="grpc-message-tab">
@@ -549,8 +555,7 @@
                                 data-protocol="grpc"
                                 role="tab"
                                 aria-selected="false"
-                                aria-controls="response-metadata"
-                                style="display: none;">
+                                aria-controls="response-metadata">
                             Metadata
                         </button>
                         <button class="tab-button response-tab-http"
@@ -566,8 +571,7 @@
                                 data-protocol="grpc"
                                 role="tab"
                                 aria-selected="false"
-                                aria-controls="response-trailers"
-                                style="display: none;">
+                                aria-controls="response-trailers">
                             Trailers
                         </button>
                         <button class="tab-button response-tab-http"

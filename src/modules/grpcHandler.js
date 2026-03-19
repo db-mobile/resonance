@@ -390,14 +390,50 @@ export function initGrpcUI() {
     // Mark tab as modified when TLS checkbox is toggled
     if (grpcTlsCheckbox) {
         grpcTlsCheckbox.addEventListener('change', () => {
-            if (window.workspaceTabController) {
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
                 window.workspaceTabController.markCurrentTabModified();
             }
         });
     }
 
-    if (grpcTargetInput && !grpcTargetInput.value) {
-        grpcTargetInput.value = lastTarget || 'grpcb.in:9000';
+    // Mark tab as modified when gRPC target input changes
+    if (grpcTargetInput) {
+        grpcTargetInput.addEventListener('input', () => {
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
+        if (!grpcTargetInput.value) {
+            grpcTargetInput.value = lastTarget || 'grpcb.in:9000';
+        }
+    }
+
+    // Mark tab as modified when service or method selection changes
+    if (grpcServiceSelect) {
+        grpcServiceSelect.addEventListener('change', () => {
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
+    }
+
+    if (grpcMethodSelect) {
+        grpcMethodSelect.addEventListener('change', () => {
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
+    }
+
+    // Mark tab as modified when metadata changes
+    const grpcMetadataList = document.getElementById('grpc-metadata-list');
+    if (grpcMetadataList) {
+        grpcMetadataList.addEventListener('input', (event) => {
+            if ((event.target.classList.contains('key-input') || event.target.classList.contains('value-input')) &&
+                window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
     }
 }
 

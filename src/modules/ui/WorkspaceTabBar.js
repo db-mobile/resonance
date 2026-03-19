@@ -342,13 +342,70 @@ export class WorkspaceTabBar {
             btn.appendChild(iconEl);
         }
 
-        btn.addEventListener('click', () => {
-            if (this.onTabCreate) {
-                this.onTabCreate();
-            }
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._showNewTabMenu(btn);
         });
 
         return btn;
+    }
+
+    /**
+     * Show protocol selection menu for new tab
+     * @private
+     */
+    _showNewTabMenu(button) {
+        // Remove any existing dropdown
+        const existingDropdown = document.querySelector('.workspace-tab-new-menu');
+        if (existingDropdown) {
+            existingDropdown.remove();
+            return;
+        }
+
+        const menu = document.createElement('div');
+        menu.className = 'workspace-tab-new-menu dropdown-panel visible';
+
+        const rect = button.getBoundingClientRect();
+        menu.style.position = 'fixed';
+        menu.style.top = `${rect.bottom + 4}px`;
+        menu.style.left = `${rect.left}px`;
+        menu.style.minWidth = '160px';
+        menu.style.zIndex = '1000';
+
+        const protocols = [
+            { label: 'HTTP', protocol: 'http' },
+            { label: 'WebSocket', protocol: 'websocket' },
+            { label: 'gRPC', protocol: 'grpc' }
+        ];
+
+        protocols.forEach(({ label, protocol }) => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item';
+
+            const labelEl = document.createElement('span');
+            labelEl.className = 'dropdown-item-label';
+            labelEl.textContent = label;
+            item.appendChild(labelEl);
+
+            item.addEventListener('click', () => {
+                menu.remove();
+                if (this.onTabCreate) {
+                    this.onTabCreate(protocol);
+                }
+            });
+
+            menu.appendChild(item);
+        });
+
+        document.body.appendChild(menu);
+
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target) && !button.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeMenu), 0);
     }
 
     /**
@@ -552,9 +609,38 @@ export class WorkspaceTabBar {
                         if (window.workspaceTabController) {
                             await window.workspaceTabController.markCurrentTabUnmodified();
                         }
+                    } else if (window.workspaceTabController && tab.type !== 'runner') {
+                        // No endpoint - show "Save to Collection" dialog
+                        const { saveRequestToCollection } = await import('../collectionManager.js');
+                        const state = await window.workspaceTabController.stateManager.captureCurrentState();
+                        const requestData = {
+                            name: tab.name,
+                            ...state.request
+                        };
+                        const result = await saveRequestToCollection(requestData);
+                        if (result) {
+                            // Update current endpoint and tab
+                            window.currentEndpoint = {
+                                collectionId: result.collectionId,
+                                endpointId: result.endpointId
+                            };
+                            await window.workspaceTabController.service.updateTab(tab.id, {
+                                name: result.name,
+                                endpoint: {
+                                    collectionId: result.collectionId,
+                                    endpointId: result.endpointId,
+                                    protocol: state.request.protocol || 'http'
+                                }
+                            });
+                            await window.workspaceTabController.markCurrentTabUnmodified();
+                            // Re-render tab bar to update the tab with new name
+                            const tabs = await window.workspaceTabController.service.getAllTabs();
+                            const activeTabId = await window.workspaceTabController.service.getActiveTabId();
+                            this.render(tabs, activeTabId);
+                        }
                     }
                 },
-                disabled: !tab.endpoint
+                disabled: tab.type === 'runner'
             },
             { divider: true },
             {

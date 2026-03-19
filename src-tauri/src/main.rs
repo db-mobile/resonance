@@ -24,6 +24,7 @@ use commands::{
     proxy::{proxy_get, proxy_set, proxy_test, ProxyState},
     scripts::{script_execute_pre_request, script_execute_test, script_get, script_save},
     store::{settings_get, settings_set, store_get, store_set},
+    websocket::{websocket_close, websocket_send, WebSocketState},
 };
 
 fn main() {
@@ -43,6 +44,7 @@ fn main() {
         .manage(RequestState::default())
         .manage(ProxyState::default())
         .manage(ProtoState::default())
+        .manage(WebSocketState::default())
         .invoke_handler(tauri::generate_handler![
             // App
             app_get_version,
@@ -89,6 +91,9 @@ fn main() {
             script_save,
             script_execute_pre_request,
             script_execute_test,
+            // WebSocket
+            websocket_send,
+            websocket_close,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

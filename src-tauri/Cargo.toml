@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "2.5.0"
+version = "2.6.0"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -23,6 +23,8 @@ tauri-plugin-window-state = "2"
 # HTTP client
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "http2", "gzip", "brotli", "socks"] }
 tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+futures-util = "0.3"
 
 # gRPC client
 tonic = { version = "0.11", default-features = false, features = ["codegen", "prost", "transport", "tls", "tls-roots"] }

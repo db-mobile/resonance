@@ -236,10 +236,11 @@ export class CollectionController {
 
                 // Load all persisted data if available
                 const isGrpc = endpoint.protocol === 'grpc';
+                const isWebSocket = endpoint.protocol === 'websocket';
 
                 const persistedUrl = isGrpc ? null : await this.repository.getPersistedUrl(collection.id, endpoint.id);
-                const persistedAuthConfig = isGrpc ? null : await this.repository.getPersistedAuthConfig(collection.id, endpoint.id);
-                const persistedPathParams = isGrpc ? [] : await this.repository.getPersistedPathParams(collection.id, endpoint.id);
+                const persistedAuthConfig = (isGrpc || isWebSocket) ? null : await this.repository.getPersistedAuthConfig(collection.id, endpoint.id);
+                const persistedPathParams = (isGrpc || isWebSocket) ? [] : await this.repository.getPersistedPathParams(collection.id, endpoint.id);
                 const persistedQueryParams = isGrpc ? [] : await this.repository.getPersistedQueryParams(collection.id, endpoint.id);
                 const persistedHeaders = isGrpc ? [] : await this.repository.getPersistedHeaders(collection.id, endpoint.id);
                 const persistedBody = isGrpc ? null : await this.repository.getModifiedRequestBody(collection.id, endpoint.id);
@@ -248,7 +249,7 @@ export class CollectionController {
                 const endpointData = {
                     ...endpoint,
                     collectionId: collection.id,
-                    protocol: isGrpc ? 'grpc' : 'http',
+                    protocol: isGrpc ? 'grpc' : (isWebSocket ? 'websocket' : 'http'),
                     collectionBaseUrl: collection.baseUrl,
                     collectionDefaultHeaders: collection.defaultHeaders,
                     path: endpoint.path,
@@ -357,6 +358,12 @@ export class CollectionController {
      */
     handleEndpointContextMenu(event, collection, endpoint) {
         const menuItems = [
+            {
+                label: 'Rename Request',
+                translationKey: 'context_menu.rename_request',
+                iconClass: ContextMenu.createRenameIcon(),
+                onClick: () => this.handleRenameRequest(collection, endpoint)
+            },
             {
                 label: 'Delete Request',
                 translationKey: 'context_menu.delete_request',
@@ -605,9 +612,11 @@ export class CollectionController {
             const nameInput = dialog.querySelector('#request-name');
             const protocolSelect = dialog.querySelector('#request-protocol');
             const methodSelect = dialog.querySelector('#request-method');
+            const methodGroup = methodSelect.closest('.form-group');
             const pathInput = dialog.querySelector('#request-path');
             const grpcTargetGroup = dialog.querySelector('#grpc-target-group');
             const grpcTargetInput = dialog.querySelector('#grpc-target');
+            const pathLabel = dialog.querySelector('label[for="request-path"]');
             const cancelBtn = dialog.querySelector('#cancel-btn');
 
             nameInput.focus();
@@ -623,16 +632,21 @@ export class CollectionController {
 
             const updateProtocolUI = () => {
                 const isGrpc = protocolSelect.value === 'grpc';
-                methodSelect.parentElement.classList.toggle('is-hidden', isGrpc);
+                const isWebSocket = protocolSelect.value === 'websocket';
+                methodGroup?.classList.toggle('is-hidden', isGrpc || isWebSocket);
                 pathInput.parentElement.classList.toggle('is-hidden', isGrpc);
                 grpcTargetGroup.classList.toggle('is-hidden', !isGrpc);
+                if (pathLabel) {
+                    pathLabel.textContent = isWebSocket ? 'URL:' : 'Path:';
+                }
+                pathInput.placeholder = isWebSocket ? 'wss://echo.websocket.events' : '/api/endpoint';
 
                 if (isGrpc) {
                     methodSelect.required = false;
                     pathInput.required = false;
                     grpcTargetInput.required = true;
                 } else {
-                    methodSelect.required = true;
+                    methodSelect.required = !isWebSocket;
                     pathInput.required = true;
                     grpcTargetInput.required = false;
                 }
@@ -658,6 +672,16 @@ export class CollectionController {
                             requestJson: '{}'
                         });
                     }
+                } else if (protocol === 'websocket') {
+                    const url = pathInput.value.trim();
+                    if (name && url) {
+                        cleanup();
+                        resolve({
+                            name,
+                            protocol: 'websocket',
+                            url
+                        });
+                    }
                 } else {
                     const method = methodSelect.value;
                     const path = pathInput.value.trim();
@@ -670,6 +694,204 @@ export class CollectionController {
                             path: path.startsWith('/') ? path : `/${  path}`
                         });
                     }
+                }
+            });
+
+            dialog.addEventListener('click', (e) => {
+                if (e.target === dialog) {
+                    cleanup();
+                    resolve(null);
+                }
+            });
+
+            const escapeHandler = (e) => {
+                if (e.key === 'Escape') {
+                    cleanup();
+                    resolve(null);
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
+        });
+    }
+
+    /**
+     * Shows dialog for saving current request to a collection
+     *
+     * Allows saving to an existing collection or creating a new one.
+     *
+     * @async
+     * @param {Object} requestData - Current request data from the active tab
+     * @returns {Promise<{collectionId: string, endpointId: string}|null>} Collection and endpoint IDs if saved, null if cancelled
+     */
+    async showSaveToCollectionDialog(requestData) {
+        const collections = await this.repository.getAll();
+
+        return new Promise((resolve) => {
+            const fragment = templateLoader.cloneSync(
+                './src/templates/collections/newDialogs.html',
+                'tpl-save-to-collection-dialog'
+            );
+            const dialog = fragment.firstElementChild;
+
+            document.body.appendChild(dialog);
+
+            if (window.i18n && window.i18n.updateUI) {
+                window.i18n.updateUI();
+            }
+
+            const form = dialog.querySelector('#save-to-collection-form');
+            const nameInput = dialog.querySelector('#save-request-name');
+            const collectionSelect = dialog.querySelector('#save-collection-select');
+            const newCollectionGroup = dialog.querySelector('#new-collection-name-group');
+            const newCollectionInput = dialog.querySelector('#new-collection-name-input');
+            const cancelBtn = dialog.querySelector('#cancel-btn');
+
+            // Pre-fill request name from tab name or generate from URL
+            if (requestData.name && requestData.name !== 'New Request' && 
+                requestData.name !== 'New WebSocket' && requestData.name !== 'New gRPC') {
+                nameInput.value = requestData.name;
+            } else if (requestData.url && requestData.url.trim()) {
+                try {
+                    const urlObj = new URL(requestData.url);
+                    const path = urlObj.pathname;
+                    const segments = path.split('/').filter(s => s);
+                    if (segments.length > 0) {
+                        const endpoint = `/${segments[segments.length - 1]}`;
+                        nameInput.value = `${requestData.method || 'GET'} ${endpoint}`;
+                    }
+                } catch {
+                    // URL parsing failed, leave empty for user to fill
+                }
+            }
+
+            // Populate collection dropdown
+            collections.forEach(collection => {
+                const option = document.createElement('option');
+                option.value = collection.id;
+                option.textContent = collection.name;
+                collectionSelect.appendChild(option);
+            });
+
+            // Add "Create new collection" option
+            const newCollectionOption = document.createElement('option');
+            newCollectionOption.value = '__new__';
+            newCollectionOption.textContent = window.i18n?.t('save_to_collection.create_new') || '+ Create new collection';
+            collectionSelect.appendChild(newCollectionOption);
+
+            nameInput.focus();
+
+            const cleanup = () => {
+                dialog.remove();
+            };
+
+            collectionSelect.addEventListener('change', () => {
+                const isNewCollection = collectionSelect.value === '__new__';
+                newCollectionGroup.classList.toggle('is-hidden', !isNewCollection);
+                newCollectionInput.required = isNewCollection;
+                if (isNewCollection) {
+                    newCollectionInput.focus();
+                }
+            });
+
+            cancelBtn.addEventListener('click', () => {
+                cleanup();
+                resolve(null);
+            });
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const name = nameInput.value.trim();
+                const selectedCollectionId = collectionSelect.value;
+
+                if (!name || !selectedCollectionId) {
+                    return;
+                }
+
+                try {
+                    let targetCollectionId = selectedCollectionId;
+
+                    // Create new collection if selected
+                    if (selectedCollectionId === '__new__') {
+                        const newCollectionName = newCollectionInput.value.trim();
+                        if (!newCollectionName) {
+                            newCollectionInput.focus();
+                            return;
+                        }
+                        const newCollection = await this.service.createCollection(newCollectionName);
+                        targetCollectionId = newCollection.id;
+                    }
+
+                    // Prepare request data for saving
+                    const endpointData = {
+                        name,
+                        protocol: requestData.protocol || 'http',
+                        method: requestData.method || 'GET',
+                        path: requestData.url || '/'
+                    };
+
+                    // Handle gRPC
+                    if (requestData.protocol === 'grpc' && requestData.grpc) {
+                        endpointData.target = requestData.grpc.target;
+                        endpointData.fullMethod = requestData.grpc.fullMethod;
+                        endpointData.requestJson = requestData.grpc.requestJson;
+                    }
+
+                    // Handle WebSocket
+                    if (requestData.protocol === 'websocket') {
+                        endpointData.url = requestData.url;
+                    }
+
+                    // Add endpoint to collection
+                    const newEndpoint = await this.service.addRequestToCollection(targetCollectionId, endpointData);
+
+                    // Save additional request data (headers, body, params, auth)
+                    if (requestData.pathParams && Object.keys(requestData.pathParams).length > 0) {
+                        const pathParamsArray = Object.entries(requestData.pathParams).map(([key, value]) => ({ key, value }));
+                        await this.repository.savePersistedPathParams(targetCollectionId, newEndpoint.id, pathParamsArray);
+                    }
+
+                    if (requestData.queryParams && Object.keys(requestData.queryParams).length > 0) {
+                        const queryParamsArray = Object.entries(requestData.queryParams).map(([key, value]) => ({ key, value }));
+                        await this.repository.savePersistedQueryParams(targetCollectionId, newEndpoint.id, queryParamsArray);
+                    }
+
+                    if (requestData.headers && Object.keys(requestData.headers).length > 0) {
+                        const headersArray = Object.entries(requestData.headers).map(([key, value]) => ({ key, value }));
+                        await this.repository.savePersistedHeaders(targetCollectionId, newEndpoint.id, headersArray);
+                    }
+
+                    if (requestData.body?.content) {
+                        await this.repository.saveModifiedRequestBody(targetCollectionId, newEndpoint.id, requestData.body.content);
+                    }
+
+                    if (requestData.authType && requestData.authType !== 'none') {
+                        await this.repository.savePersistedAuthConfig(targetCollectionId, newEndpoint.id, {
+                            type: requestData.authType,
+                            config: requestData.authConfig || {}
+                        });
+                    }
+
+                    // Save URL
+                    if (requestData.url) {
+                        await this.repository.savePersistedUrl(targetCollectionId, newEndpoint.id, requestData.url);
+                    }
+
+                    // Refresh collections display
+                    await this.loadCollectionsWithExpansionState();
+
+                    this.statusDisplay.update(`Saved request: ${name}`, null);
+
+                    cleanup();
+                    resolve({
+                        collectionId: targetCollectionId,
+                        endpointId: newEndpoint.id,
+                        name: name
+                    });
+                } catch (error) {
+                    this.statusDisplay.update(`Error saving request: ${error.message}`, null);
+                    cleanup();
+                    resolve(null);
                 }
             });
 
@@ -772,6 +994,59 @@ export class CollectionController {
     async handleExportPostman(collection) {
         try {
             await this.service.exportCollectionAsPostman(collection.id);
+        } catch (error) {
+            void error;
+        }
+    }
+
+    /**
+     * Handles request rename operation
+     *
+     * Shows rename dialog and updates request name if confirmed.
+     *
+     * @async
+     * @param {Object} collection - The parent collection
+     * @param {Object} endpoint - The request/endpoint to rename
+     * @returns {Promise<void>}
+     */
+    async handleRenameRequest(collection, endpoint) {
+        try {
+            const title = window.i18n ?
+                window.i18n.t('endpoint.rename_title') || 'Rename Request' :
+                'Rename Request';
+
+            const label = window.i18n ?
+                window.i18n.t('endpoint.rename_label') || 'Request Name:' :
+                'Request Name:';
+
+            const confirmText = window.i18n ?
+                window.i18n.t('common.rename') || 'Rename' :
+                'Rename';
+
+            const currentName = endpoint.name || endpoint.path;
+            const newName = await this.renameDialog.show(currentName, {
+                title,
+                label,
+                confirmText
+            });
+
+            if (newName && newName !== currentName) {
+                await this.service.renameRequest(collection.id, endpoint.id, newName);
+                await this.loadCollectionsWithExpansionState();
+
+                // Update any open tabs that reference this endpoint
+                if (window.workspaceTabController) {
+                    const tabs = await window.workspaceTabController.service.getAllTabs();
+                    for (const tab of tabs) {
+                        if (tab.endpoint && 
+                            tab.endpoint.collectionId === collection.id && 
+                            tab.endpoint.endpointId === endpoint.id) {
+                            await window.workspaceTabController.service.updateTab(tab.id, { name: newName });
+                            window.workspaceTabController.tabBar.updateTab(tab.id, { name: newName });
+                        }
+                    }
+                }
+            }
         } catch (error) {
             void error;
         }
@@ -1040,6 +1315,7 @@ export class CollectionController {
             const endpointLocations = this._findAllEndpointLocations(collection, endpointId);
             const endpoint = endpointLocations.length > 0 ? endpointLocations[0].endpoint : null;
             const isGrpc = endpoint && endpoint.protocol === 'grpc';
+            const isWebSocket = endpoint && endpoint.protocol === 'websocket';
 
             if (isGrpc) {
                 const grpcTargetInput = document.getElementById('grpc-target-input');
@@ -1081,6 +1357,37 @@ export class CollectionController {
                 await this.repository.save(collections);
                 await this.loadCollectionsWithExpansionState();
 
+                this.statusDisplay.update('Request saved', null);
+                return;
+            }
+
+            if (isWebSocket) {
+                const urlInput = document.getElementById('url-input');
+                const queryParamsList = document.getElementById('query-params-list');
+                const headersList = document.getElementById('headers-list');
+                const bodyInput = document.getElementById('body-input');
+
+                if (urlInput && urlInput.value) {
+                    await this.repository.savePersistedUrl(collectionId, endpointId, urlInput.value);
+                }
+
+                if (queryParamsList) {
+                    const queryParams = parseKeyValuePairs(queryParamsList);
+                    const queryParamsArray = Object.entries(queryParams).map(([key, value]) => ({ key, value }));
+                    await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParamsArray);
+                }
+
+                if (headersList) {
+                    const headers = parseKeyValuePairs(headersList);
+                    const headersArray = Object.entries(headers).map(([key, value]) => ({ key, value }));
+                    await this.repository.savePersistedHeaders(collectionId, endpointId, headersArray);
+                }
+
+                if (bodyInput) {
+                    await this.service.saveRequestBodyModification(collectionId, endpointId, bodyInput);
+                }
+
+                await this.loadCollectionsWithExpansionState();
                 this.statusDisplay.update('Request saved', null);
                 return;
             }

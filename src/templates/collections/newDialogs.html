@@ -30,6 +30,7 @@
                     <div class="select-wrapper">
                         <select id="request-protocol" class="select-base" required>
                             <option value="http">HTTP</option>
+                            <option value="websocket">WebSocket</option>
                             <option value="grpc">gRPC</option>
                         </select>
                         <span class="select-arrow icon icon-12 icon-chevron-down"></span>
@@ -59,6 +60,37 @@
                 <div class="dialog-footer">
                     <button type="button" id="cancel-btn" class="btn btn-outline" data-i18n="new_request.cancel">Cancel</button>
                     <button type="submit" id="create-btn" class="btn btn-primary" data-i18n="new_request.create">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-save-to-collection-dialog">
+    <div class="new-request-dialog-overlay modal-overlay">
+        <div class="new-request-dialog modal-dialog modal-dialog--sm">
+            <form id="save-to-collection-form" class="dialog-form">
+                <h3 class="dialog-title" data-i18n="save_to_collection.title">Save to Collection</h3>
+                <div class="form-group">
+                    <label for="save-request-name" class="form-label" data-i18n="save_to_collection.name_label">Request Name:</label>
+                    <input type="text" id="save-request-name" class="input-base form-input" data-i18n-placeholder="save_to_collection.name_placeholder" placeholder="My Request" required>
+                </div>
+                <div class="form-group">
+                    <label for="save-collection-select" class="form-label" data-i18n="save_to_collection.collection_label">Collection:</label>
+                    <div class="select-wrapper">
+                        <select id="save-collection-select" class="select-base" required>
+                            <option value="" disabled selected data-i18n="save_to_collection.select_collection">Select a collection...</option>
+                        </select>
+                        <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                    </div>
+                </div>
+                <div class="form-group is-hidden" id="new-collection-name-group">
+                    <label for="new-collection-name-input" class="form-label" data-i18n="save_to_collection.new_collection_name">New Collection Name:</label>
+                    <input type="text" id="new-collection-name-input" class="input-base form-input" data-i18n-placeholder="save_to_collection.new_collection_placeholder" placeholder="My Collection">
+                </div>
+                <div class="dialog-footer">
+                    <button type="button" id="cancel-btn" class="btn btn-outline" data-i18n="save_to_collection.cancel">Cancel</button>
+                    <button type="submit" id="save-btn" class="btn btn-primary" data-i18n="save_to_collection.save">Save</button>
                 </div>
             </form>
         </div>

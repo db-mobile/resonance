@@ -38,7 +38,9 @@
   },
   "endpoint": {
     "delete_title": "Supprimer la requête",
-    "confirm_delete": "Êtes-vous sûr de vouloir supprimer la requête \"{{name}}\" ?\n\nCette action ne peut pas être annulée."
+    "confirm_delete": "Êtes-vous sûr de vouloir supprimer la requête \"{{name}}\" ?\n\nCette action ne peut pas être annulée.",
+    "rename_title": "Renommer la requête",
+    "rename_label": "Nom de la requête :"
   },
   "context_menu": {
     "new_collection": "Nouvelle collection",
@@ -50,6 +52,7 @@
     "export_postman": "Exporter en Postman",
     "rename_collection": "Renommer la collection",
     "delete_collection": "Supprimer la collection",
+    "rename_request": "Renommer la requête",
     "delete_request": "Supprimer la requête"
   },
   "curl_import": {
@@ -83,6 +86,18 @@
     "name_label": "Nom de la collection:",
     "name_placeholder": "Ma collection",
     "create": "Créer",
+    "cancel": "Annuler"
+  },
+  "save_to_collection": {
+    "title": "Enregistrer dans une collection",
+    "name_label": "Nom de la requête:",
+    "name_placeholder": "Ma requête",
+    "collection_label": "Collection:",
+    "select_collection": "Sélectionner une collection...",
+    "new_collection_name": "Nom de la nouvelle collection:",
+    "new_collection_placeholder": "Ma collection",
+    "create_new": "+ Créer une nouvelle collection",
+    "save": "Enregistrer",
     "cancel": "Annuler"
   },
   "request": {
@@ -172,6 +187,7 @@
     "cancel": "Annuler",
     "save": "Enregistrer",
     "delete": "Supprimer",
+    "rename": "Renommer",
     "edit": "Modifier",
     "add": "Ajouter",
     "remove": "Supprimer",
