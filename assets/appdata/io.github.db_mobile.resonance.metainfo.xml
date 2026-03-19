@@ -96,6 +96,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.6.0" date="2026-03-18">
+      <description>
+        <p>New features introduced</p>
+        <ul>
+          <li>WebSocket support</li>
+          <li>UX/UI adjustments</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.5.0" date="2026-03-18">
       <description>
         <p>New features introduced</p>
