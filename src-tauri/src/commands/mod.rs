@@ -7,4 +7,5 @@ pub mod mock_server;
 pub mod proxy;
 pub mod scripts;
 pub mod store;
+pub mod updater;
 pub mod websocket;

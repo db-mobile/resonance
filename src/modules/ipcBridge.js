@@ -104,6 +104,11 @@ if (isTauri) {
             save: (collectionId, endpointId, scripts) => invoke('script_save', { collectionId, endpointId, scripts }),
             executePreRequest: (scriptData) => invoke('script_execute_pre_request', { scriptData }),
             executeTest: (scriptData) => invoke('script_execute_test', { scriptData })
+        },
+        updater: {
+            check: () => invoke('updater_check'),
+            downloadAndInstall: () => invoke('updater_download_and_install'),
+            getInstallInfo: () => invoke('updater_get_install_info')
         }
     };
     

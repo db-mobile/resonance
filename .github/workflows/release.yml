@@ -90,6 +90,9 @@ jobs:
       run: npm run build
 
     - name: Build Tauri application
+      env:
+        TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       run: npm run build:tauri
 
     - name: Prepare Linux artifacts
@@ -98,9 +101,20 @@ jobs:
         VERSION="${GITHUB_REF#refs/tags/v}"
         cp src-tauri/target/release/bundle/appimage/*.AppImage release-artifacts/
         cp src-tauri/target/release/bundle/deb/*.deb release-artifacts/
+        # Copy update artifacts (tar.gz and signature)
+        cp src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz release-artifacts/ 2>/dev/null || true
+        cp src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig release-artifacts/ 2>/dev/null || true
         for f in release-artifacts/*.AppImage; do
           [ -f "$f" ] || continue
           mv "$f" "release-artifacts/resonance_${VERSION}_${{ matrix.arch }}.AppImage"
+        done
+        for f in release-artifacts/*.AppImage.tar.gz; do
+          [ -f "$f" ] || continue
+          mv "$f" "release-artifacts/resonance_${VERSION}_${{ matrix.arch }}.AppImage.tar.gz"
+        done
+        for f in release-artifacts/*.AppImage.tar.gz.sig; do
+          [ -f "$f" ] || continue
+          mv "$f" "release-artifacts/resonance_${VERSION}_${{ matrix.arch }}.AppImage.tar.gz.sig"
         done
         for f in release-artifacts/*.deb; do
           [ -f "$f" ] || continue
@@ -145,12 +159,24 @@ jobs:
       run: npm run build
 
     - name: Build Tauri application (universal)
+      env:
+        TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       run: npm run build:tauri -- --target universal-apple-darwin
 
     - name: Prepare Mac artifacts
       run: |
         mkdir -p release-artifacts
+        VERSION="${GITHUB_REF#refs/tags/v}"
         cp src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg release-artifacts/
+        # Copy update artifacts (tar.gz and signature)
+        cp src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz release-artifacts/ 2>/dev/null || true
+        cp src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz.sig release-artifacts/ 2>/dev/null || true
+        # Rename DMG
+        for f in release-artifacts/*.dmg; do
+          [ -f "$f" ] || continue
+          mv "$f" "release-artifacts/resonance_${VERSION}_universal.dmg"
+        done
 
     - name: Upload Mac artifacts
       uses: actions/upload-artifact@v4
@@ -199,13 +225,20 @@ jobs:
       run: npm run build
 
     - name: Build Tauri application
+      env:
+        TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       run: npm run build:tauri -- --target ${{ matrix.target }}
 
     - name: Prepare Windows artifacts
       shell: pwsh
       run: |
+        $VERSION = "$env:GITHUB_REF" -replace 'refs/tags/v', ''
         New-Item -ItemType Directory -Force -Path release-artifacts
         Copy-Item src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe release-artifacts/
+        # Copy update artifacts (zip and signature)
+        Copy-Item src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.nsis.zip release-artifacts/ -ErrorAction SilentlyContinue
+        Copy-Item src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.nsis.zip.sig release-artifacts/ -ErrorAction SilentlyContinue
 
     - name: Upload Windows artifacts
       uses: actions/upload-artifact@v4
@@ -256,6 +289,69 @@ jobs:
         echo "$CHANGELOG" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
 
+    - name: Generate update manifest (latest.json)
+      run: |
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+        REPO="${{ github.repository }}"
+        TAG="${{ github.ref_name }}"
+        BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
+        PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        NOTES="${{ steps.changelog.outputs.CHANGELOG }}"
+        
+        # Read signatures from .sig files if they exist
+        LINUX_AMD64_SIG=""
+        LINUX_ARM64_SIG=""
+        WINDOWS_X64_SIG=""
+        WINDOWS_ARM64_SIG=""
+        MAC_SIG=""
+        
+        if [ -f "artifacts/release-linux-amd64/resonance_${VERSION}_amd64.AppImage.tar.gz.sig" ]; then
+          LINUX_AMD64_SIG=$(cat "artifacts/release-linux-amd64/resonance_${VERSION}_amd64.AppImage.tar.gz.sig")
+        fi
+        if [ -f "artifacts/release-linux-arm64/resonance_${VERSION}_arm64.AppImage.tar.gz.sig" ]; then
+          LINUX_ARM64_SIG=$(cat "artifacts/release-linux-arm64/resonance_${VERSION}_arm64.AppImage.tar.gz.sig")
+        fi
+        if [ -f "artifacts/release-windows-x64/Resonance_${VERSION}_x64-setup.nsis.zip.sig" ]; then
+          WINDOWS_X64_SIG=$(cat "artifacts/release-windows-x64/Resonance_${VERSION}_x64-setup.nsis.zip.sig")
+        fi
+        if [ -f "artifacts/release-windows-arm64/Resonance_${VERSION}_arm64-setup.nsis.zip.sig" ]; then
+          WINDOWS_ARM64_SIG=$(cat "artifacts/release-windows-arm64/Resonance_${VERSION}_arm64-setup.nsis.zip.sig")
+        fi
+        if [ -f "artifacts/release-mac/Resonance.app.tar.gz.sig" ]; then
+          MAC_SIG=$(cat "artifacts/release-mac/Resonance.app.tar.gz.sig")
+        fi
+        
+        # Create latest.json for Tauri updater
+        cat > artifacts/latest.json << EOF
+        {
+          "version": "${VERSION}",
+          "notes": "See release notes at https://github.com/${REPO}/releases/tag/${TAG}",
+          "pub_date": "${PUB_DATE}",
+          "platforms": {
+            "linux-x86_64": {
+              "signature": "${LINUX_AMD64_SIG}",
+              "url": "${BASE_URL}/resonance_${VERSION}_amd64.AppImage.tar.gz"
+            },
+            "linux-aarch64": {
+              "signature": "${LINUX_ARM64_SIG}",
+              "url": "${BASE_URL}/resonance_${VERSION}_arm64.AppImage.tar.gz"
+            },
+            "windows-x86_64": {
+              "signature": "${WINDOWS_X64_SIG}",
+              "url": "${BASE_URL}/Resonance_${VERSION}_x64-setup.nsis.zip"
+            },
+            "windows-aarch64": {
+              "signature": "${WINDOWS_ARM64_SIG}",
+              "url": "${BASE_URL}/Resonance_${VERSION}_arm64-setup.nsis.zip"
+            },
+            "darwin-universal": {
+              "signature": "${MAC_SIG}",
+              "url": "${BASE_URL}/Resonance.app.tar.gz"
+            }
+          }
+        }
+        EOF
+
     - name: Create Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -265,6 +361,7 @@ jobs:
         TAG="${{ github.ref_name }}"
         BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
 
+        # Upload user-facing installers first
         gh release create "$TAG" \
           --title "Release $TAG" \
           --notes "## What's Changed
@@ -298,3 +395,12 @@ jobs:
           artifacts/release-mac/*.dmg \
           artifacts/release-windows-x64/*.exe \
           artifacts/release-windows-arm64/*.exe
+
+        # Upload update artifacts (not listed in release notes, used by auto-updater)
+        gh release upload "$TAG" \
+          artifacts/latest.json \
+          artifacts/release-linux-amd64/*.AppImage.tar.gz \
+          artifacts/release-linux-arm64/*.AppImage.tar.gz \
+          artifacts/release-mac/*.app.tar.gz \
+          artifacts/release-windows-x64/*.nsis.zip \
+          artifacts/release-windows-arm64/*.nsis.zip

@@ -3563,6 +3563,29 @@ body {
   flex-shrink: 0;
 }
 
+.settings-update-section {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.update-status {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.update-status.success {
+  color: var(--color-success);
+}
+
+.update-status.error {
+  color: var(--color-error);
+}
+
+.update-status.info {
+  color: var(--text-tertiary);
+}
+
 .settings-section {
   margin-bottom: var(--space-6);
 }

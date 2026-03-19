@@ -24,6 +24,9 @@ use commands::{
     proxy::{proxy_get, proxy_set, proxy_test, ProxyState},
     scripts::{script_execute_pre_request, script_execute_test, script_get, script_save},
     store::{settings_get, settings_set, store_get, store_set},
+    updater::{
+        updater_check, updater_download_and_install, updater_get_install_info, PendingUpdate,
+    },
     websocket::{websocket_close, websocket_send, WebSocketState},
 };
 
@@ -33,6 +36,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri_plugin_window_state::Builder::new()
                 .with_state_flags(
@@ -45,6 +49,7 @@ fn main() {
         .manage(ProxyState::default())
         .manage(ProtoState::default())
         .manage(WebSocketState::default())
+        .manage(PendingUpdate::default())
         .invoke_handler(tauri::generate_handler![
             // App
             app_get_version,
@@ -94,6 +99,10 @@ fn main() {
             // WebSocket
             websocket_send,
             websocket_close,
+            // Updater
+            updater_check,
+            updater_download_and_install,
+            updater_get_install_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

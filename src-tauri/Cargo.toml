@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "2.6.0"
+version = "2.6.1"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -19,6 +19,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-window-state = "2"
+tauri-plugin-updater = "2"
 
 # HTTP client
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "http2", "gzip", "brotli", "socks"] }
