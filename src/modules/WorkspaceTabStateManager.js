@@ -28,7 +28,7 @@ export class WorkspaceTabStateManager {
      * @returns {Promise<Object>}
      */
     async captureCurrentState() {
-        const { isGrpcMode } = await import('./requestModeManager.js');
+        const { isGrpcMode, isWebSocketMode } = await import('./requestModeManager.js');
         
         if (isGrpcMode()) {
             const grpcRequestJson = window.grpcBodyEditor
@@ -71,6 +71,35 @@ export class WorkspaceTabStateManager {
                           protocol: 'grpc'
                       }
                     : null
+            };
+        }
+
+        if (isWebSocketMode()) {
+            const websocketUrlInput = document.getElementById('websocket-url-input');
+
+            return {
+                request: {
+                    protocol: 'websocket',
+                    url: websocketUrlInput?.value || this.dom.urlInput?.value || '',
+                    method: 'WS',
+                    pathParams: {},
+                    queryParams: parseKeyValuePairs(this.dom.queryParamsList),
+                    headers: parseKeyValuePairs(this.dom.headersList),
+                    body: {
+                        mode: 'json',
+                        content: getRequestBodyContent() || ''
+                    },
+                    authType: 'none',
+                    authConfig: {}
+                },
+                endpoint: window.currentEndpoint
+                    ? {
+                          collectionId: window.currentEndpoint.collectionId,
+                          endpointId: window.currentEndpoint.endpointId,
+                          protocol: 'websocket'
+                      }
+                    : null,
+                activeResponseTab: this._getActiveResponseTab()
             };
         }
 
@@ -214,6 +243,56 @@ export class WorkspaceTabStateManager {
             }
             
             // Set window.currentEndpoint for gRPC requests so Ctrl+S save works
+            if (endpoint) {
+                window.currentEndpoint = endpoint;
+            }
+            return;
+        }
+
+        if (request.protocol === 'websocket') {
+            setRequestMode(RequestMode.WEBSOCKET);
+
+            if (this.dom.urlInput) {
+                this.dom.urlInput.value = request.url || '';
+            }
+            const websocketUrlInput = document.getElementById('websocket-url-input');
+            if (websocketUrlInput) {
+                websocketUrlInput.value = request.url || '';
+            }
+
+            if (this.graphqlBodyManager) {
+                this.graphqlBodyManager.setGraphQLModeEnabled(false);
+            }
+            setRequestBodyContent(request.body?.content || '');
+
+            if (this.dom.queryParamsList) {
+                clearKeyValueList(this.dom.queryParamsList);
+                if (request.queryParams && Object.keys(request.queryParams).length > 0) {
+                    populateKeyValueList(this.dom.queryParamsList, request.queryParams);
+                    updateUrlFromQueryParams();
+                } else {
+                    addKeyValueRow(this.dom.queryParamsList);
+                }
+            }
+
+            if (this.dom.headersList) {
+                clearKeyValueList(this.dom.headersList);
+                if (request.headers && Object.keys(request.headers).length > 0) {
+                    populateKeyValueList(this.dom.headersList, request.headers);
+                } else {
+                    addKeyValueRow(this.dom.headersList);
+                }
+            }
+
+            const activeResponseTab = tab.activeResponseTab || 'response-body';
+            activateTab('response', activeResponseTab);
+
+            if (response) {
+                await this._restoreResponse(response);
+            } else {
+                this._clearResponse();
+            }
+
             if (endpoint) {
                 window.currentEndpoint = endpoint;
             }
@@ -373,7 +452,9 @@ export class WorkspaceTabStateManager {
 
         // Restore response body with CodeMirror
         if (response.data) {
-            const formattedResponse = JSON.stringify(response.data, null, 2);
+            const formattedResponse = typeof response.data === 'string'
+                ? response.data
+                : JSON.stringify(response.data, null, 2);
             const contentType = response.headers?.['content-type'] || null;
             displayResponseWithLineNumbers(formattedResponse, contentType);
         } else {
@@ -421,6 +502,10 @@ export class WorkspaceTabStateManager {
         // Restore status display
         if (response.status) {
             updateStatusDisplay(`Status: ${response.status} ${response.statusText || ''}`, response.status);
+        } else if (response.websocket?.state === 'open') {
+            updateStatusDisplay('WebSocket connected', 101);
+        } else if (response.websocket?.state === 'closed') {
+            updateStatusDisplay('WebSocket closed', null);
         } else {
             updateStatusDisplay('Ready', null);
         }

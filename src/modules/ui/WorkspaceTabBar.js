@@ -342,13 +342,70 @@ export class WorkspaceTabBar {
             btn.appendChild(iconEl);
         }
 
-        btn.addEventListener('click', () => {
-            if (this.onTabCreate) {
-                this.onTabCreate();
-            }
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._showNewTabMenu(btn);
         });
 
         return btn;
+    }
+
+    /**
+     * Show protocol selection menu for new tab
+     * @private
+     */
+    _showNewTabMenu(button) {
+        // Remove any existing dropdown
+        const existingDropdown = document.querySelector('.workspace-tab-new-menu');
+        if (existingDropdown) {
+            existingDropdown.remove();
+            return;
+        }
+
+        const menu = document.createElement('div');
+        menu.className = 'workspace-tab-new-menu dropdown-panel visible';
+
+        const rect = button.getBoundingClientRect();
+        menu.style.position = 'fixed';
+        menu.style.top = `${rect.bottom + 4}px`;
+        menu.style.left = `${rect.left}px`;
+        menu.style.minWidth = '160px';
+        menu.style.zIndex = '1000';
+
+        const protocols = [
+            { label: 'HTTP', protocol: 'http' },
+            { label: 'WebSocket', protocol: 'websocket' },
+            { label: 'gRPC', protocol: 'grpc' }
+        ];
+
+        protocols.forEach(({ label, protocol }) => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item';
+
+            const labelEl = document.createElement('span');
+            labelEl.className = 'dropdown-item-label';
+            labelEl.textContent = label;
+            item.appendChild(labelEl);
+
+            item.addEventListener('click', () => {
+                menu.remove();
+                if (this.onTabCreate) {
+                    this.onTabCreate(protocol);
+                }
+            });
+
+            menu.appendChild(item);
+        });
+
+        document.body.appendChild(menu);
+
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target) && !button.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeMenu), 0);
     }
 
     /**

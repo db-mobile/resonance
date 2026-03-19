@@ -253,13 +253,14 @@ export class CollectionService {
             }
 
             const isGrpc = requestData.protocol === 'grpc';
+            const isWebSocket = requestData.protocol === 'websocket';
 
             const newEndpoint = {
                 id: this.generateEndpointId(collection),
                 name: requestData.name,
-                protocol: isGrpc ? 'grpc' : 'http',
-                method: isGrpc ? 'GRPC' : requestData.method,
-                path: isGrpc ? requestData.fullMethod : requestData.path,
+                protocol: isGrpc ? 'grpc' : (isWebSocket ? 'websocket' : 'http'),
+                method: isGrpc ? 'GRPC' : (isWebSocket ? 'WS' : requestData.method),
+                path: isGrpc ? requestData.fullMethod : (isWebSocket ? (requestData.url || requestData.path) : requestData.path),
                 description: '',
                 parameters: {
                     query: {},
@@ -274,7 +275,9 @@ export class CollectionService {
             collection.endpoints.push(newEndpoint);
 
             if (collection.folders && collection.folders.length > 0) {
-                const basePath = this.extractBasePath(isGrpc ? '/grpc' : requestData.path);
+                const basePath = this.extractBasePath(
+                    isGrpc ? '/grpc' : (isWebSocket ? '/websocket' : requestData.path)
+                );
                 
                 let targetFolder = collection.folders.find(folder => folder.name === basePath);
                 
@@ -299,6 +302,12 @@ export class CollectionService {
                     fullMethod: requestData.fullMethod || '',
                     requestJson: requestData.requestJson || '{}'
                 });
+            } else if (isWebSocket) {
+                await this.repository.savePersistedUrl(
+                    collectionId,
+                    newEndpoint.id,
+                    requestData.url || requestData.path || ''
+                );
             }
             
             this.statusDisplay.update(`Added new request: ${requestData.name}`, null);

@@ -20,6 +20,7 @@ import { handleSendRequest, handleCancelRequest, handleGenerateCurl, setGraphQLB
 import { GraphQLBodyManager } from './modules/graphqlBodyManager.js';
 import { initGrpcUI, setGrpcMetadata, setGrpcTls } from './modules/grpcHandler.js';
 import { initRequestModeManager } from './modules/requestModeManager.js';
+import { initWebSocketHandler } from './modules/websocketHandler.js';
 import { loadCollections, importOpenApiFile, importPostmanCollection, importPostmanEnvironment, initializeBodyTracking } from './modules/collectionManager.js';
 import { ThemeManager, SettingsModal } from './modules/themeManager.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
@@ -485,6 +486,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     initGrpcUI();
     initRequestModeManager();
+    await initWebSocketHandler();
 
     // Import menu for OpenAPI and Postman formats
     const importMenu = new ContextMenu();

@@ -16,8 +16,9 @@ import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanc
 import { getRequestBodyContent } from './requestBodyHelper.js';
 import { MockServerRepository } from './storage/MockServerRepository.js';
 import { MockServerService } from './services/MockServerService.js';
-import { isGrpcMode } from './requestModeManager.js';
+import { isGrpcMode, isWebSocketMode } from './requestModeManager.js';
 import { handleGrpcSend } from './grpcHandler.js';
+import { handleWebSocketCancel, handleWebSocketSend } from './websocketHandler.js';
 
 // Initialize CodeMirror editor for response display
 let responseEditor = null;
@@ -159,6 +160,12 @@ function setRequestInProgress(inProgress) {
 }
 
 export async function handleCancelRequest() {
+    if (isWebSocketMode()) {
+        await handleWebSocketCancel();
+        setRequestInProgress(false);
+        return;
+    }
+
     try {
         const requestTabId = window.workspaceTabController
             ? await window.workspaceTabController.service.getActiveTabId()
@@ -202,6 +209,92 @@ export async function handleSendRequest() {
     // Check if we're in gRPC mode - delegate to gRPC handler
     if (isGrpcMode()) {
         return handleGrpcSend();
+    }
+
+    if (isWebSocketMode()) {
+        if (window.currentEndpoint) {
+            await saveAllRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+        }
+
+        let websocketUrl = urlInput?.value?.trim() || '';
+        if (!websocketUrl && urlInput) {
+            websocketUrl = urlInput.getAttribute('value') || '';
+        }
+
+        const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
+        const headers = parseKeyValuePairs(document.getElementById('headers-list'));
+        const authData = authManager.generateAuthData();
+
+        Object.keys(authData.queryParams).forEach(key => {
+            if (!queryParams[key]) {
+                queryParams[key] = authData.queryParams[key];
+            }
+        });
+
+        Object.keys(authData.headers).forEach(key => {
+            headers[key] = authData.headers[key];
+        });
+
+        try {
+            const variableService = getVariableService();
+            const processor = new VariableProcessor();
+            processor.clearDynamicCache();
+
+            let variables = {};
+            if (window.currentEndpoint) {
+                variables = await variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
+            } else {
+                variables = await variableService.getVariables();
+            }
+
+            websocketUrl = processor.processTemplate(websocketUrl, variables);
+
+            const processedQueryParams = {};
+            for (const [key, value] of Object.entries(queryParams)) {
+                const processedKey = processor.processTemplate(key, variables);
+                const processedValue = processor.processTemplate(value, variables);
+                processedQueryParams[processedKey] = processedValue;
+            }
+
+            const processedHeaders = {};
+            for (const [key, value] of Object.entries(headers)) {
+                const processedKey = processor.processTemplate(key, variables);
+                const processedValue = processor.processTemplate(value, variables);
+                if (processedKey) {
+                    processedHeaders[processedKey] = processedValue;
+                }
+            }
+
+            for (const key in headers) {
+                delete headers[key];
+            }
+            Object.assign(headers, processedHeaders);
+
+            const queryPairs = [];
+            for (const [key, value] of Object.entries(processedQueryParams)) {
+                if (!key) {
+                    continue;
+                }
+                const encodedKey = key.includes('%') ? key : encodeURIComponent(key);
+                const encodedValue = value.includes('%') ? value : encodeURIComponent(value);
+                queryPairs.push(`${encodedKey}=${encodedValue}`);
+            }
+
+            const queryString = queryPairs.join('&');
+            const urlWithoutQuery = websocketUrl.split('?')[0];
+            websocketUrl = queryString ? `${urlWithoutQuery}?${queryString}` : urlWithoutQuery;
+        } catch (error) {
+            updateStatusDisplay(`Variable processing error: ${error.message}`, null);
+            return;
+        }
+
+        setRequestInProgress(true);
+        try {
+            await handleWebSocketSend(websocketUrl, headers);
+        } finally {
+            setRequestInProgress(false);
+        }
+        return;
     }
     
     if (window.currentEndpoint) {

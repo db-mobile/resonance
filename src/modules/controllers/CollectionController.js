@@ -236,10 +236,11 @@ export class CollectionController {
 
                 // Load all persisted data if available
                 const isGrpc = endpoint.protocol === 'grpc';
+                const isWebSocket = endpoint.protocol === 'websocket';
 
                 const persistedUrl = isGrpc ? null : await this.repository.getPersistedUrl(collection.id, endpoint.id);
-                const persistedAuthConfig = isGrpc ? null : await this.repository.getPersistedAuthConfig(collection.id, endpoint.id);
-                const persistedPathParams = isGrpc ? [] : await this.repository.getPersistedPathParams(collection.id, endpoint.id);
+                const persistedAuthConfig = (isGrpc || isWebSocket) ? null : await this.repository.getPersistedAuthConfig(collection.id, endpoint.id);
+                const persistedPathParams = (isGrpc || isWebSocket) ? [] : await this.repository.getPersistedPathParams(collection.id, endpoint.id);
                 const persistedQueryParams = isGrpc ? [] : await this.repository.getPersistedQueryParams(collection.id, endpoint.id);
                 const persistedHeaders = isGrpc ? [] : await this.repository.getPersistedHeaders(collection.id, endpoint.id);
                 const persistedBody = isGrpc ? null : await this.repository.getModifiedRequestBody(collection.id, endpoint.id);
@@ -248,7 +249,7 @@ export class CollectionController {
                 const endpointData = {
                     ...endpoint,
                     collectionId: collection.id,
-                    protocol: isGrpc ? 'grpc' : 'http',
+                    protocol: isGrpc ? 'grpc' : (isWebSocket ? 'websocket' : 'http'),
                     collectionBaseUrl: collection.baseUrl,
                     collectionDefaultHeaders: collection.defaultHeaders,
                     path: endpoint.path,
@@ -605,9 +606,11 @@ export class CollectionController {
             const nameInput = dialog.querySelector('#request-name');
             const protocolSelect = dialog.querySelector('#request-protocol');
             const methodSelect = dialog.querySelector('#request-method');
+            const methodGroup = methodSelect.closest('.form-group');
             const pathInput = dialog.querySelector('#request-path');
             const grpcTargetGroup = dialog.querySelector('#grpc-target-group');
             const grpcTargetInput = dialog.querySelector('#grpc-target');
+            const pathLabel = dialog.querySelector('label[for="request-path"]');
             const cancelBtn = dialog.querySelector('#cancel-btn');
 
             nameInput.focus();
@@ -623,16 +626,21 @@ export class CollectionController {
 
             const updateProtocolUI = () => {
                 const isGrpc = protocolSelect.value === 'grpc';
-                methodSelect.parentElement.classList.toggle('is-hidden', isGrpc);
+                const isWebSocket = protocolSelect.value === 'websocket';
+                methodGroup?.classList.toggle('is-hidden', isGrpc || isWebSocket);
                 pathInput.parentElement.classList.toggle('is-hidden', isGrpc);
                 grpcTargetGroup.classList.toggle('is-hidden', !isGrpc);
+                if (pathLabel) {
+                    pathLabel.textContent = isWebSocket ? 'URL:' : 'Path:';
+                }
+                pathInput.placeholder = isWebSocket ? 'wss://echo.websocket.events' : '/api/endpoint';
 
                 if (isGrpc) {
                     methodSelect.required = false;
                     pathInput.required = false;
                     grpcTargetInput.required = true;
                 } else {
-                    methodSelect.required = true;
+                    methodSelect.required = !isWebSocket;
                     pathInput.required = true;
                     grpcTargetInput.required = false;
                 }
@@ -656,6 +664,16 @@ export class CollectionController {
                             target,
                             fullMethod: '',
                             requestJson: '{}'
+                        });
+                    }
+                } else if (protocol === 'websocket') {
+                    const url = pathInput.value.trim();
+                    if (name && url) {
+                        cleanup();
+                        resolve({
+                            name,
+                            protocol: 'websocket',
+                            url
                         });
                     }
                 } else {
@@ -1040,6 +1058,7 @@ export class CollectionController {
             const endpointLocations = this._findAllEndpointLocations(collection, endpointId);
             const endpoint = endpointLocations.length > 0 ? endpointLocations[0].endpoint : null;
             const isGrpc = endpoint && endpoint.protocol === 'grpc';
+            const isWebSocket = endpoint && endpoint.protocol === 'websocket';
 
             if (isGrpc) {
                 const grpcTargetInput = document.getElementById('grpc-target-input');
@@ -1081,6 +1100,37 @@ export class CollectionController {
                 await this.repository.save(collections);
                 await this.loadCollectionsWithExpansionState();
 
+                this.statusDisplay.update('Request saved', null);
+                return;
+            }
+
+            if (isWebSocket) {
+                const urlInput = document.getElementById('url-input');
+                const queryParamsList = document.getElementById('query-params-list');
+                const headersList = document.getElementById('headers-list');
+                const bodyInput = document.getElementById('body-input');
+
+                if (urlInput && urlInput.value) {
+                    await this.repository.savePersistedUrl(collectionId, endpointId, urlInput.value);
+                }
+
+                if (queryParamsList) {
+                    const queryParams = parseKeyValuePairs(queryParamsList);
+                    const queryParamsArray = Object.entries(queryParams).map(([key, value]) => ({ key, value }));
+                    await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParamsArray);
+                }
+
+                if (headersList) {
+                    const headers = parseKeyValuePairs(headersList);
+                    const headersArray = Object.entries(headers).map(([key, value]) => ({ key, value }));
+                    await this.repository.savePersistedHeaders(collectionId, endpointId, headersArray);
+                }
+
+                if (bodyInput) {
+                    await this.service.saveRequestBodyModification(collectionId, endpointId, bodyInput);
+                }
+
+                await this.loadCollectionsWithExpansionState();
                 this.statusDisplay.update('Request saved', null);
                 return;
             }

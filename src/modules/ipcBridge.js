@@ -51,6 +51,10 @@ if (isTauri) {
         },
         sendApiRequest: (requestOptions) => invoke('send_api_request', { requestOptions }),
         cancelApiRequest: () => invoke('cancel_api_request'),
+        websocket: {
+            send: (request) => invoke('websocket_send', { request }),
+            close: (tabId) => invoke('websocket_close', { tabId })
+        },
         store: {
             get: (key) => invoke('store_get', { key }),
             set: (key, value) => invoke('store_set', { key, value })

@@ -235,13 +235,13 @@ export class RunnerPanel {
         const endpoints = [];
 
         if (collection.endpoints) {
-            endpoints.push(...collection.endpoints.filter(e => e.protocol !== 'grpc'));
+            endpoints.push(...collection.endpoints.filter(e => e.protocol === 'http'));
         }
 
         if (collection.folders) {
             collection.folders.forEach(folder => {
                 if (folder.endpoints) {
-                    endpoints.push(...folder.endpoints.filter(e => e.protocol !== 'grpc'));
+                    endpoints.push(...folder.endpoints.filter(e => e.protocol === 'http'));
                 }
             });
         }

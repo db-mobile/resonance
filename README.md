@@ -9,18 +9,21 @@ A local-first, zero-account API client with excellent user experience built with
 ## Features
 
 ### Collection Import & Management
+
 - **OpenAPI/Swagger Import**: Import OpenAPI 3.0 specifications (YAML/JSON) with automatic schema-based example generation
 - **Postman Import**: Import Postman Collection Format v2.0 and v2.1 files
 - **Postman Environment Import**: Import Postman environment files with variables
 - **Smart Folder Organization**: Both formats create consistent flat folder structures by path segment
 
 ### Code Generation
+
 - **Multi-Language Export**: Generate request code in 9 languages:
   - cURL, Python (requests), JavaScript (Fetch), JavaScript (Axios)
   - Node.js (axios), Go (net/http), PHP (cURL), Ruby (net/http), Java (HttpClient)
 
 ### GraphQL Support
-- **Full GraphQL Integration**: Dedicated editors for GraphQL queries and testing
+
+- **GraphQL Integration**: Dedicated editors for GraphQL queries and testing
   - Dropdown selector to switch between JSON and GraphQL body modes
   - GraphQL query editor with syntax highlighting
   - Variables editor with JSON syntax highlighting and validation
@@ -28,7 +31,8 @@ A local-first, zero-account API client with excellent user experience built with
   - Auto-save functionality for queries and variables
 
 ### gRPC Support
-- **Full gRPC Integration**: Native gRPC client with server reflection
+
+- **gRPC Integration**: Native gRPC client with server reflection
   - Automatic service and method discovery via gRPC reflection
   - TLS support for secure connections
   - Request metadata (headers) configuration
@@ -36,7 +40,17 @@ A local-first, zero-account API client with excellent user experience built with
   - JSON-based message editing with schema-generated skeletons
   - Unary RPC support
 
+### WebSocket Support
+
+- **Native WebSocket Integration**: Native WebSocket client with persistent connections
+  - `ws://` and `wss://` support
+  - Reusable connections per request tab
+  - Handshake header configuration
+  - Message sending with transcript-style response display
+  - Request creation and persistence alongside HTTP and gRPC requests
+
 ### Collection Runner
+
 - **Batch Request Execution**: Run multiple requests sequentially with configurable options
   - Select requests from any collection and arrange execution order
   - Post-response scripts for variable chaining between requests
@@ -46,6 +60,7 @@ A local-first, zero-account API client with excellent user experience built with
   - Save and reload runner configurations
 
 ### Advanced Features
+
 - **Scripts & Automation**: Pre-request and test scripts with JavaScript execution (powered by Boa Engine)
   - **Pre-request Scripts**: Modify requests dynamically (headers, body, auth signatures)
   - **Test Scripts**: Validate responses with assertions and extract data
@@ -65,6 +80,7 @@ A local-first, zero-account API client with excellent user experience built with
   - Real-time request logging and monitoring
 
 ### Environment & Variables
+
 - **Environment Management**: Organize variables into environments (Development, Staging, Production, etc.)
 - **Variable Templating**: Use `{{ variableName }}` syntax for dynamic values in URLs, headers, and request bodies
 - **Dynamic Variables**: Auto-generated values with `{{$variableName}}` syntax (UUID, timestamps, random strings, etc.)
@@ -72,11 +88,13 @@ A local-first, zero-account API client with excellent user experience built with
 - **Import/Export**: Share environments with your team or backup as JSON files
 
 ### Authentication
+
 - **Multiple Auth Methods**: Bearer Token, Basic Auth, API Key, OAuth 2.0, Digest Auth
 - **Per-Request Configuration**: Set authentication at request, folder, or collection level
 - **Secure Credential Storage**: All credentials encrypted and stored securely
 
 ### User Experience
+
 - **Keyboard Shortcuts**: Comprehensive shortcuts for all actions with platform-aware bindings (⌘/Ctrl)
 - **Multi-Theme Support**: Light, dark, system-adaptive, and black (OLED) themes with 9 accent colors
 - **Internationalization**: Translations for English, Brazilian Portuguese, German, Spanish, French and Italian
@@ -84,6 +102,7 @@ A local-first, zero-account API client with excellent user experience built with
 - **Resizable Panels**: Customizable workspace layout with draggable panel dividers
 
 ### Technical Features
+
 - **HTTP Version Control**: Support for HTTP/1.1 and HTTP/2
 - **Request Timeouts**: Configurable timeout settings per request
 - **Secure Architecture**: Tauri's secure IPC, CSP policies, and native system integration
@@ -144,17 +163,20 @@ brew install --cask resonance
 #### Building from Source
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/db-mobile/resonance.git
 cd resonance
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Start the application in development mode:
+
 ```bash
 npm run dev
 ```
@@ -162,6 +184,7 @@ npm run dev
 ### Build for Distribution
 
 Build the application for production:
+
 ```bash
 npm run build:tauri
 ```
@@ -169,6 +192,7 @@ npm run build:tauri
 The built application will be in `src-tauri/target/release/bundle/`.
 
 **Note:** Tauri creates native installers for each platform:
+
 - **Linux**: AppImage, .deb
 - **macOS**: .app, .dmg
 - **Windows**: .msi, .exe
@@ -186,12 +210,13 @@ The built application will be in `src-tauri/target/release/bundle/`.
 4. **Switch Environments**: Use the environment selector dropdown to quickly switch between different API contexts
 5. **Make Requests**: Select endpoints from the collections sidebar and configure path params, query params, headers, body, auth, and scripts
 6. **Add Scripts (Optional)**: Write pre-request scripts to modify requests dynamically or test scripts to validate responses
-7. **View Responses**: Examine response data in the tabbed viewer (Body, Headers, Cookies, Performance, Scripts for HTTP; Body, Metadata, Trailers for gRPC)
+7. **View Responses**: Examine response data in the tabbed viewer (Body, Headers, Cookies, Performance, Scripts for HTTP; Body transcript for WebSocket; Body, Metadata, Trailers for gRPC)
 8. **Export Code**: Generate request code in your preferred language for documentation or automation
 
 ### Environment Management
 
 Organize your API variables into separate environments:
+
 - **Create Multiple Environments**: Development, Staging, Production, or any custom environment
 - **Environment-Specific Variables**: Each environment has its own set of variables
 - **Quick Switching**: Use the dropdown selector to instantly switch between environments
@@ -201,6 +226,7 @@ Organize your API variables into separate environments:
 ### Variable System
 
 Variables use the `{{ variableName }}` syntax and can be used in:
+
 - Request URLs
 - Headers
 - Query parameters
@@ -209,6 +235,7 @@ Variables use the `{{ variableName }}` syntax and can be used in:
 Variables are scoped to the active environment, allowing different values for different contexts.
 
 Example:
+
 ```
 URL: {{ baseUrl }}/users/{{ userId }}
 Header: Authorization: Bearer {{ apiKey }}
@@ -220,24 +247,25 @@ The values of `baseUrl` and `apiKey` will automatically change when you switch e
 
 Dynamic variables use the `{{$variableName}}` syntax and generate values automatically at request time. They don't need to be defined in advance.
 
-| Variable | Description | Example Output |
-|----------|-------------|----------------|
-| `{{$uuid}}` | Random UUID v4 | `550e8400-e29b-41d4-a716-446655440000` |
-| `{{$timestamp}}` | Unix timestamp (seconds) | `1737129600` |
-| `{{$timestampMs}}` | Unix timestamp (milliseconds) | `1737129600000` |
-| `{{$isoTimestamp}}` | ISO 8601 formatted date | `2026-01-17T12:00:00.000Z` |
-| `{{$randomInt}}` | Random integer 0-1000 | `742` |
-| `{{$randomInt:min:max}}` | Random integer in range | `{{$randomInt:1:100}}` → `57` |
-| `{{$randomString}}` | Random 8-character string | `xK9mPq2R` |
-| `{{$randomString:N}}` | Random N-character string | `{{$randomString:16}}` → `xK9mPq2RaB3nLp8Y` |
-| `{{$randomEmail}}` | Random email address | `abc12345@example.com` |
-| `{{$randomName}}` | Random full name | `John Smith` |
+| Variable                 | Description                   | Example Output                              |
+| ------------------------ | ----------------------------- | ------------------------------------------- |
+| `{{$uuid}}`              | Random UUID v4                | `550e8400-e29b-41d4-a716-446655440000`      |
+| `{{$timestamp}}`         | Unix timestamp (seconds)      | `1737129600`                                |
+| `{{$timestampMs}}`       | Unix timestamp (milliseconds) | `1737129600000`                             |
+| `{{$isoTimestamp}}`      | ISO 8601 formatted date       | `2026-01-17T12:00:00.000Z`                  |
+| `{{$randomInt}}`         | Random integer 0-1000         | `742`                                       |
+| `{{$randomInt:min:max}}` | Random integer in range       | `{{$randomInt:1:100}}` → `57`               |
+| `{{$randomString}}`      | Random 8-character string     | `xK9mPq2R`                                  |
+| `{{$randomString:N}}`    | Random N-character string     | `{{$randomString:16}}` → `xK9mPq2RaB3nLp8Y` |
+| `{{$randomEmail}}`       | Random email address          | `abc12345@example.com`                      |
+| `{{$randomName}}`        | Random full name              | `John Smith`                                |
 
 **Per-Request Consistency**: The same dynamic variable used multiple times within a single request will resolve to the same value. For example, using `{{$uuid}}` in both the URL and a header will produce identical UUIDs.
 
 ### Authentication
 
 Resonance supports multiple authentication methods:
+
 - **Bearer Token**: OAuth 2.0 and custom bearer tokens
 - **Basic Auth**: Username/password authentication with base64 encoding
 - **API Key**: Custom header or query parameter authentication
@@ -250,6 +278,7 @@ All authentication credentials are automatically applied to requests and work se
 
 **OpenAPI Integration**
 Resonance automatically:
+
 - Parses OpenAPI 3.0 specifications (YAML/JSON)
 - Generates intelligent example request bodies from schemas
 - Resolves schema references and nested objects
@@ -257,6 +286,7 @@ Resonance automatically:
 
 **Postman Integration**
 Import your existing Postman collections:
+
 - Supports Postman Collection Format v2.0 and v2.1
 - Preserves exact request examples from your collections
 - Automatically extracts collection variables
@@ -269,12 +299,14 @@ Import your existing Postman collections:
 Test your API clients without a running backend using Resonance's built-in mock server:
 
 **Getting Started with Mock Server**
+
 1. Click the Mock Server icon in the toolbar to open the mock server dialog
 2. Configure the port (default: 3000)
 3. Select which collections to mock by enabling their checkboxes
 4. Click "Start Server" to begin mocking
 
 **Features**
+
 - **Automatic Response Generation**: Generates realistic responses from OpenAPI schemas
 - **Custom Responses**: Override default responses with custom JSON for any endpoint
 - **Configurable Delays**: Add realistic latency by setting delays (0-30000ms) per endpoint
@@ -283,11 +315,13 @@ Test your API clients without a running backend using Resonance's built-in mock 
 
 **Per-Endpoint Configuration**
 Click the "Edit" button next to any endpoint to:
+
 - Set custom response body (JSON)
 - Configure request delay in milliseconds
 - Reset to schema-generated defaults
 
 The mock server is perfect for:
+
 - Frontend development without backend dependencies
 - Testing error scenarios and edge cases
 - Simulating network latency and slow responses
@@ -298,6 +332,7 @@ The mock server is perfect for:
 Automate your API testing and workflows with pre-request and test scripts written in JavaScript.
 
 **Getting Started with Scripts**
+
 1. Select an endpoint from your collections
 2. Click the **Scripts** tab in the request configuration area
 3. Write your scripts in the two available sub-tabs:
@@ -309,22 +344,25 @@ Automate your API testing and workflows with pre-request and test scripts writte
 **Pre-request Script Examples**
 
 Add dynamic authentication headers:
+
 ```javascript
-const apiKey = environment.get('API_KEY');
-request.headers['Authorization'] = `Bearer ${apiKey}`;
-console.log('Added auth header');
+const apiKey = environment.get("API_KEY");
+request.headers["Authorization"] = `Bearer ${apiKey}`;
+console.log("Added auth header");
 ```
 
 Generate timestamps and signatures:
+
 ```javascript
 const timestamp = Date.now();
-request.headers['X-Timestamp'] = timestamp.toString();
-request.headers['X-Signature'] = btoa(`${request.method}:${timestamp}`);
+request.headers["X-Timestamp"] = timestamp.toString();
+request.headers["X-Signature"] = btoa(`${request.method}:${timestamp}`);
 ```
 
 **Test Script Examples**
 
 Validate response and extract data:
+
 ```javascript
 // Verify status code
 expect(response.status).toBe(200);
@@ -335,20 +373,22 @@ expect(response.body.user.email).toMatch(/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/);
 
 // Extract token for next request
 const token = response.body.token;
-environment.set('AUTH_TOKEN', token);
-console.log('Token saved for subsequent requests');
+environment.set("AUTH_TOKEN", token);
+console.log("Token saved for subsequent requests");
 ```
 
 Check performance:
+
 ```javascript
 expect(response.status).toBe(200);
 expect(response.timings.total).toBeLessThan(1000);
-console.log('Response time:', response.timings.total, 'ms');
+console.log("Response time:", response.timings.total, "ms");
 ```
 
 **Available APIs**
 
 Scripts have access to powerful APIs:
+
 - `request` - Modify URL, method, headers, body, query params, path params
 - `response` (test only) - Access status, headers, body, cookies, timings
 - `environment` - Get/set/delete environment variables
@@ -356,6 +396,7 @@ Scripts have access to powerful APIs:
 - `expect()` - Rich assertion library (toBe, toEqual, toContain, toHaveProperty, toMatch, etc.)
 
 **Common Use Cases**
+
 - Request chaining (login → extract token → use in next request)
 - Dynamic authentication signature generation
 - Automated response validation and testing
@@ -370,6 +411,7 @@ For comprehensive documentation with more examples, troubleshooting, and API ref
 Resonance supports GraphQL queries with dedicated editors for queries and variables.
 
 **Using GraphQL Mode**
+
 1. Navigate to the **Body** tab in the request configuration area
 2. Use the dropdown selector at the top to switch from **JSON** to **GraphQL**
 3. Write your GraphQL query in the query editor
@@ -378,6 +420,7 @@ Resonance supports GraphQL queries with dedicated editors for queries and variab
 6. Send the request to see results
 
 **Query Editor Example**
+
 ```graphql
 query GetUser($userId: ID!) {
   user(id: $userId) {
@@ -394,6 +437,7 @@ query GetUser($userId: ID!) {
 ```
 
 **Variables Editor Example**
+
 ```json
 {
   "userId": "123"
@@ -401,6 +445,7 @@ query GetUser($userId: ID!) {
 ```
 
 **Features**
+
 - **Syntax Highlighting**: Full GraphQL syntax highlighting in the query editor
 - **Variables Support**: Separate JSON editor for GraphQL variables with validation
 - **Auto-Format**: Format button to automatically format your GraphQL queries
@@ -409,6 +454,7 @@ query GetUser($userId: ID!) {
 
 **Combined with Scripts**
 GraphQL works seamlessly with pre-request and test scripts:
+
 - Use pre-request scripts to modify GraphQL queries dynamically
 - Use test scripts to validate GraphQL response structure
 - Extract data from GraphQL responses and save to environment variables
@@ -416,6 +462,7 @@ GraphQL works seamlessly with pre-request and test scripts:
 ### Themes
 
 Switch between themes in Settings:
+
 - **Light**: Clean, bright interface
 - **Dark**: Easy on the eyes for low-light environments
 - **System**: Automatically matches your OS theme
@@ -424,6 +471,7 @@ Switch between themes in Settings:
 ### Accent Colors
 
 Personalize your interface with 9 accent colors:
+
 - Green (default), Teal, Blue, Indigo, Purple, Yellow, Orange, Red, Pink
 
 Accent colors are applied to buttons, highlights, and interactive elements throughout the application.
@@ -433,25 +481,30 @@ Accent colors are applied to buttons, highlights, and interactive elements throu
 Resonance includes comprehensive keyboard shortcuts to speed up your workflow. Press `Ctrl+/` (or `Cmd+/` on macOS) to view the shortcuts help dialog in the app.
 
 ### Request Actions
+
 - `Ctrl/Cmd+Enter` - Send request
 - `Ctrl/Cmd+S` - Save request modifications
 - `Esc` - Cancel current request
 
 ### Navigation
+
 - `Ctrl/Cmd+L` - Focus URL bar
 - `Ctrl/Cmd+B` - Toggle collections sidebar
 - `Ctrl/Cmd+H` - Toggle history sidebar
 
 ### Actions
+
 - `Ctrl/Cmd+K` - Generate code (multi-language export)
 - `Ctrl/Cmd+O` - Import collection (shows import menu)
 - `Ctrl/Cmd+E` - Open environment manager
 
 ### Settings & Help
+
 - `Ctrl/Cmd+,` - Open settings
 - `Ctrl/Cmd+/` or `Shift+/` - Show keyboard shortcuts help
 
 ### Workspace Tabs
+
 - `Ctrl/Cmd+T` - Create new workspace tab
 - `Ctrl/Cmd+W` - Close current workspace tab
 - `Ctrl/Cmd+Tab` - Switch to next workspace tab
@@ -459,6 +512,7 @@ Resonance includes comprehensive keyboard shortcuts to speed up your workflow. P
 - `Ctrl/Cmd+1` through `Ctrl/Cmd+9` - Switch to workspace tab 1-9
 
 ### Request Tabs
+
 - `Alt+1` - Switch to Path Params tab
 - `Alt+2` - Switch to Query Params tab
 - `Alt+3` - Switch to Headers tab
@@ -599,6 +653,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Roadmap
 
 ### Completed
+
 - [x] OpenAPI 3.0 import with schema-based generation
 - [x] Postman collection import (v2.0 & v2.1)
 - [x] Postman environment import
@@ -623,10 +678,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] GraphQL support with dedicated query and variables editors
 - [x] Tauri v2 migration for smaller bundle and better performance
 - [x] gRPC support with server reflection and unary RPC
+- [x] WebSocket support with native backend transport and handshake headers
 - [x] Collection runner for batch request execution with variable chaining
 
 ### Planned
-- [ ] WebSocket support
+
 - [ ] Response comparison and diff view
 - [ ] Plugin system for extensions
 - [ ] Team collaboration features
