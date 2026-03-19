@@ -92,6 +92,7 @@ export function setRequestMode(mode) {
 function updateUIForMode(mode) {
     const methodSelectContainer = document.querySelector('.method-select-container');
     const urlInput = document.getElementById('url-input');
+    const urlInputContainer = urlInput?.closest('.url-autocomplete-wrapper') || urlInput;
     const curlBtn = document.getElementById('curl-btn');
     
     // Get all request config tab buttons
@@ -102,8 +103,8 @@ function updateUIForMode(mode) {
         if (methodSelectContainer) {
             methodSelectContainer.style.display = 'none';
         }
-        if (urlInput) {
-            urlInput.style.display = 'none';
+        if (urlInputContainer) {
+            urlInputContainer.style.display = 'none';
         }
         if (curlBtn) {
             curlBtn.style.display = 'none';
@@ -133,8 +134,8 @@ function updateUIForMode(mode) {
         if (methodSelectContainer) {
             methodSelectContainer.style.display = '';
         }
-        if (urlInput) {
-            urlInput.style.display = '';
+        if (urlInputContainer) {
+            urlInputContainer.style.display = '';
         }
         if (curlBtn) {
             curlBtn.style.display = '';

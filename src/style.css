@@ -411,6 +411,8 @@ body {
    display: none;
    gap: 8px;
    align-items: center;
+   min-width: 0;
+   width: 100%;
  }
 
  .grpc-badge {
@@ -423,10 +425,17 @@ body {
  }
 
  .grpc-target-wrapper {
-   flex: 1;
+   flex: 1 1 0;
    display: flex;
    align-items: center;
    gap: 8px;
+   min-width: 0;
+   width: 0;
+ }
+
+ .grpc-target-wrapper .url-input {
+   flex: unset;
+   width: 100%;
  }
 
  .modal-overlay--dim {
@@ -4656,6 +4665,8 @@ body {
     flex: 1;
     gap: 8px;
     align-items: center;
+    min-width: 0;
+    width: 100%;
 }
 
 .grpc-badge {
@@ -4673,6 +4684,17 @@ body {
 .grpc-url-section input[type="text"] {
     flex: 1;
     min-width: 200px;
+}
+
+.grpc-target-wrapper {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 0;
+}
+
+.grpc-target-wrapper .url-input {
+    flex: unset;
+    width: 100%;
 }
 
 .grpc-url-section label {
