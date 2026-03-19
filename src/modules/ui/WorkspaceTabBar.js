@@ -609,9 +609,38 @@ export class WorkspaceTabBar {
                         if (window.workspaceTabController) {
                             await window.workspaceTabController.markCurrentTabUnmodified();
                         }
+                    } else if (window.workspaceTabController && tab.type !== 'runner') {
+                        // No endpoint - show "Save to Collection" dialog
+                        const { saveRequestToCollection } = await import('../collectionManager.js');
+                        const state = await window.workspaceTabController.stateManager.captureCurrentState();
+                        const requestData = {
+                            name: tab.name,
+                            ...state.request
+                        };
+                        const result = await saveRequestToCollection(requestData);
+                        if (result) {
+                            // Update current endpoint and tab
+                            window.currentEndpoint = {
+                                collectionId: result.collectionId,
+                                endpointId: result.endpointId
+                            };
+                            await window.workspaceTabController.service.updateTab(tab.id, {
+                                name: result.name,
+                                endpoint: {
+                                    collectionId: result.collectionId,
+                                    endpointId: result.endpointId,
+                                    protocol: state.request.protocol || 'http'
+                                }
+                            });
+                            await window.workspaceTabController.markCurrentTabUnmodified();
+                            // Re-render tab bar to update the tab with new name
+                            const tabs = await window.workspaceTabController.service.getAllTabs();
+                            const activeTabId = await window.workspaceTabController.service.getActiveTabId();
+                            this.render(tabs, activeTabId);
+                        }
                     }
                 },
-                disabled: !tab.endpoint
+                disabled: tab.type === 'runner'
             },
             { divider: true },
             {

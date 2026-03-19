@@ -2178,13 +2178,11 @@ body {
 /* Expandable Container - Shared Base for Collections/Folders */
 .collection-item,
 .folder-item {
-  --expandable-header-bg: var(--bg-white);
-  --expandable-header-hover: var(--bg-secondary);
-  --expandable-content-bg: var(--bg-white);
   overflow: hidden;
   transition: all var(--transition-base);
   display: flex;
   flex-direction: column;
+  background: transparent;
 }
 
 /* Collection Item Specifics */
@@ -2193,8 +2191,6 @@ body {
   border: 0;
   border-radius: 0;
   flex-shrink: 0;
-  --expandable-header-bg: transparent;
-  --expandable-content-bg: transparent;
 }
 
 .collection-item:hover {
@@ -2209,13 +2205,13 @@ body {
 .folder-header {
   cursor: pointer;
   justify-content: flex-start;
-  background: var(--expandable-header-bg);
+  background: transparent;
   transition: all var(--transition-base);
 }
 
 .collection-header:hover,
 .folder-header:hover {
-  background: var(--expandable-header-hover);
+  background: var(--bg-secondary);
 }
 
 .collection-header {
@@ -2227,8 +2223,6 @@ body {
   padding: var(--space-2) var(--space-3);
   padding-left: var(--space-5);
   gap: var(--space-2);
-  --expandable-header-bg: transparent;
-  --expandable-header-hover: var(--bg-secondary);
 }
 
 /* Expandable Names */
@@ -2266,7 +2260,7 @@ body {
 .collection-endpoints,
 .folder-endpoints {
   display: none;
-  background: var(--expandable-content-bg);
+  background: transparent;
 }
 
 .collection-endpoints {

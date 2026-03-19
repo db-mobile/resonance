@@ -91,10 +91,20 @@ button:hover {
 }
 
 .collection-item,
+.collection-header,
 .collection-endpoints,
+.folder-item,
+.folder-header,
+.folder-endpoints,
 .endpoint-item {
   background: transparent !important;
   color: var(--text-primary) !important;
+}
+
+.collection-header:hover,
+.folder-header:hover,
+.endpoint-item:hover {
+  background: var(--bg-secondary) !important;
 }
 
 /* Tab Navigation */

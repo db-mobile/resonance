@@ -171,6 +171,18 @@ export function restoreLastSelectedRequest() {
 }
 
 /**
+ * Shows dialog to save current request to a collection
+ *
+ * @async
+ * @param {Object} requestData - Current request data from the active tab
+ * @returns {Promise<{collectionId: string, endpointId: string}|null>} Collection and endpoint IDs if saved, null if cancelled
+ */
+export async function saveRequestToCollection(requestData) {
+    const controller = initializeController();
+    return controller.showSaveToCollectionDialog(requestData);
+}
+
+/**
  * Generates placeholder request body from schema
  *
  * @deprecated Use SchemaProcessor class instead

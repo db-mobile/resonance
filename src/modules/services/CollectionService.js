@@ -355,6 +355,64 @@ export class CollectionService {
     }
 
     /**
+     * Renames a request in a collection
+     *
+     * Updates the endpoint name in both the collection's endpoints array
+     * and any folders containing the endpoint.
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID to rename
+     * @param {string} newName - The new name for the request
+     * @returns {Promise<Object>} The updated endpoint object
+     * @throws {Error} If collection or endpoint is not found or update fails
+     */
+    async renameRequest(collectionId, endpointId, newName) {
+        try {
+            this.statusDisplay.update('Renaming request...', null);
+
+            const collection = await this.repository.getById(collectionId);
+            if (!collection) {
+                throw new Error(`Collection with id ${collectionId} not found`);
+            }
+
+            let updatedEndpoint = null;
+
+            if (collection.endpoints) {
+                const endpoint = collection.endpoints.find(ep => ep.id === endpointId);
+                if (endpoint) {
+                    endpoint.name = newName;
+                    updatedEndpoint = endpoint;
+                }
+            }
+
+            if (collection.folders && collection.folders.length > 0) {
+                collection.folders.forEach(folder => {
+                    if (folder.endpoints) {
+                        const endpoint = folder.endpoints.find(ep => ep.id === endpointId);
+                        if (endpoint) {
+                            endpoint.name = newName;
+                            updatedEndpoint = endpoint;
+                        }
+                    }
+                });
+            }
+
+            if (!updatedEndpoint) {
+                throw new Error(`Endpoint with id ${endpointId} not found in collection`);
+            }
+
+            await this.repository.update(collectionId, collection);
+
+            this.statusDisplay.update(`Request renamed to "${newName}"`, null);
+            return updatedEndpoint;
+        } catch (error) {
+            this.statusDisplay.update(`Error renaming request: ${error.message}`, null);
+            throw error;
+        }
+    }
+
+    /**
      * Deletes a request from a collection
      *
      * Removes the endpoint from the collection and all folders, and cleans up

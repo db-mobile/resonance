@@ -38,7 +38,9 @@
   },
   "endpoint": {
     "delete_title": "Delete Request",
-    "confirm_delete": "Are you sure you want to delete the request \"{{name}}\"?\n\nThis action cannot be undone."
+    "confirm_delete": "Are you sure you want to delete the request \"{{name}}\"?\n\nThis action cannot be undone.",
+    "rename_title": "Rename Request",
+    "rename_label": "Request Name:"
   },
   "context_menu": {
     "new_collection": "New Collection",
@@ -50,6 +52,7 @@
     "export_postman": "Export as Postman",
     "rename_collection": "Rename Collection",
     "delete_collection": "Delete Collection",
+    "rename_request": "Rename Request",
     "delete_request": "Delete Request"
   },
   "curl_import": {
@@ -83,6 +86,18 @@
     "name_label": "Collection Name:",
     "name_placeholder": "My Collection",
     "create": "Create",
+    "cancel": "Cancel"
+  },
+  "save_to_collection": {
+    "title": "Save to Collection",
+    "name_label": "Request Name:",
+    "name_placeholder": "My Request",
+    "collection_label": "Collection:",
+    "select_collection": "Select a collection...",
+    "new_collection_name": "New Collection Name:",
+    "new_collection_placeholder": "My Collection",
+    "create_new": "+ Create new collection",
+    "save": "Save",
     "cancel": "Cancel"
   },
   "request": {
@@ -172,6 +187,7 @@
     "cancel": "Cancel",
     "save": "Save",
     "delete": "Delete",
+    "rename": "Rename",
     "edit": "Edit",
     "add": "Add",
     "remove": "Remove",

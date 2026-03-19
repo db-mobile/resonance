@@ -339,6 +339,10 @@ function createGrpcUrlSection() {
         targetInput.value = existingTarget.value;
         targetInput.addEventListener('input', () => {
             existingTarget.value = targetInput.value;
+            // Mark tab as modified when gRPC target changes
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
         });
         existingTarget.addEventListener('input', () => {
             targetInput.value = existingTarget.value;
@@ -395,6 +399,10 @@ function createWebSocketUrlSection() {
         urlInput.value = existingUrlInput.value;
         urlInput.addEventListener('input', () => {
             existingUrlInput.value = urlInput.value;
+            // Mark tab as modified when WebSocket URL changes
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
         });
         existingUrlInput.addEventListener('input', () => {
             urlInput.value = existingUrlInput.value;

@@ -359,6 +359,12 @@ export class CollectionController {
     handleEndpointContextMenu(event, collection, endpoint) {
         const menuItems = [
             {
+                label: 'Rename Request',
+                translationKey: 'context_menu.rename_request',
+                iconClass: ContextMenu.createRenameIcon(),
+                onClick: () => this.handleRenameRequest(collection, endpoint)
+            },
+            {
                 label: 'Delete Request',
                 translationKey: 'context_menu.delete_request',
                 iconClass: ContextMenu.createDeleteIcon(),
@@ -710,6 +716,204 @@ export class CollectionController {
     }
 
     /**
+     * Shows dialog for saving current request to a collection
+     *
+     * Allows saving to an existing collection or creating a new one.
+     *
+     * @async
+     * @param {Object} requestData - Current request data from the active tab
+     * @returns {Promise<{collectionId: string, endpointId: string}|null>} Collection and endpoint IDs if saved, null if cancelled
+     */
+    async showSaveToCollectionDialog(requestData) {
+        const collections = await this.repository.getAll();
+
+        return new Promise((resolve) => {
+            const fragment = templateLoader.cloneSync(
+                './src/templates/collections/newDialogs.html',
+                'tpl-save-to-collection-dialog'
+            );
+            const dialog = fragment.firstElementChild;
+
+            document.body.appendChild(dialog);
+
+            if (window.i18n && window.i18n.updateUI) {
+                window.i18n.updateUI();
+            }
+
+            const form = dialog.querySelector('#save-to-collection-form');
+            const nameInput = dialog.querySelector('#save-request-name');
+            const collectionSelect = dialog.querySelector('#save-collection-select');
+            const newCollectionGroup = dialog.querySelector('#new-collection-name-group');
+            const newCollectionInput = dialog.querySelector('#new-collection-name-input');
+            const cancelBtn = dialog.querySelector('#cancel-btn');
+
+            // Pre-fill request name from tab name or generate from URL
+            if (requestData.name && requestData.name !== 'New Request' && 
+                requestData.name !== 'New WebSocket' && requestData.name !== 'New gRPC') {
+                nameInput.value = requestData.name;
+            } else if (requestData.url && requestData.url.trim()) {
+                try {
+                    const urlObj = new URL(requestData.url);
+                    const path = urlObj.pathname;
+                    const segments = path.split('/').filter(s => s);
+                    if (segments.length > 0) {
+                        const endpoint = `/${segments[segments.length - 1]}`;
+                        nameInput.value = `${requestData.method || 'GET'} ${endpoint}`;
+                    }
+                } catch {
+                    // URL parsing failed, leave empty for user to fill
+                }
+            }
+
+            // Populate collection dropdown
+            collections.forEach(collection => {
+                const option = document.createElement('option');
+                option.value = collection.id;
+                option.textContent = collection.name;
+                collectionSelect.appendChild(option);
+            });
+
+            // Add "Create new collection" option
+            const newCollectionOption = document.createElement('option');
+            newCollectionOption.value = '__new__';
+            newCollectionOption.textContent = window.i18n?.t('save_to_collection.create_new') || '+ Create new collection';
+            collectionSelect.appendChild(newCollectionOption);
+
+            nameInput.focus();
+
+            const cleanup = () => {
+                dialog.remove();
+            };
+
+            collectionSelect.addEventListener('change', () => {
+                const isNewCollection = collectionSelect.value === '__new__';
+                newCollectionGroup.classList.toggle('is-hidden', !isNewCollection);
+                newCollectionInput.required = isNewCollection;
+                if (isNewCollection) {
+                    newCollectionInput.focus();
+                }
+            });
+
+            cancelBtn.addEventListener('click', () => {
+                cleanup();
+                resolve(null);
+            });
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const name = nameInput.value.trim();
+                const selectedCollectionId = collectionSelect.value;
+
+                if (!name || !selectedCollectionId) {
+                    return;
+                }
+
+                try {
+                    let targetCollectionId = selectedCollectionId;
+
+                    // Create new collection if selected
+                    if (selectedCollectionId === '__new__') {
+                        const newCollectionName = newCollectionInput.value.trim();
+                        if (!newCollectionName) {
+                            newCollectionInput.focus();
+                            return;
+                        }
+                        const newCollection = await this.service.createCollection(newCollectionName);
+                        targetCollectionId = newCollection.id;
+                    }
+
+                    // Prepare request data for saving
+                    const endpointData = {
+                        name,
+                        protocol: requestData.protocol || 'http',
+                        method: requestData.method || 'GET',
+                        path: requestData.url || '/'
+                    };
+
+                    // Handle gRPC
+                    if (requestData.protocol === 'grpc' && requestData.grpc) {
+                        endpointData.target = requestData.grpc.target;
+                        endpointData.fullMethod = requestData.grpc.fullMethod;
+                        endpointData.requestJson = requestData.grpc.requestJson;
+                    }
+
+                    // Handle WebSocket
+                    if (requestData.protocol === 'websocket') {
+                        endpointData.url = requestData.url;
+                    }
+
+                    // Add endpoint to collection
+                    const newEndpoint = await this.service.addRequestToCollection(targetCollectionId, endpointData);
+
+                    // Save additional request data (headers, body, params, auth)
+                    if (requestData.pathParams && Object.keys(requestData.pathParams).length > 0) {
+                        const pathParamsArray = Object.entries(requestData.pathParams).map(([key, value]) => ({ key, value }));
+                        await this.repository.savePersistedPathParams(targetCollectionId, newEndpoint.id, pathParamsArray);
+                    }
+
+                    if (requestData.queryParams && Object.keys(requestData.queryParams).length > 0) {
+                        const queryParamsArray = Object.entries(requestData.queryParams).map(([key, value]) => ({ key, value }));
+                        await this.repository.savePersistedQueryParams(targetCollectionId, newEndpoint.id, queryParamsArray);
+                    }
+
+                    if (requestData.headers && Object.keys(requestData.headers).length > 0) {
+                        const headersArray = Object.entries(requestData.headers).map(([key, value]) => ({ key, value }));
+                        await this.repository.savePersistedHeaders(targetCollectionId, newEndpoint.id, headersArray);
+                    }
+
+                    if (requestData.body?.content) {
+                        await this.repository.saveModifiedRequestBody(targetCollectionId, newEndpoint.id, requestData.body.content);
+                    }
+
+                    if (requestData.authType && requestData.authType !== 'none') {
+                        await this.repository.savePersistedAuthConfig(targetCollectionId, newEndpoint.id, {
+                            type: requestData.authType,
+                            config: requestData.authConfig || {}
+                        });
+                    }
+
+                    // Save URL
+                    if (requestData.url) {
+                        await this.repository.savePersistedUrl(targetCollectionId, newEndpoint.id, requestData.url);
+                    }
+
+                    // Refresh collections display
+                    await this.loadCollectionsWithExpansionState();
+
+                    this.statusDisplay.update(`Saved request: ${name}`, null);
+
+                    cleanup();
+                    resolve({
+                        collectionId: targetCollectionId,
+                        endpointId: newEndpoint.id,
+                        name: name
+                    });
+                } catch (error) {
+                    this.statusDisplay.update(`Error saving request: ${error.message}`, null);
+                    cleanup();
+                    resolve(null);
+                }
+            });
+
+            dialog.addEventListener('click', (e) => {
+                if (e.target === dialog) {
+                    cleanup();
+                    resolve(null);
+                }
+            });
+
+            const escapeHandler = (e) => {
+                if (e.key === 'Escape') {
+                    cleanup();
+                    resolve(null);
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
+        });
+    }
+
+    /**
      * Handles collection deletion with confirmation
      *
      * Shows confirmation dialog and deletes collection and its variables if confirmed.
@@ -790,6 +994,59 @@ export class CollectionController {
     async handleExportPostman(collection) {
         try {
             await this.service.exportCollectionAsPostman(collection.id);
+        } catch (error) {
+            void error;
+        }
+    }
+
+    /**
+     * Handles request rename operation
+     *
+     * Shows rename dialog and updates request name if confirmed.
+     *
+     * @async
+     * @param {Object} collection - The parent collection
+     * @param {Object} endpoint - The request/endpoint to rename
+     * @returns {Promise<void>}
+     */
+    async handleRenameRequest(collection, endpoint) {
+        try {
+            const title = window.i18n ?
+                window.i18n.t('endpoint.rename_title') || 'Rename Request' :
+                'Rename Request';
+
+            const label = window.i18n ?
+                window.i18n.t('endpoint.rename_label') || 'Request Name:' :
+                'Request Name:';
+
+            const confirmText = window.i18n ?
+                window.i18n.t('common.rename') || 'Rename' :
+                'Rename';
+
+            const currentName = endpoint.name || endpoint.path;
+            const newName = await this.renameDialog.show(currentName, {
+                title,
+                label,
+                confirmText
+            });
+
+            if (newName && newName !== currentName) {
+                await this.service.renameRequest(collection.id, endpoint.id, newName);
+                await this.loadCollectionsWithExpansionState();
+
+                // Update any open tabs that reference this endpoint
+                if (window.workspaceTabController) {
+                    const tabs = await window.workspaceTabController.service.getAllTabs();
+                    for (const tab of tabs) {
+                        if (tab.endpoint && 
+                            tab.endpoint.collectionId === collection.id && 
+                            tab.endpoint.endpointId === endpoint.id) {
+                            await window.workspaceTabController.service.updateTab(tab.id, { name: newName });
+                            window.workspaceTabController.tabBar.updateTab(tab.id, { name: newName });
+                        }
+                    }
+                }
+            }
         } catch (error) {
             void error;
         }

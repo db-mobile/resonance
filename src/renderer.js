@@ -222,6 +222,35 @@ function initKeyboardShortcuts() {
                 if (window.workspaceTabController) {
                     await window.workspaceTabController.markCurrentTabUnmodified();
                 }
+            } else if (window.workspaceTabController) {
+                // No endpoint loaded - show "Save to Collection" dialog
+                const { saveRequestToCollection } = await import('./modules/collectionManager.js');
+                const activeTab = await window.workspaceTabController.service.getActiveTab();
+                if (activeTab && activeTab.type !== 'runner') {
+                    const state = await window.workspaceTabController.stateManager.captureCurrentState();
+                    const requestData = {
+                        name: activeTab.name,
+                        ...state.request
+                    };
+                    const result = await saveRequestToCollection(requestData);
+                    if (result) {
+                        // Update current endpoint and tab
+                        window.currentEndpoint = {
+                            collectionId: result.collectionId,
+                            endpointId: result.endpointId
+                        };
+                        await window.workspaceTabController.service.updateTab(activeTab.id, {
+                            name: result.name,
+                            endpoint: {
+                                collectionId: result.collectionId,
+                                endpointId: result.endpointId,
+                                protocol: state.request.protocol || 'http'
+                            }
+                        });
+                        window.workspaceTabController.tabBar.updateTab(activeTab.id, { name: result.name });
+                        await window.workspaceTabController.markCurrentTabUnmodified();
+                    }
+                }
             }
         },
         description: 'Save request',

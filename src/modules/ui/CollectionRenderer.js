@@ -332,17 +332,9 @@ export class CollectionRenderer {
 
         const pathSpan = document.createElement('span');
         pathSpan.className = 'endpoint-path';
-        // Strip {{baseUrl}} and query parameters from display path for cleaner sidebar
-        let displayPath = endpoint.path.replace(/^\{\{baseUrl\}\}/, '');
-        const queryIndex = displayPath.indexOf('?');
-        if (queryIndex !== -1) {
-            displayPath = displayPath.substring(0, queryIndex);
-        }
-        // For gRPC or when path is empty, show the endpoint name instead
-        if (!displayPath && endpoint.name) {
-            displayPath = endpoint.name;
-        }
-        pathSpan.textContent = displayPath;
+        // Show the request name instead of the URL path
+        const displayName = endpoint.name || endpoint.path.replace(/^\{\{baseUrl\}\}/, '').split('?')[0] || 'Unnamed Request';
+        pathSpan.textContent = displayName;
 
         endpointDiv.appendChild(methodSpan);
         endpointDiv.appendChild(pathSpan);

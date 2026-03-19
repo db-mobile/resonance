@@ -38,7 +38,9 @@
   },
   "endpoint": {
     "delete_title": "Elimina richiesta",
-    "confirm_delete": "Sei sicuro di voler eliminare la richiesta \"{{name}}\"?\n\nQuesta azione non può essere annullata."
+    "confirm_delete": "Sei sicuro di voler eliminare la richiesta \"{{name}}\"?\n\nQuesta azione non può essere annullata.",
+    "rename_title": "Rinomina richiesta",
+    "rename_label": "Nome della richiesta:"
   },
   "context_menu": {
     "new_collection": "Nuova collezione",
@@ -50,6 +52,7 @@
     "export_postman": "Esporta come Postman",
     "rename_collection": "Rinomina collezione",
     "delete_collection": "Elimina collezione",
+    "rename_request": "Rinomina richiesta",
     "delete_request": "Elimina richiesta"
   },
   "curl_import": {
@@ -83,6 +86,18 @@
     "name_label": "Nome della collezione:",
     "name_placeholder": "La mia collezione",
     "create": "Crea",
+    "cancel": "Annulla"
+  },
+  "save_to_collection": {
+    "title": "Salva nella collezione",
+    "name_label": "Nome della richiesta:",
+    "name_placeholder": "La mia richiesta",
+    "collection_label": "Collezione:",
+    "select_collection": "Seleziona una collezione...",
+    "new_collection_name": "Nome della nuova collezione:",
+    "new_collection_placeholder": "La mia collezione",
+    "create_new": "+ Crea nuova collezione",
+    "save": "Salva",
     "cancel": "Annulla"
   },
   "request": {
@@ -172,6 +187,7 @@
     "cancel": "Annulla",
     "save": "Salva",
     "delete": "Elimina",
+    "rename": "Rinomina",
     "edit": "Modifica",
     "add": "Aggiungi",
     "remove": "Rimuovi",
