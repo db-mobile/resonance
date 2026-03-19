@@ -7,9 +7,9 @@
  * Repository for managing collection variable persistence
  *
  * @class
- * @classdesc Handles CRUD operations for collection-scoped variables in the persistent store.
- * Variables are stored per collection and used for template substitution in requests.
- * Implements defensive programming with validation and auto-initialization.
+ * @classdesc Handles CRUD operations for collection-scoped variables using file-based storage.
+ * Variables are stored per collection in a variables.json file within the collection directory.
+ * This enables Git-friendly storage with clean diffs.
  *
  * @deprecated This repository is being phased out in favor of EnvironmentRepository
  * which provides environment-scoped variables with better organization.
@@ -22,13 +22,41 @@ export class VariableRepository {
      */
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
-        this.VARIABLES_KEY = 'collectionVariables';
+    }
+
+    /**
+     * Converts array format to object format for backward compatibility
+     * @private
+     */
+    _arrayToObject(variables) {
+        if (Array.isArray(variables)) {
+            const obj = {};
+            for (const v of variables) {
+                if (v && v.key) {
+                    obj[v.key] = v.value;
+                }
+            }
+            return obj;
+        }
+        return variables || {};
+    }
+
+    /**
+     * Converts object format to array format for storage
+     * @private
+     */
+    _objectToArray(variables) {
+        if (Array.isArray(variables)) {
+            return variables;
+        }
+        return Object.entries(variables || {}).map(([key, value]) => ({ key, value }));
     }
 
     /**
      * Retrieves all variables for all collections
      *
-     * Automatically initializes storage with empty object if undefined (packaged app first run).
+     * Note: This method is less efficient with file-based storage as it needs to
+     * read each collection's variables file. Prefer getVariablesForCollection when possible.
      *
      * @async
      * @returns {Promise<Object>} Object mapping collection IDs to variable objects
@@ -36,14 +64,17 @@ export class VariableRepository {
      */
     async getAllVariables() {
         try {
-            const variables = await this.backendAPI.store.get(this.VARIABLES_KEY);
+            const collectionIds = await this.backendAPI.collections.list();
+            const allVariables = {};
 
-            if (!variables || typeof variables !== 'object' || Array.isArray(variables)) {
-                await this.backendAPI.store.set(this.VARIABLES_KEY, {});
-                return {};
+            for (const collectionId of collectionIds) {
+                const vars = await this.getVariablesForCollection(collectionId);
+                if (Object.keys(vars).length > 0) {
+                    allVariables[collectionId] = vars;
+                }
             }
 
-            return variables;
+            return allVariables;
         } catch (error) {
             throw new Error(`Failed to load variables: ${error.message}`);
         }
@@ -59,10 +90,10 @@ export class VariableRepository {
      */
     async getVariablesForCollection(collectionId) {
         try {
-            const allVariables = await this.getAllVariables();
-            return allVariables[collectionId] || {};
+            const variables = await this.backendAPI.collections.getVariables(collectionId);
+            return this._arrayToObject(variables);
         } catch (error) {
-            throw new Error(`Failed to load collection variables: ${error.message}`);
+            return {};
         }
     }
 
@@ -79,9 +110,8 @@ export class VariableRepository {
      */
     async setVariablesForCollection(collectionId, variables) {
         try {
-            const allVariables = await this.getAllVariables();
-            allVariables[collectionId] = variables;
-            await this.backendAPI.store.set(this.VARIABLES_KEY, allVariables);
+            const arrayFormat = this._objectToArray(variables);
+            await this.backendAPI.collections.saveVariables(collectionId, arrayFormat);
         } catch (error) {
             throw new Error(`Failed to save collection variables: ${error.message}`);
         }

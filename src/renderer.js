@@ -509,6 +509,22 @@ function applyShortcutHints() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Check for and perform migration from old single-file store to per-collection files
+    try {
+        if (window.backendAPI?.collections?.needsMigration) {
+            const needsMigration = await window.backendAPI.collections.needsMigration();
+            if (needsMigration) {
+                updateStatusDisplay('Migrating collections to new format...', null);
+                const migratedCount = await window.backendAPI.collections.migrate();
+                if (migratedCount > 0) {
+                    updateStatusDisplay(`Migrated ${migratedCount} collection(s) to new format`, null);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Migration check failed:', error);
+    }
+
     curlBtn.addEventListener('click', handleGenerateCurl);
     sendRequestBtn.addEventListener('click', handleSendRequest);
     cancelRequestBtn.addEventListener('click', handleCancelRequest);

@@ -5,6 +5,12 @@ mod commands;
 use commands::{
     api_request::{cancel_api_request, send_api_request, RequestState},
     app::app_get_version,
+    collections::{
+        collection_delete, collection_delete_endpoint_data, collection_get,
+        collection_get_endpoint_data, collection_get_variables, collection_save,
+        collection_save_endpoint_data, collection_save_variables, collections_get_all,
+        collections_get_path, collections_list, collections_migrate, collections_needs_migration,
+    },
     grpc_proto::{
         grpc_list_loaded_protos, grpc_parse_proto_file, grpc_proto_get_input_skeleton,
         grpc_proto_invoke_unary, grpc_select_proto_file, grpc_unload_proto, ProtoState,
@@ -103,6 +109,20 @@ fn main() {
             updater_check,
             updater_download_and_install,
             updater_get_install_info,
+            // Collections (file-based)
+            collections_list,
+            collections_get_all,
+            collection_get,
+            collection_save,
+            collection_delete,
+            collection_get_endpoint_data,
+            collection_save_endpoint_data,
+            collection_delete_endpoint_data,
+            collection_get_variables,
+            collection_save_variables,
+            collections_needs_migration,
+            collections_migrate,
+            collections_get_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

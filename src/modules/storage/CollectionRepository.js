@@ -7,11 +7,19 @@
  * Repository for managing collection data persistence
  *
  * @class
- * @classdesc Handles all CRUD operations for collections in the persistent store.
- * Implements defensive programming with auto-initialization and validation
- * to ensure reliable operation in both development and packaged environments.
- * Also manages endpoint-specific data such as request bodies, headers, query
- * parameters, authentication configs, and UI state.
+ * @classdesc Handles all CRUD operations for collections using file-based storage.
+ * Each collection is stored in its own directory with separate files for
+ * collection metadata, endpoint data, and variables. This enables Git-friendly
+ * storage with clean diffs and partial reads.
+ * 
+ * File structure:
+ * ~/.local/share/io.github.db_mobile.resonance/collections/
+ * ├── {collection_id}/
+ * │   ├── collection.json    # Collection metadata + endpoints
+ * │   ├── variables.json     # Collection-specific variables
+ * │   └── requests/          # Endpoint-specific data
+ * │       ├── {endpoint_id}.json
+ * │       └── ...
  */
 export class CollectionRepository {
     /**
@@ -21,44 +29,10 @@ export class CollectionRepository {
      */
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
-        this.COLLECTIONS_KEY = 'collections';
-        this.MODIFIED_BODIES_KEY = 'modifiedRequestBodies';
-        this.GRAPHQL_DATA_KEY = 'graphqlData';
-        this.GRPC_DATA_KEY = 'grpcData';
-    }
-
-    /**
-     * Safely retrieves an object from the persistent store with fallback handling
-     *
-     * Implements defensive programming to handle packaged app environments where
-     * store may return undefined on first run. Automatically initializes with
-     * default value if data is invalid or missing.
-     *
-     * @private
-     * @async
-     * @param {string} key - The store key to retrieve
-     * @param {Object} [defaultValue={}] - Default value to use if data is invalid
-     * @returns {Promise<Object>} The stored object or default value
-     */
-    async _getObjectFromStore(key, defaultValue = {}) {
-        try {
-            let data = await this.backendAPI.store.get(key);
-
-            if (!data || typeof data !== 'object' || Array.isArray(data)) {
-                data = defaultValue;
-                await this.backendAPI.store.set(key, data);
-            }
-
-            return data;
-        } catch (error) {
-            return defaultValue;
-        }
     }
 
     /**
      * Retrieves all collections from storage
-     *
-     * Automatically initializes storage with empty array if undefined (packaged app first run).
      *
      * @async
      * @returns {Promise<Array<Object>>} Array of collection objects
@@ -66,21 +40,34 @@ export class CollectionRepository {
      */
     async getAll() {
         try {
-            const collections = await this.backendAPI.store.get(this.COLLECTIONS_KEY);
-
-            if (!Array.isArray(collections)) {
-                await this.backendAPI.store.set(this.COLLECTIONS_KEY, []);
-                return [];
-            }
-
-            return collections;
+            const collections = await this.backendAPI.collections.getAll();
+            return collections || [];
         } catch (error) {
-            throw new Error(`Failed to load collections: ${error.message}`);
+            throw new Error(`Failed to load collections: ${error.message || error}`);
         }
     }
 
     /**
-     * Saves collections array to storage
+     * Saves a single collection to storage
+     *
+     * @async
+     * @param {Object} collection - The collection object to save
+     * @returns {Promise<void>}
+     * @throws {Error} If storage write fails
+     */
+    async saveOne(collection) {
+        try {
+            await this.backendAPI.collections.save(collection);
+        } catch (error) {
+            throw new Error(`Failed to save collection: ${error.message || error}`);
+        }
+    }
+
+    /**
+     * Saves collections array to storage (legacy compatibility)
+     * 
+     * Note: This method saves each collection individually. For better performance,
+     * prefer using saveOne() when updating a single collection.
      *
      * @async
      * @param {Array<Object>} collections - Array of collection objects to save
@@ -89,9 +76,23 @@ export class CollectionRepository {
      */
     async save(collections) {
         try {
-            await this.backendAPI.store.set(this.COLLECTIONS_KEY, collections);
+            // Get existing collection IDs
+            const existingIds = await this.backendAPI.collections.list();
+            const newIds = collections.map(c => c.id);
+
+            // Delete collections that no longer exist
+            for (const id of existingIds) {
+                if (!newIds.includes(id)) {
+                    await this.backendAPI.collections.delete(id);
+                }
+            }
+
+            // Save all collections
+            for (const collection of collections) {
+                await this.backendAPI.collections.save(collection);
+            }
         } catch (error) {
-            throw new Error(`Failed to save collections: ${error.message}`);
+            throw new Error(`Failed to save collections: ${error.message || error}`);
         }
     }
 
@@ -103,14 +104,16 @@ export class CollectionRepository {
      * @returns {Promise<Object|undefined>} The collection object or undefined if not found
      */
     async getById(id) {
-        const collections = await this.getAll();
-        return collections.find(collection => collection.id === id);
+        try {
+            return await this.backendAPI.collections.get(id);
+        } catch (error) {
+            // Collection not found
+            return undefined;
+        }
     }
 
     /**
      * Adds a new collection to storage
-     *
-     * Includes defensive validation to ensure collections array integrity.
      *
      * @async
      * @param {Object} collection - The collection object to add
@@ -118,14 +121,7 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async add(collection) {
-        let collections = await this.getAll();
-
-        if (!Array.isArray(collections)) {
-            collections = [];
-        }
-
-        collections.push(collection);
-        await this.save(collections);
+        await this.saveOne(collection);
         return collection;
     }
 
@@ -139,16 +135,15 @@ export class CollectionRepository {
      * @throws {Error} If collection not found or save fails
      */
     async update(id, updatedCollection) {
-        const collections = await this.getAll();
-        const index = collections.findIndex(collection => collection.id === id);
+        const existing = await this.getById(id);
 
-        if (index === -1) {
+        if (!existing) {
             throw new Error(`Collection with id ${id} not found`);
         }
 
-        collections[index] = { ...collections[index], ...updatedCollection };
-        await this.save(collections);
-        return collections[index];
+        const merged = { ...existing, ...updatedCollection };
+        await this.saveOne(merged);
+        return merged;
     }
 
     /**
@@ -157,20 +152,49 @@ export class CollectionRepository {
      * @async
      * @param {string} id - The collection ID to delete
      * @returns {Promise<boolean>} True if deletion succeeded
-     * @throws {Error} If save operation fails
+     * @throws {Error} If delete operation fails
      */
     async delete(id) {
-        const collections = await this.getAll();
-        const updatedCollections = collections.filter(collection => collection.id !== id);
-        await this.save(updatedCollections);
-        return true;
+        try {
+            await this.backendAPI.collections.delete(id);
+            return true;
+        } catch (error) {
+            throw new Error(`Failed to delete collection: ${error.message || error}`);
+        }
+    }
+
+    /**
+     * Helper to get endpoint data
+     * @private
+     */
+    async _getEndpointData(collectionId, endpointId) {
+        try {
+            return await this.backendAPI.collections.getEndpointData(collectionId, endpointId);
+        } catch (error) {
+            return {};
+        }
+    }
+
+    /**
+     * Helper to save endpoint data
+     * @private
+     */
+    async _saveEndpointData(collectionId, endpointId, data) {
+        await this.backendAPI.collections.saveEndpointData(collectionId, endpointId, data);
+    }
+
+    /**
+     * Helper to update a single field in endpoint data
+     * @private
+     */
+    async _updateEndpointField(collectionId, endpointId, field, value) {
+        const data = await this._getEndpointData(collectionId, endpointId);
+        data[field] = value;
+        await this._saveEndpointData(collectionId, endpointId, data);
     }
 
     /**
      * Retrieves modified request body for a specific endpoint
-     *
-     * Returns the user-modified request body for an endpoint, allowing customization
-     * of request bodies beyond the OpenAPI schema defaults.
      *
      * @async
      * @param {string} collectionId - The collection ID
@@ -179,9 +203,8 @@ export class CollectionRepository {
      */
     async getModifiedRequestBody(collectionId, endpointId) {
         try {
-            const modifiedBodies = await this._getObjectFromStore(this.MODIFIED_BODIES_KEY);
-            const key = `${collectionId}_${endpointId}`;
-            return modifiedBodies[key] || null;
+            const data = await this._getEndpointData(collectionId, endpointId);
+            return data.modifiedBody || null;
         } catch (error) {
             return null;
         }
@@ -199,12 +222,9 @@ export class CollectionRepository {
      */
     async saveModifiedRequestBody(collectionId, endpointId, body) {
         try {
-            const modifiedBodies = await this._getObjectFromStore(this.MODIFIED_BODIES_KEY);
-            const key = `${collectionId}_${endpointId}`;
-            modifiedBodies[key] = body;
-            await this.backendAPI.store.set(this.MODIFIED_BODIES_KEY, modifiedBodies);
+            await this._updateEndpointField(collectionId, endpointId, 'modifiedBody', body);
         } catch (error) {
-            throw new Error(`Failed to save modified request body: ${error.message}`);
+            throw new Error(`Failed to save modified request body: ${error.message || error}`);
         }
     }
 
@@ -218,9 +238,8 @@ export class CollectionRepository {
      */
     async getPersistedPathParams(collectionId, endpointId) {
         try {
-            const persistedParams = await this._getObjectFromStore('persistedPathParams');
-            const key = `${collectionId}_${endpointId}`;
-            return persistedParams[key] || [];
+            const data = await this._getEndpointData(collectionId, endpointId);
+            return data.pathParams || [];
         } catch (error) {
             return [];
         }
@@ -238,12 +257,9 @@ export class CollectionRepository {
      */
     async savePersistedPathParams(collectionId, endpointId, pathParams) {
         try {
-            const persistedParams = await this._getObjectFromStore('persistedPathParams');
-            const key = `${collectionId}_${endpointId}`;
-            persistedParams[key] = pathParams;
-            await this.backendAPI.store.set('persistedPathParams', persistedParams);
+            await this._updateEndpointField(collectionId, endpointId, 'pathParams', pathParams);
         } catch (error) {
-            throw new Error(`Failed to save persisted path params: ${error.message}`);
+            throw new Error(`Failed to save persisted path params: ${error.message || error}`);
         }
     }
 
@@ -257,9 +273,8 @@ export class CollectionRepository {
      */
     async getPersistedQueryParams(collectionId, endpointId) {
         try {
-            const persistedParams = await this._getObjectFromStore('persistedQueryParams');
-            const key = `${collectionId}_${endpointId}`;
-            return persistedParams[key] || [];
+            const data = await this._getEndpointData(collectionId, endpointId);
+            return data.queryParams || [];
         } catch (error) {
             return [];
         }
@@ -277,12 +292,9 @@ export class CollectionRepository {
      */
     async savePersistedQueryParams(collectionId, endpointId, queryParams) {
         try {
-            const persistedParams = await this._getObjectFromStore('persistedQueryParams');
-            const key = `${collectionId}_${endpointId}`;
-            persistedParams[key] = queryParams;
-            await this.backendAPI.store.set('persistedQueryParams', persistedParams);
+            await this._updateEndpointField(collectionId, endpointId, 'queryParams', queryParams);
         } catch (error) {
-            throw new Error(`Failed to save persisted query params: ${error.message}`);
+            throw new Error(`Failed to save persisted query params: ${error.message || error}`);
         }
     }
 
@@ -296,9 +308,8 @@ export class CollectionRepository {
      */
     async getPersistedHeaders(collectionId, endpointId) {
         try {
-            const persistedHeaders = await this._getObjectFromStore('persistedHeaders');
-            const key = `${collectionId}_${endpointId}`;
-            return persistedHeaders[key] || [];
+            const data = await this._getEndpointData(collectionId, endpointId);
+            return data.headers || [];
         } catch (error) {
             return [];
         }
@@ -316,12 +327,9 @@ export class CollectionRepository {
      */
     async savePersistedHeaders(collectionId, endpointId, headers) {
         try {
-            const persistedHeaders = await this._getObjectFromStore('persistedHeaders');
-            const key = `${collectionId}_${endpointId}`;
-            persistedHeaders[key] = headers;
-            await this.backendAPI.store.set('persistedHeaders', persistedHeaders);
+            await this._updateEndpointField(collectionId, endpointId, 'headers', headers);
         } catch (error) {
-            throw new Error(`Failed to save persisted headers: ${error.message}`);
+            throw new Error(`Failed to save persisted headers: ${error.message || error}`);
         }
     }
 
@@ -335,9 +343,8 @@ export class CollectionRepository {
      */
     async getPersistedAuthConfig(collectionId, endpointId) {
         try {
-            const persistedAuthConfigs = await this._getObjectFromStore('persistedAuthConfigs');
-            const key = `${collectionId}_${endpointId}`;
-            return persistedAuthConfigs[key] || null;
+            const data = await this._getEndpointData(collectionId, endpointId);
+            return data.authConfig || null;
         } catch (error) {
             return null;
         }
@@ -355,12 +362,9 @@ export class CollectionRepository {
      */
     async savePersistedAuthConfig(collectionId, endpointId, authConfig) {
         try {
-            const persistedAuthConfigs = await this._getObjectFromStore('persistedAuthConfigs');
-            const key = `${collectionId}_${endpointId}`;
-            persistedAuthConfigs[key] = authConfig;
-            await this.backendAPI.store.set('persistedAuthConfigs', persistedAuthConfigs);
+            await this._updateEndpointField(collectionId, endpointId, 'authConfig', authConfig);
         } catch (error) {
-            throw new Error(`Failed to save persisted auth config: ${error.message}`);
+            throw new Error(`Failed to save persisted auth config: ${error.message || error}`);
         }
     }
 
@@ -374,9 +378,8 @@ export class CollectionRepository {
      */
     async getPersistedUrl(collectionId, endpointId) {
         try {
-            const persistedUrls = await this._getObjectFromStore('persistedUrls');
-            const key = `${collectionId}_${endpointId}`;
-            return persistedUrls[key] || null;
+            const data = await this._getEndpointData(collectionId, endpointId);
+            return data.url || null;
         } catch (error) {
             return null;
         }
@@ -394,26 +397,24 @@ export class CollectionRepository {
      */
     async savePersistedUrl(collectionId, endpointId, url) {
         try {
-            const persistedUrls = await this._getObjectFromStore('persistedUrls');
-            const key = `${collectionId}_${endpointId}`;
-            persistedUrls[key] = url;
-            await this.backendAPI.store.set('persistedUrls', persistedUrls);
+            await this._updateEndpointField(collectionId, endpointId, 'url', url);
         } catch (error) {
-            throw new Error(`Failed to save persisted URL: ${error.message}`);
+            throw new Error(`Failed to save persisted URL: ${error.message || error}`);
         }
     }
 
     /**
      * Retrieves collection expansion states for UI
      *
-     * Returns which collections and endpoints are expanded/collapsed in the tree view.
+     * Note: UI state is still stored in the main store for simplicity
      *
      * @async
      * @returns {Promise<Object>} Object mapping collection IDs to expansion state
      */
     async getCollectionExpansionStates() {
         try {
-            return await this._getObjectFromStore('collectionExpansionStates');
+            const data = await this.backendAPI.store.get('collectionExpansionStates');
+            return data || {};
         } catch (error) {
             return {};
         }
@@ -431,15 +432,12 @@ export class CollectionRepository {
         try {
             await this.backendAPI.store.set('collectionExpansionStates', expansionStates);
         } catch (error) {
-            throw new Error(`Failed to save collection expansion states: ${error.message}`);
+            throw new Error(`Failed to save collection expansion states: ${error.message || error}`);
         }
     }
 
     /**
      * Deletes all persisted data for a specific endpoint
-     *
-     * Removes modified bodies, query params, headers, and auth configs.
-     * Used when deleting an endpoint or collection to clean up orphaned data.
      *
      * @async
      * @param {string} collectionId - The collection ID
@@ -449,52 +447,14 @@ export class CollectionRepository {
      */
     async deletePersistedEndpointData(collectionId, endpointId) {
         try {
-            const key = `${collectionId}_${endpointId}`;
-
-            const modifiedBodies = await this._getObjectFromStore(this.MODIFIED_BODIES_KEY);
-            if (modifiedBodies[key]) {
-                delete modifiedBodies[key];
-                await this.backendAPI.store.set(this.MODIFIED_BODIES_KEY, modifiedBodies);
-            }
-
-            const persistedParams = await this._getObjectFromStore('persistedQueryParams');
-            if (persistedParams[key]) {
-                delete persistedParams[key];
-                await this.backendAPI.store.set('persistedQueryParams', persistedParams);
-            }
-
-            const persistedHeaders = await this._getObjectFromStore('persistedHeaders');
-            if (persistedHeaders[key]) {
-                delete persistedHeaders[key];
-                await this.backendAPI.store.set('persistedHeaders', persistedHeaders);
-            }
-
-            const persistedAuthConfigs = await this._getObjectFromStore('persistedAuthConfigs');
-            if (persistedAuthConfigs[key]) {
-                delete persistedAuthConfigs[key];
-                await this.backendAPI.store.set('persistedAuthConfigs', persistedAuthConfigs);
-            }
-
-            const persistedScripts = await this._getObjectFromStore('persistedScripts');
-            if (persistedScripts[key]) {
-                delete persistedScripts[key];
-                await this.backendAPI.store.set('persistedScripts', persistedScripts);
-            }
-
-            const grpcData = await this._getObjectFromStore(this.GRPC_DATA_KEY);
-            if (grpcData[key]) {
-                delete grpcData[key];
-                await this.backendAPI.store.set(this.GRPC_DATA_KEY, grpcData);
-            }
+            await this.backendAPI.collections.deleteEndpointData(collectionId, endpointId);
         } catch (error) {
-            throw new Error(`Failed to delete persisted endpoint data: ${error.message}`);
+            throw new Error(`Failed to delete persisted endpoint data: ${error.message || error}`);
         }
     }
 
     /**
      * Retrieves the last selected request
-     *
-     * Used to restore UI state on app startup.
      *
      * @async
      * @returns {Promise<Object|null>} Object with collectionId and endpointId or null
@@ -539,7 +499,7 @@ export class CollectionRepository {
         try {
             await this.backendAPI.store.set('lastSelectedRequest', null);
         } catch (error) {
-            throw new Error(`Failed to clear last selected request: ${error.message}`);
+            throw new Error(`Failed to clear last selected request: ${error.message || error}`);
         }
     }
 
@@ -555,12 +515,9 @@ export class CollectionRepository {
      */
     async saveGraphQLData(collectionId, endpointId, data) {
         try {
-            const graphqlData = await this._getObjectFromStore(this.GRAPHQL_DATA_KEY);
-            const key = `${collectionId}_${endpointId}`;
-            graphqlData[key] = data;
-            await this.backendAPI.store.set(this.GRAPHQL_DATA_KEY, graphqlData);
+            await this._updateEndpointField(collectionId, endpointId, 'graphqlData', data);
         } catch (error) {
-            throw new Error(`Failed to save GraphQL data: ${error.message}`);
+            throw new Error(`Failed to save GraphQL data: ${error.message || error}`);
         }
     }
 
@@ -574,9 +531,8 @@ export class CollectionRepository {
      */
     async getGraphQLData(collectionId, endpointId) {
         try {
-            const graphqlData = await this._getObjectFromStore(this.GRAPHQL_DATA_KEY);
-            const key = `${collectionId}_${endpointId}`;
-            return graphqlData[key] || null;
+            const data = await this._getEndpointData(collectionId, endpointId);
+            return data.graphqlData || null;
         } catch (error) {
             return null;
         }
@@ -584,20 +540,16 @@ export class CollectionRepository {
 
     async saveGrpcData(collectionId, endpointId, data) {
         try {
-            const grpcData = await this._getObjectFromStore(this.GRPC_DATA_KEY);
-            const key = `${collectionId}_${endpointId}`;
-            grpcData[key] = data;
-            await this.backendAPI.store.set(this.GRPC_DATA_KEY, grpcData);
+            await this._updateEndpointField(collectionId, endpointId, 'grpcData', data);
         } catch (error) {
-            throw new Error(`Failed to save gRPC data: ${error.message}`);
+            throw new Error(`Failed to save gRPC data: ${error.message || error}`);
         }
     }
 
     async getGrpcData(collectionId, endpointId) {
         try {
-            const grpcData = await this._getObjectFromStore(this.GRPC_DATA_KEY);
-            const key = `${collectionId}_${endpointId}`;
-            return grpcData[key] || null;
+            const data = await this._getEndpointData(collectionId, endpointId);
+            return data.grpcData || null;
         } catch (error) {
             return null;
         }
