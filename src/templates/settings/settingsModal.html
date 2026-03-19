@@ -84,17 +84,44 @@
                         <p class="form-input-hint" data-i18n="settings.history_limit_description">Maximum number of requests stored in history</p>
                     </div>
                 </div>
+
+                <div class="settings-tab-content" data-tab-content="updates">
+                    <div class="settings-section">
+                        <h3 data-i18n="settings.auto_update">Automatic Updates</h3>
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="checkUpdatesOnLaunch">
+                            <span class="toggle-track"></span>
+                            <span data-i18n="settings.check_updates_on_launch">Check for updates on launch</span>
+                        </label>
+                        <p class="form-input-hint" data-i18n="settings.check_updates_on_launch_description">Automatically check for new versions when the application starts.</p>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 data-i18n="settings.manual_update">Manual Update</h3>
+                        <div class="settings-update-section">
+                            <button type="button" class="btn btn-secondary btn-sm" id="check-for-updates-btn" data-i18n="settings.check_for_updates">Check for Updates</button>
+                            <span id="update-status" class="update-status"></span>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 data-i18n="settings.version_info">Version Information</h3>
+                        <p class="version-info-text"><span data-i18n="settings.current_version">Current version</span>: <span id="settings-current-version"></span></p>
+                    </div>
+                </div>
             </div>
 
-            <div class="settings-footer u-flex u-justify-end">
-                <span id="settings-app-version" class="settings-app-version"></span>
-            </div>
+            <div class="settings-footer"></div>
         </div>
     </div>
 </template>
 
 <template id="tpl-settings-proxy-tab">
     <button class="settings-tab" data-tab="proxy" data-i18n="settings.tab_proxy">Proxy</button>
+</template>
+
+<template id="tpl-settings-updates-tab">
+    <button class="settings-tab" data-tab="updates" data-i18n="settings.tab_updates">Updates</button>
 </template>
 
 <template id="tpl-settings-proxy-content">

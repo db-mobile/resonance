@@ -712,6 +712,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     updateStatusDisplay('Ready', null);
 
+    // Check for updates on launch if enabled
+    checkForUpdatesOnLaunch();
+
     initKeyValueListeners();
     initializeBodyTracking();
     initResizer();
@@ -774,3 +777,38 @@ window.addEventListener('beforeunload', async (_e) => {
         void error;
     }
 });
+
+/**
+ * Check for updates on application launch if the setting is enabled
+ */
+async function checkForUpdatesOnLaunch() {
+    try {
+        // Check if updater is available and setting is enabled
+        if (!window.backendAPI?.updater?.check || !window.backendAPI?.updater?.getInstallInfo) {
+            return;
+        }
+
+        // Check if auto-update is supported for this installation type
+        const installInfo = await window.backendAPI.updater.getInstallInfo();
+        if (!installInfo.autoUpdateSupported) {
+            return;
+        }
+
+        // Check if the setting is enabled
+        const settings = await window.backendAPI.settings.get();
+        if (!settings.checkUpdatesOnLaunch) {
+            return;
+        }
+
+        // Check for updates
+        const update = await window.backendAPI.updater.check();
+        if (update?.available) {
+            // Show a notification or status bar message
+            const message = window.i18n?.t('settings.update_available', { version: update.version }) || `Update available: v${update.version}`;
+            updateStatusDisplay(message, 'info');
+        }
+    } catch (error) {
+        // Silently ignore errors during startup update check
+        void error;
+    }
+}

@@ -1,6 +1,6 @@
 {
   "name": "resonance",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "description": "Resonance - A local-first, zero-account API client with excellent user experience",
   "license": "MIT",
   "engines": {
@@ -55,6 +55,7 @@
     "@tauri-apps/plugin-fs": "^2.0.0",
     "@tauri-apps/plugin-shell": "^2.0.0",
     "@tauri-apps/plugin-store": "^2.0.0",
+    "@tauri-apps/plugin-updater": "^2.0.0",
     "@tauri-apps/plugin-window-state": "^2.4.1",
     "cm6-graphql": "^0.2.1",
     "codemirror": "^6.0.2",

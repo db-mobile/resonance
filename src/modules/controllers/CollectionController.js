@@ -1030,22 +1030,25 @@ export class CollectionController {
                 confirmText
             });
 
-            if (newName && newName !== currentName) {
-                await this.service.renameRequest(collection.id, endpoint.id, newName);
-                await this.loadCollectionsWithExpansionState();
+            if (!newName || newName === currentName) {
+                return;
+            }
+            await this.service.renameRequest(collection.id, endpoint.id, newName);
+            await this.loadCollectionsWithExpansionState();
 
-                // Update any open tabs that reference this endpoint
-                if (window.workspaceTabController) {
-                    const tabs = await window.workspaceTabController.service.getAllTabs();
-                    for (const tab of tabs) {
-                        if (tab.endpoint && 
-                            tab.endpoint.collectionId === collection.id && 
-                            tab.endpoint.endpointId === endpoint.id) {
-                            await window.workspaceTabController.service.updateTab(tab.id, { name: newName });
-                            window.workspaceTabController.tabBar.updateTab(tab.id, { name: newName });
-                        }
-                    }
-                }
+            // Update any open tabs that reference this endpoint
+            if (!window.workspaceTabController) {
+                return;
+            }
+            const tabs = await window.workspaceTabController.service.getAllTabs();
+            const matchingTabs = tabs.filter(tab => 
+                tab.endpoint && 
+                tab.endpoint.collectionId === collection.id && 
+                tab.endpoint.endpointId === endpoint.id
+            );
+            for (const tab of matchingTabs) {
+                await window.workspaceTabController.service.updateTab(tab.id, { name: newName });
+                window.workspaceTabController.tabBar.updateTab(tab.id, { name: newName });
             }
         } catch (error) {
             void error;

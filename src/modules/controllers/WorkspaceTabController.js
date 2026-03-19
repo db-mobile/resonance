@@ -399,6 +399,32 @@ export class WorkspaceTabController {
      */
     async closeTab(tabId) {
         try {
+            // Check for unsaved changes before closing
+            const allTabs = await this.service.getAllTabs();
+            const tab = allTabs.find(t => t.id === tabId);
+            if (tab?.isModified) {
+                const { ConfirmDialog } = await import('../ui/ConfirmDialog.js');
+                const dialog = new ConfirmDialog();
+                const confirmed = await dialog.show(
+                    `"${tab.name}" has unsaved changes. Close anyway?`,
+                    {
+                        title: 'Unsaved Changes',
+                        confirmText: 'Close',
+                        cancelText: 'Keep Open',
+                        dangerous: true
+                    }
+                );
+                if (!confirmed) {
+                    return;
+                }
+            }
+
+            // If this is the last tab, open a fresh one first so the close is allowed
+            const tabCount = (await this.service.getAllTabs()).length;
+            if (tabCount === 1) {
+                await this.createNewTab();
+            }
+
             // Check if this is a runner tab and clean up
             if (this.runnerControllers.has(tabId)) {
                 this._cleanupRunnerTab(tabId);
@@ -501,6 +527,27 @@ export class WorkspaceTabController {
         try {
             const tabs = await this.service.getAllTabs();
             const tabsToClose = tabs.filter(t => t.id !== tabId);
+
+            // Warn if any tabs to close have unsaved changes
+            const modifiedCount = tabsToClose.filter(t => t.isModified).length;
+            if (modifiedCount > 0) {
+                const { ConfirmDialog } = await import('../ui/ConfirmDialog.js');
+                const dialog = new ConfirmDialog();
+                const confirmed = await dialog.show(
+                    modifiedCount === 1
+                        ? '1 tab has unsaved changes. Close anyway?'
+                        : `${modifiedCount} tabs have unsaved changes. Close anyway?`,
+                    {
+                        title: 'Unsaved Changes',
+                        confirmText: 'Close All',
+                        cancelText: 'Keep Open',
+                        dangerous: true
+                    }
+                );
+                if (!confirmed) {
+                    return;
+                }
+            }
 
             for (const tab of tabsToClose) {
                 await this.service.closeTab(tab.id);

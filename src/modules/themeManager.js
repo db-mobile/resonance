@@ -253,11 +253,13 @@ export class SettingsModal {
         let currentVerifySsl = true;
         let currentFollowRedirects = true;
         let currentHistoryLimit = 100;
+        let currentCheckUpdatesOnLaunch = false;
         try {
             const settings = await window.backendAPI.settings.get();
             currentVerifySsl = settings.verifySsl !== false;
             currentFollowRedirects = settings.followRedirects !== false;
             currentHistoryLimit = settings.historyLimit || 100;
+            currentCheckUpdatesOnLaunch = settings.checkUpdatesOnLaunch === true;
         } catch (e) {
             void e;
         }
@@ -294,6 +296,22 @@ export class SettingsModal {
         const historyLimitInput = overlay.querySelector('input[name="historyLimit"]');
         if (historyLimitInput) {
             historyLimitInput.value = currentHistoryLimit;
+        }
+
+        // Set check updates on launch
+        const checkUpdatesOnLaunchCheckbox = overlay.querySelector('input[name="checkUpdatesOnLaunch"]');
+        if (checkUpdatesOnLaunchCheckbox) {
+            checkUpdatesOnLaunchCheckbox.checked = currentCheckUpdatesOnLaunch;
+        }
+
+        // Set current version in Updates tab
+        const currentVersionSpan = overlay.querySelector('#settings-current-version');
+        if (currentVersionSpan && window.backendAPI?.app?.getVersion) {
+            window.backendAPI.app.getVersion().then(version => {
+                currentVersionSpan.textContent = version;
+            }).catch(() => {
+                currentVersionSpan.textContent = 'Unknown';
+            });
         }
 
         // Add language section if i18nManager is available
@@ -335,6 +353,14 @@ export class SettingsModal {
             proxyContent.appendChild(proxySection);
             contentContainer.appendChild(proxyContent);
         }
+
+        // Add Updates tab (always last)
+        const tabsContainer = overlay.querySelector('.settings-tabs');
+        const updatesTabFragment = templateLoader.cloneSync(
+            './src/templates/settings/settingsModal.html',
+            'tpl-settings-updates-tab'
+        );
+        tabsContainer.appendChild(updatesTabFragment);
 
         this.attachEventListeners(overlay);
         return overlay;
@@ -591,9 +617,118 @@ export class SettingsModal {
             });
         }
 
+        // Check updates on launch toggle
+        const checkUpdatesOnLaunchCheckbox = overlay.querySelector('input[name="checkUpdatesOnLaunch"]');
+        if (checkUpdatesOnLaunchCheckbox) {
+            checkUpdatesOnLaunchCheckbox.addEventListener('change', async (e) => {
+                try {
+                    const settings = await window.backendAPI.settings.get();
+                    settings.checkUpdatesOnLaunch = e.target.checked;
+                    await window.backendAPI.settings.set(settings);
+                } catch (err) {
+                    void err;
+                }
+            });
+        }
+
         // Proxy settings event listeners
         if (this.proxyController) {
             this.attachProxyEventListeners(overlay);
+        }
+
+        // Check for updates button
+        const checkUpdatesBtn = overlay.querySelector('#check-for-updates-btn');
+        const updateStatus = overlay.querySelector('#update-status');
+        const autoUpdateSection = overlay.querySelector('[data-tab-content="updates"] .settings-section:first-child');
+        const manualUpdateSection = overlay.querySelector('[data-tab-content="updates"] .settings-section:nth-child(2)');
+        if (checkUpdatesBtn && updateStatus) {
+            // Check installation type on load
+            (async () => {
+                try {
+                    if (window.backendAPI?.updater?.getInstallInfo) {
+                        const installInfo = await window.backendAPI.updater.getInstallInfo();
+                        if (installInfo.autoUpdateSupported) {
+                            return;
+                        }
+                        // Hide the auto-update and manual update sections entirely
+                        if (autoUpdateSection) {
+                            autoUpdateSection.style.display = 'none';
+                        }
+                        if (manualUpdateSection) {
+                            manualUpdateSection.style.display = 'none';
+                        }
+                        // Show message prominently in the version info section
+                        const versionSection = overlay.querySelector('[data-tab-content="updates"] .settings-section:last-child');
+                        if (!versionSection) {
+                            return;
+                        }
+                        // Make the managed message the main heading
+                        const messageH3 = document.createElement('h3');
+                        messageH3.textContent = installInfo.message || window.i18n?.t('settings.updates_managed_externally') || 'Updates are managed by your package manager';
+                        // Make version info smaller
+                        const versionH3 = versionSection.querySelector('h3');
+                        if (versionH3) {
+                            versionH3.className = 'form-input-hint';
+                            versionH3.style.marginTop = '16px';
+                        }
+                        versionSection.insertBefore(messageH3, versionSection.firstChild);
+                    }
+                } catch (e) {
+                    // Ignore errors
+                }
+            })();
+
+            checkUpdatesBtn.addEventListener('click', async () => {
+                checkUpdatesBtn.disabled = true;
+                updateStatus.textContent = window.i18n?.t('settings.checking_updates') || 'Checking...';
+                updateStatus.className = 'update-status';
+
+                try {
+                    if (!window.backendAPI?.updater?.check) {
+                        updateStatus.textContent = window.i18n?.t('settings.updates_not_available') || 'Updates not available in this build';
+                        updateStatus.className = 'update-status info';
+                        return;
+                    }
+
+                    const update = await window.backendAPI.updater.check();
+                    
+                    if (update?.available) {
+                        updateStatus.textContent = window.i18n?.t('settings.update_available', { version: update.version }) || `Update available: v${update.version}`;
+                        updateStatus.className = 'update-status success';
+                        
+                        // Ask user if they want to install
+                        const installBtn = document.createElement('button');
+                        installBtn.className = 'btn btn-primary btn-sm';
+                        installBtn.style.marginLeft = '8px';
+                        installBtn.textContent = window.i18n?.t('settings.install_update') || 'Install & Restart';
+                        installBtn.addEventListener('click', async () => {
+                            installBtn.disabled = true;
+                            installBtn.remove();
+                            updateStatus.textContent = window.i18n?.t('settings.downloading_update') || 'Downloading...';
+                            try {
+                                await window.backendAPI.updater.downloadAndInstall(update);
+                                // If we get here in simulation mode, show success
+                                updateStatus.textContent = window.i18n?.t('settings.update_installed') || 'Update installed! Restart to apply.';
+                                updateStatus.className = 'update-status success';
+                            } catch (err) {
+                                const errMsg = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
+                                updateStatus.textContent = `Error: ${errMsg}`;
+                                updateStatus.className = 'update-status error';
+                            }
+                        });
+                        updateStatus.appendChild(installBtn);
+                    } else {
+                        updateStatus.textContent = window.i18n?.t('settings.up_to_date') || 'You are up to date!';
+                        updateStatus.className = 'update-status success';
+                    }
+                } catch (error) {
+                    const errorMsg = typeof error === 'string' ? error : (error?.message || JSON.stringify(error));
+                    updateStatus.textContent = `Error: ${errorMsg}`;
+                    updateStatus.className = 'update-status error';
+                } finally {
+                    checkUpdatesBtn.disabled = false;
+                }
+            });
         }
 
         overlay.addEventListener('click', (e) => {
