@@ -647,29 +647,31 @@ export class SettingsModal {
                 try {
                     if (window.backendAPI?.updater?.getInstallInfo) {
                         const installInfo = await window.backendAPI.updater.getInstallInfo();
-                        if (!installInfo.autoUpdateSupported) {
-                            // Hide the auto-update and manual update sections entirely
-                            if (autoUpdateSection) {
-                                autoUpdateSection.style.display = 'none';
-                            }
-                            if (manualUpdateSection) {
-                                manualUpdateSection.style.display = 'none';
-                            }
-                            // Show message prominently in the version info section
-                            const versionSection = overlay.querySelector('[data-tab-content="updates"] .settings-section:last-child');
-                            if (versionSection) {
-                                // Make the managed message the main heading
-                                const messageH3 = document.createElement('h3');
-                                messageH3.textContent = installInfo.message || window.i18n?.t('settings.updates_managed_externally') || 'Updates are managed by your package manager';
-                                // Make version info smaller
-                                const versionH3 = versionSection.querySelector('h3');
-                                if (versionH3) {
-                                    versionH3.className = 'form-input-hint';
-                                    versionH3.style.marginTop = '16px';
-                                }
-                                versionSection.insertBefore(messageH3, versionSection.firstChild);
-                            }
+                        if (installInfo.autoUpdateSupported) {
+                            return;
                         }
+                        // Hide the auto-update and manual update sections entirely
+                        if (autoUpdateSection) {
+                            autoUpdateSection.style.display = 'none';
+                        }
+                        if (manualUpdateSection) {
+                            manualUpdateSection.style.display = 'none';
+                        }
+                        // Show message prominently in the version info section
+                        const versionSection = overlay.querySelector('[data-tab-content="updates"] .settings-section:last-child');
+                        if (!versionSection) {
+                            return;
+                        }
+                        // Make the managed message the main heading
+                        const messageH3 = document.createElement('h3');
+                        messageH3.textContent = installInfo.message || window.i18n?.t('settings.updates_managed_externally') || 'Updates are managed by your package manager';
+                        // Make version info smaller
+                        const versionH3 = versionSection.querySelector('h3');
+                        if (versionH3) {
+                            versionH3.className = 'form-input-hint';
+                            versionH3.style.marginTop = '16px';
+                        }
+                        versionSection.insertBefore(messageH3, versionSection.firstChild);
                     }
                 } catch (e) {
                     // Ignore errors
