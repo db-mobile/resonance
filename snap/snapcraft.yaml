@@ -109,7 +109,7 @@ parts:
       set -eu
       rustup default stable
       npm install
-      npm run tauri build -- --bundles deb
+      TAURI_SIGNING_PRIVATE_KEY="" npm run tauri build -- --bundles deb -c '{"bundle":{"createUpdaterArtifacts":false}}'
       dpkg -x src-tauri/target/release/bundle/deb/*.deb $SNAPCRAFT_PART_INSTALL/
 
       mkdir -p $CRAFT_PART_INSTALL/usr/share/applications
