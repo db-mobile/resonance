@@ -234,14 +234,16 @@ export class RunnerPanel {
     _getAllEndpoints(collection) {
         const endpoints = [];
 
+        const isHttp = e => e.protocol !== 'grpc' && e.protocol !== 'websocket';
+
         if (collection.endpoints) {
-            endpoints.push(...collection.endpoints.filter(e => e.protocol === 'http'));
+            endpoints.push(...collection.endpoints.filter(isHttp));
         }
 
         if (collection.folders) {
             collection.folders.forEach(folder => {
                 if (folder.endpoints) {
-                    endpoints.push(...folder.endpoints.filter(e => e.protocol === 'http'));
+                    endpoints.push(...folder.endpoints.filter(isHttp));
                 }
             });
         }

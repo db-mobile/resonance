@@ -280,7 +280,7 @@ export class MockServerDialog {
                     endpointDiv.className = 'mock-server-endpoint u-flex u-items-center u-gap-3';
 
                     const methodSpan = document.createElement('span');
-                    methodSpan.className = 'mock-server-endpoint-method';
+                    methodSpan.className = 'method-pill';
                     methodSpan.dataset.method = endpoint.method.toUpperCase();
                     methodSpan.textContent = endpoint.method.toUpperCase();
 

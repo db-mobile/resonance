@@ -111,7 +111,7 @@ class KeyboardShortcutsManager {
         // or CodeMirror editor, unless it's a specific input-safe shortcut
         const targetTag = event.target.tagName.toLowerCase();
         const { isContentEditable } = event.target;
-        const isCodeMirror = event.target.closest('.CodeMirror');
+        const isCodeMirror = event.target.closest('.cm-editor') || event.target.closest('.CodeMirror');
         const isInputField = targetTag === 'input' ||
                            targetTag === 'textarea' ||
                            isContentEditable ||

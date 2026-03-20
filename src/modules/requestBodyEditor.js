@@ -4,6 +4,7 @@ import { json } from '@codemirror/lang-json';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
+import { searchKeymap, highlightSelectionMatches, search } from '@codemirror/search';
 import { isDarkMode, darkHighlighting } from './editorTheme.js';
 
 // Light theme syntax highlighting style
@@ -38,53 +39,22 @@ export class RequestBodyEditor {
      * @returns {Array} Array of theme extensions
      */
     getThemeExtensions() {
-        const baseTheme = EditorView.theme({
-            '&': {
-                height: '100%',
-                fontSize: '13px',
-                backgroundColor: 'var(--bg-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '4px'
-            },
-            '&.cm-focused': {
-                outline: '2px solid var(--primary-color)',
-                outlineOffset: '1px'
-            },
-            '.cm-scroller': {
-                fontFamily: '"Fira Code", "Courier New", monospace',
-                overflow: 'auto'
-            },
-            '.cm-gutters': {
-                backgroundColor: 'var(--bg-secondary)',
-                color: 'var(--text-secondary)',
-                border: 'none',
-                borderRight: '1px solid var(--border-color)',
-                paddingRight: '8px'
-            },
-            '.cm-lineNumbers .cm-gutterElement': {
-                padding: '0 8px 0 4px',
-                minWidth: '40px'
-            },
-            '.cm-content': {
-                color: 'var(--text-primary)',
-                caretColor: 'var(--text-primary)',
-                padding: '4px 0'
-            },
-            '.cm-line': {
-                padding: '0 8px'
-            },
-            '.cm-activeLine': {
-                backgroundColor: 'var(--bg-secondary)'
-            },
-            '.cm-activeLineGutter': {
-                backgroundColor: 'var(--bg-secondary)'
-            }
-        });
-
         if (isDarkMode()) {
-            return [darkHighlighting, baseTheme];
+            return [darkHighlighting];
         }
-        return [syntaxHighlighting(lightHighlightStyle), baseTheme];
+        return [syntaxHighlighting(lightHighlightStyle)];
+    }
+
+    /**
+     * Get search extensions for Ctrl+F functionality
+     * @returns {Array} Array of search extensions
+     */
+    getSearchExtensions() {
+        return [
+            search(),
+            highlightSelectionMatches(),
+            keymap.of(searchKeymap)
+        ];
     }
 
     /**
@@ -100,6 +70,7 @@ export class RequestBodyEditor {
                 EditorView.editable.of(true), // Editable
                 EditorView.lineWrapping,
                 json(), // Always use JSON highlighting
+                ...this.getSearchExtensions(),
                 EditorView.updateListener.of((update) => {
                     // Call change callback if content changed
                     if (update.docChanged && this.changeCallback) {

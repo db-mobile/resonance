@@ -1,13 +1,17 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 use tauri::AppHandle;
+use tauri::Manager;
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_store::StoreExt;
 use tokio::sync::oneshot;
 
 const STORE_FILE: &str = "resonance-store.json";
 const LAST_IMPORT_DIR_KEY: &str = "lastImportDirectory";
+const COLLECTIONS_DIR: &str = "collections";
 
 fn is_http_method(method: &str) -> bool {
     matches!(
@@ -42,6 +46,76 @@ fn save_last_import_directory(app: &AppHandle, file_path: &std::path::Path) {
             let _ = store.save();
         }
     }
+}
+
+/// Get the collections directory path
+fn get_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    Ok(app_data_dir.join(COLLECTIONS_DIR))
+}
+
+/// Get the path to a specific collection's directory
+fn get_collection_dir(app: &AppHandle, collection_id: &str) -> Result<PathBuf, String> {
+    Ok(get_collections_dir(app)?.join(collection_id))
+}
+
+/// Ensure the collections directory exists
+fn ensure_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = get_collections_dir(app)?;
+    if !dir.exists() {
+        fs::create_dir_all(&dir).map_err(|e| format!("Failed to create collections dir: {}", e))?;
+    }
+    Ok(dir)
+}
+
+/// Write JSON to file with pretty printing
+fn write_json_file<T: Serialize>(path: &PathBuf, data: &T) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(data)
+        .map_err(|e| format!("Failed to serialize JSON: {}", e))?;
+    fs::write(path, json).map_err(|e| format!("Failed to write file: {}", e))?;
+    Ok(())
+}
+
+/// Save a collection to the file-based storage format
+fn save_collection_to_files(app: &AppHandle, collection: &Collection) -> Result<(), String> {
+    ensure_collections_dir(app)?;
+
+    let collection_dir = get_collection_dir(app, &collection.id)?;
+
+    if !collection_dir.exists() {
+        fs::create_dir_all(&collection_dir)
+            .map_err(|e| format!("Failed to create collection dir: {}", e))?;
+    }
+
+    // Convert to the format expected by collections.rs
+    let collection_data = serde_json::json!({
+        "id": collection.id,
+        "name": collection.name,
+        "baseUrl": collection.base_url.clone().unwrap_or_default(),
+        "endpoints": collection.endpoints,
+        "folders": collection.folders,
+        "defaultHeaders": {},
+        "_openApiSpec": null
+    });
+
+    let collection_file = collection_dir.join("collection.json");
+    write_json_file(&collection_file, &collection_data)?;
+
+    // Save baseUrl as a collection variable if present
+    if let Some(base_url) = &collection.base_url {
+        if !base_url.is_empty() {
+            let variables = serde_json::json!([
+                { "key": "baseUrl", "value": base_url }
+            ]);
+            let variables_file = collection_dir.join("variables.json");
+            write_json_file(&variables_file, &variables)?;
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,38 +194,8 @@ pub async fn import_openapi_file(app: AppHandle) -> Result<Option<Collection>, S
     // Convert OpenAPI spec to Collection
     let collection = parse_openapi_spec(spec)?;
 
-    // Save to store
-    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
-    let mut collections: Vec<Collection> = store
-        .get("collections")
-        .and_then(|v| serde_json::from_value(v).ok())
-        .unwrap_or_default();
-
-    collections.push(collection.clone());
-    store.set(
-        "collections".to_string(),
-        serde_json::to_value(&collections).unwrap(),
-    );
-
-    // Save baseUrl as a collection variable if present
-    if let Some(base_url) = &collection.base_url {
-        let mut collection_variables: HashMap<String, HashMap<String, String>> = store
-            .get("collectionVariables")
-            .and_then(|v| serde_json::from_value(v).ok())
-            .unwrap_or_default();
-
-        let vars = collection_variables
-            .entry(collection.id.clone())
-            .or_default();
-        vars.insert("baseUrl".to_string(), base_url.clone());
-
-        store.set(
-            "collectionVariables".to_string(),
-            serde_json::to_value(&collection_variables).unwrap(),
-        );
-    }
-
-    store.save().map_err(|e| e.to_string())?;
+    // Save to file-based storage
+    save_collection_to_files(&app, &collection)?;
 
     Ok(Some(collection))
 }
@@ -622,38 +666,8 @@ pub async fn import_postman_collection(app: AppHandle) -> Result<Option<Collecti
     // Convert Postman format to Collection
     let collection = parse_postman_collection(postman)?;
 
-    // Save to store
-    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
-    let mut collections: Vec<Collection> = store
-        .get("collections")
-        .and_then(|v| serde_json::from_value(v).ok())
-        .unwrap_or_default();
-
-    collections.push(collection.clone());
-    store.set(
-        "collections".to_string(),
-        serde_json::to_value(&collections).unwrap(),
-    );
-
-    // Save baseUrl as a collection variable if present
-    if let Some(base_url) = &collection.base_url {
-        let mut collection_variables: HashMap<String, HashMap<String, String>> = store
-            .get("collectionVariables")
-            .and_then(|v| serde_json::from_value(v).ok())
-            .unwrap_or_default();
-
-        let vars = collection_variables
-            .entry(collection.id.clone())
-            .or_default();
-        vars.insert("baseUrl".to_string(), base_url.clone());
-
-        store.set(
-            "collectionVariables".to_string(),
-            serde_json::to_value(&collection_variables).unwrap(),
-        );
-    }
-
-    store.save().map_err(|e| e.to_string())?;
+    // Save to file-based storage
+    save_collection_to_files(&app, &collection)?;
 
     Ok(Some(collection))
 }

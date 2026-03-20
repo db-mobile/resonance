@@ -60,6 +60,21 @@ if (isTauri) {
             set: (key, value) => invoke('store_set', { key, value })
         },
         collections: {
+            // File-based collection storage
+            list: () => invoke('collections_list'),
+            getAll: () => invoke('collections_get_all'),
+            get: (collectionId) => invoke('collection_get', { collectionId }),
+            save: (collection) => invoke('collection_save', { collection }),
+            delete: (collectionId) => invoke('collection_delete', { collectionId }),
+            getEndpointData: (collectionId, endpointId) => invoke('collection_get_endpoint_data', { collectionId, endpointId }),
+            saveEndpointData: (collectionId, endpointId, data) => invoke('collection_save_endpoint_data', { collectionId, endpointId, data }),
+            deleteEndpointData: (collectionId, endpointId) => invoke('collection_delete_endpoint_data', { collectionId, endpointId }),
+            getVariables: (collectionId) => invoke('collection_get_variables', { collectionId }),
+            saveVariables: (collectionId, variables) => invoke('collection_save_variables', { collectionId, variables }),
+            needsMigration: () => invoke('collections_needs_migration'),
+            migrate: () => invoke('collections_migrate'),
+            getPath: () => invoke('collections_get_path'),
+            // Import/Export
             importOpenApiFile: () => invoke('import_openapi_file'),
             importPostmanCollection: () => invoke('import_postman_collection'),
             importPostmanEnvironment: () => invoke('import_postman_environment'),
