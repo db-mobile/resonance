@@ -280,7 +280,6 @@ function initKeyboardShortcuts() {
         category: 'Navigation'
     });
 
-
     keyboardShortcuts.register('KeyH', {
         ctrl: true,
         handler: () => {

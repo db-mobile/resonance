@@ -408,19 +408,13 @@
                         </nav>
 
                         <!-- Pre-request Script Tab -->
-                        <div class="script-tab-panel active u-flex-1 u-min-h-0 u-overflow-y-auto" id="script-pre-request" role="tabpanel">
-                            <textarea id="pre-request-script"
-                                      class="textarea-base script-textarea"
-                                      placeholder="// Modify request before sending&#10;request.headers['X-Custom-Header'] = 'value';&#10;environment.set('timestamp', Date.now());"
-                                      aria-label="Pre-request Script"></textarea>
+                        <div class="script-tab-panel active u-flex-1 u-min-h-0" id="script-pre-request" role="tabpanel">
+                            <div id="pre-request-script-container" class="script-editor-container" aria-label="Pre-request Script"></div>
                         </div>
 
                         <!-- Test Script Tab -->
-                        <div class="script-tab-panel u-flex-1 u-min-h-0 u-overflow-y-auto" id="script-test" role="tabpanel">
-                            <textarea id="test-script"
-                                      class="textarea-base script-textarea"
-                                      placeholder="// Validate response and extract data&#10;expect(response.status).toBe(200);&#10;expect(response.body.id).toBeDefined();&#10;environment.set('userId', response.body.id);"
-                                      aria-label="Test Script"></textarea>
+                        <div class="script-tab-panel u-flex-1 u-min-h-0" id="script-test" role="tabpanel">
+                            <div id="test-script-container" class="script-editor-container" aria-label="Test Script"></div>
                         </div>
 
                         <!-- API Reference Tab -->

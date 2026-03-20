@@ -3,19 +3,23 @@
  * @module ui/InlineScriptManager
  */
 
+import { ScriptEditor } from '../scriptEditor.bundle.js';
+
 /**
  * Manages inline script editing with auto-save functionality
  *
  * @class
- * @classdesc Handles loading, saving, and managing scripts in the Scripts tab
+ * @classdesc Handles loading, saving, and managing scripts in the Scripts tab using CodeMirror
  */
 export class InlineScriptManager {
     /**
      * Creates an InlineScriptManager instance
      */
     constructor() {
-        this.preRequestTextarea = document.getElementById('pre-request-script');
-        this.testScriptTextarea = document.getElementById('test-script');
+        this.preRequestContainer = document.getElementById('pre-request-script-container');
+        this.testScriptContainer = document.getElementById('test-script-container');
+        this.preRequestEditor = null;
+        this.testScriptEditor = null;
         this.currentCollectionId = null;
         this.currentEndpointId = null;
         this.saveTimeout = null;
@@ -23,21 +27,23 @@ export class InlineScriptManager {
     }
 
     /**
-     * Initialize event listeners for auto-save
+     * Initialize CodeMirror editors and event listeners for auto-save
      */
     initialize() {
         if (this.initialized) {
             return;
         }
 
-        if (this.preRequestTextarea) {
-            this.preRequestTextarea.addEventListener('input', () => {
+        if (this.preRequestContainer && !this.preRequestEditor) {
+            this.preRequestEditor = new ScriptEditor(this.preRequestContainer);
+            this.preRequestEditor.onChange(() => {
                 this.scheduleAutoSave();
             });
         }
 
-        if (this.testScriptTextarea) {
-            this.testScriptTextarea.addEventListener('input', () => {
+        if (this.testScriptContainer && !this.testScriptEditor) {
+            this.testScriptEditor = new ScriptEditor(this.testScriptContainer);
+            this.testScriptEditor.onChange(() => {
                 this.scheduleAutoSave();
             });
         }
@@ -58,12 +64,12 @@ export class InlineScriptManager {
         try {
             const scripts = await window.backendAPI.scripts.get(collectionId, endpointId);
 
-            if (this.preRequestTextarea) {
-                this.preRequestTextarea.value = scripts.preRequestScript || '';
+            if (this.preRequestEditor) {
+                this.preRequestEditor.setContent(scripts.preRequestScript || '');
             }
 
-            if (this.testScriptTextarea) {
-                this.testScriptTextarea.value = scripts.testScript || '';
+            if (this.testScriptEditor) {
+                this.testScriptEditor.setContent(scripts.testScript || '');
             }
         } catch (error) {
             void error;
@@ -71,18 +77,18 @@ export class InlineScriptManager {
     }
 
     /**
-     * Clear script textareas
+     * Clear script editors
      */
     clear() {
         this.currentCollectionId = null;
         this.currentEndpointId = null;
 
-        if (this.preRequestTextarea) {
-            this.preRequestTextarea.value = '';
+        if (this.preRequestEditor) {
+            this.preRequestEditor.clear();
         }
 
-        if (this.testScriptTextarea) {
-            this.testScriptTextarea.value = '';
+        if (this.testScriptEditor) {
+            this.testScriptEditor.clear();
         }
     }
 
@@ -119,8 +125,8 @@ export class InlineScriptManager {
         }
 
         const scripts = {
-            preRequestScript: this.preRequestTextarea?.value || '',
-            testScript: this.testScriptTextarea?.value || ''
+            preRequestScript: this.preRequestEditor?.getContent() || '',
+            testScript: this.testScriptEditor?.getContent() || ''
         };
 
         try {
@@ -140,8 +146,8 @@ export class InlineScriptManager {
      */
     getCurrentScripts() {
         return {
-            preRequestScript: this.preRequestTextarea?.value || '',
-            testScript: this.testScriptTextarea?.value || ''
+            preRequestScript: this.preRequestEditor?.getContent() || '',
+            testScript: this.testScriptEditor?.getContent() || ''
         };
     }
 }

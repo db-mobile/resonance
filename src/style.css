@@ -3005,6 +3005,150 @@ body {
   --textarea-bg: var(--bg-white);
 }
 
+/* Script Editor Container (CodeMirror) */
+.script-editor-container {
+  flex: 1;
+  min-height: 200px;
+  overflow: hidden;
+}
+
+.script-editor-container .cm-editor {
+  height: 100%;
+}
+
+/* CodeMirror Editor Base Styles */
+.cm-editor {
+  height: 100%;
+  font-size: 13px;
+  background-color: var(--bg-primary);
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+.cm-editor .cm-scroller {
+  font-family: "Fira Code", "Courier New", monospace;
+  overflow: auto;
+}
+
+.cm-editor .cm-gutters {
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: none;
+  padding-right: 8px;
+}
+
+.cm-editor .cm-lineNumbers .cm-gutterElement {
+  padding: 0 8px 0 4px;
+  min-width: 40px;
+}
+
+.cm-editor .cm-content {
+  color: var(--text-primary);
+  caret-color: var(--text-primary);
+  padding: 4px 0;
+}
+
+.cm-editor .cm-line {
+  padding: 0 8px;
+}
+
+.cm-editor .cm-activeLine {
+  background-color: var(--bg-secondary);
+}
+
+.cm-editor .cm-activeLineGutter {
+  background-color: var(--bg-secondary);
+}
+
+.cm-editor .cm-placeholder {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.cm-editor .cm-cursor {
+  border-left-width: 2px;
+}
+
+/* CodeMirror Search Panel */
+.cm-editor .cm-panels {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.cm-editor .cm-panels.cm-panels-top {
+  border-bottom: 1px solid var(--border-light);
+}
+
+.cm-editor .cm-searchMatch {
+  background-color: rgba(59, 130, 246, 0.3);
+  outline: 1px solid #3b82f6;
+}
+
+.cm-editor .cm-searchMatch.cm-searchMatch-selected {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.cm-editor .cm-panel.cm-search {
+  padding: 8px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.cm-editor .cm-panel.cm-search input {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+  outline: none;
+}
+
+.cm-editor .cm-panel.cm-search input:focus {
+  border-color: var(--accent, #3b82f6);
+}
+
+.cm-editor .cm-panel.cm-search button {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cm-editor .cm-panel.cm-search button:hover {
+  background-color: var(--bg-hover);
+}
+
+.cm-editor .cm-panel.cm-search label {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cm-editor .cm-panel.cm-search [name=close] {
+  position: static;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  margin-left: 8px;
+}
+
 /* API Reference Content */
 .api-reference-content {
   gap: var(--space-6);

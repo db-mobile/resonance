@@ -1,10 +1,11 @@
-import { EditorView, lineNumbers } from '@codemirror/view';
+import { EditorView, lineNumbers, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { json } from '@codemirror/lang-json';
 import { xml } from '@codemirror/lang-xml';
 import { html } from '@codemirror/lang-html';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
+import { searchKeymap, highlightSelectionMatches, search, openSearchPanel } from '@codemirror/search';
 import { isDarkMode, darkHighlighting } from './editorTheme.js';
 
 // Light theme syntax highlighting style
@@ -45,59 +46,37 @@ export class ResponseEditor {
      * @returns {Array} Array of theme extensions
      */
     getThemeExtensions() {
-        const baseTheme = EditorView.theme({
-            '&': {
-                height: '100%',
-                fontSize: '13px',
-                backgroundColor: 'var(--bg-primary)'
-            },
-            '.cm-scroller': {
-                fontFamily: '"Fira Code", "Courier New", monospace',
-                overflow: 'auto'
-            },
-            '.cm-gutters': {
-                backgroundColor: 'var(--bg-secondary)',
-                color: 'var(--text-secondary)',
-                border: 'none',
-                paddingRight: '8px'
-            },
-            '.cm-lineNumbers .cm-gutterElement': {
-                padding: '0 8px 0 4px',
-                minWidth: '40px'
-            },
-            '.cm-content': {
-                color: 'var(--text-primary)',
-                caretColor: 'var(--text-primary)',
-                padding: '4px 0'
-            },
-            '.cm-line': {
-                padding: '0 8px'
-            },
-            '.cm-activeLine': {
-                backgroundColor: 'var(--bg-secondary)'
-            },
-            '.cm-activeLineGutter': {
-                backgroundColor: 'var(--bg-secondary)'
-            }
-        });
-
         if (isDarkMode()) {
-            return [darkHighlighting, baseTheme];
+            return [darkHighlighting];
         }
-        return [syntaxHighlighting(lightHighlightStyle), baseTheme];
+        return [syntaxHighlighting(lightHighlightStyle)];
     }
 
     /**
      * Initialize the CodeMirror editor
      */
+    /**
+     * Get search extensions for Ctrl+F functionality
+     * @returns {Array} Array of search extensions
+     */
+    getSearchExtensions() {
+        return [
+            search(),
+            highlightSelectionMatches(),
+            keymap.of(searchKeymap)
+        ];
+    }
+
     init() {
         const state = EditorState.create({
             doc: '',
             extensions: [
                 lineNumbers(),
                 EditorView.editable.of(false), // Read-only
+                EditorView.contentAttributes.of({ tabindex: '0' }), // Make focusable for keyboard events
                 EditorView.lineWrapping,
-                ...this.getThemeExtensions()
+                ...this.getThemeExtensions(),
+                ...this.getSearchExtensions()
             ]
         });
 
@@ -221,8 +200,10 @@ export class ResponseEditor {
         const extensions = [
             lineNumbers(),
             EditorView.editable.of(false),
+            EditorView.contentAttributes.of({ tabindex: '0' }), // Make focusable for keyboard events
             EditorView.lineWrapping,
-            ...this.getThemeExtensions()
+            ...this.getThemeExtensions(),
+            ...this.getSearchExtensions()
         ];
 
         // Add language extension if specified
@@ -307,6 +288,16 @@ export class ResponseEditor {
         if (this.view) {
             this.view.destroy();
             this.view = null;
+        }
+    }
+
+    /**
+     * Open the search panel (Ctrl+F functionality)
+     */
+    openSearch() {
+        if (this.view) {
+            this.view.focus();
+            openSearchPanel(this.view);
         }
     }
 }

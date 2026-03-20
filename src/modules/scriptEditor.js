@@ -9,21 +9,22 @@ import { javascript } from '@codemirror/lang-javascript';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
+import { searchKeymap, highlightSelectionMatches, search } from '@codemirror/search';
 import { isDarkMode, darkHighlighting } from './editorTheme.js';
 
 // Light theme syntax highlighting style for JavaScript
 const lightHighlightStyle = HighlightStyle.define([
-    { tag: tags.keyword, color: '#6d28d9' },
-    { tag: tags.string, color: '#15803d' },
-    { tag: tags.number, color: '#1d4ed8' },
-    { tag: tags.bool, color: '#0369a1' },
-    { tag: tags.null, color: '#0369a1' },
-    { tag: tags.punctuation, color: '#0f172a' },
-    { tag: tags.bracket, color: '#0f172a' },
-    { tag: tags.propertyName, color: '#b91c1c' },
-    { tag: tags.variableName, color: '#0f172a' },
-    { tag: tags.function(tags.variableName), color: '#1d4ed8' },
-    { tag: tags.comment, color: '#6b7280', fontStyle: 'italic' },
+    { tag: tags.keyword, color: '#8b5cf6' },
+    { tag: tags.string, color: '#22c55e' },
+    { tag: tags.number, color: '#3b82f6' },
+    { tag: tags.bool, color: '#0ea5e9' },
+    { tag: tags.null, color: '#0ea5e9' },
+    { tag: tags.punctuation, color: '#64748b' },
+    { tag: tags.bracket, color: '#64748b' },
+    { tag: tags.propertyName, color: '#ef4444' },
+    { tag: tags.variableName, color: '#f97316' },
+    { tag: tags.function(tags.variableName), color: '#3b82f6' },
+    { tag: tags.comment, color: '#94a3b8', fontStyle: 'italic' },
 ]);
 
 /**
@@ -42,46 +43,22 @@ export class ScriptEditor {
      * @returns {Array} Array of theme extensions
      */
     getThemeExtensions() {
-        const baseTheme = EditorView.theme({
-            '&': {
-                height: '100%',
-                fontSize: '13px',
-                backgroundColor: 'var(--bg-primary)'
-            },
-            '.cm-scroller': {
-                fontFamily: '"Fira Code", "Courier New", monospace',
-                overflow: 'auto'
-            },
-            '.cm-gutters': {
-                backgroundColor: 'var(--bg-secondary)',
-                color: 'var(--text-secondary)',
-                border: 'none',
-                paddingRight: '8px'
-            },
-            '.cm-content': {
-                color: 'var(--text-primary)',
-                caretColor: 'var(--text-primary)',
-                padding: '4px 0'
-            },
-            '.cm-line': {
-                padding: '0 8px'
-            },
-            '.cm-placeholder': {
-                color: 'var(--text-tertiary)',
-                fontStyle: 'italic'
-            },
-            '.cm-activeLine': {
-                backgroundColor: 'var(--bg-secondary)'
-            },
-            '.cm-activeLineGutter': {
-                backgroundColor: 'var(--bg-secondary)'
-            }
-        });
-
         if (isDarkMode()) {
-            return [darkHighlighting, baseTheme];
+            return [darkHighlighting];
         }
-        return [syntaxHighlighting(lightHighlightStyle), baseTheme];
+        return [syntaxHighlighting(lightHighlightStyle)];
+    }
+
+    /**
+     * Get search extensions for Ctrl+F functionality
+     * @returns {Array} Array of search extensions
+     */
+    getSearchExtensions() {
+        return [
+            search(),
+            highlightSelectionMatches(),
+            keymap.of(searchKeymap)
+        ];
     }
 
     /**
@@ -94,7 +71,8 @@ export class ScriptEditor {
             keymap.of([...defaultKeymap, ...historyKeymap]),
             EditorView.lineWrapping,
             javascript(),
-            placeholder('// Extract data from response and set environment variables\nenvironment.set(\'token\', response.body.token);\nenvironment.set(\'userId\', response.body.id);'),
+            ...this.getSearchExtensions(),
+            placeholder('// Write your script here...'),
             EditorView.updateListener.of((update) => {
                 if (update.docChanged && this.changeCallback) {
                     this.changeCallback(this.getContent());
