@@ -1,6 +1,6 @@
 name: db-mobile-resonance
 base: core22
-version: '2.6.1'
+version: '2.6.2'
 title: Resonance
 summary: Test and explore web services
 description: |
