@@ -326,8 +326,8 @@ export class CollectionRenderer {
         endpointDiv.dataset.collectionId = collection.id;
 
         const methodSpan = document.createElement('span');
-        methodSpan.className = 'endpoint-method';
-        methodSpan.dataset.method = endpoint.method.toLowerCase();
+        methodSpan.className = 'method-pill';
+        methodSpan.dataset.method = endpoint.method.toUpperCase();
         methodSpan.textContent = endpoint.method;
 
         const pathSpan = document.createElement('span');
