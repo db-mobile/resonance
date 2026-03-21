@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Resonance - A local-first API client for HTTP, GraphQL, and gRPC workflows">
+    <meta name="description" content="Resonance - A local-first, zero-account API client for HTTP, GraphQL, and gRPC workflows. Resource-friendly at ~15MB bundle size and ~50MB memory usage.">
     <meta name="keywords" content="API client, REST client, GraphQL, gRPC, OpenAPI, API testing, Tauri">
     <meta name="author" content="Dennis Blümer">
     <title>Resonance</title>
@@ -33,12 +33,70 @@
         <section class="hero">
             <div class="container">
                 <h1>Resonance</h1>
-                <p class="tagline">A local-first API client for HTTP, GraphQL, and gRPC workflows</p>
+                <p class="tagline">A local-first, zero-account API client for HTTP, GraphQL, and gRPC workflows — resource-friendly at ~15MB bundle size and ~50MB memory usage</p>
                 <div class="hero-buttons">
                     <a href="#download" class="btn btn-primary">Download Now</a>
                     <a href="https://github.com/db-mobile/resonance" class="btn btn-secondary" target="_blank">View on GitHub</a>
                 </div>
                 <div class="version-badge" id="version-badge">Loading version...</div>
+            </div>
+        </section>
+
+        <section id="screenshots" class="screenshots">
+            <div class="container">
+                <h2>Screenshots</h2>
+                <div class="screenshots-grid">
+                    <div class="screenshot-item">
+                        <img src="assets/screenshots/main_window.png" alt="Main Interface" loading="lazy">
+                        <p>Main interface with request configuration</p>
+                    </div>
+                    <div class="screenshot-item">
+                        <img src="assets/screenshots/environment.png" alt="Environment Management" loading="lazy">
+                        <p>Environment management dialog</p>
+                    </div>
+                    <div class="screenshot-item">
+                        <img src="assets/screenshots/mock_server.png" alt="Mock Server" loading="lazy">
+                        <p>Mock server with request logging</p>
+                    </div>
+                    <div class="screenshot-item">
+                        <img src="assets/screenshots/settings.png" alt="Settings" loading="lazy">
+                        <p>Settings with theme selection</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="download" class="download">
+            <div class="container">
+                <h2>Download</h2>
+                <p class="download-subtitle">Available for Linux, macOS, and Windows</p>
+                <div class="download-grid">
+                    <div class="download-card">
+                        <h3>Linux</h3>
+                        <p>AppImage and DEB packages, plus Flathub support for Linux desktops</p>
+                        <a href="https://github.com/db-mobile/resonance/releases/latest" class="btn btn-download" target="_blank">Download for Linux</a>
+                    </div>
+                    <div class="download-card">
+                        <h3>macOS</h3>
+                        <p>DMG installer for Intel and Apple Silicon</p>
+                        <a href="https://github.com/db-mobile/resonance/releases/latest" class="btn btn-download" target="_blank">Download for macOS</a>
+                    </div>
+                    <div class="download-card">
+                        <h3>Windows</h3>
+                        <p>Installer packages for Windows desktops</p>
+                        <a href="https://github.com/db-mobile/resonance/releases/latest" class="btn btn-download" target="_blank">Download for Windows</a>
+                    </div>
+                </div>
+                <div class="source-download">
+                    <p>Or build from source:</p>
+                    <p>Building the Tauri app requires system dependencies. See: <a href="https://tauri.app/start/prerequisites/" target="_blank">Tauri prerequisites</a></p>
+                    <div class="code-block">
+                        <code>git clone https://github.com/db-mobile/resonance.git
+cd resonance
+npm install
+npm run build:tauri</code>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -105,64 +163,6 @@
                         <div class="feature-icon">🔒</div>
                         <h3>Secure Architecture</h3>
                         <p>Tauri-based desktop architecture with secure IPC boundaries, sandboxed scripting, and native packaging</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="screenshots" class="screenshots">
-            <div class="container">
-                <h2>Screenshots</h2>
-                <div class="screenshots-grid">
-                    <div class="screenshot-item">
-                        <img src="assets/screenshots/main_window.png" alt="Main Interface" loading="lazy">
-                        <p>Main interface with request configuration</p>
-                    </div>
-                    <div class="screenshot-item">
-                        <img src="assets/screenshots/environment.png" alt="Environment Management" loading="lazy">
-                        <p>Environment management dialog</p>
-                    </div>
-                    <div class="screenshot-item">
-                        <img src="assets/screenshots/mock_server.png" alt="Mock Server" loading="lazy">
-                        <p>Mock server with request logging</p>
-                    </div>
-                    <div class="screenshot-item">
-                        <img src="assets/screenshots/settings.png" alt="Settings" loading="lazy">
-                        <p>Settings with theme selection</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="download" class="download">
-            <div class="container">
-                <h2>Download</h2>
-                <p class="download-subtitle">Available for Linux, macOS, and Windows</p>
-                <div class="download-grid">
-                    <div class="download-card">
-                        <h3>Linux</h3>
-                        <p>AppImage and DEB packages, plus Flathub support for Linux desktops</p>
-                        <a href="https://github.com/db-mobile/resonance/releases/latest" class="btn btn-download" target="_blank">Download for Linux</a>
-                    </div>
-                    <div class="download-card">
-                        <h3>macOS</h3>
-                        <p>DMG installer for Intel and Apple Silicon</p>
-                        <a href="https://github.com/db-mobile/resonance/releases/latest" class="btn btn-download" target="_blank">Download for macOS</a>
-                    </div>
-                    <div class="download-card">
-                        <h3>Windows</h3>
-                        <p>Installer packages for Windows desktops</p>
-                        <a href="https://github.com/db-mobile/resonance/releases/latest" class="btn btn-download" target="_blank">Download for Windows</a>
-                    </div>
-                </div>
-                <div class="source-download">
-                    <p>Or build from source:</p>
-                    <p>Building the Tauri app requires system dependencies. See: <a href="https://tauri.app/start/prerequisites/" target="_blank">Tauri prerequisites</a></p>
-                    <div class="code-block">
-                        <code>git clone https://github.com/db-mobile/resonance.git
-cd resonance
-npm install
-npm run build:tauri</code>
                     </div>
                 </div>
             </div>
