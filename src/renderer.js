@@ -61,6 +61,7 @@ import { CollectionRepository } from './modules/storage/CollectionRepository.js'
 import { RequestBodyEditor } from './modules/requestBodyEditor.bundle.js';
 import { PreviewRepository } from './modules/storage/PreviewRepository.js';
 import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
+import { toast } from './modules/ui/Toast.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
@@ -818,9 +819,8 @@ async function checkForUpdatesOnLaunch() {
         // Check for updates
         const update = await window.backendAPI.updater.check();
         if (update?.available) {
-            // Show a notification or status bar message
             const message = window.i18n?.t('settings.update_available', { version: update.version }) || `Update available: v${update.version}`;
-            updateStatusDisplay(message, 'info');
+            toast.info(message);
         }
     } catch (error) {
         // Silently ignore errors during startup update check

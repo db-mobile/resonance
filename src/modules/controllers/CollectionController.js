@@ -15,6 +15,7 @@ import { RenameDialog } from '../ui/RenameDialog.js';
 import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 import { VariableManager } from '../ui/VariableManager.js';
 import { CurlImportDialog } from '../ui/CurlImportDialog.js';
+import { toast } from '../ui/Toast.js';
 import { templateLoader } from '../templateLoader.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { setRequestBodyContent, getRequestBodyContent } from '../requestBodyHelper.js';
@@ -880,7 +881,6 @@ export class CollectionController {
                     // Refresh collections display
                     await this.loadCollectionsWithExpansionState();
 
-                    this.statusDisplay.update(`Saved request: ${name}`, null);
 
                     cleanup();
                     resolve({
@@ -951,8 +951,9 @@ export class CollectionController {
                 await this.service.deleteCollection(collection.id);
                 await this.variableService.cleanupCollectionVariables(collection.id);
                 await this.loadCollections();
+                toast.success(`Collection "${collection.name}" deleted`);
             } catch (error) {
-                void error;
+                toast.error(`Failed to delete collection: ${error.message}`);
             }
         }
     }
@@ -1133,13 +1134,14 @@ export class CollectionController {
 
             if (collection) {
                 await this.loadCollections();
+                toast.success(`Imported "${collection.name}"`);
                 return collection;
             }
                 this.statusDisplay.update('Import cancelled', null);
                 return null;
 
         } catch (error) {
-            this.statusDisplay.update(`Import error: ${error.message}`, null);
+            toast.error(`Import failed: ${error.message}`);
             throw error;
         }
     }
@@ -1160,14 +1162,14 @@ export class CollectionController {
 
             if (result) {
                 await this.loadCollections();
-                this.statusDisplay.update('Postman collection imported successfully', null);
+                toast.success(`Imported "${result.collection.name}"`);
                 return result.collection;
             }
                 this.statusDisplay.update('Import cancelled', null);
                 return null;
 
         } catch (error) {
-            this.statusDisplay.update(`Import error: ${error.message}`, null);
+            toast.error(`Import failed: ${error.message}`);
             throw error;
         }
     }
@@ -1274,10 +1276,10 @@ export class CollectionController {
             }
 
             await this.loadCollections();
-            this.statusDisplay.update(`Imported cURL as "${result.endpoint.name}"`, null);
+            toast.success(`Imported cURL as "${result.endpoint.name}"`);
 
         } catch (error) {
-            this.statusDisplay.update(`cURL import error: ${error.message}`, null);
+            toast.error(`cURL import failed: ${error.message}`);
         }
     }
 
@@ -1360,7 +1362,6 @@ export class CollectionController {
                 await this.repository.save(collections);
                 await this.loadCollectionsWithExpansionState();
 
-                this.statusDisplay.update('Request saved', null);
                 return;
             }
 
@@ -1391,7 +1392,6 @@ export class CollectionController {
                 }
 
                 await this.loadCollectionsWithExpansionState();
-                this.statusDisplay.update('Request saved', null);
                 return;
             }
 
@@ -1475,8 +1475,6 @@ export class CollectionController {
             if (authConfig) {
                 await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
             }
-
-            this.statusDisplay.update('Request saved', null);
 
             // Update the current workspace tab state to reflect the saved changes
             if (!window.workspaceTabController) {

@@ -1,8 +1,8 @@
 <template id="tpl-variable-manager-dialog">
     <div class="dialog-stack">
-        <div class="variable-manager-header dialog-header u-items-center u-justify-between">
+        <div class="manager-header dialog-header u-items-center u-justify-between">
             <h3 class="dialog-title" data-role="title"></h3>
-            <div class="variable-manager-actions u-flex">
+            <div class="manager-header-actions u-flex">
                 <button id="add-variable-btn" class="btn-xs btn-outline-primary">+ Add Variable</button>
                 <button id="import-variables-btn" class="btn-xs btn-outline">Import</button>
                 <button id="export-variables-btn" class="btn-xs btn-outline">Export</button>
@@ -33,9 +33,9 @@
             </details>
         </div>
 
-        <div id="variables-container" class="variable-manager-container"></div>
+        <div id="variables-container" class="manager-content"></div>
 
-        <div class="variable-manager-footer dialog-footer dialog-footer--divided">
+        <div class="dialog-footer dialog-footer--divided">
             <button id="variables-cancel-btn" class="btn btn-outline">Cancel</button>
             <button id="variables-save-btn" class="btn btn-primary">Save Variables</button>
         </div>

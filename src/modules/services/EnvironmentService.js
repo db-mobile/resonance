@@ -163,7 +163,6 @@ export class EnvironmentService {
             }
 
             await this.repository.setActiveEnvironment(environmentId);
-            this.statusDisplay.update(`Switched to environment: ${environment.name}`, null);
 
             this._notifyListeners({
                 type: 'environment-switched',

@@ -593,9 +593,6 @@ export async function handleSendRequest() {
             if (responsePerformanceDisplay) {clearPerformanceMetrics(responsePerformanceDisplay);}
         }
 
-        if (await isTabCurrentlyActive(requestTabId)) {
-            updateStatusDisplay('Status: Sending...', null);
-        }
 
         if (authData.authConfig) {
             requestConfig.auth = authData.authConfig;

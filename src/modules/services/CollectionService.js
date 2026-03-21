@@ -106,17 +106,8 @@ export class CollectionService {
      * @throws {Error} If collection is not found or deletion fails
      */
     async deleteCollection(collectionId) {
-        try {
-            this.statusDisplay.update('Deleting collection...', null);
-
-            await this.repository.delete(collectionId);
-
-            this.statusDisplay.update('Collection deleted successfully', null);
-            return true;
-        } catch (error) {
-            this.statusDisplay.update(`Error deleting collection: ${error.message}`, null);
-            throw error;
-        }
+        await this.repository.delete(collectionId);
+        return true;
     }
 
     /**

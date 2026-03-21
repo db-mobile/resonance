@@ -12,6 +12,8 @@
  * switching, import/export, and change notifications. Listens for service events
  * and synchronizes UI state accordingly.
  */
+import { toast } from '../ui/Toast.js';
+
 export class EnvironmentController {
     /**
      * Creates an EnvironmentController instance
@@ -365,7 +367,7 @@ export class EnvironmentController {
                     await this.service.importEnvironments(data, merge);
                     resolve(true);
                 } catch (error) {
-                    alert(`Error importing environments: ${error.message}`);
+                    toast.error(`Error importing environments: ${error.message}`);
                     resolve(false);
                 }
             };

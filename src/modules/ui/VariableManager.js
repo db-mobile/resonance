@@ -12,6 +12,7 @@
  * Variables use {{variableName}} template syntax in requests.
  */
 import { templateLoader } from '../templateLoader.js';
+import { toast } from './Toast.js';
 
 export class VariableManager {
     /**
@@ -175,7 +176,7 @@ export class VariableManager {
         });
 
         if (errors.length > 0) {
-            alert(`Validation errors:\n\n${  errors.join('\n')}`);
+            toast.error(`Validation errors:\n\n${errors.join('\n')}`);
             return;
         }
 
@@ -236,7 +237,7 @@ export class VariableManager {
                 this.importVariables(variables);
                 importDialog.remove();
             } catch (error) {
-                alert(`Invalid JSON: ${  error.message}`);
+                toast.error(`Invalid JSON: ${error.message}`);
             }
         });
     }
@@ -247,7 +248,7 @@ export class VariableManager {
         this.populateVariables(variables);
     }
 
-    exportVariables() {
+    async exportVariables() {
         const container = this.dialog.querySelector('#variables-container');
         const rows = container.querySelectorAll('.variable-row');
         const variables = {};
@@ -261,16 +262,20 @@ export class VariableManager {
         });
 
         const json = JSON.stringify(variables, null, 2);
-        
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'collection-variables.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+
+        if (window.backendAPI?.environments?.saveJsonExport) {
+            try {
+                const result = await window.backendAPI.environments.saveJsonExport('collection-variables.json', json);
+                if (result?.cancelled) {
+                    return;
+                }
+                toast.success('Variables exported successfully');
+            } catch (error) {
+                toast.error(`Export failed: ${error.message}`);
+            }
+        } else {
+            toast.error('Native export is not available in this runtime');
+        }
     }
 
     escapeHtml(text) {

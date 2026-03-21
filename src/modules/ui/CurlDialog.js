@@ -13,6 +13,7 @@
  * @deprecated Use CodeSnippetDialog for multi-language code export
  */
 import { templateLoader } from '../templateLoader.js';
+import { toast } from './Toast.js';
 
 export class CurlDialog {
     /**
@@ -99,7 +100,7 @@ export class CurlDialog {
                     copyBtn.classList.remove('is-copied');
                 }, 2000);
             } catch (err) {
-                alert('Failed to copy to clipboard');
+                toast.error('Failed to copy to clipboard');
             }
         });
 
