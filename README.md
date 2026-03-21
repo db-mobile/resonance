@@ -1,10 +1,96 @@
 # Resonance
 
-A local-first, zero-account API client with excellent user experience built with Tauri.
+A local-first, zero-account API client with excellent user experience built with Tauri. Resonance is designed to be resource-friendly — with a ~15MB bundle size and ~50MB memory footprint, it runs lean compared to Electron-based alternatives.
 
 ![Resonance API Client](https://img.shields.io/badge/License-MIT-blue.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-v2.0.0-brightgreen.svg)
 ![Rust](https://img.shields.io/badge/Rust-Latest-orange.svg)
+
+![Alt text](/assets/screenshots/main_window.png?raw=true "Main interface showing API request configuration")
+
+## Installation
+
+### Package Managers
+
+#### Flathub (Linux)
+
+Install from Flathub:
+
+```bash
+flatpak install flathub io.github.db_mobile.resonance
+```
+
+Run the application:
+
+```bash
+flatpak run io.github.db_mobile.resonance
+```
+
+#### Snap (Linux)
+
+Install from Snap Store:
+
+```bash
+snap install db-mobile-resonance
+```
+
+#### Homebrew (macOS)
+
+Install via Homebrew:
+
+```bash
+brew tap db-mobile/resonance
+brew install --cask resonance
+```
+
+### From Source
+
+#### Prerequisites
+
+- **Node.js** v20.0.0 or higher
+- **Rust** (latest stable) - [Install Rust](https://www.rust-lang.org/tools/install)
+- **Git** (for cloning the repository)
+- **Platform-specific dependencies**:
+  - **Linux**: `sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev`
+  - **macOS**: Xcode Command Line Tools (`xcode-select --install`)
+  - **Windows**: Microsoft Visual Studio C++ Build Tools
+
+#### Building from Source
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/db-mobile/resonance.git
+cd resonance
+```
+
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Start the application in development mode:
+
+```bash
+npm run dev
+```
+
+### Build for Distribution
+
+Build the application for production:
+
+```bash
+npm run build:tauri
+```
+
+The built application will be in `src-tauri/target/release/bundle/`.
+
+**Note:** Tauri creates native installers for each platform:
+
+- **Linux**: AppImage, .deb
+- **macOS**: .app, .dmg
+- **Windows**: .msi, .exe
 
 ## Features
 
@@ -108,94 +194,6 @@ A local-first, zero-account API client with excellent user experience built with
 - **Secure Architecture**: Tauri's secure IPC, CSP policies, and native system integration
 - **Persistent Storage**: Auto-save for collections, variables, environments, settings, and history
 - **Lightweight**: ~15MB bundle size, ~50MB memory usage (vs ~150MB/~200MB for Electron)
-
-## Screenshots
-
-![Alt text](/assets/screenshots/main_window.png?raw=true "Main interface showing API request configuration")
-
-## Installation
-
-### Package Managers
-
-#### Flathub (Linux)
-
-Install from Flathub:
-
-```bash
-flatpak install flathub io.github.db_mobile.resonance
-```
-
-Run the application:
-
-```bash
-flatpak run io.github.db_mobile.resonance
-```
-
-#### Snap (Linux)
-
-Install from Snap Store:
-
-```bash
-snap install db-mobile-resonance
-```
-
-#### Homebrew (macOS)
-
-Install via Homebrew:
-
-```bash
-brew tap db-mobile/resonance
-brew install --cask resonance
-```
-
-### From Source
-
-#### Prerequisites
-
-- **Node.js** v20.0.0 or higher
-- **Rust** (latest stable) - [Install Rust](https://www.rust-lang.org/tools/install)
-- **Git** (for cloning the repository)
-- **Platform-specific dependencies**:
-  - **Linux**: `sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev`
-  - **macOS**: Xcode Command Line Tools (`xcode-select --install`)
-  - **Windows**: Microsoft Visual Studio C++ Build Tools
-
-#### Building from Source
-
-1. Clone the repository:
-
-```bash
-git clone https://github.com/db-mobile/resonance.git
-cd resonance
-```
-
-2. Install dependencies:
-
-```bash
-npm install
-```
-
-3. Start the application in development mode:
-
-```bash
-npm run dev
-```
-
-### Build for Distribution
-
-Build the application for production:
-
-```bash
-npm run build:tauri
-```
-
-The built application will be in `src-tauri/target/release/bundle/`.
-
-**Note:** Tauri creates native installers for each platform:
-
-- **Linux**: AppImage, .deb
-- **macOS**: .app, .dmg
-- **Windows**: .msi, .exe
 
 ## Usage
 
