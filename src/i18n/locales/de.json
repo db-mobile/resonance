@@ -242,6 +242,7 @@
     "escape": "Anfrage abbrechen",
     "ctrl_keyl": "URL-Leiste fokussieren",
     "ctrl_keyh": "Verlaufs-Sidebar umschalten",
+    "ctrl_keyj": "Cookie-Jar öffnen",
     "ctrl_keyk": "cURL-Befehl generieren",
     "ctrl_keyo": "OpenAPI-Sammlung importieren",
     "ctrl_keye": "Umgebungsmanager öffnen",

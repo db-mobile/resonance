@@ -242,6 +242,7 @@
     "escape": "Cancelar requisição",
     "ctrl_keyl": "Focar barra de URL",
     "ctrl_keyh": "Alternar painel de histórico",
+    "ctrl_keyj": "Abrir o gerenciador de cookies",
     "ctrl_keyk": "Gerar comando cURL",
     "ctrl_keyo": "Importar coleção OpenAPI",
     "ctrl_keye": "Abrir gerenciador de ambientes",

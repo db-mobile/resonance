@@ -1,0 +1,60 @@
+<template id="tpl-cookie-manager">
+    <div class="dialog-header">
+        <h2 class="dialog-title">Cookie Jar</h2>
+        <span class="cookie-manager-env-badge">
+            <span class="icon icon-14 icon-globe" aria-hidden="true"></span>
+            <span class="cookie-manager-env-label">Environment</span>
+            <span class="cookie-manager-env-name"></span>
+        </span>
+        <button class="dialog-close-btn" id="cookie-manager-close-btn" aria-label="Close Cookie Manager">
+            <span class="icon icon-20 icon-x"></span>
+        </button>
+    </div>
+
+    <div class="cookie-manager-toggle-row">
+        <label class="toggle-switch">
+            <input type="checkbox" id="cookie-manager-enabled-toggle">
+            <span class="toggle-track"></span>
+            <span>Automatically store and send cookies</span>
+        </label>
+    </div>
+
+    <div class="cookie-manager-search-row">
+        <div class="search-input-wrap">
+            <span class="search-input-icon icon icon-16 icon-search" aria-hidden="true"></span>
+            <input
+                type="text"
+                class="input-base form-input compact search-input"
+                id="cookie-manager-search"
+                placeholder="Search cookies..."
+                aria-label="Search cookies"
+            />
+        </div>
+    </div>
+
+    <div class="dialog-body cookie-manager-body">
+        <table class="cookies-table cookie-manager-table">
+            <thead>
+                <tr>
+                    <th>Domain</th>
+                    <th>Name</th>
+                    <th>Value</th>
+                    <th>Path</th>
+                    <th>Expires</th>
+                    <th>Flags</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="cookie-manager-tbody">
+            </tbody>
+        </table>
+        <div class="cookies-empty" id="cookie-manager-empty" style="display:none">
+            No cookies stored for this environment.
+        </div>
+    </div>
+
+    <div class="dialog-footer dialog-footer--divided">
+        <button class="btn-sm btn-outline" id="cookie-manager-clear-session-btn">Clear Session</button>
+        <button class="btn-sm btn-outline" id="cookie-manager-clear-all-btn">Clear All</button>
+    </div>
+</template>

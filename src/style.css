@@ -258,6 +258,10 @@
   -webkit-mask-image: url("../assets/ui/mock-server.svg");
   mask-image: url("../assets/ui/mock-server.svg");
 }
+.icon-cookie {
+  -webkit-mask-image: url("../assets/ui/cookie.svg");
+  mask-image: url("../assets/ui/cookie.svg");
+}
 .icon-clock {
   -webkit-mask-image: url("../assets/ui/clock.svg");
   mask-image: url("../assets/ui/clock.svg");
@@ -528,6 +532,101 @@ body {
   max-height: 90vh;
 }
 
+.modal-dialog--cookie-manager {
+  width: 70vw;
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+.cookie-manager-env-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin-left: auto;
+  margin-right: var(--space-3);
+}
+
+.cookie-manager-env-label {
+  font-weight: 400;
+}
+
+.cookie-manager-env-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cookie-manager-toggle-row {
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+}
+
+.cookie-manager-search-row {
+  padding: var(--space-3) 0;
+  flex-shrink: 0;
+}
+
+.cookie-manager-body {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+}
+
+.cookie-manager-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.cookie-manager-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-secondary);
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border-light);
+  white-space: nowrap;
+}
+
+.cookie-manager-table tbody tr {
+  border-bottom: 1px solid var(--border-light);
+}
+
+.cookie-manager-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.cookie-manager-table tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+.cookie-manager-table tbody td {
+  padding: 7px 10px;
+  vertical-align: middle;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cookie-manager-table tbody td:last-child {
+  width: 60px;
+  text-align: right;
+  padding-right: 6px;
+}
+
 .modal-dialog--runner-saved {
   width: 500px;
   max-width: 90vw;
@@ -644,8 +743,14 @@ body {
   color: var(--text-primary);
 }
 
+.dialog-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
 .dialog-subtitle {
-  margin: var(--space-1) 0 0;
+  margin: 0;
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
 }

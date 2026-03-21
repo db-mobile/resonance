@@ -612,6 +612,18 @@ export async function handleSendRequest() {
             }
         }
 
+        // Inject cookies from jar before sending
+        if (window.cookieController) {
+            const cookieHeader = await window.cookieController.getCookieHeader(url);
+            if (cookieHeader) {
+                requestConfig.headers = requestConfig.headers || {};
+                // Don't overwrite a manually set Cookie header
+                if (!requestConfig.headers['Cookie'] && !requestConfig.headers['cookie']) {
+                    requestConfig.headers['Cookie'] = cookieHeader;
+                }
+            }
+        }
+
         const result = await window.backendAPI.sendApiRequest(requestConfig);
 
         if (result.success) {
@@ -655,6 +667,11 @@ export async function handleSendRequest() {
                 const cookies = extractCookies(result.headers);
                 renderCookies(containerElements.cookiesDisplay, cookies);
 
+                // Persist cookies from response into the jar
+                if (window.cookieController && result.setCookies && result.setCookies.length > 0) {
+                    window.cookieController.handleCookiesFromResponse(result.setCookies, url);
+                }
+
                 // Display performance metrics to workspace tab's container
                 displayPerformanceMetrics(containerElements.performanceDisplay, result.timings, result.size);
             } else {
@@ -669,6 +686,11 @@ export async function handleSendRequest() {
 
                 const cookies = extractCookies(result.headers);
                 renderCookies(responseCookiesDisplay, cookies);
+
+                // Persist cookies from response into the jar (fallback path)
+                if (window.cookieController && result.setCookies && result.setCookies.length > 0) {
+                    window.cookieController.handleCookiesFromResponse(result.setCookies, url);
+                }
 
                 displayPerformanceMetrics(responsePerformanceDisplay, result.timings, result.size);
             }

@@ -10,6 +10,7 @@ fn get_default_for_key(key: &str) -> Value {
         "environments" => serde_json::json!([]),
         "activeEnvironmentId" => Value::Null,
         "requestHistory" => serde_json::json!([]),
+        "cookieJar" => serde_json::json!([]),
         "workspaceTabs" => serde_json::json!([]),
         "activeWorkspaceTabId" => Value::Null,
         "theme" => serde_json::json!("system"),

@@ -62,6 +62,10 @@ import { RequestBodyEditor } from './modules/requestBodyEditor.bundle.js';
 import { PreviewRepository } from './modules/storage/PreviewRepository.js';
 import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
 import { toast } from './modules/ui/Toast.js';
+import { CookieRepository } from './modules/storage/CookieRepository.js';
+import { CookieJarService } from './modules/services/CookieJarService.js';
+import { CookieController } from './modules/controllers/CookieController.js';
+import { CookieManagerDialog } from './modules/ui/CookieManagerDialog.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
@@ -97,6 +101,21 @@ environmentController = new EnvironmentController(
     environmentManager,
     environmentSelector
 );
+
+// Initialize cookie jar system
+const cookieRepository = new CookieRepository(window.backendAPI);
+const cookieJarService = new CookieJarService(cookieRepository);
+const cookieManagerDialog = new CookieManagerDialog(cookieJarService);
+const cookieController = new CookieController(cookieJarService, cookieManagerDialog);
+cookieController.initialize();
+window.cookieController = cookieController;
+
+// Sync cookie jar environment when active environment changes
+environmentService.addChangeListener((event) => {
+    if (event.type === 'environment-switched') {
+        cookieController.setActiveEnvironment(event.environmentId, event.environmentName);
+    }
+});
 
 // Initialize script system
 const scriptRepository = new ScriptRepository(window.backendAPI);
@@ -304,6 +323,17 @@ function initKeyboardShortcuts() {
         category: 'Navigation'
     });
 
+    keyboardShortcuts.register('KeyJ', {
+        ctrl: true,
+        handler: () => {
+            if (window.cookieController) {
+                window.cookieController.openCookieManager();
+            }
+        },
+        description: 'Open cookie jar',
+        category: 'Navigation'
+    });
+
     // Actions
     keyboardShortcuts.register('KeyK', {
         ctrl: true,
@@ -489,6 +519,7 @@ function applyShortcutHints() {
         { id: 'curl-btn', key: 'KeyK', ctrl: true },
         { id: 'import-collection-btn', key: 'KeyO', ctrl: true },
         { id: 'history-toggle-btn', key: 'KeyH', ctrl: true },
+        { id: 'cookie-jar-btn', key: 'KeyJ', ctrl: true },
         { id: 'settings-btn', key: 'Comma', ctrl: true },
     ];
 
@@ -615,6 +646,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // Cookie jar button — opens the cookie manager dialog
+    const cookieJarBtn = document.getElementById('cookie-jar-btn');
+    if (cookieJarBtn) {
+        cookieJarBtn.addEventListener('click', () => {
+            cookieController.openCookieManager();
+        });
+    }
+
     await i18n.init();
 
     window.i18n = i18n;
@@ -632,6 +671,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initialize environment controller and load active environment
     await environmentController.initialize();
+
+    // Sync cookie jar with active environment on startup
+    try {
+        const activeEnv = await environmentService.getActiveEnvironment();
+        if (activeEnv) {
+            cookieController.setActiveEnvironment(activeEnv.id, activeEnv.name);
+        }
+    } catch (_e) { /* non-blocking */ }
 
     // Initialize status bar
     const statusBar = new StatusBar(environmentService);

@@ -242,6 +242,7 @@
     "escape": "Cancel request",
     "ctrl_keyl": "Focus URL bar",
     "ctrl_keyh": "Toggle history sidebar",
+    "ctrl_keyj": "Open cookie jar",
     "ctrl_keyk": "Generate cURL command",
     "ctrl_keyo": "Import OpenAPI collection",
     "ctrl_keye": "Open environment manager",
