@@ -5,6 +5,7 @@
 
 import { generateCode, SUPPORTED_LANGUAGES } from '../codeGenerator.js';
 import { templateLoader } from '../templateLoader.js';
+import { toast } from './Toast.js';
 
 /**
  * Multi-language code snippet generator dialog
@@ -114,7 +115,7 @@ export class CodeSnippetDialog {
                     copyBtn.classList.remove('copied');
                 }, 2000);
             } catch (err) {
-                alert('Failed to copy to clipboard');
+                toast.error('Failed to copy to clipboard');
             }
         });
 

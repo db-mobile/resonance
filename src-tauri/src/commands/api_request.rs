@@ -196,6 +196,8 @@ pub struct ApiResponse {
     pub status: Option<u16>,
     pub status_text: Option<String>,
     pub headers: HashMap<String, String>,
+    /// All Set-Cookie header values preserved as a list (the headers map collapses duplicates)
+    pub set_cookies: Vec<String>,
     pub message: Option<String>,
     pub ttfb: Option<u64>,
     pub size: Option<usize>,
@@ -247,6 +249,7 @@ pub async fn send_api_request(
             status: None,
             status_text: None,
             headers: HashMap::new(),
+            set_cookies: vec![],
             message: Some("URL is empty. Please enter a valid URL.".to_string()),
             ttfb: None,
             size: None,
@@ -361,6 +364,7 @@ pub async fn send_api_request(
                 status: None,
                 status_text: None,
                 headers: HashMap::new(),
+                set_cookies: vec![],
                 message: Some(format!("Client build error: {}", e)),
                 ttfb: None,
                 size: None,
@@ -447,6 +451,7 @@ pub async fn send_api_request(
                 status: None,
                 status_text: Some("Cancelled".to_string()),
                 headers: HashMap::new(),
+                set_cookies: vec![],
                 message: Some("Request was cancelled".to_string()),
                 ttfb: None,
                 size: None,
@@ -474,6 +479,15 @@ async fn process_response(
                 .canonical_reason()
                 .unwrap_or("Unknown")
                 .to_string();
+
+            // Extract Set-Cookie headers before collapsing into a HashMap (HashMap drops duplicates)
+            let set_cookies: Vec<String> = response
+                .headers()
+                .get_all("set-cookie")
+                .iter()
+                .filter_map(|v| v.to_str().ok())
+                .map(|s| s.to_string())
+                .collect();
 
             let headers: HashMap<String, String> = response
                 .headers()
@@ -512,6 +526,7 @@ async fn process_response(
                 status: Some(status),
                 status_text: Some(status_text),
                 headers,
+                set_cookies,
                 message: None,
                 ttfb: Some(timings.first_byte),
                 size: Some(size),
@@ -546,6 +561,7 @@ async fn process_response(
                 status: e.status().map(|s| s.as_u16()),
                 status_text: None,
                 headers: HashMap::new(),
+                set_cookies: vec![],
                 message: Some(message),
                 ttfb: None,
                 size: None,

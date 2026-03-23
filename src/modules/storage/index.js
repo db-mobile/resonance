@@ -21,3 +21,4 @@ export { HistoryRepository } from './HistoryRepository.js';
 export { ProxyRepository } from './ProxyRepository.js';
 export { WorkspaceTabRepository } from './WorkspaceTabRepository.js';
 export { RunnerRepository } from './RunnerRepository.js';
+export { CookieRepository } from './CookieRepository.js';

@@ -242,6 +242,7 @@
     "escape": "Annulla richiesta",
     "ctrl_keyl": "Metti il focus sulla barra URL",
     "ctrl_keyh": "Attiva/disattiva barra cronologia",
+    "ctrl_keyj": "Apri il gestore dei cookie",
     "ctrl_keyk": "Genera comando cURL",
     "ctrl_keyo": "Importa collezione OpenAPI",
     "ctrl_keye": "Apri gestore ambienti",

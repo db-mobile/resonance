@@ -14,3 +14,4 @@ export { EnvironmentManager } from './EnvironmentManager.js';
 export { EnvironmentSelector } from './EnvironmentSelector.js';
 export { HistoryRenderer } from './HistoryRenderer.js';
 export { StatusBar } from './StatusBar.js';
+export { toast } from './Toast.js';
