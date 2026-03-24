@@ -44,6 +44,21 @@ export function loadCollections() {
 }
 
 /**
+ * Returns the already-loaded collections from memory, falling back to a full
+ * load only if collections haven't been fetched yet.
+ *
+ * @async
+ * @returns {Promise<Array<Object>>} Array of collection objects
+ */
+export async function getCollections() {
+    const controller = initializeController();
+    if (controller.allCollections && controller.allCollections.length > 0) {
+        return controller.allCollections;
+    }
+    return controller.loadCollections();
+}
+
+/**
  * Displays collections in the UI
  *
  * @param {Array<Object>} collections - Array of collection objects to display

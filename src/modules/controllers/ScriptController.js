@@ -10,6 +10,8 @@
  * @class
  * @classdesc Handles inline script editing, execution, and result display
  */
+import { toast } from '../ui/Toast.js';
+
 export class ScriptController {
     /**
      * Creates a ScriptController instance
@@ -157,10 +159,7 @@ export class ScriptController {
      */
     _showScriptError(title, errors) {
         const errorMessage = Array.isArray(errors) ? errors.join('\n') : errors;
-
-        // Could show in status bar or toast notification
-        // For now, just log to console
-        console.error(title, errorMessage);
+        toast.error(`${title}: ${errorMessage}`);
     }
 
     /**
@@ -170,9 +169,6 @@ export class ScriptController {
      * @param {string} message - Error message
      */
     _showError(title, message) {
-
-        // Could show in status bar or toast notification
-        // For now, just log to console
-        console.error(title, message);
+        toast.error(`${title}: ${message}`);
     }
 }

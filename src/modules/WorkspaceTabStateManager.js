@@ -6,7 +6,7 @@
  */
 import { parseKeyValuePairs, populateKeyValueList, clearKeyValueList, addKeyValueRow, updateUrlFromQueryParams } from './keyValueManager.js';
 import { authManager } from './authManager.js';
-import { displayResponseWithLineNumbers, clearResponseDisplay } from './apiHandler.js';
+import { displayResponseWithLineNumbersForTab, clearResponseDisplayForTab } from './apiHandler.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import logger from './logger.js';
 
@@ -288,9 +288,9 @@ export class WorkspaceTabStateManager {
             activateTab('response', activeResponseTab);
 
             if (response) {
-                await this._restoreResponse(response);
+                await this._restoreResponse(response, tab.id);
             } else {
-                this._clearResponse();
+                this._clearResponse(tab.id);
             }
 
             if (endpoint) {
@@ -380,9 +380,9 @@ export class WorkspaceTabStateManager {
 
         // Restore response if it exists
         if (response) {
-            await this._restoreResponse(response);
+            await this._restoreResponse(response, tab.id);
         } else {
-            this._clearResponse();
+            this._clearResponse(tab.id);
         }
 
         // Restore preview mode if it was active
@@ -444,11 +444,13 @@ export class WorkspaceTabStateManager {
      * Restore response to UI (private)
      * @private
      */
-    async _restoreResponse(response) {
+    async _restoreResponse(response, tabId) {
         if (!response) {
-            this._clearResponse();
+            this._clearResponse(tabId);
             return;
         }
+
+        const containerElements = window.responseContainerManager?.getOrCreateContainer(tabId);
 
         // Restore response body with CodeMirror
         if (response.data) {
@@ -456,46 +458,37 @@ export class WorkspaceTabStateManager {
                 ? response.data
                 : JSON.stringify(response.data, null, 2);
             const contentType = response.headers?.['content-type'] || null;
-            displayResponseWithLineNumbers(formattedResponse, contentType);
+            displayResponseWithLineNumbersForTab(formattedResponse, contentType, tabId);
         } else {
-            clearResponseDisplay();
+            clearResponseDisplayForTab(tabId);
         }
 
-        // Restore response headers using CodeMirror if available
-        const containerElements = window.responseContainerManager?.getActiveElements();
+        // Restore response headers
         if (containerElements?.headersEditor) {
             if (response.headers && Object.keys(response.headers).length > 0) {
                 containerElements.headersEditor.setContent(JSON.stringify(response.headers, null, 2), 'application/json');
             } else {
                 containerElements.headersEditor.setContent('No response headers.', 'application/json');
             }
-        } else if (this.dom.responseHeadersDisplay) {
-            if (response.headers && Object.keys(response.headers).length > 0) {
-                this.dom.responseHeadersDisplay.textContent = JSON.stringify(response.headers, null, 2);
-            } else {
-                this.dom.responseHeadersDisplay.textContent = 'No response headers.';
-            }
         }
 
         // Restore cookies
-        if (this.dom.responseCookiesDisplay) {
+        if (containerElements?.cookiesDisplay) {
             if (response.cookies && response.cookies.length > 0) {
-                this.dom.responseCookiesDisplay.innerHTML = formatCookiesAsHtml(response.cookies);
+                containerElements.cookiesDisplay.innerHTML = formatCookiesAsHtml(response.cookies);
             } else {
-                this.dom.responseCookiesDisplay.innerHTML = '<div class="cookies-empty">No cookies in response</div>';
+                containerElements.cookiesDisplay.innerHTML = '<div class="cookies-empty">No cookies in response</div>';
             }
         }
 
         // Restore performance metrics
-        if (this.dom.responsePerformanceDisplay) {
+        if (containerElements?.performanceDisplay) {
             if (response.performanceHTML) {
-                // Restore the saved HTML directly
-                this.dom.responsePerformanceDisplay.innerHTML = response.performanceHTML;
+                containerElements.performanceDisplay.innerHTML = response.performanceHTML;
             } else if (response.timings) {
-                // Generate from timings if HTML not saved
-                displayPerformanceMetrics(this.dom.responsePerformanceDisplay, response.timings, response.size);
+                displayPerformanceMetrics(containerElements.performanceDisplay, response.timings, response.size);
             } else {
-                clearPerformanceMetrics(this.dom.responsePerformanceDisplay);
+                clearPerformanceMetrics(containerElements.performanceDisplay);
             }
         }
 
@@ -521,9 +514,9 @@ export class WorkspaceTabStateManager {
      * Clear response display
      * @private
      */
-    _clearResponse() {
+    _clearResponse(tabId) {
         // Clear response body
-        clearResponseDisplay();
+        clearResponseDisplayForTab(tabId);
 
         // Clear status display
         updateStatusDisplay('Ready', null);
@@ -532,22 +525,21 @@ export class WorkspaceTabStateManager {
         updateResponseTime(null);
         updateResponseSize(null);
 
+        const containerElements = window.responseContainerManager?.getOrCreateContainer(tabId);
+
         // Clear response headers
-        const containerElements = window.responseContainerManager?.getActiveElements();
         if (containerElements?.headersEditor) {
             containerElements.headersEditor.setContent('', 'application/json');
-        } else if (this.dom.responseHeadersDisplay) {
-            this.dom.responseHeadersDisplay.textContent = '';
         }
 
         // Clear cookies
-        if (this.dom.responseCookiesDisplay) {
-            this.dom.responseCookiesDisplay.innerHTML = '';
+        if (containerElements?.cookiesDisplay) {
+            containerElements.cookiesDisplay.innerHTML = '';
         }
 
         // Clear performance metrics
-        if (this.dom.responsePerformanceDisplay) {
-            clearPerformanceMetrics(this.dom.responsePerformanceDisplay);
+        if (containerElements?.performanceDisplay) {
+            clearPerformanceMetrics(containerElements.performanceDisplay);
         }
     }
 

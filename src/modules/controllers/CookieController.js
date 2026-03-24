@@ -33,7 +33,7 @@ export class CookieController {
      */
     async getCookieHeader(requestUrl) {
         try {
-            const settings = await window.backendAPI?.settings?.get();
+            const settings = window.getApiHandlerSettingsCache?.() ?? await window.backendAPI?.settings?.get();
             if (settings?.cookieJarEnabled === false) { return null; }
             return await this.service.getCookieHeaderForRequest(requestUrl, this._activeEnvironmentId);
         } catch (_e) {
@@ -48,7 +48,7 @@ export class CookieController {
      */
     async handleCookiesFromResponse(setCookieHeaders, requestUrl) {
         try {
-            const settings = await window.backendAPI?.settings?.get();
+            const settings = window.getApiHandlerSettingsCache?.() ?? await window.backendAPI?.settings?.get();
             if (settings?.cookieJarEnabled === false) { return; }
             await this.service.processCookiesFromResponse(setCookieHeaders, requestUrl, this._activeEnvironmentId);
         } catch (_e) {

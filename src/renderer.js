@@ -16,7 +16,7 @@ import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl, setUrl
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
-import { handleSendRequest, handleCancelRequest, handleGenerateCurl, setGraphQLBodyManager } from './modules/apiHandler.js';
+import { handleSendRequest, handleCancelRequest, handleGenerateCurl, setGraphQLBodyManager, invalidateSettingsCache, getSettingsCache, invalidateEnvironmentCache } from './modules/apiHandler.js';
 import { GraphQLBodyManager } from './modules/graphqlBodyManager.js';
 import { initGrpcUI, setGrpcMetadata, setGrpcTls } from './modules/grpcHandler.js';
 import { initRequestModeManager } from './modules/requestModeManager.js';
@@ -70,6 +70,12 @@ import { CookieManagerDialog } from './modules/ui/CookieManagerDialog.js';
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
 const timeoutManager = new TimeoutManager();
+
+// Expose settings cache invalidation so themeManager/httpVersionManager/timeoutManager
+// can bust it when the user saves new settings
+window.invalidateApiHandlerSettingsCache = invalidateSettingsCache;
+window.getApiHandlerSettingsCache = getSettingsCache;
+window.invalidateApiHandlerEnvironmentCache = invalidateEnvironmentCache;
 
 // Initialize shared status display adapter
 const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
@@ -539,30 +545,31 @@ function applyShortcutHints() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-    // Check for and perform migration from old single-file store to per-collection files
-    try {
-        if (window.backendAPI?.collections?.needsMigration) {
-            const needsMigration = await window.backendAPI.collections.needsMigration();
-            if (needsMigration) {
-                updateStatusDisplay('Migrating collections to new format...', null);
-                const migratedCount = await window.backendAPI.collections.migrate();
-                if (migratedCount > 0) {
-                    updateStatusDisplay(`Migrated ${migratedCount} collection(s) to new format`, null);
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Migration check failed:', error);
+/**
+ * Schedule a task to run during browser idle time.
+ * Falls back to setTimeout if requestIdleCallback is not available.
+ * @param {Function} callback - Task to run
+ * @param {number} timeout - Maximum time to wait before forcing execution (ms)
+ */
+function scheduleIdleTask(callback, timeout = 2000) {
+    if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(callback, { timeout });
+    } else {
+        setTimeout(callback, 0);
     }
+}
 
+document.addEventListener('DOMContentLoaded', async () => {
+    // === CRITICAL PATH: Must complete before first paint ===
+    
+    // Set up core button event listeners immediately
     curlBtn.addEventListener('click', handleGenerateCurl);
     sendRequestBtn.addEventListener('click', handleSendRequest);
     cancelRequestBtn.addEventListener('click', handleCancelRequest);
 
+    // Initialize request mode UI (needed for tab visibility)
     initGrpcUI();
     initRequestModeManager();
-    await initWebSocketHandler();
 
     // Import menu for OpenAPI and Postman formats
     const importMenu = new ContextMenu();
@@ -654,8 +661,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // Initialize i18n (needed for UI text)
     await i18n.init();
 
+    // Expose global references
     window.i18n = i18n;
     window.authManager = authManager;
     window.historyController = historyController;
@@ -666,7 +675,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.setGrpcMetadata = setGrpcMetadata;
     window.setGrpcTls = setGrpcTls;
 
-    // Initialize environment selector
+    // Initialize environment selector (needed for environment switching)
     environmentSelector.initialize('environment-selector-container');
 
     // Initialize environment controller and load active environment
@@ -680,23 +689,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } catch (_e) { /* non-blocking */ }
 
-    // Initialize status bar
-    const statusBar = new StatusBar(environmentService);
-    statusBar.initialize();
-
-    // Initialize history controller
-    await historyController.init();
-
-    // Initialize URL autocomplete from history
-    if (urlInput) {
-        const urlAutocomplete = new UrlAutocomplete(urlInput, historyController);
-        urlAutocomplete.init();
-    }
-
-    // Initialize mock server controller
-    await mockServerController.initialize();
-
-    // Initialize workspace tabs
+    // Initialize workspace tabs (restores user's last state - critical for UX)
     await workspaceTabController.initialize();
 
     // Initialize request body editor
@@ -775,9 +768,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     updateStatusDisplay('Ready', null);
 
-    // Check for updates on launch if enabled
-    checkForUpdatesOnLaunch();
-
     initKeyValueListeners();
     initializeBodyTracking();
     initResizer();
@@ -812,8 +802,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     activateTab('request', 'path-params');
 
-    await loadCollections();
-
     const pathParamsList = document.getElementById('path-params-list');
     const headersList = document.getElementById('headers-list');
     const _queryParamsList = document.getElementById('query-params-list');
@@ -823,9 +811,60 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     updateQueryParamsFromUrl();
 
-    // Note: restoreLastSelectedRequest() is no longer called here because
-    // workspace tabs now handle all tab state persistence and restoration.
-    // Calling it here would overwrite the workspace tab state restored earlier.
+    // === FIRST PAINT COMPLETE ===
+    // The UI is now interactive. Defer non-critical initialization to idle time.
+
+    // Load collections (can show loading state in sidebar)
+    loadCollections();
+
+    // === DEFERRED INITIALIZATION ===
+    // These tasks run during browser idle time to avoid blocking the main thread
+
+    // Tier 1: Initialize after first idle (needed for full functionality)
+    scheduleIdleTask(async () => {
+        // Initialize status bar
+        const statusBar = new StatusBar(environmentService);
+        statusBar.initialize();
+
+        // Initialize history controller (needed for history sidebar)
+        await historyController.init();
+
+        // Initialize URL autocomplete from history
+        if (urlInput) {
+            const urlAutocomplete = new UrlAutocomplete(urlInput, historyController);
+            urlAutocomplete.init();
+        }
+    }, 1000);
+
+    // Tier 2: Lower priority initialization
+    scheduleIdleTask(async () => {
+        // Initialize mock server controller
+        await mockServerController.initialize();
+
+        // Initialize WebSocket handler
+        await initWebSocketHandler();
+
+        // Check for and perform migration from old single-file store
+        try {
+            if (window.backendAPI?.collections?.needsMigration) {
+                const needsMigration = await window.backendAPI.collections.needsMigration();
+                if (needsMigration) {
+                    updateStatusDisplay('Migrating collections to new format...', null);
+                    const migratedCount = await window.backendAPI.collections.migrate();
+                    if (migratedCount > 0) {
+                        updateStatusDisplay(`Migrated ${migratedCount} collection(s) to new format`, null);
+                    }
+                }
+            }
+        } catch (error) {
+            toast.error(`Migration check failed: ${error.message}`);
+        }
+    }, 2000);
+
+    // Tier 3: Lowest priority (update check)
+    scheduleIdleTask(() => {
+        checkForUpdatesOnLaunch();
+    }, 3000);
 });
 
 // Save current tab state before window closes

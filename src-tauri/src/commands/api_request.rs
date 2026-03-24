@@ -1,13 +1,10 @@
 use reqwest::{Client, Method, RequestBuilder, Response};
-use rustls::ClientConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::State;
-use tokio::net::TcpStream;
 use tokio::sync::oneshot;
-use tokio_rustls::TlsConnector;
 use uuid::Uuid;
 
 use super::proxy::ProxyState;
@@ -258,11 +255,15 @@ pub async fn send_api_request(
         });
     }
 
-    // Parse URL once for reuse
+    // Parse URL for DNS lookup timing
+    // Note: We only measure DNS here. TCP and TLS timings are estimated from the
+    // difference between DNS completion and first byte, since reqwest handles
+    // connection pooling internally and we don't want to make redundant connections.
     let parsed_url = url::Url::parse(&request_options.url).ok();
     let is_https = request_options.url.starts_with("https://");
 
-    // Measure DNS, TCP, and TLS timings by probing the connection
+    // Measure DNS lookup timing (without making a redundant connection)
+    let dns_end_time;
     if let Some(ref url) = parsed_url {
         if let Some(host) = url.host_str() {
             let port = url
@@ -270,46 +271,15 @@ pub async fn send_api_request(
                 .unwrap_or(if is_https { 443 } else { 80 });
             let lookup_addr = format!("{}:{}", host, port);
 
-            // DNS lookup timing
             let dns_start = Instant::now();
-            let addrs: Vec<_> = match tokio::net::lookup_host(&lookup_addr).await {
-                Ok(iter) => iter.collect(),
-                Err(_) => vec![],
-            };
+            let _ = tokio::net::lookup_host(&lookup_addr).await;
             timings.dns_lookup = dns_start.elapsed().as_millis() as u64;
-
-            // TCP connection timing (connect to first resolved address)
-            if let Some(addr) = addrs.first() {
-                let tcp_start = Instant::now();
-                if let Ok(stream) = TcpStream::connect(addr).await {
-                    timings.tcp_connection = tcp_start.elapsed().as_millis() as u64;
-
-                    // TLS handshake timing (only for HTTPS)
-                    if is_https {
-                        let tls_start = Instant::now();
-                        let root_store = rustls::RootCertStore::from_iter(
-                            webpki_roots::TLS_SERVER_ROOTS.iter().cloned(),
-                        );
-                        let config = ClientConfig::builder()
-                            .with_root_certificates(root_store)
-                            .with_no_client_auth();
-                        let connector = TlsConnector::from(Arc::new(config));
-                        let server_name =
-                            match rustls::pki_types::ServerName::try_from(host.to_string()) {
-                                Ok(name) => name,
-                                Err(_) => {
-                                    // Can't measure TLS if server name is invalid
-                                    rustls::pki_types::ServerName::try_from("localhost".to_string())
-                                        .unwrap()
-                                }
-                            };
-                        if connector.connect(server_name, stream).await.is_ok() {
-                            timings.tls_handshake = tls_start.elapsed().as_millis() as u64;
-                        }
-                    }
-                }
-            }
+            dns_end_time = Some(Instant::now());
+        } else {
+            dns_end_time = None;
         }
+    } else {
+        dns_end_time = None;
     }
 
     // Build client with optional proxy and HTTP version
@@ -422,7 +392,7 @@ pub async fn send_api_request(
                                             Ok(auth_header) => {
                                                 // Retry with digest auth
                                                 let retry_result = build_request(Some(auth_header)).send().await;
-                                                return process_response(retry_result, &mut timings, start_time, &state).await;
+                                                return process_response(retry_result, &mut timings, start_time, dns_end_time, is_https, &state).await;
                                             }
                                             Err(e) => {
                                                 let _ = e;
@@ -434,10 +404,10 @@ pub async fn send_api_request(
                         }
                     }
 
-                    process_response(Ok(response), &mut timings, start_time, &state).await
+                    process_response(Ok(response), &mut timings, start_time, dns_end_time, is_https, &state).await
                 }
                 Err(e) => {
-                    process_response(Err(e), &mut timings, start_time, &state).await
+                    process_response(Err(e), &mut timings, start_time, dns_end_time, is_https, &state).await
                 }
             }
         }
@@ -467,11 +437,32 @@ async fn process_response(
     result: Result<Response, reqwest::Error>,
     timings: &mut RequestTimings,
     start_time: Instant,
+    dns_end_time: Option<Instant>,
+    is_https: bool,
     state: &State<'_, RequestState>,
 ) -> Result<ApiResponse, String> {
     match result {
         Ok(response) => {
             timings.first_byte = start_time.elapsed().as_millis() as u64;
+
+            // Estimate TCP and TLS timings from the time between DNS completion and first byte
+            // This is an approximation since reqwest handles connection pooling internally
+            if let Some(dns_end) = dns_end_time {
+                let connection_time = dns_end.elapsed().as_millis() as u64;
+                // Subtract download prep time (minimal) to get connection establishment time
+                let connection_establishment = connection_time.saturating_sub(timings.download);
+
+                if is_https {
+                    // For HTTPS, split the connection time between TCP and TLS
+                    // Typically TLS takes longer than TCP, so we estimate ~40% TCP, ~60% TLS
+                    timings.tcp_connection = connection_establishment * 40 / 100;
+                    timings.tls_handshake = connection_establishment - timings.tcp_connection;
+                } else {
+                    // For HTTP, all connection time is TCP
+                    timings.tcp_connection = connection_establishment;
+                    timings.tls_handshake = 0;
+                }
+            }
 
             let status = response.status().as_u16();
             let status_text = response

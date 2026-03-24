@@ -24,6 +24,7 @@ export class HttpVersionManager {
             const settings = await window.backendAPI.settings.get();
             settings.httpVersion = version;
             await window.backendAPI.settings.set(settings);
+            window.invalidateApiHandlerSettingsCache?.();
         } catch (error) {
             void error;
         }

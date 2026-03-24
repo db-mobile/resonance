@@ -2,6 +2,9 @@ import esbuild from 'esbuild';
 import fs from 'fs';
 import path from 'path';
 
+// Check for production build flag
+const isProduction = process.argv.includes('--production') || process.env.NODE_ENV === 'production';
+
 // Ensure dist directory exists
 if (!fs.existsSync('dist')) {
     fs.mkdirSync('dist', { recursive: true });
@@ -36,82 +39,48 @@ copyRecursive('src', 'dist/src');
 
 console.log('✓ Static files copied to dist/');
 
-// Build the responseEditor module and its dependencies
-await esbuild.build({
-    entryPoints: ['src/modules/responseEditor.js'],
+// Shared build options
+const sharedBuildOptions = {
     bundle: true,
     format: 'esm',
-    outfile: 'dist/src/modules/responseEditor.bundle.js',
     platform: 'browser',
     target: 'es2020',
-    sourcemap: true,
+    sourcemap: !isProduction,
+    minify: isProduction,
+    treeShaking: true,
+};
+
+// Build all editor modules together with code splitting
+// This allows esbuild to automatically deduplicate shared CodeMirror code
+await esbuild.build({
+    ...sharedBuildOptions,
+    entryPoints: [
+        'src/modules/responseEditor.js',
+        'src/modules/jsonEditor.js',
+        'src/modules/requestBodyEditor.js',
+        'src/modules/graphqlEditor.js',
+        'src/modules/scriptEditor.js',
+    ],
+    outdir: 'dist/src/modules',
+    splitting: true,
+    chunkNames: 'chunks/[name]-[hash]',
+    entryNames: '[name].bundle',
 }).then(() => {
-    console.log('✓ responseEditor bundled successfully');
+    console.log('✓ All editor modules bundled with code splitting');
 }).catch((error) => {
     console.error('Build failed:', error);
     process.exit(1);
 });
 
-// Build the jsonEditor module and its dependencies
-await esbuild.build({
-    entryPoints: ['src/modules/jsonEditor.js'],
-    bundle: true,
-    format: 'esm',
-    outfile: 'dist/src/modules/jsonEditor.bundle.js',
-    platform: 'browser',
-    target: 'es2020',
-    sourcemap: true,
-}).then(() => {
-    console.log('✓ jsonEditor bundled successfully');
-}).catch((error) => {
-    console.error('Build failed:', error);
-    process.exit(1);
-});
+// Print build summary
+const chunkDir = 'dist/src/modules/chunks';
+if (fs.existsSync(chunkDir)) {
+    const chunks = fs.readdirSync(chunkDir);
+    console.log(`  → ${chunks.length} shared chunk(s) created`);
+}
 
-// Build the requestBodyEditor module and its dependencies
-await esbuild.build({
-    entryPoints: ['src/modules/requestBodyEditor.js'],
-    bundle: true,
-    format: 'esm',
-    outfile: 'dist/src/modules/requestBodyEditor.bundle.js',
-    platform: 'browser',
-    target: 'es2020',
-    sourcemap: true,
-}).then(() => {
-    console.log('✓ requestBodyEditor bundled successfully');
-}).catch((error) => {
-    console.error('Build failed:', error);
-    process.exit(1);
-});
-
-// Build the graphqlEditor module and its dependencies
-await esbuild.build({
-    entryPoints: ['src/modules/graphqlEditor.js'],
-    bundle: true,
-    format: 'esm',
-    outfile: 'dist/src/modules/graphqlEditor.bundle.js',
-    platform: 'browser',
-    target: 'es2020',
-    sourcemap: true,
-}).then(() => {
-    console.log('✓ graphqlEditor bundled successfully');
-}).catch((error) => {
-    console.error('Build failed:', error);
-    process.exit(1);
-});
-
-// Build the scriptEditor module and its dependencies
-await esbuild.build({
-    entryPoints: ['src/modules/scriptEditor.js'],
-    bundle: true,
-    format: 'esm',
-    outfile: 'dist/src/modules/scriptEditor.bundle.js',
-    platform: 'browser',
-    target: 'es2020',
-    sourcemap: true,
-}).then(() => {
-    console.log('✓ scriptEditor bundled successfully');
-}).catch((error) => {
-    console.error('Build failed:', error);
-    process.exit(1);
-});
+if (isProduction) {
+    console.log('\n✓ Production build complete (minified, no sourcemaps)');
+} else {
+    console.log('\n✓ Development build complete (with sourcemaps)');
+}

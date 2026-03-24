@@ -23,12 +23,37 @@
  */
 export class CollectionRepository {
     /**
+     * Maximum number of collections to keep in cache.
+     * Prevents unbounded memory growth for users with many collections.
+     * @private
+     */
+    static MAX_CACHE_SIZE = 20;
+
+    /**
      * Creates a CollectionRepository instance
      *
      * @param {Object} backendAPI - The backend IPC API bridge
      */
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
+        this._byIdCache = new Map();
+    }
+
+    /**
+     * Adds an item to cache with LRU eviction if cache is full
+     * @private
+     */
+    _addToCache(id, collection) {
+        // If already in cache, delete to update insertion order
+        if (this._byIdCache.has(id)) {
+            this._byIdCache.delete(id);
+        }
+        // Evict oldest entry if at capacity
+        if (this._byIdCache.size >= CollectionRepository.MAX_CACHE_SIZE) {
+            const oldestKey = this._byIdCache.keys().next().value;
+            this._byIdCache.delete(oldestKey);
+        }
+        this._byIdCache.set(id, collection);
     }
 
     /**
@@ -58,6 +83,9 @@ export class CollectionRepository {
     async saveOne(collection) {
         try {
             await this.backendAPI.collections.save(collection);
+            if (collection?.id) {
+                this._addToCache(collection.id, collection);
+            }
         } catch (error) {
             throw new Error(`Failed to save collection: ${error.message || error}`);
         }
@@ -104,8 +132,19 @@ export class CollectionRepository {
      * @returns {Promise<Object|undefined>} The collection object or undefined if not found
      */
     async getById(id) {
+        if (this._byIdCache.has(id)) {
+            // Move to end of Map to mark as recently used
+            const cached = this._byIdCache.get(id);
+            this._byIdCache.delete(id);
+            this._byIdCache.set(id, cached);
+            return cached;
+        }
         try {
-            return await this.backendAPI.collections.get(id);
+            const collection = await this.backendAPI.collections.get(id);
+            if (collection) {
+                this._addToCache(id, collection);
+            }
+            return collection;
         } catch (error) {
             // Collection not found
             return undefined;
@@ -157,6 +196,7 @@ export class CollectionRepository {
     async delete(id) {
         try {
             await this.backendAPI.collections.delete(id);
+            this._byIdCache.delete(id);
             return true;
         } catch (error) {
             throw new Error(`Failed to delete collection: ${error.message || error}`);
@@ -173,6 +213,39 @@ export class CollectionRepository {
         } catch (error) {
             return {};
         }
+    }
+
+    /**
+     * Retrieves all persisted data for an endpoint in a single IPC call
+     *
+     * This is more efficient than calling individual getters (getPersistedUrl,
+     * getPersistedAuthConfig, etc.) which each make separate IPC calls.
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<Object>} Object containing all persisted endpoint data
+     * @returns {string|null} return.url - Persisted URL
+     * @returns {Object|null} return.authConfig - Authentication configuration
+     * @returns {Array} return.pathParams - Path parameters
+     * @returns {Array} return.queryParams - Query parameters
+     * @returns {Array} return.headers - Headers
+     * @returns {string|null} return.modifiedBody - Modified request body
+     * @returns {Object|null} return.graphqlData - GraphQL data
+     * @returns {Object|null} return.grpcData - gRPC data
+     */
+    async getAllPersistedEndpointData(collectionId, endpointId) {
+        const data = await this._getEndpointData(collectionId, endpointId);
+        return {
+            url: data.url || null,
+            authConfig: data.authConfig || null,
+            pathParams: data.pathParams || [],
+            queryParams: data.queryParams || [],
+            headers: data.headers || [],
+            modifiedBody: data.modifiedBody || null,
+            graphqlData: data.graphqlData || null,
+            grpcData: data.grpcData || null
+        };
     }
 
     /**

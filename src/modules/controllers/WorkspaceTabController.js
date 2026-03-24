@@ -101,43 +101,38 @@ export class WorkspaceTabController {
             await this._saveCurrentTabState();
 
             const { protocol = 'http', ...tabOptions } = options;
-            let newTab = await this.service.createTab(tabOptions);
-            await this.service.switchTab(newTab.id);
 
-            // Apply protocol-specific structure for non-HTTP protocols
+            // Embed protocol-specific structure at creation time to avoid extra updateTab + getActiveTab round-trips
             if (protocol === 'websocket') {
-                await this.service.updateTab(newTab.id, {
-                    name: 'New WebSocket',
-                    request: {
-                        protocol: 'websocket',
-                        url: '',
-                        method: 'WS',
-                        pathParams: {},
-                        queryParams: {},
-                        headers: {},
-                        body: { mode: 'json', content: '' },
-                        authType: 'none',
-                        authConfig: {}
-                    }
-                });
-                newTab = await this.service.getActiveTab();
+                tabOptions.name = tabOptions.name || 'New WebSocket';
+                tabOptions.request = {
+                    protocol: 'websocket',
+                    url: '',
+                    method: 'WS',
+                    pathParams: {},
+                    queryParams: {},
+                    headers: {},
+                    body: { mode: 'json', content: '' },
+                    authType: 'none',
+                    authConfig: {}
+                };
             } else if (protocol === 'grpc') {
-                await this.service.updateTab(newTab.id, {
-                    name: 'New gRPC',
-                    request: {
-                        protocol: 'grpc',
-                        grpc: {
-                            target: '',
-                            service: '',
-                            fullMethod: '',
-                            requestJson: '{}',
-                            metadata: {},
-                            useTls: false
-                        }
+                tabOptions.name = tabOptions.name || 'New gRPC';
+                tabOptions.request = {
+                    protocol: 'grpc',
+                    grpc: {
+                        target: '',
+                        service: '',
+                        fullMethod: '',
+                        requestJson: '{}',
+                        metadata: {},
+                        useTls: false
                     }
-                });
-                newTab = await this.service.getActiveTab();
+                };
             }
+
+            const newTab = await this.service.createTab(tabOptions);
+            await this.service.switchTab(newTab.id);
 
             // Update UI based on tab type (switch from runner to request UI if needed)
             this._updateUIForTabType(newTab);
@@ -145,10 +140,9 @@ export class WorkspaceTabController {
             // Show response container for new tab
             this.responseContainerManager.showContainer(newTab.id);
 
-            // Re-render tab bar
+            // Re-render tab bar — active ID is already known
             const tabs = await this.service.getAllTabs();
-            const activeTabId = await this.service.getActiveTabId();
-            this.tabBar.render(tabs, activeTabId);
+            this.tabBar.render(tabs, newTab.id);
 
             // Clear UI for new tab
             this.isRestoringState = true;
@@ -215,7 +209,7 @@ export class WorkspaceTabController {
     async _initializeRunnerTab(tabId) {
         // Import RunnerController dynamically to avoid circular dependencies
         const { RunnerController } = await import('./RunnerController.js');
-        const { loadCollections } = await import('../collectionManager.js');
+        const { getCollections } = await import('../collectionManager.js');
 
         // Create a container for the runner panel
         const mainContentArea = document.getElementById('main-content-area');
@@ -255,7 +249,7 @@ export class WorkspaceTabController {
         // Initialize runner controller
         const runnerController = new RunnerController(
             window.backendAPI,
-            async () => loadCollections()
+            () => getCollections()
         );
 
         await runnerController.initialize(runnerContainer);
@@ -419,10 +413,20 @@ export class WorkspaceTabController {
                 }
             }
 
-            // If this is the last tab, open a fresh one first so the close is allowed
-            const tabCount = (await this.service.getAllTabs()).length;
-            if (tabCount === 1) {
+            // If this is the last tab, create a replacement first then close this one
+            if (allTabs.length === 1) {
+                if (this.runnerControllers.has(tabId)) {
+                    this._cleanupRunnerTab(tabId);
+                }
                 await this.createNewTab();
+                // createNewTab already rendered the tab bar with [old, new] and activated new.
+                // Now remove the old tab from storage and re-render with just [new].
+                await this.service.closeTab(tabId);
+                this.responseContainerManager.removeContainer(tabId);
+                const remainingTabs = await this.service.getAllTabs();
+                const activeTabId = await this.service.getActiveTabId();
+                this.tabBar.render(remainingTabs, activeTabId);
+                return;
             }
 
             // Check if this is a runner tab and clean up
@@ -438,13 +442,13 @@ export class WorkspaceTabController {
             // Remove response container for closed tab
             this.responseContainerManager.removeContainer(tabId);
 
-            // Re-render tab bar
-            const tabs = await this.service.getAllTabs();
-            this.tabBar.render(tabs, result.newActiveTabId);
+            // Re-render tab bar — tabs cache is updated by deleteTab, fetch reflects removal
+            const remainingTabs = allTabs.filter(t => t.id !== tabId);
+            this.tabBar.render(remainingTabs, result.newActiveTabId);
 
             // If we switched to a different tab, activate it
             if (result.newActiveTabId !== tabId) {
-                const newActiveTab = tabs.find(t => t.id === result.newActiveTabId);
+                const newActiveTab = remainingTabs.find(t => t.id === result.newActiveTabId);
                 if (newActiveTab) {
                     await this._activateTab(newActiveTab);
                 }
@@ -683,7 +687,7 @@ export class WorkspaceTabController {
                 const grpcData = endpoint.grpcData || {};
                 const tabName = endpoint.name || 'gRPC Request';
 
-                await this.service.updateTab(targetTabId, {
+                const tab = await this.service.updateTab(targetTabId, {
                     name: tabName,
                     type: 'request',
                     endpoint: {
@@ -705,14 +709,13 @@ export class WorkspaceTabController {
                     isModified: false
                 });
 
-                const tab = await this.service.getActiveTab();
                 if (tab) {
                     this._updateUIForTabType(tab);
                     this.responseContainerManager.showContainer(targetTabId);
+                    this.tabBar.updateTab(targetTabId, { name: tabName, isModified: false });
                     this.isRestoringState = true;
                     await this.stateManager.restoreTabState(tab);
                     this.isRestoringState = false;
-                    this.tabBar.updateTab(targetTabId, { name: tabName, isModified: false });
                 }
 
                 if (window.scriptController && endpoint.collectionId && endpoint.id) {
@@ -740,7 +743,7 @@ export class WorkspaceTabController {
                 const tabName = endpoint.name || 'WebSocket Request';
                 const fullUrl = endpoint.persistedUrl || endpoint.path || '';
 
-                await this.service.updateTab(targetTabId, {
+                const tab = await this.service.updateTab(targetTabId, {
                     name: tabName,
                     type: 'request',
                     endpoint: {
@@ -765,14 +768,13 @@ export class WorkspaceTabController {
                     isModified: false
                 });
 
-                const tab = await this.service.getActiveTab();
                 if (tab) {
                     this._updateUIForTabType(tab);
                     this.responseContainerManager.showContainer(targetTabId);
+                    this.tabBar.updateTab(targetTabId, { name: tabName, isModified: false });
                     this.isRestoringState = true;
                     await this.stateManager.restoreTabState(tab);
                     this.isRestoringState = false;
-                    this.tabBar.updateTab(targetTabId, { name: tabName, isModified: false });
                 }
 
                 return;
@@ -888,7 +890,7 @@ export class WorkspaceTabController {
             // Use endpoint.name if available (contains OpenAPI summary/operationId),
             // otherwise generate from method and path
             const tabName = endpoint.name || this.service.generateTabName(endpoint.method, endpoint.path);
-            await this.service.updateTab(targetTabId, {
+            const tab = await this.service.updateTab(targetTabId, {
                 name: tabName,
                 type: 'request',
                 endpoint: {
@@ -911,14 +913,13 @@ export class WorkspaceTabController {
             });
 
             // Restore state to UI
-            const tab = await this.service.getActiveTab();
             if (tab) {
                 this._updateUIForTabType(tab);
                 this.responseContainerManager.showContainer(targetTabId);
+                this.tabBar.updateTab(targetTabId, { name: tabName, isModified: false });
                 this.isRestoringState = true;
                 await this.stateManager.restoreTabState(tab);
                 this.isRestoringState = false;
-                this.tabBar.updateTab(targetTabId, { name: tabName, isModified: false });
             }
 
             // Load scripts for this endpoint

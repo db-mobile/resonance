@@ -1,6 +1,7 @@
 import { getRequestBodyContent } from './requestBodyHelper.js';
 import { clearResponseDisplayForTab, displayResponseWithLineNumbersForTab } from './apiHandler.js';
 import { updateResponseSize, updateResponseTime, updateStatusDisplay } from './statusDisplay.js';
+import { toast } from './ui/Toast.js';
 
 const socketState = new Map();
 let websocketListenerPromise = null;
@@ -198,7 +199,7 @@ export async function handleWebSocketSend(url, headers = {}) {
     await initWebSocketHandler();
 
     if (!window.backendAPI?.websocket) {
-        updateStatusDisplay('WebSocket backend is not available', null);
+        toast.error('WebSocket backend is not available');
         return;
     }
 
@@ -206,7 +207,7 @@ export async function handleWebSocketSend(url, headers = {}) {
     const normalizedUrl = normalizeWebSocketUrl(url?.trim());
 
     if (!normalizedUrl) {
-        updateStatusDisplay('WebSocket URL is required', null);
+        toast.error('WebSocket URL is required');
         return;
     }
 
@@ -230,7 +231,7 @@ export async function handleWebSocketSend(url, headers = {}) {
             headers
         });
     } catch (error) {
-        updateStatusDisplay(`WebSocket connection failed: ${error.message}`, null);
+        toast.error(`WebSocket connection failed: ${error.message}`);
         return;
     }
 

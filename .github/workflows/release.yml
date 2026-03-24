@@ -87,7 +87,7 @@ jobs:
       run: npm ci
 
     - name: Build frontend
-      run: npm run build
+      run: npm run build:prod
 
     - name: Build Tauri application
       env:
@@ -152,7 +152,7 @@ jobs:
       run: npm ci
 
     - name: Build frontend
-      run: npm run build
+      run: npm run build:prod
 
     - name: Build Tauri application (universal)
       env:
@@ -218,7 +218,7 @@ jobs:
       run: npm ci
 
     - name: Build frontend
-      run: npm run build
+      run: npm run build:prod
 
     - name: Build Tauri application
       env:

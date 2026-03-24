@@ -235,17 +235,19 @@ export class CollectionController {
                     requestBodyString = this.service.generateRequestBody(endpoint.requestBody);
                 }
 
-                // Load all persisted data if available
+                // Load all persisted data in a single IPC call (instead of 7 separate calls)
                 const isGrpc = endpoint.protocol === 'grpc';
                 const isWebSocket = endpoint.protocol === 'websocket';
 
-                const persistedUrl = isGrpc ? null : await this.repository.getPersistedUrl(collection.id, endpoint.id);
-                const persistedAuthConfig = (isGrpc || isWebSocket) ? null : await this.repository.getPersistedAuthConfig(collection.id, endpoint.id);
-                const persistedPathParams = (isGrpc || isWebSocket) ? [] : await this.repository.getPersistedPathParams(collection.id, endpoint.id);
-                const persistedQueryParams = isGrpc ? [] : await this.repository.getPersistedQueryParams(collection.id, endpoint.id);
-                const persistedHeaders = isGrpc ? [] : await this.repository.getPersistedHeaders(collection.id, endpoint.id);
-                const persistedBody = isGrpc ? null : await this.repository.getModifiedRequestBody(collection.id, endpoint.id);
-                const grpcData = isGrpc ? await this.repository.getGrpcData(collection.id, endpoint.id) : null;
+                const persistedData = await this.repository.getAllPersistedEndpointData(collection.id, endpoint.id);
+                
+                const persistedUrl = isGrpc ? null : persistedData.url;
+                const persistedAuthConfig = (isGrpc || isWebSocket) ? null : persistedData.authConfig;
+                const persistedPathParams = (isGrpc || isWebSocket) ? [] : persistedData.pathParams;
+                const persistedQueryParams = isGrpc ? [] : persistedData.queryParams;
+                const persistedHeaders = isGrpc ? [] : persistedData.headers;
+                const persistedBody = isGrpc ? null : persistedData.modifiedBody;
+                const grpcData = isGrpc ? persistedData.grpcData : null;
 
                 const endpointData = {
                     ...endpoint,

@@ -27,6 +27,8 @@ export class WorkspaceTabRepository {
         this.backendAPI = backendAPI;
         this.STORE_KEY = 'workspace-tabs';
         this.ACTIVE_TAB_KEY = 'active-tab-id';
+        this._tabsCache = null;
+        this._activeTabIdCache = undefined; // undefined = not yet loaded, null = loaded but empty
     }
 
     /**
@@ -38,7 +40,20 @@ export class WorkspaceTabRepository {
      * @async
      * @returns {Promise<Array<Object>>} Array of workspace tab objects
      */
+    /**
+     * Maximum size in characters for response data stored in tabs.
+     * Responses larger than this will be truncated to save memory.
+     * @private
+     */
+    static MAX_RESPONSE_SIZE = 500000; // ~500KB
+
     async getTabs() {
+        if (this._tabsCache !== null) {
+            // Return shallow copy of array with same tab references
+            // Callers should not mutate returned tabs directly
+            return [...this._tabsCache];
+        }
+
         try {
             const data = await this.backendAPI.store.get(this.STORE_KEY);
 
@@ -46,15 +61,15 @@ export class WorkspaceTabRepository {
             if (!data || !Array.isArray(data)) {
                 const defaultTabs = [this._createDefaultTab()];
                 await this.saveTabs(defaultTabs);
-                return defaultTabs;
+                return [...defaultTabs];
             }
 
-            // Deep clone to avoid reference issues
-            return JSON.parse(JSON.stringify(data));
+            this._tabsCache = data;
+            return [...data];
         } catch (error) {
             const defaultTabs = [this._createDefaultTab()];
             await this.saveTabs(defaultTabs);
-            return defaultTabs;
+            return [...defaultTabs];
         }
     }
 
@@ -70,6 +85,7 @@ export class WorkspaceTabRepository {
         if (!Array.isArray(tabs)) {
             throw new Error('Tabs must be an array');
         }
+        this._tabsCache = tabs;
         await this.backendAPI.store.set(this.STORE_KEY, tabs);
     }
 
@@ -80,10 +96,16 @@ export class WorkspaceTabRepository {
      * @returns {Promise<string|null>} The active tab ID or null
      */
     async getActiveTabId() {
+        if (this._activeTabIdCache !== undefined) {
+            return this._activeTabIdCache;
+        }
+
         try {
             const activeId = await this.backendAPI.store.get(this.ACTIVE_TAB_KEY);
-            return activeId || null;
+            this._activeTabIdCache = activeId || null;
+            return this._activeTabIdCache;
         } catch (error) {
+            this._activeTabIdCache = null;
             return null;
         }
     }
@@ -97,7 +119,9 @@ export class WorkspaceTabRepository {
      * @throws {Error} If save fails
      */
     async setActiveTabId(tabId) {
-        await this.backendAPI.store.set(this.ACTIVE_TAB_KEY, tabId);
+        this._activeTabIdCache = tabId;
+        // Cache is authoritative — persist in background without blocking callers
+        this.backendAPI.store.set(this.ACTIVE_TAB_KEY, tabId).catch(() => { /* fire-and-forget */ });
     }
 
     /**
@@ -112,12 +136,8 @@ export class WorkspaceTabRepository {
     async getTabById(tabId) {
         const tabs = await this.getTabs();
         const tab = tabs.find(tab => tab.id === tabId);
-
-        // Deep clone to avoid reference issues
-        if (tab) {
-            return JSON.parse(JSON.stringify(tab));
-        }
-        return null;
+        // Return tab reference directly - callers should not mutate
+        return tab || null;
     }
 
     /**
@@ -144,7 +164,9 @@ export class WorkspaceTabRepository {
             lastModifiedAt: Date.now()
         };
         tabs.push(newTab);
-        await this.saveTabs(tabs);
+        // Update cache synchronously, persist in background
+        this._tabsCache = tabs;
+        this.backendAPI.store.set(this.STORE_KEY, tabs).catch(() => { /* fire-and-forget */ });
         return newTab;
     }
 
@@ -179,25 +201,32 @@ export class WorkspaceTabRepository {
             ...tabs[index]
         };
 
-        // Deep merge nested objects first to avoid shallow overwrite
-        // Use JSON parse/stringify to create deep clones and avoid reference issues
+        // Merge nested objects - use spread for shallow merge (sufficient for our data structures)
         const mergedRequest = updates.request ?
-            JSON.parse(JSON.stringify({
-                ...(existingTab.request || {}),
-                ...updates.request
-            })) : JSON.parse(JSON.stringify(existingTab.request));
+            { ...(existingTab.request || {}), ...updates.request } :
+            existingTab.request;
 
         // For response, completely replace instead of merge
-        // Deep clone to ensure each tab has its own isolated response data
-        const mergedResponse = updates.response !== undefined ?
-            JSON.parse(JSON.stringify(updates.response)) :
-            JSON.parse(JSON.stringify(existingTab.response));
+        // Truncate large responses to save memory
+        let mergedResponse = updates.response !== undefined ?
+            updates.response : existingTab.response;
+        
+        if (mergedResponse?.data) {
+            const dataStr = typeof mergedResponse.data === 'string' 
+                ? mergedResponse.data 
+                : JSON.stringify(mergedResponse.data);
+            if (dataStr.length > WorkspaceTabRepository.MAX_RESPONSE_SIZE) {
+                mergedResponse = {
+                    ...mergedResponse,
+                    data: dataStr.substring(0, WorkspaceTabRepository.MAX_RESPONSE_SIZE),
+                    truncated: true
+                };
+            }
+        }
 
         const mergedEndpoint = (updates.endpoint && existingTab.endpoint) ?
-            JSON.parse(JSON.stringify({
-                ...existingTab.endpoint,
-                ...updates.endpoint
-            })) : (updates.endpoint ? JSON.parse(JSON.stringify(updates.endpoint)) : JSON.parse(JSON.stringify(existingTab.endpoint)));
+            { ...existingTab.endpoint, ...updates.endpoint } :
+            (updates.endpoint || existingTab.endpoint);
 
         // Create merged tab, excluding nested objects from updates
         const { request: _r, response: _res, endpoint: _e, ...restUpdates } = updates;
@@ -214,7 +243,9 @@ export class WorkspaceTabRepository {
 
         tabs[index] = mergedTab;
 
-        await this.saveTabs(tabs);
+        // Update cache synchronously, then persist in background
+        this._tabsCache = tabs;
+        this.backendAPI.store.set(this.STORE_KEY, tabs).catch(() => { /* fire-and-forget */ });
 
         return tabs[index];
     }
@@ -242,7 +273,9 @@ export class WorkspaceTabRepository {
             filteredTabs.push(this._createDefaultTab());
         }
 
-        await this.saveTabs(filteredTabs);
+        // Update cache synchronously, persist in background
+        this._tabsCache = filteredTabs;
+        this.backendAPI.store.set(this.STORE_KEY, filteredTabs).catch(() => { /* fire-and-forget */ });
         return true;
     }
 

@@ -22,6 +22,7 @@ export class EnvironmentRepository {
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.ENVIRONMENTS_KEY = 'environments';
+        this._cache = null;
     }
 
     /**
@@ -69,12 +70,17 @@ export class EnvironmentRepository {
      * @throws {Error} If storage access fails
      */
     async getAllEnvironments() {
+        if (this._cache !== null) {
+            return this._cache;
+        }
+
         try {
             const data = await this.backendAPI.store.get(this.ENVIRONMENTS_KEY);
 
             if (!data || typeof data !== 'object') {
                 const defaultData = this._getDefaultEnvironments();
                 await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, defaultData);
+                this._cache = defaultData;
                 return defaultData;
             }
 
@@ -82,6 +88,7 @@ export class EnvironmentRepository {
             if (!Array.isArray(data.items)) {
                 const defaultData = this._getDefaultEnvironments();
                 await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, defaultData);
+                this._cache = defaultData;
                 return defaultData;
             }
 
@@ -95,6 +102,7 @@ export class EnvironmentRepository {
                 await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, normalizedData);
             }
 
+            this._cache = normalizedData;
             return normalizedData;
         } catch (error) {
             throw new Error(`Failed to load environments: ${error.message}`);
@@ -139,7 +147,8 @@ export class EnvironmentRepository {
             }
 
             data.activeEnvironmentId = environmentId;
-            await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data);
+            // Cache is already mutated above; persist in background
+            this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data).catch(() => { /* fire-and-forget */ });
             return true;
         } catch (error) {
             throw new Error(`Failed to set active environment: ${error.message}`);
@@ -438,6 +447,7 @@ export class EnvironmentRepository {
                 }
             }
 
+            this._cache = data;
             await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data);
             return true;
         } catch (error) {
