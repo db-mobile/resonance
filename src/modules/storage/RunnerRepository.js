@@ -20,6 +20,7 @@ export class RunnerRepository {
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.RUNNERS_KEY = 'collectionRunners';
+        this._cache = null;
     }
 
     /**
@@ -29,14 +30,20 @@ export class RunnerRepository {
      * @returns {Promise<Array<Object>>} Array of runner objects
      */
     async getAll() {
+        if (this._cache !== null) {
+            return this._cache;
+        }
+
         try {
             const runners = await this.backendAPI.store.get(this.RUNNERS_KEY);
 
             if (!Array.isArray(runners)) {
                 await this.backendAPI.store.set(this.RUNNERS_KEY, []);
+                this._cache = [];
                 return [];
             }
 
+            this._cache = runners;
             return runners;
         } catch (error) {
             return [];
@@ -53,6 +60,7 @@ export class RunnerRepository {
      */
     async save(runners) {
         try {
+            this._cache = runners;
             await this.backendAPI.store.set(this.RUNNERS_KEY, runners);
         } catch (error) {
             throw new Error(`Failed to save runners: ${error.message}`);

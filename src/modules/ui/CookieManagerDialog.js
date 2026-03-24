@@ -153,6 +153,7 @@ export class CookieManagerDialog {
                     const settings = await window.backendAPI.settings.get();
                     settings.cookieJarEnabled = e.target.checked;
                     await window.backendAPI.settings.set(settings);
+                    window.invalidateApiHandlerSettingsCache?.();
                 } catch (_e) { /* non-blocking */ }
             });
         }

@@ -22,6 +22,21 @@ export class VariableRepository {
      */
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
+        // Per-collection cache: Map<collectionId, variables>
+        this._cache = new Map();
+    }
+
+    /**
+     * Invalidates the cache for a specific collection or all collections
+     *
+     * @param {string} [collectionId] - Optional collection ID to invalidate. If not provided, clears entire cache.
+     */
+    invalidateCache(collectionId = null) {
+        if (collectionId) {
+            this._cache.delete(collectionId);
+        } else {
+            this._cache.clear();
+        }
     }
 
     /**
@@ -89,9 +104,16 @@ export class VariableRepository {
      * @throws {Error} If retrieval fails
      */
     async getVariablesForCollection(collectionId) {
+        // Return cached value if available
+        if (this._cache.has(collectionId)) {
+            return this._cache.get(collectionId);
+        }
+
         try {
             const variables = await this.backendAPI.collections.getVariables(collectionId);
-            return this._arrayToObject(variables);
+            const result = this._arrayToObject(variables);
+            this._cache.set(collectionId, result);
+            return result;
         } catch (error) {
             return {};
         }
@@ -112,7 +134,11 @@ export class VariableRepository {
         try {
             const arrayFormat = this._objectToArray(variables);
             await this.backendAPI.collections.saveVariables(collectionId, arrayFormat);
+            // Update cache with the new values
+            this._cache.set(collectionId, this._arrayToObject(arrayFormat));
         } catch (error) {
+            // Invalidate cache on error to ensure consistency
+            this._cache.delete(collectionId);
             throw new Error(`Failed to save collection variables: ${error.message}`);
         }
     }
@@ -171,6 +197,8 @@ export class VariableRepository {
             const allVariables = await this.getAllVariables();
             delete allVariables[collectionId];
             await this.backendAPI.store.set(this.VARIABLES_KEY, allVariables);
+            // Remove from cache
+            this._cache.delete(collectionId);
         } catch (error) {
             throw new Error(`Failed to delete collection variables: ${error.message}`);
         }

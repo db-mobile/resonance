@@ -2,6 +2,31 @@ import { urlInput, methodSelect, sendRequestBtn, cancelRequestBtn, responseBodyC
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { saveAllRequestModifications } from './collectionManager.js';
+
+// Debounce timer for auto-save operations
+let _saveDebounceTimer = null;
+const SAVE_DEBOUNCE_MS = 500;
+
+/**
+ * Debounced, fire-and-forget save of request modifications.
+ * Does not block the caller - saves happen asynchronously after a delay.
+ * Multiple rapid calls will be coalesced into a single save.
+ * 
+ * @param {string} collectionId - Collection ID
+ * @param {string} endpointId - Endpoint ID
+ */
+function debouncedSaveRequestModifications(collectionId, endpointId) {
+    if (_saveDebounceTimer) {
+        clearTimeout(_saveDebounceTimer);
+    }
+    _saveDebounceTimer = setTimeout(() => {
+        _saveDebounceTimer = null;
+        // Fire-and-forget: don't await, just catch errors silently
+        saveAllRequestModifications(collectionId, endpointId).catch(() => {
+            // Silently ignore save errors during auto-save
+        });
+    }, SAVE_DEBOUNCE_MS);
+}
 import { VariableProcessor } from './variables/VariableProcessor.js';
 import { VariableRepository } from './storage/VariableRepository.js';
 import { EnvironmentRepository } from './storage/EnvironmentRepository.js';
@@ -30,21 +55,51 @@ export function setGraphQLBodyManager(manager) {
     graphqlBodyManager = manager;
 }
 
-// Helper function to get variable service with environment support
-function getVariableService() {
-    const variableRepository = new VariableRepository(window.backendAPI);
-    const environmentRepository = new EnvironmentRepository(window.backendAPI);
-    const variableProcessor = new VariableProcessor();
-    const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
+// Module-level singletons — created once, reused on every request
+let _variableService = null;
+let _mockServerService = null;
+let _collectionRepository = null;
+let _settingsCache = null;
 
-    return new VariableService(variableRepository, variableProcessor, statusDisplayAdapter, environmentRepository);
+export function invalidateSettingsCache() {
+    _settingsCache = null;
 }
 
-// Helper function to get mock server service
+export function invalidateEnvironmentCache() {
+    if (_variableService?.environmentRepository) {
+        _variableService.environmentRepository._cache = null;
+    }
+}
+
+export function getSettingsCache() {
+    return _settingsCache;
+}
+
+function getVariableService() {
+    if (!_variableService) {
+        const variableRepository = new VariableRepository(window.backendAPI);
+        const environmentRepository = new EnvironmentRepository(window.backendAPI);
+        const variableProcessor = new VariableProcessor();
+        const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
+        _variableService = new VariableService(variableRepository, variableProcessor, statusDisplayAdapter, environmentRepository);
+    }
+    return _variableService;
+}
+
 function getMockServerService() {
-    const mockServerRepository = new MockServerRepository(window.backendAPI);
-    const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
-    return new MockServerService(mockServerRepository, statusDisplayAdapter);
+    if (!_mockServerService) {
+        const mockServerRepository = new MockServerRepository(window.backendAPI);
+        const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
+        _mockServerService = new MockServerService(mockServerRepository, statusDisplayAdapter);
+    }
+    return _mockServerService;
+}
+
+function getCollectionRepository() {
+    if (!_collectionRepository) {
+        _collectionRepository = new CollectionRepository(window.backendAPI);
+    }
+    return _collectionRepository;
 }
 
 export function initResponseEditor() {
@@ -213,7 +268,8 @@ export async function handleSendRequest() {
 
     if (isWebSocketMode()) {
         if (window.currentEndpoint) {
-            await saveAllRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+            // Fire-and-forget: don't block WebSocket connection on save
+            debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
         }
 
         let websocketUrl = urlInput?.value?.trim() || '';
@@ -297,8 +353,12 @@ export async function handleSendRequest() {
         return;
     }
     
+    // Show cancel button immediately so the UI feels responsive
+    setRequestInProgress(true);
+
     if (window.currentEndpoint) {
-        await saveAllRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+        // Fire-and-forget: don't block request on save
+        debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
     }
 
     // Get URL from input - fall back to default attribute if value was cleared
@@ -312,6 +372,8 @@ export async function handleSendRequest() {
 
     const method = methodSelect.value;
     let body = undefined;
+    // Resolved once and reused for both URL/headers and body processing (avoids a duplicate IPC call)
+    let _resolvedVariables = null;
 
     const pathParams = parseKeyValuePairs(document.getElementById('path-params-list'));
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
@@ -341,8 +403,7 @@ export async function handleSendRequest() {
 
         if (window.currentEndpoint) {
             // Get collection-specific variables + environment variables
-            const collectionRepository = new CollectionRepository(window.backendAPI);
-            const collection = await collectionRepository.getById(window.currentEndpoint.collectionId);
+            const collection = await getCollectionRepository().getById(window.currentEndpoint.collectionId);
 
             if (collection && collection.defaultHeaders) {
                 const mergedHeaders = { ...collection.defaultHeaders, ...headers };
@@ -393,9 +454,11 @@ export async function handleSendRequest() {
             delete queryParams[key];
         }
         Object.assign(queryParams, processedQueryParams);
+        _resolvedVariables = variables;
 
     } catch (error) {
         updateStatusDisplay(`Variable processing error: ${error.message}`, null);
+        setRequestInProgress(false);
         return;
     }
 
@@ -431,8 +494,7 @@ export async function handleSendRequest() {
             
             if (shouldUseMock && mockBaseUrl) {
                 // Get the endpoint path from the collection
-                const collectionRepository = new CollectionRepository(window.backendAPI);
-                const collection = await collectionRepository.getById(window.currentEndpoint.collectionId);
+                const collection = await getCollectionRepository().getById(window.currentEndpoint.collectionId);
                 
                 if (collection) {
                     // Find the endpoint in the collection
@@ -466,13 +528,15 @@ export async function handleSendRequest() {
     // Handle request body (supports JSON and GraphQL modes)
     if (['POST', 'PUT', 'PATCH'].includes(method)) {
         try {
-            const variableService = getVariableService();
-            let variables = {};
-
-            if (window.currentEndpoint) {
-                variables = await variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
-            } else {
-                variables = await variableService.getVariables();
+            // Reuse variables already fetched above — avoids a duplicate IPC call
+            let variables = _resolvedVariables;
+            if (variables === null) {
+                const variableService = getVariableService();
+                if (window.currentEndpoint) {
+                    variables = await variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
+                } else {
+                    variables = await variableService.getVariables();
+                }
             }
 
             // Note: reusing the same processor from above to maintain consistent dynamic variable values
@@ -496,6 +560,7 @@ export async function handleSendRequest() {
                         updateStatusDisplay(`Invalid GraphQL Variables JSON: ${e.message}`, null);
                         clearResponseDisplay();
                         responseHeadersDisplay.textContent = '';
+                        setRequestInProgress(false);
                         return;
                     }
                 }
@@ -517,6 +582,7 @@ export async function handleSendRequest() {
                         updateStatusDisplay(`Invalid Body JSON: ${e.message}`, null);
                         clearResponseDisplay();
                         responseHeadersDisplay.textContent = '';
+                        setRequestInProgress(false);
                         return;
                     }
                 }
@@ -525,17 +591,21 @@ export async function handleSendRequest() {
             updateStatusDisplay(`Error processing request body: ${e.message}`, null);
             clearResponseDisplay();
             responseHeadersDisplay.textContent = '';
+            setRequestInProgress(false);
             return;
         }
     }
 
-    // Get HTTP version and timeout settings
+    // Get HTTP version and timeout settings (cached — invalidated by settings saves)
     let httpVersion = 'auto';
     let timeout = 30000; // Default 30 seconds
     let verifySsl = true;
     let followRedirects = true;
     try {
-        const settings = await window.backendAPI.settings.get();
+        if (!_settingsCache) {
+            _settingsCache = await window.backendAPI.settings.get();
+        }
+        const settings = _settingsCache;
         httpVersion = settings.httpVersion || 'auto';
         // TimeoutManager saves as requestTimeout, store default uses timeout
         // 0 means no timeout - pass null to backend to disable timeout
@@ -568,13 +638,7 @@ export async function handleSendRequest() {
         : null;
 
     try {
-        setRequestInProgress(true);
-
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        if (responseBodyContainer && responseBodyContainer.parentElement) {
-            void responseBodyContainer.parentElement.offsetHeight; // Force reflow
-        }
+        await new Promise(resolve => requestAnimationFrame(resolve));
 
         displayResponseWithLineNumbersForTab('Sending request...', null, requestTabId);
 
@@ -645,7 +709,6 @@ export async function handleSendRequest() {
                 formattedResponse = JSON.stringify(result.data, null, 2);
             }
 
-            // Display response body (currently uses global editor - TODO: make per-tab)
             displayResponseWithLineNumbersForTab(formattedResponse, contentType, requestTabId);
 
             // Get active workspace tab's response container elements for headers/cookies/performance
@@ -695,39 +758,36 @@ export async function handleSendRequest() {
                 displayPerformanceMetrics(responsePerformanceDisplay, result.timings, result.size);
             }
 
-            // Save response data to workspace tab
-            if (window.workspaceTabController) {
-                if (requestTabId) {
-                    await window.workspaceTabController.service.updateTab(requestTabId, {
-                        response: {
-                            data: result.data,
-                            headers: result.headers || {},
-                            status: result.status,
-                            statusText: result.statusText,
-                            ttfb: result.ttfb,
-                            size: result.size,
-                            timings: result.timings,
-                            cookies: extractCookies(result.headers)
-                        },
-                        isModified: false
-                    });
-                    await window.workspaceTabController.service.setTabModified(requestTabId, false);
-                    if (window.workspaceTabController.tabBar?.updateTab) {
-                        window.workspaceTabController.tabBar.updateTab(requestTabId, { isModified: false });
-                    }
+            // Restore UI immediately — status bar and Send button are not gated on storage
+            updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
+            updateResponseTime(result.ttfb);
+            updateResponseSize(result.size);
+            setRequestInProgress(false);
+
+            // Persist response data to workspace tab in the background (non-blocking)
+            if (window.workspaceTabController && requestTabId) {
+                window.workspaceTabController.service.updateTab(requestTabId, {
+                    response: {
+                        data: result.data,
+                        headers: result.headers || {},
+                        status: result.status,
+                        statusText: result.statusText,
+                        ttfb: result.ttfb,
+                        size: result.size,
+                        timings: result.timings,
+                        cookies: extractCookies(result.headers)
+                    },
+                    isModified: false
+                }).catch(() => { /* fire-and-forget */ });
+                window.workspaceTabController.service.setTabModified(requestTabId, false).catch(() => { /* fire-and-forget */ });
+                if (window.workspaceTabController.tabBar?.updateTab) {
+                    window.workspaceTabController.tabBar.updateTab(requestTabId, { isModified: false });
                 }
             }
 
-            if (await isTabCurrentlyActive(requestTabId)) {
-                updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
-                updateResponseTime(result.ttfb);
-                updateResponseSize(result.size);
-            }
-            setRequestInProgress(false);
-
-            // Add to history
+            // Add to history in the background — does not need to block the response display
             if (window.historyController) {
-                await window.historyController.addHistoryEntry(requestConfig, result, window.currentEndpoint);
+                window.historyController.addHistoryEntry(requestConfig, result, window.currentEndpoint).catch(() => { /* fire-and-forget */ });
             }
 
             // Execute test script if exists
@@ -865,9 +925,9 @@ export async function handleSendRequest() {
             updateResponseSize(error.size);
         }
 
-        // Add error to history
+        // Add error to history in the background
         if (window.historyController) {
-            await window.historyController.addHistoryEntry(requestConfig, error, window.currentEndpoint);
+            window.historyController.addHistoryEntry(requestConfig, error, window.currentEndpoint).catch(() => { /* fire-and-forget */ });
         }
 
         // Execute test script for error responses as well (e.g. assert 400/401/etc)
@@ -926,8 +986,7 @@ export async function handleGenerateCurl() {
 
         if (window.currentEndpoint) {
             // Get collection-specific variables + environment variables
-            const collectionRepository = new CollectionRepository(window.backendAPI);
-            const collection = await collectionRepository.getById(window.currentEndpoint.collectionId);
+            const collection = await getCollectionRepository().getById(window.currentEndpoint.collectionId);
 
             if (collection && collection.defaultHeaders) {
                 const mergedHeaders = { ...collection.defaultHeaders, ...headers };

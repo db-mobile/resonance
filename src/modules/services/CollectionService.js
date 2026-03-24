@@ -4,6 +4,7 @@
  */
 
 import { setRequestBodyContent, getRequestBodyContent } from '../requestBodyHelper.js';
+import { toast } from '../ui/Toast.js';
 
 /**
  * Service for managing API collection business logic
@@ -188,8 +189,6 @@ export class CollectionService {
      */
     async createCollection(name) {
         try {
-            this.statusDisplay.update('Creating collection...', null);
-
             const newCollection = {
                 id: this.generateCollectionId(),
                 name: name,
@@ -202,7 +201,7 @@ export class CollectionService {
 
             const createdCollection = await this.repository.add(newCollection);
 
-            this.statusDisplay.update(`Collection "${name}" created successfully`, null);
+            toast.success(`Collection "${name}" created`);
             return createdCollection;
         } catch (error) {
             this.statusDisplay.update(`Error creating collection: ${error.message}`, null);

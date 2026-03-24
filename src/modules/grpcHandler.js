@@ -17,6 +17,7 @@ import {
 } from './domElements.js';
 
 import { updateStatusDisplay } from './statusDisplay.js';
+import { toast } from './ui/Toast.js';
 import { displayResponseWithLineNumbersForTab } from './apiHandler.js';
 
 let lastTarget = null;
@@ -156,6 +157,7 @@ async function onConnect() {
         updateStatusDisplay('gRPC connected', null);
     } catch (error) {
         setGrpcStatus('Error');
+        toast.error(`gRPC connect error: ${error.message || String(error)}`);
         updateStatusDisplay(`gRPC connect error: ${error.message || String(error)}`, null);
     }
 }
@@ -188,6 +190,7 @@ async function onServiceChange() {
         setGrpcStatus('Connected');
     } catch (error) {
         setGrpcStatus('Error');
+        toast.error(`gRPC methods error: ${error.message || String(error)}`);
         updateStatusDisplay(`gRPC methods error: ${error.message || String(error)}`, null);
     }
 }
@@ -207,7 +210,7 @@ export async function handleGrpcSend() {
         try {
             requestJson = JSON.parse(raw);
         } catch (e) {
-            updateStatusDisplay(`Invalid gRPC JSON: ${e.message}`, null);
+            toast.error(`Invalid gRPC JSON: ${e.message}`);
             return;
         }
     }
@@ -267,6 +270,7 @@ export async function handleGrpcSend() {
         }
     } catch (error) {
         const msg = error.message || String(error);
+        toast.error(`gRPC send error: ${msg}`);
         updateStatusDisplay(`gRPC send error: ${msg}`, null);
         displayResponseWithLineNumbersForTab(`Error: ${msg}`, null, null);
     }
@@ -313,6 +317,7 @@ export async function loadProtoFile(protoPath, includePaths = null) {
         return protoInfo;
     } catch (error) {
         setGrpcStatus('Error');
+        toast.error(`Proto load error: ${error.message || String(error)}`);
         updateStatusDisplay(`Proto load error: ${error.message || String(error)}`, null);
         throw error;
     }

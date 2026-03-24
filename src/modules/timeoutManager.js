@@ -22,6 +22,7 @@ export class TimeoutManager {
             const settings = await window.backendAPI.settings.get();
             settings.requestTimeout = timeout;
             await window.backendAPI.settings.set(settings);
+            window.invalidateApiHandlerSettingsCache?.();
         } catch (error) {
             void error;
         }

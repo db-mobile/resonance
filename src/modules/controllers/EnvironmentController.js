@@ -96,6 +96,7 @@ export class EnvironmentController {
      */
     async onEnvironmentSwitched(_event) {
         try {
+            window.invalidateApiHandlerEnvironmentCache?.();
             const environment = await this.service.getActiveEnvironment();
             if (environment) {
                 this.selector.setActiveEnvironment(environment);
@@ -116,6 +117,7 @@ export class EnvironmentController {
      */
     async onEnvironmentsChanged() {
         try {
+            window.invalidateApiHandlerEnvironmentCache?.();
             const activeEnvironment = await this.service.getActiveEnvironment();
             if (activeEnvironment) {
                 this.selector.setActiveEnvironment(activeEnvironment);

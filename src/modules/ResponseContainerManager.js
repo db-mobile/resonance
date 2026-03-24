@@ -71,8 +71,19 @@ export class ResponseContainerManager {
      */
     removeContainer(tabId) {
         const container = this.containers.get(tabId);
-        if (container && container.wrapper.parentNode) {
-            container.wrapper.parentNode.removeChild(container.wrapper);
+        if (container) {
+            // Destroy CodeMirror editors to free memory
+            if (container.editor && typeof container.editor.destroy === 'function') {
+                container.editor.destroy();
+            }
+            if (container.headersEditor && typeof container.headersEditor.destroy === 'function') {
+                container.headersEditor.destroy();
+            }
+            
+            // Remove DOM element
+            if (container.wrapper.parentNode) {
+                container.wrapper.parentNode.removeChild(container.wrapper);
+            }
         }
         this.containers.delete(tabId);
 

@@ -10,6 +10,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { updateStatusDisplay } from '../statusDisplay.js';
 import { templateLoader } from '../templateLoader.js';
+import { toast } from '../ui/Toast.js';
 
 /**
  * Controller for coordinating collection runner operations
@@ -65,8 +66,12 @@ export class RunnerController {
         this.panel.onRun = this._handleRun;
         this.panel.onStop = this._handleStop;
 
-        // Get collections and render
-        const collections = await this.getCollections();
+        // Fetch collections and last-runner settings in parallel
+        const [collections, settings] = await Promise.all([
+            this.getCollections(),
+            this.backendAPI.settings.get().catch(() => ({}))
+        ]);
+
         this.panel.render(collections);
 
         // Listen for service events
@@ -74,8 +79,8 @@ export class RunnerController {
             this._handleServiceEvent(event, data);
         });
 
-        // Load last opened runner
-        await this._loadLastRunner();
+        // Load last opened runner using already-fetched settings
+        await this._loadLastRunner(settings);
     }
 
     /**
@@ -96,7 +101,7 @@ export class RunnerController {
                 this.currentRunnerId = runner.id;
             }
         } catch (error) {
-            updateStatusDisplay(`Error saving runner: ${error.message}`, null);
+            toast.error(`Error saving runner: ${error.message}`);
         }
     }
 
@@ -111,7 +116,7 @@ export class RunnerController {
         try {
             return await this.service.getAllRunners();
         } catch (error) {
-            console.error('Error loading runners:', error);
+            toast.error(`Error loading runners: ${error.message}`);
             return [];
         }
     }
@@ -134,7 +139,7 @@ export class RunnerController {
                 updateStatusDisplay(`Loaded runner: ${runner.name}`, null);
             }
         } catch (error) {
-            updateStatusDisplay(`Error loading runner: ${error.message}`, null);
+            toast.error(`Error loading runner: ${error.message}`);
         }
     }
 
@@ -183,7 +188,7 @@ export class RunnerController {
             this.panel?._handleNewRunner();
             updateStatusDisplay('Runner deleted', null);
         } catch (error) {
-            updateStatusDisplay(`Error deleting runner: ${error.message}`, null);
+            toast.error(`Error deleting runner: ${error.message}`);
         }
     }
 
@@ -307,7 +312,7 @@ export class RunnerController {
                 updateStatusDisplay(`Loaded runner: ${runner.name}`, null);
             }
         } catch (error) {
-            updateStatusDisplay(`Error loading runner: ${error.message}`, null);
+            toast.error(`Error loading runner: ${error.message}`);
         }
     }
 
@@ -352,7 +357,7 @@ export class RunnerController {
             this.panel?.showResults(results);
 
         } catch (error) {
-            updateStatusDisplay(`Runner error: ${error.message}`, null);
+            toast.error(`Runner error: ${error.message}`);
             this.panel?.showResults({ error: error.message });
         }
     }
@@ -448,9 +453,8 @@ export class RunnerController {
      * @private
      * @async
      */
-    async _loadLastRunner() {
+    async _loadLastRunner(settings) {
         try {
-            const settings = await this.backendAPI.settings.get();
             const lastRunnerId = settings?.lastRunnerId;
             if (lastRunnerId) {
                 const runner = await this.service.getRunner(lastRunnerId);

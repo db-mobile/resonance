@@ -582,6 +582,7 @@ export class SettingsModal {
                     const settings = await window.backendAPI.settings.get();
                     settings.verifySsl = e.target.checked;
                     await window.backendAPI.settings.set(settings);
+                    window.invalidateApiHandlerSettingsCache?.();
                 } catch (err) {
                     void err;
                 }
@@ -595,6 +596,7 @@ export class SettingsModal {
                     const settings = await window.backendAPI.settings.get();
                     settings.followRedirects = e.target.checked;
                     await window.backendAPI.settings.set(settings);
+                    window.invalidateApiHandlerSettingsCache?.();
                 } catch (err) {
                     void err;
                 }

@@ -235,6 +235,18 @@ export class PreviewManager {
      * @param {string} tabId - Workspace tab ID
      */
     removeContainer(tabId) {
+        const container = this.containers.get(tabId);
+        if (container) {
+            // Clear renderer content to free DOM nodes
+            if (container.renderer) {
+                container.renderer.clear();
+            }
+            // Remove event listeners by clearing references
+            container.codeBtn = null;
+            container.previewBtn = null;
+            container.editor = null;
+            container.renderer = null;
+        }
         this.containers.delete(tabId);
         this.previewRepository.removePreviewMode(tabId);
     }
