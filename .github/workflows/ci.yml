@@ -95,7 +95,7 @@ jobs:
       run: npm ci
 
     - name: Build frontend
-      run: npm run build
+      run: npm run build:prod
 
     - name: Build Tauri application
       env:
