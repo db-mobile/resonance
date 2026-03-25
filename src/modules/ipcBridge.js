@@ -124,6 +124,14 @@ if (isTauri) {
             check: () => invoke('updater_check'),
             downloadAndInstall: () => invoke('updater_download_and_install'),
             getInstallInfo: () => invoke('updater_get_install_info')
+        },
+        oauth2: {
+            generatePkce: () => invoke('oauth2_generate_pkce'),
+            generateState: () => invoke('oauth2_generate_state'),
+            storePkceVerifier: (stateParam, codeVerifier) => invoke('oauth2_store_pkce_verifier', { stateParam, codeVerifier }),
+            getPkceVerifier: (stateParam) => invoke('oauth2_get_pkce_verifier', { stateParam }),
+            buildAuthorizationUrl: (params) => invoke('oauth2_build_authorization_url', { params }),
+            getToken: (config) => invoke('oauth2_get_token', { config })
         }
     };
     

@@ -66,6 +66,7 @@ import { CookieRepository } from './modules/storage/CookieRepository.js';
 import { CookieJarService } from './modules/services/CookieJarService.js';
 import { CookieController } from './modules/controllers/CookieController.js';
 import { CookieManagerDialog } from './modules/ui/CookieManagerDialog.js';
+import { SchemaController } from './modules/controllers/SchemaController.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
@@ -167,6 +168,13 @@ const mockServerRepository = new MockServerRepository(window.backendAPI);
 const mockServerService = new MockServerService(mockServerRepository, statusDisplayAdapter);
 const mockServerController = new MockServerController(mockServerService, collectionRepository);
 const mockServerDialog = new MockServerDialog(mockServerController);
+
+// Initialize schema validation system
+const schemaController = new SchemaController({
+    repository: collectionRepository,
+    statusDisplay: statusDisplayAdapter
+});
+window.schemaController = schemaController;
 
 // Initialize history controller
 const historyController = new HistoryController(window.backendAPI);

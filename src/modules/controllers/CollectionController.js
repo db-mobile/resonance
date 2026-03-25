@@ -1136,6 +1136,10 @@ export class CollectionController {
 
             if (collection) {
                 await this.loadCollections();
+                
+                // Extract and save response schemas from OpenAPI endpoints
+                await this._saveResponseSchemasFromImport(collection);
+                
                 toast.success(`Imported "${collection.name}"`);
                 return collection;
             }
@@ -1146,6 +1150,78 @@ export class CollectionController {
             toast.error(`Import failed: ${error.message}`);
             throw error;
         }
+    }
+
+    /**
+     * Extracts and saves response schemas from imported OpenAPI endpoints
+     * @private
+     * @param {Object} collection - The imported collection
+     */
+    async _saveResponseSchemasFromImport(collection) {
+        if (!collection) {
+            return;
+        }
+
+        // Collect all endpoints from root and folders
+        const allEndpoints = [
+            ...(collection.endpoints || []),
+            ...(collection.folders || []).flatMap(folder => folder.endpoints || [])
+        ];
+
+        // Process each endpoint
+        for (const endpoint of allEndpoints) {
+            await this._saveEndpointResponseSchema(collection.id, endpoint);
+        }
+    }
+
+    /**
+     * Saves response schema for a single endpoint if available
+     * @private
+     * @param {string} collectionId - Collection ID
+     * @param {Object} endpoint - Endpoint object
+     */
+    async _saveEndpointResponseSchema(collectionId, endpoint) {
+        if (!endpoint.responses) {
+            return;
+        }
+
+        const responseSchema = this._extractResponseSchema(endpoint.responses);
+        if (!responseSchema) {
+            return;
+        }
+
+        try {
+            await this.repository.saveResponseSchema(collectionId, endpoint.id, responseSchema);
+        } catch (error) {
+            console.error(`Failed to save response schema for ${endpoint.name}:`, error);
+        }
+    }
+
+    /**
+     * Extracts JSON Schema from OpenAPI response object
+     * @private
+     * @param {Object} responses - OpenAPI responses object
+     * @returns {Object|null} JSON Schema or null
+     */
+    _extractResponseSchema(responses) {
+        // Priority: 200, 201, 202, default
+        const statusCodes = ['200', '201', '202', 'default'];
+        
+        for (const code of statusCodes) {
+            const response = responses[code];
+            if (response) {
+                // OpenAPI 3.x format: content -> application/json -> schema
+                if (response.content && response.content['application/json'] && response.content['application/json'].schema) {
+                    return response.content['application/json'].schema;
+                }
+                // OpenAPI 2.x format: schema directly on response
+                if (response.schema) {
+                    return response.schema;
+                }
+            }
+        }
+        
+        return null;
     }
 
     /**

@@ -46,10 +46,10 @@ const GRPC_ONLY_TABS = ['grpc', 'grpc-message', 'grpc-metadata'];
 const SHARED_TABS = ['authorization'];
 
 /**
- * HTTP-only shared tabs (like scripts, not needed for gRPC)
+ * HTTP-only shared tabs (like scripts, not needed for gRPC/WebSocket)
  * @type {string[]}
  */
-const HTTP_SHARED_TABS = ['scripts'];
+const HTTP_SHARED_TABS = ['scripts', 'schema'];
 
 /**
  * Get the current request mode

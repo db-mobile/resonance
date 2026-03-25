@@ -216,6 +216,14 @@
                             data-i18n="tabs.authorization">
                         Authorization
                     </button>
+                    <button class="tab-button"
+                            data-tab="schema"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="schema"
+                            data-i18n="tabs.schema">
+                        Schema
+                    </button>
                 </nav>
 
                 <div class="tab-content active" id="path-params" role="tabpanel" aria-labelledby="path-params-tab">
@@ -506,6 +514,24 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="schema" role="tabpanel" aria-labelledby="schema-tab">
+                    <div class="schema-tab-container u-flex u-flex-col u-flex-1 u-min-h-0">
+                        <div class="schema-header u-flex u-items-center u-justify-between">
+                            <h3 data-i18n="schema.title">Response Schema</h3>
+                            <div class="schema-actions u-flex u-items-center">
+                                <button id="schema-infer-btn" class="btn-sm btn-secondary" title="Generate schema from last response" data-i18n="schema.infer_btn">
+                                    Infer from Response
+                                </button>
+                                <button id="schema-clear-btn" class="btn-sm btn-secondary" title="Clear schema" data-i18n="schema.clear_btn">
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                        <div id="schema-editor-container" class="schema-editor-container u-flex u-flex-col u-flex-1"></div>
+                        <div id="schema-validation-status" class="schema-validation-status"></div>
                     </div>
                 </div>
             </section>

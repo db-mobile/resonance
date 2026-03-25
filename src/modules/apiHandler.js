@@ -147,6 +147,61 @@ export function displayResponseWithLineNumbers(content, contentType = null) {
     return displayResponseWithLineNumbersForTab(content, contentType, null);
 }
 
+/**
+ * Clears the schema validation badge from the response area
+ * @param {string|null} tabId - Workspace tab ID
+ */
+export function clearSchemaValidationBadge(tabId = null) {
+    const containerElements = tabId
+        ? window.responseContainerManager?.getOrCreateContainer(tabId)
+        : window.responseContainerManager?.getActiveElements();
+
+    const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
+    if (!statusContainer) {
+        return;
+    }
+
+    const existingBadge = statusContainer.querySelector('.response-validation-badge');
+    if (existingBadge) {
+        existingBadge.remove();
+    }
+}
+
+/**
+ * Displays schema validation result in the response area
+ * @param {Object} validationResult - { valid: boolean, errors: Array, hasSchema: boolean }
+ * @param {string|null} tabId - Workspace tab ID
+ */
+function displaySchemaValidationResult(validationResult, tabId = null) {
+    // Clear existing badge first
+    clearSchemaValidationBadge(tabId);
+
+    // Don't show anything if no schema is defined
+    if (!validationResult.hasSchema) {
+        return;
+    }
+
+    const containerElements = tabId
+        ? window.responseContainerManager?.getOrCreateContainer(tabId)
+        : window.responseContainerManager?.getActiveElements();
+
+    const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
+    if (!statusContainer) {
+        return;
+    }
+
+    // Create validation badge
+    const badge = document.createElement('span');
+    badge.className = `response-validation-badge ${validationResult.valid ? 'valid' : 'invalid'}`;
+    badge.textContent = validationResult.valid ? 'Schema Valid' : `Schema Invalid (${validationResult.errors.length})`;
+    
+    if (!validationResult.valid && validationResult.errors.length > 0) {
+        badge.title = validationResult.errors.map(e => `${e.path}: ${e.message}`).join('\n');
+    }
+
+    statusContainer.appendChild(badge);
+}
+
 export function displayResponseWithLineNumbersForTab(content, contentType = null, tabId = null) {
     // Use per-tab editor if available, otherwise fall back to global editor
     const containerElements = tabId
@@ -710,6 +765,13 @@ export async function handleSendRequest() {
             }
 
             displayResponseWithLineNumbersForTab(formattedResponse, contentType, requestTabId);
+
+            // Store response body for schema inference and validate against schema
+            if (window.schemaController) {
+                window.schemaController.setLastResponseBody(result.data);
+                const validationResult = window.schemaController.validateResponse(result.data);
+                displaySchemaValidationResult(validationResult, requestTabId);
+            }
 
             // Get active workspace tab's response container elements for headers/cookies/performance
             const containerElements = requestTabId

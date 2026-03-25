@@ -27,6 +27,10 @@ use commands::{
         mock_server_clear_logs, mock_server_logs, mock_server_reload_settings, mock_server_start,
         mock_server_status, mock_server_stop,
     },
+    oauth::{
+        oauth2_build_authorization_url, oauth2_generate_pkce, oauth2_generate_state,
+        oauth2_get_pkce_verifier, oauth2_get_token, oauth2_store_pkce_verifier, OAuth2State,
+    },
     proxy::{proxy_get, proxy_set, proxy_test, ProxyState},
     scripts::{script_execute_pre_request, script_execute_test, script_get, script_save},
     store::{settings_get, settings_set, store_get, store_set},
@@ -56,6 +60,7 @@ fn main() {
         .manage(ProtoState::default())
         .manage(WebSocketState::default())
         .manage(PendingUpdate::default())
+        .manage(OAuth2State::default())
         .invoke_handler(tauri::generate_handler![
             // App
             app_get_version,
@@ -105,6 +110,13 @@ fn main() {
             // WebSocket
             websocket_send,
             websocket_close,
+            // OAuth 2.0
+            oauth2_generate_pkce,
+            oauth2_generate_state,
+            oauth2_store_pkce_verifier,
+            oauth2_get_pkce_verifier,
+            oauth2_build_authorization_url,
+            oauth2_get_token,
             // Updater
             updater_check,
             updater_download_and_install,

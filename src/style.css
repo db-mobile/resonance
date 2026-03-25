@@ -3021,6 +3021,113 @@ body {
   height: 100%;
 }
 
+/* Schema Tab Styles */
+.schema-tab-container {
+  padding: 0;
+  height: 100%;
+}
+
+.schema-header {
+  margin-bottom: 8px;
+}
+
+.schema-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.schema-actions {
+  gap: 8px;
+}
+
+.schema-description {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 12px 0;
+}
+
+.schema-editor-container {
+  flex: 1;
+  min-height: 150px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.schema-editor-container .cm-editor {
+  height: 100%;
+}
+
+.schema-validation-status {
+  margin-top: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  min-height: 20px;
+}
+
+.schema-validation-status:empty {
+  display: none;
+}
+
+.schema-status-valid {
+  background-color: var(--color-success-light, rgba(16, 185, 129, 0.1));
+  color: var(--color-success, #10b981);
+}
+
+.schema-status-error {
+  background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
+  color: var(--color-error, #ef4444);
+}
+
+.schema-status-warning {
+  background-color: var(--color-warning-light, rgba(234, 179, 8, 0.1));
+  color: var(--color-warning, #eab308);
+}
+
+/* Response validation indicator */
+.response-validation-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+.response-validation-badge.valid {
+  background-color: var(--color-success-light, rgba(16, 185, 129, 0.1));
+  color: var(--color-success, #10b981);
+}
+
+.response-validation-badge.invalid {
+  background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
+  color: var(--color-error, #ef4444);
+}
+
+.response-validation-errors {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
+  border: 1px solid var(--color-error, #ef4444);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--color-error, #ef4444);
+}
+
+.response-validation-errors ul {
+  margin: 4px 0 0 0;
+  padding-left: 16px;
+}
+
+.response-validation-errors li {
+  margin: 2px 0;
+}
+
 /* CodeMirror Editor Base Styles */
 .cm-editor {
   height: 100%;

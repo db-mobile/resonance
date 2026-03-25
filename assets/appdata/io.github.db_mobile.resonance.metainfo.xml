@@ -42,7 +42,7 @@
   <icon type="stock">io.github.db_mobile.resonance</icon>
 
   <branding>
-    <color type="primary" scheme_preference="light">#2b6cbf</color>
+    <color type="primary" scheme_preference="light">#f9f06b</color>
     <color type="primary" scheme_preference="dark">#123056</color>
   </branding>
 
@@ -96,6 +96,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.7.2" date="2026-03-25">
+      <description>
+        <p>Feature stabilization</p>
+        <ul>
+          <li>Response schema validation</li>
+          <li>Improve OAuth2 flow</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.7.1" date="2026-03-24">
       <description>
         <p>Feature stabilization</p>
