@@ -5,6 +5,7 @@ pub mod grpc_proto;
 pub mod grpc_reflection;
 pub mod import_export;
 pub mod mock_server;
+pub mod oauth;
 pub mod proxy;
 pub mod scripts;
 pub mod store;

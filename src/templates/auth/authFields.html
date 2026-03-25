@@ -43,14 +43,124 @@
 
 <template id="tpl-auth-oauth2">
     <div class="u-flex u-flex-col u-gap-4">
+        <!-- Grant Type Selection -->
         <div class="auth-field-group u-flex u-flex-col">
-            <label for="oauth2-token">Access Token</label>
-            <input type="text" id="oauth2-token" class="input-base form-input" placeholder="Enter access token" aria-label="OAuth 2.0 Access Token">
-            <small class="form-input-hint">The token will be sent in the Authorization header as "Bearer {token}"</small>
+            <label for="oauth2-grant-type">Grant Type</label>
+            <select id="oauth2-grant-type" class="form-select" aria-label="OAuth 2.0 Grant Type">
+                <option value="client_credentials">Client Credentials</option>
+                <option value="authorization_code">Authorization Code</option>
+                <option value="password">Password (Resource Owner)</option>
+                <option value="manual">Manual Token Entry</option>
+            </select>
         </div>
+
+        <!-- Token URL (for all flows except manual) -->
+        <div class="auth-field-group u-flex u-flex-col" id="oauth2-token-url-group">
+            <label for="oauth2-token-url">Token URL</label>
+            <input type="text" id="oauth2-token-url" class="input-base form-input" placeholder="https://auth.example.com/oauth/token" aria-label="Token URL">
+        </div>
+
+        <!-- Authorization URL (for authorization code flow) -->
+        <div class="auth-field-group u-flex u-flex-col u-hidden" id="oauth2-auth-url-group">
+            <label for="oauth2-auth-url">Authorization URL</label>
+            <input type="text" id="oauth2-auth-url" class="input-base form-input" placeholder="https://auth.example.com/oauth/authorize" aria-label="Authorization URL">
+        </div>
+
+        <!-- Client ID -->
+        <div class="auth-field-group u-flex u-flex-col" id="oauth2-client-id-group">
+            <label for="oauth2-client-id">Client ID</label>
+            <input type="text" id="oauth2-client-id" class="input-base form-input" placeholder="Enter client ID" aria-label="Client ID">
+        </div>
+
+        <!-- Client Secret -->
+        <div class="auth-field-group u-flex u-flex-col" id="oauth2-client-secret-group">
+            <label for="oauth2-client-secret">Client Secret</label>
+            <input type="password" id="oauth2-client-secret" class="input-base form-input" placeholder="Enter client secret" aria-label="Client Secret">
+        </div>
+
+        <!-- Username (for password grant) -->
+        <div class="auth-field-group u-flex u-flex-col u-hidden" id="oauth2-username-group">
+            <label for="oauth2-username">Username</label>
+            <input type="text" id="oauth2-username" class="input-base form-input" placeholder="Enter username" aria-label="Username">
+        </div>
+
+        <!-- Password (for password grant) -->
+        <div class="auth-field-group u-flex u-flex-col u-hidden" id="oauth2-password-group">
+            <label for="oauth2-password">Password</label>
+            <input type="password" id="oauth2-password" class="input-base form-input" placeholder="Enter password" aria-label="Password">
+        </div>
+
+        <!-- Redirect URI (for authorization code flow) -->
+        <div class="auth-field-group u-flex u-flex-col u-hidden" id="oauth2-redirect-uri-group">
+            <label for="oauth2-redirect-uri">Redirect URI</label>
+            <input type="text" id="oauth2-redirect-uri" class="input-base form-input" placeholder="http://localhost:8080/callback" aria-label="Redirect URI">
+        </div>
+
+        <!-- Scope -->
+        <div class="auth-field-group u-flex u-flex-col" id="oauth2-scope-group">
+            <label for="oauth2-scope">Scope</label>
+            <input type="text" id="oauth2-scope" class="input-base form-input" placeholder="openid profile email" aria-label="Scope">
+            <small class="form-input-hint">Space-separated list of scopes</small>
+        </div>
+
+        <!-- Audience (optional, for Auth0 etc.) -->
+        <div class="auth-field-group u-flex u-flex-col" id="oauth2-audience-group">
+            <label for="oauth2-audience">Audience (optional)</label>
+            <input type="text" id="oauth2-audience" class="input-base form-input" placeholder="https://api.example.com" aria-label="Audience">
+        </div>
+
+        <!-- PKCE Toggle (for authorization code flow) -->
+        <div class="auth-field-group u-flex u-items-center u-gap-2 u-hidden" id="oauth2-pkce-group">
+            <input type="checkbox" id="oauth2-use-pkce" class="form-checkbox" checked aria-label="Use PKCE">
+            <label for="oauth2-use-pkce">Use PKCE (recommended for public clients)</label>
+        </div>
+
+        <!-- Client Auth Method -->
+        <div class="auth-field-group u-flex u-flex-col" id="oauth2-client-auth-group">
+            <label for="oauth2-client-auth">Client Authentication</label>
+            <select id="oauth2-client-auth" class="form-select" aria-label="Client Authentication Method">
+                <option value="body">Send in request body</option>
+                <option value="header">Send as Basic Auth header</option>
+            </select>
+        </div>
+
+        <!-- Get Token Button -->
+        <div class="auth-field-group u-flex u-flex-col" id="oauth2-get-token-group">
+            <button type="button" id="oauth2-get-token-btn" class="btn btn-primary">
+                <span id="oauth2-get-token-text">Get New Access Token</span>
+                <span id="oauth2-get-token-loading" class="u-hidden">Getting Token...</span>
+            </button>
+        </div>
+
+        <!-- Token Display Section -->
+        <div class="auth-field-group u-flex u-flex-col" id="oauth2-token-display-group">
+            <label>Current Token</label>
+            <div class="oauth2-token-info u-flex u-flex-col u-gap-2">
+                <div class="auth-field-group u-flex u-flex-col">
+                    <label for="oauth2-token">Access Token</label>
+                    <input type="text" id="oauth2-token" class="input-base form-input" placeholder="No token - click 'Get New Access Token'" aria-label="Access Token" readonly>
+                </div>
+                <div class="u-flex u-gap-2 u-items-center" id="oauth2-token-meta">
+                    <span id="oauth2-token-type" class="badge badge-info u-hidden">Bearer</span>
+                    <span id="oauth2-token-expires" class="badge badge-warning u-hidden"></span>
+                </div>
+                <div class="auth-field-group u-flex u-flex-col u-hidden" id="oauth2-refresh-token-group">
+                    <label for="oauth2-refresh-token">Refresh Token</label>
+                    <input type="text" id="oauth2-refresh-token" class="input-base form-input" aria-label="Refresh Token" readonly>
+                    <button type="button" id="oauth2-refresh-btn" class="btn btn-secondary btn-sm u-mt-2">Refresh Token</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Header Prefix -->
         <div class="auth-field-group u-flex u-flex-col">
             <label for="oauth2-header-prefix">Header Prefix</label>
-            <input type="text" id="oauth2-header-prefix" class="input-base form-input" placeholder="Bearer" aria-label="OAuth 2.0 Header Prefix">
+            <input type="text" id="oauth2-header-prefix" class="input-base form-input" placeholder="Bearer" value="Bearer" aria-label="Header Prefix">
+        </div>
+
+        <!-- Error Display -->
+        <div class="auth-field-group u-flex u-flex-col u-hidden" id="oauth2-error-group">
+            <div class="alert alert-error" id="oauth2-error-message"></div>
         </div>
     </div>
 </template>
