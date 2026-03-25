@@ -147,6 +147,18 @@ export class ResponseContainerManager {
         const headersEditor = new ResponseEditor(headersContainer);
         headersEditor.setContent('', 'application/json');
 
+        // Fix: Prevent main-content-area from scrolling when editor gets focus
+        // CodeMirror focus causes the parent to scroll, hiding the workspace tabs
+        const mainContentArea = document.getElementById('main-content-area');
+        if (mainContentArea) {
+            // Prevent scroll on the main content area entirely
+            mainContentArea.addEventListener('scroll', () => {
+                if (mainContentArea.scrollTop !== 0) {
+                    mainContentArea.scrollTop = 0;
+                }
+            });
+        }
+
         // Initialize PreviewManager for this tab
         if (this.previewManager && previewContainer && codeBtn && previewBtn) {
             this.previewManager.initializeForTab(tabId, previewContainer, bodyContainer, editor, codeBtn, previewBtn);
