@@ -124,7 +124,20 @@
     "grpc_message": "Nachricht",
     "grpc_metadata": "Metadaten",
     "response_body": "Body",
-    "response_headers": "Header"
+    "response_headers": "Header",
+    "schema": "Schema"
+  },
+  "schema": {
+    "title": "Antwort-Schema",
+    "description": "Definieren Sie ein JSON-Schema zur Validierung von API-Antworten. Das Schema wird automatisch aus OpenAPI-Importen übernommen.",
+    "infer_btn": "Aus Antwort ableiten",
+    "clear_btn": "Löschen",
+    "valid": "Schema gültig",
+    "invalid": "Schema ungültig",
+    "no_response": "Keine Antwort verfügbar, um Schema abzuleiten",
+    "not_json": "Antwort ist kein gültiges JSON",
+    "inferred": "Schema aus Antwort abgeleitet",
+    "cleared": "Schema gelöscht"
   },
   "variables": {
     "title": "Variablen",

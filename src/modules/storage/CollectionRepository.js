@@ -244,7 +244,8 @@ export class CollectionRepository {
             headers: data.headers || [],
             modifiedBody: data.modifiedBody || null,
             graphqlData: data.graphqlData || null,
-            grpcData: data.grpcData || null
+            grpcData: data.grpcData || null,
+            responseSchema: data.responseSchema || null
         };
     }
 
@@ -623,6 +624,41 @@ export class CollectionRepository {
         try {
             const data = await this._getEndpointData(collectionId, endpointId);
             return data.grpcData || null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /**
+     * Saves response schema for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {Object|null} schema - The JSON Schema object or null to clear
+     * @returns {Promise<void>}
+     * @throws {Error} If save operation fails
+     */
+    async saveResponseSchema(collectionId, endpointId, schema) {
+        try {
+            await this._updateEndpointField(collectionId, endpointId, 'responseSchema', schema);
+        } catch (error) {
+            throw new Error(`Failed to save response schema: ${error.message || error}`);
+        }
+    }
+
+    /**
+     * Retrieves response schema for a specific endpoint
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<Object|null>} The JSON Schema object or null if not found
+     */
+    async getResponseSchema(collectionId, endpointId) {
+        try {
+            const data = await this._getEndpointData(collectionId, endpointId);
+            return data.responseSchema || null;
         } catch (error) {
             return null;
         }

@@ -124,7 +124,20 @@
     "grpc_message": "Messaggio",
     "grpc_metadata": "Metadati",
     "response_body": "Corpo",
-    "response_headers": "Intestazioni"
+    "response_headers": "Intestazioni",
+    "schema": "Schema"
+  },
+  "schema": {
+    "title": "Schema di Risposta",
+    "description": "Definisci un JSON Schema per validare le risposte dell'API. Lo schema verrà compilato automaticamente dalle importazioni OpenAPI.",
+    "infer_btn": "Inferisci dalla Risposta",
+    "clear_btn": "Cancella",
+    "valid": "Schema Valido",
+    "invalid": "Schema Non Valido",
+    "no_response": "Nessuna risposta disponibile per inferire lo schema",
+    "not_json": "La risposta non è un JSON valido",
+    "inferred": "Schema inferito dalla risposta",
+    "cleared": "Schema cancellato"
   },
   "variables": {
     "title": "Variabili",

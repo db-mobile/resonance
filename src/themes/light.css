@@ -34,6 +34,7 @@
   --shadow-xl: 0 16px 32px -8px rgba(0, 0, 0, 0.1);
 
   /* Status Colors - Light mode variants */
+  --color-success: #047857;
   --color-success-light: #dcfce7;
   --color-warning-light: #fef3c7;
   --color-error-light: #fee2e2;

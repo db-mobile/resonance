@@ -256,10 +256,7 @@ fn parse_openapi_spec(spec: Value) -> Result<Collection, String> {
                             operation.get("requestBody"),
                             &spec,
                         ),
-                        responses: operation
-                            .get("responses")
-                            .and_then(|r| r.as_object())
-                            .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect()),
+                        responses: extract_openapi_responses(operation.get("responses"), &spec),
                         security: extract_openapi_security(operation.get("security"), &spec),
                     };
 
@@ -361,18 +358,134 @@ fn extract_openapi_request_body(request_body: Option<&Value>, spec: &Value) -> O
     None
 }
 
-/// Resolve $ref in OpenAPI schema
-fn resolve_schema_ref(schema: &Value, spec: &Value) -> Value {
-    if let Some(ref_path) = schema.get("$ref").and_then(|r| r.as_str()) {
-        // Parse ref like "#/components/schemas/Post"
-        if ref_path.starts_with("#/") {
-            let _path = ref_path.trim_start_matches("#/").replace('/', "~1");
-            let json_pointer = format!("/{}", ref_path.trim_start_matches("#/"));
-            if let Some(resolved) = spec.pointer(&json_pointer) {
-                return resolved.clone();
+/// Extract and resolve OpenAPI responses with schema references
+fn extract_openapi_responses(
+    responses: Option<&Value>,
+    spec: &Value,
+) -> Option<HashMap<String, Value>> {
+    let responses_obj = responses?.as_object()?;
+
+    let mut result: HashMap<String, Value> = HashMap::new();
+
+    for (status_code, response) in responses_obj {
+        let mut resolved_response = response.clone();
+
+        // Resolve schema $ref in content/application/json/schema
+        if let Some(content) = response.get("content") {
+            if let Some(json_content) = content.get("application/json") {
+                if let Some(schema) = json_content.get("schema") {
+                    let resolved_schema = resolve_schema_ref(schema, spec);
+
+                    // Build the resolved response structure
+                    let mut new_response = serde_json::Map::new();
+
+                    // Copy description if present
+                    if let Some(desc) = response.get("description") {
+                        new_response.insert("description".to_string(), desc.clone());
+                    }
+
+                    // Build content with resolved schema
+                    let mut new_content = serde_json::Map::new();
+                    let mut new_json_content = serde_json::Map::new();
+                    new_json_content.insert("schema".to_string(), resolved_schema);
+
+                    // Copy example if present
+                    if let Some(example) = json_content.get("example") {
+                        new_json_content.insert("example".to_string(), example.clone());
+                    }
+
+                    new_content.insert(
+                        "application/json".to_string(),
+                        Value::Object(new_json_content),
+                    );
+                    new_response.insert("content".to_string(), Value::Object(new_content));
+
+                    resolved_response = Value::Object(new_response);
+                }
             }
         }
+
+        // Also handle OpenAPI 2.x style schema directly on response
+        if let Some(schema) = response.get("schema") {
+            let resolved_schema = resolve_schema_ref(schema, spec);
+            let mut new_response = response.as_object().cloned().unwrap_or_default();
+            new_response.insert("schema".to_string(), resolved_schema);
+            resolved_response = Value::Object(new_response);
+        }
+
+        result.insert(status_code.clone(), resolved_response);
     }
+
+    Some(result)
+}
+
+/// Resolve $ref in OpenAPI schema recursively
+fn resolve_schema_ref(schema: &Value, spec: &Value) -> Value {
+    resolve_schema_ref_recursive(schema, spec, 0)
+}
+
+/// Recursively resolve all $ref in OpenAPI schema with depth limit to prevent infinite loops
+fn resolve_schema_ref_recursive(schema: &Value, spec: &Value, depth: usize) -> Value {
+    // Prevent infinite recursion
+    if depth > 20 {
+        return schema.clone();
+    }
+
+    // Handle direct $ref
+    if let Some(ref_path) = schema.get("$ref").and_then(|r| r.as_str()) {
+        if ref_path.starts_with("#/") {
+            let json_pointer = format!("/{}", ref_path.trim_start_matches("#/"));
+            if let Some(resolved) = spec.pointer(&json_pointer) {
+                // Recursively resolve the resolved schema
+                return resolve_schema_ref_recursive(resolved, spec, depth + 1);
+            }
+        }
+        return schema.clone();
+    }
+
+    // Handle object with properties
+    if let Some(obj) = schema.as_object() {
+        let mut new_obj = serde_json::Map::new();
+
+        for (key, value) in obj {
+            if key == "properties" {
+                if let Some(props) = value.as_object() {
+                    let mut new_props = serde_json::Map::new();
+                    for (prop_key, prop_value) in props {
+                        new_props.insert(
+                            prop_key.clone(),
+                            resolve_schema_ref_recursive(prop_value, spec, depth + 1),
+                        );
+                    }
+                    new_obj.insert(key.clone(), Value::Object(new_props));
+                } else {
+                    new_obj.insert(key.clone(), value.clone());
+                }
+            } else if key == "items" {
+                // Handle array items
+                new_obj.insert(
+                    key.clone(),
+                    resolve_schema_ref_recursive(value, spec, depth + 1),
+                );
+            } else if key == "allOf" || key == "oneOf" || key == "anyOf" {
+                // Handle composition keywords
+                if let Some(arr) = value.as_array() {
+                    let resolved_arr: Vec<Value> = arr
+                        .iter()
+                        .map(|item| resolve_schema_ref_recursive(item, spec, depth + 1))
+                        .collect();
+                    new_obj.insert(key.clone(), Value::Array(resolved_arr));
+                } else {
+                    new_obj.insert(key.clone(), value.clone());
+                }
+            } else {
+                new_obj.insert(key.clone(), value.clone());
+            }
+        }
+
+        return Value::Object(new_obj);
+    }
+
     schema.clone()
 }
 

@@ -194,14 +194,13 @@ export class VariableRepository {
      */
     async deleteAllVariablesForCollection(collectionId) {
         try {
-            const allVariables = await this.getAllVariables();
-            delete allVariables[collectionId];
-            await this.backendAPI.store.set(this.VARIABLES_KEY, allVariables);
-            // Remove from cache
-            this._cache.delete(collectionId);
-        } catch (error) {
-            throw new Error(`Failed to delete collection variables: ${error.message}`);
+            // Save empty array to clear variables for this collection
+            await this.backendAPI.collections.saveVariables(collectionId, []);
+        } catch {
+            // Ignore errors - collection may already be deleted
         }
+        // Remove from cache regardless
+        this._cache.delete(collectionId);
     }
 
     /**

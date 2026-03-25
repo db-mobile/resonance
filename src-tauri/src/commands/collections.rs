@@ -48,6 +48,8 @@ pub struct EndpointData {
     pub graphql_data: Option<Value>,
     #[serde(default)]
     pub grpc_data: Option<Value>,
+    #[serde(default)]
+    pub response_schema: Option<Value>,
 }
 
 /// Get the collections directory path
@@ -457,6 +459,7 @@ fn migrate_endpoint_data(
             scripts: scripts.get(&key).cloned(),
             graphql_data: graphql_data.get(&key).cloned(),
             grpc_data: grpc_data.get(&key).cloned(),
+            response_schema: None,
         };
 
         // Only save if there's actual data

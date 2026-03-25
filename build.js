@@ -60,6 +60,7 @@ await esbuild.build({
         'src/modules/requestBodyEditor.js',
         'src/modules/graphqlEditor.js',
         'src/modules/scriptEditor.js',
+        'src/modules/schemaEditor.js',
     ],
     outdir: 'dist/src/modules',
     splitting: true,

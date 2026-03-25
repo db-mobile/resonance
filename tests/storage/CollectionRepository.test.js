@@ -51,7 +51,8 @@ describe('CollectionRepository', () => {
                 headers: [{ key: 'X-Custom', value: 'value' }],
                 modifiedBody: '{"name": "test"}',
                 graphqlData: { query: 'query { users }', variables: '{}' },
-                grpcData: { service: 'UserService', method: 'GetUser' }
+                grpcData: { service: 'UserService', method: 'GetUser' },
+                responseSchema: null
             });
             expect(mockBackendAPI.collections.getEndpointData).toHaveBeenCalledWith('collection_1', 'endpoint_1');
             expect(mockBackendAPI.collections.getEndpointData).toHaveBeenCalledTimes(1);
@@ -70,7 +71,8 @@ describe('CollectionRepository', () => {
                 headers: [],
                 modifiedBody: null,
                 graphqlData: null,
-                grpcData: null
+                grpcData: null,
+                responseSchema: null
             });
         });
 
@@ -90,7 +92,8 @@ describe('CollectionRepository', () => {
                 headers: [{ key: 'Authorization', value: 'Bearer token' }],
                 modifiedBody: null,
                 graphqlData: null,
-                grpcData: null
+                grpcData: null,
+                responseSchema: null
             });
         });
 
@@ -107,7 +110,8 @@ describe('CollectionRepository', () => {
                 headers: [],
                 modifiedBody: null,
                 graphqlData: null,
-                grpcData: null
+                grpcData: null,
+                responseSchema: null
             });
         });
     });

@@ -3946,7 +3946,7 @@ dependencies = [
 
 [[package]]
 name = "resonance"
-version = "2.7.1"
+version = "2.7.2"
 dependencies = [
  "anyhow",
  "axum 0.7.9",

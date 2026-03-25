@@ -124,7 +124,20 @@
     "grpc_message": "Message",
     "grpc_metadata": "Metadata",
     "response_body": "Body",
-    "response_headers": "Headers"
+    "response_headers": "Headers",
+    "schema": "Schema"
+  },
+  "schema": {
+    "title": "Response Schema",
+    "description": "Define a JSON Schema to validate API responses. Schema will be auto-populated from OpenAPI imports.",
+    "infer_btn": "Infer from Response",
+    "clear_btn": "Clear",
+    "valid": "Schema Valid",
+    "invalid": "Schema Invalid",
+    "no_response": "No response available to infer schema from",
+    "not_json": "Response is not valid JSON",
+    "inferred": "Schema inferred from response",
+    "cleared": "Schema cleared"
   },
   "variables": {
     "title": "Variables",

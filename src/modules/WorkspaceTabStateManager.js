@@ -6,7 +6,7 @@
  */
 import { parseKeyValuePairs, populateKeyValueList, clearKeyValueList, addKeyValueRow, updateUrlFromQueryParams } from './keyValueManager.js';
 import { authManager } from './authManager.js';
-import { displayResponseWithLineNumbersForTab, clearResponseDisplayForTab } from './apiHandler.js';
+import { displayResponseWithLineNumbersForTab, clearResponseDisplayForTab, clearSchemaValidationBadge } from './apiHandler.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import logger from './logger.js';
 
@@ -402,17 +402,33 @@ export class WorkspaceTabStateManager {
         if (endpoint) {
             window.currentEndpoint = endpoint;
 
+            // Clear schema validation badge when switching endpoints
+            clearSchemaValidationBadge();
+
             // Load scripts for this endpoint
             if (window.inlineScriptManager && endpoint.collectionId && endpoint.endpointId) {
                 await window.inlineScriptManager.loadScripts(endpoint.collectionId, endpoint.endpointId);
+            }
+
+            // Load schema for this endpoint
+            if (window.schemaController && endpoint.collectionId && endpoint.endpointId) {
+                await window.schemaController.loadSchema(endpoint.collectionId, endpoint.endpointId);
             }
         } else if (Object.prototype.hasOwnProperty.call(tab, 'endpoint')) {
             // Tab explicitly has no endpoint (e.g., manually created tab)
             window.currentEndpoint = null;
 
+            // Clear schema validation badge when no endpoint
+            clearSchemaValidationBadge();
+
             // Clear scripts when no endpoint
             if (window.inlineScriptManager) {
                 window.inlineScriptManager.clear();
+            }
+
+            // Clear schema when no endpoint
+            if (window.schemaController) {
+                window.schemaController.clearContext();
             }
         }
         // If tab doesn't have endpoint property at all (old tab format),
