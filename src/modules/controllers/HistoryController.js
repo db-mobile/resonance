@@ -51,9 +51,9 @@ export class HistoryController {
      * @param {Object|null} [currentEndpoint=null] - Optional current endpoint context
      * @returns {Promise<void>}
      */
-    async addHistoryEntry(requestConfig, result, currentEndpoint = null) {
+    async addHistoryEntry(requestConfig, result, currentEndpoint = null, environmentName = null) {
         try {
-            await this.service.createHistoryEntry(requestConfig, result, currentEndpoint);
+            await this.service.createHistoryEntry(requestConfig, result, currentEndpoint, environmentName);
             await this.renderer.refresh();
         } catch (error) {
             void error;

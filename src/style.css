@@ -1004,6 +1004,7 @@ body {
   border-color: var(--input-hover-border, var(--border-medium));
 }
 
+
 .input-base::placeholder,
 .form-input::placeholder,
 .field-input::placeholder {
@@ -4099,6 +4100,23 @@ body {
   color: var(--color-error);
   border-color: var(--color-error);
 }
+
+.history-item-env {
+  display: none;
+}
+
+.history-item-env--active {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-top: var(--space-1);
+}
+
+.history-item-env--active::before {
+  content: '⬡ ';
+  opacity: 0.6;
+}
+
 /* Environment Management Styles */
 .environment-section {
   padding: var(--space-1) var(--space-1);

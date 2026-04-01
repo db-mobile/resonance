@@ -1,4 +1,5 @@
 import { urlInput, methodSelect, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, responseCookiesDisplay, responsePerformanceDisplay, languageSelector } from './domElements.js';
+import { toast } from './ui/Toast.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { saveAllRequestModifications } from './collectionManager.js';
@@ -23,7 +24,7 @@ function debouncedSaveRequestModifications(collectionId, endpointId) {
         _saveDebounceTimer = null;
         // Fire-and-forget: don't await, just catch errors silently
         saveAllRequestModifications(collectionId, endpointId).catch(() => {
-            // Silently ignore save errors during auto-save
+            toast.error('Failed to save changes');
         });
     }, SAVE_DEBOUNCE_MS);
 }
@@ -849,7 +850,8 @@ export async function handleSendRequest() {
 
             // Add to history in the background — does not need to block the response display
             if (window.historyController) {
-                window.historyController.addHistoryEntry(requestConfig, result, window.currentEndpoint).catch(() => { /* fire-and-forget */ });
+                const _activeEnvName = await window.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
+                window.historyController.addHistoryEntry(requestConfig, result, window.currentEndpoint, _activeEnvName).catch(() => { /* fire-and-forget */ });
             }
 
             // Execute test script if exists
@@ -989,7 +991,8 @@ export async function handleSendRequest() {
 
         // Add error to history in the background
         if (window.historyController) {
-            window.historyController.addHistoryEntry(requestConfig, error, window.currentEndpoint).catch(() => { /* fire-and-forget */ });
+            const _activeEnvName = await window.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
+            window.historyController.addHistoryEntry(requestConfig, error, window.currentEndpoint, _activeEnvName).catch(() => { /* fire-and-forget */ });
         }
 
         // Execute test script for error responses as well (e.g. assert 400/401/etc)

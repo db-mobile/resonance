@@ -60,10 +60,11 @@ export class HistoryService {
      * @param {string} [currentEndpoint.endpointId] - Endpoint ID
      * @returns {Promise<Object>} The created history entry
      */
-    async createHistoryEntry(requestConfig, result, currentEndpoint = null) {
+    async createHistoryEntry(requestConfig, result, currentEndpoint = null, environmentName = null) {
         const historyEntry = {
             id: this.generateId(),
             timestamp: Date.now(),
+            environmentName: environmentName || null,
             request: {
                 method: requestConfig.method,
                 url: requestConfig.url,
