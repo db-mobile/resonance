@@ -403,3 +403,103 @@ jobs:
         gh release upload "$TAG" artifacts/latest.json
         # Upload mac tar.gz for updater (macOS still uses tar.gz in v2)
         gh release upload "$TAG" artifacts/release-mac/*.app.tar.gz 2>/dev/null || true
+
+  update-aur:
+    needs: [release]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Extract version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Download Linux amd64 artifact
+      uses: actions/download-artifact@v6
+      with:
+        name: release-linux-amd64
+        path: artifacts/amd64
+
+    - name: Download Linux arm64 artifact
+      uses: actions/download-artifact@v6
+      with:
+        name: release-linux-arm64
+        path: artifacts/arm64
+
+    - name: Compute checksums
+      id: checksums
+      run: |
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+        AMD64_SHA=$(sha256sum artifacts/amd64/resonance_${VERSION}_amd64.deb | awk '{print $1}')
+        ARM64_SHA=$(sha256sum artifacts/arm64/resonance_${VERSION}_arm64.deb | awk '{print $1}')
+        curl -sL "https://github.com/db-mobile/resonance/archive/refs/tags/v${VERSION}.tar.gz" -o source.tar.gz
+        SOURCE_SHA=$(sha256sum source.tar.gz | awk '{print $1}')
+        echo "AMD64_SHA=$AMD64_SHA" >> $GITHUB_OUTPUT
+        echo "ARM64_SHA=$ARM64_SHA" >> $GITHUB_OUTPUT
+        echo "SOURCE_SHA=$SOURCE_SHA" >> $GITHUB_OUTPUT
+
+    - name: Fill PKGBUILD template
+      run: |
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+        PKGBUILD="packaging/aur/resonance-bin/PKGBUILD"
+        sed -i "s/PKGVER/${VERSION}/" "$PKGBUILD"
+        sed -i "s/SRCSUM/${{ steps.checksums.outputs.SOURCE_SHA }}/" "$PKGBUILD"
+        sed -i "s/X86_64SUM/${{ steps.checksums.outputs.AMD64_SHA }}/" "$PKGBUILD"
+        sed -i "s/AARCH64SUM/${{ steps.checksums.outputs.ARM64_SHA }}/" "$PKGBUILD"
+
+    - uses: KSXGitHub/github-actions-deploy-aur@v4.1.1
+      with:
+        pkgname: resonance-bin
+        pkgbuild: ./packaging/aur/resonance-bin/PKGBUILD
+        commit_username: Dennis Blümer
+        commit_email: dennis.bluemer@ducart.de
+        ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        commit_message: "Update upstream to v${{ steps.get_version.outputs.VERSION }}"
+
+  update-homebrew:
+    needs: [release]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Extract version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Download Mac artifact
+      uses: actions/download-artifact@v6
+      with:
+        name: release-mac
+        path: artifacts/mac
+
+    - name: Compute DMG checksum
+      id: checksum
+      run: |
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+        DMG_SHA=$(sha256sum artifacts/mac/resonance_${VERSION}_universal.dmg | awk '{print $1}')
+        echo "DMG_SHA=$DMG_SHA" >> $GITHUB_OUTPUT
+
+    - name: Fill cask template
+      run: |
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+        CASK="packaging/homebrew/resonance.rb"
+        sed -i "s/CASK_VERSION/${VERSION}/" "$CASK"
+        sed -i "s/CASK_SHA256/${{ steps.checksum.outputs.DMG_SHA }}/" "$CASK"
+
+    - name: Push to homebrew-resonance tap
+      env:
+        HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      run: |
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+        git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/db-mobile/homebrew-resonance.git" tap
+        cp packaging/homebrew/resonance.rb tap/Casks/resonance.rb
+        cd tap
+        git config user.name "Dennis Blümer"
+        git config user.email "dennis.bluemer@ducart.de"
+        git add Casks/resonance.rb
+        git commit -m "Update upstream to v${VERSION}"
+        git push
