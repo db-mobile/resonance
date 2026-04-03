@@ -75,7 +75,7 @@ export class CollectionRenderer {
      * @param {boolean} [options.forceExpandAll=false] - Expand all visible collections and folders
      * @returns {Promise<void>}
      */
-    async renderCollections(collections, eventHandlers = {}, preserveExpansionState = false, options = {}) {
+    async renderCollections(collections, eventHandlers = {}, preserveExpansionState = false, options = {}, pinnedRequests = {}) {
         if (this.emptySpaceContextMenuHandler) {
             this.container.removeEventListener('contextmenu', this.emptySpaceContextMenuHandler);
             this.emptySpaceContextMenuHandler = null;
@@ -114,8 +114,14 @@ export class CollectionRenderer {
         }
 
         this.container.innerHTML = '';
+
+        const pinnedSection = this.createPinnedSection(collections, pinnedRequests, eventHandlers);
+        if (pinnedSection) {
+            this.container.appendChild(pinnedSection);
+        }
+
         collections.forEach(collection => {
-            const collectionElement = this.createCollectionElement(collection, eventHandlers);
+            const collectionElement = this.createCollectionElement(collection, eventHandlers, pinnedRequests);
             this.container.appendChild(collectionElement);
         });
 
@@ -180,13 +186,72 @@ export class CollectionRenderer {
      * @param {Object} eventHandlers - Event handler callbacks
      * @returns {HTMLDivElement} The created collection element
      */
-    createCollectionElement(collection, eventHandlers) {
+    createPinnedSection(collections, pinnedRequests, eventHandlers) {
+        const pinnedKeys = Object.keys(pinnedRequests);
+        if (pinnedKeys.length === 0) {
+            return null;
+        }
+
+        const pinnedEntries = [];
+        collections.forEach(collection => {
+            const allEndpoints = [];
+            if (collection.folders && collection.folders.length > 0) {
+                collection.folders.forEach(folder => allEndpoints.push(...folder.endpoints));
+            } else {
+                allEndpoints.push(...collection.endpoints);
+            }
+            allEndpoints.forEach(endpoint => {
+                if (pinnedRequests[`${collection.id}_${endpoint.id}`]) {
+                    pinnedEntries.push({ collection, endpoint });
+                }
+            });
+        });
+
+        if (pinnedEntries.length === 0) {
+            return null;
+        }
+
+        const section = document.createElement('div');
+        section.className = 'pinned-section expanded';
+
+        const header = document.createElement('div');
+        header.className = 'pinned-section-header';
+
+        const toggle = document.createElement('span');
+        toggle.className = 'pinned-section-toggle';
+        toggle.textContent = '▶';
+
+        const label = document.createElement('span');
+        label.textContent = (window.i18n && window.i18n.t('sidebar.pinned')) || 'Pinned';
+
+        header.appendChild(toggle);
+        header.appendChild(label);
+
+        const endpointsDiv = document.createElement('div');
+        endpointsDiv.className = 'pinned-section-endpoints';
+
+        pinnedEntries.forEach(({ collection, endpoint }) => {
+            const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers, true);
+            endpointsDiv.appendChild(endpointDiv);
+        });
+
+        header.addEventListener('click', () => {
+            section.classList.toggle('expanded');
+        });
+
+        section.appendChild(header);
+        section.appendChild(endpointsDiv);
+
+        return section;
+    }
+
+    createCollectionElement(collection, eventHandlers, pinnedRequests = {}) {
         const div = document.createElement('div');
         div.className = 'collection-item';
         div.dataset.collectionId = collection.id;
 
         const headerDiv = this.createCollectionHeader(collection);
-        const endpointsDiv = this.createEndpointsContainer(collection, eventHandlers);
+        const endpointsDiv = this.createEndpointsContainer(collection, eventHandlers, pinnedRequests);
 
         div.appendChild(headerDiv);
         div.appendChild(endpointsDiv);
@@ -233,18 +298,19 @@ export class CollectionRenderer {
      * @param {Object} eventHandlers - Event handler callbacks
      * @returns {HTMLDivElement} Container element with endpoints or folders
      */
-    createEndpointsContainer(collection, eventHandlers) {
+    createEndpointsContainer(collection, eventHandlers, pinnedRequests = {}) {
         const endpointsDiv = document.createElement('div');
         endpointsDiv.className = 'collection-endpoints';
 
         if (collection.folders && collection.folders.length > 0) {
             collection.folders.forEach(folder => {
-                const folderDiv = this.createFolderElement(folder, collection, eventHandlers);
+                const folderDiv = this.createFolderElement(folder, collection, eventHandlers, pinnedRequests);
                 endpointsDiv.appendChild(folderDiv);
             });
         } else {
             collection.endpoints.forEach(endpoint => {
-                const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers);
+                const isPinned = !!pinnedRequests[`${collection.id}_${endpoint.id}`];
+                const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers, isPinned);
                 endpointsDiv.appendChild(endpointDiv);
             });
         }
@@ -266,7 +332,7 @@ export class CollectionRenderer {
      * @param {Object} eventHandlers - Event handler callbacks
      * @returns {HTMLDivElement} The created folder element
      */
-    createFolderElement(folder, collection, eventHandlers) {
+    createFolderElement(folder, collection, eventHandlers, pinnedRequests = {}) {
         const folderDiv = document.createElement('div');
         folderDiv.className = 'folder-item';
         folderDiv.dataset.folderId = folder.id;
@@ -289,7 +355,8 @@ export class CollectionRenderer {
         folderEndpoints.className = 'folder-endpoints';
 
         folder.endpoints.forEach(endpoint => {
-            const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers);
+            const isPinned = !!pinnedRequests[`${collection.id}_${endpoint.id}`];
+            const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers, isPinned);
             folderEndpoints.appendChild(endpointDiv);
         });
 
@@ -319,7 +386,7 @@ export class CollectionRenderer {
      * @param {Object} eventHandlers - Event handler callbacks
      * @returns {HTMLDivElement} The created endpoint element
      */
-    createEndpointElement(endpoint, collection, eventHandlers) {
+    createEndpointElement(endpoint, collection, eventHandlers, isPinned = false) {
         const endpointDiv = document.createElement('div');
         endpointDiv.className = 'endpoint-item u-flex u-items-center';
         endpointDiv.dataset.endpointId = endpoint.id;
@@ -336,8 +403,19 @@ export class CollectionRenderer {
         const displayName = endpoint.name || endpoint.path.replace(/^\{\{baseUrl\}\}/, '').split('?')[0] || 'Unnamed Request';
         pathSpan.textContent = displayName;
 
+        const pinBtn = document.createElement('span');
+        pinBtn.className = `icon icon-14 icon-star endpoint-pin-btn${isPinned ? ' is-pinned' : ''}`;
+        pinBtn.title = isPinned ? 'Unpin request' : 'Pin request';
+        pinBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (eventHandlers.onTogglePinned) {
+                eventHandlers.onTogglePinned(collection, endpoint);
+            }
+        });
+
         endpointDiv.appendChild(methodSpan);
         endpointDiv.appendChild(pathSpan);
+        endpointDiv.appendChild(pinBtn);
 
         if (eventHandlers.onEndpointClick) {
             endpointDiv.addEventListener('click', (e) => {

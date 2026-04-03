@@ -74,6 +74,7 @@ export class CollectionController {
         this.handleImportCurl = this.handleImportCurl.bind(this);
         this.handleCollectionsSearch = this.handleCollectionsSearch.bind(this);
         this.handleGenerateDocumentation = this.handleGenerateDocumentation.bind(this);
+        this.handleTogglePinned = this.handleTogglePinned.bind(this);
 
         this.docGeneratorService = new DocGeneratorService(this.repository);
 
@@ -123,17 +124,19 @@ export class CollectionController {
     async renderCollections(collections, preserveExpansionState = false) {
         const filteredCollections = this.filterCollections(collections, this.searchQuery);
         const isSearching = this.searchQuery.length > 0;
+        const pinnedRequests = await this.repository.getPinnedRequests();
         const eventHandlers = {
             onEndpointClick: this.handleEndpointClick,
             onContextMenu: this.handleContextMenu,
             onEndpointContextMenu: this.handleEndpointContextMenu,
-            onEmptySpaceContextMenu: this.handleEmptySpaceContextMenu
+            onEmptySpaceContextMenu: this.handleEmptySpaceContextMenu,
+            onTogglePinned: this.handleTogglePinned
         };
 
         await this.renderer.renderCollections(filteredCollections, eventHandlers, preserveExpansionState && !isSearching, {
             showSearchEmptyState: isSearching && this.allCollections.length > 0,
             expandSearchResults: isSearching
-        });
+        }, pinnedRequests);
     }
 
     initializeCollectionsSearch() {
@@ -369,8 +372,16 @@ export class CollectionController {
      * @param {Object} endpoint - The endpoint object
      * @returns {void}
      */
-    handleEndpointContextMenu(event, collection, endpoint) {
+    async handleEndpointContextMenu(event, collection, endpoint) {
+        const pinned = await this.repository.getPinnedRequests();
+        const isPinned = !!pinned[`${collection.id}_${endpoint.id}`];
         const menuItems = [
+            {
+                label: isPinned ? 'Unpin Request' : 'Pin Request',
+                translationKey: isPinned ? 'context_menu.unpin_request' : 'context_menu.pin_request',
+                iconClass: 'icon-star',
+                onClick: () => this.handleTogglePinned(collection, endpoint)
+            },
             {
                 label: 'Rename Request',
                 translationKey: 'context_menu.rename_request',
@@ -387,6 +398,11 @@ export class CollectionController {
         ];
 
         this.contextMenu.show(event, menuItems);
+    }
+
+    async handleTogglePinned(collection, endpoint) {
+        await this.repository.togglePinnedRequest(collection.id, endpoint.id);
+        await this.loadCollectionsWithExpansionState();
     }
 
     /**

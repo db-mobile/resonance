@@ -14,6 +14,7 @@
     "collections_search_placeholder": "Pesquisar coleções...",
     "history": "Histórico",
     "import": "Importar",
+    "pinned": "Fixadas",
     "empty": {
       "title": "Nenhuma coleção importada",
       "subtitle": "Importe uma coleção OpenAPI ou Postman para começar"
@@ -54,7 +55,9 @@
     "rename_collection": "Renomear Coleção",
     "delete_collection": "Excluir Coleção",
     "rename_request": "Renomear Requisição",
-    "delete_request": "Excluir Requisição"
+    "delete_request": "Excluir Requisição",
+    "pin_request": "Fixar Requisição",
+    "unpin_request": "Desafixar Requisição"
   },
   "docs": {
     "title": "Gerar Documentação",
