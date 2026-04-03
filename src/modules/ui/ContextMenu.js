@@ -252,4 +252,13 @@ export class ContextMenu {
     static createScriptIcon() {
         return 'icon-script';
     }
+
+    /**
+     * Creates document/documentation icon
+     * @static
+     * @returns {string} Icon class name
+     */
+    static createDocumentIcon() {
+        return 'icon-document';
+    }
 }

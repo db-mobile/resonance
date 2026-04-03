@@ -214,6 +214,10 @@
   -webkit-mask-image: url("../assets/ui/export.svg");
   mask-image: url("../assets/ui/export.svg");
 }
+.icon-document {
+  -webkit-mask-image: url("../assets/ui/file.svg");
+  mask-image: url("../assets/ui/file.svg");
+}
 .icon-trash {
   -webkit-mask-image: url("../assets/ui/trash.svg");
   mask-image: url("../assets/ui/trash.svg");
@@ -536,6 +540,57 @@ body {
   width: 70vw;
   max-height: 90vh;
   overflow: hidden;
+}
+
+/* Documentation Options Dialog */
+.modal-dialog--docs {
+  min-width: 550px;
+  max-width: 650px;
+}
+
+.doc-language-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  max-height: 280px;
+  overflow-y: auto;
+  padding: var(--space-3);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+}
+
+.doc-language-item {
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-base);
+}
+
+.doc-language-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.doc-language-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.doc-language-name {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.doc-language-desc {
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.doc-options-overlay .form-hint {
+  margin: var(--space-1) 0 0 0;
+  padding-left: calc(32px + var(--space-2));
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
 }
 
 .cookie-manager-env-badge {
@@ -1003,6 +1058,7 @@ body {
 .field-input:hover {
   border-color: var(--input-hover-border, var(--border-medium));
 }
+
 
 .input-base::placeholder,
 .form-input::placeholder,
@@ -4099,6 +4155,23 @@ body {
   color: var(--color-error);
   border-color: var(--color-error);
 }
+
+.history-item-env {
+  display: none;
+}
+
+.history-item-env--active {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-top: var(--space-1);
+}
+
+.history-item-env--active::before {
+  content: '⬡ ';
+  opacity: 0.6;
+}
+
 /* Environment Management Styles */
 .environment-section {
   padding: var(--space-1) var(--space-1);

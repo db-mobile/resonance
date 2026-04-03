@@ -50,10 +50,24 @@
     "export_openapi_json": "Als OpenAPI exportieren (JSON)",
     "export_openapi_yaml": "Als OpenAPI exportieren (YAML)",
     "export_postman": "Als Postman exportieren",
+    "generate_docs": "Dokumentation generieren",
     "rename_collection": "Sammlung umbenennen",
     "delete_collection": "Sammlung löschen",
     "rename_request": "Anfrage umbenennen",
     "delete_request": "Anfrage löschen"
+  },
+  "docs": {
+    "title": "Dokumentation generieren",
+    "format": "Format",
+    "format_markdown": "Markdown",
+    "format_html": "HTML",
+    "include_examples": "Beispieldaten einbeziehen",
+    "include_examples_help": "Ihre gespeicherten Parameterwerte und Anfragekörper einbeziehen",
+    "code_samples": "Code-Beispiele",
+    "generate": "Generieren",
+    "success": "Dokumentation erfolgreich generiert",
+    "error": "Fehler beim Generieren der Dokumentation",
+    "no_http_endpoints": "Diese Sammlung enthält keine HTTP-Anfragen zum Dokumentieren"
   },
   "curl_import": {
     "title": "cURL importieren",

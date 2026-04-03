@@ -150,6 +150,7 @@ export class HistoryRenderer {
         const statusSlotEl = itemEl.querySelector('[data-role="status-slot"]');
         const timeEl = itemEl.querySelector('[data-role="time"]');
         const urlEl = itemEl.querySelector('[data-role="url"]');
+        const envSlotEl = itemEl.querySelector('[data-role="env-slot"]');
 
         if (methodEl) {
             methodEl.textContent = entry.request.method;
@@ -159,6 +160,10 @@ export class HistoryRenderer {
         if (urlEl) {
             urlEl.textContent = url;
             urlEl.title = entry.request.url;
+        }
+        if (envSlotEl && entry.environmentName) {
+            envSlotEl.textContent = entry.environmentName;
+            envSlotEl.classList.add('history-item-env--active');
         }
 
         if (statusSlotEl) {

@@ -84,6 +84,9 @@ if (isTauri) {
         environments: {
             saveJsonExport: (defaultFileName, content) => invoke('save_json_export', { defaultFileName, content })
         },
+        docs: {
+            save: (defaultFileName, content, mimeType) => invoke('save_documentation', { defaultFileName, content, mimeType })
+        },
         grpc: {
             listServices: (target, useTls = false) => invoke('grpc_reflection_list_services', { target, useTls }),
             listMethods: (target, serviceName, useTls = false) => invoke('grpc_reflection_list_methods', { target, serviceName, useTls }),
