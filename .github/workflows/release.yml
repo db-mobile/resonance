@@ -449,7 +449,7 @@ jobs:
         sed -i "s/X86_64SUM/${{ steps.checksums.outputs.AMD64_SHA }}/" "$PKGBUILD"
         sed -i "s/AARCH64SUM/${{ steps.checksums.outputs.ARM64_SHA }}/" "$PKGBUILD"
 
-    - uses: KSXGitHub/github-actions-deploy-aur@v4.1.1
+    - uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
       with:
         pkgname: resonance-bin
         pkgbuild: ./packaging/aur/resonance-bin/PKGBUILD
