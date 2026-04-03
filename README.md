@@ -34,6 +34,22 @@ Install from Snap Store:
 snap install db-mobile-resonance
 ```
 
+#### AUR (Arch Linux)
+
+Install via an AUR helper like `yay` or `paru`:
+
+```bash
+yay -S resonance-bin
+```
+
+Or manually with `makepkg`:
+
+```bash
+git clone https://aur.archlinux.org/resonance-bin.git
+cd resonance-bin
+makepkg -si
+```
+
 #### Homebrew (macOS)
 
 Install via Homebrew:
