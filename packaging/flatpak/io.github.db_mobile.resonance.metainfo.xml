@@ -43,25 +43,25 @@
 
   <branding>
     <color type="primary" scheme_preference="light">#f9f06b</color>
-    <color type="primary" scheme_preference="dark">#123056</color>
+    <color type="primary" scheme_preference="dark">#6b5900</color>
   </branding>
 
   <screenshots>
     <screenshot type="default">
       <caption>Main interface showing API request configuration</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.5.0/assets/screenshots/main_window.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.7.5/assets/screenshots/main_window.png</image>
     </screenshot>
     <screenshot>
       <caption>Environment management</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.5.0/assets/screenshots/environment.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.7.5/assets/screenshots/environment.png</image>
     </screenshot>
     <screenshot>
       <caption>Mock server</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.5.0/assets/screenshots/mock_server.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.7.5/assets/screenshots/mock_server.png</image>
     </screenshot>
     <screenshot>
       <caption>Settings modal in dark theme</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.5.0/assets/screenshots/settings.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.7.5/assets/screenshots/settings.png</image>
     </screenshot>
   </screenshots>
 
@@ -96,6 +96,14 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.7.5" date="2026-04-04">
+      <description>
+        <p>Usability improvement</p>
+        <ul>
+          <li>Auto-generate mock server responses from schema</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.7.4" date="2026-04-03">
       <description>
         <p>Usability improvement</p>
