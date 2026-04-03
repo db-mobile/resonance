@@ -510,6 +510,30 @@ export class CollectionRepository {
         }
     }
 
+    async getPinnedRequests() {
+        try {
+            const data = await this.backendAPI.store.get('pinnedRequests');
+            return data || {};
+        } catch (error) {
+            return {};
+        }
+    }
+
+    async togglePinnedRequest(collectionId, endpointId) {
+        try {
+            const pinned = await this.getPinnedRequests();
+            const key = `${collectionId}_${endpointId}`;
+            pinned[key] = !pinned[key];
+            if (!pinned[key]) {
+                delete pinned[key];
+            }
+            await this.backendAPI.store.set('pinnedRequests', pinned);
+            return !!pinned[key];
+        } catch (error) {
+            throw new Error(`Failed to toggle pinned request: ${error.message || error}`);
+        }
+    }
+
     /**
      * Deletes all persisted data for a specific endpoint
      *

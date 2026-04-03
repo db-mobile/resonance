@@ -14,6 +14,7 @@
     "collections_search_placeholder": "Buscar colecciones...",
     "history": "Historial",
     "import": "Importar",
+    "pinned": "Fijadas",
     "empty": {
       "title": "No hay colecciones importadas",
       "subtitle": "Importa una colección OpenAPI o Postman para comenzar"
@@ -54,7 +55,9 @@
     "rename_collection": "Renombrar colección",
     "delete_collection": "Eliminar colección",
     "rename_request": "Renombrar solicitud",
-    "delete_request": "Eliminar solicitud"
+    "delete_request": "Eliminar solicitud",
+    "pin_request": "Fijar solicitud",
+    "unpin_request": "Desfijar solicitud"
   },
   "docs": {
     "title": "Generar documentación",
