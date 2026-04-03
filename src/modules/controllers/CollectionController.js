@@ -19,6 +19,7 @@ import { toast } from '../ui/Toast.js';
 import { templateLoader } from '../templateLoader.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { setRequestBodyContent, getRequestBodyContent } from '../requestBodyHelper.js';
+import { DocGeneratorService } from '../services/DocGeneratorService.js';
 
 /**
  * Controller for coordinating collection operations between UI and services
@@ -72,6 +73,9 @@ export class CollectionController {
         this.handleExportOpenApiYaml = this.handleExportOpenApiYaml.bind(this);
         this.handleImportCurl = this.handleImportCurl.bind(this);
         this.handleCollectionsSearch = this.handleCollectionsSearch.bind(this);
+        this.handleGenerateDocumentation = this.handleGenerateDocumentation.bind(this);
+
+        this.docGeneratorService = new DocGeneratorService(this.repository);
 
         this.initializeCollectionsSearch();
     }
@@ -330,6 +334,12 @@ export class CollectionController {
                 translationKey: 'context_menu.export_postman',
                 iconClass: ContextMenu.createExportIcon(),
                 onClick: () => this.handleExportPostman(collection)
+            },
+            {
+                label: 'Generate Documentation',
+                translationKey: 'context_menu.generate_docs',
+                iconClass: ContextMenu.createDocumentIcon(),
+                onClick: () => this.handleGenerateDocumentation(collection)
             },
             {
                 label: 'Rename Collection',
@@ -1000,6 +1010,159 @@ export class CollectionController {
         } catch (error) {
             void error;
         }
+    }
+
+    /**
+     * Handles documentation generation for a collection
+     *
+     * Shows options dialog and generates documentation in selected format.
+     *
+     * @async
+     * @param {Object} collection - The collection to generate documentation for
+     * @returns {Promise<void>}
+     */
+    async handleGenerateDocumentation(collection) {
+        try {
+            // Check if collection has any HTTP endpoints
+            if (!this.docGeneratorService.hasHttpEndpoints(collection)) {
+                toast.error(window.i18n?.t('docs.no_http_endpoints') || 'This collection has no HTTP requests to document');
+                return;
+            }
+
+            const options = await this._showDocOptionsDialog();
+            if (!options) {
+                return;
+            }
+
+            this.statusDisplay.update('Generating documentation...', null);
+
+            let content;
+            let fileExtension;
+            let mimeType;
+
+            if (options.format === 'html') {
+                content = await this.docGeneratorService.generateHtml(collection, {
+                    includePersistedData: options.includeExamples,
+                    languages: options.languages
+                });
+                fileExtension = 'html';
+                mimeType = 'text/html';
+            } else {
+                content = await this.docGeneratorService.generateMarkdown(collection, {
+                    includePersistedData: options.includeExamples,
+                    languages: options.languages
+                });
+                fileExtension = 'md';
+                mimeType = 'text/markdown';
+            }
+
+            const defaultFileName = `${collection.name.replace(/[^a-zA-Z0-9]/g, '_')}_docs.${fileExtension}`;
+
+            const result = await this.backendAPI.docs.save(defaultFileName, content, mimeType);
+
+            if (result && result.success) {
+                toast.success(window.i18n?.t('docs.success') || 'Documentation generated successfully');
+            } else if (result && !result.cancelled) {
+                toast.error(window.i18n?.t('docs.error') || 'Failed to generate documentation');
+            }
+
+            this.statusDisplay.update('', null);
+        } catch (error) {
+            this.statusDisplay.update('', null);
+            toast.error(`Documentation generation failed: ${error.message}`);
+        }
+    }
+
+    /**
+     * Shows the documentation options dialog
+     *
+     * @private
+     * @async
+     * @returns {Promise<Object|null>} Options object or null if cancelled
+     */
+    async _showDocOptionsDialog() {
+        return new Promise((resolve) => {
+            const fragment = templateLoader.cloneSync(
+                './src/templates/docs/docOptionsDialog.html',
+                'tpl-doc-options-dialog'
+            );
+            const dialog = fragment.firstElementChild;
+
+            document.body.appendChild(dialog);
+
+            if (window.i18n && window.i18n.updateUI) {
+                window.i18n.updateUI();
+            }
+
+            const form = dialog.querySelector('#doc-options-form');
+            const formatSelect = dialog.querySelector('#doc-format');
+            const includeExamplesCheckbox = dialog.querySelector('#doc-include-examples');
+            const languageCheckboxesContainer = dialog.querySelector('#language-checkboxes');
+            const cancelBtn = dialog.querySelector('#cancel-btn');
+
+            // Populate language checkboxes
+            const languages = DocGeneratorService.getAvailableLanguages();
+            const defaultLanguages = DocGeneratorService.DEFAULT_LANGUAGES;
+
+            languages.forEach(lang => {
+                const checkboxFragment = templateLoader.cloneSync(
+                    './src/templates/docs/docOptionsDialog.html',
+                    'tpl-language-checkbox'
+                );
+                const label = checkboxFragment.firstElementChild;
+                const checkbox = label.querySelector('input[type="checkbox"]');
+                const nameSpan = label.querySelector('.doc-language-name');
+                const descSpan = label.querySelector('.doc-language-desc');
+
+                checkbox.dataset.langId = lang.id;
+                checkbox.checked = defaultLanguages.includes(lang.id);
+                nameSpan.textContent = lang.name;
+                descSpan.textContent = lang.description ? `(${lang.description})` : '';
+
+                languageCheckboxesContainer.appendChild(label);
+            });
+
+            const cleanup = () => {
+                dialog.remove();
+            };
+
+            cancelBtn.addEventListener('click', () => {
+                cleanup();
+                resolve(null);
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+
+                const selectedLanguages = [];
+                languageCheckboxesContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                    selectedLanguages.push(cb.dataset.langId);
+                });
+
+                cleanup();
+                resolve({
+                    format: formatSelect.value,
+                    includeExamples: includeExamplesCheckbox.checked,
+                    languages: selectedLanguages
+                });
+            });
+
+            dialog.addEventListener('click', (e) => {
+                if (e.target === dialog) {
+                    cleanup();
+                    resolve(null);
+                }
+            });
+
+            const escapeHandler = (e) => {
+                if (e.key === 'Escape') {
+                    cleanup();
+                    resolve(null);
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
+        });
     }
 
     /**
