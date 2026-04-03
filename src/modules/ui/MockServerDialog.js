@@ -4,6 +4,7 @@
  */
 
 import { templateLoader } from '../templateLoader.js';
+import { SchemaProcessor } from '../schema/SchemaProcessor.js';
 
 /**
  * UI Dialog for managing mock server
@@ -687,8 +688,10 @@ export class MockServerDialog {
         const customStatusCode = await this.controller.getCustomStatusCode(collection.id, endpoint.id);
         const currentStatusCode = customStatusCode || this.getDefaultStatusCode(endpoint);
 
-        // For default, we'll generate it from the endpoint schema (similar to mock server)
-        const defaultResponse = this.generateDefaultResponse(endpoint);
+        // Generate default response from schema via controller (supports $ref resolution)
+        const defaultResponse =
+            (await this.controller.getDefaultResponse(collection.id, endpoint.id)) ??
+            this.generateDefaultResponse(endpoint);
         const currentResponse = customResponse || defaultResponse;
 
         const overlay = document.createElement('div');
@@ -875,28 +878,34 @@ export class MockServerDialog {
      * @returns {Object} Default response object
      */
     generateDefaultResponse(endpoint) {
-        // Simple default response generation
-        // In production, this would use the schema processor
+        const method = endpoint.method?.toUpperCase();
+        const { responses } = endpoint;
+
         let schema = null;
-
-        // Try to find response schema
-        if (endpoint.responses?.['200']?.content?.['application/json']?.schema) {
-            ({ schema } = endpoint.responses['200'].content['application/json']);
-        } else if (['POST', 'PUT'].includes(endpoint.method.toUpperCase()) &&
-                   endpoint.responses?.['201']?.content?.['application/json']?.schema) {
-            ({ schema } = endpoint.responses['201'].content['application/json']);
+        if (responses?.['200']?.content?.['application/json']?.schema) {
+            ({ schema } = responses['200'].content['application/json']);
+        } else if (['POST', 'PUT'].includes(method) && responses?.['201']?.content?.['application/json']?.schema) {
+            ({ schema } = responses['201'].content['application/json']);
+        } else if (responses) {
+            for (const code of Object.keys(responses)) {
+                if (code.startsWith('2') && responses[code]?.content?.['application/json']?.schema) {
+                    ({ schema } = responses[code].content['application/json']);
+                    break;
+                }
+            }
         }
 
-        // Return a basic example if no schema
         if (!schema) {
-            return {
-                message: 'Success',
-                data: {}
-            };
+            return { message: 'Success', data: {} };
         }
 
-        // Return the example or a basic object
-        return schema.example || { message: 'Success' };
+        const schemaProcessor = new SchemaProcessor();
+        const generated = schemaProcessor.generateExampleFromSchema(schema);
+
+        if (typeof generated === 'string') {
+            try {return JSON.parse(generated);} catch {return { message: 'Success' };}
+        }
+        return generated ?? { message: 'Success' };
     }
 
     /**
