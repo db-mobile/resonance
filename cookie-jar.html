@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Resonance Cookie Jar — automatic cookie capture, injection, and management scoped per environment.">
+  
+  <title>Cookie Jar — Resonance</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+</head>
+<body>
+
+  <div class="grain" aria-hidden="true"></div>
+
+  <header id="header">
+    <nav class="container nav-inner">
+      <a href="index.html" class="logo">
+        <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+        <span class="logo-text">Resonance</span>
+      </a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="index.html#screenshots">Screenshots</a></li>
+        <li><a href="index.html#download">Download</a></li>
+        <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="documentation.html" class="nav-cta">Docs</a></li>
+      </ul>
+      <button class="burger" id="burger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <div class="doc-page">
+      <aside class="doc-sidebar">
+        <div class="doc-sidebar-label">Documentation</div>
+        <ul class="doc-nav-list">
+          <li><a href="documentation.html">Getting Started</a></li>
+          <li><a href="cookie-jar.html" class="active">Cookie Jar</a></li>
+          <li><a href="mock-server.html">Mock Server</a></li>
+          <li><a href="scripts.html">Using Scripts</a></li>
+          <li><a href="collection-runner.html">Collection Runner</a></li>
+        </ul>
+      </aside>
+
+      <div class="doc-content-wrap">
+        <div class="doc-page-label">// cookie jar</div>
+        <h2>Cookie Jar</h2>
+        <p class="doc-lead">Resonance maintains a local cookie jar that automatically captures cookies from responses and injects them into matching requests — the same behaviour as a browser, without any server or cloud storage involved. Cookies are scoped per environment so your development and production sessions never mix.</p>
+
+        <h3>How It Works</h3>
+        <ul class="doc-list">
+          <li>When a response includes a <code>Set-Cookie</code> header, Resonance parses and stores it locally</li>
+          <li>On each subsequent request, Resonance checks the jar and injects a <code>Cookie</code> header for all cookies whose domain, path, and flags match the request URL</li>
+          <li>All matching follows <strong>RFC 6265</strong> — domain matching, path matching, <code>Secure</code>, <code>HttpOnly</code>, <code>SameSite</code>, expiry, and <code>Max-Age</code> are all respected</li>
+          <li>Expired cookies are pruned automatically before each request</li>
+        </ul>
+
+        <h3>Environment Scoping</h3>
+        <p>Cookies are stored per active environment. Switching from <em>Development</em> to <em>Production</em> in the environment selector also switches to that environment's cookie jar — no cross-contamination between sessions.</p>
+        <ul class="doc-list">
+          <li>If no environment is active, cookies are stored under a <em>default</em> bucket</li>
+          <li>Clearing cookies in one environment has no effect on others</li>
+        </ul>
+
+        <h3>Enabling and Disabling</h3>
+        <p>The cookie jar is enabled by default. To toggle it, open the Cookie Manager and use the switch at the top of the dialog. When disabled, Resonance neither captures nor injects cookies — useful when testing endpoints that rely on explicit auth headers rather than session cookies.</p>
+
+        <h3>Cookie Manager</h3>
+        <p>Open the Cookie Manager from the toolbar to inspect and manage all stored cookies for the active environment.</p>
+
+        <h4>What you can see</h4>
+        <div class="api-list">
+          <div class="api-item"><code>Domain</code><span>The domain the cookie is scoped to.</span></div>
+          <div class="api-item"><code>Name</code><span>The cookie name.</span></div>
+          <div class="api-item"><code>Value</code><span>The cookie value. Hidden (<code>••••••</code>) for <code>HttpOnly</code> cookies.</span></div>
+          <div class="api-item"><code>Path</code><span>The path scope — only requests under this path receive the cookie.</span></div>
+          <div class="api-item"><code>Expires</code><span><em>Session</em> for cookies without an expiry; a timestamp for persistent cookies.</span></div>
+          <div class="api-item"><code>Flags</code><span>Active attributes: <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=&lt;value&gt;</code>.</span></div>
+        </div>
+
+        <h4>Actions</h4>
+        <ul class="doc-list">
+          <li><strong>Search</strong> — filter by domain, name, or value</li>
+          <li><strong>Delete</strong> — remove a single cookie</li>
+          <li><strong>Clear session cookies</strong> — remove all cookies without an expiry date</li>
+          <li><strong>Clear all</strong> — remove every cookie for the active environment</li>
+        </ul>
+
+        <h3>Cookie Attributes</h3>
+        <p>Resonance parses and honours the following <code>Set-Cookie</code> attributes:</p>
+        <div class="api-list">
+          <div class="api-item"><code>Domain</code><span>If set, subdomain matching applies. If absent, the cookie is host-only (exact match only).</span></div>
+          <div class="api-item"><code>Path</code><span>Cookie is only sent on requests whose path starts with this value. Defaults to <code>/</code>.</span></div>
+          <div class="api-item"><code>Expires</code><span>An absolute expiry date. Cookies past this date are pruned automatically.</span></div>
+          <div class="api-item"><code>Max-Age</code><span>Expiry in seconds relative to now. Takes precedence over <code>Expires</code>. <code>Max-Age=0</code> deletes the cookie immediately.</span></div>
+          <div class="api-item"><code>HttpOnly</code><span>Stored and injected normally; value is masked in the Cookie Manager UI.</span></div>
+          <div class="api-item"><code>Secure</code><span>Only injected when the request URL uses <code>https:</code>.</span></div>
+          <div class="api-item"><code>SameSite</code><span>Stored and displayed as a flag; informational only in the context of a desktop client.</span></div>
+        </div>
+
+        <h3>Common Scenarios</h3>
+
+        <h4>Session-based authentication</h4>
+        <p>Send a login request. If the server responds with a <code>Set-Cookie: session=…</code> header, Resonance stores it. All subsequent requests to that domain automatically include the session cookie — no manual header needed.</p>
+
+        <h4>Switching environments</h4>
+        <p>Log in against <em>Development</em>, switch the environment selector to <em>Staging</em>, and send the same login request there. Each environment holds its own cookies. Switching back to <em>Development</em> restores the previous session.</p>
+
+        <h4>Inspecting what was set</h4>
+        <p>After sending a request, open the <strong>Cookies</strong> tab in the response panel to see the raw <code>Set-Cookie</code> headers. Open the Cookie Manager to see the parsed, stored result.</p>
+
+        <h4>Disabling for a specific test</h4>
+        <p>When testing an endpoint that expects no cookie (e.g. to confirm an unauthenticated response), disable the jar in the Cookie Manager, send the request, then re-enable it.</p>
+
+        <h3>Next Steps</h3>
+        <ul class="doc-list">
+          <li><a href="documentation.html">Getting Started</a> — request basics, environments, and authentication</li>
+          <li><a href="scripts.html">Using Scripts</a> — access <code>response.cookies</code> in test scripts to inspect cookies programmatically</li>
+          <li><a href="collection-runner.html">Collection Runner</a> — cookie state is shared across all steps in a run</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="index.html" class="logo">
+          <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+          <span class="logo-text">Resonance</span>
+        </a>
+        <p class="footer-tagline">A Tauri desktop app. Open source under the MIT license.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <span class="footer-col-label">Project</span>
+          <ul>
+            <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub Repository</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/issues" target="_blank" rel="noopener">Report Issues</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <span class="footer-col-label">Resources</span>
+          <ul>
+            <li><a href="documentation.html">Documentation</a></li>
+            <li><a href="scripts.html">Using Scripts</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/blob/main/LICENSE" target="_blank" rel="noopener">License (MIT)</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <span>&copy; 2026 Resonance &mdash; MIT License</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

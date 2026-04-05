@@ -1,95 +1,72 @@
-// Smooth scrolling for navigation links
-document.addEventListener('DOMContentLoaded', function() {
-    // Fetch latest version from GitHub Releases
-    const versionBadge = document.getElementById('version-badge');
-    fetch('https://api.github.com/repos/db-mobile/resonance/releases/latest')
-        .then(response => response.json())
-        .then(data => {
-            const version = data.tag_name || data.name || '2.5.0';
-            // Remove 'v' prefix if present
-            const cleanVersion = version.startsWith('v') ? version.substring(1) : version;
-            versionBadge.textContent = `Version ${cleanVersion}`;
-        })
-        .catch(error => {
-            console.error('Error fetching version:', error);
-            versionBadge.textContent = 'Version 2.5.0'; // Fallback to current version
-        });
+document.addEventListener('DOMContentLoaded', function () {
 
-    // Handle smooth scrolling for anchor links
-    const links = document.querySelectorAll('a[href^="#"]');
-
-    links.forEach(link => {
-        link.addEventListener('click', function(e) {
-            const href = this.getAttribute('href');
-
-            // Skip if it's just "#"
-            if (href === '#') {
-                e.preventDefault();
-                return;
-            }
-
-            const target = document.querySelector(href);
-
-            if (target) {
-                e.preventDefault();
-                const headerOffset = 80;
-                const elementPosition = target.getBoundingClientRect().top;
-                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-
-                window.scrollTo({
-                    top: offsetPosition,
-                    behavior: 'smooth'
-                });
-            }
-        });
+  /* ── Version badge ── */
+  fetch('https://api.github.com/repos/db-mobile/resonance/releases/latest')
+    .then(r => r.json())
+    .then(data => {
+      const raw = data.tag_name || data.name || '';
+      const ver = raw.startsWith('v') ? raw.slice(1) : raw;
+      const el = document.getElementById('vb-val');
+      if (el) { el.textContent = ver || '—'; }
+    })
+    .catch(() => {
+      const el = document.getElementById('vb-val');
+      if (el) { el.textContent = '—'; }
     });
 
-    // Add animation on scroll
-    const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px'
-    };
+  /* ── Sticky header shadow on scroll ── */
+  const header = document.getElementById('header');
+  const onScroll = () => {
+    if (window.scrollY > 10) {
+      header.classList.add('scrolled');
+    } else {
+      header.classList.remove('scrolled');
+    }
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
 
-    const observer = new IntersectionObserver(function(entries) {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.style.opacity = '1';
-                entry.target.style.transform = 'translateY(0)';
-            }
-        });
-    }, observerOptions);
-
-    // Observe feature cards and screenshot items
-    const animatedElements = document.querySelectorAll('.feature-card, .screenshot-item, .download-card, .tech-item');
-
-    animatedElements.forEach(el => {
-        el.style.opacity = '0';
-        el.style.transform = 'translateY(20px)';
-        el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-        observer.observe(el);
+  /* ── Smooth scroll for anchor links ── */
+  document.querySelectorAll('a[href^="#"]').forEach(link => {
+    link.addEventListener('click', function (e) {
+      const href = this.getAttribute('href');
+      if (href === '#') { e.preventDefault(); return; }
+      const target = document.querySelector(href);
+      if (target) {
+        e.preventDefault();
+        const offset = parseInt(getComputedStyle(document.documentElement)
+          .getPropertyValue('--nav-h'), 10) || 60;
+        const top = target.getBoundingClientRect().top + window.pageYOffset - offset;
+        window.scrollTo({ top, behavior: 'smooth' });
+        // Close mobile nav if open
+        navLinks.classList.remove('open');
+        burger.setAttribute('aria-expanded', 'false');
+      }
     });
+  });
 
-    // Mobile menu toggle (if needed in future)
-    const createMobileMenu = () => {
-        const nav = document.querySelector('nav');
-        const navLinks = document.querySelector('.nav-links');
+  /* ── Mobile burger ── */
+  const burger   = document.getElementById('burger');
+  const navLinks = document.getElementById('nav-links');
 
-        if (window.innerWidth <= 768) {
-            if (!document.querySelector('.mobile-menu-toggle')) {
-                const toggle = document.createElement('button');
-                toggle.className = 'mobile-menu-toggle';
-                toggle.innerHTML = '☰';
-                toggle.style.cssText = 'background: none; border: none; font-size: 1.5rem; cursor: pointer; display: block;';
+  burger.addEventListener('click', () => {
+    const open = navLinks.classList.toggle('open');
+    burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
 
-                toggle.addEventListener('click', () => {
-                    navLinks.classList.toggle('active');
-                });
-
-                nav.appendChild(toggle);
-            }
+  /* ── Scroll reveal (Intersection Observer) ── */
+  const observer = new IntersectionObserver(
+    entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
         }
-    };
+      });
+    },
+    { threshold: 0.08, rootMargin: '0px 0px -40px 0px' }
+  );
 
-    window.addEventListener('resize', createMobileMenu);
-    createMobileMenu();
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
 });
