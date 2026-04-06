@@ -235,6 +235,33 @@ label {
   background: var(--accent-light) !important;
   color: var(--accent) !important;
 }
+
+/* Preview Mode Buttons — exempt from generic button overrides */
+.preview-mode-btn,
+.preview-mode-btn:hover {
+  border: none !important;
+}
+.preview-mode-btn {
+  background: var(--bg-primary) !important;
+  color: var(--text-tertiary) !important;
+  border-right: 1px solid var(--border-light) !important;
+}
+.preview-mode-btn:last-child {
+  border-right: none !important;
+}
+.preview-mode-btn:hover:not(:disabled):not(.active) {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-secondary) !important;
+}
+.preview-mode-btn.active {
+  background: var(--color-primary) !important;
+  color: white !important;
+  border-right-color: transparent !important;
+}
+.preview-mode-btn.active:hover {
+  background: var(--color-primary) !important;
+  color: white !important;
+}
 .activity-bar {
   background: var(--activity-bar-bg) !important;
 }

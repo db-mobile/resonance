@@ -235,13 +235,11 @@ export class AuthManager {
 
         // Group elements for visibility toggling
         const authUrlGroup = document.getElementById('oauth2-auth-url-group');
-        const usernameGroup = document.getElementById('oauth2-username-group');
-        const passwordGroup = document.getElementById('oauth2-password-group');
+        const usernamePasswordPairGroup = document.getElementById('oauth2-username-password-pair');
         const redirectUriGroup = document.getElementById('oauth2-redirect-uri-group');
         const pkceGroup = document.getElementById('oauth2-pkce-group');
         const tokenUrlGroup = document.getElementById('oauth2-token-url-group');
-        const clientIdGroup = document.getElementById('oauth2-client-id-group');
-        const clientSecretGroup = document.getElementById('oauth2-client-secret-group');
+        const credentialsPairGroup = document.getElementById('oauth2-credentials-pair');
         const scopeGroup = document.getElementById('oauth2-scope-group');
         const audienceGroup = document.getElementById('oauth2-audience-group');
         const clientAuthGroup = document.getElementById('oauth2-client-auth-group');
@@ -252,7 +250,7 @@ export class AuthManager {
         // Update UI visibility based on grant type
         const updateGrantTypeUI = (grantType) => {
             // Hide all optional groups first
-            [authUrlGroup, usernameGroup, passwordGroup, redirectUriGroup, pkceGroup].forEach(g => {
+            [authUrlGroup, usernamePasswordPairGroup, redirectUriGroup, pkceGroup].forEach(g => {
                 if (g) {g.classList.add('u-hidden');}
             });
 
@@ -262,11 +260,10 @@ export class AuthManager {
                 if (redirectUriGroup) {redirectUriGroup.classList.remove('u-hidden');}
                 if (pkceGroup) {pkceGroup.classList.remove('u-hidden');}
             } else if (grantType === 'password') {
-                if (usernameGroup) {usernameGroup.classList.remove('u-hidden');}
-                if (passwordGroup) {passwordGroup.classList.remove('u-hidden');}
+                if (usernamePasswordPairGroup) {usernamePasswordPairGroup.classList.remove('u-hidden');}
             } else if (grantType === 'manual') {
                 // Hide most fields for manual token entry
-                [tokenUrlGroup, clientIdGroup, clientSecretGroup, scopeGroup, 
+                [tokenUrlGroup, credentialsPairGroup, scopeGroup,
                  audienceGroup, clientAuthGroup, getTokenGroup].forEach(g => {
                     if (g) {g.classList.add('u-hidden');}
                 });
@@ -276,7 +273,7 @@ export class AuthManager {
             }
 
             // For non-manual modes, show standard fields and make token readonly
-            [tokenUrlGroup, clientIdGroup, clientSecretGroup, scopeGroup, 
+            [tokenUrlGroup, credentialsPairGroup, scopeGroup,
              audienceGroup, clientAuthGroup, getTokenGroup].forEach(g => {
                 if (g) {g.classList.remove('u-hidden');}
             });

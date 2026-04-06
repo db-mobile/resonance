@@ -54,6 +54,7 @@
   --color-warning-light: #fef3c7;
   --color-error: #ef4444;
   --color-error-light: #fee2e2;
+  --color-danger: var(--color-error); /* alias */
   --color-purple: #8b5cf6;
   --color-post: #3b82f6;
 
@@ -78,8 +79,9 @@
     ui-monospace, SFMono-Regular, "SF Mono", Monaco, Menlo, Consolas,
     "Liberation Mono", "Courier New", monospace;
 
-  --font-size-xs: 0.75rem;
-  --font-size-sm: 0.875rem;
+  --font-size-2xs: 0.6875rem; /* 11px */
+  --font-size-xs: 0.75rem; /* 12px */
+  --font-size-sm: 0.875rem; /* 14px */
   --font-size-base: 1rem;
   --font-size-lg: 1.125rem;
   --font-size-xl: 1.25rem;
@@ -947,11 +949,6 @@ body {
 
 .modal-overlay--dim {
   background: rgba(0, 0, 0, 0.7);
-}
-
-.modal-dialog--md {
-  min-width: 500px;
-  max-width: 700px;
 }
 
 .modal-dialog--lg {
@@ -2016,7 +2013,8 @@ body {
   display: none;
 }
 
-.is-hidden {
+.is-hidden,
+.u-hidden {
   display: none !important;
 }
 
@@ -2302,6 +2300,19 @@ body {
   --btn-color: var(--text-secondary);
   padding: var(--space-1);
   border: none;
+}
+.btn-icon:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+.btn-icon:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 .btn-icon.active {
   background: var(--bg-tertiary);
@@ -3258,12 +3269,6 @@ body {
   min-height: 0;
 }
 
-/* Format button */
-.btn-sm {
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--font-size-xs);
-}
-
 /* Script Sub-tabs */
 .script-sub-tabs {
   display: flex;
@@ -3358,7 +3363,7 @@ body {
 .schema-editor-container {
   flex: 1;
   min-height: 150px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-light);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -4242,6 +4247,28 @@ body {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   color: var(--text-secondary);
+}
+
+.oauth2-field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.oauth2-advanced-details {
+  margin-top: var(--space-1);
+}
+
+.oauth2-advanced-summary {
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.oauth2-advanced-details > div {
+  margin-top: var(--space-3);
 }
 
 /* History Sidebar */
@@ -5376,7 +5403,6 @@ body {
 /* Preview Mode Button Group */
 .preview-mode-buttons {
   display: flex;
-  gap: 0;
   margin-left: var(--space-2);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
@@ -5386,15 +5412,17 @@ body {
 .preview-mode-btn {
   background: var(--bg-primary);
   border: none;
-  color: var(--text-secondary);
+  border-right: 1px solid var(--border-light);
+  color: var(--text-tertiary);
   cursor: pointer;
   padding: var(--space-1) var(--space-2);
-  transition: all var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast);
   display: flex;
   align-items: center;
   gap: var(--space-1);
   font-size: var(--font-size-xs);
-  border-right: 1px solid var(--border-light);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
 }
 
 .preview-mode-btn:last-child {
@@ -5406,17 +5434,13 @@ body {
   height: 14px;
 }
 
-.preview-mode-btn span {
-  font-weight: 500;
-}
-
-.preview-mode-btn:hover:not(:disabled) {
+.preview-mode-btn:hover:not(:disabled):not(.active) {
   background: var(--bg-tertiary);
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 
 .preview-mode-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
 }
 
@@ -5424,11 +5448,13 @@ body {
 .preview-mode-btn.active {
   background: var(--color-primary);
   color: white;
+  font-weight: var(--font-weight-semibold);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .preview-mode-btn.active:hover {
   background: var(--color-primary);
-  opacity: 0.9;
+  color: white;
 }
 
 /* Preview Container */
@@ -5626,7 +5652,7 @@ body {
 .grpc-source-section {
   margin-bottom: 16px;
   padding-bottom: 16px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .grpc-source-row {
@@ -6624,7 +6650,8 @@ body {
   white-space: nowrap;
 }
 
-.runner-results-no-cookies {
+.runner-results-no-cookies,
+.runner-table-empty-cell {
   padding: var(--space-4);
   text-align: center;
   color: var(--text-tertiary);
