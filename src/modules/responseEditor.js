@@ -117,6 +117,11 @@ export class ResponseEditor {
             return { extension: html(), type: 'html' };
         }
 
+        // Plain text
+        if (lowerContentType.includes('text/plain')) {
+            return { type: 'text' };
+        }
+
         return null;
     }
 

@@ -167,7 +167,7 @@ export class ResponseContainerManager {
         // Set up callback to update dropdown when language changes
         editor.onLanguageChange((lang) => {
             if (languageSelector) {
-                languageSelector.value = lang;
+                languageSelector.value = lang || 'text';
             }
             // Update preview button state based on new language
             if (this.previewManager) {
