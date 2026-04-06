@@ -209,6 +209,7 @@ The built application will be in `src-tauri/target/release/bundle/`.
 - **Request Timeouts**: Configurable timeout settings per request
 - **Secure Architecture**: Tauri's secure IPC, CSP policies, and native system integration
 - **Persistent Storage**: Auto-save for collections, variables, environments, settings, and history
+- **Git-Friendly Storage**: Collections are stored as human-readable JSON files in a directory structure, making them easy to version control, diff, and collaborate on with Git
 - **Lightweight**: ~15MB bundle size, ~50MB memory usage (vs ~150MB/~200MB for Electron)
 
 ## Usage

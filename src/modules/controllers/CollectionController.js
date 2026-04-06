@@ -309,12 +309,6 @@ export class CollectionController {
                 onClick: () => this.handleNewRequest(collection)
             },
             {
-                label: 'Import cURL',
-                translationKey: 'context_menu.import_curl',
-                iconClass: ContextMenu.createImportIcon(),
-                onClick: () => this.handleImportCurl(collection)
-            },
-            {
                 label: 'Manage Variables',
                 translationKey: 'context_menu.manage_variables',
                 iconClass: ContextMenu.createVariableIcon(),
@@ -426,12 +420,6 @@ export class CollectionController {
                 translationKey: 'context_menu.new_request',
                 iconClass: ContextMenu.createNewRequestIcon(),
                 onClick: () => this.handleNewRequestInEmptySpace()
-            },
-            {
-                label: 'Import cURL',
-                translationKey: 'context_menu.import_curl',
-                iconClass: ContextMenu.createImportIcon(),
-                onClick: () => this.handleImportCurl(null)
             }
         ];
 
@@ -520,9 +508,9 @@ export class CollectionController {
      */
     async handleNewCollection() {
         try {
-            const collectionName = await this.showNewCollectionDialog();
-            if (collectionName) {
-                await this.service.createCollection(collectionName);
+            const collectionOptions = await this.showNewCollectionDialog();
+            if (collectionOptions) {
+                await this.service.createCollection(collectionOptions);
                 await this.loadCollections();
             }
         } catch (error) {
@@ -542,9 +530,9 @@ export class CollectionController {
         try {
             const requestData = await this.showNewRequestDialog();
             if (requestData) {
-                const collectionName = await this.showNewCollectionDialog();
-                if (collectionName) {
-                    const newCollection = await this.service.createCollection(collectionName);
+                const collectionOptions = await this.showNewCollectionDialog();
+                if (collectionOptions) {
+                    const newCollection = await this.service.createCollection(collectionOptions);
                     await this.service.addRequestToCollection(newCollection.id, requestData);
                     await this.loadCollections();
                 }
@@ -560,7 +548,9 @@ export class CollectionController {
      * @async
      * @returns {Promise<string|null>} Collection name if confirmed, null if cancelled
      */
-    async showNewCollectionDialog() {
+    async showNewCollectionDialog(initialName = '') {
+        const defaultStoragePath = await this.backendAPI.collections.getPath().catch(() => '');
+
         return new Promise((resolve) => {
             const fragment = templateLoader.cloneSync(
                 './src/templates/collections/newDialogs.html',
@@ -576,7 +566,13 @@ export class CollectionController {
 
             const form = dialog.querySelector('#new-collection-form');
             const nameInput = dialog.querySelector('#collection-name');
+            const locationInput = dialog.querySelector('#collection-location');
+            const locationBtn = dialog.querySelector('#collection-location-btn');
             const cancelBtn = dialog.querySelector('#cancel-btn');
+            let selectedStoragePath = defaultStoragePath;
+
+            nameInput.value = initialName;
+            locationInput.value = selectedStoragePath;
 
             nameInput.focus();
 
@@ -589,13 +585,24 @@ export class CollectionController {
                 resolve(null);
             });
 
+            locationBtn.addEventListener('click', async () => {
+                const pickedPath = await this.backendAPI.collections.pickDirectory().catch(() => null);
+                if (pickedPath) {
+                    selectedStoragePath = pickedPath;
+                    locationInput.value = pickedPath;
+                }
+            });
+
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
                 const name = nameInput.value.trim();
 
                 if (name) {
                     cleanup();
-                    resolve(name);
+                    resolve({
+                        name,
+                        storageParentPath: selectedStoragePath || null
+                    });
                 }
             });
 
@@ -755,6 +762,7 @@ export class CollectionController {
      */
     async showSaveToCollectionDialog(requestData) {
         const collections = await this.repository.getAll();
+        const defaultStoragePath = await this.backendAPI.collections.getPath().catch(() => '');
 
         return new Promise((resolve) => {
             const fragment = templateLoader.cloneSync(
@@ -774,7 +782,13 @@ export class CollectionController {
             const collectionSelect = dialog.querySelector('#save-collection-select');
             const newCollectionGroup = dialog.querySelector('#new-collection-name-group');
             const newCollectionInput = dialog.querySelector('#new-collection-name-input');
+            const newCollectionLocationGroup = dialog.querySelector('#new-collection-location-group');
+            const newCollectionLocationInput = dialog.querySelector('#new-collection-location-input');
+            const newCollectionLocationBtn = dialog.querySelector('#new-collection-location-btn');
             const cancelBtn = dialog.querySelector('#cancel-btn');
+            let newCollectionStoragePath = defaultStoragePath;
+
+            newCollectionLocationInput.value = newCollectionStoragePath;
 
             // Pre-fill request name from tab name or generate from URL
             if (requestData.name && requestData.name !== 'New Request' && 
@@ -817,9 +831,18 @@ export class CollectionController {
             collectionSelect.addEventListener('change', () => {
                 const isNewCollection = collectionSelect.value === '__new__';
                 newCollectionGroup.classList.toggle('is-hidden', !isNewCollection);
+                newCollectionLocationGroup.classList.toggle('is-hidden', !isNewCollection);
                 newCollectionInput.required = isNewCollection;
                 if (isNewCollection) {
                     newCollectionInput.focus();
+                }
+            });
+
+            newCollectionLocationBtn.addEventListener('click', async () => {
+                const pickedPath = await this.backendAPI.collections.pickDirectory().catch(() => null);
+                if (pickedPath) {
+                    newCollectionStoragePath = pickedPath;
+                    newCollectionLocationInput.value = pickedPath;
                 }
             });
 
@@ -847,7 +870,10 @@ export class CollectionController {
                             newCollectionInput.focus();
                             return;
                         }
-                        const newCollection = await this.service.createCollection(newCollectionName);
+                        const newCollection = await this.service.createCollection({
+                            name: newCollectionName,
+                            storageParentPath: newCollectionStoragePath || null
+                        });
                         targetCollectionId = newCollection.id;
                     }
 
@@ -1311,7 +1337,19 @@ export class CollectionController {
      */
     async importOpenApiFile() {
         try {
-            const collection = await window.backendAPI.collections.importOpenApiFile();
+            const importOptions = await this.showCollectionImportDialog({
+                importKind: 'openapi',
+                title: 'Import OpenAPI Collection'
+            });
+            if (!importOptions) {
+                this.statusDisplay.update('Import cancelled', null);
+                return null;
+            }
+
+            const collection = await window.backendAPI.collections.importOpenApiFile(
+                importOptions.filePath,
+                importOptions.storageParentPath
+            );
 
             if (collection) {
                 await this.loadCollections();
@@ -1326,7 +1364,8 @@ export class CollectionController {
                 return null;
 
         } catch (error) {
-            toast.error(`Import failed: ${error.message}`);
+            const errorMessage = typeof error === 'string' ? error : (error.message || 'Unknown error');
+            toast.error(`Import failed: ${errorMessage}`);
             throw error;
         }
     }
@@ -1415,20 +1454,189 @@ export class CollectionController {
      */
     async importPostmanCollection() {
         try {
-            const result = await window.backendAPI.collections.importPostmanCollection();
+            const importOptions = await this.showCollectionImportDialog({
+                importKind: 'postman',
+                title: 'Import Postman Collection'
+            });
+            if (!importOptions) {
+                this.statusDisplay.update('Import cancelled', null);
+                return null;
+            }
 
-            if (result) {
+            const collection = await window.backendAPI.collections.importPostmanCollection(
+                importOptions.filePath,
+                importOptions.storageParentPath
+            );
+
+            if (collection) {
                 await this.loadCollections();
-                toast.success(`Imported "${result.collection.name}"`);
-                return result.collection;
+                toast.success(`Imported "${collection.name}"`);
+                return collection;
             }
                 this.statusDisplay.update('Import cancelled', null);
                 return null;
 
         } catch (error) {
-            toast.error(`Import failed: ${error.message}`);
+            const errorMessage = typeof error === 'string' ? error : (error.message || 'Unknown error');
+            toast.error(`Import failed: ${errorMessage}`);
             throw error;
         }
+    }
+
+    async showCollectionImportDialog({ importKind }) {
+        const defaultStoragePath = await this.backendAPI.collections.getPath().catch(() => '');
+
+        return new Promise((resolve) => {
+            const fragment = templateLoader.cloneSync(
+                './src/templates/collections/newDialogs.html',
+                'tpl-import-collection-dialog'
+            );
+            const dialog = fragment.firstElementChild;
+
+            document.body.appendChild(dialog);
+
+            const titleElement = dialog.querySelector('#import-collection-title');
+            const subtitleElement = dialog.querySelector('#import-collection-subtitle');
+            const form = dialog.querySelector('#import-collection-form');
+            const sourceFileCard = dialog.querySelector('#import-source-card');
+            const sourceFileInput = dialog.querySelector('#import-source-file');
+            const sourceFileMeta = dialog.querySelector('#import-source-meta');
+            const sourceFileBtn = dialog.querySelector('#import-source-file-btn');
+            const destinationCard = dialog.querySelector('#import-destination-card');
+            const destinationFolderInput = dialog.querySelector('#import-destination-folder');
+            const destinationFolderMeta = dialog.querySelector('#import-destination-meta');
+            const destinationFolderBtn = dialog.querySelector('#import-destination-folder-btn');
+            const closeBtn = dialog.querySelector('#import-collection-close-btn');
+            const cancelBtn = dialog.querySelector('#cancel-btn');
+            const errorMessage = dialog.querySelector('#import-dialog-error');
+
+            let selectedFilePath = '';
+            let selectedStoragePath = defaultStoragePath;
+            let dialogClosed = false;
+            const keydownController = new AbortController();
+
+            // Apply i18n translations to the dialog
+            if (window.i18n && window.i18n.updateUI) {
+                window.i18n.updateUI(dialog);
+            }
+
+            // Set dynamic title and subtitle based on import type
+            const t = (key, fallback) => (window.i18n && window.i18n.t) ? window.i18n.t(key) : fallback;
+            if (importKind === 'openapi') {
+                titleElement.textContent = t('import_dialog.title_openapi', 'Import OpenAPI Collection');
+                subtitleElement.textContent = t('import_dialog.subtitle_openapi', 'Choose an OpenAPI file and where the collection should be stored.');
+            } else if (importKind === 'postman') {
+                titleElement.textContent = t('import_dialog.title_postman', 'Import Postman Collection');
+                subtitleElement.textContent = t('import_dialog.subtitle_postman', 'Choose a Postman file and where the collection should be stored.');
+            }
+
+            const setError = (message = '') => {
+                if (!message) {
+                    errorMessage.classList.add('is-hidden');
+                    errorMessage.textContent = '';
+                    return;
+                }
+                errorMessage.textContent = message;
+                errorMessage.classList.remove('is-hidden');
+            };
+
+            const fileNameFromPath = (path) => path.split(/[/\\]/).filter(Boolean).pop() || path;
+            const setSourceFile = (path) => {
+                selectedFilePath = path;
+                sourceFileInput.textContent = path ? fileNameFromPath(path) : t('import_dialog.no_file_selected', 'No file selected');
+                sourceFileInput.title = path || '';
+                sourceFileMeta.textContent = path || t('import_dialog.supported_formats', 'Supported formats depend on the import type.');
+                sourceFileCard.classList.toggle('is-selected', Boolean(path));
+            };
+
+            const setDestinationFolder = (path) => {
+                selectedStoragePath = path;
+                destinationFolderInput.textContent = path || t('import_dialog.default_storage', 'Default app storage');
+                destinationFolderInput.title = path || '';
+                destinationFolderMeta.textContent = path
+                    ? t('import_dialog.destination_meta', 'Choose the parent folder for the imported collection.')
+                    : t('import_dialog.destination_meta', 'Choose the parent folder for the imported collection.');
+                destinationCard.classList.toggle('is-selected', Boolean(path));
+            };
+
+            setSourceFile('');
+            setDestinationFolder(selectedStoragePath);
+
+            const cleanup = async () => {
+                if (dialogClosed) {
+                    return;
+                }
+                dialogClosed = true;
+                keydownController.abort();
+                dialog.remove();
+            };
+
+            const closeDialog = async (result = null) => {
+                await cleanup();
+                resolve(result);
+            };
+
+            const escapeHandler = (e) => {
+                if (e.key === 'Escape') {
+                    void closeDialog(null);
+                }
+            };
+
+            closeBtn.addEventListener('click', () => {
+                void closeDialog(null);
+            });
+
+            cancelBtn.addEventListener('click', () => {
+                void closeDialog(null);
+            });
+
+            sourceFileBtn.addEventListener('click', async () => {
+                const filePath = await this.backendAPI.collections.pickImportFile(importKind).catch(() => null);
+                if (filePath) {
+                    setSourceFile(filePath);
+                    setError('');
+                }
+            });
+
+            destinationFolderBtn.addEventListener('click', async () => {
+                const folderPath = await this.backendAPI.collections.pickDirectory().catch(() => null);
+                if (folderPath) {
+                    setDestinationFolder(folderPath);
+                    setError('');
+                }
+            });
+
+            sourceFileCard.addEventListener('click', (event) => {
+                if (event.target.closest('button')) {
+                    return;
+                }
+                sourceFileBtn.click();
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (!selectedFilePath) {
+                    setError(t('import_dialog.error_no_file', 'Choose an import file before continuing.'));
+                    sourceFileBtn.focus();
+                    return;
+                }
+
+                void closeDialog({
+                    filePath: selectedFilePath,
+                    storageParentPath: selectedStoragePath || null
+                });
+            });
+
+            dialog.addEventListener('click', (e) => {
+                if (e.target === dialog) {
+                    void closeDialog(null);
+                }
+            });
+
+            document.addEventListener('keydown', escapeHandler, {
+                signal: keydownController.signal
+            });
+        });
     }
 
     /**
@@ -1486,7 +1694,10 @@ export class CollectionController {
             let targetCollection;
 
             if (result.newCollectionName) {
-                targetCollection = await this.service.createCollection(result.newCollectionName);
+                targetCollection = await this.service.createCollection({
+                    name: result.newCollectionName,
+                    storageParentPath: result.newCollectionLocation
+                });
             } else {
                 targetCollection = collections.find(c => c.id === result.collectionId);
                 if (!targetCollection) {

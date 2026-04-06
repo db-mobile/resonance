@@ -74,9 +74,11 @@ if (isTauri) {
             needsMigration: () => invoke('collections_needs_migration'),
             migrate: () => invoke('collections_migrate'),
             getPath: () => invoke('collections_get_path'),
+            pickDirectory: () => invoke('collections_pick_directory'),
+            pickImportFile: (importKind) => invoke('collections_pick_import_file', { importKind }),
             // Import/Export
-            importOpenApiFile: () => invoke('import_openapi_file'),
-            importPostmanCollection: () => invoke('import_postman_collection'),
+            importOpenApiFile: (filePath = null, storageParentPath = null) => invoke('import_openapi_file', { filePath, storageParentPath }),
+            importPostmanCollection: (filePath = null, storageParentPath = null) => invoke('import_postman_collection', { filePath, storageParentPath }),
             importPostmanEnvironment: () => invoke('import_postman_environment'),
             exportOpenApi: (collectionId, format) => invoke('export_openapi', { collectionId, format }),
             exportPostman: (collectionId) => invoke('export_postman', { collectionId })

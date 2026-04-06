@@ -10,6 +10,7 @@ use commands::{
         collection_get_endpoint_data, collection_get_variables, collection_save,
         collection_save_endpoint_data, collection_save_variables, collections_get_all,
         collections_get_path, collections_list, collections_migrate, collections_needs_migration,
+        collections_pick_directory,
     },
     grpc_proto::{
         grpc_list_loaded_protos, grpc_parse_proto_file, grpc_proto_get_input_skeleton,
@@ -20,8 +21,9 @@ use commands::{
         grpc_reflection_list_services,
     },
     import_export::{
-        export_openapi, export_postman, import_openapi_file, import_postman_collection,
-        import_postman_environment, save_documentation, save_json_export,
+        collections_pick_import_file, export_openapi, export_postman, import_openapi_file,
+        import_postman_collection, import_postman_environment, save_documentation,
+        save_json_export,
     },
     mock_server::{
         mock_server_clear_logs, mock_server_logs, mock_server_reload_settings, mock_server_start,
@@ -80,6 +82,7 @@ fn main() {
             import_openapi_file,
             import_postman_collection,
             import_postman_environment,
+            collections_pick_import_file,
             export_openapi,
             export_postman,
             save_json_export,
@@ -136,6 +139,7 @@ fn main() {
             collections_needs_migration,
             collections_migrate,
             collections_get_path,
+            collections_pick_directory,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

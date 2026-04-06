@@ -1,3 +1,4 @@
+use crate::commands::collections as storage_collections;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -57,11 +58,6 @@ fn get_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir.join(COLLECTIONS_DIR))
 }
 
-/// Get the path to a specific collection's directory
-fn get_collection_dir(app: &AppHandle, collection_id: &str) -> Result<PathBuf, String> {
-    Ok(get_collections_dir(app)?.join(collection_id))
-}
-
 /// Ensure the collections directory exists
 fn ensure_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = get_collections_dir(app)?;
@@ -80,29 +76,38 @@ fn write_json_file<T: Serialize>(path: &PathBuf, data: &T) -> Result<(), String>
 }
 
 /// Save a collection to the file-based storage format
-fn save_collection_to_files(app: &AppHandle, collection: &Collection) -> Result<(), String> {
+fn save_collection_to_files(
+    app: &AppHandle,
+    collection: &Collection,
+    storage_parent_path: Option<String>,
+) -> Result<(), String> {
     ensure_collections_dir(app)?;
 
-    let collection_dir = get_collection_dir(app, &collection.id)?;
+    let endpoints = serde_json::to_value(&collection.endpoints)
+        .map_err(|e| format!("Failed to serialize endpoints: {}", e))?;
+    let folders = serde_json::to_value(&collection.folders)
+        .map_err(|e| format!("Failed to serialize folders: {}", e))?;
 
-    if !collection_dir.exists() {
-        fs::create_dir_all(&collection_dir)
-            .map_err(|e| format!("Failed to create collection dir: {}", e))?;
-    }
+    let persisted = storage_collections::persist_collection(
+        app,
+        storage_collections::Collection {
+            id: collection.id.clone(),
+            name: collection.name.clone(),
+            base_url: collection.base_url.clone().unwrap_or_default(),
+            endpoints: endpoints.as_array().cloned().unwrap_or_default(),
+            folders: folders.as_array().cloned().unwrap_or_default(),
+            default_headers: serde_json::json!({}),
+            open_api_spec: None,
+            storage_path: None,
+            storage_parent_path,
+        },
+    )?;
 
-    // Convert to the format expected by collections.rs
-    let collection_data = serde_json::json!({
-        "id": collection.id,
-        "name": collection.name,
-        "baseUrl": collection.base_url.clone().unwrap_or_default(),
-        "endpoints": collection.endpoints,
-        "folders": collection.folders,
-        "defaultHeaders": {},
-        "_openApiSpec": null
-    });
-
-    let collection_file = collection_dir.join("collection.json");
-    write_json_file(&collection_file, &collection_data)?;
+    let collection_dir = PathBuf::from(
+        persisted
+            .storage_path
+            .ok_or_else(|| "Collection storage path missing".to_string())?,
+    );
 
     // Save baseUrl as a collection variable if present
     if let Some(base_url) = &collection.base_url {
@@ -116,6 +121,44 @@ fn save_collection_to_files(app: &AppHandle, collection: &Collection) -> Result<
     }
 
     Ok(())
+}
+
+async fn pick_import_file_with_kind(
+    app: &AppHandle,
+    import_kind: &str,
+) -> Result<Option<PathBuf>, String> {
+    let (tx, rx) = oneshot::channel::<Option<FilePath>>();
+
+    let mut dialog = app.dialog().file();
+    match import_kind {
+        "openapi" => {
+            dialog = dialog.add_filter("OpenAPI Files", &["yml", "yaml", "json"]);
+        }
+        "postman" => {
+            dialog = dialog.add_filter("Postman Collection", &["json"]);
+        }
+        "postman_environment" => {
+            dialog = dialog.add_filter("Postman Environment", &["json"]);
+        }
+        _ => {}
+    }
+
+    if let Some(last_dir) = get_last_import_directory(app) {
+        dialog = dialog.set_directory(last_dir);
+    }
+
+    dialog.pick_file(move |file_path| {
+        let _ = tx.send(file_path);
+    });
+
+    let file_path = rx.await.map_err(|e| format!("Dialog error: {}", e))?;
+    let Some(path) = file_path else {
+        return Ok(None);
+    };
+
+    let file_path = path.as_path().ok_or("Invalid file path")?;
+    save_last_import_directory(app, file_path);
+    Ok(Some(file_path.to_path_buf()))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -157,35 +200,23 @@ pub struct Endpoint {
 }
 
 #[tauri::command]
-pub async fn import_openapi_file(app: AppHandle) -> Result<Option<Collection>, String> {
-    let (tx, rx) = oneshot::channel::<Option<FilePath>>();
-
-    let mut dialog = app
-        .dialog()
-        .file()
-        .add_filter("OpenAPI Files", &["yml", "yaml", "json"]);
-
-    // Set starting directory to last used location
-    if let Some(last_dir) = get_last_import_directory(&app) {
-        dialog = dialog.set_directory(last_dir);
-    }
-
-    dialog.pick_file(move |file_path| {
-        let _ = tx.send(file_path);
-    });
-
-    let file_path = rx.await.map_err(|e| format!("Dialog error: {}", e))?;
-
-    let Some(path) = file_path else {
-        return Ok(None);
+pub async fn import_openapi_file(
+    app: AppHandle,
+    file_path: Option<String>,
+    storage_parent_path: Option<String>,
+) -> Result<Option<Collection>, String> {
+    let resolved_file_path = if let Some(file_path) = file_path {
+        let path = PathBuf::from(file_path);
+        save_last_import_directory(&app, &path);
+        path
+    } else {
+        let Some(path) = pick_import_file_with_kind(&app, "openapi").await? else {
+            return Ok(None);
+        };
+        path
     };
-
-    let file_path = path.as_path().ok_or("Invalid file path")?;
-
-    // Save the directory for next time
-    save_last_import_directory(&app, file_path);
-    let content =
-        std::fs::read_to_string(file_path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let content = std::fs::read_to_string(&resolved_file_path)
+        .map_err(|e| format!("Failed to read file: {}", e))?;
 
     // Parse as YAML (also handles JSON)
     let spec: Value = serde_yaml::from_str(&content)
@@ -195,7 +226,7 @@ pub async fn import_openapi_file(app: AppHandle) -> Result<Option<Collection>, S
     let collection = parse_openapi_spec(spec)?;
 
     // Save to file-based storage
-    save_collection_to_files(&app, &collection)?;
+    save_collection_to_files(&app, &collection, storage_parent_path)?;
 
     Ok(Some(collection))
 }
@@ -742,36 +773,24 @@ fn extract_openapi_security(security: Option<&Value>, spec: &Value) -> Option<Va
 }
 
 #[tauri::command]
-pub async fn import_postman_collection(app: AppHandle) -> Result<Option<Collection>, String> {
-    let (tx, rx) = oneshot::channel::<Option<FilePath>>();
-
-    let mut dialog = app
-        .dialog()
-        .file()
-        .add_filter("Postman Collection", &["json"]);
-
-    // Set starting directory to last used location
-    if let Some(last_dir) = get_last_import_directory(&app) {
-        dialog = dialog.set_directory(last_dir);
-    }
-
-    dialog.pick_file(move |file_path| {
-        let _ = tx.send(file_path);
-    });
-
-    let file_path = rx.await.map_err(|e| format!("Dialog error: {}", e))?;
-
-    let Some(path) = file_path else {
-        return Ok(None);
+pub async fn import_postman_collection(
+    app: AppHandle,
+    file_path: Option<String>,
+    storage_parent_path: Option<String>,
+) -> Result<Option<Collection>, String> {
+    let resolved_file_path = if let Some(file_path) = file_path {
+        let path = PathBuf::from(file_path);
+        save_last_import_directory(&app, &path);
+        path
+    } else {
+        let Some(path) = pick_import_file_with_kind(&app, "postman").await? else {
+            return Ok(None);
+        };
+        path
     };
 
-    let file_path = path.as_path().ok_or("Invalid file path")?;
-
-    // Save the directory for next time
-    save_last_import_directory(&app, file_path);
-
-    let content =
-        std::fs::read_to_string(file_path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let content = std::fs::read_to_string(&resolved_file_path)
+        .map_err(|e| format!("Failed to read file: {}", e))?;
 
     let postman: Value = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse Postman collection: {}", e))?;
@@ -780,7 +799,7 @@ pub async fn import_postman_collection(app: AppHandle) -> Result<Option<Collecti
     let collection = parse_postman_collection(postman)?;
 
     // Save to file-based storage
-    save_collection_to_files(&app, &collection)?;
+    save_collection_to_files(&app, &collection, storage_parent_path)?;
 
     Ok(Some(collection))
 }
@@ -1353,6 +1372,16 @@ pub async fn import_postman_environment(app: AppHandle) -> Result<Option<Value>,
     }
 
     Ok(Some(serde_json::to_value(variables).unwrap()))
+}
+
+#[tauri::command]
+pub async fn collections_pick_import_file(
+    app: AppHandle,
+    import_kind: String,
+) -> Result<Option<String>, String> {
+    Ok(pick_import_file_with_kind(&app, &import_kind)
+        .await?
+        .map(|path| path.to_string_lossy().to_string()))
 }
 
 #[tauri::command]

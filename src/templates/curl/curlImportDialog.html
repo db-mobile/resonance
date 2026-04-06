@@ -51,6 +51,14 @@
                 <label for="new-collection-name" class="form-label" data-i18n="curl_import.collection_name">New Collection Name</label>
                 <input type="text" id="new-collection-name" class="input-base form-input" placeholder="My Collection">
             </div>
+
+            <div id="new-collection-location-group" class="form-group is-hidden">
+                <label for="new-collection-location" class="form-label" data-i18n="curl_import.collection_location">Collection Location</label>
+                <div class="u-flex u-gap-8">
+                    <input type="text" id="new-collection-location" class="input-base form-input" readonly data-i18n-placeholder="import_dialog.default_storage" placeholder="Default app storage">
+                    <button type="button" id="new-collection-location-btn" class="btn btn-outline" data-i18n="import_dialog.choose_folder">Choose Folder</button>
+                </div>
+            </div>
         </div>
         <div class="dialog-footer dialog-footer--divided">
             <button id="curl-import-cancel-btn" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>

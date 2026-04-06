@@ -112,7 +112,7 @@ export class CurlImportDialog {
     }
 
     /**
-     * Updates visibility of new collection name field
+     * Updates visibility of new collection name and location fields
      *
      * @private
      * @param {HTMLElement} dialog - Dialog element
@@ -120,9 +120,14 @@ export class CurlImportDialog {
     updateNewCollectionVisibility(dialog) {
         const select = dialog.querySelector('#curl-import-collection');
         const newCollectionGroup = dialog.querySelector('#new-collection-group');
+        const newCollectionLocationGroup = dialog.querySelector('#new-collection-location-group');
         
-        if (select && newCollectionGroup) {
-            newCollectionGroup.classList.toggle('is-hidden', select.value !== '__new__');
+        const isNewCollection = select?.value === '__new__';
+        if (newCollectionGroup) {
+            newCollectionGroup.classList.toggle('is-hidden', !isNewCollection);
+        }
+        if (newCollectionLocationGroup) {
+            newCollectionLocationGroup.classList.toggle('is-hidden', !isNewCollection);
         }
     }
 
@@ -139,10 +144,22 @@ export class CurlImportDialog {
         const cancelBtn = dialog.querySelector('#curl-import-cancel-btn');
         const importBtn = dialog.querySelector('#curl-import-confirm-btn');
         const closeBtn = dialog.querySelector('#curl-import-close-btn');
+        const locationInput = dialog.querySelector('#new-collection-location');
+        const locationBtn = dialog.querySelector('#new-collection-location-btn');
 
         if (collectionSelect) {
             collectionSelect.addEventListener('change', () => {
                 this.updateNewCollectionVisibility(dialog);
+            });
+        }
+
+        if (locationBtn && locationInput) {
+            locationBtn.addEventListener('click', async () => {
+                const folderPath = await window.backendAPI.collections.pickDirectory().catch(() => null);
+                if (folderPath) {
+                    locationInput.value = folderPath;
+                    locationInput.title = folderPath;
+                }
             });
         }
 
@@ -283,11 +300,13 @@ export class CurlImportDialog {
 
         const collectionSelect = dialog.querySelector('#curl-import-collection');
         const newCollectionInput = dialog.querySelector('#new-collection-name');
+        const newCollectionLocationInput = dialog.querySelector('#new-collection-location');
         const requestNameInput = dialog.querySelector('#curl-request-name');
 
         const collectionId = collectionSelect?.value;
         const isNewCollection = collectionId === '__new__';
         const newCollectionName = newCollectionInput?.value?.trim();
+        const newCollectionLocation = newCollectionLocationInput?.value?.trim() || null;
         const requestName = requestNameInput?.value?.trim() || this.parsedRequest.name;
 
         if (isNewCollection && !newCollectionName) {
@@ -304,6 +323,7 @@ export class CurlImportDialog {
             endpoint,
             collectionId: isNewCollection ? null : collectionId,
             newCollectionName: isNewCollection ? newCollectionName : null,
+            newCollectionLocation: isNewCollection ? newCollectionLocation : null,
             auth: this.parsedRequest.auth
         };
 

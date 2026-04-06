@@ -187,17 +187,30 @@ export class CollectionService {
      * @returns {Promise<Object>} The newly created collection object
      * @throws {Error} If creation or storage operation fails
      */
-    async createCollection(name) {
+    async createCollection(nameOrOptions) {
         try {
+            const options = typeof nameOrOptions === 'string'
+                ? { name: nameOrOptions }
+                : (nameOrOptions || {});
+            const name = options.name?.trim();
+
+            if (!name) {
+                throw new Error('Collection name is required');
+            }
+
             const newCollection = {
                 id: this.generateCollectionId(),
-                name: name,
+                name,
                 baseUrl: '',
                 endpoints: [],
                 folders: [],
                 defaultHeaders: {},
                 _openApiSpec: null
             };
+
+            if (options.storageParentPath) {
+                newCollection.storageParentPath = options.storageParentPath;
+            }
 
             const createdCollection = await this.repository.add(newCollection);
 

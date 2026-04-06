@@ -7,6 +7,13 @@
                     <label for="collection-name" class="form-label" data-i18n="new_collection.name_label">Collection Name:</label>
                     <input type="text" id="collection-name" class="input-base form-input" data-i18n-placeholder="new_collection.name_placeholder" placeholder="My Collection" required>
                 </div>
+                <div class="form-group">
+                    <label for="collection-location" class="form-label">Location:</label>
+                    <div class="u-flex u-gap-8">
+                        <input type="text" id="collection-location" class="input-base form-input" readonly>
+                        <button type="button" id="collection-location-btn" class="btn btn-outline">Choose Folder</button>
+                    </div>
+                </div>
                 <div class="dialog-footer">
                     <button type="button" id="cancel-btn" class="btn btn-outline" data-i18n="new_collection.cancel">Cancel</button>
                     <button type="submit" id="create-btn" class="btn btn-primary" data-i18n="new_collection.create">Create</button>
@@ -88,9 +95,72 @@
                     <label for="new-collection-name-input" class="form-label" data-i18n="save_to_collection.new_collection_name">New Collection Name:</label>
                     <input type="text" id="new-collection-name-input" class="input-base form-input" data-i18n-placeholder="save_to_collection.new_collection_placeholder" placeholder="My Collection">
                 </div>
+                <div class="form-group is-hidden" id="new-collection-location-group">
+                    <label for="new-collection-location-input" class="form-label">Location:</label>
+                    <div class="u-flex u-gap-8">
+                        <input type="text" id="new-collection-location-input" class="input-base form-input" readonly>
+                        <button type="button" id="new-collection-location-btn" class="btn btn-outline">Choose Folder</button>
+                    </div>
+                </div>
                 <div class="dialog-footer">
                     <button type="button" id="cancel-btn" class="btn btn-outline" data-i18n="save_to_collection.cancel">Cancel</button>
                     <button type="submit" id="save-btn" class="btn btn-primary" data-i18n="save_to_collection.save">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-import-collection-dialog">
+    <div class="new-request-dialog-overlay modal-overlay">
+        <div class="new-request-dialog modal-dialog modal-dialog--md">
+            <form id="import-collection-form" class="dialog-form">
+                <div class="dialog-header">
+                    <div>
+                        <h3 class="dialog-title" id="import-collection-title" data-i18n="import_dialog.title">Import Collection</h3>
+                        <p class="dialog-message" id="import-collection-subtitle" data-i18n="import_dialog.subtitle">Choose a source file and where the collection should be stored.</p>
+                    </div>
+                    <button type="button" id="import-collection-close-btn" class="dialog-close-btn" aria-label="Close">&times;</button>
+                </div>
+
+                <div class="import-dialog-stack">
+                    <div class="import-selector-card" id="import-source-card">
+                        <div class="import-selector-card__header">
+                            <div>
+                                <div class="import-selector-card__eyebrow" data-i18n="import_dialog.source">Source</div>
+                                <div class="import-selector-card__title" data-i18n="import_dialog.import_file">Import File</div>
+                            </div>
+                            <div class="import-selector-card__icon icon icon-16 icon-file"></div>
+                        </div>
+                        <div class="import-selector-card__hint" data-i18n="import_dialog.choose_file_hint">Choose the file to import.</div>
+                        <div class="import-selector-card__path" id="import-source-file" data-i18n="import_dialog.no_file_selected">No file selected</div>
+                        <div class="import-selector-card__meta" id="import-source-meta" data-i18n="import_dialog.supported_formats">Supported formats depend on the import type.</div>
+                        <div class="import-selector-card__actions">
+                            <button type="button" id="import-source-file-btn" class="btn btn-outline" data-i18n="import_dialog.choose_file">Choose File</button>
+                        </div>
+                    </div>
+
+                    <div class="import-destination-section">
+                        <div class="import-destination-section__header">
+                            <div class="import-selector-card__eyebrow" data-i18n="import_dialog.destination">Destination</div>
+                            <div class="import-destination-section__title" data-i18n="import_dialog.collection_folder">Collection Folder</div>
+                            <div class="import-destination-section__hint" data-i18n="import_dialog.destination_hint">Choose where the imported collection folder should be created.</div>
+                        </div>
+                        <div class="import-destination-picker" id="import-destination-card">
+                            <div class="import-destination-picker__content">
+                                <div class="import-destination-picker__path" id="import-destination-folder" data-i18n="import_dialog.default_storage">Default app storage</div>
+                                <div class="import-destination-picker__meta" id="import-destination-meta" data-i18n="import_dialog.destination_meta">Choose the parent folder for the imported collection.</div>
+                            </div>
+                            <button type="button" id="import-destination-folder-btn" class="btn btn-outline" data-i18n="import_dialog.choose_folder">Choose Folder</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="import-dialog-error is-hidden" id="import-dialog-error"></div>
+
+                <div class="dialog-footer">
+                    <button type="button" id="cancel-btn" class="btn btn-outline" data-i18n="import_dialog.cancel">Cancel</button>
+                    <button type="submit" id="import-btn" class="btn btn-primary" data-i18n="import_dialog.import">Import</button>
                 </div>
             </form>
         </div>
