@@ -116,6 +116,17 @@ export function importPostmanEnvironment() {
 }
 
 /**
+ * Opens cURL import dialog
+ *
+ * @async
+ * @returns {Promise<void>}
+ */
+export function importCurl() {
+    const controller = initializeController();
+    return controller.handleImportCurl(null);
+}
+
+/**
  * Saves modified request body for an endpoint
  *
  * @async

@@ -27,7 +27,31 @@
   "import": {
     "openapi": "OpenAPI-Sammlung",
     "postman_collection": "Postman-Sammlung",
-    "postman_environment": "Postman-Umgebung"
+    "postman_environment": "Postman-Umgebung",
+    "curl": "cURL-Befehl"
+  },
+  "import_dialog": {
+    "title": "Sammlung importieren",
+    "title_openapi": "OpenAPI-Sammlung importieren",
+    "title_postman": "Postman-Sammlung importieren",
+    "subtitle": "Wählen Sie eine Quelldatei und den Speicherort für die Sammlung.",
+    "subtitle_openapi": "Wählen Sie eine OpenAPI-Datei und den Speicherort für die Sammlung.",
+    "subtitle_postman": "Wählen Sie eine Postman-Datei und den Speicherort für die Sammlung.",
+    "source": "Quelle",
+    "import_file": "Importdatei",
+    "choose_file_hint": "Wählen Sie die zu importierende Datei.",
+    "no_file_selected": "Keine Datei ausgewählt",
+    "supported_formats": "Unterstützte Formate hängen vom Importtyp ab.",
+    "choose_file": "Datei wählen",
+    "destination": "Ziel",
+    "collection_folder": "Sammlungsordner",
+    "destination_hint": "Wählen Sie, wo der importierte Sammlungsordner erstellt werden soll.",
+    "default_storage": "Standard-App-Speicher",
+    "destination_meta": "Wählen Sie den übergeordneten Ordner für die importierte Sammlung.",
+    "choose_folder": "Ordner wählen",
+    "cancel": "Abbrechen",
+    "import": "Importieren",
+    "error_no_file": "Wählen Sie eine Importdatei, bevor Sie fortfahren."
   },
   "collection": {
     "rename": "Sammlung umbenennen",
@@ -84,6 +108,7 @@
     "target_collection": "In Sammlung importieren",
     "new_collection": "Neue Sammlung erstellen",
     "collection_name": "Name der neuen Sammlung",
+    "collection_location": "Speicherort der Sammlung",
     "import": "Importieren",
     "error_invalid": "Ungültiger cURL-Befehl",
     "error_no_url": "Keine URL im cURL-Befehl gefunden"

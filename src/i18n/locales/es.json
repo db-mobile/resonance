@@ -27,7 +27,31 @@
   "import": {
     "openapi": "Colección OpenAPI",
     "postman_collection": "Colección Postman",
-    "postman_environment": "Entorno Postman"
+    "postman_environment": "Entorno Postman",
+    "curl": "Comando cURL"
+  },
+  "import_dialog": {
+    "title": "Importar colección",
+    "title_openapi": "Importar colección OpenAPI",
+    "title_postman": "Importar colección Postman",
+    "subtitle": "Elige un archivo de origen y dónde se debe almacenar la colección.",
+    "subtitle_openapi": "Elige un archivo OpenAPI y dónde se debe almacenar la colección.",
+    "subtitle_postman": "Elige un archivo Postman y dónde se debe almacenar la colección.",
+    "source": "Origen",
+    "import_file": "Archivo de importación",
+    "choose_file_hint": "Elige el archivo a importar.",
+    "no_file_selected": "Ningún archivo seleccionado",
+    "supported_formats": "Los formatos compatibles dependen del tipo de importación.",
+    "choose_file": "Elegir archivo",
+    "destination": "Destino",
+    "collection_folder": "Carpeta de colección",
+    "destination_hint": "Elige dónde se debe crear la carpeta de la colección importada.",
+    "default_storage": "Almacenamiento predeterminado",
+    "destination_meta": "Elige la carpeta principal para la colección importada.",
+    "choose_folder": "Elegir carpeta",
+    "cancel": "Cancelar",
+    "import": "Importar",
+    "error_no_file": "Elige un archivo de importación antes de continuar."
   },
   "collection": {
     "rename": "Renombrar colección",
@@ -84,6 +108,7 @@
     "target_collection": "Importar a colección",
     "new_collection": "Crear nueva colección",
     "collection_name": "Nombre de la nueva colección",
+    "collection_location": "Ubicación de la colección",
     "import": "Importar",
     "error_invalid": "Comando cURL inválido",
     "error_no_url": "No se encontró URL en el comando cURL"
