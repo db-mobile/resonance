@@ -113,16 +113,32 @@ export class WorkspaceTabStateManager {
         // Capture active response tab
         const activeResponseTab = this._getActiveResponseTab();
 
-        // Capture body based on mode (JSON or GraphQL)
-        const isGraphQLMode = this.graphqlBodyManager && this.graphqlBodyManager.isGraphQLMode();
-        const bodyData = isGraphQLMode ? {
-            mode: 'graphql',
-            query: this.graphqlBodyManager.getGraphQLQuery(),
-            variables: this.graphqlBodyManager.getGraphQLVariables()
-        } : {
-            mode: 'json',
-            content: getRequestBodyContent() || ''
-        };
+        // Capture body based on active mode
+        const bodyModeSelect = document.getElementById('body-mode-select');
+        const currentBodyMode = bodyModeSelect?.value || 'json';
+        let bodyData;
+        if (currentBodyMode === 'graphql' && this.graphqlBodyManager) {
+            bodyData = {
+                mode: 'graphql',
+                query: this.graphqlBodyManager.getGraphQLQuery(),
+                variables: this.graphqlBodyManager.getGraphQLVariables()
+            };
+        } else if (currentBodyMode === 'formdata' && window.formBodyManager) {
+            bodyData = {
+                mode: 'formdata',
+                fields: window.formBodyManager.getFormDataFields()
+            };
+        } else if (currentBodyMode === 'urlencoded' && window.formBodyManager) {
+            bodyData = {
+                mode: 'urlencoded',
+                fields: window.formBodyManager.getUrlencodedFields()
+            };
+        } else {
+            bodyData = {
+                mode: 'json',
+                content: getRequestBodyContent() || ''
+            };
+        }
 
         // Capture preview mode state from active container
         const containerElements = window.responseContainerManager?.getActiveElements();
@@ -311,12 +327,19 @@ export class WorkspaceTabStateManager {
             this.dom.methodSelect.value = request.method || 'GET';
         }
 
-        // Restore body based on mode (GraphQL or JSON)
+        // Restore body based on mode
         if (request.body && typeof request.body === 'object' && request.body.mode) {
-            if (request.body.mode === 'graphql' && this.graphqlBodyManager) {
+            const { mode } = request.body;
+            if (mode === 'graphql' && this.graphqlBodyManager) {
                 this.graphqlBodyManager.setGraphQLModeEnabled(true);
                 this.graphqlBodyManager.setGraphQLQuery(request.body.query || '');
                 this.graphqlBodyManager.setGraphQLVariables(request.body.variables || '');
+            } else if (mode === 'formdata' && window.formBodyManager) {
+                this.graphqlBodyManager?.switchMode('formdata');
+                window.formBodyManager.setFormDataFields(request.body.fields || {});
+            } else if (mode === 'urlencoded' && window.formBodyManager) {
+                this.graphqlBodyManager?.switchMode('urlencoded');
+                window.formBodyManager.setUrlencodedFields(request.body.fields || {});
             } else {
                 if (this.graphqlBodyManager) {
                     this.graphqlBodyManager.setGraphQLModeEnabled(false);

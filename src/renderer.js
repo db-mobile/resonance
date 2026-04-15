@@ -18,6 +18,7 @@ import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest, handleCancelRequest, handleGenerateCurl, setGraphQLBodyManager, invalidateSettingsCache, getSettingsCache, invalidateEnvironmentCache } from './modules/apiHandler.js';
 import { GraphQLBodyManager } from './modules/graphqlBodyManager.js';
+import { FormBodyManager } from './modules/formBodyManager.js';
 import { initGrpcUI, setGrpcMetadata, setGrpcTls } from './modules/grpcHandler.js';
 import { initRequestModeManager } from './modules/requestModeManager.js';
 import { initWebSocketHandler } from './modules/websocketHandler.js';
@@ -158,6 +159,11 @@ setGraphQLBodyManager(graphqlBodyManager);
 
 // Make available globally for workspace tab state manager
 window.graphqlBodyManager = graphqlBodyManager;
+
+// Initialize form-data / URL-encoded body manager
+const formBodyManager = new FormBodyManager();
+formBodyManager.initialize();
+window.formBodyManager = formBodyManager;
 
 // Initialize settings modal with all managers
 const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager, proxyController);

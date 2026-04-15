@@ -756,6 +756,43 @@ export class CollectionService {
      * @returns {Promise<void>}
      */
     async populateRequestBody(collection, endpoint, _formElements) {
+        // Check if this endpoint has form body data (formdata / urlencoded)
+        const formBodyData = await this.repository.getFormBodyData(collection.id, endpoint.id);
+
+        if (formBodyData && (formBodyData.mode === 'formdata' || formBodyData.mode === 'urlencoded')) {
+            if (window.graphqlBodyManager) {
+                window.graphqlBodyManager.switchMode(formBodyData.mode);
+            }
+            if (window.formBodyManager) {
+                if (formBodyData.mode === 'formdata') {
+                    window.formBodyManager.setFormDataFields(formBodyData.fields || {});
+                } else {
+                    window.formBodyManager.setUrlencodedFields(formBodyData.fields || {});
+                }
+            }
+            const key = `${collection.id}_${endpoint.id}`;
+            this.originalBodyValues.set(key, JSON.stringify(formBodyData.fields || {}));
+            return;
+        }
+
+        // Check if the endpoint's requestBody was imported from a form-data or urlencoded source
+        const importedBodyType = endpoint.requestBody?.type;
+        if (importedBodyType === 'formdata' || importedBodyType === 'urlencoded') {
+            if (window.graphqlBodyManager) {
+                window.graphqlBodyManager.switchMode(importedBodyType);
+            }
+            if (window.formBodyManager) {
+                if (importedBodyType === 'formdata') {
+                    window.formBodyManager.setFormDataFields(endpoint.requestBody.fields || {});
+                } else {
+                    window.formBodyManager.setUrlencodedFields(endpoint.requestBody.fields || {});
+                }
+            }
+            const key = `${collection.id}_${endpoint.id}`;
+            this.originalBodyValues.set(key, JSON.stringify(endpoint.requestBody.fields || {}));
+            return;
+        }
+
         // Check if this endpoint has GraphQL data
         const graphqlData = await this.repository.getGraphQLData(collection.id, endpoint.id);
 
@@ -844,8 +881,20 @@ export class CollectionService {
      */
     async saveModifiedRequestBody(collectionId, endpointId) {
         try {
-            // Check if we're in GraphQL mode
-            if (window.graphqlBodyManager && window.graphqlBodyManager.isGraphQLMode()) {
+            const bodyModeSelect = document.getElementById('body-mode-select');
+            const bodyMode = bodyModeSelect?.value || 'json';
+
+            if (bodyMode === 'formdata' && window.formBodyManager) {
+                await this.repository.saveFormBodyData(collectionId, endpointId, {
+                    mode: 'formdata',
+                    fields: window.formBodyManager.getFormDataFields()
+                });
+            } else if (bodyMode === 'urlencoded' && window.formBodyManager) {
+                await this.repository.saveFormBodyData(collectionId, endpointId, {
+                    mode: 'urlencoded',
+                    fields: window.formBodyManager.getUrlencodedFields()
+                });
+            } else if (window.graphqlBodyManager && window.graphqlBodyManager.isGraphQLMode()) {
                 const query = window.graphqlBodyManager.getGraphQLQuery();
                 const variables = window.graphqlBodyManager.getGraphQLVariables();
 
