@@ -842,7 +842,6 @@ export async function handleSendRequest() {
                     },
                     isModified: false
                 }).catch(() => { /* fire-and-forget */ });
-                window.workspaceTabController.service.setTabModified(requestTabId, false).catch(() => { /* fire-and-forget */ });
                 if (window.workspaceTabController.tabBar?.updateTab) {
                     window.workspaceTabController.tabBar.updateTab(requestTabId, { isModified: false });
                 }
