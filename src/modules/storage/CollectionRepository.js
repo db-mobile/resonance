@@ -244,6 +244,7 @@ export class CollectionRepository {
             headers: data.headers || [],
             modifiedBody: data.modifiedBody || null,
             graphqlData: data.graphqlData || null,
+            formBodyData: data.formBodyData || null,
             grpcData: data.grpcData || null,
             responseSchema: data.responseSchema || null
         };
@@ -299,6 +300,23 @@ export class CollectionRepository {
             await this._updateEndpointField(collectionId, endpointId, 'modifiedBody', body);
         } catch (error) {
             throw new Error(`Failed to save modified request body: ${error.message || error}`);
+        }
+    }
+
+    async getFormBodyData(collectionId, endpointId) {
+        try {
+            const data = await this._getEndpointData(collectionId, endpointId);
+            return data?.formBodyData || null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    async saveFormBodyData(collectionId, endpointId, data) {
+        try {
+            await this._updateEndpointField(collectionId, endpointId, 'formBodyData', data);
+        } catch (error) {
+            throw new Error(`Failed to save form body data: ${error.message || error}`);
         }
     }
 

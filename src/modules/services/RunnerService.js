@@ -508,6 +508,7 @@ export class RunnerService {
         // Get all persisted data first
         const persistedHeaders = await this.collectionRepository.getPersistedHeaders(collection.id, endpoint.id) || [];
         const persistedBody = await this.collectionRepository.getModifiedRequestBody(collection.id, endpoint.id);
+        const persistedFormBodyData = await this.collectionRepository.getFormBodyData(collection.id, endpoint.id);
         const persistedQueryParams = await this.collectionRepository.getPersistedQueryParams(collection.id, endpoint.id) || [];
         const persistedPathParams = await this.collectionRepository.getPersistedPathParams(collection.id, endpoint.id) || [];
         const persistedAuthConfig = await this.collectionRepository.getPersistedAuthConfig(collection.id, endpoint.id);
@@ -601,7 +602,21 @@ export class RunnerService {
 
         // Build body
         let body = undefined;
-        if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
+        let bodyType = undefined;
+
+        if (persistedFormBodyData && (persistedFormBodyData.mode === 'formdata' || persistedFormBodyData.mode === 'urlencoded')) {
+            // Form Data / URL Encoded mode
+            const rawFields = persistedFormBodyData.fields || {};
+            const processed = {};
+            for (const [k, v] of Object.entries(rawFields)) {
+                processed[this.variableProcessor.processTemplate(k, effectiveVariables)]
+                    = this.variableProcessor.processTemplate(v, effectiveVariables);
+            }
+            if (Object.keys(processed).length > 0) {
+                body = processed;
+            }
+            bodyType = persistedFormBodyData.mode;
+        } else if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
             // Use persisted body first, then fall back to endpoint's requestBody example/schema
             let bodyContent = persistedBody;
             if (!bodyContent && endpoint.requestBody) {
@@ -652,6 +667,7 @@ export class RunnerService {
             url,
             headers: processedHeaders,
             body,
+            bodyType,
             httpVersion,
             timeout,
             auth: authData.authConfig

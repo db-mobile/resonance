@@ -1098,7 +1098,9 @@ fn extract_postman_auth(auth: Option<&Value>) -> Option<Value> {
 }
 
 /// Extract request body from Postman body format
-/// Converts Postman's { mode: "raw", raw: "..." } to { example: "..." }
+/// Converts Postman's body to a format understood by the frontend.
+/// Raw bodies become { example: "..." }.
+/// Form bodies become { type: "formdata"|"urlencoded", fields: { key: value } }.
 fn extract_postman_body(body: Option<&Value>) -> Option<Value> {
     let body_obj = body?.as_object()?;
 
@@ -1118,40 +1120,44 @@ fn extract_postman_body(body: Option<&Value>) -> Option<Value> {
             }))
         }
         "formdata" => {
-            // Form data - convert to example object
             if let Some(formdata) = body_obj.get("formdata").and_then(|f| f.as_array()) {
-                let mut form_obj = serde_json::Map::new();
+                let mut fields = serde_json::Map::new();
                 for item in formdata {
+                    // Skip file-type fields (file upload is not yet supported)
+                    if item.get("type").and_then(|t| t.as_str()) == Some("file") {
+                        continue;
+                    }
                     if let (Some(key), Some(value)) = (
                         item.get("key").and_then(|k| k.as_str()),
                         item.get("value").and_then(|v| v.as_str()),
                     ) {
-                        form_obj.insert(key.to_string(), Value::String(value.to_string()));
+                        fields.insert(key.to_string(), Value::String(value.to_string()));
                     }
                 }
-                if !form_obj.is_empty() {
+                if !fields.is_empty() {
                     return Some(serde_json::json!({
-                        "example": serde_json::to_string_pretty(&Value::Object(form_obj)).unwrap_or_default()
+                        "type": "formdata",
+                        "fields": Value::Object(fields)
                     }));
                 }
             }
             None
         }
         "urlencoded" => {
-            // URL encoded - convert to example object
             if let Some(urlencoded) = body_obj.get("urlencoded").and_then(|u| u.as_array()) {
-                let mut form_obj = serde_json::Map::new();
+                let mut fields = serde_json::Map::new();
                 for item in urlencoded {
                     if let (Some(key), Some(value)) = (
                         item.get("key").and_then(|k| k.as_str()),
                         item.get("value").and_then(|v| v.as_str()),
                     ) {
-                        form_obj.insert(key.to_string(), Value::String(value.to_string()));
+                        fields.insert(key.to_string(), Value::String(value.to_string()));
                     }
                 }
-                if !form_obj.is_empty() {
+                if !fields.is_empty() {
                     return Some(serde_json::json!({
-                        "example": serde_json::to_string_pretty(&Value::Object(form_obj)).unwrap_or_default()
+                        "type": "urlencoded",
+                        "fields": Value::Object(fields)
                     }));
                 }
             }
