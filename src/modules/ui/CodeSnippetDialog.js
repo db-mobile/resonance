@@ -107,12 +107,12 @@ export class CodeSnippetDialog {
                 const iconSpan = copyBtn.querySelector('.icon');
                 iconSpan.classList.remove('icon-copy');
                 iconSpan.classList.add('icon-check');
-                copyBtn.classList.add('copied');
+                copyBtn.classList.add('is-copied');
 
                 setTimeout(() => {
                     iconSpan.classList.remove('icon-check');
                     iconSpan.classList.add('icon-copy');
-                    copyBtn.classList.remove('copied');
+                    copyBtn.classList.remove('is-copied');
                 }, 2000);
             } catch (err) {
                 toast.error('Failed to copy to clipboard');

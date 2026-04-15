@@ -126,6 +126,12 @@ export class CollectionController {
         const isSearching = this.searchQuery.length > 0;
         const pinnedRequests = await this.repository.getPinnedRequests();
         const eventHandlers = {
+            onEmptyStateActions: {
+                'new-collection': this.handleNewCollection,
+                'import-openapi': () => this.importOpenApiFile(),
+                'import-postman': () => this.importPostmanCollection(),
+                'import-curl': () => this.handleImportCurl(null)
+            },
             onEndpointClick: this.handleEndpointClick,
             onContextMenu: this.handleContextMenu,
             onEndpointContextMenu: this.handleEndpointContextMenu,

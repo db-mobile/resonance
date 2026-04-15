@@ -66,28 +66,28 @@
             <input type="text" id="oauth2-auth-url" class="input-base form-input" placeholder="https://auth.example.com/oauth/authorize" aria-label="Authorization URL">
         </div>
 
-        <!-- Client ID -->
-        <div class="auth-field-group u-flex u-flex-col" id="oauth2-client-id-group">
-            <label for="oauth2-client-id">Client ID</label>
-            <input type="text" id="oauth2-client-id" class="input-base form-input" placeholder="Enter client ID" aria-label="Client ID">
+        <!-- Client ID + Client Secret -->
+        <div id="oauth2-credentials-pair" class="oauth2-field-pair">
+            <div class="auth-field-group u-flex u-flex-col" id="oauth2-client-id-group">
+                <label for="oauth2-client-id">Client ID</label>
+                <input type="text" id="oauth2-client-id" class="input-base form-input" placeholder="Enter client ID" aria-label="Client ID">
+            </div>
+            <div class="auth-field-group u-flex u-flex-col" id="oauth2-client-secret-group">
+                <label for="oauth2-client-secret">Client Secret</label>
+                <input type="password" id="oauth2-client-secret" class="input-base form-input" placeholder="Enter client secret" aria-label="Client Secret">
+            </div>
         </div>
 
-        <!-- Client Secret -->
-        <div class="auth-field-group u-flex u-flex-col" id="oauth2-client-secret-group">
-            <label for="oauth2-client-secret">Client Secret</label>
-            <input type="password" id="oauth2-client-secret" class="input-base form-input" placeholder="Enter client secret" aria-label="Client Secret">
-        </div>
-
-        <!-- Username (for password grant) -->
-        <div class="auth-field-group u-flex u-flex-col u-hidden" id="oauth2-username-group">
-            <label for="oauth2-username">Username</label>
-            <input type="text" id="oauth2-username" class="input-base form-input" placeholder="Enter username" aria-label="Username">
-        </div>
-
-        <!-- Password (for password grant) -->
-        <div class="auth-field-group u-flex u-flex-col u-hidden" id="oauth2-password-group">
-            <label for="oauth2-password">Password</label>
-            <input type="password" id="oauth2-password" class="input-base form-input" placeholder="Enter password" aria-label="Password">
+        <!-- Username + Password (for password grant) -->
+        <div id="oauth2-username-password-pair" class="oauth2-field-pair u-hidden">
+            <div class="auth-field-group u-flex u-flex-col" id="oauth2-username-group">
+                <label for="oauth2-username">Username</label>
+                <input type="text" id="oauth2-username" class="input-base form-input" placeholder="Enter username" aria-label="Username">
+            </div>
+            <div class="auth-field-group u-flex u-flex-col" id="oauth2-password-group">
+                <label for="oauth2-password">Password</label>
+                <input type="password" id="oauth2-password" class="input-base form-input" placeholder="Enter password" aria-label="Password">
+            </div>
         </div>
 
         <!-- Redirect URI (for authorization code flow) -->
@@ -103,25 +103,10 @@
             <small class="form-input-hint">Space-separated list of scopes</small>
         </div>
 
-        <!-- Audience (optional, for Auth0 etc.) -->
-        <div class="auth-field-group u-flex u-flex-col" id="oauth2-audience-group">
-            <label for="oauth2-audience">Audience (optional)</label>
-            <input type="text" id="oauth2-audience" class="input-base form-input" placeholder="https://api.example.com" aria-label="Audience">
-        </div>
-
         <!-- PKCE Toggle (for authorization code flow) -->
         <div class="auth-field-group u-flex u-items-center u-gap-2 u-hidden" id="oauth2-pkce-group">
             <input type="checkbox" id="oauth2-use-pkce" class="form-checkbox" checked aria-label="Use PKCE">
             <label for="oauth2-use-pkce">Use PKCE (recommended for public clients)</label>
-        </div>
-
-        <!-- Client Auth Method -->
-        <div class="auth-field-group u-flex u-flex-col" id="oauth2-client-auth-group">
-            <label for="oauth2-client-auth">Client Authentication</label>
-            <select id="oauth2-client-auth" class="form-select" aria-label="Client Authentication Method">
-                <option value="body">Send in request body</option>
-                <option value="header">Send as Basic Auth header</option>
-            </select>
         </div>
 
         <!-- Get Token Button -->
@@ -152,11 +137,32 @@
             </div>
         </div>
 
-        <!-- Header Prefix -->
-        <div class="auth-field-group u-flex u-flex-col">
-            <label for="oauth2-header-prefix">Header Prefix</label>
-            <input type="text" id="oauth2-header-prefix" class="input-base form-input" placeholder="Bearer" value="Bearer" aria-label="Header Prefix">
-        </div>
+        <!-- Advanced Settings -->
+        <details class="oauth2-advanced-details">
+            <summary class="oauth2-advanced-summary">Advanced</summary>
+            <div class="u-flex u-flex-col u-gap-4">
+                <!-- Audience (optional, for Auth0 etc.) -->
+                <div class="auth-field-group u-flex u-flex-col" id="oauth2-audience-group">
+                    <label for="oauth2-audience">Audience (optional)</label>
+                    <input type="text" id="oauth2-audience" class="input-base form-input" placeholder="https://api.example.com" aria-label="Audience">
+                </div>
+
+                <!-- Client Auth Method -->
+                <div class="auth-field-group u-flex u-flex-col" id="oauth2-client-auth-group">
+                    <label for="oauth2-client-auth">Client Authentication</label>
+                    <select id="oauth2-client-auth" class="form-select" aria-label="Client Authentication Method">
+                        <option value="body">Send in request body</option>
+                        <option value="header">Send as Basic Auth header</option>
+                    </select>
+                </div>
+
+                <!-- Header Prefix -->
+                <div class="auth-field-group u-flex u-flex-col">
+                    <label for="oauth2-header-prefix">Header Prefix</label>
+                    <input type="text" id="oauth2-header-prefix" class="input-base form-input" placeholder="Bearer" value="Bearer" aria-label="Header Prefix">
+                </div>
+            </div>
+        </details>
 
         <!-- Error Display -->
         <div class="auth-field-group u-flex u-flex-col u-hidden" id="oauth2-error-group">

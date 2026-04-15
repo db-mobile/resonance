@@ -38,13 +38,19 @@ export class CollectionRenderer {
      *
      * @returns {void}
      */
-    renderEmptyState() {
+    renderEmptyState(actions = {}) {
         const fragment = templateLoader.cloneSync(
             './src/templates/collections/collectionRenderer.html',
             'tpl-collections-empty'
         );
         this.container.innerHTML = '';
         this.container.appendChild(fragment);
+        this.container.querySelectorAll('[data-action]').forEach((btn) => {
+            const handler = actions[btn.dataset.action];
+            if (handler) {
+                btn.addEventListener('click', handler);
+            }
+        });
     }
 
     renderSearchEmptyState() {
@@ -85,7 +91,7 @@ export class CollectionRenderer {
             if (options.showSearchEmptyState) {
                 this.renderSearchEmptyState();
             } else {
-                this.renderEmptyState();
+                this.renderEmptyState(eventHandlers.onEmptyStateActions ?? {});
             }
             if (window.i18n && window.i18n.updateUI) {
                 window.i18n.updateUI();

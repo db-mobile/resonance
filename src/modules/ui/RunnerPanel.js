@@ -1356,7 +1356,7 @@ export class RunnerPanel {
                 });
             } else {
                 const row = document.createElement('tr');
-                row.innerHTML = '<td colspan="2" style="text-align: center; color: var(--text-tertiary);">No headers</td>';
+                row.innerHTML = '<td colspan="2" class="runner-table-empty-cell">No headers</td>';
                 this.resultsDom.headersBody.appendChild(row);
             }
         }

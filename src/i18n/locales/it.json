@@ -16,8 +16,18 @@
     "import": "Importa",
     "pinned": "Fissate",
     "empty": {
-      "title": "Nessuna collezione importata",
-      "subtitle": "Importa una collezione OpenAPI o Postman per iniziare"
+      "title": "Benvenuto in Resonance",
+      "subtitle": "Crea o importa una collezione per iniziare",
+      "action": {
+        "new_collection": "Nuova Collezione",
+        "new_collection_sub": "Inizia da zero",
+        "import_openapi": "Importa OpenAPI",
+        "import_openapi_sub": "Da un file spec",
+        "import_postman": "Importa Postman",
+        "import_postman_sub": "Da un file esportato",
+        "import_curl": "Importa cURL",
+        "import_curl_sub": "Incolla un comando cURL"
+      }
     },
     "search_empty": {
       "title": "Nessuna collezione trovata",
