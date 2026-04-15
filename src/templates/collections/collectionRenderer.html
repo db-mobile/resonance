@@ -1,8 +1,30 @@
 <template id="tpl-collections-empty">
     <div class="empty-state-base collections-empty u-flex u-flex-col u-items-center">
         <span class="collections-empty-icon icon icon-64 icon-spark"></span>
-        <p class="collections-empty-text" data-i18n="sidebar.empty.title">No collections imported yet</p>
-        <p class="collections-empty-subtext" data-i18n="sidebar.empty.subtitle">Import an OpenAPI collection to get started</p>
+        <p class="collections-empty-text" data-i18n="sidebar.empty.title">Welcome to Resonance</p>
+        <p class="collections-empty-subtext" data-i18n="sidebar.empty.subtitle">Create or import a collection to get started</p>
+        <div class="collections-empty-actions">
+            <button class="collections-empty-action-btn" data-action="new-collection">
+                <span class="icon icon-18 icon-plus collections-empty-action-icon"></span>
+                <span class="collections-empty-action-title" data-i18n="sidebar.empty.action.new_collection">New Collection</span>
+                <span class="collections-empty-action-sub" data-i18n="sidebar.empty.action.new_collection_sub">Start from scratch</span>
+            </button>
+            <button class="collections-empty-action-btn" data-action="import-openapi">
+                <span class="icon icon-18 icon-file collections-empty-action-icon"></span>
+                <span class="collections-empty-action-title" data-i18n="sidebar.empty.action.import_openapi">Import OpenAPI</span>
+                <span class="collections-empty-action-sub" data-i18n="sidebar.empty.action.import_openapi_sub">From a spec file</span>
+            </button>
+            <button class="collections-empty-action-btn" data-action="import-postman">
+                <span class="icon icon-18 icon-document collections-empty-action-icon"></span>
+                <span class="collections-empty-action-title" data-i18n="sidebar.empty.action.import_postman">Import Postman</span>
+                <span class="collections-empty-action-sub" data-i18n="sidebar.empty.action.import_postman_sub">From an export file</span>
+            </button>
+            <button class="collections-empty-action-btn" data-action="import-curl">
+                <span class="icon icon-18 icon-curl collections-empty-action-icon"></span>
+                <span class="collections-empty-action-title" data-i18n="sidebar.empty.action.import_curl">Import cURL</span>
+                <span class="collections-empty-action-sub" data-i18n="sidebar.empty.action.import_curl_sub">Paste a cURL command</span>
+            </button>
+        </div>
     </div>
 </template>
 
