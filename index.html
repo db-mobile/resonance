@@ -281,6 +281,8 @@
                             <select id="body-mode-select" class="body-mode-select" aria-label="Body Mode">
                                 <option value="json">JSON</option>
                                 <option value="graphql">GraphQL</option>
+                                <option value="formdata">Form Data</option>
+                                <option value="urlencoded">URL Encoded</option>
                             </select>
                             <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                         </div>
@@ -294,6 +296,18 @@
                                   aria-label="Request Body JSON"
                                   style="display: none;"></textarea>
                         <div id="body-editor-container" class="body-editor-container u-flex u-flex-col"></div>
+                    </div>
+
+                    <!-- Form Data Mode -->
+                    <div class="body-mode-panel" id="body-formdata-section" data-mode="formdata">
+                        <div id="formdata-list" class="key-value-list"></div>
+                        <button id="add-formdata-row-btn" class="btn btn-sm btn-secondary">Add Field</button>
+                    </div>
+
+                    <!-- URL Encoded Mode -->
+                    <div class="body-mode-panel" id="body-urlencoded-section" data-mode="urlencoded">
+                        <div id="urlencoded-list" class="key-value-list"></div>
+                        <button id="add-urlencoded-row-btn" class="btn btn-sm btn-secondary">Add Field</button>
                     </div>
 
                     <!-- GraphQL Mode (new) -->
@@ -635,7 +649,7 @@
         <aside class="history-sidebar" role="complementary" id="history-sidebar">
             <div class="sidebar-header u-flex u-items-center u-justify-between">
                 <h2 class="sidebar-title" data-i18n="sidebar.history">History</h2>
-                <div class="sidebar-actions u-flex u-items-center">
+                <div class="u-flex u-items-center u-gap-2">
                     <button id="clear-all-history-btn" class="btn btn-icon-bordered" data-i18n-title="history.clear_all" data-i18n-aria="history.clear_all">
                         <span class="icon icon-16 icon-trash"></span>
                     </button>

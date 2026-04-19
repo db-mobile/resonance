@@ -12,6 +12,8 @@
  * closing, renaming, and duplication. Manages synchronization between tab state
  * and form UI, and coordinates with response container visibility.
  */
+import { WorkspaceTabEndpointLoaderService } from '../services/WorkspaceTabEndpointLoaderService.js';
+
 export class WorkspaceTabController {
     /**
      * Creates a WorkspaceTabController instance
@@ -30,6 +32,14 @@ export class WorkspaceTabController {
 
         // Runner controllers map (tabId -> RunnerController)
         this.runnerControllers = new Map();
+        this.endpointLoader = new WorkspaceTabEndpointLoaderService({
+            service: this.service,
+            stateManager: this.stateManager,
+            responseContainerManager: this.responseContainerManager,
+            tabBar: this.tabBar,
+            updateUIForTabType: (tab) => this._updateUIForTabType(tab),
+            restoreTabStateSafely: (tab) => this._restoreTabStateSafely(tab)
+        });
 
         // Bind tab bar event handlers
         this.tabBar.onTabSwitch = (tabId) => this.switchTab(tabId);
@@ -74,7 +84,7 @@ export class WorkspaceTabController {
                     } else {
                         // Show response container for request tab
                         this.responseContainerManager.showContainer(activeTabId);
-                        await this.stateManager.restoreTabState(activeTab);
+                        await this._restoreTabStateSafely(activeTab);
                     }
                 }
             }
@@ -145,9 +155,7 @@ export class WorkspaceTabController {
             this.tabBar.render(tabs, newTab.id);
 
             // Clear UI for new tab
-            this.isRestoringState = true;
-            await this.stateManager.restoreTabState(newTab);
-            this.isRestoringState = false;
+            await this._restoreTabStateSafely(newTab);
 
             // Clear scripts for new tab (no endpoint selected)
             if (window.scriptController) {
@@ -274,6 +282,20 @@ export class WorkspaceTabController {
     }
 
     /**
+     * Cleans up controller-managed UI resources for a closed tab.
+     *
+     * @private
+     * @param {string} tabId - The closed tab ID
+     * @returns {void}
+     */
+    _cleanupClosedTabUI(tabId) {
+        if (this.runnerControllers.has(tabId)) {
+            this._cleanupRunnerTab(tabId);
+        }
+        this.responseContainerManager.removeContainer(tabId);
+    }
+
+    /**
      * Shows or hides runner/request UI based on tab type
      *
      * @private
@@ -360,9 +382,7 @@ export class WorkspaceTabController {
             }
 
             // Set flag to prevent marking tab as modified during restoration
-            this.isRestoringState = true;
-            await this.stateManager.restoreTabState(tab);
-            this.isRestoringState = false;
+            await this._restoreTabStateSafely(tab);
 
             // Load scripts for this tab's endpoint, or clear if no endpoint
             if (window.scriptController) {
@@ -415,32 +435,23 @@ export class WorkspaceTabController {
 
             // If this is the last tab, create a replacement first then close this one
             if (allTabs.length === 1) {
-                if (this.runnerControllers.has(tabId)) {
-                    this._cleanupRunnerTab(tabId);
-                }
+                this._cleanupClosedTabUI(tabId);
                 await this.createNewTab();
                 // createNewTab already rendered the tab bar with [old, new] and activated new.
                 // Now remove the old tab from storage and re-render with just [new].
                 await this.service.closeTab(tabId);
-                this.responseContainerManager.removeContainer(tabId);
                 const remainingTabs = await this.service.getAllTabs();
                 const activeTabId = await this.service.getActiveTabId();
                 this.tabBar.render(remainingTabs, activeTabId);
                 return;
             }
 
-            // Check if this is a runner tab and clean up
-            if (this.runnerControllers.has(tabId)) {
-                this._cleanupRunnerTab(tabId);
-            }
+            this._cleanupClosedTabUI(tabId);
 
             const result = await this.service.closeTab(tabId);
             if (!result) {
                 return; // Could not close (last tab or not found)
             }
-
-            // Remove response container for closed tab
-            this.responseContainerManager.removeContainer(tabId);
 
             // Re-render tab bar — tabs cache is updated by deleteTab, fetch reflects removal
             const remainingTabs = allTabs.filter(t => t.id !== tabId);
@@ -474,9 +485,7 @@ export class WorkspaceTabController {
             }
         } else {
             this.responseContainerManager.showContainer(tab.id);
-            this.isRestoringState = true;
-            await this.stateManager.restoreTabState(tab);
-            this.isRestoringState = false;
+            await this._restoreTabStateSafely(tab);
         }
     }
 
@@ -554,6 +563,7 @@ export class WorkspaceTabController {
             }
 
             for (const tab of tabsToClose) {
+                this._cleanupClosedTabUI(tab.id);
                 await this.service.closeTab(tab.id);
             }
 
@@ -564,12 +574,10 @@ export class WorkspaceTabController {
             const remainingTabs = await this.service.getAllTabs();
             this.tabBar.render(remainingTabs, tabId);
 
-            // Restore tab state
+            // Activate the remaining tab using the standard request/runner flow
             const activeTab = remainingTabs.find(t => t.id === tabId);
             if (activeTab) {
-                this.isRestoringState = true;
-                await this.stateManager.restoreTabState(activeTab);
-                this.isRestoringState = false;
+                await this._activateTab(activeTab);
             }
         } catch (error) {
             void error;
@@ -683,249 +691,7 @@ export class WorkspaceTabController {
                 targetTabId = await this.service.getActiveTabId();
             }
 
-            if (endpoint.protocol === 'grpc') {
-                const grpcData = endpoint.grpcData || {};
-                const tabName = endpoint.name || 'gRPC Request';
-
-                const tab = await this.service.updateTab(targetTabId, {
-                    name: tabName,
-                    type: 'request',
-                    endpoint: {
-                        collectionId: endpoint.collectionId,
-                        endpointId: endpoint.id,
-                        protocol: 'grpc'
-                    },
-                    request: {
-                        protocol: 'grpc',
-                        grpc: {
-                            target: grpcData.target || '',
-                            service: grpcData.service || '',
-                            fullMethod: grpcData.fullMethod || endpoint.path || '',
-                            requestJson: grpcData.requestJson || '{}',
-                            metadata: grpcData.metadata || {},
-                            useTls: grpcData.useTls || false
-                        }
-                    },
-                    isModified: false
-                });
-
-                if (tab) {
-                    this._updateUIForTabType(tab);
-                    this.responseContainerManager.showContainer(targetTabId);
-                    this.tabBar.updateTab(targetTabId, { name: tabName, isModified: false });
-                    this.isRestoringState = true;
-                    await this.stateManager.restoreTabState(tab);
-                    this.isRestoringState = false;
-                }
-
-                if (window.scriptController && endpoint.collectionId && endpoint.id) {
-                    await window.scriptController.loadScriptsForEndpoint(endpoint.collectionId, endpoint.id);
-                }
-
-                return;
-            }
-
-            if (endpoint.protocol === 'websocket') {
-                const queryParams = {};
-                if (endpoint.persistedQueryParams && endpoint.persistedQueryParams.length > 0) {
-                    endpoint.persistedQueryParams.forEach(param => {
-                        queryParams[param.key] = param.value;
-                    });
-                }
-
-                const headers = {};
-                if (endpoint.persistedHeaders && endpoint.persistedHeaders.length > 0) {
-                    endpoint.persistedHeaders.forEach(header => {
-                        headers[header.key] = header.value;
-                    });
-                }
-
-                const tabName = endpoint.name || 'WebSocket Request';
-                const fullUrl = endpoint.persistedUrl || endpoint.path || '';
-
-                const tab = await this.service.updateTab(targetTabId, {
-                    name: tabName,
-                    type: 'request',
-                    endpoint: {
-                        collectionId: endpoint.collectionId,
-                        endpointId: endpoint.id,
-                        protocol: 'websocket'
-                    },
-                    request: {
-                        protocol: 'websocket',
-                        url: fullUrl,
-                        method: 'WS',
-                        pathParams: {},
-                        queryParams,
-                        headers,
-                        body: {
-                            mode: 'json',
-                            content: endpoint.persistedBody || ''
-                        },
-                        authType: 'none',
-                        authConfig: {}
-                    },
-                    isModified: false
-                });
-
-                if (tab) {
-                    this._updateUIForTabType(tab);
-                    this.responseContainerManager.showContainer(targetTabId);
-                    this.tabBar.updateTab(targetTabId, { name: tabName, isModified: false });
-                    this.isRestoringState = true;
-                    await this.stateManager.restoreTabState(tab);
-                    this.isRestoringState = false;
-                }
-
-                return;
-            }
-
-            // Use persisted URL if available, otherwise construct from endpoint
-            let fullUrl;
-            if (endpoint.persistedUrl) {
-                // Use the persisted URL (user has edited it)
-                fullUrl = endpoint.persistedUrl;
-            } else {
-                // Construct URL with {{baseUrl}} if collection has a baseUrl
-                // but only if path doesn't already contain {{baseUrl}}
-                fullUrl = endpoint.path;
-                if (endpoint.collectionBaseUrl && !endpoint.path.includes('{{baseUrl}}')) {
-                    fullUrl = `{{baseUrl}}${  endpoint.path}`;
-                }
-
-                // Replace path parameters with {{paramName}} format
-                if (endpoint.parameters?.path) {
-                    Object.entries(endpoint.parameters.path).forEach(([key, _param]) => {
-                        const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        const singleBraceParamRegex = new RegExp(`(?<!\\{)\\{${escapedKey}\\}(?!\\})`, 'g');
-                        fullUrl = fullUrl.replace(singleBraceParamRegex, `{{${key}}}`);
-                    });
-                }
-            }
-
-            // Load path parameters (prioritize persisted over defaults)
-            const pathParams = {};
-            if (endpoint.persistedPathParams && endpoint.persistedPathParams.length > 0) {
-                // Use persisted path params
-                endpoint.persistedPathParams.forEach(param => {
-                    pathParams[param.key] = param.value;
-                });
-            } else if (endpoint.parameters?.path) {
-                // Use defaults from OpenAPI spec
-                Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
-                    pathParams[key] = param.example || '';
-                });
-            }
-
-            // Load query parameters (prioritize persisted over defaults)
-            const queryParams = {};
-            if (endpoint.persistedQueryParams && endpoint.persistedQueryParams.length > 0) {
-                // Use persisted query params
-                endpoint.persistedQueryParams.forEach(param => {
-                    queryParams[param.key] = param.value;
-                });
-            } else if (endpoint.parameters?.query) {
-                // Use defaults from OpenAPI spec
-                Object.entries(endpoint.parameters.query).forEach(([key, param]) => {
-                    queryParams[key] = param.example || '';
-                });
-            }
-
-            // Load headers (prioritize persisted over defaults)
-            const headers = {};
-            if (endpoint.persistedHeaders && endpoint.persistedHeaders.length > 0) {
-                // Use persisted headers
-                endpoint.persistedHeaders.forEach(header => {
-                    headers[header.key] = header.value;
-                });
-            } else {
-                // Use defaults from collection and OpenAPI spec
-                if (endpoint.collectionDefaultHeaders) {
-                    Object.entries(endpoint.collectionDefaultHeaders).forEach(([key, value]) => {
-                        headers[key] = value;
-                    });
-                }
-
-                if (endpoint.parameters?.header) {
-                    Object.entries(endpoint.parameters.header).forEach(([key, param]) => {
-                        headers[key] = param.example || '';
-                    });
-                }
-
-                // Add Content-Type for POST/PUT/PATCH if not already present
-                if (['POST', 'PUT', 'PATCH'].includes(endpoint.method) && !headers['Content-Type']) {
-                    headers['Content-Type'] = endpoint.requestBody?.contentType || 'application/json';
-                }
-            }
-
-            // Load request body (prioritize persisted over generated)
-            let bodyString = '';
-            if (endpoint.persistedBody) {
-                // Use persisted body
-                bodyString = endpoint.persistedBody;
-            } else if (endpoint.requestBodyString) {
-                // Use the properly generated body string passed from CollectionController
-                bodyString = endpoint.requestBodyString;
-            } else if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-                bodyString = JSON.stringify({ 'data': 'example' }, null, 2);
-            }
-
-            // Load auth configuration (prioritize persisted config over OpenAPI spec)
-            let authType = 'none';
-            let authConfig = {};
-
-            if (endpoint.persistedAuthConfig) {
-                // Use persisted auth config if available (user's saved auth)
-                // persistedAuthConfig has structure: { type: 'bearer', config: {...} }
-                authType = endpoint.persistedAuthConfig.type || 'none';
-                authConfig = endpoint.persistedAuthConfig.config || {};
-            } else if (endpoint.security) {
-                // Fall back to endpoint.security from OpenAPI spec
-                // Both persistedAuthConfig and endpoint.security have the same structure: { type, config }
-                authType = endpoint.security.type || 'none';
-                authConfig = endpoint.security.config || {};
-            }
-
-            // Update tab with endpoint data
-            // Use endpoint.name if available (contains OpenAPI summary/operationId),
-            // otherwise generate from method and path
-            const tabName = endpoint.name || this.service.generateTabName(endpoint.method, endpoint.path);
-            const tab = await this.service.updateTab(targetTabId, {
-                name: tabName,
-                type: 'request',
-                endpoint: {
-                    collectionId: endpoint.collectionId,
-                    endpointId: endpoint.id,
-                    protocol: 'http'
-                },
-                request: {
-                    protocol: 'http',
-                    url: fullUrl,
-                    method: endpoint.method,
-                    pathParams: pathParams,
-                    queryParams: queryParams,
-                    headers: headers,
-                    body: bodyString,
-                    authType: authType,
-                    authConfig: authConfig
-                },
-                isModified: false
-            });
-
-            // Restore state to UI
-            if (tab) {
-                this._updateUIForTabType(tab);
-                this.responseContainerManager.showContainer(targetTabId);
-                this.tabBar.updateTab(targetTabId, { name: tabName, isModified: false });
-                this.isRestoringState = true;
-                await this.stateManager.restoreTabState(tab);
-                this.isRestoringState = false;
-            }
-
-            // Load scripts for this endpoint
-            if (window.scriptController && endpoint.collectionId && endpoint.id) {
-                await window.scriptController.loadScriptsForEndpoint(endpoint.collectionId, endpoint.id);
-            }
+            await this.endpointLoader.loadEndpoint(endpoint, targetTabId);
         } catch (error) {
             void error;
         }
@@ -951,6 +717,15 @@ export class WorkspaceTabController {
             await this.service.updateTab(activeTabId, currentState);
         } catch (error) {
             void error;
+        }
+    }
+
+    async _restoreTabStateSafely(tab) {
+        this.isRestoringState = true;
+        try {
+            await this.stateManager.restoreTabState(tab);
+        } finally {
+            this.isRestoringState = false;
         }
     }
 

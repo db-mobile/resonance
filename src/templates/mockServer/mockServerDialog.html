@@ -29,7 +29,7 @@
             <div class="u-flex u-flex-col u-flex-1 u-min-h-0 u-overflow-hidden">
                 <div class="mock-server-log-header u-flex u-items-center u-justify-between">
                     <h4 class="section-eyebrow mock-server-section-title" data-role="request-log-heading"></h4>
-                    <button id="mock-server-clear-logs-btn" class="btn-xs btn-outline" data-role="clear"></button>
+                    <button id="mock-server-clear-logs-btn" class="btn btn-xs btn-outline" data-role="clear"></button>
                 </div>
                 <div id="mock-server-logs" class="mock-server-logs u-flex-1 u-overflow-y-auto"></div>
             </div>
@@ -90,9 +90,9 @@
 
         <div class="mock-server-notice is-hidden" data-role="custom-notice"></div>
 
-        <div class="field-row">
-            <div class="field-group">
-                <label class="field-label" data-role="delay-label"></label>
+        <div class="u-flex u-gap-6">
+            <div class="u-flex u-flex-col u-gap-2 u-flex-1">
+                <label class="form-label" data-role="delay-label"></label>
                 <input
                     type="number"
                     id="response-editor-delay"
@@ -102,8 +102,8 @@
                 />
                 <span class="field-help mock-server-input-hint">(0-30000)</span>
             </div>
-            <div class="field-group">
-                <label class="field-label" data-role="status-code-label"></label>
+            <div class="u-flex u-flex-col u-gap-2 u-flex-1">
+                <label class="form-label" data-role="status-code-label"></label>
                 <input
                     type="number"
                     id="response-editor-status-code"
@@ -115,8 +115,8 @@
             </div>
         </div>
 
-        <div class="field-group u-flex u-flex-col u-flex-1 u-min-h-0 u-overflow-hidden">
-            <label class="field-label" data-role="body-label"></label>
+        <div class="u-flex u-flex-col u-flex-1 u-min-h-0 u-overflow-hidden">
+            <label class="form-label" data-role="body-label"></label>
             <textarea
                 id="response-editor-textarea"
                 class="textarea-base mock-server-response-editor-textarea"

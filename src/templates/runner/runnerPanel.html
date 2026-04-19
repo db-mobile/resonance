@@ -21,21 +21,21 @@
                         </div>
                     </div>
                 </div>
-                <div class="runner-header-actions u-flex">
-                    <button class="btn-sm btn-primary" data-action="new-runner" title="New Runner">
+                <div class="u-flex u-gap-2">
+                    <button class="btn btn-sm btn-primary" data-action="new-runner" title="New Runner">
                         <span class="icon icon-14 icon-plus"></span>
                         <span data-i18n="runner.new">New</span>
                     </button>
-                    <button class="btn-sm btn-outline" data-action="save-runner" title="Save Runner">
+                    <button class="btn btn-sm btn-outline" data-action="save-runner" title="Save Runner">
                         <span class="icon icon-14 icon-save"></span>
                         <span data-i18n="runner.save">Save</span>
                     </button>
-                    <button class="btn-sm btn-outline runner-danger-btn" data-action="delete-runner" title="Delete Runner">
+                    <button class="btn btn-sm btn-outline-danger" data-action="delete-runner" title="Delete Runner">
                         <span class="icon icon-14 icon-trash"></span>
                     </button>
                 </div>
                 <div class="runner-header-separator"></div>
-                <div class="runner-header-options u-flex u-items-center">
+                <div class="u-flex u-items-center u-gap-4">
                     <label class="toggle-switch">
                         <input type="checkbox" data-option="stop-on-error" checked>
                         <span class="toggle-track"></span>
@@ -133,7 +133,7 @@
         <div class="runner-request-drag-handle">
             <span class="icon icon-14 icon-menu"></span>
         </div>
-        <div class="runner-request-info">
+        <div class="u-flex u-flex-1 u-items-center u-gap-2 u-overflow-hidden u-min-w-0">
             <span class="method-pill" data-role="method">GET</span>
             <span class="runner-request-name" data-role="name">/endpoint</span>
         </div>
@@ -186,7 +186,7 @@
                 <span class="runner-results-time" data-role="total-time">0ms</span>
             </div>
         </div>
-        <div class="runner-results-body">
+        <div class="u-flex u-flex-1 u-overflow-hidden u-min-h-0">
             <div class="runner-results-list-panel">
                 <div class="runner-results-list" data-role="results-list">
                 </div>
@@ -277,15 +277,15 @@
 
 <template id="tpl-runner-saved-item">
     <div class="runner-saved-item u-flex u-items-center u-justify-between">
-        <div class="runner-saved-item-info">
+        <div class="u-flex-1 u-overflow-hidden">
             <span class="runner-saved-item-name" data-role="name">Runner Name</span>
             <span class="runner-saved-item-meta" data-role="meta">3 requests • Last run: Never</span>
         </div>
-        <div class="runner-saved-item-actions u-flex">
-            <button class="btn-sm btn-outline" data-action="load" title="Load">
+        <div class="u-flex u-gap-2">
+            <button class="btn btn-sm btn-outline" data-action="load" title="Load">
                 <span class="icon icon-14 icon-import"></span>
             </button>
-            <button class="btn-sm btn-outline runner-danger-btn" data-action="delete" title="Delete">
+            <button class="btn btn-sm btn-outline-danger" data-action="delete" title="Delete">
                 <span class="icon icon-14 icon-trash"></span>
             </button>
         </div>

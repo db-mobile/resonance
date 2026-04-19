@@ -1,11 +1,11 @@
 <template id="tpl-variable-manager-dialog">
-    <div class="dialog-stack">
+    <div class="u-flex u-flex-col u-gap-4">
         <div class="manager-header dialog-header u-items-center u-justify-between">
             <h3 class="dialog-title" data-role="title"></h3>
             <div class="manager-header-actions u-flex">
-                <button id="add-variable-btn" class="btn-xs btn-outline-primary">+ Add Variable</button>
-                <button id="import-variables-btn" class="btn-xs btn-outline">Import</button>
-                <button id="export-variables-btn" class="btn-xs btn-outline">Export</button>
+                <button id="add-variable-btn" class="btn btn-xs btn-outline-primary">+ Add Variable</button>
+                <button id="import-variables-btn" class="btn btn-xs btn-outline">Import</button>
+                <button id="export-variables-btn" class="btn btn-xs btn-outline">Export</button>
             </div>
         </div>
 
@@ -51,7 +51,7 @@
 </template>
 
 <template id="tpl-variable-manager-import-dialog">
-    <div class="dialog-stack">
+    <div class="u-flex u-flex-col u-gap-4">
         <h4 class="dialog-title">Import Variables</h4>
         <textarea id="import-textarea" placeholder="Paste JSON object with variables..." class="textarea-base variable-import-textarea"></textarea>
         <div class="dialog-footer">

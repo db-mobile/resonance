@@ -2,28 +2,28 @@
     <div class="manager-header dialog-header u-items-center u-justify-between">
         <h3 class="dialog-title">Manage Environments</h3>
         <div class="manager-header-actions u-flex">
-            <button id="env-import-btn" class="btn-xs btn-outline" title="Import Environments">
+            <button id="env-import-btn" class="btn btn-xs btn-outline" title="Import Environments">
                 <span class="icon icon-14 icon-import"></span>
                 <span>Import</span>
             </button>
-            <button id="env-export-all-btn" class="btn-xs btn-outline" title="Export All Environments">
+            <button id="env-export-all-btn" class="btn btn-xs btn-outline" title="Export All Environments">
                 <span class="icon icon-14 icon-export"></span>
                 <span>Export All</span>
             </button>
         </div>
     </div>
 
-    <div class="env-manager-main u-flex u-gap-4">
+    <div class="u-flex u-flex-1 u-gap-4 u-overflow-hidden">
         <div class="env-manager-sidebar">
             <div class="env-manager-sidebar-header">
                 <h4 class="manager-section-title">ENVIRONMENTS</h4>
-                <button id="env-create-btn" class="btn-sm btn-outline-primary" title="Create New Environment">+</button>
+                <button id="env-create-btn" class="btn btn-sm btn-outline-primary" title="Create New Environment">+</button>
             </div>
             <div id="env-list" class="env-manager-list"></div>
         </div>
 
-        <div class="env-manager-details">
-            <div id="env-details" class="env-manager-details-scroll">
+        <div class="u-flex u-flex-1 u-flex-col u-overflow-hidden">
+            <div id="env-details" class="u-flex-1 u-overflow-y-auto">
                 <div class="empty-state-base env-manager-empty-state">
                     Select an environment to view and edit its variables
                 </div>
@@ -37,19 +37,19 @@
 </template>
 
 <template id="tpl-environment-manager-details">
-    <div class="env-manager-details-content">
-        <div class="env-manager-details-top u-flex u-flex-col u-gap-3">
+    <div class="u-flex u-flex-col u-gap-3">
+        <div class="u-flex u-flex-col u-gap-3 u-mb-4">
             <input type="text" id="env-name-input" class="input-base env-manager-name-input" />
             <div class="env-manager-color-row">
                 <label for="env-color-input" class="env-manager-color-label">Color</label>
                 <div class="env-manager-color-controls">
                     <input type="color" id="env-color-input" class="env-manager-color-input" value="#4F46E5" />
                     <span id="env-color-value" class="env-manager-color-value">None</span>
-                    <button id="env-color-clear-btn" type="button" class="btn-xs btn-outline">Clear</button>
+                    <button id="env-color-clear-btn" type="button" class="btn btn-xs btn-outline">Clear</button>
                 </div>
             </div>
             <div class="env-manager-details-actions u-flex">
-                <button id="env-set-active-btn" class="btn-xs btn-outline" title="Set as Active">
+                <button id="env-set-active-btn" class="btn btn-xs btn-outline" title="Set as Active">
                     <span class="icon icon-14 icon-check"></span>
                     <span>Active</span>
                 </button>
@@ -57,22 +57,22 @@
                     <span class="icon icon-14 icon-check"></span>
                     <span>ACTIVE</span>
                 </span>
-                <button id="env-duplicate-btn" class="btn-xs btn-outline" title="Duplicate Environment">
+                <button id="env-duplicate-btn" class="btn btn-xs btn-outline" title="Duplicate Environment">
                     <span class="icon icon-14 icon-duplicate"></span>
                 </button>
-                <button id="env-export-btn" class="btn-xs btn-outline" title="Export Environment">
+                <button id="env-export-btn" class="btn btn-xs btn-outline" title="Export Environment">
                     <span class="icon icon-14 icon-export"></span>
                 </button>
-                <button id="env-delete-btn" class="btn-xs btn-outline env-danger-btn" title="Delete Environment">
+                <button id="env-delete-btn" class="btn btn-xs btn-outline-danger" title="Delete Environment">
                     <span class="icon icon-14 icon-trash"></span>
                 </button>
             </div>
         </div>
 
-        <div class="env-manager-variables-section">
+        <div class="u-mb-4">
             <div class="env-manager-variables-header u-flex u-items-center u-justify-between">
-                <h4 class="manager-section-title manager-section-title--no-margin">VARIABLES</h4>
-                <button id="env-add-variable-btn" class="btn-sm btn-outline-primary" title="Add Variable">+ Add</button>
+                <h4 class="manager-section-title">VARIABLES</h4>
+                <button id="env-add-variable-btn" class="btn btn-sm btn-outline-primary" title="Add Variable">+ Add</button>
             </div>
             <div id="env-variables-container"></div>
         </div>
@@ -88,7 +88,7 @@
 </template>
 
 <template id="tpl-environment-manager-input-dialog">
-    <div class="dialog-stack">
+    <div class="u-flex u-flex-col u-gap-4">
         <h3 class="dialog-title" data-role="title"></h3>
         <p class="dialog-message" data-role="message"></p>
         <input type="text" id="input-dialog-input" class="input-base field-input" />
@@ -100,7 +100,7 @@
 </template>
 
 <template id="tpl-environment-manager-alert-dialog">
-    <div class="dialog-stack">
+    <div class="u-flex u-flex-col u-gap-4">
         <p class="dialog-message dialog-message--primary" data-role="message"></p>
         <div class="dialog-footer">
             <button id="alert-dialog-ok" class="btn btn-primary">OK</button>
@@ -109,7 +109,7 @@
 </template>
 
 <template id="tpl-environment-manager-confirm-dialog">
-    <div class="dialog-stack">
+    <div class="u-flex u-flex-col u-gap-4">
         <p class="dialog-message dialog-message--primary" data-role="message"></p>
         <div class="dialog-footer">
             <button id="confirm-dialog-cancel" class="btn btn-outline">Cancel</button>

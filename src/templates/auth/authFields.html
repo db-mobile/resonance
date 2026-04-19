@@ -1,6 +1,6 @@
 <template id="tpl-auth-bearer">
     <div class="auth-field-group u-flex u-flex-col">
-        <label for="bearer-token">Token</label>
+        <label for="bearer-token" class="form-label">Token</label>
         <input type="text" id="bearer-token" class="input-base form-input" placeholder="Enter bearer token" aria-label="Bearer Token">
         <small class="form-input-hint">The token will be sent in the Authorization header as "Bearer {token}". You can use variables like {{bearerToken}}.</small>
     </div>
@@ -9,11 +9,11 @@
 <template id="tpl-auth-basic">
     <div class="u-flex u-flex-col u-gap-4">
         <div class="auth-field-group u-flex u-flex-col">
-            <label for="basic-username">Username</label>
+            <label for="basic-username" class="form-label">Username</label>
             <input type="text" id="basic-username" class="input-base form-input" placeholder="Enter username" aria-label="Username">
         </div>
         <div class="auth-field-group u-flex u-flex-col">
-            <label for="basic-password">Password</label>
+            <label for="basic-password" class="form-label">Password</label>
             <input type="password" id="basic-password" class="input-base form-input" placeholder="Enter password" aria-label="Password">
         </div>
         <small class="form-input-hint">Credentials will be base64 encoded and sent in the Authorization header</small>
@@ -23,15 +23,15 @@
 <template id="tpl-auth-api-key">
     <div class="u-flex u-flex-col u-gap-4">
         <div class="auth-field-group u-flex u-flex-col">
-            <label for="api-key-name">Key Name</label>
+            <label for="api-key-name" class="form-label">Key Name</label>
             <input type="text" id="api-key-name" class="input-base form-input" placeholder="e.g., X-API-Key" aria-label="API Key Name">
         </div>
         <div class="auth-field-group u-flex u-flex-col">
-            <label for="api-key-value">Key Value</label>
+            <label for="api-key-value" class="form-label">Key Value</label>
             <input type="text" id="api-key-value" class="input-base form-input" placeholder="Enter API key" aria-label="API Key Value">
         </div>
         <div class="auth-field-group u-flex u-flex-col">
-            <label for="api-key-location">Add To</label>
+            <label for="api-key-location" class="form-label">Add To</label>
             <select id="api-key-location" class="form-select" aria-label="API Key Location">
                 <option value="header">Header</option>
                 <option value="query">Query Parameters</option>
@@ -45,7 +45,7 @@
     <div class="u-flex u-flex-col u-gap-4">
         <!-- Grant Type Selection -->
         <div class="auth-field-group u-flex u-flex-col">
-            <label for="oauth2-grant-type">Grant Type</label>
+            <label for="oauth2-grant-type" class="form-label">Grant Type</label>
             <select id="oauth2-grant-type" class="form-select" aria-label="OAuth 2.0 Grant Type">
                 <option value="client_credentials">Client Credentials</option>
                 <option value="authorization_code">Authorization Code</option>
@@ -56,24 +56,24 @@
 
         <!-- Token URL (for all flows except manual) -->
         <div class="auth-field-group u-flex u-flex-col" id="oauth2-token-url-group">
-            <label for="oauth2-token-url">Token URL</label>
+            <label for="oauth2-token-url" class="form-label">Token URL</label>
             <input type="text" id="oauth2-token-url" class="input-base form-input" placeholder="https://auth.example.com/oauth/token" aria-label="Token URL">
         </div>
 
         <!-- Authorization URL (for authorization code flow) -->
         <div class="auth-field-group u-flex u-flex-col u-hidden" id="oauth2-auth-url-group">
-            <label for="oauth2-auth-url">Authorization URL</label>
+            <label for="oauth2-auth-url" class="form-label">Authorization URL</label>
             <input type="text" id="oauth2-auth-url" class="input-base form-input" placeholder="https://auth.example.com/oauth/authorize" aria-label="Authorization URL">
         </div>
 
         <!-- Client ID + Client Secret -->
         <div id="oauth2-credentials-pair" class="oauth2-field-pair">
             <div class="auth-field-group u-flex u-flex-col" id="oauth2-client-id-group">
-                <label for="oauth2-client-id">Client ID</label>
+                <label for="oauth2-client-id" class="form-label">Client ID</label>
                 <input type="text" id="oauth2-client-id" class="input-base form-input" placeholder="Enter client ID" aria-label="Client ID">
             </div>
             <div class="auth-field-group u-flex u-flex-col" id="oauth2-client-secret-group">
-                <label for="oauth2-client-secret">Client Secret</label>
+                <label for="oauth2-client-secret" class="form-label">Client Secret</label>
                 <input type="password" id="oauth2-client-secret" class="input-base form-input" placeholder="Enter client secret" aria-label="Client Secret">
             </div>
         </div>
@@ -81,24 +81,24 @@
         <!-- Username + Password (for password grant) -->
         <div id="oauth2-username-password-pair" class="oauth2-field-pair u-hidden">
             <div class="auth-field-group u-flex u-flex-col" id="oauth2-username-group">
-                <label for="oauth2-username">Username</label>
+                <label for="oauth2-username" class="form-label">Username</label>
                 <input type="text" id="oauth2-username" class="input-base form-input" placeholder="Enter username" aria-label="Username">
             </div>
             <div class="auth-field-group u-flex u-flex-col" id="oauth2-password-group">
-                <label for="oauth2-password">Password</label>
+                <label for="oauth2-password" class="form-label">Password</label>
                 <input type="password" id="oauth2-password" class="input-base form-input" placeholder="Enter password" aria-label="Password">
             </div>
         </div>
 
         <!-- Redirect URI (for authorization code flow) -->
         <div class="auth-field-group u-flex u-flex-col u-hidden" id="oauth2-redirect-uri-group">
-            <label for="oauth2-redirect-uri">Redirect URI</label>
+            <label for="oauth2-redirect-uri" class="form-label">Redirect URI</label>
             <input type="text" id="oauth2-redirect-uri" class="input-base form-input" placeholder="http://localhost:8080/callback" aria-label="Redirect URI">
         </div>
 
         <!-- Scope -->
         <div class="auth-field-group u-flex u-flex-col" id="oauth2-scope-group">
-            <label for="oauth2-scope">Scope</label>
+            <label for="oauth2-scope" class="form-label">Scope</label>
             <input type="text" id="oauth2-scope" class="input-base form-input" placeholder="openid profile email" aria-label="Scope">
             <small class="form-input-hint">Space-separated list of scopes</small>
         </div>
@@ -122,7 +122,7 @@
             <label>Current Token</label>
             <div class="oauth2-token-info u-flex u-flex-col u-gap-2">
                 <div class="auth-field-group u-flex u-flex-col">
-                    <label for="oauth2-token">Access Token</label>
+                    <label for="oauth2-token" class="form-label">Access Token</label>
                     <input type="text" id="oauth2-token" class="input-base form-input" placeholder="No token - click 'Get New Access Token'" aria-label="Access Token" readonly>
                 </div>
                 <div class="u-flex u-gap-2 u-items-center" id="oauth2-token-meta">
@@ -130,7 +130,7 @@
                     <span id="oauth2-token-expires" class="badge badge-warning u-hidden"></span>
                 </div>
                 <div class="auth-field-group u-flex u-flex-col u-hidden" id="oauth2-refresh-token-group">
-                    <label for="oauth2-refresh-token">Refresh Token</label>
+                    <label for="oauth2-refresh-token" class="form-label">Refresh Token</label>
                     <input type="text" id="oauth2-refresh-token" class="input-base form-input" aria-label="Refresh Token" readonly>
                     <button type="button" id="oauth2-refresh-btn" class="btn btn-secondary btn-sm u-mt-2">Refresh Token</button>
                 </div>
@@ -143,13 +143,13 @@
             <div class="u-flex u-flex-col u-gap-4">
                 <!-- Audience (optional, for Auth0 etc.) -->
                 <div class="auth-field-group u-flex u-flex-col" id="oauth2-audience-group">
-                    <label for="oauth2-audience">Audience (optional)</label>
+                    <label for="oauth2-audience" class="form-label">Audience (optional)</label>
                     <input type="text" id="oauth2-audience" class="input-base form-input" placeholder="https://api.example.com" aria-label="Audience">
                 </div>
 
                 <!-- Client Auth Method -->
                 <div class="auth-field-group u-flex u-flex-col" id="oauth2-client-auth-group">
-                    <label for="oauth2-client-auth">Client Authentication</label>
+                    <label for="oauth2-client-auth" class="form-label">Client Authentication</label>
                     <select id="oauth2-client-auth" class="form-select" aria-label="Client Authentication Method">
                         <option value="body">Send in request body</option>
                         <option value="header">Send as Basic Auth header</option>
@@ -158,7 +158,7 @@
 
                 <!-- Header Prefix -->
                 <div class="auth-field-group u-flex u-flex-col">
-                    <label for="oauth2-header-prefix">Header Prefix</label>
+                    <label for="oauth2-header-prefix" class="form-label">Header Prefix</label>
                     <input type="text" id="oauth2-header-prefix" class="input-base form-input" placeholder="Bearer" value="Bearer" aria-label="Header Prefix">
                 </div>
             </div>
@@ -174,11 +174,11 @@
 <template id="tpl-auth-digest">
     <div class="u-flex u-flex-col u-gap-4">
         <div class="auth-field-group u-flex u-flex-col">
-            <label for="digest-username">Username</label>
+            <label for="digest-username" class="form-label">Username</label>
             <input type="text" id="digest-username" class="input-base form-input" placeholder="Enter username" aria-label="Digest Auth Username">
         </div>
         <div class="auth-field-group u-flex u-flex-col">
-            <label for="digest-password">Password</label>
+            <label for="digest-password" class="form-label">Password</label>
             <input type="password" id="digest-password" class="input-base form-input" placeholder="Enter password" aria-label="Digest Auth Password">
         </div>
         <small class="form-input-hint">Digest authentication will be handled automatically by the HTTP client</small>

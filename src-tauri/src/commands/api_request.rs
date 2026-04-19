@@ -162,6 +162,9 @@ pub struct RequestOptions {
     /// Whether to follow HTTP redirects (defaults to true)
     #[serde(default)]
     pub follow_redirects: Option<bool>,
+    /// Body encoding type: "json" (default) | "formdata" | "urlencoded"
+    #[serde(default)]
+    pub body_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -350,16 +353,55 @@ pub async fn send_api_request(
         .parse::<Method>()
         .map_err(|e| format!("Invalid HTTP method: {}", e))?;
 
+    // Extract body_type before the closure to avoid borrow issues
+    let body_type = request_options
+        .body_type
+        .as_deref()
+        .unwrap_or("json")
+        .to_string();
+
     // Helper to build a request
     let build_request = |auth_header: Option<String>| -> RequestBuilder {
         let mut rb = client.request(method.clone(), &request_options.url);
         if let Some(headers) = &request_options.headers {
             for (key, value) in headers {
+                // Skip Content-Type for form modes — reqwest sets it automatically
+                if (body_type == "formdata" || body_type == "urlencoded")
+                    && key.to_lowercase() == "content-type"
+                {
+                    continue;
+                }
                 rb = rb.header(key, value);
             }
         }
-        if let Some(body) = &request_options.body {
-            rb = rb.json(body);
+        match body_type.as_str() {
+            "urlencoded" => {
+                if let Some(body) = &request_options.body {
+                    if let Some(obj) = body.as_object() {
+                        let pairs: Vec<(String, String)> = obj
+                            .iter()
+                            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
+                            .collect();
+                        rb = rb.form(&pairs);
+                    }
+                }
+            }
+            "formdata" => {
+                if let Some(body) = &request_options.body {
+                    if let Some(obj) = body.as_object() {
+                        let mut form = reqwest::multipart::Form::new();
+                        for (k, v) in obj {
+                            form = form.text(k.clone(), v.as_str().unwrap_or("").to_string());
+                        }
+                        rb = rb.multipart(form);
+                    }
+                }
+            }
+            _ => {
+                if let Some(body) = &request_options.body {
+                    rb = rb.json(body);
+                }
+            }
         }
         if let Some(auth) = auth_header {
             rb = rb.header("Authorization", auth);

@@ -51,6 +51,7 @@ describe('CollectionRepository', () => {
                 headers: [{ key: 'X-Custom', value: 'value' }],
                 modifiedBody: '{"name": "test"}',
                 graphqlData: { query: 'query { users }', variables: '{}' },
+                formBodyData: null,
                 grpcData: { service: 'UserService', method: 'GetUser' },
                 responseSchema: null
             });
@@ -71,6 +72,7 @@ describe('CollectionRepository', () => {
                 headers: [],
                 modifiedBody: null,
                 graphqlData: null,
+                formBodyData: null,
                 grpcData: null,
                 responseSchema: null
             });
@@ -92,6 +94,7 @@ describe('CollectionRepository', () => {
                 headers: [{ key: 'Authorization', value: 'Bearer token' }],
                 modifiedBody: null,
                 graphqlData: null,
+                formBodyData: null,
                 grpcData: null,
                 responseSchema: null
             });
@@ -110,6 +113,7 @@ describe('CollectionRepository', () => {
                 headers: [],
                 modifiedBody: null,
                 graphqlData: null,
+                formBodyData: null,
                 grpcData: null,
                 responseSchema: null
             });

@@ -581,8 +581,9 @@ export async function handleSendRequest() {
         }
     }
 
-    // Handle request body (supports JSON and GraphQL modes)
-    if (['POST', 'PUT', 'PATCH'].includes(method)) {
+    // Handle request body (supports JSON, GraphQL, Form Data, and URL Encoded modes)
+    const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
+    if (['POST', 'PUT', 'PATCH'].includes(method) || bodyMode === 'formdata' || bodyMode === 'urlencoded') {
         try {
             // Reuse variables already fetched above — avoids a duplicate IPC call
             let variables = _resolvedVariables;
@@ -626,6 +627,19 @@ export async function handleSendRequest() {
                     query: queryText,
                     variables: parsedVariables
                 };
+            } else if ((bodyMode === 'formdata' || bodyMode === 'urlencoded') && window.formBodyManager) {
+                // Form Data / URL Encoded mode: read key-value pairs
+                const rawFields = bodyMode === 'formdata'
+                    ? window.formBodyManager.getFormDataFields()
+                    : window.formBodyManager.getUrlencodedFields();
+                const processed = {};
+                for (const [k, v] of Object.entries(rawFields)) {
+                    processed[processor.processTemplate(k, variables)]
+                        = processor.processTemplate(v, variables);
+                }
+                if (Object.keys(processed).length > 0) {
+                    body = processed;
+                }
             } else {
                 // JSON mode: existing behavior
                 let bodyText = getRequestBodyContent().trim();
@@ -681,6 +695,7 @@ export async function handleSendRequest() {
         rawUrl,
         headers,
         body,
+        bodyType: (bodyMode === 'formdata' || bodyMode === 'urlencoded') ? bodyMode : undefined,
         httpVersion,
         timeout,
         verifySsl,
