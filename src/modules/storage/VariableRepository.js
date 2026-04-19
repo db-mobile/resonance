@@ -11,8 +11,6 @@
  * Variables are stored per collection in a variables.json file within the collection directory.
  * This enables Git-friendly storage with clean diffs.
  *
- * @deprecated This repository is being phased out in favor of EnvironmentRepository
- * which provides environment-scoped variables with better organization.
  */
 export class VariableRepository {
     /**
