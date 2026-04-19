@@ -1,7 +1,7 @@
 <template id="tpl-new-collection-dialog">
     <div class="new-request-dialog-overlay modal-overlay">
         <div class="new-request-dialog modal-dialog modal-dialog--sm">
-            <form id="new-collection-form" class="dialog-form">
+            <form id="new-collection-form" class="u-flex u-flex-col u-gap-4">
                 <h3 class="dialog-title" data-i18n="new_collection.title">Create New Collection</h3>
                 <div class="form-group">
                     <label for="collection-name" class="form-label" data-i18n="new_collection.name_label">Collection Name:</label>
@@ -26,7 +26,7 @@
 <template id="tpl-new-request-dialog">
     <div class="new-request-dialog-overlay modal-overlay">
         <div class="new-request-dialog modal-dialog modal-dialog--sm">
-            <form id="new-request-form" class="dialog-form">
+            <form id="new-request-form" class="u-flex u-flex-col u-gap-4">
                 <h3 class="dialog-title" data-i18n="new_request.title">Create New Request</h3>
                 <div class="form-group">
                     <label for="request-name" class="form-label" data-i18n="new_request.name_label">Request Name:</label>
@@ -76,7 +76,7 @@
 <template id="tpl-save-to-collection-dialog">
     <div class="new-request-dialog-overlay modal-overlay">
         <div class="new-request-dialog modal-dialog modal-dialog--sm">
-            <form id="save-to-collection-form" class="dialog-form">
+            <form id="save-to-collection-form" class="u-flex u-flex-col u-gap-4">
                 <h3 class="dialog-title" data-i18n="save_to_collection.title">Save to Collection</h3>
                 <div class="form-group">
                     <label for="save-request-name" class="form-label" data-i18n="save_to_collection.name_label">Request Name:</label>
@@ -114,7 +114,7 @@
 <template id="tpl-import-collection-dialog">
     <div class="new-request-dialog-overlay modal-overlay">
         <div class="new-request-dialog modal-dialog modal-dialog--md">
-            <form id="import-collection-form" class="dialog-form">
+            <form id="import-collection-form" class="u-flex u-flex-col u-gap-4">
                 <div class="dialog-header">
                     <div>
                         <h3 class="dialog-title" id="import-collection-title" data-i18n="import_dialog.title">Import Collection</h3>
@@ -123,7 +123,7 @@
                     <button type="button" id="import-collection-close-btn" class="dialog-close-btn" aria-label="Close">&times;</button>
                 </div>
 
-                <div class="import-dialog-stack">
+                <div class="u-flex u-flex-col u-gap-4">
                     <div class="import-selector-card" id="import-source-card">
                         <div class="import-selector-card__header">
                             <div>

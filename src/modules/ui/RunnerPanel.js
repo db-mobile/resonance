@@ -740,7 +740,7 @@ export class RunnerPanel {
             return `
                 <div class="runner-dropdown-item dropdown-item u-flex u-items-center u-justify-between ${isSelected ? 'is-selected is-active' : ''}" data-runner-id="${runner.id}">
                     <span class="runner-dropdown-item-name dropdown-item-label">${this._escapeHtml(runner.name)}</span>
-                    <span class="runner-dropdown-item-meta dropdown-item-meta">${requestCount} requests</span>
+                    <span class="dropdown-item-meta">${requestCount} requests</span>
                 </div>
             `;
         }).join('');
