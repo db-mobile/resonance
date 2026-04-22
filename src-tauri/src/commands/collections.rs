@@ -345,7 +345,10 @@ fn sync_endpoint_data_file_names(
     Ok(())
 }
 
-fn resolve_collection_dir(app: &AppHandle, collection_id: &str) -> Result<Option<PathBuf>, String> {
+pub(crate) fn resolve_collection_dir(
+    app: &AppHandle,
+    collection_id: &str,
+) -> Result<Option<PathBuf>, String> {
     let index = get_collection_index(app)?;
     if let Some(path_str) = index.get(collection_id) {
         let path = PathBuf::from(path_str);
@@ -527,6 +530,7 @@ pub async fn collection_delete(app: AppHandle, collection_id: String) -> Result<
     }
 
     unregister_collection_path(&app, &collection_id)?;
+    super::scripts::purge_store_scripts_for_collection(&app, &collection_id);
     Ok(())
 }
 

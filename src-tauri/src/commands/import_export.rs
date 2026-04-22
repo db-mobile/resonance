@@ -1390,23 +1390,83 @@ pub async fn collections_pick_import_file(
         .map(|path| path.to_string_lossy().to_string()))
 }
 
+fn load_collection_for_export(app: &AppHandle, collection_id: &str) -> Result<Collection, String> {
+    let collection_dir = storage_collections::resolve_collection_dir(app, collection_id)?
+        .ok_or_else(|| format!("Collection {} not found", collection_id))?;
+
+    let collection_file = collection_dir.join("collection.json");
+    let content = fs::read_to_string(&collection_file)
+        .map_err(|e| format!("Failed to read collection.json: {}", e))?;
+    let raw: Value =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse collection: {}", e))?;
+
+    let id = raw
+        .get("id")
+        .and_then(|v| v.as_str())
+        .unwrap_or(collection_id)
+        .to_string();
+    let name = raw
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let description = raw
+        .get("description")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let base_url = raw
+        .get("baseUrl")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from);
+
+    let endpoints: Vec<Endpoint> = raw
+        .get("endpoints")
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or_default();
+
+    let folders: Vec<Folder> = raw
+        .get("folders")
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or_default();
+
+    let variables_file = collection_dir.join("variables.json");
+    let variables: Option<HashMap<String, String>> = if variables_file.exists() {
+        fs::read_to_string(&variables_file)
+            .ok()
+            .and_then(|s| serde_json::from_str::<Vec<Value>>(&s).ok())
+            .map(|entries| {
+                entries
+                    .into_iter()
+                    .filter_map(|e| {
+                        let key = e.get("key")?.as_str()?.to_string();
+                        let value = e.get("value")?.as_str()?.to_string();
+                        Some((key, value))
+                    })
+                    .collect()
+            })
+    } else {
+        None
+    };
+
+    Ok(Collection {
+        id,
+        name,
+        description,
+        base_url,
+        endpoints,
+        folders,
+        variables,
+    })
+}
+
 #[tauri::command]
 pub async fn export_openapi(
     app: AppHandle,
     collection_id: String,
     format: String,
 ) -> Result<Value, String> {
-    // Get collection from store
-    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
-    let collections: Vec<Collection> = store
-        .get("collections")
-        .and_then(|v| serde_json::from_value(v).ok())
-        .unwrap_or_default();
-
-    let collection = collections
-        .iter()
-        .find(|c| c.id == collection_id)
-        .ok_or("Collection not found")?;
+    let collection = load_collection_for_export(&app, &collection_id)?;
 
     // Show save dialog
     let file_ext = if format == "yaml" { "yaml" } else { "json" };
@@ -1441,7 +1501,7 @@ pub async fn export_openapi(
     };
 
     // Convert to OpenAPI format
-    let (openapi_spec, skipped) = collection_to_openapi(collection);
+    let (openapi_spec, skipped) = collection_to_openapi(&collection);
 
     let content = if format == "yaml" {
         serde_yaml::to_string(&openapi_spec).map_err(|e| e.to_string())?
@@ -1469,17 +1529,7 @@ pub async fn export_openapi(
 
 #[tauri::command]
 pub async fn export_postman(app: AppHandle, collection_id: String) -> Result<Value, String> {
-    // Get collection from store
-    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
-    let collections: Vec<Collection> = store
-        .get("collections")
-        .and_then(|v| serde_json::from_value(v).ok())
-        .unwrap_or_default();
-
-    let collection = collections
-        .iter()
-        .find(|c| c.id == collection_id)
-        .ok_or("Collection not found")?;
+    let collection = load_collection_for_export(&app, &collection_id)?;
 
     // Show save dialog
     let (tx, rx) = oneshot::channel::<Option<FilePath>>();
@@ -1505,7 +1555,7 @@ pub async fn export_postman(app: AppHandle, collection_id: String) -> Result<Val
         return Ok(serde_json::json!({ "success": false, "cancelled": true }));
     };
 
-    let (postman_collection, skipped) = collection_to_postman(collection);
+    let (postman_collection, skipped) = collection_to_postman(&collection);
     let content = serde_json::to_string_pretty(&postman_collection).map_err(|e| e.to_string())?;
 
     let file_path = path.as_path().ok_or("Invalid file path")?;

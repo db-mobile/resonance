@@ -105,32 +105,19 @@ export class ProxyService {
      * @fires ProxyService#proxy-settings-updated
      */
     async updateSettings(settings) {
-        try {
-            // Validate settings
-            const validationErrors = this.validateSettings(settings);
-            if (validationErrors.length > 0) {
-                const errorMessage = validationErrors.join('; ');
-                throw new Error(errorMessage);
-            }
-
-            const updatedSettings = await this.repository.saveProxySettings(settings);
-
-            const statusMessage = settings.enabled
-                ? `Proxy enabled: ${settings.type}://${settings.host}:${settings.port}`
-                : 'Proxy disabled';
-
-            this.statusDisplay.update(statusMessage, null);
-
-            this._notifyListeners({
-                type: 'proxy-settings-updated',
-                settings: updatedSettings
-            });
-
-            return updatedSettings;
-        } catch (error) {
-            this.statusDisplay.update(`Error updating proxy settings: ${error.message}`, null);
-            throw error;
+        const validationErrors = this.validateSettings(settings);
+        if (validationErrors.length > 0) {
+            throw new Error(validationErrors.join('; '));
         }
+
+        const updatedSettings = await this.repository.saveProxySettings(settings);
+
+        this._notifyListeners({
+            type: 'proxy-settings-updated',
+            settings: updatedSettings
+        });
+
+        return updatedSettings;
     }
 
     /**
@@ -142,47 +129,28 @@ export class ProxyService {
      * @fires ProxyService#proxy-toggled
      */
     async toggleProxy() {
-        try {
-            const enabled = await this.repository.toggleProxyEnabled();
-            const settings = await this.repository.getProxySettings();
+        const enabled = await this.repository.toggleProxyEnabled();
 
-            const statusMessage = enabled
-                ? `Proxy enabled: ${settings.type}://${settings.host}:${settings.port}`
-                : 'Proxy disabled';
+        this._notifyListeners({
+            type: 'proxy-toggled',
+            enabled: enabled
+        });
 
-            this.statusDisplay.update(statusMessage, null);
-
-            this._notifyListeners({
-                type: 'proxy-toggled',
-                enabled: enabled
-            });
-
-            return enabled;
-        } catch (error) {
-            this.statusDisplay.update(`Error toggling proxy: ${error.message}`, null);
-            throw error;
-        }
+        return enabled;
     }
 
     /**
      * Reset proxy settings to defaults
      */
     async resetToDefaults() {
-        try {
-            const defaultSettings = await this.repository.resetToDefaults();
+        const defaultSettings = await this.repository.resetToDefaults();
 
-            this.statusDisplay.update('Proxy settings reset to defaults', null);
+        this._notifyListeners({
+            type: 'proxy-settings-reset',
+            settings: defaultSettings
+        });
 
-            this._notifyListeners({
-                type: 'proxy-settings-reset',
-                settings: defaultSettings
-            });
-
-            return defaultSettings;
-        } catch (error) {
-            this.statusDisplay.update(`Error resetting proxy settings: ${error.message}`, null);
-            throw error;
-        }
+        return defaultSettings;
     }
 
     /**
@@ -289,11 +257,14 @@ export class ProxyService {
             errors.push('Invalid proxy type. Must be: http, https, socks4, or socks5');
         }
 
-        // Validate host
-        if (settings.enabled) {
-            if (!settings.host || typeof settings.host !== 'string' || settings.host.trim() === '') {
-                errors.push('Proxy host is required when proxy is enabled');
-            } else if (!this.isValidHost(settings.host)) {
+        // Validate host format when provided. Empty host is allowed even when
+        // proxy is enabled — settings autosave on every keystroke/toggle, so an
+        // in-progress form shouldn't error. The backend treats an unparseable
+        // proxy URL as disabled, so no request leaks through misconfiguration.
+        if (settings.enabled && !settings.useSystemProxy && settings.host) {
+            if (typeof settings.host !== 'string') {
+                errors.push('Invalid proxy host format');
+            } else if (settings.host.trim() !== '' && !this.isValidHost(settings.host)) {
                 errors.push('Invalid proxy host format');
             }
         }
@@ -371,53 +342,38 @@ export class ProxyService {
      * Add domain to bypass list
      */
     async addBypassDomain(domain) {
-        try {
-            const settings = await this.repository.getProxySettings();
+        const settings = await this.repository.getProxySettings();
 
-            if (!domain || typeof domain !== 'string' || domain.trim() === '') {
-                throw new Error('Invalid domain');
-            }
-
-            const cleanDomain = domain.trim();
-
-            // Check if already in list
-            if (settings.bypassList.includes(cleanDomain)) {
-                throw new Error('Domain already in bypass list');
-            }
-
-            settings.bypassList.push(cleanDomain);
-            await this.repository.saveProxySettings(settings);
-
-            this.statusDisplay.update(`Added ${cleanDomain} to proxy bypass list`, null);
-
-            return settings;
-        } catch (error) {
-            this.statusDisplay.update(`Error adding bypass domain: ${error.message}`, null);
-            throw error;
+        if (!domain || typeof domain !== 'string' || domain.trim() === '') {
+            throw new Error('Invalid domain');
         }
+
+        const cleanDomain = domain.trim();
+
+        if (settings.bypassList.includes(cleanDomain)) {
+            throw new Error('Domain already in bypass list');
+        }
+
+        settings.bypassList.push(cleanDomain);
+        await this.repository.saveProxySettings(settings);
+
+        return settings;
     }
 
     /**
      * Remove domain from bypass list
      */
     async removeBypassDomain(domain) {
-        try {
-            const settings = await this.repository.getProxySettings();
+        const settings = await this.repository.getProxySettings();
 
-            const index = settings.bypassList.indexOf(domain);
-            if (index === -1) {
-                throw new Error('Domain not found in bypass list');
-            }
-
-            settings.bypassList.splice(index, 1);
-            await this.repository.saveProxySettings(settings);
-
-            this.statusDisplay.update(`Removed ${domain} from proxy bypass list`, null);
-
-            return settings;
-        } catch (error) {
-            this.statusDisplay.update(`Error removing bypass domain: ${error.message}`, null);
-            throw error;
+        const index = settings.bypassList.indexOf(domain);
+        if (index === -1) {
+            throw new Error('Domain not found in bypass list');
         }
+
+        settings.bypassList.splice(index, 1);
+        await this.repository.saveProxySettings(settings);
+
+        return settings;
     }
 }
