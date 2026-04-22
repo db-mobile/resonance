@@ -51,16 +51,33 @@ impl Default for ProxyState {
     }
 }
 
+/// What the HTTP client should do about proxying for a given URL.
+///
+/// - `Disable`: no proxy — callers MUST explicitly suppress system proxies
+///   (e.g. `client_builder.no_proxy()`), otherwise reqwest auto-detects
+///   `HTTP(S)_PROXY` env vars and platform settings.
+/// - `UseSystem`: leave the client alone so reqwest's default detection runs.
+/// - `Manual`: apply this specific proxy.
+pub enum ProxyAction {
+    Disable,
+    UseSystem,
+    Manual(Box<Proxy>),
+}
+
 impl ProxyState {
-    pub fn get_proxy_config(&self, url: &str) -> Option<Proxy> {
+    pub fn get_proxy_config(&self, url: &str) -> ProxyAction {
         let settings = self.settings.read().unwrap();
 
         if !settings.enabled {
-            return None;
+            return ProxyAction::Disable;
         }
 
         if self.should_bypass(url, &settings.bypass_list) {
-            return None;
+            return ProxyAction::Disable;
+        }
+
+        if settings.use_system_proxy {
+            return ProxyAction::UseSystem;
         }
 
         let proxy_url = format!(
@@ -68,13 +85,16 @@ impl ProxyState {
             settings.proxy_type, settings.host, settings.port
         );
 
-        let mut proxy = Proxy::all(&proxy_url).ok()?;
+        let mut proxy = match Proxy::all(&proxy_url) {
+            Ok(p) => p,
+            Err(_) => return ProxyAction::Disable,
+        };
 
         if settings.auth.enabled && !settings.auth.username.is_empty() {
             proxy = proxy.basic_auth(&settings.auth.username, &settings.auth.password);
         }
 
-        Some(proxy)
+        ProxyAction::Manual(Box::new(proxy))
     }
 
     fn should_bypass(&self, url: &str, bypass_list: &[String]) -> bool {
@@ -141,37 +161,44 @@ pub async fn proxy_test(state: State<'_, ProxyState>) -> Result<serde_json::Valu
         }));
     }
 
-    if settings.host.is_empty() || settings.port == 0 {
-        return Ok(serde_json::json!({
-            "success": false,
-            "message": "Proxy host and port are required"
-        }));
-    }
+    let mut client_builder =
+        reqwest::Client::builder().timeout(Duration::from_millis(settings.timeout));
 
-    let proxy_url = format!(
-        "{}://{}:{}",
-        settings.proxy_type, settings.host, settings.port
-    );
-
-    let mut proxy = match Proxy::all(&proxy_url) {
-        Ok(p) => p,
-        Err(e) => {
+    if settings.use_system_proxy {
+        // Let reqwest auto-detect system proxy from env vars / platform APIs.
+        // Nothing to attach; a successful request proves connectivity works
+        // under the system's default routing (which may or may not use a proxy).
+    } else {
+        if settings.host.is_empty() || settings.port == 0 {
             return Ok(serde_json::json!({
                 "success": false,
-                "message": format!("Invalid proxy configuration: {}", e)
+                "message": "Proxy host and port are required"
             }));
         }
-    };
 
-    if settings.auth.enabled && !settings.auth.username.is_empty() {
-        proxy = proxy.basic_auth(&settings.auth.username, &settings.auth.password);
+        let proxy_url = format!(
+            "{}://{}:{}",
+            settings.proxy_type, settings.host, settings.port
+        );
+
+        let mut proxy = match Proxy::all(&proxy_url) {
+            Ok(p) => p,
+            Err(e) => {
+                return Ok(serde_json::json!({
+                    "success": false,
+                    "message": format!("Invalid proxy configuration: {}", e)
+                }));
+            }
+        };
+
+        if settings.auth.enabled && !settings.auth.username.is_empty() {
+            proxy = proxy.basic_auth(&settings.auth.username, &settings.auth.password);
+        }
+
+        client_builder = client_builder.proxy(proxy);
     }
 
-    let client = match reqwest::Client::builder()
-        .proxy(proxy)
-        .timeout(Duration::from_millis(settings.timeout))
-        .build()
-    {
+    let client = match client_builder.build() {
         Ok(c) => c,
         Err(e) => {
             return Ok(serde_json::json!({

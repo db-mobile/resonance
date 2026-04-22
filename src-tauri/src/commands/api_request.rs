@@ -9,7 +9,7 @@ use tokio::sync::oneshot;
 use tokio::time::timeout as tokio_timeout;
 use uuid::Uuid;
 
-use super::proxy::ProxyState;
+use super::proxy::{ProxyAction, ProxyState};
 
 /// Maximum time to spend on the TCP+TLS timing probe before giving up.
 const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -404,7 +404,10 @@ pub async fn send_api_request(
     // tunnel would require reimplementing proxy auth, which is out of scope.
     let parsed_url = url::Url::parse(&request_options.url).ok();
     let is_https = request_options.url.starts_with("https://");
-    let proxy_active = proxy_state.get_proxy_config(&request_options.url).is_some();
+    // Resolve the proxy decision once: used below to skip the timing probe and
+    // again when building the reqwest client.
+    let proxy_action = proxy_state.get_proxy_config(&request_options.url);
+    let skip_probe = !matches!(proxy_action, ProxyAction::Disable);
 
     if let Some(ref url) = parsed_url {
         if let Some(host) = url.host_str() {
@@ -417,7 +420,7 @@ pub async fn send_api_request(
             let _ = tokio::net::lookup_host(&lookup_addr).await;
             timings.dns_lookup = dns_start.elapsed().as_millis() as u64;
 
-            if !proxy_active {
+            if !skip_probe {
                 let verify_ssl = request_options.verify_ssl != Some(false);
                 let (tcp_ms, tls_ms) =
                     measure_connection_timings(host, port, is_https, verify_ssl).await;
@@ -465,9 +468,19 @@ pub async fn send_api_request(
         client_builder = client_builder.redirect(reqwest::redirect::Policy::none());
     }
 
-    // Apply proxy settings if configured
-    if let Some(proxy) = proxy_state.get_proxy_config(&request_options.url) {
-        client_builder = client_builder.proxy(proxy);
+    // Apply proxy decision resolved earlier. `Disable` must call `no_proxy()`
+    // explicitly — otherwise reqwest would still honour HTTP(S)_PROXY env vars
+    // and platform settings by default.
+    match proxy_action {
+        ProxyAction::Disable => {
+            client_builder = client_builder.no_proxy();
+        }
+        ProxyAction::UseSystem => {
+            // reqwest auto-detects system proxy; nothing to configure.
+        }
+        ProxyAction::Manual(proxy) => {
+            client_builder = client_builder.proxy(*proxy);
+        }
     }
 
     let client = match client_builder.build() {
