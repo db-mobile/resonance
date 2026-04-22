@@ -1,13 +1,150 @@
 use reqwest::{Client, Method, RequestBuilder, Response};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::State;
+use tokio::net::TcpStream;
 use tokio::sync::oneshot;
+use tokio::time::timeout as tokio_timeout;
 use uuid::Uuid;
 
 use super::proxy::ProxyState;
+
+/// Maximum time to spend on the TCP+TLS timing probe before giving up.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Dangerous cert verifier used only when the request has `verify_ssl: false`.
+/// Kept in sync with reqwest's `danger_accept_invalid_certs(true)` behavior so
+/// the probe does not fail on self-signed certs where the real request succeeds.
+#[derive(Debug)]
+struct NoCertVerifier;
+
+impl rustls::client::danger::ServerCertVerifier for NoCertVerifier {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &rustls::pki_types::CertificateDer<'_>,
+        _intermediates: &[rustls::pki_types::CertificateDer<'_>],
+        _server_name: &rustls::pki_types::ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: rustls::pki_types::UnixTime,
+    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
+        Ok(rustls::client::danger::ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &rustls::pki_types::CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &rustls::pki_types::CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        use rustls::SignatureScheme::*;
+        vec![
+            RSA_PKCS1_SHA1,
+            ECDSA_SHA1_Legacy,
+            RSA_PKCS1_SHA256,
+            ECDSA_NISTP256_SHA256,
+            RSA_PKCS1_SHA384,
+            ECDSA_NISTP384_SHA384,
+            RSA_PKCS1_SHA512,
+            ECDSA_NISTP521_SHA512,
+            RSA_PSS_SHA256,
+            RSA_PSS_SHA384,
+            RSA_PSS_SHA512,
+            ED25519,
+            ED448,
+        ]
+    }
+}
+
+fn build_probe_tls_config(verify_ssl: bool) -> rustls::ClientConfig {
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let builder = rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .expect("rustls safe default protocol versions");
+
+    if verify_ssl {
+        let mut root_store = rustls::RootCertStore::empty();
+        root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+        builder
+            .with_root_certificates(root_store)
+            .with_no_client_auth()
+    } else {
+        builder
+            .dangerous()
+            .with_custom_certificate_verifier(Arc::new(NoCertVerifier))
+            .with_no_client_auth()
+    }
+}
+
+/// Measure TCP and (for HTTPS) TLS handshake times against `host:port` via a
+/// separate short-lived probe connection. Returns `(tcp_ms, tls_ms)`. Any error
+/// is logged and reported as `None` — the caller must proceed regardless.
+async fn measure_connection_timings(
+    host: &str,
+    port: u16,
+    is_https: bool,
+    verify_ssl: bool,
+) -> (Option<u64>, Option<u64>) {
+    let tcp_start = Instant::now();
+    let connect_future = TcpStream::connect((host, port));
+    let tcp_stream = match tokio_timeout(PROBE_TIMEOUT, connect_future).await {
+        Ok(Ok(stream)) => stream,
+        Ok(Err(e)) => {
+            tracing::warn!("TCP timing probe failed for {}:{} - {}", host, port, e);
+            return (None, None);
+        }
+        Err(_) => {
+            tracing::warn!("TCP timing probe timed out for {}:{}", host, port);
+            return (None, None);
+        }
+    };
+    let tcp_ms = tcp_start.elapsed().as_millis() as u64;
+
+    if !is_https {
+        return (Some(tcp_ms), None);
+    }
+
+    let server_name = match rustls::pki_types::ServerName::try_from(host.to_string()) {
+        Ok(name) => name,
+        Err(e) => {
+            tracing::warn!("Invalid TLS server name {} - {}", host, e);
+            return (Some(tcp_ms), None);
+        }
+    };
+
+    let config = build_probe_tls_config(verify_ssl);
+    let connector = tokio_rustls::TlsConnector::from(Arc::new(config));
+
+    let tls_start = Instant::now();
+    let tls_future = connector.connect(server_name, tcp_stream);
+    let tls_ms = match tokio_timeout(PROBE_TIMEOUT, tls_future).await {
+        Ok(Ok(_tls_stream)) => Some(tls_start.elapsed().as_millis() as u64),
+        Ok(Err(e)) => {
+            tracing::warn!("TLS timing probe failed for {} - {}", host, e);
+            None
+        }
+        Err(_) => {
+            tracing::warn!("TLS timing probe timed out for {}", host);
+            None
+        }
+    };
+
+    (Some(tcp_ms), tls_ms)
+}
 
 /// Digest authentication challenge parsed from WWW-Authenticate header
 #[derive(Debug, Clone)]
@@ -258,15 +395,17 @@ pub async fn send_api_request(
         });
     }
 
-    // Parse URL for DNS lookup timing
-    // Note: We only measure DNS here. TCP and TLS timings are estimated from the
-    // difference between DNS completion and first byte, since reqwest handles
-    // connection pooling internally and we don't want to make redundant connections.
+    // Parse URL and measure DNS + TCP + TLS timings via a short-lived probe
+    // connection. The probe uses a separate TCP (and optional TLS) handshake
+    // ahead of the real reqwest call, since reqwest/hyper does not expose
+    // per-stage connection timings. Probe results are best-effort: any failure
+    // is logged and the affected field stays at 0.
+    // Probe is skipped when a proxy is active — measuring through a CONNECT
+    // tunnel would require reimplementing proxy auth, which is out of scope.
     let parsed_url = url::Url::parse(&request_options.url).ok();
     let is_https = request_options.url.starts_with("https://");
+    let proxy_active = proxy_state.get_proxy_config(&request_options.url).is_some();
 
-    // Measure DNS lookup timing (without making a redundant connection)
-    let dns_end_time;
     if let Some(ref url) = parsed_url {
         if let Some(host) = url.host_str() {
             let port = url
@@ -277,12 +416,15 @@ pub async fn send_api_request(
             let dns_start = Instant::now();
             let _ = tokio::net::lookup_host(&lookup_addr).await;
             timings.dns_lookup = dns_start.elapsed().as_millis() as u64;
-            dns_end_time = Some(Instant::now());
-        } else {
-            dns_end_time = None;
+
+            if !proxy_active {
+                let verify_ssl = request_options.verify_ssl != Some(false);
+                let (tcp_ms, tls_ms) =
+                    measure_connection_timings(host, port, is_https, verify_ssl).await;
+                timings.tcp_connection = tcp_ms.unwrap_or(0);
+                timings.tls_handshake = tls_ms.unwrap_or(0);
+            }
         }
-    } else {
-        dns_end_time = None;
     }
 
     // Build client with optional proxy and HTTP version
@@ -434,7 +576,7 @@ pub async fn send_api_request(
                                             Ok(auth_header) => {
                                                 // Retry with digest auth
                                                 let retry_result = build_request(Some(auth_header)).send().await;
-                                                return process_response(retry_result, &mut timings, start_time, dns_end_time, is_https, &state).await;
+                                                return process_response(retry_result, &mut timings, start_time, &state).await;
                                             }
                                             Err(e) => {
                                                 let _ = e;
@@ -446,10 +588,10 @@ pub async fn send_api_request(
                         }
                     }
 
-                    process_response(Ok(response), &mut timings, start_time, dns_end_time, is_https, &state).await
+                    process_response(Ok(response), &mut timings, start_time, &state).await
                 }
                 Err(e) => {
-                    process_response(Err(e), &mut timings, start_time, dns_end_time, is_https, &state).await
+                    process_response(Err(e), &mut timings, start_time, &state).await
                 }
             }
         }
@@ -479,32 +621,11 @@ async fn process_response(
     result: Result<Response, reqwest::Error>,
     timings: &mut RequestTimings,
     start_time: Instant,
-    dns_end_time: Option<Instant>,
-    is_https: bool,
     state: &State<'_, RequestState>,
 ) -> Result<ApiResponse, String> {
     match result {
         Ok(response) => {
             timings.first_byte = start_time.elapsed().as_millis() as u64;
-
-            // Estimate TCP and TLS timings from the time between DNS completion and first byte
-            // This is an approximation since reqwest handles connection pooling internally
-            if let Some(dns_end) = dns_end_time {
-                let connection_time = dns_end.elapsed().as_millis() as u64;
-                // Subtract download prep time (minimal) to get connection establishment time
-                let connection_establishment = connection_time.saturating_sub(timings.download);
-
-                if is_https {
-                    // For HTTPS, split the connection time between TCP and TLS
-                    // Typically TLS takes longer than TCP, so we estimate ~40% TCP, ~60% TLS
-                    timings.tcp_connection = connection_establishment * 40 / 100;
-                    timings.tls_handshake = connection_establishment - timings.tcp_connection;
-                } else {
-                    // For HTTP, all connection time is TCP
-                    timings.tcp_connection = connection_establishment;
-                    timings.tls_handshake = 0;
-                }
-            }
 
             let status = response.status().as_u16();
             let status_text = response
