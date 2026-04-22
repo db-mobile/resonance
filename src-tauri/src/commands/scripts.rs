@@ -183,13 +183,8 @@ pub async fn script_save(
     endpoint_id: String,
     scripts: ScriptData,
 ) -> Result<(), String> {
-    write_scripts_to_endpoint_file(
-        &app,
-        collection_id.clone(),
-        endpoint_id.clone(),
-        scripts,
-    )
-    .await?;
+    write_scripts_to_endpoint_file(&app, collection_id.clone(), endpoint_id.clone(), scripts)
+        .await?;
     remove_store_script_entry(&app, &collection_id, &endpoint_id);
     Ok(())
 }
