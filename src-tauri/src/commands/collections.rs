@@ -530,6 +530,7 @@ pub async fn collection_delete(app: AppHandle, collection_id: String) -> Result<
     }
 
     unregister_collection_path(&app, &collection_id)?;
+    super::scripts::purge_store_scripts_for_collection(&app, &collection_id);
     Ok(())
 }
 
