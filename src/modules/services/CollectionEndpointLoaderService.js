@@ -94,6 +94,8 @@ export class CollectionEndpointLoaderService {
             persistedQueryParams: isGrpc ? [] : persistedData.queryParams,
             persistedHeaders: isGrpc ? [] : persistedData.headers,
             persistedBody: isGrpc ? null : persistedData.modifiedBody,
+            persistedFormBodyData: (isGrpc || isWebSocket) ? null : persistedData.formBodyData,
+            persistedGraphQLData: (isGrpc || isWebSocket) ? null : persistedData.graphqlData,
             grpcData: isGrpc ? persistedData.grpcData : null
         };
 

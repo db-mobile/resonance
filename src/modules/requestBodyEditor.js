@@ -27,10 +27,11 @@ const lightHighlightStyle = HighlightStyle.define([
  * Provides syntax highlighting for JSON with line numbers and editing capability
  */
 export class RequestBodyEditor {
-    constructor(containerElement) {
+    constructor(containerElement, options = {}) {
         this.container = containerElement;
         this.view = null;
         this.changeCallback = null;
+        this.language = options.language === 'plain' ? 'plain' : 'json';
         this.init();
     }
 
@@ -61,24 +62,29 @@ export class RequestBodyEditor {
      * Initialize the CodeMirror editor
      */
     init() {
+        const extensions = [
+            lineNumbers(),
+            history(),
+            keymap.of([...defaultKeymap, ...historyKeymap]),
+            EditorView.editable.of(true), // Editable
+            EditorView.lineWrapping,
+            ...this.getSearchExtensions(),
+            EditorView.updateListener.of((update) => {
+                // Call change callback if content changed
+                if (update.docChanged && this.changeCallback) {
+                    this.changeCallback(this.getContent());
+                }
+            }),
+            ...this.getThemeExtensions()
+        ];
+
+        if (this.language === 'json') {
+            extensions.splice(5, 0, json());
+        }
+
         const state = EditorState.create({
             doc: '',
-            extensions: [
-                lineNumbers(),
-                history(),
-                keymap.of([...defaultKeymap, ...historyKeymap]),
-                EditorView.editable.of(true), // Editable
-                EditorView.lineWrapping,
-                json(), // Always use JSON highlighting
-                ...this.getSearchExtensions(),
-                EditorView.updateListener.of((update) => {
-                    // Call change callback if content changed
-                    if (update.docChanged && this.changeCallback) {
-                        this.changeCallback(this.getContent());
-                    }
-                }),
-                ...this.getThemeExtensions()
-            ]
+            extensions
         });
 
         this.view = new EditorView({
@@ -130,6 +136,9 @@ export class RequestBodyEditor {
      * @returns {boolean} - True if formatting succeeded, false otherwise
      */
     formatJSON() {
+        if (this.language !== 'json') {
+            return true;
+        }
         try {
             const content = this.getContent().trim();
             if (!content) {

@@ -10,7 +10,7 @@
 // Import ipcBridge first to set up window.backendAPI before any other modules
 import './modules/ipcBridge.js';
 
-import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, bodyEditorContainer, pathParamsList, queryParamsList, headersList, authTypeSelect, responseBodyContainer, statusDisplay, responseHeadersDisplay, responseCookiesDisplay, grpcTargetInput, grpcServiceSelect, grpcMethodSelect, grpcBodyInput, grpcBodyEditorContainer } from './modules/domElements.js';
+import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, bodyEditorContainer, bodyTextEditorContainer, pathParamsList, queryParamsList, headersList, authTypeSelect, responseBodyContainer, statusDisplay, responseHeadersDisplay, responseCookiesDisplay, grpcTargetInput, grpcServiceSelect, grpcMethodSelect, grpcBodyInput, grpcBodyEditorContainer } from './modules/domElements.js';
 
 import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl, setUrlUpdating } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
@@ -744,6 +744,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 isInitializingEditor = false;
             }, 0);
         }
+    }
+
+    // Initialize plain-text body editor (CodeMirror without language extension)
+    if (bodyTextEditorContainer) {
+        const requestBodyTextEditor = new RequestBodyEditor(bodyTextEditorContainer, { language: 'plain' });
+        window.requestBodyTextEditor = requestBodyTextEditor;
+
+        requestBodyTextEditor.onChange((_content) => {
+            if (window.workspaceTabController &&
+                !window.workspaceTabController.isRestoringState) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
     }
 
     // Initialize gRPC body editor
