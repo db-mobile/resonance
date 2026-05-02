@@ -775,6 +775,18 @@ export class CollectionService {
             return;
         }
 
+        if (formBodyData && formBodyData.mode === 'text') {
+            if (window.graphqlBodyManager) {
+                window.graphqlBodyManager.switchMode('text');
+            }
+            if (window.requestBodyTextEditor) {
+                window.requestBodyTextEditor.setContent(formBodyData.content || '');
+            }
+            const key = `${collection.id}_${endpoint.id}`;
+            this.originalBodyValues.set(key, formBodyData.content || '');
+            return;
+        }
+
         // Check if the endpoint's requestBody was imported from a form-data or urlencoded source
         const importedBodyType = endpoint.requestBody?.type;
         if (importedBodyType === 'formdata' || importedBodyType === 'urlencoded') {
@@ -879,39 +891,47 @@ export class CollectionService {
      * @param {string} endpointId - The endpoint ID
      * @returns {Promise<void>}
      */
+    captureRequestBodyState() {
+        const bodyModeSelect = document.getElementById('body-mode-select');
+        const bodyMode = bodyModeSelect?.value || 'json';
+
+        const state = { modifiedBody: null, formBodyData: null, graphqlData: null };
+
+        if (bodyMode === 'formdata' && window.formBodyManager) {
+            state.formBodyData = {
+                mode: 'formdata',
+                fields: window.formBodyManager.getFormDataFields()
+            };
+        } else if (bodyMode === 'urlencoded' && window.formBodyManager) {
+            state.formBodyData = {
+                mode: 'urlencoded',
+                fields: window.formBodyManager.getUrlencodedFields()
+            };
+        } else if (bodyMode === 'text') {
+            state.formBodyData = {
+                mode: 'text',
+                content: window.requestBodyTextEditor
+                    ? window.requestBodyTextEditor.getContent()
+                    : ''
+            };
+        } else if (window.graphqlBodyManager && window.graphqlBodyManager.isGraphQLMode()) {
+            state.graphqlData = {
+                mode: 'graphql',
+                query: window.graphqlBodyManager.getGraphQLQuery(),
+                variables: window.graphqlBodyManager.getGraphQLVariables()
+            };
+        } else {
+            const currentBody = getRequestBodyContent().trim();
+            state.modifiedBody = currentBody || null;
+        }
+
+        return state;
+    }
+
     async saveModifiedRequestBody(collectionId, endpointId) {
         try {
-            const bodyModeSelect = document.getElementById('body-mode-select');
-            const bodyMode = bodyModeSelect?.value || 'json';
-
-            if (bodyMode === 'formdata' && window.formBodyManager) {
-                await this.repository.saveFormBodyData(collectionId, endpointId, {
-                    mode: 'formdata',
-                    fields: window.formBodyManager.getFormDataFields()
-                });
-            } else if (bodyMode === 'urlencoded' && window.formBodyManager) {
-                await this.repository.saveFormBodyData(collectionId, endpointId, {
-                    mode: 'urlencoded',
-                    fields: window.formBodyManager.getUrlencodedFields()
-                });
-            } else if (window.graphqlBodyManager && window.graphqlBodyManager.isGraphQLMode()) {
-                const query = window.graphqlBodyManager.getGraphQLQuery();
-                const variables = window.graphqlBodyManager.getGraphQLVariables();
-
-                // Save GraphQL data
-                await this.saveGraphQLData(collectionId, endpointId, query, variables);
-            } else {
-                // JSON mode - save as regular request body
-                const currentBody = getRequestBodyContent().trim();
-                if (!currentBody) {
-                    return;
-                }
-
-                // Always save the current body when explicitly called
-                // This ensures the body is persisted even when using workspace tabs
-                // where originalBodyValues may not be set
-                await this.repository.saveModifiedRequestBody(collectionId, endpointId, currentBody);
-            }
+            const state = this.captureRequestBodyState();
+            await this.repository.saveBodyState(collectionId, endpointId, state);
         } catch (error) {
             void error;
         }

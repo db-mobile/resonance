@@ -268,6 +268,32 @@ export class CollectionRepository {
         await this._saveEndpointData(collectionId, endpointId, data);
     }
 
+    async _updateEndpointFields(collectionId, endpointId, updates) {
+        const data = await this._getEndpointData(collectionId, endpointId);
+        Object.assign(data, updates);
+        await this._saveEndpointData(collectionId, endpointId, data);
+    }
+
+    async updateEndpointFields(collectionId, endpointId, updates) {
+        try {
+            await this._updateEndpointFields(collectionId, endpointId, updates);
+        } catch (error) {
+            throw new Error(`Failed to update endpoint fields: ${error.message || error}`);
+        }
+    }
+
+    async saveBodyState(collectionId, endpointId, { modifiedBody = null, formBodyData = null, graphqlData = null } = {}) {
+        try {
+            await this._updateEndpointFields(collectionId, endpointId, {
+                modifiedBody,
+                formBodyData,
+                graphqlData
+            });
+        } catch (error) {
+            throw new Error(`Failed to save body state: ${error.message || error}`);
+        }
+    }
+
     /**
      * Retrieves modified request body for a specific endpoint
      *

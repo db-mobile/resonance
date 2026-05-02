@@ -715,6 +715,14 @@ export class WorkspaceTabController {
 
             const currentState = await this.stateManager.captureCurrentState();
             await this.service.updateTab(activeTabId, currentState);
+
+            const ep = currentState.endpoint;
+            if (ep && ep.collectionId && ep.endpointId && window.collectionController) {
+                await window.collectionController.saveRequestBodyModification(
+                    ep.collectionId,
+                    ep.endpointId
+                );
+            }
         } catch (error) {
             void error;
         }

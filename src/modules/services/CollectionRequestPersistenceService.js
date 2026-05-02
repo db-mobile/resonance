@@ -132,9 +132,10 @@ export class CollectionRequestPersistenceService {
     async saveHttpRequest(collectionId, endpointId, parseKeyValuePairs, authManager) {
         const { urlInput, pathParamsList, queryParamsList, headersList, bodyInput } = this.getRequestFormElements();
 
+        const updates = {};
+
         if (urlInput && urlInput.value) {
-            await this.repository.savePersistedUrl(collectionId, endpointId, urlInput.value);
-            await this.updateEndpointPathFromUrl(collectionId, endpointId, urlInput.value);
+            updates.url = urlInput.value;
         }
 
         let pathParams = {};
@@ -143,29 +144,35 @@ export class CollectionRequestPersistenceService {
 
         if (pathParamsList) {
             pathParams = parseKeyValuePairs(pathParamsList);
-            const pathParamsArray = Object.entries(pathParams).map(([key, value]) => ({ key, value }));
-            await this.repository.savePersistedPathParams(collectionId, endpointId, pathParamsArray);
+            updates.pathParams = Object.entries(pathParams).map(([key, value]) => ({ key, value }));
         }
 
         if (queryParamsList) {
             queryParams = parseKeyValuePairs(queryParamsList);
-            const queryParamsArray = Object.entries(queryParams).map(([key, value]) => ({ key, value }));
-            await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParamsArray);
+            updates.queryParams = Object.entries(queryParams).map(([key, value]) => ({ key, value }));
         }
 
         if (headersList) {
             headers = parseKeyValuePairs(headersList);
-            const headersArray = Object.entries(headers).map(([key, value]) => ({ key, value }));
-            await this.repository.savePersistedHeaders(collectionId, endpointId, headersArray);
+            updates.headers = Object.entries(headers).map(([key, value]) => ({ key, value }));
         }
 
-        if (bodyInput) {
-            await this.collectionService.saveRequestBodyModification(collectionId, endpointId, bodyInput);
+        const bodyState = bodyInput ? this.collectionService.captureRequestBodyState() : null;
+        if (bodyState) {
+            Object.assign(updates, bodyState);
         }
 
         const authConfig = authManager.getAuthConfig();
         if (authConfig) {
-            await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
+            updates.authConfig = authConfig;
+        }
+
+        if (Object.keys(updates).length > 0) {
+            await this.repository.updateEndpointFields(collectionId, endpointId, updates);
+        }
+
+        if (urlInput && urlInput.value) {
+            await this.updateEndpointPathFromUrl(collectionId, endpointId, urlInput.value);
         }
 
         await this.syncActiveWorkspaceTab({
@@ -193,6 +200,11 @@ export class CollectionRequestPersistenceService {
 
             const foundLocations = this.findAllEndpointLocations(collection, endpointId);
             if (foundLocations.length === 0) {
+                return;
+            }
+
+            const pathChanged = foundLocations.some(({ endpoint }) => endpoint.path !== path);
+            if (!pathChanged) {
                 return;
             }
 

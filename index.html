@@ -283,6 +283,7 @@
                                 <option value="graphql">GraphQL</option>
                                 <option value="formdata">Form Data</option>
                                 <option value="urlencoded">URL Encoded</option>
+                                <option value="text">Text</option>
                             </select>
                             <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                         </div>
@@ -308,6 +309,11 @@
                     <div class="body-mode-panel" id="body-urlencoded-section" data-mode="urlencoded">
                         <div id="urlencoded-list" class="key-value-list"></div>
                         <button id="add-urlencoded-row-btn" class="btn btn-sm btn-secondary">Add Field</button>
+                    </div>
+
+                    <!-- Plain Text Mode -->
+                    <div class="body-mode-panel" id="body-text-section" data-mode="text">
+                        <div id="body-text-editor-container" class="body-editor-container u-flex u-flex-col"></div>
                     </div>
 
                     <!-- GraphQL Mode (new) -->

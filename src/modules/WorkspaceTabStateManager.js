@@ -133,6 +133,13 @@ export class WorkspaceTabStateManager {
                 mode: 'urlencoded',
                 fields: window.formBodyManager.getUrlencodedFields()
             };
+        } else if (currentBodyMode === 'text') {
+            bodyData = {
+                mode: 'text',
+                content: window.requestBodyTextEditor
+                    ? window.requestBodyTextEditor.getContent()
+                    : ''
+            };
         } else {
             bodyData = {
                 mode: 'json',
@@ -340,6 +347,11 @@ export class WorkspaceTabStateManager {
             } else if (mode === 'urlencoded' && window.formBodyManager) {
                 this.graphqlBodyManager?.switchMode('urlencoded');
                 window.formBodyManager.setUrlencodedFields(request.body.fields || {});
+            } else if (mode === 'text') {
+                this.graphqlBodyManager?.switchMode('text');
+                if (window.requestBodyTextEditor) {
+                    window.requestBodyTextEditor.setContent(request.body.content || '');
+                }
             } else {
                 if (this.graphqlBodyManager) {
                     this.graphqlBodyManager.setGraphQLModeEnabled(false);

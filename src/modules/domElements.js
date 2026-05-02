@@ -27,6 +27,12 @@ export const bodyInput = document.getElementById('body-input');
 export const bodyEditorContainer = document.getElementById('body-editor-container');
 
 /**
+ * Plain-text request body CodeMirror editor container
+ * @const {HTMLElement}
+ */
+export const bodyTextEditorContainer = document.getElementById('body-text-editor-container');
+
+/**
  * GraphQL query editor container
  * @const {HTMLElement}
  */

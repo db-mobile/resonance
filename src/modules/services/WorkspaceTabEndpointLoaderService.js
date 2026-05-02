@@ -220,19 +220,40 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     buildHttpBody(endpoint) {
+        const formBody = endpoint.persistedFormBodyData;
+        if (formBody && (formBody.mode === 'formdata' || formBody.mode === 'urlencoded')) {
+            return { mode: formBody.mode, fields: formBody.fields || {} };
+        }
+        if (formBody && formBody.mode === 'text') {
+            return { mode: 'text', content: formBody.content || '' };
+        }
+
+        const graphql = endpoint.persistedGraphQLData;
+        if (graphql && graphql.mode === 'graphql') {
+            return {
+                mode: 'graphql',
+                query: graphql.query || '',
+                variables: graphql.variables || ''
+            };
+        }
+
+        const importedType = endpoint.requestBody?.type;
+        if (importedType === 'formdata' || importedType === 'urlencoded') {
+            return { mode: importedType, fields: endpoint.requestBody.fields || {} };
+        }
+
+        let content;
         if (endpoint.persistedBody) {
-            return endpoint.persistedBody;
+            content = endpoint.persistedBody;
+        } else if (endpoint.requestBodyString) {
+            content = endpoint.requestBodyString;
+        } else if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
+            content = JSON.stringify({ 'data': 'example' }, null, 2);
+        } else {
+            content = '';
         }
 
-        if (endpoint.requestBodyString) {
-            return endpoint.requestBodyString;
-        }
-
-        if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-            return JSON.stringify({ 'data': 'example' }, null, 2);
-        }
-
-        return '';
+        return { mode: 'json', content };
     }
 
     buildHttpAuth(endpoint) {

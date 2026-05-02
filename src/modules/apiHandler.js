@@ -640,6 +640,14 @@ export async function handleSendRequest() {
                 if (Object.keys(processed).length > 0) {
                     body = processed;
                 }
+            } else if (bodyMode === 'text') {
+                // Plain Text mode: send raw string body
+                const rawText = window.requestBodyTextEditor
+                    ? window.requestBodyTextEditor.getContent()
+                    : '';
+                if (rawText) {
+                    body = processor.processTemplate(rawText, variables);
+                }
             } else {
                 // JSON mode: existing behavior
                 let bodyText = getRequestBodyContent().trim();
@@ -695,7 +703,7 @@ export async function handleSendRequest() {
         rawUrl,
         headers,
         body,
-        bodyType: (bodyMode === 'formdata' || bodyMode === 'urlencoded') ? bodyMode : undefined,
+        bodyType: (bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'text') ? bodyMode : undefined,
         httpVersion,
         timeout,
         verifySsl,

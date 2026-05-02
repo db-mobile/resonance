@@ -299,7 +299,7 @@ pub struct RequestOptions {
     /// Whether to follow HTTP redirects (defaults to true)
     #[serde(default)]
     pub follow_redirects: Option<bool>,
-    /// Body encoding type: "json" (default) | "formdata" | "urlencoded"
+    /// Body encoding type: "json" (default) | "formdata" | "urlencoded" | "text"
     #[serde(default)]
     pub body_type: Option<String>,
 }
@@ -515,6 +515,13 @@ pub async fn send_api_request(
         .unwrap_or("json")
         .to_string();
 
+    // Detect whether the user already supplied a Content-Type header
+    let user_has_content_type = request_options
+        .headers
+        .as_ref()
+        .map(|h| h.keys().any(|k| k.to_lowercase() == "content-type"))
+        .unwrap_or(false);
+
     // Helper to build a request
     let build_request = |auth_header: Option<String>| -> RequestBuilder {
         let mut rb = client.request(method.clone(), &request_options.url);
@@ -549,6 +556,15 @@ pub async fn send_api_request(
                             form = form.text(k.clone(), v.as_str().unwrap_or("").to_string());
                         }
                         rb = rb.multipart(form);
+                    }
+                }
+            }
+            "text" => {
+                if let Some(body) = &request_options.body {
+                    let raw = body.as_str().unwrap_or("").to_string();
+                    rb = rb.body(raw);
+                    if !user_has_content_type {
+                        rb = rb.header("Content-Type", "text/plain");
                     }
                 }
             }
