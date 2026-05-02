@@ -709,10 +709,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } catch (_e) { /* non-blocking */ }
 
-    // Initialize workspace tabs (restores user's last state - critical for UX)
-    await workspaceTabController.initialize();
-
-    // Initialize request body editor
+    // Initialize body editors BEFORE workspace tabs so they're available during tab state restoration
+    // Initialize request body editor (JSON mode)
     let requestBodyEditor = null;
     let isInitializingEditor = false; // Flag to prevent marking tab as modified during init
     if (bodyEditorContainer) {
@@ -733,17 +731,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.workspaceTabController.markCurrentTabModified();
             }
         });
-
-        // Sync editor with textarea content (restored by workspace tab initialization)
-        // Use flag to prevent marking tab as modified during this sync
-        if (bodyInput && bodyInput.value) {
-            isInitializingEditor = true;
-            requestBodyEditor.setContent(bodyInput.value);
-            // Use setTimeout to ensure flag is cleared after any async updates
-            setTimeout(() => {
-                isInitializingEditor = false;
-            }, 0);
-        }
     }
 
     // Initialize plain-text body editor (CodeMirror without language extension)
@@ -776,14 +763,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.workspaceTabController.markCurrentTabModified();
             }
         });
+    }
 
-        if (grpcBodyInput && grpcBodyInput.value) {
-            isInitializingGrpcEditor = true;
-            grpcBodyEditor.setContent(grpcBodyInput.value);
-            setTimeout(() => {
-                isInitializingGrpcEditor = false;
-            }, 0);
-        }
+    // Initialize workspace tabs (restores user's last state - critical for UX)
+    // Must happen AFTER body editors are initialized so text/gRPC body content can be restored
+    await workspaceTabController.initialize();
+
+    // Sync JSON body editor with textarea content (restored by workspace tab initialization)
+    // Use flag to prevent marking tab as modified during this sync
+    if (requestBodyEditor && bodyInput && bodyInput.value) {
+        isInitializingEditor = true;
+        requestBodyEditor.setContent(bodyInput.value);
+        // Use setTimeout to ensure flag is cleared after any async updates
+        setTimeout(() => {
+            isInitializingEditor = false;
+        }, 0);
+    }
+
+    // Sync gRPC body editor with textarea content
+    if (grpcBodyEditor && grpcBodyInput && grpcBodyInput.value) {
+        isInitializingGrpcEditor = true;
+        grpcBodyEditor.setContent(grpcBodyInput.value);
+        setTimeout(() => {
+            isInitializingGrpcEditor = false;
+        }, 0);
     }
 
     // Initialize tab listeners AFTER workspace tabs are created
