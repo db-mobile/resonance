@@ -6,26 +6,9 @@
 import { EditorView, lineNumbers, placeholder, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { javascript } from '@codemirror/lang-javascript';
-import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
-import { tags } from '@lezer/highlight';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { searchKeymap, highlightSelectionMatches, search } from '@codemirror/search';
-import { isDarkMode, darkHighlighting } from './editorTheme.js';
-
-// Light theme syntax highlighting style for JavaScript
-const lightHighlightStyle = HighlightStyle.define([
-    { tag: tags.keyword, color: '#8b5cf6' },
-    { tag: tags.string, color: '#22c55e' },
-    { tag: tags.number, color: '#3b82f6' },
-    { tag: tags.bool, color: '#0ea5e9' },
-    { tag: tags.null, color: '#0ea5e9' },
-    { tag: tags.punctuation, color: '#64748b' },
-    { tag: tags.bracket, color: '#64748b' },
-    { tag: tags.propertyName, color: '#ef4444' },
-    { tag: tags.variableName, color: '#f97316' },
-    { tag: tags.function(tags.variableName), color: '#3b82f6' },
-    { tag: tags.comment, color: '#94a3b8', fontStyle: 'italic' },
-]);
+import { createThemedHighlighting } from './editorTheme.js';
 
 /**
  * ScriptEditor - CodeMirror editor for JavaScript code editing
@@ -35,6 +18,7 @@ export class ScriptEditor {
         this.container = containerElement;
         this.view = null;
         this.changeCallback = null;
+        this._themed = null;
         this.init();
     }
 
@@ -43,10 +27,7 @@ export class ScriptEditor {
      * @returns {Array} Array of theme extensions
      */
     getThemeExtensions() {
-        if (isDarkMode()) {
-            return [darkHighlighting];
-        }
-        return [syntaxHighlighting(lightHighlightStyle)];
+        return [this._themed.extension];
     }
 
     /**
@@ -65,6 +46,7 @@ export class ScriptEditor {
      * Initialize the CodeMirror editor
      */
     init() {
+        this._themed = createThemedHighlighting();
         const extensions = [
             lineNumbers(),
             history(),
@@ -90,6 +72,7 @@ export class ScriptEditor {
             state,
             parent: this.container
         });
+        this._themed.attach(this.view);
     }
 
     /**
@@ -140,6 +123,8 @@ export class ScriptEditor {
      * Destroy the editor
      */
     destroy() {
+        this._themed?.dispose();
+        this._themed = null;
         if (this.view) {
             this.view.destroy();
             this.view = null;

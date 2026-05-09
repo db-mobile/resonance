@@ -145,6 +145,7 @@ export class ThemeManager {
             await this.loadThemeCSS(theme);
             document.documentElement.setAttribute('data-theme', theme);
             this.currentTheme = theme;
+            window.dispatchEvent(new CustomEvent('resonance:theme-changed', { detail: { theme } }));
         } catch (error) {
             if (theme !== 'system') {
                 await this.applyTheme('system');

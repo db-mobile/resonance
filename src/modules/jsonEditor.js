@@ -6,21 +6,8 @@
 import { EditorView, lineNumbers, placeholder, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { json } from '@codemirror/lang-json';
-import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
-import { tags } from '@lezer/highlight';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
-import { isDarkMode, darkHighlighting } from './editorTheme.js';
-
-// Light theme syntax highlighting style for JSON
-const lightHighlightStyle = HighlightStyle.define([
-    { tag: tags.propertyName, color: '#6d28d9' },
-    { tag: tags.string, color: '#15803d' },
-    { tag: tags.number, color: '#1d4ed8' },
-    { tag: tags.bool, color: '#0369a1' },
-    { tag: tags.null, color: '#0369a1' },
-    { tag: tags.punctuation, color: '#0f172a' },
-    { tag: tags.bracket, color: '#0f172a' },
-]);
+import { createThemedHighlighting } from './editorTheme.js';
 
 /**
  * JSONEditor - CodeMirror editor for editable JSON content
@@ -30,6 +17,7 @@ export class JSONEditor {
         this.container = containerElement;
         this.view = null;
         this.changeCallback = null;
+        this._themed = null;
         this.init();
     }
 
@@ -74,16 +62,14 @@ export class JSONEditor {
             }
         });
 
-        if (isDarkMode()) {
-            return [darkHighlighting, baseTheme];
-        }
-        return [syntaxHighlighting(lightHighlightStyle), baseTheme];
+        return [this._themed.extension, baseTheme];
     }
 
     /**
      * Initialize the CodeMirror editor
      */
     init() {
+        this._themed = createThemedHighlighting();
         const extensions = [
             lineNumbers(),
             history(),
@@ -109,6 +95,19 @@ export class JSONEditor {
             state,
             parent: this.container
         });
+        this._themed.attach(this.view);
+    }
+
+    /**
+     * Tear down theme listeners. Call when the editor is no longer used.
+     */
+    destroy() {
+        this._themed?.dispose();
+        this._themed = null;
+        if (this.view) {
+            this.view.destroy();
+            this.view = null;
+        }
     }
 
     /**

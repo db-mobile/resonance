@@ -1,26 +1,9 @@
 import { EditorView, lineNumbers, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { json } from '@codemirror/lang-json';
-import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
-import { tags } from '@lezer/highlight';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { searchKeymap, highlightSelectionMatches, search } from '@codemirror/search';
-import { isDarkMode, darkHighlighting } from './editorTheme.js';
-
-// Light theme syntax highlighting style
-const lightHighlightStyle = HighlightStyle.define([
-    { tag: tags.keyword, color: '#b91c1c' },
-    { tag: tags.atom, color: '#0369a1' },
-    { tag: tags.bool, color: '#0369a1' },
-    { tag: tags.null, color: '#0369a1' },
-    { tag: tags.number, color: '#1d4ed8' },
-    { tag: tags.string, color: '#15803d' },
-    { tag: tags.propertyName, color: '#6d28d9' },
-    { tag: tags.comment, color: '#475569', fontStyle: 'italic' },
-    { tag: tags.operator, color: '#b91c1c' },
-    { tag: tags.punctuation, color: '#0f172a' },
-    { tag: tags.bracket, color: '#0f172a' },
-]);
+import { createThemedHighlighting } from './editorTheme.js';
 
 /**
  * RequestBodyEditor - Manages CodeMirror editor for request body input
@@ -32,6 +15,7 @@ export class RequestBodyEditor {
         this.view = null;
         this.changeCallback = null;
         this.language = options.language === 'plain' ? 'plain' : 'json';
+        this._themed = null;
         this.init();
     }
 
@@ -40,10 +24,7 @@ export class RequestBodyEditor {
      * @returns {Array} Array of theme extensions
      */
     getThemeExtensions() {
-        if (isDarkMode()) {
-            return [darkHighlighting];
-        }
-        return [syntaxHighlighting(lightHighlightStyle)];
+        return [this._themed.extension];
     }
 
     /**
@@ -62,6 +43,7 @@ export class RequestBodyEditor {
      * Initialize the CodeMirror editor
      */
     init() {
+        this._themed = createThemedHighlighting();
         const extensions = [
             lineNumbers(),
             history(),
@@ -91,6 +73,7 @@ export class RequestBodyEditor {
             state,
             parent: this.container
         });
+        this._themed.attach(this.view);
     }
 
     /**
@@ -165,6 +148,8 @@ export class RequestBodyEditor {
      * Destroy the editor instance
      */
     destroy() {
+        this._themed?.dispose();
+        this._themed = null;
         if (this.view) {
             this.view.destroy();
             this.view = null;

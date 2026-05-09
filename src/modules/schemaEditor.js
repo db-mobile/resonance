@@ -6,21 +6,8 @@
 import { EditorView, lineNumbers, placeholder, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { json } from '@codemirror/lang-json';
-import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
-import { tags } from '@lezer/highlight';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
-import { isDarkMode, darkHighlighting } from './editorTheme.js';
-
-// Light theme syntax highlighting style for JSON Schema
-const lightHighlightStyle = HighlightStyle.define([
-    { tag: tags.propertyName, color: '#6d28d9' },
-    { tag: tags.string, color: '#15803d' },
-    { tag: tags.number, color: '#1d4ed8' },
-    { tag: tags.bool, color: '#0369a1' },
-    { tag: tags.null, color: '#0369a1' },
-    { tag: tags.punctuation, color: '#0f172a' },
-    { tag: tags.bracket, color: '#0f172a' },
-]);
+import { createThemedHighlighting } from './editorTheme.js';
 
 /**
  * SchemaEditor - CodeMirror editor for JSON Schema content
@@ -31,6 +18,7 @@ export class SchemaEditor {
         this.view = null;
         this.changeCallback = options.onChange || null;
         this._debounceTimer = null;
+        this._themed = null;
         this.init();
     }
 
@@ -75,16 +63,14 @@ export class SchemaEditor {
             }
         });
 
-        if (isDarkMode()) {
-            return [darkHighlighting, baseTheme];
-        }
-        return [syntaxHighlighting(lightHighlightStyle), baseTheme];
+        return [this._themed.extension, baseTheme];
     }
 
     /**
      * Initialize the CodeMirror editor
      */
     init() {
+        this._themed = createThemedHighlighting();
         const extensions = [
             lineNumbers(),
             history(),
@@ -109,6 +95,7 @@ export class SchemaEditor {
             state,
             parent: this.container
         });
+        this._themed.attach(this.view);
     }
 
     /**
@@ -239,6 +226,8 @@ export class SchemaEditor {
         if (this._debounceTimer) {
             clearTimeout(this._debounceTimer);
         }
+        this._themed?.dispose();
+        this._themed = null;
         if (this.view) {
             this.view.destroy();
             this.view = null;
