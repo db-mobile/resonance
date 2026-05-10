@@ -3,28 +3,8 @@ import { EditorState } from '@codemirror/state';
 import { json } from '@codemirror/lang-json';
 import { xml } from '@codemirror/lang-xml';
 import { html } from '@codemirror/lang-html';
-import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
-import { tags } from '@lezer/highlight';
 import { searchKeymap, highlightSelectionMatches, search, openSearchPanel } from '@codemirror/search';
-import { isDarkMode, darkHighlighting } from './editorTheme.js';
-
-// Light theme syntax highlighting style
-const lightHighlightStyle = HighlightStyle.define([
-    { tag: tags.keyword, color: '#b91c1c' },
-    { tag: tags.atom, color: '#0369a1' },
-    { tag: tags.bool, color: '#0369a1' },
-    { tag: tags.null, color: '#0369a1' },
-    { tag: tags.number, color: '#1d4ed8' },
-    { tag: tags.string, color: '#15803d' },
-    { tag: tags.propertyName, color: '#6d28d9' },
-    { tag: tags.comment, color: '#475569', fontStyle: 'italic' },
-    { tag: tags.operator, color: '#b91c1c' },
-    { tag: tags.punctuation, color: '#0f172a' },
-    { tag: tags.bracket, color: '#0f172a' },
-    { tag: tags.tagName, color: '#15803d' },
-    { tag: tags.attributeName, color: '#6d28d9' },
-    { tag: tags.attributeValue, color: '#1e3a8a' },
-]);
+import { createThemedHighlighting } from './editorTheme.js';
 
 /**
  * ResponseEditor - Manages CodeMirror editor for response display
@@ -38,6 +18,7 @@ export class ResponseEditor {
         this.currentContentType = null;
         this.manualLanguageOverride = null;
         this.languageChangeCallback = null;
+        this._themed = null;
         this.init();
     }
 
@@ -46,10 +27,7 @@ export class ResponseEditor {
      * @returns {Array} Array of theme extensions
      */
     getThemeExtensions() {
-        if (isDarkMode()) {
-            return [darkHighlighting];
-        }
-        return [syntaxHighlighting(lightHighlightStyle)];
+        return [this._themed.extension];
     }
 
     /**
@@ -68,6 +46,7 @@ export class ResponseEditor {
     }
 
     init() {
+        this._themed = createThemedHighlighting();
         const state = EditorState.create({
             doc: '',
             extensions: [
@@ -84,6 +63,7 @@ export class ResponseEditor {
             state,
             parent: this.container
         });
+        this._themed.attach(this.view);
     }
 
     /**
@@ -290,6 +270,8 @@ export class ResponseEditor {
      * Destroy the editor instance
      */
     destroy() {
+        this._themed?.dispose();
+        this._themed = null;
         if (this.view) {
             this.view.destroy();
             this.view = null;

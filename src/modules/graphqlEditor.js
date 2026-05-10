@@ -5,25 +5,9 @@
 
 import { EditorView, lineNumbers, placeholder, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
-import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
-import { tags } from '@lezer/highlight';
 import { graphql } from 'cm6-graphql';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
-import { isDarkMode, darkHighlighting } from './editorTheme.js';
-
-// Light theme syntax highlighting style for GraphQL
-const lightHighlightStyle = HighlightStyle.define([
-    { tag: tags.keyword, color: '#b91c1c' },
-    { tag: tags.propertyName, color: '#6d28d9' },
-    { tag: tags.string, color: '#15803d' },
-    { tag: tags.number, color: '#1d4ed8' },
-    { tag: tags.bool, color: '#0369a1' },
-    { tag: tags.null, color: '#0369a1' },
-    { tag: tags.punctuation, color: '#0f172a' },
-    { tag: tags.bracket, color: '#0f172a' },
-    { tag: tags.typeName, color: '#6d28d9' },
-    { tag: tags.variableName, color: '#b45309' },
-]);
+import { createThemedHighlighting } from './editorTheme.js';
 
 /**
  * GraphQLEditor - CodeMirror editor for GraphQL queries
@@ -33,6 +17,7 @@ export class GraphQLEditor {
         this.container = containerElement;
         this.view = null;
         this.changeCallback = null;
+        this._themed = null;
         this.init();
     }
 
@@ -77,16 +62,14 @@ export class GraphQLEditor {
             }
         });
 
-        if (isDarkMode()) {
-            return [darkHighlighting, baseTheme];
-        }
-        return [syntaxHighlighting(lightHighlightStyle), baseTheme];
+        return [this._themed.extension, baseTheme];
     }
 
     /**
      * Initialize the CodeMirror editor
      */
     init() {
+        this._themed = createThemedHighlighting();
         const extensions = [
             lineNumbers(),
             history(),
@@ -112,6 +95,19 @@ export class GraphQLEditor {
             state,
             parent: this.container
         });
+        this._themed.attach(this.view);
+    }
+
+    /**
+     * Tear down theme listeners. Call when the editor is no longer used.
+     */
+    destroy() {
+        this._themed?.dispose();
+        this._themed = null;
+        if (this.view) {
+            this.view.destroy();
+            this.view = null;
+        }
     }
 
     /**
