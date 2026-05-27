@@ -80,6 +80,10 @@ jobs:
     - name: Install Rust stable
       uses: dtolnay/rust-toolchain@stable
 
+    - name: Ensure dtolnay cargo wins over preinstalled rustup shim (macOS)
+      if: matrix.os == 'macos-14'
+      run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
     - name: Rust cache
       uses: swatinem/rust-cache@v2
       with:
