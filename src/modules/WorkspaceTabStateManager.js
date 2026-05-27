@@ -28,7 +28,7 @@ export class WorkspaceTabStateManager {
      * @returns {Promise<Object>}
      */
     async captureCurrentState() {
-        const { isGrpcMode, isWebSocketMode } = await import('./requestModeManager.js');
+        const { isGrpcMode, isWebSocketMode, isSseMode } = await import('./requestModeManager.js');
         
         if (isGrpcMode()) {
             const grpcRequestJson = window.grpcBodyEditor
@@ -71,6 +71,31 @@ export class WorkspaceTabStateManager {
                           protocol: 'grpc'
                       }
                     : null
+            };
+        }
+
+        if (isSseMode()) {
+            const sseUrlInput = document.getElementById('sse-url-input');
+            return {
+                request: {
+                    protocol: 'sse',
+                    url: sseUrlInput?.value || this.dom.urlInput?.value || '',
+                    method: 'GET',
+                    pathParams: {},
+                    queryParams: parseKeyValuePairs(this.dom.queryParamsList),
+                    headers: parseKeyValuePairs(this.dom.headersList),
+                    body: { mode: 'none', content: '' },
+                    authType: 'none',
+                    authConfig: {}
+                },
+                endpoint: window.currentEndpoint
+                    ? {
+                          collectionId: window.currentEndpoint.collectionId,
+                          endpointId: window.currentEndpoint.endpointId,
+                          protocol: 'sse'
+                      }
+                    : null,
+                activeResponseTab: this._getActiveResponseTab()
             };
         }
 
@@ -266,6 +291,51 @@ export class WorkspaceTabStateManager {
             }
             
             // Set window.currentEndpoint for gRPC requests so Ctrl+S save works
+            if (endpoint) {
+                window.currentEndpoint = endpoint;
+            }
+            return;
+        }
+
+        if (request.protocol === 'sse') {
+            setRequestMode(RequestMode.SSE);
+
+            if (this.dom.urlInput) {
+                this.dom.urlInput.value = request.url || '';
+            }
+            const sseUrlInput = document.getElementById('sse-url-input');
+            if (sseUrlInput) {
+                sseUrlInput.value = request.url || '';
+            }
+
+            if (this.dom.queryParamsList) {
+                clearKeyValueList(this.dom.queryParamsList);
+                if (request.queryParams && Object.keys(request.queryParams).length > 0) {
+                    populateKeyValueList(this.dom.queryParamsList, request.queryParams);
+                    updateUrlFromQueryParams();
+                } else {
+                    addKeyValueRow(this.dom.queryParamsList);
+                }
+            }
+
+            if (this.dom.headersList) {
+                clearKeyValueList(this.dom.headersList);
+                if (request.headers && Object.keys(request.headers).length > 0) {
+                    populateKeyValueList(this.dom.headersList, request.headers);
+                } else {
+                    addKeyValueRow(this.dom.headersList);
+                }
+            }
+
+            const activeResponseTab = tab.activeResponseTab || 'response-body';
+            activateTab('response', activeResponseTab);
+
+            if (response) {
+                await this._restoreResponse(response, tab.id);
+            } else {
+                this._clearResponse(tab.id);
+            }
+
             if (endpoint) {
                 window.currentEndpoint = endpoint;
             }

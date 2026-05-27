@@ -36,6 +36,7 @@ use commands::{
     },
     proxy::{proxy_get, proxy_set, proxy_test, ProxyState},
     scripts::{script_execute_pre_request, script_execute_test, script_get, script_save},
+    sse::{sse_close, sse_connect, SseState},
     store::{settings_get, settings_set, store_get, store_set},
     updater::{
         updater_check, updater_download_and_install, updater_get_install_info, PendingUpdate,
@@ -63,6 +64,7 @@ fn main() {
         .manage(ProtoState::default())
         .manage(GrpcStreamingState::default())
         .manage(WebSocketState::default())
+        .manage(SseState::default())
         .manage(PendingUpdate::default())
         .manage(OAuth2State::default())
         .invoke_handler(tauri::generate_handler![
@@ -120,6 +122,9 @@ fn main() {
             // WebSocket
             websocket_send,
             websocket_close,
+            // SSE
+            sse_connect,
+            sse_close,
             // OAuth 2.0
             oauth2_generate_pkce,
             oauth2_generate_state,

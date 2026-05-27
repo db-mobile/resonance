@@ -41,9 +41,10 @@ import { extractCookies } from './cookieParser.js';
 import { getRequestBodyContent } from './requestBodyHelper.js';
 import { MockServerRepository } from './storage/MockServerRepository.js';
 import { MockServerService } from './services/MockServerService.js';
-import { isGrpcMode, isWebSocketMode } from './requestModeManager.js';
+import { isGrpcMode, isSseMode, isWebSocketMode } from './requestModeManager.js';
 import { handleGrpcSend } from './grpcHandler.js';
 import { handleWebSocketCancel, handleWebSocketSend } from './websocketHandler.js';
+import { handleSseCancel, handleSseConnect } from './sseHandler.js';
 import { cancelStream as cancelGrpcStream, hasActiveStream as hasActiveGrpcStream } from './grpcStreamHandler.js';
 import { RequestBuilderService } from './services/RequestBuilderService.js';
 import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes } from './ResponseDisplayHelper.js';
@@ -299,6 +300,12 @@ export async function handleCancelRequest() {
         return;
     }
 
+    if (isSseMode()) {
+        await handleSseCancel();
+        setRequestInProgress(false);
+        return;
+    }
+
     if (isGrpcMode()) {
         const tabId = window.workspaceTabController
             ? await window.workspaceTabController.service.getActiveTabId()
@@ -386,7 +393,49 @@ export async function handleSendRequest() {
         }
         return;
     }
-    
+
+    if (isSseMode()) {
+        if (window.currentEndpoint) {
+            debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+        }
+
+        const sseInput = document.getElementById('sse-url-input');
+        let sseUrl = sseInput?.value?.trim() || urlInput?.value?.trim() || '';
+
+        const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
+        const headers = parseKeyValuePairs(document.getElementById('headers-list'));
+        const authData = authManager.generateAuthData();
+
+        const builder = getRequestBuilderService();
+        builder.mergeAuthData(headers, queryParams, authData);
+
+        try {
+            const { variables, processor } = await builder.resolveVariables(
+                window.currentEndpoint, headers
+            );
+            const result = builder.processRequestComponents({
+                url: sseUrl,
+                pathParams: {},
+                headers,
+                queryParams,
+                variables,
+                processor
+            });
+            sseUrl = result.url;
+        } catch (error) {
+            updateStatusDisplay(`Variable processing error: ${error.message}`, null);
+            return;
+        }
+
+        setRequestInProgress(true);
+        try {
+            await handleSseConnect(sseUrl, headers);
+        } finally {
+            setRequestInProgress(false);
+        }
+        return;
+    }
+
     // Show cancel button immediately so the UI feels responsive
     setRequestInProgress(true);
 

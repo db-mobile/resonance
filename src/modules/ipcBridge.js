@@ -55,6 +55,10 @@ if (isTauri) {
             send: (request) => invoke('websocket_send', { request }),
             close: (tabId) => invoke('websocket_close', { tabId })
         },
+        sse: {
+            connect: (request) => invoke('sse_connect', { request }),
+            close: (tabId) => invoke('sse_close', { tabId })
+        },
         store: {
             get: (key) => invoke('store_get', { key }),
             set: (key, value) => invoke('store_set', { key, value })

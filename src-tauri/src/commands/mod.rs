@@ -9,6 +9,7 @@ pub mod mock_server;
 pub mod oauth;
 pub mod proxy;
 pub mod scripts;
+pub mod sse;
 pub mod store;
 pub mod updater;
 pub mod websocket;
