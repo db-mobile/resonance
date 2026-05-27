@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Resonance is a local-first, zero-account API client built with Tauri v2.0.0. It's a cross-platform desktop application (Linux, macOS, Windows) for REST/GraphQL testing, OpenAPI/Postman import, mock server, scripting, and environment management.
+Resonance is a local-first, zero-account API client built with Tauri v2.0.0. It's a cross-platform desktop application (Linux, macOS, Windows) supporting REST, GraphQL, gRPC (with server reflection), and WebSocket protocols, plus OpenAPI/Postman import, a built-in mock server, pre-request/test scripting, collection runner, and environment management.
+
+**Prerequisites**: Node.js v20+, Rust stable.
+
+Collections, environments, history, and settings are persisted as human-readable JSON files (git-friendly) via the repository layer in `src/modules/storage/`.
 
 ## Build Commands
 
@@ -19,6 +23,7 @@ npm run build:tauri      # Build production application
 ```bash
 npm test                 # Run Jest tests
 npm test -- --testPathPattern="VariableService"  # Run single test file
+npm run test:watch       # Run tests in watch mode
 npm run test:coverage    # Generate coverage report
 ```
 
@@ -28,6 +33,7 @@ npm run test:coverage    # Generate coverage report
 npm run lint             # Run ESLint
 npm run lint:fix         # Auto-fix ESLint issues
 npm run format           # Format with Prettier
+npm run format:check     # Check formatting without writing
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check   # Check Rust formatting
 cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings  # Lint Rust
 ```
@@ -42,6 +48,15 @@ cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings  # Lint Rust
 ### Backend (Rust)
 - **Entry Point**: `src-tauri/src/main.rs`
 - **Commands**: `src-tauri/src/commands/` - IPC handlers for HTTP requests, mock server, scripts, storage
+- **Key crates**:
+  - `reqwest` v0.12 — async HTTP client (HTTP/2, SOCKS proxy)
+  - `Axum` v0.7 — powers the built-in mock server
+  - `Boa Engine` v0.19 — JS engine for pre-request/test scripts (sandboxed, 10s timeout)
+  - `tauri-plugin-store` — persistent config storage
+  - `serde_yaml` — OpenAPI YAML parsing
+
+### Scripts Subsystem
+Pre-request and test scripts execute in Boa with access to: `request` (mutable URL/method/headers/body/params), `response` (test scripts only — status/headers/body/cookies/timings), `environment` (get/set/delete env vars), `console`, and `expect()` assertions. See `SCRIPTS.md` for the full API.
 
 ### Module Organization
 ```

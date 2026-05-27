@@ -498,9 +498,8 @@ export async function handleSendRequest() {
                     try {
                         parsedVariables = JSON.parse(variablesText);
                     } catch (e) {
-                        updateStatusDisplay(`Invalid GraphQL Variables JSON: ${e.message}`, null);
+                        toast.error(`Invalid GraphQL Variables JSON: ${e.message}`);
                         clearResponseDisplay();
-                        responseHeadersDisplay.textContent = '';
                         setRequestInProgress(false);
                         return;
                     }
@@ -541,18 +540,16 @@ export async function handleSendRequest() {
                     try {
                         body = JSON.parse(bodyText);
                     } catch (e) {
-                        updateStatusDisplay(`Invalid Body JSON: ${e.message}`, null);
+                        toast.error(`Invalid Body JSON: ${e.message}`);
                         clearResponseDisplay();
-                        responseHeadersDisplay.textContent = '';
                         setRequestInProgress(false);
                         return;
                     }
                 }
             }
         } catch (e) {
-            updateStatusDisplay(`Error processing request body: ${e.message}`, null);
+            toast.error(`Error processing request body: ${e.message}`);
             clearResponseDisplay();
-            responseHeadersDisplay.textContent = '';
             setRequestInProgress(false);
             return;
         }
