@@ -19,9 +19,12 @@ import {
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
 import { displayResponseWithLineNumbersForTab } from './apiHandler.js';
+import { startOrSend as grpcStreamStartOrSend } from './grpcStreamHandler.js';
 
 let lastTarget = null;
 let methodsCache = new Map();
+// Maps fullMethod -> { clientStreaming, serverStreaming } for the currently displayed service
+const methodFlagsCache = new Map();
 
 // Proto file mode state
 let protoFileMode = false;
@@ -74,9 +77,15 @@ export function setGrpcMetadata(metadataObj) {
     }
 }
 
-function setGrpcStatus(text) {
-    if (grpcConnectionStatus) {
-        grpcConnectionStatus.textContent = text || '';
+function setGrpcStatus(text, state = null) {
+    if (!grpcConnectionStatus) {
+        return;
+    }
+    grpcConnectionStatus.textContent = text || '';
+    if (state) {
+        grpcConnectionStatus.setAttribute('data-state', state);
+    } else if (!text) {
+        grpcConnectionStatus.setAttribute('data-state', 'idle');
     }
 }
 
@@ -97,6 +106,47 @@ function addOption(select, value, label) {
     opt.value = value;
     opt.textContent = label;
     select.appendChild(opt);
+}
+
+function methodKindFromFlags(flags) {
+    if (!flags) {
+        return '';
+    }
+    if (flags.clientStreaming && flags.serverStreaming) {
+        return 'bidi';
+    }
+    if (flags.serverStreaming) {
+        return 'server-stream';
+    }
+    if (flags.clientStreaming) {
+        return 'client-stream';
+    }
+    return 'unary';
+}
+
+function updateMethodKindBadge(fullMethod) {
+    const badge = document.getElementById('grpc-method-kind-badge');
+    if (!badge) {
+        return;
+    }
+    const flags = methodFlagsCache.get(fullMethod);
+    const kind = methodKindFromFlags(flags);
+    badge.setAttribute('data-kind', kind);
+    badge.textContent = kind;
+}
+
+function populateMethodOptions(methods) {
+    clearSelect(grpcMethodSelect);
+    methodFlagsCache.clear();
+    methods.forEach(m => {
+        const label = `${m.name} (${m.inputType} → ${m.outputType})`;
+        addOption(grpcMethodSelect, m.fullMethod, label);
+        methodFlagsCache.set(m.fullMethod, {
+            clientStreaming: !!m.clientStreaming,
+            serverStreaming: !!m.serverStreaming
+        });
+    });
+    updateMethodKindBadge(grpcMethodSelect?.value);
 }
 
 function getUseTls() {
@@ -136,7 +186,7 @@ async function onConnect() {
     }
 
     try {
-        setGrpcStatus('Connecting...');
+        setGrpcStatus('Connecting…', 'connecting');
         updateStatusDisplay('Connecting to gRPC server...', null);
 
         const services = await loadServices(target);
@@ -144,19 +194,18 @@ async function onConnect() {
         methodsCache = new Map();
 
         if (services.length === 0) {
-            setGrpcStatus('No services');
+            setGrpcStatus('No services', 'error');
             return;
         }
 
         const firstService = grpcServiceSelect.value;
         const methods = await loadMethods(target, firstService);
-        clearSelect(grpcMethodSelect);
-        methods.forEach(m => addOption(grpcMethodSelect, m.fullMethod, `${m.name} (${m.inputType} → ${m.outputType})`));
+        populateMethodOptions(methods);
 
-        setGrpcStatus('Connected');
+        setGrpcStatus('Connected', 'connected');
         updateStatusDisplay('gRPC connected', null);
     } catch (error) {
-        setGrpcStatus('Error');
+        setGrpcStatus('Error', 'error');
         toast.error(`gRPC connect error: ${error.message || String(error)}`);
         updateStatusDisplay(`gRPC connect error: ${error.message || String(error)}`, null);
     }
@@ -170,9 +219,7 @@ async function onServiceChange() {
 
     // In proto file mode, use cached methods
     if (protoFileMode && methodsCache.has(serviceName)) {
-        const methods = methodsCache.get(serviceName);
-        clearSelect(grpcMethodSelect);
-        methods.forEach(m => addOption(grpcMethodSelect, m.fullMethod, `${m.name} (${m.inputType} → ${m.outputType})`));
+        populateMethodOptions(methodsCache.get(serviceName));
         return;
     }
 
@@ -183,13 +230,12 @@ async function onServiceChange() {
     }
 
     try {
-        setGrpcStatus('Loading methods...');
+        setGrpcStatus('Loading methods…', 'connecting');
         const methods = await loadMethods(target, serviceName);
-        clearSelect(grpcMethodSelect);
-        methods.forEach(m => addOption(grpcMethodSelect, m.fullMethod, `${m.name} (${m.inputType} → ${m.outputType})`));
-        setGrpcStatus('Connected');
+        populateMethodOptions(methods);
+        setGrpcStatus('Connected', 'connected');
     } catch (error) {
-        setGrpcStatus('Error');
+        setGrpcStatus('Error', 'error');
         toast.error(`gRPC methods error: ${error.message || String(error)}`);
         updateStatusDisplay(`gRPC methods error: ${error.message || String(error)}`, null);
     }
@@ -215,12 +261,27 @@ export async function handleGrpcSend() {
         }
     }
 
+    const metadata = getMetadata();
+    const useTls = getUseTls();
+    const flags = methodFlagsCache.get(fullMethod);
+    const isStreaming = !!(flags && (flags.serverStreaming || flags.clientStreaming));
+
+    if (isStreaming) {
+        await grpcStreamStartOrSend({
+            target,
+            fullMethod,
+            requestJson,
+            metadata,
+            tls: { useTls, skipVerify: false },
+            protoPath: protoFileMode ? loadedProtoPath : null,
+            canSend: !!flags.clientStreaming
+        });
+        return;
+    }
+
     try {
         updateStatusDisplay('Sending gRPC request...', null);
         displayResponseWithLineNumbersForTab('Sending gRPC request...', null, null);
-
-        const metadata = getMetadata();
-        const useTls = getUseTls();
 
         let result;
         if (protoFileMode && loadedProtoPath) {
@@ -283,7 +344,10 @@ export async function handleGrpcSend() {
  */
 export async function loadProtoFile(protoPath, includePaths = null) {
     try {
-        setGrpcStatus('Loading proto file...');
+        if (grpcProtoStatus) {
+            grpcProtoStatus.textContent = 'Loading…';
+            grpcProtoStatus.setAttribute('data-state', 'connecting');
+        }
         updateStatusDisplay('Parsing proto file...', null);
 
         const protoInfo = await window.backendAPI.grpc.parseProtoFile(protoPath, includePaths);
@@ -300,23 +364,19 @@ export async function loadProtoFile(protoPath, includePaths = null) {
         if (protoInfo.services.length > 0) {
             // Populate methods for first service
             const firstService = protoInfo.services[0];
-            clearSelect(grpcMethodSelect);
-            firstService.methods.forEach(m => 
-                addOption(grpcMethodSelect, m.fullMethod, `${m.name} (${m.inputType} → ${m.outputType})`)
-            );
-            
+            populateMethodOptions(firstService.methods);
+
             // Cache methods for all services
             protoInfo.services.forEach(svc => {
                 methodsCache.set(svc.fullName, svc.methods);
             });
         }
 
-        setGrpcStatus('Proto loaded');
         updateStatusDisplay(`Loaded proto: ${protoInfo.package || protoPath}`, null);
-        
+
         return protoInfo;
     } catch (error) {
-        setGrpcStatus('Error');
+        setProtoStatusError('Failed');
         toast.error(`Proto load error: ${error.message || String(error)}`);
         updateStatusDisplay(`Proto load error: ${error.message || String(error)}`, null);
         throw error;
@@ -334,9 +394,10 @@ export function clearProtoFile() {
     loadedProtoPath = null;
     loadedProtoInfo = null;
     methodsCache = new Map();
+    methodFlagsCache.clear();
     clearSelect(grpcServiceSelect);
     clearSelect(grpcMethodSelect);
-    setGrpcStatus('');
+    updateMethodKindBadge(null);
     updateStatusDisplay('Proto file cleared', null);
 }
 
@@ -424,6 +485,7 @@ export function initGrpcUI() {
 
     if (grpcMethodSelect) {
         grpcMethodSelect.addEventListener('change', () => {
+            updateMethodKindBadge(grpcMethodSelect.value);
             if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
                 window.workspaceTabController.markCurrentTabModified();
             }
@@ -524,7 +586,14 @@ function updateProtoUI(loaded, protoPath) {
     }
     
     if (grpcProtoStatus) {
-        grpcProtoStatus.textContent = loaded ? '● Loaded' : '';
-        grpcProtoStatus.className = loaded ? 'proto-status proto-status-loaded' : 'proto-status';
+        grpcProtoStatus.textContent = loaded ? 'Loaded' : '';
+        grpcProtoStatus.setAttribute('data-state', loaded ? 'loaded' : 'idle');
+    }
+}
+
+function setProtoStatusError(message) {
+    if (grpcProtoStatus) {
+        grpcProtoStatus.textContent = message || 'Error';
+        grpcProtoStatus.setAttribute('data-state', 'error');
     }
 }

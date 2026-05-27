@@ -126,6 +126,19 @@ export class WorkspaceTabController {
                     authType: 'none',
                     authConfig: {}
                 };
+            } else if (protocol === 'sse') {
+                tabOptions.name = tabOptions.name || 'New SSE';
+                tabOptions.request = {
+                    protocol: 'sse',
+                    url: '',
+                    method: 'GET',
+                    pathParams: {},
+                    queryParams: {},
+                    headers: {},
+                    body: { mode: 'none', content: '' },
+                    authType: 'none',
+                    authConfig: {}
+                };
             } else if (protocol === 'grpc') {
                 tabOptions.name = tabOptions.name || 'New gRPC';
                 tabOptions.request = {

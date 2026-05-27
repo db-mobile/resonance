@@ -5654,55 +5654,317 @@ body {
   padding-left: 8px;
 }
 
-/* gRPC Source Section Styles (Connection + Proto in one row) */
+/* ============================================
+   gRPC Tab — Source cards, selectors, badges
+   ============================================ */
+
 .grpc-source-section {
-  margin-bottom: 16px;
-  padding-bottom: 16px;
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-5);
   border-bottom: 1px solid var(--border-light);
 }
 
-.grpc-source-row {
+.grpc-source-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+@media (max-width: 720px) {
+  .grpc-source-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.grpc-source-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition:
+    border-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.grpc-source-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--source-stripe, var(--border-medium));
+  opacity: 0.6;
+  transition: opacity var(--transition-base);
+  pointer-events: none;
+}
+
+.grpc-source-card[data-source="reflection"] {
+  --source-stripe: var(--accent);
+}
+
+.grpc-source-card[data-source="proto"] {
+  --source-stripe: color-mix(in srgb, var(--text-secondary) 55%, var(--accent) 45%);
+}
+
+.grpc-source-card:hover,
+.grpc-source-card:focus-within {
+  border-color: color-mix(in srgb, var(--border-light) 45%, var(--accent) 55%);
+  box-shadow: var(--shadow-xs);
+}
+
+.grpc-source-card:hover::before,
+.grpc-source-card:focus-within::before {
+  opacity: 1;
+}
+
+.grpc-source-card-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-light);
+  background: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
+}
+
+.grpc-source-card-title {
+  margin: 0;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.grpc-source-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.grpc-source-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
-.grpc-source-item {
+.grpc-source-card-actions .toggle-switch {
+  margin-right: auto;
+}
+
+.grpc-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.grpc-field-label {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.grpc-field-input {
+  --input-bg: var(--bg-primary);
+  --input-padding: var(--space-2) var(--space-3);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+}
+
+.grpc-proto-filename-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.grpc-source-divider {
-  font-size: 12px;
-  color: var(--text-secondary);
-  padding: 0 4px;
-}
-
-.grpc-hint {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 8px 0 0 0;
+  min-height: calc(var(--font-size-xs) + var(--space-2));
 }
 
 .proto-filename {
-  font-size: 13px;
+  display: block;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
   color: var(--text-primary);
-  font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 200px;
+  max-width: 100%;
 }
 
-.proto-status {
-  font-size: 12px;
+.proto-filename:empty::before {
+  content: "No file loaded";
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-xs);
+  font-style: italic;
+  color: var(--text-tertiary);
+}
+
+.grpc-hint {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  color: var(--text-tertiary);
+}
+
+.grpc-hint code {
+  padding: 0 var(--space-1);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-family-mono);
+  font-size: 0.95em;
   color: var(--text-secondary);
 }
 
-.proto-status-loaded {
-  color: var(--color-success, #22c55e);
+/* Status pills — Reflection: idle | connecting | connected | error
+                  Proto:      idle | connecting | loaded    | error */
+.grpc-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition:
+    color var(--transition-base),
+    background-color var(--transition-base),
+    border-color var(--transition-base);
+}
+
+.grpc-status-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  opacity: 0.75;
+}
+
+.grpc-status-pill:empty {
+  display: none;
+}
+
+.grpc-status-pill[data-state="connecting"] {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning) 30%, transparent);
+}
+
+.grpc-status-pill[data-state="connecting"]::before {
+  animation: grpc-pulse 1.2s ease-in-out infinite;
+}
+
+.grpc-status-pill[data-state="connected"],
+.grpc-status-pill[data-state="loaded"] {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+}
+
+.grpc-status-pill[data-state="error"] {
+  color: var(--color-error);
+  background: color-mix(in srgb, var(--color-error) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-error) 30%, transparent);
+}
+
+@keyframes grpc-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+/* Service / Method selectors */
+.grpc-selectors {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.grpc-selector-row {
+  display: grid;
+  grid-template-columns: minmax(72px, max-content) 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.grpc-selector-label {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.grpc-selector-control {
+  min-width: 0;
+}
+
+/* Method kind badge — reads like a compiler annotation */
+.grpc-method-kind-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--kind-border, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--kind-bg, transparent);
+  color: var(--kind-fg, var(--text-secondary));
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition:
+    color var(--transition-base),
+    background-color var(--transition-base),
+    border-color var(--transition-base);
+}
+
+.grpc-method-kind-badge[data-kind=""],
+.grpc-method-kind-badge:empty {
+  display: none;
+}
+
+.grpc-method-kind-badge[data-kind="unary"] {
+  --kind-fg: var(--text-secondary);
+  --kind-bg: var(--bg-tertiary);
+  --kind-border: var(--border-light);
+}
+
+.grpc-method-kind-badge[data-kind="server-stream"] {
+  --kind-fg: var(--accent-blue);
+  --kind-bg: color-mix(in srgb, var(--accent-blue) 10%, transparent);
+  --kind-border: color-mix(in srgb, var(--accent-blue) 28%, transparent);
+}
+
+.grpc-method-kind-badge[data-kind="client-stream"] {
+  --kind-fg: var(--accent-orange);
+  --kind-bg: color-mix(in srgb, var(--accent-orange) 10%, transparent);
+  --kind-border: color-mix(in srgb, var(--accent-orange) 28%, transparent);
+}
+
+.grpc-method-kind-badge[data-kind="bidi"] {
+  --kind-fg: var(--accent-purple);
+  --kind-bg: color-mix(in srgb, var(--accent-purple) 10%, transparent);
+  --kind-border: color-mix(in srgb, var(--accent-purple) 28%, transparent);
 }
 
 /* ============================================

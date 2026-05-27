@@ -14,7 +14,7 @@ pub use super::grpc_reflection::GrpcUnaryRequest;
 /// State to hold loaded proto file descriptors
 pub struct ProtoState {
     /// Map from proto file path to its descriptor pool
-    pools: Mutex<HashMap<String, DescriptorPool>>,
+    pub(crate) pools: Mutex<HashMap<String, DescriptorPool>>,
 }
 
 impl Default for ProtoState {

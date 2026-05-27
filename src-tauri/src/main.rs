@@ -20,6 +20,7 @@ use commands::{
         grpc_get_input_skeleton, grpc_invoke_unary, grpc_reflection_list_methods,
         grpc_reflection_list_services,
     },
+    grpc_streaming::{grpc_stream_cancel, grpc_stream_send, grpc_stream_start, GrpcStreamingState},
     import_export::{
         collections_pick_import_file, export_openapi, export_postman, import_openapi_file,
         import_postman_collection, import_postman_environment, save_documentation,
@@ -35,6 +36,7 @@ use commands::{
     },
     proxy::{proxy_get, proxy_set, proxy_test, ProxyState},
     scripts::{script_execute_pre_request, script_execute_test, script_get, script_save},
+    sse::{sse_close, sse_connect, SseState},
     store::{settings_get, settings_set, store_get, store_set},
     updater::{
         updater_check, updater_download_and_install, updater_get_install_info, PendingUpdate,
@@ -60,7 +62,9 @@ fn main() {
         .manage(RequestState::default())
         .manage(ProxyState::default())
         .manage(ProtoState::default())
+        .manage(GrpcStreamingState::default())
         .manage(WebSocketState::default())
+        .manage(SseState::default())
         .manage(PendingUpdate::default())
         .manage(OAuth2State::default())
         .invoke_handler(tauri::generate_handler![
@@ -99,6 +103,10 @@ fn main() {
             grpc_proto_invoke_unary,
             grpc_list_loaded_protos,
             grpc_unload_proto,
+            // gRPC Streaming
+            grpc_stream_start,
+            grpc_stream_send,
+            grpc_stream_cancel,
             // Mock Server
             mock_server_start,
             mock_server_stop,
@@ -114,6 +122,9 @@ fn main() {
             // WebSocket
             websocket_send,
             websocket_close,
+            // SSE
+            sse_connect,
+            sse_close,
             // OAuth 2.0
             oauth2_generate_pkce,
             oauth2_generate_state,

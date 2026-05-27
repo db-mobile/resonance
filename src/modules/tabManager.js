@@ -105,7 +105,7 @@ export function setResponseTabsForProtocol(protocol) {
     if (protocol === 'grpc') {
         httpTabs.forEach(tab => tab.classList.add('is-hidden'));
         grpcTabs.forEach(tab => tab.classList.remove('is-hidden'));
-    } else if (protocol === 'websocket') {
+    } else if (protocol === 'websocket' || protocol === 'sse') {
         httpTabs.forEach(tab => tab.classList.add('is-hidden'));
         grpcTabs.forEach(tab => tab.classList.add('is-hidden'));
     } else {

@@ -342,58 +342,75 @@
                 </div>
 
                 <div class="tab-content" id="grpc" role="tabpanel" aria-labelledby="grpc-tab">
-                    <!-- Hidden elements for state management -->
-                    <div id="grpc-hidden-elements" style="display: none;">
-                        <input id="grpc-target-input" class="input-base url-input" placeholder="localhost:50051" aria-label="gRPC Target">
-                        <!-- Deprecated: use main Send Request button instead -->
-                        <button id="grpc-send-btn" class="btn btn-primary" aria-label="Send gRPC">Send gRPC</button>
-                    </div>
-                    
-                    <!-- Connection & Proto File Row -->
-                    <div class="grpc-source-section">
-                        <div class="grpc-source-row">
-                            <!-- Reflection Connection -->
-                            <div class="grpc-source-item">
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="grpc-tls-checkbox" aria-label="Use TLS">
-                                    <span class="toggle-track"></span>
-                                    <span>TLS</span>
-                                </label>
-                                <button id="grpc-connect-btn" class="btn-sm btn-secondary" aria-label="Connect via Reflection">
-                                    Connect
-                                </button>
-                                <span id="grpc-connection-status" class="status-text"></span>
-                            </div>
-                            
-                            <span class="grpc-source-divider">or</span>
-                            
-                            <!-- Proto File -->
-                            <div class="grpc-source-item">
-                                <button id="grpc-load-proto-btn" class="btn-sm btn-secondary" aria-label="Load Proto File">
-                                    <span class="icon icon-14 icon-file"></span>
-                                Load .proto
-                            </button>
-                                <button id="grpc-clear-proto-btn" class="btn-sm btn-secondary" aria-label="Clear Proto" style="display: none;">
-                                    Clear
-                                </button>
-                                <span id="grpc-proto-filename" class="proto-filename"></span>
-                                <span id="grpc-proto-status" class="proto-status"></span>
+                    <!-- Deprecated send button (kept hidden for legacy listener) -->
+                    <button id="grpc-send-btn" class="btn btn-primary" style="display: none;" aria-hidden="true" tabindex="-1">Send gRPC</button>
+
+                    <section class="grpc-source-section">
+                        <div class="grpc-source-cards">
+                            <article class="grpc-source-card" data-source="reflection">
+                                <header class="grpc-source-card-header">
+                                    <h4 class="grpc-source-card-title">Server reflection</h4>
+                                    <span id="grpc-connection-status" class="grpc-status-pill" data-state="idle" role="status"></span>
+                                </header>
+                                <div class="grpc-source-card-body">
+                                    <label class="grpc-field">
+                                        <span class="grpc-field-label">Target</span>
+                                        <input id="grpc-target-input" type="text" class="input-base grpc-field-input" placeholder="localhost:50051" aria-label="gRPC Target">
+                                    </label>
+                                    <div class="grpc-source-card-actions">
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="grpc-tls-checkbox" aria-label="Use TLS">
+                                            <span class="toggle-track"></span>
+                                            <span>TLS</span>
+                                        </label>
+                                        <button id="grpc-connect-btn" class="btn-sm btn-secondary" aria-label="Connect via Reflection">
+                                            Connect
+                                        </button>
+                                    </div>
+                                </div>
+                            </article>
+
+                            <article class="grpc-source-card" data-source="proto">
+                                <header class="grpc-source-card-header">
+                                    <h4 class="grpc-source-card-title">Proto file</h4>
+                                    <span id="grpc-proto-status" class="grpc-status-pill" data-state="idle" role="status"></span>
+                                </header>
+                                <div class="grpc-source-card-body">
+                                    <div class="grpc-proto-filename-row">
+                                        <span id="grpc-proto-filename" class="proto-filename" aria-live="polite"></span>
+                                    </div>
+                                    <div class="grpc-source-card-actions">
+                                        <button id="grpc-load-proto-btn" class="btn-sm btn-secondary" aria-label="Load Proto File">
+                                            <span class="icon icon-14 icon-file"></span>
+                                            Load .proto
+                                        </button>
+                                        <button id="grpc-clear-proto-btn" class="btn-sm btn-secondary" aria-label="Clear Proto" style="display: none;">
+                                            Clear
+                                        </button>
+                                    </div>
+                                </div>
+                            </article>
+                        </div>
+                        <p class="grpc-hint">Connect to a server with reflection enabled, or load a <code>.proto</code> file to use type definitions directly.</p>
+                    </section>
+
+                    <section class="grpc-selectors">
+                        <div class="grpc-selector-row">
+                            <label class="grpc-selector-label" for="grpc-service-select">Service</label>
+                            <div class="select-wrapper grpc-selector-control">
+                                <select id="grpc-service-select" class="select-base" aria-label="gRPC Service"></select>
+                                <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                             </div>
                         </div>
-                        <p class="grpc-hint">Use <strong>Connect</strong> to discover services via server reflection, or <strong>Load .proto</strong> to use a proto file directly.</p>
-                    </div>
-                    
-                    <h3>Service</h3>
-                    <div class="select-wrapper">
-                        <select id="grpc-service-select" class="select-base" aria-label="gRPC Service"></select>
-                        <span class="select-arrow icon icon-12 icon-chevron-down"></span>
-                    </div>
-                    
-                    <h3>Method</h3>
-                    <div class="select-wrapper">
-                        <select id="grpc-method-select" class="select-base" aria-label="gRPC Method"></select>
-                        <span class="select-arrow icon icon-12 icon-chevron-down"></span>
-                    </div>
+                        <div class="grpc-selector-row">
+                            <label class="grpc-selector-label" for="grpc-method-select">Method</label>
+                            <div class="select-wrapper grpc-selector-control">
+                                <select id="grpc-method-select" class="select-base" aria-label="gRPC Method"></select>
+                                <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                            </div>
+                            <span id="grpc-method-kind-badge" class="grpc-method-kind-badge" data-kind="" aria-live="polite"></span>
+                        </div>
+                    </section>
                 </div>
 
                 <div class="tab-content" id="grpc-message" role="tabpanel" aria-labelledby="grpc-message-tab">

@@ -12,7 +12,8 @@ import { setResponseTabsForProtocol } from './tabManager.js';
 export const RequestMode = {
     HTTP: 'http',
     WEBSOCKET: 'websocket',
-    GRPC: 'grpc'
+    GRPC: 'grpc',
+    SSE: 'sse'
 };
 
 /**
@@ -32,6 +33,12 @@ const HTTP_ONLY_TABS = ['path-params'];
  * @type {string[]}
  */
 const HTTP_AND_WEBSOCKET_TABS = ['query-params', 'headers', 'body'];
+
+/**
+ * Tabs shown in SSE mode (no body, since SSE is GET-only)
+ * @type {string[]}
+ */
+const SSE_TABS = ['query-params', 'headers'];
 
 /**
  * gRPC-specific tab IDs that should be hidden in HTTP mode
@@ -76,6 +83,14 @@ export function isWebSocketMode() {
 }
 
 /**
+ * Check if current mode is SSE
+ * @returns {boolean}
+ */
+export function isSseMode() {
+    return currentMode === RequestMode.SSE;
+}
+
+/**
  * Check if current mode is HTTP
  * @returns {boolean}
  */
@@ -88,7 +103,10 @@ export function isHttpMode() {
  * @param {string} mode - The mode to set
  */
 export function setRequestMode(mode) {
-    if (mode !== RequestMode.HTTP && mode !== RequestMode.WEBSOCKET && mode !== RequestMode.GRPC) {
+    if (mode !== RequestMode.HTTP
+        && mode !== RequestMode.WEBSOCKET
+        && mode !== RequestMode.GRPC
+        && mode !== RequestMode.SSE) {
         console.warn(`Invalid request mode: ${mode}, defaulting to HTTP`);
         mode = RequestMode.HTTP;
     }
@@ -131,6 +149,7 @@ function updateUIForMode(mode) {
         // Show gRPC target input in URL section
         showGrpcUrlSection(true);
         showWebSocketUrlSection(false);
+        showSseUrlSection(false);
         
         // Update tab visibility - show gRPC tabs, hide HTTP-only tabs
         tabButtons.forEach(btn => {
@@ -160,6 +179,41 @@ function updateUIForMode(mode) {
             || HTTP_SHARED_TABS.includes(activeTab.dataset.tab)) {
             activateTab('grpc');
         }
+    } else if (mode === RequestMode.SSE) {
+        if (methodSelectContainer) {
+            methodSelectContainer.style.display = 'none';
+        }
+        if (urlInputContainer) {
+            urlInputContainer.style.display = 'none';
+        }
+        if (curlBtn) {
+            curlBtn.style.display = 'none';
+        }
+
+        showGrpcUrlSection(false);
+        showWebSocketUrlSection(false);
+        showSseUrlSection(true);
+
+        tabButtons.forEach(btn => {
+            const tabId = btn.dataset.tab;
+            if (SSE_TABS.includes(tabId)) {
+                btn.style.display = '';
+            } else {
+                btn.style.display = 'none';
+            }
+        });
+
+        if (bodyModeContainer) {
+            bodyModeContainer.style.display = 'none';
+        }
+        if (window.graphqlBodyManager) {
+            window.graphqlBodyManager.setGraphQLModeEnabled(false);
+        }
+
+        const activeTab = document.querySelector('.request-config .tab-nav .tab-button.active');
+        if (!activeTab || activeTab.style.display === 'none') {
+            activateTab('headers');
+        }
     } else if (mode === RequestMode.WEBSOCKET) {
         if (methodSelectContainer) {
             methodSelectContainer.style.display = 'none';
@@ -173,6 +227,7 @@ function updateUIForMode(mode) {
 
         showGrpcUrlSection(false);
         showWebSocketUrlSection(true);
+        showSseUrlSection(false);
 
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
@@ -219,6 +274,7 @@ function updateUIForMode(mode) {
         // Hide gRPC target input from URL section
         showGrpcUrlSection(false);
         showWebSocketUrlSection(false);
+        showSseUrlSection(false);
         
         // Update tab visibility - show HTTP tabs, hide gRPC-only tabs
         tabButtons.forEach(btn => {
@@ -421,6 +477,84 @@ function createWebSocketUrlSection() {
     }
 
     return websocketSection;
+}
+
+function showSseUrlSection(show) {
+    let sseUrlSection = document.getElementById('sse-url-section');
+
+    if (show) {
+        if (!sseUrlSection) {
+            sseUrlSection = createSseUrlSection();
+        }
+        if (sseUrlSection) {
+            syncSseUrlInput();
+            sseUrlSection.style.display = 'flex';
+        }
+    } else if (sseUrlSection) {
+        sseUrlSection.style.display = 'none';
+    }
+}
+
+function createSseUrlSection() {
+    const requestUrlSection = document.querySelector('.request-url-section');
+    if (!requestUrlSection) {
+        return null;
+    }
+
+    const sseSection = document.createElement('div');
+    sseSection.id = 'sse-url-section';
+    sseSection.className = 'grpc-url-section';
+    sseSection.style.display = 'none';
+
+    const badge = document.createElement('span');
+    badge.className = 'protocol-url-badge protocol-url-badge-sse';
+    badge.textContent = 'SSE';
+
+    const targetWrapper = document.createElement('div');
+    targetWrapper.className = 'grpc-target-wrapper';
+
+    const existingUrlInput = document.getElementById('url-input');
+    const urlInput = document.createElement('input');
+    urlInput.type = 'url';
+    urlInput.id = 'sse-url-input';
+    urlInput.className = 'input-base url-input';
+    urlInput.placeholder = 'https://example.com/events';
+    urlInput.setAttribute('aria-label', 'SSE URL');
+
+    if (existingUrlInput) {
+        urlInput.value = existingUrlInput.value;
+        urlInput.addEventListener('input', () => {
+            existingUrlInput.value = urlInput.value;
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
+        existingUrlInput.addEventListener('input', () => {
+            urlInput.value = existingUrlInput.value;
+        });
+    }
+
+    targetWrapper.appendChild(urlInput);
+    sseSection.appendChild(badge);
+    sseSection.appendChild(targetWrapper);
+
+    const methodSelectContainer = document.querySelector('.method-select-container');
+    if (methodSelectContainer) {
+        methodSelectContainer.after(sseSection);
+    } else {
+        requestUrlSection.prepend(sseSection);
+    }
+
+    return sseSection;
+}
+
+function syncSseUrlInput() {
+    const existingUrlInput = document.getElementById('url-input');
+    const sseUrlInput = document.getElementById('sse-url-input');
+
+    if (existingUrlInput && sseUrlInput) {
+        sseUrlInput.value = existingUrlInput.value;
+    }
 }
 
 function syncWebSocketUrlInput() {
