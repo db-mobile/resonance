@@ -126,12 +126,11 @@ fn parse_line(line: &str, partial: &mut PartialEvent) {
     match field {
         "event" => partial.event = Some(value.to_string()),
         "data" => partial.data.push(value.to_string()),
-        "id" => {
+        "id"
             // Spec: NULL byte in id is ignored; otherwise set last event id.
-            if !value.contains('\0') {
+            if !value.contains('\0') => {
                 partial.id = Some(value.to_string());
             }
-        }
         "retry" => {
             if let Ok(ms) = value.parse::<u64>() {
                 partial.retry = Some(ms);
