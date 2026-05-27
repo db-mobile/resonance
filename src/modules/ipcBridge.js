@@ -100,7 +100,11 @@ if (isTauri) {
             protoGetInputSkeleton: (protoPath, fullMethod) => invoke('grpc_proto_get_input_skeleton', { protoPath, fullMethod }),
             protoInvokeUnary: (protoPath, request) => invoke('grpc_proto_invoke_unary', { protoPath, request }),
             listLoadedProtos: () => invoke('grpc_list_loaded_protos'),
-            unloadProto: (protoPath) => invoke('grpc_unload_proto', { protoPath })
+            unloadProto: (protoPath) => invoke('grpc_unload_proto', { protoPath }),
+            // Streaming (server-streaming + bidirectional)
+            streamStart: (request) => invoke('grpc_stream_start', { request }),
+            streamSend: (tabId, messageJson) => invoke('grpc_stream_send', { tabId, messageJson }),
+            streamCancel: (tabId) => invoke('grpc_stream_cancel', { tabId })
         },
         settings: {
             get: () => invoke('settings_get'),

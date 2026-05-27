@@ -296,7 +296,7 @@ fn normalize_target(target: String) -> String {
     }
 }
 
-fn normalize_target_with_tls(target: &str, use_tls: bool) -> String {
+pub(crate) fn normalize_target_with_tls(target: &str, use_tls: bool) -> String {
     let trimmed = target.trim();
     if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
         trimmed.to_string()
@@ -307,7 +307,7 @@ fn normalize_target_with_tls(target: &str, use_tls: bool) -> String {
     }
 }
 
-async fn create_channel(target: &str, tls: &GrpcTlsOptions) -> Result<Channel, String> {
+pub(crate) async fn create_channel(target: &str, tls: &GrpcTlsOptions) -> Result<Channel, String> {
     let mut endpoint =
         Endpoint::from_shared(target.to_string()).map_err(|e| format!("Invalid target: {}", e))?;
 
@@ -324,11 +324,11 @@ async fn create_channel(target: &str, tls: &GrpcTlsOptions) -> Result<Channel, S
         .map_err(|e| format!("Connection failed: {}", e))
 }
 
-fn strip_leading_dot(name: &str) -> String {
+pub(crate) fn strip_leading_dot(name: &str) -> String {
     name.strip_prefix('.').unwrap_or(name).to_string()
 }
 
-fn metadata_to_json_map(meta: &tonic::metadata::MetadataMap) -> Value {
+pub(crate) fn metadata_to_json_map(meta: &tonic::metadata::MetadataMap) -> Value {
     let mut map = serde_json::Map::new();
     for kv in meta.iter() {
         match kv {
@@ -351,7 +351,7 @@ fn metadata_to_json_map(meta: &tonic::metadata::MetadataMap) -> Value {
     Value::Object(map)
 }
 
-fn resolve_method_types(
+pub(crate) fn resolve_method_types(
     pool: &DescriptorPool,
     full_method: &str,
 ) -> Result<(String, String), String> {
@@ -383,7 +383,7 @@ fn resolve_method_types(
     ))
 }
 
-fn json_to_dynamic_message(
+pub(crate) fn json_to_dynamic_message(
     value: &Value,
     desc: prost_reflect::MessageDescriptor,
 ) -> Result<DynamicMessage, String> {
@@ -393,7 +393,7 @@ fn json_to_dynamic_message(
         .map_err(|e| format!("Failed to map JSON to protobuf: {}", e))
 }
 
-fn dynamic_message_to_json(msg: &DynamicMessage) -> Result<Value, String> {
+pub(crate) fn dynamic_message_to_json(msg: &DynamicMessage) -> Result<Value, String> {
     serde_json::to_value(msg).map_err(|e| format!("Failed to map protobuf to JSON: {}", e))
 }
 
@@ -474,7 +474,7 @@ async fn build_descriptor_pool_for_method(
     build_descriptor_pool_for_method_with_tls(target, full_method, &GrpcTlsOptions::default()).await
 }
 
-async fn build_descriptor_pool_for_method_with_tls(
+pub(crate) async fn build_descriptor_pool_for_method_with_tls(
     target: &str,
     full_method: &str,
     tls: &GrpcTlsOptions,
@@ -524,14 +524,14 @@ async fn build_descriptor_pool_for_method_with_tls(
         .map_err(|e| format!("Failed to build descriptor pool: {}", e))
 }
 
-#[allow(dead_code)]
-struct DynamicMessageCodec {
+pub(crate) struct DynamicMessageCodec {
+    #[allow(dead_code)]
     input_desc: prost_reflect::MessageDescriptor,
     output_desc: prost_reflect::MessageDescriptor,
 }
 
 impl DynamicMessageCodec {
-    fn new(
+    pub(crate) fn new(
         input_desc: prost_reflect::MessageDescriptor,
         output_desc: prost_reflect::MessageDescriptor,
     ) -> Self {
@@ -559,7 +559,7 @@ impl Codec for DynamicMessageCodec {
     }
 }
 
-struct DynamicMessageEncoder;
+pub(crate) struct DynamicMessageEncoder;
 
 impl Encoder for DynamicMessageEncoder {
     type Item = DynamicMessage;
@@ -572,7 +572,7 @@ impl Encoder for DynamicMessageEncoder {
     }
 }
 
-struct DynamicMessageDecoder {
+pub(crate) struct DynamicMessageDecoder {
     desc: prost_reflect::MessageDescriptor,
 }
 

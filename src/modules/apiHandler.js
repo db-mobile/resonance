@@ -44,6 +44,7 @@ import { MockServerService } from './services/MockServerService.js';
 import { isGrpcMode, isWebSocketMode } from './requestModeManager.js';
 import { handleGrpcSend } from './grpcHandler.js';
 import { handleWebSocketCancel, handleWebSocketSend } from './websocketHandler.js';
+import { cancelStream as cancelGrpcStream, hasActiveStream as hasActiveGrpcStream } from './grpcStreamHandler.js';
 import { RequestBuilderService } from './services/RequestBuilderService.js';
 import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes } from './ResponseDisplayHelper.js';
 
@@ -296,6 +297,17 @@ export async function handleCancelRequest() {
         await handleWebSocketCancel();
         setRequestInProgress(false);
         return;
+    }
+
+    if (isGrpcMode()) {
+        const tabId = window.workspaceTabController
+            ? await window.workspaceTabController.service.getActiveTabId()
+            : null;
+        if (tabId && hasActiveGrpcStream(tabId)) {
+            await cancelGrpcStream(tabId);
+            setRequestInProgress(false);
+            return;
+        }
     }
 
     try {

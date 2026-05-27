@@ -22,6 +22,7 @@ import { FormBodyManager } from './modules/formBodyManager.js';
 import { initGrpcUI, setGrpcMetadata, setGrpcTls } from './modules/grpcHandler.js';
 import { initRequestModeManager } from './modules/requestModeManager.js';
 import { initWebSocketHandler } from './modules/websocketHandler.js';
+import { initGrpcStreamHandler } from './modules/grpcStreamHandler.js';
 import { loadCollections, importOpenApiFile, importPostmanCollection, importPostmanEnvironment, importCurl, initializeBodyTracking } from './modules/collectionManager.js';
 import { ThemeManager, SettingsModal } from './modules/themeManager.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
@@ -879,6 +880,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Initialize WebSocket handler
         await initWebSocketHandler();
+
+        // Initialize gRPC streaming handler
+        await initGrpcStreamHandler();
 
         // Check for and perform migration from old single-file store
         try {
