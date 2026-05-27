@@ -37,14 +37,15 @@ import { StatusDisplayAdapter } from './interfaces/IStatusDisplay.js';
 import { authManager } from './authManager.js';
 import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
 import { ResponseEditor } from './responseEditor.bundle.js';
-import { extractCookies, renderCookies } from './cookieParser.js';
-import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
+import { extractCookies } from './cookieParser.js';
 import { getRequestBodyContent } from './requestBodyHelper.js';
 import { MockServerRepository } from './storage/MockServerRepository.js';
 import { MockServerService } from './services/MockServerService.js';
 import { isGrpcMode, isWebSocketMode } from './requestModeManager.js';
 import { handleGrpcSend } from './grpcHandler.js';
 import { handleWebSocketCancel, handleWebSocketSend } from './websocketHandler.js';
+import { RequestBuilderService } from './services/RequestBuilderService.js';
+import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes } from './ResponseDisplayHelper.js';
 
 // Initialize CodeMirror editor for response display
 let responseEditor = null;
@@ -101,6 +102,26 @@ function getCollectionRepository() {
         _collectionRepository = new CollectionRepository(window.backendAPI);
     }
     return _collectionRepository;
+}
+
+let _requestBuilderService = null;
+function getRequestBuilderService() {
+    if (!_requestBuilderService) {
+        _requestBuilderService = new RequestBuilderService(getVariableService, getCollectionRepository);
+    }
+    return _requestBuilderService;
+}
+
+/**
+ * Returns the global DOM element references used as fallbacks
+ * when per-tab response containers are not available.
+ */
+function globalResponseElements() {
+    return {
+        headersDisplay: responseHeadersDisplay,
+        cookiesDisplay: responseCookiesDisplay,
+        performanceDisplay: responsePerformanceDisplay
+    };
 }
 
 export function initResponseEditor() {
@@ -291,21 +312,7 @@ export async function handleCancelRequest() {
                 updateResponseSize(null);
             }
             displayResponseWithLineNumbersForTab('Request was cancelled by user', null, requestTabId);
-
-            // Use per-tab elements if available
-            const containerElements = requestTabId
-            ? window.responseContainerManager?.getOrCreateContainer(requestTabId)
-            : window.responseContainerManager?.getActiveElements();
-            if (containerElements) {
-                if (containerElements.headersEditor) {containerElements.headersEditor.setContent('', 'application/json');}
-                if (containerElements.cookiesDisplay) {renderCookies(containerElements.cookiesDisplay, []);}
-                if (containerElements.performanceDisplay) {clearPerformanceMetrics(containerElements.performanceDisplay);}
-            } else {
-                // Fallback to global elements
-                if (responseHeadersDisplay) {responseHeadersDisplay.textContent = '';}
-                if (responseCookiesDisplay) {renderCookies(responseCookiesDisplay, []);}
-                if (responsePerformanceDisplay) {clearPerformanceMetrics(responsePerformanceDisplay);}
-            }
+            clearResponsePanes(requestTabId, globalResponseElements());
         }
     } catch (error) {
         updateStatusDisplay('Error cancelling request', null);
@@ -337,64 +344,23 @@ export async function handleSendRequest() {
         const headers = parseKeyValuePairs(document.getElementById('headers-list'));
         const authData = authManager.generateAuthData();
 
-        Object.keys(authData.queryParams).forEach(key => {
-            if (!queryParams[key]) {
-                queryParams[key] = authData.queryParams[key];
-            }
-        });
-
-        Object.keys(authData.headers).forEach(key => {
-            headers[key] = authData.headers[key];
-        });
+        const builder = getRequestBuilderService();
+        builder.mergeAuthData(headers, queryParams, authData);
 
         try {
-            const variableService = getVariableService();
-            const processor = new VariableProcessor();
-            processor.clearDynamicCache();
+            const { variables, processor } = await builder.resolveVariables(
+                window.currentEndpoint, headers
+            );
 
-            let variables = {};
-            if (window.currentEndpoint) {
-                variables = await variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
-            } else {
-                variables = await variableService.getVariables();
-            }
-
-            websocketUrl = processor.processTemplate(websocketUrl, variables);
-
-            const processedQueryParams = {};
-            for (const [key, value] of Object.entries(queryParams)) {
-                const processedKey = processor.processTemplate(key, variables);
-                const processedValue = processor.processTemplate(value, variables);
-                processedQueryParams[processedKey] = processedValue;
-            }
-
-            const processedHeaders = {};
-            for (const [key, value] of Object.entries(headers)) {
-                const processedKey = processor.processTemplate(key, variables);
-                const processedValue = processor.processTemplate(value, variables);
-                if (processedKey) {
-                    processedHeaders[processedKey] = processedValue;
-                }
-            }
-
-            for (const key in headers) {
-                delete headers[key];
-            }
-            Object.assign(headers, processedHeaders);
-
-            const queryPairs = [];
-            for (const [key, value] of Object.entries(processedQueryParams)) {
-                if (!key) {
-                    continue;
-                }
-                const encodedKey = key.includes('%') ? key : encodeURIComponent(key);
-                const encodedValue = value.includes('%') ? value : encodeURIComponent(value);
-                queryPairs.push(`${encodedKey}=${encodedValue}`);
-            }
-
-            const queryString = queryPairs.join('&');
-            const urlWithoutQuery = websocketUrl.split('?')[0];
-            websocketUrl = queryString ? `${urlWithoutQuery}?${queryString}` : urlWithoutQuery;
+            const result = builder.processRequestComponents({
+                url: websocketUrl,
+                pathParams: {},
+                headers,
+                queryParams,
+                variables,
+                processor
+            });
+            websocketUrl = result.url;
         } catch (error) {
             updateStatusDisplay(`Variable processing error: ${error.message}`, null);
             return;
@@ -428,8 +394,6 @@ export async function handleSendRequest() {
 
     const method = methodSelect.value;
     let body = undefined;
-    // Resolved once and reused for both URL/headers and body processing (avoids a duplicate IPC call)
-    let _resolvedVariables = null;
 
     const pathParams = parseKeyValuePairs(document.getElementById('path-params-list'));
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
@@ -437,109 +401,29 @@ export async function handleSendRequest() {
 
     const authData = authManager.generateAuthData();
 
-    Object.keys(authData.headers).forEach(key => {
-        headers[key] = authData.headers[key];
-    });
+    const builder = getRequestBuilderService();
+    builder.mergeAuthData(headers, queryParams, authData);
 
-    Object.keys(authData.queryParams).forEach(key => {
-        if (!queryParams[key]) {
-            queryParams[key] = authData.queryParams[key];
-        }
-    });
-
-    // Create a single processor for the entire request to ensure dynamic variables
+    // Resolve variables and process all request components (URL, headers, query params)
+    // A fresh VariableProcessor is created per request to ensure dynamic variables
     // (like {{$uuid}}) resolve consistently throughout the request
-    const processor = new VariableProcessor();
-    processor.clearDynamicCache(); // Ensure fresh dynamic values for each new request
-
-    // Always try to substitute variables (collection + environment or just environment)
+    let processor;
+    let _resolvedVariables = null;
+    let queryString = '';
     try {
-        const variableService = getVariableService();
-        let variables = {};
+        ({ variables: _resolvedVariables, processor } = await builder.resolveVariables(
+            window.currentEndpoint, headers
+        ));
 
-        if (window.currentEndpoint) {
-            // Get collection-specific variables + environment variables
-            const collection = await getCollectionRepository().getById(window.currentEndpoint.collectionId);
-
-            if (collection && collection.defaultHeaders) {
-                const mergedHeaders = { ...collection.defaultHeaders, ...headers };
-                Object.assign(headers, mergedHeaders);
-            }
-
-            variables = await variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
-        } else {
-            // No endpoint loaded - use environment variables only
-            variables = await variableService.getVariables();
-        }
-
-        // First, substitute variables in path param VALUES (so {{var}} in path params get replaced)
-        const processedPathParams = {};
-        for (const [key, value] of Object.entries(pathParams)) {
-            processedPathParams[key] = processor.processTemplate(value, variables);
-        }
-
-        // Then substitute variables in URL (include processed path params)
-        const combinedVariables = { ...variables, ...processedPathParams };
-        url = processor.processTemplate(url, combinedVariables);
-
-        // Auto-prepend https:// if no protocol is specified (after variable substitution)
-        if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {
-            url = `https://${url}`;
-        }
-
-        // Substitute variables in headers
-        const processedHeaders = {};
-        for (const [key, value] of Object.entries(headers)) {
-            const processedKey = processor.processTemplate(key, variables);
-            const processedValue = processor.processTemplate(value, variables);
-            processedHeaders[processedKey] = processedValue;
-        }
-        for (const key in headers) {
-            delete headers[key];
-        }
-        Object.assign(headers, processedHeaders);
-
-        // Substitute variables in query params
-        const processedQueryParams = {};
-        for (const [key, value] of Object.entries(queryParams)) {
-            const processedKey = processor.processTemplate(key, variables);
-            const processedValue = processor.processTemplate(value, variables);
-            processedQueryParams[processedKey] = processedValue;
-        }
-        for (const key in queryParams) {
-            delete queryParams[key];
-        }
-        Object.assign(queryParams, processedQueryParams);
-        _resolvedVariables = variables;
-
+        ({ url, queryString } = builder.processRequestComponents({
+            url, pathParams, headers, queryParams,
+            variables: _resolvedVariables,
+            processor
+        }));
     } catch (error) {
         updateStatusDisplay(`Variable processing error: ${error.message}`, null);
         setRequestInProgress(false);
         return;
-    }
-
-    // Strip existing query params from URL and rebuild from query params list
-    // This prevents duplication since updateUrlFromQueryParams() already shows them in the URL field
-    const urlWithoutQuery = url.split('?')[0];
-
-    // Build query string manually to preserve exact encoding
-    // URLSearchParams over-encodes some characters (e.g., %2F -> %252F)
-    const queryPairs = [];
-    for (const [key, value] of Object.entries(queryParams)) {
-        if (key) {
-            // Only encode if not already encoded, by checking for % signs
-            // If value contains %, assume it's already encoded and use as-is
-            const encodedValue = value.includes('%') ? value : encodeURIComponent(value);
-            const encodedKey = key.includes('%') ? key : encodeURIComponent(key);
-            queryPairs.push(`${encodedKey}=${encodedValue}`);
-        }
-    }
-
-    const queryString = queryPairs.join('&');
-    if (queryString) {
-        url = `${urlWithoutQuery}?${queryString}`;
-    } else {
-        url = urlWithoutQuery;
     }
 
     // Check if mock server should be used for this request
@@ -614,9 +498,8 @@ export async function handleSendRequest() {
                     try {
                         parsedVariables = JSON.parse(variablesText);
                     } catch (e) {
-                        updateStatusDisplay(`Invalid GraphQL Variables JSON: ${e.message}`, null);
+                        toast.error(`Invalid GraphQL Variables JSON: ${e.message}`);
                         clearResponseDisplay();
-                        responseHeadersDisplay.textContent = '';
                         setRequestInProgress(false);
                         return;
                     }
@@ -657,18 +540,16 @@ export async function handleSendRequest() {
                     try {
                         body = JSON.parse(bodyText);
                     } catch (e) {
-                        updateStatusDisplay(`Invalid Body JSON: ${e.message}`, null);
+                        toast.error(`Invalid Body JSON: ${e.message}`);
                         clearResponseDisplay();
-                        responseHeadersDisplay.textContent = '';
                         setRequestInProgress(false);
                         return;
                     }
                 }
             }
         } catch (e) {
-            updateStatusDisplay(`Error processing request body: ${e.message}`, null);
+            toast.error(`Error processing request body: ${e.message}`);
             clearResponseDisplay();
-            responseHeadersDisplay.textContent = '';
             setRequestInProgress(false);
             return;
         }
@@ -721,21 +602,8 @@ export async function handleSendRequest() {
 
         displayResponseWithLineNumbersForTab('Sending request...', null, requestTabId);
 
-        // Clear response displays using per-tab elements if available
-        const containerElements = requestTabId
-            ? window.responseContainerManager?.getOrCreateContainer(requestTabId)
-            : window.responseContainerManager?.getActiveElements();
-        if (containerElements) {
-            if (containerElements.headersEditor) {containerElements.headersEditor.setContent('', 'application/json');}
-            if (containerElements.cookiesDisplay) {renderCookies(containerElements.cookiesDisplay, []);}
-            if (containerElements.performanceDisplay) {clearPerformanceMetrics(containerElements.performanceDisplay);}
-        } else {
-            // Fallback to global elements
-            if (responseHeadersDisplay) {responseHeadersDisplay.textContent = '';}
-            if (responseCookiesDisplay) {renderCookies(responseCookiesDisplay, []);}
-            if (responsePerformanceDisplay) {clearPerformanceMetrics(responsePerformanceDisplay);}
-        }
-
+        // Clear response displays
+        clearResponsePanes(requestTabId, globalResponseElements());
 
         if (authData.authConfig) {
             requestConfig.auth = authData.authConfig;
@@ -797,51 +665,16 @@ export async function handleSendRequest() {
                 displaySchemaValidationResult(validationResult, requestTabId);
             }
 
-            // Get active workspace tab's response container elements for headers/cookies/performance
-            const containerElements = requestTabId
-                ? window.responseContainerManager?.getOrCreateContainer(requestTabId)
-                : window.responseContainerManager?.getActiveElements();
+            // Display headers, cookies, and performance metrics
+            displayResponsePanes(requestTabId, globalResponseElements(), {
+                headers: result.headers,
+                timings: result.timings,
+                size: result.size
+            });
 
-            if (containerElements) {
-                // Write headers to workspace tab's container using CodeMirror
-                let headersString = '';
-                if (result.headers) {
-                    headersString = JSON.stringify(result.headers, null, 2);
-                }
-                if (containerElements.headersEditor) {
-                    containerElements.headersEditor.setContent(headersString || 'No response headers.', 'application/json');
-                }
-
-                // Parse and display cookies to workspace tab's container
-                const cookies = extractCookies(result.headers);
-                renderCookies(containerElements.cookiesDisplay, cookies);
-
-                // Persist cookies from response into the jar
-                if (window.cookieController && result.setCookies && result.setCookies.length > 0) {
-                    window.cookieController.handleCookiesFromResponse(result.setCookies, url);
-                }
-
-                // Display performance metrics to workspace tab's container
-                displayPerformanceMetrics(containerElements.performanceDisplay, result.timings, result.size);
-            } else {
-                // Fallback to global elements
-                let headersString = '';
-                if (result.headers) {
-                    headersString = JSON.stringify(result.headers, null, 2);
-                }
-                if (responseHeadersDisplay) {
-                    responseHeadersDisplay.textContent = headersString || 'No response headers.';
-                }
-
-                const cookies = extractCookies(result.headers);
-                renderCookies(responseCookiesDisplay, cookies);
-
-                // Persist cookies from response into the jar (fallback path)
-                if (window.cookieController && result.setCookies && result.setCookies.length > 0) {
-                    window.cookieController.handleCookiesFromResponse(result.setCookies, url);
-                }
-
-                displayPerformanceMetrics(responsePerformanceDisplay, result.timings, result.size);
+            // Persist cookies from response into the jar
+            if (window.cookieController && result.setCookies && result.setCookies.length > 0) {
+                window.cookieController.handleCookiesFromResponse(result.setCookies, url);
             }
 
             // Restore UI immediately — status bar and Send button are not gated on storage
@@ -896,21 +729,7 @@ export async function handleSendRequest() {
                 updateResponseSize(null);
             }
             displayResponseWithLineNumbersForTab('Request was cancelled', null, requestTabId);
-
-            // Use per-tab elements if available
-            const containerElements = requestTabId
-                ? window.responseContainerManager?.getOrCreateContainer(requestTabId)
-                : window.responseContainerManager?.getActiveElements();
-            if (containerElements) {
-                if (containerElements.headersEditor) {containerElements.headersEditor.setContent('', 'application/json');}
-                if (containerElements.cookiesDisplay) {renderCookies(containerElements.cookiesDisplay, []);}
-                if (containerElements.performanceDisplay) {clearPerformanceMetrics(containerElements.performanceDisplay);}
-            } else {
-                // Fallback to global elements
-                if (responseHeadersDisplay) {responseHeadersDisplay.textContent = '';}
-                if (responseCookiesDisplay) {renderCookies(responseCookiesDisplay, []);}
-                if (responsePerformanceDisplay) {clearPerformanceMetrics(responsePerformanceDisplay);}
-            }
+            clearResponsePanes(requestTabId, globalResponseElements());
             setRequestInProgress(false);
         } else {
             throw result;
@@ -945,60 +764,8 @@ export async function handleSendRequest() {
 
         displayResponseWithLineNumbersForTab(errorContent, contentType, requestTabId);
 
-        // Get active workspace tab's response container elements
-        const containerElements = requestTabId
-            ? window.responseContainerManager?.getOrCreateContainer(requestTabId)
-            : window.responseContainerManager?.getActiveElements();
-
-        if (error.headers && Object.keys(error.headers).length > 0) {
-            try {
-                const headersText = JSON.stringify(error.headers, null, 2);
-                if (containerElements && containerElements.headersEditor) {
-                    containerElements.headersEditor.setContent(headersText, 'application/json');
-                } else if (responseHeadersDisplay) {
-                    responseHeadersDisplay.textContent = headersText;
-                }
-            } catch {
-                if (containerElements && containerElements.headersEditor) {
-                    containerElements.headersEditor.setContent('Error parsing response headers.', 'application/json');
-                } else if (responseHeadersDisplay) {
-                    responseHeadersDisplay.textContent = 'Error parsing response headers.';
-                }
-            }
-
-            // Parse and display cookies from error response
-            const cookies = extractCookies(error.headers);
-            if (containerElements && containerElements.cookiesDisplay) {
-                renderCookies(containerElements.cookiesDisplay, cookies);
-            } else if (responseCookiesDisplay) {
-                renderCookies(responseCookiesDisplay, cookies);
-            }
-        } else {
-            if (containerElements && containerElements.headersEditor) {
-                containerElements.headersEditor.setContent('No headers available for error response.', 'application/json');
-            } else if (responseHeadersDisplay) {
-                responseHeadersDisplay.textContent = 'No headers available for error response.';
-            }
-
-            if (containerElements && containerElements.cookiesDisplay) {
-                renderCookies(containerElements.cookiesDisplay, []);
-            } else if (responseCookiesDisplay) {
-                renderCookies(responseCookiesDisplay, []);
-            }
-        }
-
-        // Display performance metrics for error responses
-        if (error.timings) {
-            if (containerElements && containerElements.performanceDisplay) {
-                displayPerformanceMetrics(containerElements.performanceDisplay, error.timings, error.size);
-            } else if (responsePerformanceDisplay) {
-                displayPerformanceMetrics(responsePerformanceDisplay, error.timings, error.size);
-            }
-        } else if (containerElements && containerElements.performanceDisplay) {
-                clearPerformanceMetrics(containerElements.performanceDisplay);
-            } else if (responsePerformanceDisplay) {
-                clearPerformanceMetrics(responsePerformanceDisplay);
-            }
+        // Display error response headers, cookies, and performance metrics
+        displayErrorResponsePanes(requestTabId, globalResponseElements(), error);
 
         let statusDisplayText = 'Request Failed';
         if (status) {
@@ -1051,109 +818,32 @@ export async function handleGenerateCurl() {
 
     const authData = authManager.generateAuthData();
 
-    Object.keys(authData.headers).forEach(key => {
-        headers[key] = authData.headers[key];
-    });
+    const builder = getRequestBuilderService();
+    builder.mergeAuthData(headers, queryParams, authData);
 
-    Object.keys(authData.queryParams).forEach(key => {
-        if (!queryParams[key]) {
-            queryParams[key] = authData.queryParams[key];
-        }
-    });
-
-    // Create a single processor for the entire request to ensure dynamic variables
-    // (like {{$uuid}}) resolve consistently throughout the request
-    const processor = new VariableProcessor();
-    processor.clearDynamicCache(); // Ensure fresh dynamic values for each new request
-
-    // Always try to substitute variables (collection + environment or just environment)
+    // Resolve variables and process all request components
+    let processor;
+    let resolvedVariables;
     try {
-        const variableService = getVariableService();
-        let variables = {};
+        ({ variables: resolvedVariables, processor } = await builder.resolveVariables(
+            window.currentEndpoint, headers
+        ));
 
-        if (window.currentEndpoint) {
-            // Get collection-specific variables + environment variables
-            const collection = await getCollectionRepository().getById(window.currentEndpoint.collectionId);
-
-            if (collection && collection.defaultHeaders) {
-                const mergedHeaders = { ...collection.defaultHeaders, ...headers };
-                Object.assign(headers, mergedHeaders);
-            }
-
-            variables = await variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
-        } else {
-            // No endpoint loaded - use environment variables only
-            variables = await variableService.getVariables();
-        }
-
-        // First, substitute variables in path param VALUES (so {{var}} in path params get replaced)
-        const processedPathParams = {};
-        for (const [key, value] of Object.entries(pathParams)) {
-            processedPathParams[key] = processor.processTemplate(value, variables);
-        }
-
-        // Then substitute variables in URL (include processed path params)
-        const combinedVariables = { ...variables, ...processedPathParams };
-        url = processor.processTemplate(url, combinedVariables);
-
-        // Auto-prepend https:// if no protocol is specified (after variable substitution)
-        if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {
-            url = `https://${url}`;
-        }
-
-        // Substitute variables in headers
-        const processedHeaders = {};
-        for (const [key, value] of Object.entries(headers)) {
-            const processedKey = processor.processTemplate(key, variables);
-            const processedValue = processor.processTemplate(value, variables);
-            processedHeaders[processedKey] = processedValue;
-        }
-        for (const key in headers) {
-            delete headers[key];
-        }
-        Object.assign(headers, processedHeaders);
-
-        // Substitute variables in query params
-        const processedQueryParams = {};
-        for (const [key, value] of Object.entries(queryParams)) {
-            const processedKey = processor.processTemplate(key, variables);
-            const processedValue = processor.processTemplate(value, variables);
-            processedQueryParams[processedKey] = processedValue;
-        }
-        for (const key in queryParams) {
-            delete queryParams[key];
-        }
-        Object.assign(queryParams, processedQueryParams);
-
+        ({ url } = builder.processRequestComponents({
+            url, pathParams, headers, queryParams,
+            variables: resolvedVariables,
+            processor
+        }));
     } catch (error) {
         updateStatusDisplay(`Variable processing error: ${error.message}`, null);
         return;
-    }
-
-    const urlWithoutQuery = url.split('?')[0];
-
-    // Build query string manually to preserve exact encoding (same as handleSendRequest)
-    const queryPairs = [];
-    for (const [key, value] of Object.entries(queryParams)) {
-        if (key) {
-            const encodedValue = value.includes('%') ? value : encodeURIComponent(value);
-            const encodedKey = key.includes('%') ? key : encodeURIComponent(key);
-            queryPairs.push(`${encodedKey}=${encodedValue}`);
-        }
-    }
-
-    const queryString = queryPairs.join('&');
-    if (queryString) {
-        url = `${urlWithoutQuery}?${queryString}`;
-    } else {
-        url = urlWithoutQuery;
     }
 
     if (['POST', 'PUT', 'PATCH'].includes(method) && getRequestBodyContent().trim()) {
         try {
             let bodyText = getRequestBodyContent().trim();
 
-            // Always try to substitute variables in body (collection + environment or just environment)
+            // Reuse the same processor to maintain consistent dynamic variable values
             const variableService = getVariableService();
             let variables = {};
 
@@ -1163,7 +853,6 @@ export async function handleGenerateCurl() {
                 variables = await variableService.getVariables();
             }
 
-            // Note: reusing the same processor from above to maintain consistent dynamic variable values
             bodyText = processor.processTemplate(bodyText, variables);
 
             body = JSON.parse(bodyText);
