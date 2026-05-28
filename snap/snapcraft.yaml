@@ -104,6 +104,7 @@ parts:
       - libayatana-appindicator3-1
       - libssl3
       - libproxy1v5
+      - protobuf-compiler
     source: .
     override-build: |
       set -eu
