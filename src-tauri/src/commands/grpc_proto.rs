@@ -339,7 +339,10 @@ mod protox_parse {
     }
 
     fn find_protoc() -> Result<PathBuf, String> {
+        let prev_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
         let vendored = std::panic::catch_unwind(protoc_bin_vendored::protoc_bin_path);
+        std::panic::set_hook(prev_hook);
         if let Ok(Ok(path)) = vendored {
             if path.exists() {
                 return Ok(path);
