@@ -996,9 +996,9 @@ export class RunnerPanel {
         this.selectedResultIndex = -1;
 
         // Clear summary
-        if (this.resultsDom.passed) {this.resultsDom.passed.textContent = '0 passed';}
-        if (this.resultsDom.failed) {this.resultsDom.failed.textContent = '0 failed';}
-        if (this.resultsDom.totalTime) {this.resultsDom.totalTime.textContent = '';}
+        if (this.resultsDom.passed) {this.resultsDom.passed.textContent = '0';}
+        if (this.resultsDom.failed) {this.resultsDom.failed.textContent = '0';}
+        if (this.resultsDom.totalTime) {this.resultsDom.totalTime.textContent = '—';}
 
         // Clear results list
         if (this.resultsDom.resultsList) {
@@ -1237,20 +1237,20 @@ export class RunnerPanel {
             Object.assign(this.resultsData[index], result);
         }
 
-        // Update status icon
+        // Update status icon (and mirror status onto the item for the status rail)
         const statusIcon = el.querySelector('[data-role="status-icon"]');
+        const statusClass =
+            result.status === 'success' ? 'is-success' :
+            result.status === 'error' ? 'is-error' :
+            result.status === 'running' ? 'is-running' : 'is-pending';
+
         if (statusIcon) {
             statusIcon.classList.remove('is-pending', 'is-running', 'is-success', 'is-error');
-            if (result.status === 'success') {
-                statusIcon.classList.add('is-success');
-            } else if (result.status === 'error') {
-                statusIcon.classList.add('is-error');
-            } else if (result.status === 'running') {
-                statusIcon.classList.add('is-running');
-            } else {
-                statusIcon.classList.add('is-pending');
-            }
+            statusIcon.classList.add(statusClass);
         }
+
+        el.classList.remove('is-pending', 'is-running', 'is-success', 'is-error');
+        el.classList.add(statusClass);
 
         // Update status code
         const statusCodeEl = el.querySelector('[data-role="status-code"]');
@@ -1412,10 +1412,10 @@ export class RunnerPanel {
      */
     _updateResultsSummary(results) {
         if (this.resultsDom.passed) {
-            this.resultsDom.passed.textContent = `${results.passed || 0} passed`;
+            this.resultsDom.passed.textContent = `${results.passed || 0}`;
         }
         if (this.resultsDom.failed) {
-            this.resultsDom.failed.textContent = `${results.failed || 0} failed`;
+            this.resultsDom.failed.textContent = `${results.failed || 0}`;
         }
         if (this.resultsDom.totalTime) {
             this.resultsDom.totalTime.textContent = `${results.totalTime || 0}ms`;

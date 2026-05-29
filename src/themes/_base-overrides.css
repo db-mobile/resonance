@@ -268,3 +268,56 @@ label {
 .status-bar {
   background: var(--activity-bar-bg) !important;
 }
+
+/* Collection Runner — affordance buttons/inputs are exempt from the generic
+   button/input overrides above so they read as embedded ghost controls
+   (the Run/Stop buttons intentionally keep the standard neutral .btn look). */
+.runner-selector .runner-selector-input,
+.runner-selector .runner-selector-input:focus {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.runner-selector-toggle,
+.runner-selector-toggle:hover {
+  background: transparent !important;
+  border: none !important;
+}
+
+.runner-icon-btn,
+.runner-endpoint-add-btn,
+.runner-request-edit-btn,
+.runner-request-remove-btn,
+.runner-results-tab {
+  background: transparent !important;
+  border: none !important;
+}
+
+.runner-icon-btn:hover {
+  background: var(--bg-tertiary) !important;
+}
+.runner-icon-btn.is-primary:hover {
+  background: var(--accent-light) !important;
+}
+.runner-icon-btn.is-danger:hover {
+  background: var(--color-error-light) !important;
+}
+
+.runner-endpoint-add-btn:hover {
+  background: var(--accent-light) !important;
+}
+
+.runner-request-edit-btn:hover {
+  background: var(--accent-light) !important;
+}
+.runner-request-remove-btn:hover {
+  background: var(--color-error-light) !important;
+}
+
+.runner-results-tab:hover {
+  background: var(--bg-secondary) !important;
+}
+.runner-results-tab.is-active {
+  background: var(--accent-light) !important;
+}
