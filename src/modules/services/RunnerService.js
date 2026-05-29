@@ -111,6 +111,31 @@ export class RunnerService {
     }
 
     /**
+     * Resolves an endpoint's saved request config, used to seed per-request
+     * runner overrides when a request is added to a runner.
+     *
+     * @async
+     * @param {string} collectionId - Collection ID
+     * @param {string} endpointId - Endpoint ID
+     * @returns {Promise<Object>} { pathParams, queryParams, headers, body }
+     */
+    async getEndpointRequestConfig(collectionId, endpointId) {
+        const [pathParams, queryParams, headers, body] = await Promise.all([
+            this.collectionRepository.getPersistedPathParams(collectionId, endpointId),
+            this.collectionRepository.getPersistedQueryParams(collectionId, endpointId),
+            this.collectionRepository.getPersistedHeaders(collectionId, endpointId),
+            this.collectionRepository.getModifiedRequestBody(collectionId, endpointId)
+        ]);
+
+        return {
+            pathParams: pathParams || [],
+            queryParams: queryParams || [],
+            headers: headers || [],
+            body: body || ''
+        };
+    }
+
+    /**
      * Executes a runner's request sequence
      *
      * Runs requests sequentially, executing post-response scripts after each
@@ -380,8 +405,8 @@ export class RunnerService {
                 throw new Error(`Endpoint not found: ${request.endpointId}`);
             }
 
-            // Build request configuration
-            const requestConfig = await this._buildRequestConfig(collection, endpoint, variables);
+            // Build request configuration (per-request overrides take precedence)
+            const requestConfig = await this._buildRequestConfig(collection, endpoint, variables, request.overrides);
 
             // Execute the request
             const response = await this.backendAPI.sendApiRequest(requestConfig);
@@ -502,9 +527,10 @@ export class RunnerService {
      * @param {Object} collection - Collection object
      * @param {Object} endpoint - Endpoint object
      * @param {Object} variables - Variables for substitution
+     * @param {Object} [overrides] - Per-request overrides (pathParams, queryParams, headers, body)
      * @returns {Promise<Object>} Request configuration
      */
-    async _buildRequestConfig(collection, endpoint, variables) {
+    async _buildRequestConfig(collection, endpoint, variables, overrides) {
         // Get all persisted data first
         const persistedHeaders = await this.collectionRepository.getPersistedHeaders(collection.id, endpoint.id) || [];
         const persistedBody = await this.collectionRepository.getModifiedRequestBody(collection.id, endpoint.id);
@@ -512,7 +538,13 @@ export class RunnerService {
         const persistedQueryParams = await this.collectionRepository.getPersistedQueryParams(collection.id, endpoint.id) || [];
         const persistedPathParams = await this.collectionRepository.getPersistedPathParams(collection.id, endpoint.id) || [];
         const persistedAuthConfig = await this.collectionRepository.getPersistedAuthConfig(collection.id, endpoint.id);
-        
+
+        // Per-request overrides take precedence over the collection's saved config
+        const effectivePathParams = overrides?.pathParams?.length ? overrides.pathParams : persistedPathParams;
+        const effectiveQueryParams = overrides?.queryParams?.length ? overrides.queryParams : persistedQueryParams;
+        const effectiveHeaders = overrides?.headers?.length ? overrides.headers : persistedHeaders;
+        const overrideBody = typeof overrides?.body === 'string' && overrides.body.trim() !== '' ? overrides.body : null;
+
         // Use persisted auth config if available, otherwise fall back to endpoint's security definition
         const effectiveAuthConfig = persistedAuthConfig || endpoint.security || null;
         
@@ -531,9 +563,9 @@ export class RunnerService {
             baseUrl: variables.baseUrl || collection.baseUrl || ''
         };
 
-        // Apply persisted path parameters to URL
-        if (persistedPathParams.length > 0) {
-            for (const param of persistedPathParams) {
+        // Apply path parameters to URL (overrides > persisted > endpoint defaults)
+        if (effectivePathParams.length > 0) {
+            for (const param of effectivePathParams) {
                 if (param.key && param.value) {
                     effectiveVariables[param.key] = param.value;
                 }
@@ -550,10 +582,10 @@ export class RunnerService {
         // Substitute variables in URL
         url = this.variableProcessor.processTemplate(url, effectiveVariables);
 
-        // Apply persisted query parameters
+        // Apply query parameters (overrides > persisted > endpoint defaults)
         const queryParams = {};
-        if (persistedQueryParams.length > 0) {
-            for (const param of persistedQueryParams) {
+        if (effectiveQueryParams.length > 0) {
+            for (const param of effectiveQueryParams) {
                 if (param.key) {
                     queryParams[param.key] = this.variableProcessor.processTemplate(param.value || '', effectiveVariables);
                 }
@@ -586,8 +618,8 @@ export class RunnerService {
         if (endpoint.headers) {
             headers = { ...headers, ...endpoint.headers };
         }
-        // Apply persisted headers
-        for (const h of persistedHeaders) {
+        // Apply headers (overrides > persisted)
+        for (const h of effectiveHeaders) {
             if (h.key) {
                 headers[h.key] = h.value;
             }
@@ -604,7 +636,7 @@ export class RunnerService {
         let body = undefined;
         let bodyType = undefined;
 
-        if (persistedFormBodyData && (persistedFormBodyData.mode === 'formdata' || persistedFormBodyData.mode === 'urlencoded')) {
+        if (!overrideBody && persistedFormBodyData && (persistedFormBodyData.mode === 'formdata' || persistedFormBodyData.mode === 'urlencoded')) {
             // Form Data / URL Encoded mode
             const rawFields = persistedFormBodyData.fields || {};
             const processed = {};
@@ -616,9 +648,9 @@ export class RunnerService {
                 body = processed;
             }
             bodyType = persistedFormBodyData.mode;
-        } else if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-            // Use persisted body first, then fall back to endpoint's requestBody example/schema
-            let bodyContent = persistedBody;
+        } else if (overrideBody || ['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
+            // Override body > persisted body > endpoint's requestBody example/schema
+            let bodyContent = overrideBody || persistedBody;
             if (!bodyContent && endpoint.requestBody) {
                 if (endpoint.requestBody.example && endpoint.requestBody.example !== 'null') {
                     bodyContent = endpoint.requestBody.example;

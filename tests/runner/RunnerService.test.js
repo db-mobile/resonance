@@ -493,4 +493,114 @@ describe('RunnerService', () => {
             expect(result.error).toBe('Execution failed');
         });
     });
+
+    describe('getEndpointRequestConfig', () => {
+        test('should aggregate persisted config from the collection repository', async () => {
+            service.collectionRepository.getPersistedPathParams = jest
+                .fn()
+                .mockResolvedValue([{ key: 'id', value: '1' }]);
+            service.collectionRepository.getPersistedQueryParams = jest
+                .fn()
+                .mockResolvedValue([{ key: 'q', value: 'a' }]);
+            service.collectionRepository.getPersistedHeaders = jest
+                .fn()
+                .mockResolvedValue([{ key: 'X-H', value: 'h' }]);
+            service.collectionRepository.getModifiedRequestBody = jest
+                .fn()
+                .mockResolvedValue('{"k":1}');
+
+            const config = await service.getEndpointRequestConfig('c1', 'e1');
+
+            expect(config).toEqual({
+                pathParams: [{ key: 'id', value: '1' }],
+                queryParams: [{ key: 'q', value: 'a' }],
+                headers: [{ key: 'X-H', value: 'h' }],
+                body: '{"k":1}'
+            });
+        });
+
+        test('should default missing config to empty values', async () => {
+            service.collectionRepository.getPersistedPathParams = jest.fn().mockResolvedValue(null);
+            service.collectionRepository.getPersistedQueryParams = jest.fn().mockResolvedValue(null);
+            service.collectionRepository.getPersistedHeaders = jest.fn().mockResolvedValue(null);
+            service.collectionRepository.getModifiedRequestBody = jest.fn().mockResolvedValue(null);
+
+            const config = await service.getEndpointRequestConfig('c1', 'e1');
+
+            expect(config).toEqual({ pathParams: [], queryParams: [], headers: [], body: '' });
+        });
+    });
+
+    describe('_buildRequestConfig with per-request overrides', () => {
+        let endpoint;
+        let collection;
+
+        beforeEach(() => {
+            // Persisted (collection-level) config that overrides should win against
+            service.collectionRepository.getPersistedHeaders = jest
+                .fn()
+                .mockResolvedValue([{ key: 'X-Persisted', value: 'persisted' }]);
+            service.collectionRepository.getModifiedRequestBody = jest
+                .fn()
+                .mockResolvedValue('{"from":"collection"}');
+            service.collectionRepository.getFormBodyData = jest.fn().mockResolvedValue(null);
+            service.collectionRepository.getPersistedQueryParams = jest
+                .fn()
+                .mockResolvedValue([{ key: 'persistedQ', value: 'pq' }]);
+            service.collectionRepository.getPersistedPathParams = jest
+                .fn()
+                .mockResolvedValue([{ key: 'userId', value: 'persisted-id' }]);
+            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
+
+            collection = { id: 'c1', baseUrl: '', defaultHeaders: {} };
+            endpoint = { id: 'e1', method: 'POST', path: '{{baseUrl}}/users/{{userId}}' };
+        });
+
+        test('should prefer overrides over persisted config', async () => {
+            const overrides = {
+                pathParams: [{ key: 'userId', value: 'override-id' }],
+                queryParams: [{ key: 'q', value: 'overridden' }],
+                headers: [{ key: 'X-Override', value: 'yes' }],
+                body: '{"from":"override"}'
+            };
+
+            const config = await service._buildRequestConfig(
+                collection,
+                endpoint,
+                { baseUrl: 'https://api.test' },
+                overrides
+            );
+
+            expect(config.url).toContain('/users/override-id');
+            expect(config.url).toContain('q=overridden');
+            expect(config.url).not.toContain('persistedQ');
+            expect(config.headers['X-Override']).toBe('yes');
+            expect(config.headers['X-Persisted']).toBeUndefined();
+            expect(config.body).toEqual({ from: 'override' });
+        });
+
+        test('should fall back to persisted config when overrides are empty', async () => {
+            const config = await service._buildRequestConfig(
+                collection,
+                endpoint,
+                { baseUrl: 'https://api.test' },
+                { pathParams: [], queryParams: [], headers: [], body: '' }
+            );
+
+            expect(config.url).toContain('/users/persisted-id');
+            expect(config.url).toContain('persistedQ=pq');
+            expect(config.headers['X-Persisted']).toBe('persisted');
+            expect(config.body).toEqual({ from: 'collection' });
+        });
+
+        test('should behave as before when no overrides are provided', async () => {
+            const config = await service._buildRequestConfig(collection, endpoint, {
+                baseUrl: 'https://api.test'
+            });
+
+            expect(config.url).toContain('/users/persisted-id');
+            expect(config.headers['X-Persisted']).toBe('persisted');
+            expect(config.body).toEqual({ from: 'collection' });
+        });
+    });
 });

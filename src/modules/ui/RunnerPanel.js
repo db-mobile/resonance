@@ -5,6 +5,7 @@
 
 import { templateLoader } from '../templateLoader.js';
 import { ScriptEditor } from '../scriptEditor.bundle.js';
+import { JSONEditor } from '../jsonEditor.bundle.js';
 
 /**
  * UI component for the Collection Runner panel
@@ -29,10 +30,14 @@ export class RunnerPanel {
         this.resultsData = [];
         this.selectedResultIndex = -1;
 
-        // Script modal state
+        // Request editor modal state
         this.scriptModal = null;
         this.scriptEditor = null;
+        this.bodyEditor = null;
         this.editingRequestIndex = -1;
+
+        // Resolves an endpoint's saved config to seed per-request overrides
+        this.onResolveEndpointDefaults = null;
 
         // Event callbacks
         this.onRequestsChange = null;
@@ -298,24 +303,59 @@ export class RunnerPanel {
     /**
      * Adds a request to the selected list
      *
+     * Seeds per-request overrides (path/query params, headers, body) from the
+     * collection's saved config so the request editor opens pre-filled.
+     *
      * @private
+     * @async
      * @param {Object} collection - Collection object
      * @param {Object} endpoint - Endpoint object
      */
-    _addRequest(collection, endpoint) {
+    async _addRequest(collection, endpoint) {
         const request = {
             collectionId: collection.id,
             endpointId: endpoint.id,
             name: endpoint.name || endpoint.path,
             method: endpoint.method,
             path: endpoint.path,
-            postResponseScript: ''
+            postResponseScript: '',
+            overrides: await this._resolveOverrides(collection.id, endpoint.id)
         };
 
         this.selectedRequests.push(request);
         this._renderRequestsList();
         this._updateRequestCount();
         this._notifyRequestsChange();
+    }
+
+    /**
+     * Resolves the initial overrides for a request from the collection's saved config
+     *
+     * @private
+     * @async
+     * @param {string} collectionId - Collection ID
+     * @param {string} endpointId - Endpoint ID
+     * @returns {Promise<Object>} Overrides object
+     */
+    async _resolveOverrides(collectionId, endpointId) {
+        const empty = { pathParams: [], queryParams: [], headers: [], body: '' };
+
+        if (!this.onResolveEndpointDefaults) {
+            return empty;
+        }
+
+        try {
+            const config = await this.onResolveEndpointDefaults(collectionId, endpointId);
+            return {
+                pathParams: (config?.pathParams || []).map(p => ({ key: p.key, value: p.value })),
+                queryParams: (config?.queryParams || []).map(p => ({ key: p.key, value: p.value })),
+                headers: (config?.headers || []).map(p => ({ key: p.key, value: p.value })),
+                body: config?.body || ''
+            };
+        } catch (error) {
+            console.error('[RunnerPanel] Error resolving endpoint defaults:', error);
+            return empty;
+        }
     }
 
     /**
@@ -469,7 +509,26 @@ export class RunnerPanel {
     }
 
     /**
-     * Opens the script editor modal for a request
+     * Ensures a request has a complete overrides object (back-compat for older runners)
+     *
+     * @private
+     * @param {Object} request - Request object
+     * @returns {Object} The request's overrides object
+     */
+    _ensureOverrides(request) {
+        if (!request.overrides) {
+            request.overrides = { pathParams: [], queryParams: [], headers: [], body: '' };
+        }
+        const o = request.overrides;
+        o.pathParams = o.pathParams || [];
+        o.queryParams = o.queryParams || [];
+        o.headers = o.headers || [];
+        o.body = o.body || '';
+        return o;
+    }
+
+    /**
+     * Opens the per-request editor modal (params, headers, body, script)
      *
      * @private
      * @param {number} index - Request index
@@ -480,6 +539,7 @@ export class RunnerPanel {
         }
 
         const request = this.selectedRequests[index];
+        const overrides = this._ensureOverrides(request);
         this.editingRequestIndex = index;
 
         // Create modal from template
@@ -502,6 +562,18 @@ export class RunnerPanel {
             pathEl.textContent = request.path;
         }
 
+        // Populate key-value lists from overrides
+        this._renderKvList(this.scriptModal.querySelector('[data-role="path-params-list"]'), overrides.pathParams);
+        this._renderKvList(this.scriptModal.querySelector('[data-role="query-params-list"]'), overrides.queryParams);
+        this._renderKvList(this.scriptModal.querySelector('[data-role="headers-list"]'), overrides.headers);
+
+        // Initialize body editor (CodeMirror JSON)
+        const bodyContainer = this.scriptModal.querySelector('[data-role="override-body-container"]');
+        if (bodyContainer) {
+            this.bodyEditor = new JSONEditor(bodyContainer);
+            this.bodyEditor.setContent(overrides.body || '');
+        }
+
         // Initialize ScriptEditor (CodeMirror-based)
         const editorContainer = this.scriptModal.querySelector('[data-role="script-editor-container"]');
         if (editorContainer) {
@@ -512,15 +584,95 @@ export class RunnerPanel {
         // Attach modal event listeners
         this._attachModalEventListeners();
 
-        // Focus editor
-        setTimeout(() => {
-            this.scriptEditor?.focus();
-        }, 100);
-
-        // Update i18n if available
+        // Update i18n if available (sets tab labels and input placeholders)
         if (window.i18n && window.i18n.updateUI) {
-            window.i18n.updateUI();
+            window.i18n.updateUI(this.scriptModal);
         }
+    }
+
+    /**
+     * Renders editable key-value rows into a container
+     *
+     * @private
+     * @param {HTMLElement} container - Target container
+     * @param {Array<Object>} rows - Array of {key, value} objects
+     */
+    _renderKvList(container, rows) {
+        if (!container) {return;}
+        container.innerHTML = '';
+        (rows || []).forEach(row => this._addKvRow(container, row.key, row.value));
+    }
+
+    /**
+     * Appends a single editable key-value row to a container
+     *
+     * @private
+     * @param {HTMLElement} container - Target container
+     * @param {string} [key] - Initial key
+     * @param {string} [value] - Initial value
+     */
+    _addKvRow(container, key = '', value = '') {
+        if (!container) {return;}
+
+        const fragment = templateLoader.cloneSync(
+            './src/templates/runner/runnerPanel.html',
+            'tpl-runner-kv-row'
+        );
+        const row = fragment.firstElementChild;
+
+        const keyInput = row.querySelector('[data-role="kv-key"]');
+        const valueInput = row.querySelector('[data-role="kv-value"]');
+        if (keyInput) {
+            keyInput.value = key;
+            keyInput.placeholder = window.i18n?.t('runner.key') || 'Key';
+        }
+        if (valueInput) {
+            valueInput.value = value;
+            valueInput.placeholder = window.i18n?.t('runner.value') || 'Value';
+        }
+
+        row.querySelector('[data-action="remove-kv"]')?.addEventListener('click', () => {
+            row.remove();
+        });
+
+        container.appendChild(row);
+    }
+
+    /**
+     * Collects {key, value} rows from a key-value list, skipping rows with empty keys
+     *
+     * @private
+     * @param {HTMLElement} container - Source container
+     * @returns {Array<Object>} Array of {key, value}
+     */
+    _collectKvList(container) {
+        if (!container) {return [];}
+        const rows = [];
+        container.querySelectorAll('.key-value-row').forEach(row => {
+            const key = row.querySelector('[data-role="kv-key"]')?.value.trim() || '';
+            const value = row.querySelector('[data-role="kv-value"]')?.value || '';
+            if (key) {
+                rows.push({ key, value });
+            }
+        });
+        return rows;
+    }
+
+    /**
+     * Switches the active tab in the request editor modal
+     *
+     * @private
+     * @param {string} tabName - Tab name (params, headers, body, script)
+     */
+    _switchEditorTab(tabName) {
+        if (!this.scriptModal) {return;}
+
+        this.scriptModal.querySelectorAll('.runner-editor-tab').forEach(tab => {
+            tab.classList.toggle('is-active', tab.dataset.editTab === tabName);
+        });
+        this.scriptModal.querySelectorAll('.runner-editor-tab-content').forEach(content => {
+            content.classList.toggle('is-active', content.dataset.editContent === tabName);
+        });
     }
 
     /**
@@ -546,6 +698,24 @@ export class RunnerPanel {
             this._closeScriptModal(true);
         });
 
+        // Tab switching
+        this.scriptModal.querySelectorAll('.runner-editor-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                this._switchEditorTab(tab.dataset.editTab);
+            });
+        });
+
+        // Add-row buttons
+        this.scriptModal.querySelector('[data-action="add-path-param"]')?.addEventListener('click', () => {
+            this._addKvRow(this.scriptModal.querySelector('[data-role="path-params-list"]'));
+        });
+        this.scriptModal.querySelector('[data-action="add-query-param"]')?.addEventListener('click', () => {
+            this._addKvRow(this.scriptModal.querySelector('[data-role="query-params-list"]'));
+        });
+        this.scriptModal.querySelector('[data-action="add-header"]')?.addEventListener('click', () => {
+            this._addKvRow(this.scriptModal.querySelector('[data-role="headers-list"]'));
+        });
+
         // Close on overlay click
         this.scriptModal.querySelector('[data-role="script-modal-overlay"]')?.addEventListener('click', (e) => {
             if (e.target === e.currentTarget) {
@@ -566,25 +736,39 @@ export class RunnerPanel {
     }
 
     /**
-     * Closes the script editor modal
+     * Closes the request editor modal, optionally persisting overrides and script
      *
      * @private
-     * @param {boolean} save - Whether to save the script content
+     * @param {boolean} save - Whether to save the edited content
      */
     _closeScriptModal(save) {
-        if (save && this.scriptEditor && this.editingRequestIndex >= 0) {
-            const script = this.scriptEditor.getContent();
-            this.selectedRequests[this.editingRequestIndex].postResponseScript = script;
+        if (save && this.editingRequestIndex >= 0) {
+            const request = this.selectedRequests[this.editingRequestIndex];
+            const overrides = this._ensureOverrides(request);
+
+            overrides.pathParams = this._collectKvList(this.scriptModal?.querySelector('[data-role="path-params-list"]'));
+            overrides.queryParams = this._collectKvList(this.scriptModal?.querySelector('[data-role="query-params-list"]'));
+            overrides.headers = this._collectKvList(this.scriptModal?.querySelector('[data-role="headers-list"]'));
+            overrides.body = this.bodyEditor ? this.bodyEditor.getContent() : (overrides.body || '');
+
+            const script = this.scriptEditor ? this.scriptEditor.getContent() : (request.postResponseScript || '');
+            request.postResponseScript = script;
 
             if (this.onScriptChange) {
                 this.onScriptChange(this.editingRequestIndex, script);
             }
+            this._notifyRequestsChange();
         }
 
         // Cleanup
         if (this._modalKeyHandler) {
             document.removeEventListener('keydown', this._modalKeyHandler);
             this._modalKeyHandler = null;
+        }
+
+        if (this.bodyEditor) {
+            this.bodyEditor.destroy();
+            this.bodyEditor = null;
         }
 
         if (this.scriptEditor) {

@@ -65,6 +65,8 @@ export class RunnerController {
         this.panel.onRunnerDelete = this._handleRunnerDelete;
         this.panel.onRun = this._handleRun;
         this.panel.onStop = this._handleStop;
+        this.panel.onResolveEndpointDefaults = (collectionId, endpointId) =>
+            this.service.getEndpointRequestConfig(collectionId, endpointId);
 
         // Fetch collections and last-runner settings in parallel
         const [collections, settings] = await Promise.all([
