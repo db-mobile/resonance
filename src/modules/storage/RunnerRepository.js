@@ -225,6 +225,12 @@ export class RunnerRepository {
  * @property {string} method - HTTP method
  * @property {string} path - Request path
  * @property {string} postResponseScript - Script to execute after response
+ * @property {Object} [overrides] - Per-request overrides applied at execution, taking
+ *   precedence over the collection's saved config (the collection request is never mutated)
+ * @property {Array<{key: string, value: string}>} [overrides.pathParams] - Path parameter overrides
+ * @property {Array<{key: string, value: string}>} [overrides.queryParams] - Query parameter overrides
+ * @property {Array<{key: string, value: string}>} [overrides.headers] - Header overrides
+ * @property {string} [overrides.body] - Raw/JSON request body override
  */
 
 /**

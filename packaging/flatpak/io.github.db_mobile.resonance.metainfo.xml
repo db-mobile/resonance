@@ -33,7 +33,7 @@
       <li>Protocol version control supporting HTTP/1.1, HTTP/2, and HTTP/3</li>
       <li>Comprehensive keyboard shortcuts for efficient workflow</li>
       <li>Four theme options: light, dark, system-adaptive, and black (OLED)</li>
-      <li>Available in English, German, Spanish, French, and Italian</li>
+      <li>Available in English, German, Spanish, French, Italian and Portuguese (BR)</li>
     </ul>
   </description>
 
@@ -96,6 +96,14 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.9.2" date="2026-05-30">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Rework the Collection Runner</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.9.1" date="2026-05-28">
       <description>
         <p>Feature stabilization release</p>

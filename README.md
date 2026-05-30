@@ -151,6 +151,16 @@ The built application will be in `src-tauri/target/release/bundle/`.
   - Message sending with transcript-style response display
   - Request creation and persistence alongside HTTP and gRPC requests
 
+### Server-Sent Events (SSE) Support
+
+- **Native SSE Integration**: Stream `text/event-stream` responses over a persistent backend connection
+  - Custom request header configuration for the initial handshake
+  - Transcript-style display of each event with `event`, `id`, `retry`, and `data` fields
+  - Automatic reconnection honoring the server's `retry` interval
+  - `Last-Event-ID` resumption to continue the stream after a reconnect
+  - Live connection lifecycle status (connecting, connected, reconnecting, closed, error)
+  - Per-tab connection state with transcript persistence
+
 ### Collection Runner
 
 - **Batch Request Execution**: Run multiple requests sequentially with configurable options
@@ -225,7 +235,7 @@ The built application will be in `src-tauri/target/release/bundle/`.
 4. **Switch Environments**: Use the environment selector dropdown to quickly switch between different API contexts
 5. **Make Requests**: Select endpoints from the collections sidebar and configure path params, query params, headers, body, auth, and scripts
 6. **Add Scripts (Optional)**: Write pre-request scripts to modify requests dynamically or test scripts to validate responses
-7. **View Responses**: Examine response data in the tabbed viewer (Body, Headers, Cookies, Performance, Scripts for HTTP; Body transcript for WebSocket; Body, Metadata, Trailers for gRPC)
+7. **View Responses**: Examine response data in the tabbed viewer (Body, Headers, Cookies, Performance, Scripts for HTTP; Body transcript for WebSocket and SSE; Body, Metadata, Trailers for gRPC)
 8. **Export Code**: Generate request code in your preferred language for documentation or automation
 
 ### Environment Management
@@ -694,6 +704,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Tauri v2 migration for smaller bundle and better performance
 - [x] gRPC support with server reflection and unary RPC
 - [x] WebSocket support with native backend transport and handshake headers
+- [x] Server-Sent Events (SSE) support with automatic reconnection and Last-Event-ID resumption
 - [x] Collection runner for batch request execution with variable chaining
 
 ### Planned

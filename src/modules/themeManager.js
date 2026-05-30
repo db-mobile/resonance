@@ -5,7 +5,6 @@ export class ThemeManager {
         this.currentTheme = 'system';
         this.currentAccent = 'green';
         this.currentThemeLink = null;
-        this.baseOverridesLink = null;
         this.availableThemes = ['light', 'dark', 'system', 'black'];
         this.availableAccents = ['green', 'teal', 'blue', 'indigo', 'purple', 'yellow', 'orange', 'red', 'pink'];
         this.init();
@@ -98,42 +97,13 @@ export class ThemeManager {
             link.href = `src/themes/${themeFile}.css`;
             link.id = `theme-${theme}`;
 
-            link.onload = async () => {
+            link.onload = () => {
                 this.currentThemeLink = link;
-                // Load base overrides after theme variables are loaded
-                await this.loadBaseOverrides();
                 resolve();
             };
 
             link.onerror = () => {
                 reject(new Error(`Failed to load theme: ${theme}`));
-            };
-
-            document.head.appendChild(link);
-        });
-    }
-
-    async loadBaseOverrides() {
-        // Remove existing base overrides to ensure correct order after theme
-        if (this.baseOverridesLink) {
-            this.baseOverridesLink.remove();
-            this.baseOverridesLink = null;
-        }
-
-        return new Promise((resolve) => {
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = 'src/themes/_base-overrides.css';
-            link.id = 'theme-base-overrides';
-
-            link.onload = () => {
-                this.baseOverridesLink = link;
-                resolve();
-            };
-
-            link.onerror = () => {
-                // Base overrides are optional, continue without them
-                resolve();
             };
 
             document.head.appendChild(link);

@@ -2,11 +2,11 @@
     <div class="runner-panel">
         <!-- Runner Header -->
         <div class="runner-header">
-            <div class="runner-title-section u-flex u-items-center u-justify-between">
+            <div class="runner-title-section">
                 <div class="runner-selector-wrapper">
-                    <div class="runner-selector u-flex u-items-center" data-role="runner-selector">
-                        <input type="text" 
-                               class="input-base runner-selector-input" 
+                    <div class="runner-selector" data-role="runner-selector">
+                        <input type="text"
+                               class="runner-selector-input"
                                placeholder="Untitled Runner"
                                data-role="runner-name"
                                aria-label="Runner name"
@@ -21,40 +21,37 @@
                         </div>
                     </div>
                 </div>
-                <div class="u-flex u-gap-2">
-                    <button class="btn btn-sm btn-primary" data-action="new-runner" title="New Runner">
+                <div class="runner-file-actions">
+                    <button class="runner-icon-btn is-primary" data-action="new-runner" title="New Runner" aria-label="New Runner">
                         <span class="icon icon-14 icon-plus"></span>
-                        <span data-i18n="runner.new">New</span>
                     </button>
-                    <button class="btn btn-sm btn-outline" data-action="save-runner" title="Save Runner">
+                    <button class="runner-icon-btn" data-action="save-runner" title="Save Runner" aria-label="Save Runner">
                         <span class="icon icon-14 icon-save"></span>
-                        <span data-i18n="runner.save">Save</span>
                     </button>
-                    <button class="btn btn-sm btn-outline-danger" data-action="delete-runner" title="Delete Runner">
+                    <button class="runner-icon-btn is-danger" data-action="delete-runner" title="Delete Runner" aria-label="Delete Runner">
                         <span class="icon icon-14 icon-trash"></span>
                     </button>
                 </div>
-                <div class="runner-header-separator"></div>
-                <div class="u-flex u-items-center u-gap-4">
-                    <label class="toggle-switch">
+                <div class="runner-config">
+                    <label class="runner-chip toggle-switch">
                         <input type="checkbox" data-option="stop-on-error" checked>
                         <span class="toggle-track"></span>
                         <span data-i18n="runner.stop_on_error">Stop on error</span>
                     </label>
-                    <label class="runner-option-inline u-flex u-items-center">
-                        <span data-i18n="runner.delay_between">Delay:</span>
-                        <input type="number" 
-                               class="input-base runner-delay-input-sm" 
-                               data-option="delay" 
-                               value="0" 
-                               min="0" 
+                    <div class="runner-chip">
+                        <span class="runner-chip-label" data-i18n="runner.delay">Delay</span>
+                        <input type="number"
+                               class="runner-delay-input-sm"
+                               data-option="delay"
+                               value="0"
+                               min="0"
                                max="10000"
                                aria-label="Delay in milliseconds">
                         <span>ms</span>
-                    </label>
+                    </div>
                 </div>
-                <div class="runner-header-controls u-flex">
-                    <button class="btn btn-success" data-action="run" aria-label="Run Collection">
+                <div class="runner-header-controls">
+                    <button class="btn btn-primary runner-run-btn" data-action="run" aria-label="Run Collection">
                         <span class="icon icon-16 icon-play"></span>
                         <span data-i18n="runner.run">Run</span>
                     </button>
@@ -104,7 +101,7 @@
         <div class="modal-dialog modal-dialog--script-editor">
             <div class="dialog-header">
                 <div class="runner-script-modal-title u-flex u-flex-col">
-                    <h3 class="dialog-title" data-i18n="runner.post_response_script">Post-Response Script</h3>
+                    <h3 class="dialog-title" data-i18n="runner.edit_request">Edit Request</h3>
                     <div class="runner-script-request-info u-flex u-items-center u-gap-2">
                         <span class="method-pill" data-role="script-method">GET</span>
                         <span class="runner-script-path" data-role="script-path">/endpoint</span>
@@ -114,17 +111,63 @@
                     <span class="icon icon-16 icon-x"></span>
                 </button>
             </div>
-            <div class="runner-script-modal-body">
-                <div class="runner-script-editor-container" data-role="script-editor-container"></div>
+            <div class="runner-editor-tabs">
+                <button class="runner-editor-tab is-active" data-edit-tab="params" data-i18n="runner.tab_params">Params</button>
+                <button class="runner-editor-tab" data-edit-tab="headers" data-i18n="runner.tab_headers">Headers</button>
+                <button class="runner-editor-tab" data-edit-tab="body" data-i18n="runner.tab_body">Body</button>
+                <button class="runner-editor-tab" data-edit-tab="script" data-i18n="runner.tab_script">Script</button>
             </div>
-            <div class="runner-script-modal-hint">
-                <strong>Available APIs:</strong> response, environment.set(), environment.get(), console.log()
+            <div class="runner-editor-body">
+                <div class="runner-editor-tab-content is-active" data-edit-content="params">
+                    <div class="runner-editor-section">
+                        <div class="runner-editor-section-header u-flex u-items-center u-justify-between">
+                            <h4 class="runner-editor-section-title" data-i18n="runner.path_params">Path Parameters</h4>
+                            <button class="btn btn-sm btn-outline" data-action="add-path-param" data-i18n="runner.add_param">+ Add</button>
+                        </div>
+                        <div class="key-value-list" data-role="path-params-list"></div>
+                    </div>
+                    <div class="runner-editor-section">
+                        <div class="runner-editor-section-header u-flex u-items-center u-justify-between">
+                            <h4 class="runner-editor-section-title" data-i18n="runner.query_params">Query Parameters</h4>
+                            <button class="btn btn-sm btn-outline" data-action="add-query-param" data-i18n="runner.add_param">+ Add</button>
+                        </div>
+                        <div class="key-value-list" data-role="query-params-list"></div>
+                    </div>
+                </div>
+                <div class="runner-editor-tab-content" data-edit-content="headers">
+                    <div class="runner-editor-section">
+                        <div class="runner-editor-section-header u-flex u-items-center u-justify-between">
+                            <h4 class="runner-editor-section-title" data-i18n="runner.headers">Headers</h4>
+                            <button class="btn btn-sm btn-outline" data-action="add-header" data-i18n="runner.add_header">+ Add</button>
+                        </div>
+                        <div class="key-value-list" data-role="headers-list"></div>
+                    </div>
+                </div>
+                <div class="runner-editor-tab-content" data-edit-content="body">
+                    <div class="runner-editor-body-host" data-role="override-body-container"></div>
+                </div>
+                <div class="runner-editor-tab-content" data-edit-content="script">
+                    <div class="runner-script-editor-container" data-role="script-editor-container"></div>
+                    <div class="runner-script-modal-hint">
+                        <strong>Available APIs:</strong> response, environment.set(), environment.get(), console.log()
+                    </div>
+                </div>
             </div>
             <div class="runner-script-modal-footer dialog-footer dialog-footer--divided">
                 <button class="btn btn-outline" data-action="cancel" data-i18n="common.cancel">Cancel</button>
                 <button class="btn btn-primary" data-action="save" data-i18n="common.save">Save</button>
             </div>
         </div>
+    </div>
+</template>
+
+<template id="tpl-runner-kv-row">
+    <div class="key-value-row">
+        <input type="text" class="key-input" data-role="kv-key" autocomplete="off">
+        <input type="text" class="value-input" data-role="kv-value" autocomplete="off">
+        <button class="runner-request-remove-btn" data-action="remove-kv" title="Remove" aria-label="Remove">
+            <span class="icon icon-14 icon-x"></span>
+        </button>
     </div>
 </template>
 
@@ -138,7 +181,7 @@
             <span class="runner-request-name" data-role="name">/endpoint</span>
         </div>
         <div class="runner-request-actions u-flex">
-            <button class="runner-request-edit-btn" data-action="edit-script" title="Edit post-response script">
+            <button class="runner-request-edit-btn" data-action="edit-script" data-i18n-title="runner.edit_request" title="Edit request">
                 <span class="icon icon-14 icon-script"></span>
             </button>
             <button class="runner-request-remove-btn" data-action="remove" title="Remove">
@@ -180,13 +223,22 @@
     <div class="runner-results-container">
         <div class="runner-results-header u-flex u-items-center u-justify-between">
             <h4 class="runner-section-title" data-i18n="runner.results">Results</h4>
-            <div class="runner-results-summary u-flex" data-role="summary">
-                <span class="runner-results-passed" data-role="passed">0 passed</span>
-                <span class="runner-results-failed" data-role="failed">0 failed</span>
-                <span class="runner-results-time" data-role="total-time">0ms</span>
+            <div class="runner-results-summary" data-role="summary">
+                <div class="runner-stat runner-results-passed">
+                    <span class="runner-stat-value" data-role="passed">0</span>
+                    <span class="runner-stat-label" data-i18n="runner.passed">Passed</span>
+                </div>
+                <div class="runner-stat runner-results-failed">
+                    <span class="runner-stat-value" data-role="failed">0</span>
+                    <span class="runner-stat-label" data-i18n="runner.failed">Failed</span>
+                </div>
+                <div class="runner-stat runner-results-time">
+                    <span class="runner-stat-value" data-role="total-time">—</span>
+                    <span class="runner-stat-label" data-i18n="runner.total">Total</span>
+                </div>
             </div>
         </div>
-        <div class="u-flex u-flex-1 u-overflow-hidden u-min-h-0">
+        <div class="runner-results-body u-flex u-flex-1 u-overflow-hidden u-min-h-0">
             <div class="runner-results-list-panel">
                 <div class="runner-results-list" data-role="results-list">
                 </div>
