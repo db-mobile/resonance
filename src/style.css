@@ -384,6 +384,70 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Native button chrome reset — component classes (.btn, .tab-button, etc.)
+   layer their own appearance on top via higher specificity. */
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Themed defaults for form controls — component rules refine these. */
+input[type="text"],
+input[type="url"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea,
+select {
+  background: var(--input-bg, var(--bg-secondary));
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+}
+
+input[type="text"]:focus,
+input[type="url"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent, #10b981);
+  box-shadow: 0 0 0 2px
+    rgba(var(--accent-rgb, 16, 185, 129), var(--focus-shadow-opacity, 0.2));
+}
+
+/* Code blocks */
+pre,
+code {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+}
+
+/* Scrollbars — themed via CSS variables */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-medium)
+    var(--scrollbar-track-bg, var(--bg-secondary));
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track-bg, var(--bg-secondary));
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
 /* Layout utilities */
 .u-flex {
   display: flex;
@@ -2217,10 +2281,12 @@ body {
 }
 
 .activity-bar-btn:hover {
+  background: var(--bg-tertiary);
   color: var(--text-secondary);
 }
 
 .activity-bar-btn.active {
+  background: var(--accent-light);
   color: var(--accent);
 }
 
@@ -2299,14 +2365,15 @@ body {
   pointer-events: none;
 }
 
-/* Variant: Primary (filled) */
+/* Variant: Primary — rendered as a neutral theme surface (aligned to the theme,
+   matching the previous look) rather than an accent-colored fill. */
 .btn-primary {
-  --btn-bg: var(--color-primary);
-  --btn-bg-hover: var(--color-primary-dark);
-  --btn-color: var(--text-inverse);
-  --btn-color-hover: var(--text-inverse);
-  --btn-shadow: var(--shadow-sm);
-  --btn-shadow-hover: var(--shadow-base);
+  --btn-bg: var(--bg-secondary);
+  --btn-bg-hover: var(--bg-tertiary);
+  --btn-color: var(--text-primary);
+  --btn-color-hover: var(--text-primary);
+  --btn-border: var(--border-light);
+  --btn-border-hover: var(--border-medium);
 }
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
@@ -2315,14 +2382,15 @@ body {
   transform: translateY(0);
 }
 
-/* Variant: Danger (filled) */
+/* Variant: Danger — rendered as a neutral theme surface (same as the other
+   buttons); the class is kept only so existing markup/toggles keep working. */
 .btn-danger {
-  --btn-bg: var(--color-error);
-  --btn-bg-hover: #dc2626;
-  --btn-color: var(--text-inverse);
-  --btn-color-hover: var(--text-inverse);
-  --btn-shadow: var(--shadow-sm);
-  --btn-shadow-hover: var(--shadow-base);
+  --btn-bg: var(--bg-secondary);
+  --btn-bg-hover: var(--bg-tertiary);
+  --btn-color: var(--text-primary);
+  --btn-color-hover: var(--text-primary);
+  --btn-border: var(--border-light);
+  --btn-border-hover: var(--border-medium);
 }
 .btn-danger:hover:not(:disabled) {
   transform: translateY(-1px);
@@ -2799,7 +2867,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg-white);
+  background: var(--content-bg, var(--bg-secondary));
 }
 
 /* Workspace Tab Bar */
@@ -3117,7 +3185,7 @@ body {
 
 /* Request Builder */
 .request-builder {
-  background: var(--bg-white);
+  background: var(--content-bg, var(--bg-secondary));
   border-bottom: 1px solid var(--border-light);
   padding: var(--space-3);
   box-shadow: var(--shadow-xs);
@@ -3146,7 +3214,7 @@ body {
 
 /* Request Configuration Tabs */
 .request-config {
-  background: var(--bg-white);
+  background: var(--content-bg, var(--bg-secondary));
   border-bottom: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
@@ -3162,7 +3230,7 @@ body {
 }
 
 .tab-nav {
-  background: var(--bg-secondary);
+  background: var(--nav-bg, var(--bg-primary));
 }
 
 .tab-button,
@@ -3182,6 +3250,7 @@ body {
 .tab-button {
   padding: var(--space-2) var(--space-4);
   border-bottom-width: 3px;
+  background: var(--nav-bg, var(--bg-primary));
 }
 
 .tab-button:hover,
@@ -3190,7 +3259,7 @@ body {
 }
 
 .tab-button:hover {
-  background: var(--bg-tertiary);
+  background: var(--nav-bg, var(--bg-primary));
 }
 
 .tab-button.active,
@@ -3201,7 +3270,7 @@ body {
 }
 
 .tab-button.active {
-  background: var(--bg-white);
+  background: var(--nav-bg, var(--bg-primary));
   font-weight: var(--font-weight-semibold);
   box-shadow: 0 -2px 0 0 var(--color-primary) inset;
 }
@@ -3820,14 +3889,14 @@ body {
 /* Response Area */
 .response-area {
   overflow: hidden;
-  background: var(--bg-white);
+  background: var(--content-bg, var(--bg-secondary));
   min-height: 100px;
 }
 
 .response-header {
   padding: var(--space-1) var(--space-3);
   border-bottom: 1px solid var(--border-light);
-  background: var(--bg-secondary);
+  background: var(--nav-bg, var(--bg-primary));
 }
 
 .response-title {
@@ -3843,12 +3912,13 @@ body {
 
 .status-display {
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  font-weight: 600;
   padding: 0.15rem var(--space-2);
   border-radius: var(--radius-sm);
   margin: 0;
   border: 1px solid var(--border-light);
-  background: var(--bg-white);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
   white-space: nowrap;
 }
 
@@ -3867,28 +3937,28 @@ body {
 }
 
 .status-success {
-  background: var(--color-success-light);
-  color: #047857;
-  border-color: var(--color-success);
+  background: var(--method-get-bg);
+  color: var(--method-get-text);
+  border-color: var(--method-get-text);
 }
 
 .status-redirect {
   background: var(--color-warning-light);
-  color: #92400e;
-  border-color: var(--color-warning);
+  color: var(--status-redirect-text, #b45309);
+  border-color: #f59e0b;
 }
 
 .status-client-error,
 .status-server-error {
-  background: var(--color-error-light);
-  color: #b91c1c;
-  border-color: var(--color-error);
+  background: var(--method-delete-bg);
+  color: var(--method-delete-text);
+  border-color: var(--method-delete-text);
 }
 
 .status-info {
-  background: var(--color-primary-light);
-  color: var(--color-primary-dark);
-  border-color: var(--color-primary);
+  background: var(--method-post-bg);
+  color: var(--method-post-text);
+  border-color: var(--method-post-text);
 }
 
 /* Response Content */
@@ -3974,7 +4044,7 @@ body {
 .response-display {
   flex: 1 1 0;
   overflow: hidden;
-  background: var(--bg-white);
+  background: var(--content-bg, var(--bg-secondary));
   min-height: 0;
   height: 100%;
 }
@@ -6468,8 +6538,8 @@ body {
   flex-shrink: 0;
   opacity: 0;
   border: none;
-  background: var(--accent);
-  color: #fff;
+  background: transparent;
+  color: var(--text-primary);
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition:
@@ -6482,6 +6552,7 @@ body {
 }
 
 .runner-endpoint-add-btn:hover {
+  background: var(--accent-light);
   transform: scale(1.1);
 }
 
