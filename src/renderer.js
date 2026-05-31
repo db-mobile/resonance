@@ -683,11 +683,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Initialize i18n (needed for UI text)
-    await i18n.init();
-
     // Expose global references
-    window.i18n = i18n;
     window.authManager = authManager;
     window.historyController = historyController;
     window.environmentController = environmentController;
@@ -700,16 +696,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initialize environment selector (needed for environment switching)
     environmentSelector.initialize('environment-selector-container');
 
-    // Initialize environment controller and load active environment
-    await environmentController.initialize();
-
-    // Sync cookie jar with active environment on startup
-    try {
-        const activeEnv = await environmentService.getActiveEnvironment();
-        if (activeEnv) {
-            cookieController.setActiveEnvironment(activeEnv.id, activeEnv.name);
-        }
-    } catch (_e) { /* non-blocking */ }
+    // Parallelize independent IPC calls: i18n, environment controller, and cookie jar sync
+    await Promise.all([
+        i18n.init().then(() => { window.i18n = i18n; }),
+        environmentController.initialize(),
+        environmentService.getActiveEnvironment().then(activeEnv => {
+            if (activeEnv) {
+                cookieController.setActiveEnvironment(activeEnv.id, activeEnv.name);
+            }
+        }).catch(() => { /* non-blocking */ })
+    ]);
 
     // Initialize body editors BEFORE workspace tabs so they're available during tab state restoration
     // Initialize request body editor (JSON mode)

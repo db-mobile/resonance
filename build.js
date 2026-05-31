@@ -50,11 +50,27 @@ const sharedBuildOptions = {
     treeShaking: true,
 };
 
-// Build all editor modules together with code splitting
-// This allows esbuild to automatically deduplicate shared CodeMirror code
+// Plugin to resolve .bundle.js imports to their source .js files
+// so esbuild can properly bundle and deduplicate shared code (e.g. CodeMirror)
+const bundleAliasPlugin = {
+    name: 'bundle-alias',
+    setup(build) {
+        build.onResolve({ filter: /\.bundle\.js$/ }, (args) => {
+            // Resolve e.g. './responseEditor.bundle.js' → './responseEditor.js'
+            const sourceName = args.path.replace('.bundle.js', '.js');
+            const resolved = path.resolve(args.resolveDir, sourceName);
+            return { path: resolved };
+        });
+    }
+};
+
+// Build renderer.js and all editor modules together with code splitting
+// This bundles the entire module graph into a single entry point + shared chunks,
+// eliminating the ~100-file waterfall of individual ES module requests on startup
 await esbuild.build({
     ...sharedBuildOptions,
     entryPoints: [
+        'src/renderer.js',
         'src/modules/responseEditor.js',
         'src/modules/jsonEditor.js',
         'src/modules/requestBodyEditor.js',
@@ -62,21 +78,31 @@ await esbuild.build({
         'src/modules/scriptEditor.js',
         'src/modules/schemaEditor.js',
     ],
-    outdir: 'dist/src/modules',
+    outdir: 'dist/src',
     splitting: true,
     chunkNames: 'chunks/[name]-[hash]',
-    entryNames: '[name].bundle',
+    entryNames: '[dir]/[name].bundle',
+    plugins: [bundleAliasPlugin],
 }).then(() => {
-    console.log('✓ All editor modules bundled with code splitting');
+    console.log('✓ Renderer and editor modules bundled with code splitting');
 }).catch((error) => {
     console.error('Build failed:', error);
     process.exit(1);
 });
 
+// Update index.html in dist to reference the bundled renderer
+const indexHtml = fs.readFileSync('dist/index.html', 'utf8');
+const updatedHtml = indexHtml.replace(
+    '<script type="module" src="./src/renderer.js"></script>',
+    '<script type="module" src="./src/renderer.bundle.js"></script>'
+);
+fs.writeFileSync('dist/index.html', updatedHtml);
+console.log('✓ dist/index.html updated to use bundled renderer');
+
 // Print build summary
-const chunkDir = 'dist/src/modules/chunks';
+const chunkDir = 'dist/src/chunks';
 if (fs.existsSync(chunkDir)) {
-    const chunks = fs.readdirSync(chunkDir);
+    const chunks = fs.readdirSync(chunkDir).filter(f => f.endsWith('.js'));
     console.log(`  → ${chunks.length} shared chunk(s) created`);
 }
 
