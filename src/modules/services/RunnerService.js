@@ -702,7 +702,8 @@ export class RunnerService {
             bodyType,
             httpVersion,
             timeout,
-            auth: authData.authConfig
+            auth: authData.authConfig,
+            awsAuth: authData.awsAuth || null
         };
     }
 
@@ -838,6 +839,18 @@ export class RunnerService {
                     authData.authConfig = {
                         username: processValue(config.username),
                         password: processValue(config.password)
+                    };
+                }
+                break;
+
+            case 'aws-v4':
+                if (config.accessKeyId && config.secretAccessKey) {
+                    authData.awsAuth = {
+                        accessKeyId: processValue(config.accessKeyId),
+                        secretAccessKey: processValue(config.secretAccessKey),
+                        region: processValue(config.region) || 'us-east-1',
+                        service: processValue(config.service) || '',
+                        sessionToken: config.sessionToken ? processValue(config.sessionToken) : null
                     };
                 }
                 break;

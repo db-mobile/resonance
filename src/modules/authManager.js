@@ -90,6 +90,10 @@ export class AuthManager {
                 this.renderDigestAuthFields();
                 break;
 
+            case 'aws-v4':
+                this.renderAwsV4Fields();
+                break;
+
             default:
                 break;
         }
@@ -710,6 +714,62 @@ export class AuthManager {
     }
 
     /**
+     * Renders AWS Signature V4 authentication fields
+     *
+     * @private
+     * @returns {void}
+     */
+    renderAwsV4Fields() {
+        const fragment = templateLoader.cloneSync(
+            './src/templates/auth/authFields.html',
+            'tpl-auth-aws-v4'
+        );
+        this.authFieldsContainer.innerHTML = '';
+        this.authFieldsContainer.appendChild(fragment);
+
+        const accessKeyInput = document.getElementById('aws-access-key-id');
+        const secretKeyInput = document.getElementById('aws-secret-access-key');
+        const regionInput = document.getElementById('aws-region');
+        const serviceInput = document.getElementById('aws-service');
+        const sessionTokenInput = document.getElementById('aws-session-token');
+
+        if (accessKeyInput) {
+            accessKeyInput.value = this.currentAuthConfig.config.accessKeyId || '';
+            accessKeyInput.addEventListener('input', (e) => {
+                this.currentAuthConfig.config.accessKeyId = e.target.value;
+            });
+        }
+
+        if (secretKeyInput) {
+            secretKeyInput.value = this.currentAuthConfig.config.secretAccessKey || '';
+            secretKeyInput.addEventListener('input', (e) => {
+                this.currentAuthConfig.config.secretAccessKey = e.target.value;
+            });
+        }
+
+        if (regionInput) {
+            regionInput.value = this.currentAuthConfig.config.region || '';
+            regionInput.addEventListener('input', (e) => {
+                this.currentAuthConfig.config.region = e.target.value;
+            });
+        }
+
+        if (serviceInput) {
+            serviceInput.value = this.currentAuthConfig.config.service || '';
+            serviceInput.addEventListener('input', (e) => {
+                this.currentAuthConfig.config.service = e.target.value;
+            });
+        }
+
+        if (sessionTokenInput) {
+            sessionTokenInput.value = this.currentAuthConfig.config.sessionToken || '';
+            sessionTokenInput.addEventListener('input', (e) => {
+                this.currentAuthConfig.config.sessionToken = e.target.value;
+            });
+        }
+    }
+
+    /**
      * Generates authentication data for API requests
      *
      * Converts current authentication configuration into headers, query parameters,
@@ -770,6 +830,18 @@ export class AuthManager {
                     authData.authConfig = {
                         username: config.username || '',
                         password: config.password || ''
+                    };
+                }
+                break;
+
+            case 'aws-v4':
+                if (config.accessKeyId && config.secretAccessKey) {
+                    authData.awsAuth = {
+                        accessKeyId: config.accessKeyId,
+                        secretAccessKey: config.secretAccessKey,
+                        region: config.region || 'us-east-1',
+                        service: config.service || '',
+                        sessionToken: config.sessionToken || null
                     };
                 }
                 break;
@@ -907,6 +979,20 @@ export class AuthManager {
                 if (digestPassword && config.password) {
                     digestPassword.value = config.password;
                 }
+                break;
+            }
+
+            case 'aws-v4': {
+                const awsAccessKey = document.getElementById('aws-access-key-id');
+                const awsSecretKey = document.getElementById('aws-secret-access-key');
+                const awsRegion = document.getElementById('aws-region');
+                const awsService = document.getElementById('aws-service');
+                const awsSessionToken = document.getElementById('aws-session-token');
+                if (awsAccessKey && config.accessKeyId) {awsAccessKey.value = config.accessKeyId;}
+                if (awsSecretKey && config.secretAccessKey) {awsSecretKey.value = config.secretAccessKey;}
+                if (awsRegion && config.region) {awsRegion.value = config.region;}
+                if (awsService && config.service) {awsService.value = config.service;}
+                if (awsSessionToken && config.sessionToken) {awsSessionToken.value = config.sessionToken;}
                 break;
             }
 

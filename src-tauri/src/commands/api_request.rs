@@ -1,6 +1,8 @@
+use hmac::{Hmac, Mac};
 use reqwest::{Client, Method, RequestBuilder, Response};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::State;
@@ -280,6 +282,191 @@ fn build_digest_auth_header(
     Ok(header)
 }
 
+// ---------------------------------------------------------------------------
+// AWS Signature Version 4
+// ---------------------------------------------------------------------------
+
+type HmacSha256 = Hmac<Sha256>;
+
+/// Compute SHA-256 hex digest of arbitrary bytes.
+fn sha256_hex(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    hex::encode(hasher.finalize())
+}
+
+/// HMAC-SHA256 keyed hash, returns raw bytes.
+fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
+    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC key length is always valid");
+    mac.update(data);
+    mac.finalize().into_bytes().to_vec()
+}
+
+/// AWS-compliant URI encoding per RFC 3986.
+/// When `encode_slash` is true, '/' is also percent-encoded (used for query
+/// params). When false, '/' is left as-is (used for URI paths).
+fn aws_uri_encode(input: &str, encode_slash: bool) -> String {
+    let mut encoded = String::with_capacity(input.len() * 2);
+    for byte in input.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b'-' | b'~' | b'.' => {
+                encoded.push(byte as char);
+            }
+            b'/' => {
+                if encode_slash {
+                    encoded.push_str("%2F");
+                } else {
+                    encoded.push('/');
+                }
+            }
+            _ => {
+                encoded.push_str(&format!("%{:02X}", byte));
+            }
+        }
+    }
+    encoded
+}
+
+/// Derive the AWS Signature V4 signing key.
+fn aws_derive_signing_key(secret: &str, date: &str, region: &str, service: &str) -> Vec<u8> {
+    let k_date = hmac_sha256(format!("AWS4{}", secret).as_bytes(), date.as_bytes());
+    let k_region = hmac_sha256(&k_date, region.as_bytes());
+    let k_service = hmac_sha256(&k_region, service.as_bytes());
+    hmac_sha256(&k_service, b"aws4_request")
+}
+
+/// Build AWS Signature V4 headers for a request.
+///
+/// Returns a map of headers that must be added to the request:
+/// `Authorization`, `x-amz-date`, `x-amz-content-sha256`, and optionally
+/// `x-amz-security-token`.
+fn build_aws_v4_headers(
+    aws: &AwsAuthConfig,
+    method: &str,
+    url_str: &str,
+    existing_headers: &HashMap<String, String>,
+    body_bytes: &[u8],
+) -> Result<HashMap<String, String>, String> {
+    let parsed =
+        url::Url::parse(url_str).map_err(|e| format!("Invalid URL for AWS signing: {}", e))?;
+
+    let now = chrono::Utc::now();
+    let date_stamp = now.format("%Y%m%d").to_string();
+    let amz_date = now.format("%Y%m%dT%H%M%SZ").to_string();
+
+    let payload_hash = sha256_hex(body_bytes);
+
+    // -- Collect headers that will be signed ----------------------------------
+    let host = parsed.host_str().unwrap_or_default();
+    let port = parsed.port();
+    let host_header = match port {
+        Some(p)
+            if (parsed.scheme() == "https" && p != 443)
+                || (parsed.scheme() == "http" && p != 80) =>
+        {
+            format!("{}:{}", host, p)
+        }
+        _ => host.to_string(),
+    };
+
+    let mut headers_to_sign: BTreeMap<String, String> = BTreeMap::new();
+    headers_to_sign.insert("host".to_string(), host_header);
+    headers_to_sign.insert("x-amz-date".to_string(), amz_date.clone());
+    headers_to_sign.insert("x-amz-content-sha256".to_string(), payload_hash.clone());
+
+    if let Some(token) = &aws.session_token {
+        if !token.is_empty() {
+            headers_to_sign.insert("x-amz-security-token".to_string(), token.clone());
+        }
+    }
+
+    // Include user-supplied headers that are not already covered
+    for (k, v) in existing_headers {
+        let lower = k.to_lowercase();
+        headers_to_sign
+            .entry(lower)
+            .or_insert_with(|| v.trim().to_string());
+    }
+
+    // -- Step 1: Canonical Request --------------------------------------------
+    let canonical_uri = if parsed.path().is_empty() {
+        "/".to_string()
+    } else {
+        parsed.path().to_string()
+    };
+
+    // Canonical query string: sorted by key then value
+    let mut query_pairs: Vec<(String, String)> = parsed
+        .query_pairs()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+    query_pairs.sort();
+    let canonical_querystring: String = query_pairs
+        .iter()
+        .map(|(k, v)| format!("{}={}", aws_uri_encode(k, true), aws_uri_encode(v, true)))
+        .collect::<Vec<_>>()
+        .join("&");
+
+    let canonical_headers: String = headers_to_sign
+        .iter()
+        .map(|(k, v)| format!("{}:{}", k, v))
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n";
+
+    let signed_headers: String = headers_to_sign
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(";");
+
+    let canonical_request = format!(
+        "{}\n{}\n{}\n{}\n{}\n{}",
+        method.to_uppercase(),
+        canonical_uri,
+        canonical_querystring,
+        canonical_headers,
+        signed_headers,
+        payload_hash
+    );
+
+    // -- Step 2: String to Sign -----------------------------------------------
+    let credential_scope = format!("{}/{}/{}/aws4_request", date_stamp, aws.region, aws.service);
+    let string_to_sign = format!(
+        "AWS4-HMAC-SHA256\n{}\n{}\n{}",
+        amz_date,
+        credential_scope,
+        sha256_hex(canonical_request.as_bytes())
+    );
+
+    // -- Step 3 & 4: Signing key + signature ----------------------------------
+    let signing_key = aws_derive_signing_key(
+        &aws.secret_access_key,
+        &date_stamp,
+        &aws.region,
+        &aws.service,
+    );
+    let signature = hex::encode(hmac_sha256(&signing_key, string_to_sign.as_bytes()));
+
+    // -- Build output headers -------------------------------------------------
+    let authorization = format!(
+        "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}",
+        aws.access_key_id, credential_scope, signed_headers, signature
+    );
+
+    let mut out: HashMap<String, String> = HashMap::new();
+    out.insert("Authorization".to_string(), authorization);
+    out.insert("x-amz-date".to_string(), amz_date);
+    out.insert("x-amz-content-sha256".to_string(), payload_hash);
+    if let Some(token) = &aws.session_token {
+        if !token.is_empty() {
+            out.insert("x-amz-security-token".to_string(), token.clone());
+        }
+    }
+
+    Ok(out)
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RequestOptions {
@@ -302,6 +489,9 @@ pub struct RequestOptions {
     /// Body encoding type: "json" (default) | "formdata" | "urlencoded" | "text"
     #[serde(default)]
     pub body_type: Option<String>,
+    /// AWS Signature V4 authentication configuration
+    #[serde(default)]
+    pub aws_auth: Option<AwsAuthConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -311,6 +501,17 @@ pub struct AuthConfig {
     pub password: String,
     #[serde(default)]
     pub auth_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AwsAuthConfig {
+    pub access_key_id: String,
+    pub secret_access_key: String,
+    pub region: String,
+    pub service: String,
+    #[serde(default)]
+    pub session_token: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -522,6 +723,27 @@ pub async fn send_api_request(
         .map(|h| h.keys().any(|k| k.to_lowercase() == "content-type"))
         .unwrap_or(false);
 
+    // Compute AWS Signature V4 headers if configured.
+    // This must happen before building the request because the signature covers
+    // the method, URL, headers, and body hash.
+    let aws_headers: Option<HashMap<String, String>> = if let Some(aws) = &request_options.aws_auth
+    {
+        let body_bytes = match &request_options.body {
+            Some(b) => serde_json::to_vec(b).unwrap_or_default(),
+            None => Vec::new(),
+        };
+        let existing = request_options.headers.clone().unwrap_or_default();
+        Some(build_aws_v4_headers(
+            aws,
+            &request_options.method,
+            &request_options.url,
+            &existing,
+            &body_bytes,
+        )?)
+    } else {
+        None
+    };
+
     // Helper to build a request
     let build_request = |auth_header: Option<String>| -> RequestBuilder {
         let mut rb = client.request(method.clone(), &request_options.url);
@@ -533,6 +755,12 @@ pub async fn send_api_request(
                 {
                     continue;
                 }
+                rb = rb.header(key, value);
+            }
+        }
+        // Apply AWS Signature V4 headers (Authorization, x-amz-date, etc.)
+        if let Some(ref aws_hdrs) = aws_headers {
+            for (key, value) in aws_hdrs {
                 rb = rb.header(key, value);
             }
         }

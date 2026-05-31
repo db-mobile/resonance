@@ -670,6 +670,10 @@ export async function handleSendRequest() {
             requestConfig.auth = authData.authConfig;
         }
 
+        if (authData.awsAuth) {
+            requestConfig.awsAuth = authData.awsAuth;
+        }
+
         // Execute pre-request script if exists
         if (window.currentEndpoint && window.scriptController) {
             try {

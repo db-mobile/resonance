@@ -1,6 +1,6 @@
 name: db-mobile-resonance
 base: core22
-version: '2.9.2'
+version: '2.9.3'
 title: Resonance
 summary: Test and explore web services
 description: |
@@ -10,7 +10,7 @@ description: |
   Features:
   - Import collections from OpenAPI 3.0 specifications and Postman collections
   - Environment management with variable templating
-  - Multiple authentication methods (Bearer, Basic, API keys, OAuth 2.0, Digest)
+  - Multiple authentication methods (Bearer, Basic, API keys, OAuth 2.0, Digest, AWS Signature)
   - Code generation in 9 languages
   - GraphQL support with dedicated query editor
   - gRPC support with server reflection

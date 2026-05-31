@@ -184,3 +184,29 @@
         <small class="form-input-hint">Digest authentication will be handled automatically by the HTTP client</small>
     </div>
 </template>
+
+<template id="tpl-auth-aws-v4">
+    <div class="u-flex u-flex-col u-gap-4">
+        <div class="auth-field-group u-flex u-flex-col">
+            <label for="aws-access-key-id" class="form-label">Access Key ID</label>
+            <input type="text" id="aws-access-key-id" class="input-base form-input" placeholder="AKIAIOSFODNN7EXAMPLE" aria-label="AWS Access Key ID">
+        </div>
+        <div class="auth-field-group u-flex u-flex-col">
+            <label for="aws-secret-access-key" class="form-label">Secret Access Key</label>
+            <input type="password" id="aws-secret-access-key" class="input-base form-input" placeholder="Enter secret access key" aria-label="AWS Secret Access Key">
+        </div>
+        <div class="auth-field-group u-flex u-flex-col">
+            <label for="aws-region" class="form-label">Region</label>
+            <input type="text" id="aws-region" class="input-base form-input" placeholder="us-east-1" aria-label="AWS Region">
+        </div>
+        <div class="auth-field-group u-flex u-flex-col">
+            <label for="aws-service" class="form-label">Service Name</label>
+            <input type="text" id="aws-service" class="input-base form-input" placeholder="s3, execute-api, etc." aria-label="AWS Service Name">
+        </div>
+        <div class="auth-field-group u-flex u-flex-col">
+            <label for="aws-session-token" class="form-label">Session Token (optional)</label>
+            <input type="password" id="aws-session-token" class="input-base form-input" placeholder="Required for temporary credentials (STS)" aria-label="AWS Session Token">
+        </div>
+        <small class="form-input-hint">Request will be signed with AWS Signature Version 4. The signature is computed automatically at send time.</small>
+    </div>
+</template>

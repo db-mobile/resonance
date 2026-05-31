@@ -943,6 +943,7 @@ checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer",
  "crypto-common",
+ "subtle",
 ]
 
 [[package]]
@@ -1721,6 +1722,15 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "hmac"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
+dependencies = [
+ "digest",
+]
 
 [[package]]
 name = "home"
@@ -3807,7 +3817,7 @@ dependencies = [
 
 [[package]]
 name = "resonance"
-version = "2.9.2"
+version = "2.9.3"
 dependencies = [
  "anyhow",
  "axum 0.7.9",
@@ -3817,6 +3827,7 @@ dependencies = [
  "chrono",
  "futures-util",
  "hex",
+ "hmac",
  "http 0.2.12",
  "md5",
  "prost",
