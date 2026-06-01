@@ -575,11 +575,14 @@ export class WorkspaceTabStateManager {
 
         // Restore response body with CodeMirror
         if (response.data) {
-            const formattedResponse = typeof response.data === 'string'
-                ? response.data
-                : JSON.stringify(response.data, null, 2);
+            const isStructured = typeof response.data !== 'string';
+            const formattedResponse = isStructured
+                ? JSON.stringify(response.data, null, 2)
+                : response.data;
             const contentType = response.headers?.['content-type'] || null;
-            displayResponseWithLineNumbersForTab(formattedResponse, contentType, tabId);
+            // Structured data is known JSON — hint it so the editor skips re-parsing.
+            const languageHint = isStructured ? 'json' : undefined;
+            displayResponseWithLineNumbersForTab(formattedResponse, contentType, tabId, languageHint);
         } else {
             clearResponseDisplayForTab(tabId);
         }

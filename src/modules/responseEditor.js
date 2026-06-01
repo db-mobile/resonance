@@ -217,13 +217,24 @@ export class ResponseEditor {
      * Update editor content with syntax highlighting
      * @param {string} content - The content to display
      * @param {string|null} contentType - Optional Content-Type header
+     * @param {string} [languageHint] - Known language ('json'/'xml'/'html'/'text').
+     *   When provided, detection is skipped — this avoids re-parsing the body to
+     *   discover a type the caller already knows (e.g. a structured JSON response).
      */
-    setContent(content, contentType = null) {
+    setContent(content, contentType = null, languageHint = undefined) {
         this.currentContentType = contentType;
 
         // If manual override is set, use it
         if (this.manualLanguageOverride !== null) {
             this._updateEditorWithLanguage(content, this.manualLanguageOverride);
+            return;
+        }
+
+        // A caller-supplied hint short-circuits detection. The response display
+        // path already knows the body is JSON (it just serialized it), so this
+        // skips the redundant JSON.parse that content-based detection would do.
+        if (languageHint !== undefined && languageHint !== null) {
+            this._updateEditorWithLanguage(content, languageHint);
             return;
         }
 
