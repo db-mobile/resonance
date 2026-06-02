@@ -29,6 +29,7 @@ fn get_default_for_key(key: &str) -> Value {
             "delay": 0,
             "enabled": false
         }),
+        "clientCertificates" => serde_json::json!({ "items": [] }),
         "settings" => serde_json::json!({
             "httpVersion": "auto",
             "timeout": 30000,

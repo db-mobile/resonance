@@ -5534,6 +5534,107 @@ code {
   margin-top: var(--space-3);
 }
 
+/* Client certificates (mTLS) settings */
+.certs-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.certs-actions {
+  margin-top: var(--space-3);
+}
+
+.cert-entry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+}
+
+.cert-entry-header {
+  gap: var(--space-3);
+}
+
+.cert-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cert-field-grow {
+  flex: 1;
+}
+
+.cert-field label,
+.cert-file-row > label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.cert-entry input[type="text"] {
+  padding: var(--space-2);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-white);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  transition: all var(--transition-base);
+}
+
+.cert-entry input[type="text"]:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.cert-file-row {
+  gap: var(--space-2);
+}
+
+.cert-file-row > label {
+  width: 200px;
+  flex-shrink: 0;
+}
+
+.cert-file-row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.cert-enabled-toggle {
+  flex-shrink: 0;
+}
+
+.cert-entry .icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  flex-shrink: 0;
+}
+
+.cert-entry .icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.cert-entry-error {
+  color: var(--color-danger, #ef4444);
+  margin-top: var(--space-1);
+}
+
 /* Theme select dropdown */
 .theme-select-container {
   margin-top: var(--space-2);

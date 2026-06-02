@@ -129,6 +129,79 @@
     <div class="settings-tab-content" data-tab-content="proxy"></div>
 </template>
 
+<template id="tpl-settings-certs-tab">
+    <button class="settings-tab" data-tab="certificates" data-i18n="settings.tab_certificates">Certificates</button>
+</template>
+
+<template id="tpl-settings-certs-content">
+    <div class="settings-tab-content" data-tab-content="certificates"></div>
+</template>
+
+<template id="tpl-certs-section">
+    <div class="settings-section certs-settings-section">
+        <h3 data-i18n="settings.certs_title">Client Certificates (mTLS)</h3>
+        <p class="form-input-hint" data-i18n="settings.certs_description">Present a client certificate and/or trust a custom CA for requests to a matching host. Files are read from disk at request time; only their paths are stored.</p>
+
+        <div class="certs-list" data-role="certs-list"></div>
+
+        <div class="certs-empty is-hidden" data-role="certs-empty">
+            <p class="form-input-hint" data-i18n="settings.certs_empty">No certificates configured.</p>
+        </div>
+
+        <div class="certs-actions">
+            <button type="button" class="btn btn-secondary btn-sm" data-role="certs-add" data-i18n="settings.certs_add">Add Certificate</button>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-cert-entry">
+    <div class="cert-entry">
+        <div class="cert-entry-header u-flex u-items-center u-justify-between">
+            <div class="cert-field cert-field-grow">
+                <label data-i18n="settings.certs_host">Host</label>
+                <input type="text" name="certHost" placeholder="api.example.com" autocomplete="off">
+            </div>
+            <label class="toggle-switch cert-enabled-toggle">
+                <input type="checkbox" name="certEnabled" checked>
+                <span class="toggle-track"></span>
+                <span data-i18n="settings.certs_enabled">Enabled</span>
+            </label>
+            <button type="button" class="icon-btn cert-remove-btn" data-role="cert-remove" aria-label="Remove" data-i18n-aria="settings.certs_remove">
+                <span class="icon icon-16 icon-trash"></span>
+            </button>
+        </div>
+
+        <div class="cert-file-row u-flex u-items-center" data-file="cert">
+            <label data-i18n="settings.certs_cert_file">Certificate (PEM)</label>
+            <input type="text" name="certCertPath" readonly placeholder="—">
+            <button type="button" class="btn btn-secondary btn-xs" data-role="cert-pick" data-kind="cert" data-i18n="settings.certs_choose">Choose…</button>
+            <button type="button" class="icon-btn" data-role="cert-clear" data-kind="cert" aria-label="Clear" data-i18n-aria="settings.certs_clear">
+                <span class="icon icon-14 icon-x"></span>
+            </button>
+        </div>
+
+        <div class="cert-file-row u-flex u-items-center" data-file="key">
+            <label data-i18n="settings.certs_key_file">Private Key (PEM, unencrypted)</label>
+            <input type="text" name="certKeyPath" readonly placeholder="—">
+            <button type="button" class="btn btn-secondary btn-xs" data-role="cert-pick" data-kind="key" data-i18n="settings.certs_choose">Choose…</button>
+            <button type="button" class="icon-btn" data-role="cert-clear" data-kind="key" aria-label="Clear" data-i18n-aria="settings.certs_clear">
+                <span class="icon icon-14 icon-x"></span>
+            </button>
+        </div>
+
+        <div class="cert-file-row u-flex u-items-center" data-file="ca">
+            <label data-i18n="settings.certs_ca_file">CA Bundle (PEM, optional)</label>
+            <input type="text" name="certCaPath" readonly placeholder="—">
+            <button type="button" class="btn btn-secondary btn-xs" data-role="cert-pick" data-kind="ca" data-i18n="settings.certs_choose">Choose…</button>
+            <button type="button" class="icon-btn" data-role="cert-clear" data-kind="ca" aria-label="Clear" data-i18n-aria="settings.certs_clear">
+                <span class="icon icon-14 icon-x"></span>
+            </button>
+        </div>
+
+        <p class="cert-entry-error form-input-hint is-hidden" data-role="cert-error"></p>
+    </div>
+</template>
+
 <template id="tpl-language-section">
     <div class="settings-section">
         <h3 data-i18n="settings.language">Language</h3>

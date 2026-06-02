@@ -611,6 +611,18 @@ export async function handleSendRequest() {
         followRedirects
     };
 
+    // Apply a client certificate / custom CA configured for this request's host (mTLS).
+    if (window.certificateController) {
+        try {
+            const clientCert = window.certificateController.getForHost(new URL(url).host);
+            if (clientCert) {
+                requestConfig.clientCert = clientCert;
+            }
+        } catch (e) {
+            void e;
+        }
+    }
+
     const requestTabId = window.workspaceTabController
         ? await window.workspaceTabController.service.getActiveTabId()
         : null;

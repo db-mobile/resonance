@@ -8,5 +8,6 @@ export { VariableService } from './VariableService.js';
 export { EnvironmentService } from './EnvironmentService.js';
 export { HistoryService } from './HistoryService.js';
 export { ProxyService } from './ProxyService.js';
+export { CertificateService } from './CertificateService.js';
 export { WorkspaceTabService } from './WorkspaceTabService.js';
 export { RunnerService } from './RunnerService.js';
