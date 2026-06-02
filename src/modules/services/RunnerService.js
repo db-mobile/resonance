@@ -7,6 +7,8 @@ import { VariableProcessor } from '../variables/VariableProcessor.js';
 import { VariableRepository } from '../storage/VariableRepository.js';
 import { EnvironmentRepository } from '../storage/EnvironmentRepository.js';
 import { CollectionRepository } from '../storage/CollectionRepository.js';
+import { CertificateRepository } from '../storage/CertificateRepository.js';
+import { CertificateService } from './CertificateService.js';
 
 /**
  * Service for managing collection runner operations and execution
@@ -37,6 +39,7 @@ export class RunnerService {
         this.variableRepository = new VariableRepository(backendAPI);
         this.environmentRepository = new EnvironmentRepository(backendAPI);
         this.collectionRepository = new CollectionRepository(backendAPI);
+        this.certificateService = new CertificateService(new CertificateRepository(backendAPI));
 
         // Execution state
         this.isRunning = false;
@@ -694,6 +697,15 @@ export class RunnerService {
             // Use defaults
         }
 
+        // Resolve a client certificate / custom CA configured for this host (mTLS).
+        let clientCert = null;
+        try {
+            await this.certificateService.getItems();
+            clientCert = this.certificateService.getForHost(new URL(url).host);
+        } catch (e) {
+            void e;
+        }
+
         return {
             method: endpoint.method,
             url,
@@ -703,7 +715,8 @@ export class RunnerService {
             httpVersion,
             timeout,
             auth: authData.authConfig,
-            awsAuth: authData.awsAuth || null
+            awsAuth: authData.awsAuth || null,
+            clientCert
         };
     }
 

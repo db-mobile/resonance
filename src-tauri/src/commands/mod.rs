@@ -1,5 +1,6 @@
 pub mod api_request;
 pub mod app;
+pub mod certificates;
 pub mod collections;
 pub mod grpc_proto;
 pub mod grpc_reflection;

@@ -205,6 +205,14 @@ The built application will be in `src-tauri/target/release/bundle/`.
 - **Per-Request Configuration**: Set authentication at request, folder, or collection level
 - **Secure Credential Storage**: All credentials encrypted and stored securely
 
+### Client Certificates (mTLS)
+
+- **Mutual TLS Authentication**: Present a PEM client certificate and private key to servers that require mTLS
+- **Custom CA Trust**: Trust a custom CA bundle for servers using private or self-signed certificate authorities
+- **Per-Host Configuration**: Map certificates to a specific `host` or `host:port`, with exact `host:port` matches taking precedence over a bare host
+- **Path-Only Storage**: Only file paths are stored — certificate, key, and CA files are read from disk at request time, never copied into config
+- **Enable/Disable Per Entry**: Toggle individual certificate entries without deleting them
+
 ### User Experience
 
 - **Keyboard Shortcuts**: Comprehensive shortcuts for all actions with platform-aware bindings (⌘/Ctrl)
@@ -298,6 +306,27 @@ Resonance supports multiple authentication methods:
 - **Digest Auth**: RFC 2617 compliant Digest authentication with MD5 hashing
 
 All authentication credentials are automatically applied to requests and work seamlessly with the variable templating system.
+
+### Client Certificates (mTLS)
+
+For APIs protected by mutual TLS, configure client certificates in **Settings → Certificates**:
+
+1. Open **Settings** (`Ctrl/Cmd+,`) and select the **Certificates** tab
+2. Click **Add Certificate** and enter the **Host** the certificate applies to (e.g. `api.example.com` or `api.example.com:8443`)
+3. Choose the PEM files:
+   - **Certificate (PEM)**: your client certificate chain
+   - **Private Key (PEM, unencrypted)**: the matching private key
+   - **CA Bundle (PEM, optional)**: a custom CA to trust for this host
+4. Leave the entry **Enabled** to activate it
+
+When a request is sent, Resonance resolves the certificate whose host matches the request host — an exact `host:port` match is preferred over a bare hostname match. The client certificate and key are applied as a TLS identity (mTLS), and any CA bundle is added to the trusted roots.
+
+**Notes:**
+
+- A client certificate requires **both** the certificate and the key file; a CA bundle can be supplied on its own to only extend trust.
+- Private keys must be **unencrypted** PEM files.
+- Only file **paths** are persisted (stored as `clientCertificates`). The files are read from disk each time a matching request is sent, so keep them in place.
+- Certificates also apply to requests run through the **Collection Runner**.
 
 ### Collection Import
 
@@ -577,8 +606,9 @@ src-tauri/
 └── src/
     ├── main.rs        # Application entry point
     └── commands/      # IPC command handlers
-        ├── api_request.rs    # HTTP request handling with reqwest
+        ├── api_request.rs    # HTTP request handling with reqwest (incl. mTLS / client certs)
         ├── proxy.rs          # Proxy configuration
+        ├── certificates.rs   # Native file picker for client certificate (mTLS) files
         ├── mock_server.rs    # Mock server with Axum
         ├── scripts.rs        # JavaScript execution with Boa Engine
         ├── store.rs          # Data persistence
@@ -692,6 +722,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Multi-theme support (4 themes with 9 accent colors)
 - [x] Internationalization (5 languages)
 - [x] Authentication support (Bearer, Basic, API Key, OAuth2, Digest)
+- [x] Client certificates / mTLS with per-host configuration and custom CA trust
 - [x] Request history with search and replay
 - [x] Environment management (Dev, Staging, Production, custom)
 - [x] Keyboard shortcuts for all major actions

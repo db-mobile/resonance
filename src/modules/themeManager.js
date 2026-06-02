@@ -179,12 +179,13 @@ export class ThemeManager {
 }
 
 export class SettingsModal {
-    constructor(themeManager, i18nManager = null, httpVersionManager = null, timeoutManager = null, proxyController = null) {
+    constructor(themeManager, i18nManager = null, httpVersionManager = null, timeoutManager = null, proxyController = null, certificateController = null) {
         this.themeManager = themeManager;
         this.i18nManager = i18nManager;
         this.httpVersionManager = httpVersionManager;
         this.timeoutManager = timeoutManager;
         this.proxyController = proxyController;
+        this.certificateController = certificateController;
         this.isOpen = false;
     }
 
@@ -323,6 +324,26 @@ export class SettingsModal {
             const proxySection = await this.createProxySectionDOM();
             proxyContent.appendChild(proxySection);
             contentContainer.appendChild(proxyContent);
+        }
+
+        // Add certificates tab if certificateController is available
+        if (this.certificateController) {
+            const tabsContainer = overlay.querySelector('.settings-tabs');
+            const certsTabFragment = templateLoader.cloneSync(
+                './src/templates/settings/settingsModal.html',
+                'tpl-settings-certs-tab'
+            );
+            tabsContainer.appendChild(certsTabFragment);
+
+            const contentContainer = overlay.querySelector('.settings-content');
+            const certsContentFragment = templateLoader.cloneSync(
+                './src/templates/settings/settingsModal.html',
+                'tpl-settings-certs-content'
+            );
+            const certsContent = certsContentFragment.firstElementChild;
+            const certsSection = await this.createCertsSectionDOM();
+            certsContent.appendChild(certsSection);
+            contentContainer.appendChild(certsContent);
         }
 
         // Add Updates tab (always last)
@@ -470,6 +491,156 @@ export class SettingsModal {
         }
 
         return section;
+    }
+
+    async createCertsSectionDOM() {
+        const fragment = templateLoader.cloneSync(
+            './src/templates/settings/settingsModal.html',
+            'tpl-certs-section'
+        );
+        const section = fragment.firstElementChild;
+        this._certsListEl = section.querySelector('[data-role="certs-list"]');
+
+        let items = [];
+        try {
+            items = await this.certificateController.getItems();
+        } catch (error) {
+            void error;
+        }
+
+        items.forEach(item => this._certsListEl.appendChild(this._renderCertEntry(item)));
+        this._updateCertsEmpty(section);
+
+        const addBtn = section.querySelector('[data-role="certs-add"]');
+        if (addBtn) {
+            addBtn.addEventListener('click', () => {
+                const row = this._renderCertEntry({
+                    host: '', certPath: '', keyPath: '', caPath: '', enabled: true
+                });
+                this._certsListEl.appendChild(row);
+                this._updateCertsEmpty(section);
+                this.i18nManager?.updateUI(row);
+                row.querySelector('input[name="certHost"]')?.focus();
+            });
+        }
+
+        this.i18nManager?.updateUI(section);
+        return section;
+    }
+
+    _renderCertEntry(item) {
+        const fragment = templateLoader.cloneSync(
+            './src/templates/settings/settingsModal.html',
+            'tpl-cert-entry'
+        );
+        const row = fragment.firstElementChild;
+
+        const host = row.querySelector('input[name="certHost"]');
+        const enabled = row.querySelector('input[name="certEnabled"]');
+        const pathInputs = {
+            cert: row.querySelector('input[name="certCertPath"]'),
+            key: row.querySelector('input[name="certKeyPath"]'),
+            ca: row.querySelector('input[name="certCaPath"]')
+        };
+
+        host.value = item.host || '';
+        enabled.checked = item.enabled !== false;
+        pathInputs.cert.value = item.certPath || '';
+        pathInputs.key.value = item.keyPath || '';
+        pathInputs.ca.value = item.caPath || '';
+
+        host.addEventListener('input', () => this._saveCerts());
+        enabled.addEventListener('change', () => this._saveCerts());
+
+        row.querySelectorAll('[data-role="cert-pick"]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                try {
+                    const pickedPath = await window.backendAPI.certificates.pickFile(btn.dataset.kind);
+                    if (pickedPath) {
+                        pathInputs[btn.dataset.kind].value = pickedPath;
+                        this._validateRow(row);
+                        this._saveCerts();
+                    }
+                } catch (error) {
+                    void error;
+                }
+            });
+        });
+
+        row.querySelectorAll('[data-role="cert-clear"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                pathInputs[btn.dataset.kind].value = '';
+                this._validateRow(row);
+                this._saveCerts();
+            });
+        });
+
+        row.querySelector('[data-role="cert-remove"]')?.addEventListener('click', () => {
+            const section = row.closest('.certs-settings-section');
+            row.remove();
+            this._saveCerts();
+            if (section) {
+                this._updateCertsEmpty(section);
+            }
+        });
+
+        this._validateRow(row);
+        return row;
+    }
+
+    _validateRow(row) {
+        const errorEl = row.querySelector('[data-role="cert-error"]');
+        if (!errorEl || !this.certificateController) {
+            return;
+        }
+        const errors = this.certificateController.validateEntry({
+            host: row.querySelector('input[name="certHost"]').value,
+            certPath: row.querySelector('input[name="certCertPath"]').value,
+            keyPath: row.querySelector('input[name="certKeyPath"]').value,
+            caPath: row.querySelector('input[name="certCaPath"]').value
+        });
+        // Surface only the cert/key pairing error inline; an empty host while
+        // adding a new row is self-evident and shouldn't flash an error.
+        const pairing = errors.find(e => e.toLowerCase().includes('key file'));
+        if (pairing) {
+            errorEl.textContent = pairing;
+            errorEl.classList.remove('is-hidden');
+        } else {
+            errorEl.textContent = '';
+            errorEl.classList.add('is-hidden');
+        }
+    }
+
+    _collectCertItems() {
+        if (!this._certsListEl) {
+            return [];
+        }
+        return Array.from(this._certsListEl.querySelectorAll('.cert-entry')).map(row => ({
+            host: row.querySelector('input[name="certHost"]').value.trim(),
+            certPath: row.querySelector('input[name="certCertPath"]').value.trim(),
+            keyPath: row.querySelector('input[name="certKeyPath"]').value.trim(),
+            caPath: row.querySelector('input[name="certCaPath"]').value.trim(),
+            enabled: row.querySelector('input[name="certEnabled"]').checked
+        }));
+    }
+
+    async _saveCerts() {
+        if (!this.certificateController) {
+            return;
+        }
+        try {
+            await this.certificateController.saveItems(this._collectCertItems());
+        } catch (error) {
+            void error;
+        }
+    }
+
+    _updateCertsEmpty(section) {
+        const emptyEl = section.querySelector('[data-role="certs-empty"]');
+        const hasRows = Boolean(this._certsListEl?.querySelector('.cert-entry'));
+        if (emptyEl) {
+            emptyEl.classList.toggle('is-hidden', hasRows);
+        }
     }
 
     attachEventListeners(overlay) {

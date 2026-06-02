@@ -119,6 +119,9 @@ if (isTauri) {
             set: (settings) => invoke('proxy_set', { settings }),
             test: () => invoke('proxy_test')
         },
+        certificates: {
+            pickFile: (kind) => invoke('pick_certificate_file', { kind })
+        },
         mockServer: {
             start: (settings, collections) => invoke('mock_server_start', { settings, collections }),
             stop: () => invoke('mock_server_stop'),

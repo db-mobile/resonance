@@ -492,6 +492,9 @@ pub struct RequestOptions {
     /// AWS Signature V4 authentication configuration
     #[serde(default)]
     pub aws_auth: Option<AwsAuthConfig>,
+    /// Client certificate (mTLS) and custom CA configuration, resolved by host
+    #[serde(default)]
+    pub client_cert: Option<ClientCertConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -512,6 +515,89 @@ pub struct AwsAuthConfig {
     pub service: String,
     #[serde(default)]
     pub session_token: Option<String>,
+}
+
+/// Client certificate (mutual TLS) and custom CA trust configuration.
+///
+/// All fields are filesystem paths to PEM-encoded files. Only paths are sent
+/// from the frontend (the certificate store persists paths, never cert bytes);
+/// the backend reads and parses the files here.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientCertConfig {
+    /// PEM certificate chain to present to the server (mTLS).
+    #[serde(default)]
+    pub cert_path: Option<String>,
+    /// PEM PKCS#8 private key (unencrypted) matching `cert_path`.
+    #[serde(default)]
+    pub key_path: Option<String>,
+    /// PEM CA bundle used to verify the server's certificate chain.
+    #[serde(default)]
+    pub ca_path: Option<String>,
+}
+
+impl ClientCertConfig {
+    /// Whether any certificate material is configured. Used to skip the TLS
+    /// timing probe (which uses the default trust roots and no client auth and
+    /// would otherwise fail/mislead against mTLS or private-CA endpoints).
+    fn is_active(&self) -> bool {
+        self.cert_path.as_deref().is_some_and(|p| !p.is_empty())
+            || self.ca_path.as_deref().is_some_and(|p| !p.is_empty())
+    }
+}
+
+/// Apply a [`ClientCertConfig`] to a reqwest [`ClientBuilder`]: load the client
+/// identity (cert chain + key) for mTLS and add any custom CA roots. Returns a
+/// descriptive error so the UI can surface load/parse failures instead of an
+/// opaque TLS handshake error.
+fn apply_client_cert(
+    mut builder: reqwest::ClientBuilder,
+    cert: &ClientCertConfig,
+) -> Result<reqwest::ClientBuilder, String> {
+    // Client identity (mTLS): requires both a cert chain and a private key.
+    let cert_path = cert.cert_path.as_deref().filter(|p| !p.is_empty());
+    let key_path = cert.key_path.as_deref().filter(|p| !p.is_empty());
+    match (cert_path, key_path) {
+        (Some(cert_path), Some(key_path)) => {
+            let cert_pem = std::fs::read(cert_path).map_err(|e| {
+                format!(
+                    "Client certificate could not be read ({}): {}",
+                    cert_path, e
+                )
+            })?;
+            let key_pem = std::fs::read(key_path)
+                .map_err(|e| format!("Client key could not be read ({}): {}", key_path, e))?;
+            let mut pem = cert_pem;
+            pem.push(b'\n');
+            pem.extend_from_slice(&key_pem);
+            let identity = reqwest::Identity::from_pem(&pem).map_err(|e| {
+                format!(
+                    "Client certificate could not be loaded (expects a PEM cert chain plus an unencrypted private key in PKCS#8, RSA, or SEC1 form): {}",
+                    e
+                )
+            })?;
+            builder = builder.identity(identity);
+        }
+        (Some(_), None) | (None, Some(_)) => {
+            return Err(
+                "Client certificate requires both a certificate and a key file".to_string(),
+            );
+        }
+        (None, None) => {}
+    }
+
+    // Custom CA trust: add each CA in the bundle to the default roots.
+    if let Some(ca_path) = cert.ca_path.as_deref().filter(|p| !p.is_empty()) {
+        let ca_pem = std::fs::read(ca_path)
+            .map_err(|e| format!("CA certificate could not be read ({}): {}", ca_path, e))?;
+        let cas = reqwest::Certificate::from_pem_bundle(&ca_pem)
+            .map_err(|e| format!("CA certificate could not be parsed ({}): {}", ca_path, e))?;
+        for ca in cas {
+            builder = builder.add_root_certificate(ca);
+        }
+    }
+
+    Ok(builder)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -608,7 +694,14 @@ pub async fn send_api_request(
     // Resolve the proxy decision once: used below to skip the timing probe and
     // again when building the reqwest client.
     let proxy_action = proxy_state.get_proxy_config(&request_options.url);
-    let skip_probe = !matches!(proxy_action, ProxyAction::Disable);
+    // Skip the timing probe through a proxy (would require CONNECT-tunnel auth)
+    // and when client-cert/custom-CA material is configured (the probe uses the
+    // default trust roots and no client auth, so it would fail or mislead).
+    let client_cert_active = request_options
+        .client_cert
+        .as_ref()
+        .is_some_and(ClientCertConfig::is_active);
+    let skip_probe = !matches!(proxy_action, ProxyAction::Disable) || client_cert_active;
 
     if let Some(ref url) = parsed_url {
         if let Some(host) = url.host_str() {
@@ -662,6 +755,28 @@ pub async fn send_api_request(
     // Disable SSL verification if requested (e.g. for self-signed certs in dev)
     if request_options.verify_ssl == Some(false) {
         client_builder = client_builder.danger_accept_invalid_certs(true);
+    }
+
+    // Apply client certificate (mTLS) and/or custom CA trust resolved for this host.
+    if let Some(client_cert) = &request_options.client_cert {
+        match apply_client_cert(client_builder, client_cert) {
+            Ok(b) => client_builder = b,
+            Err(message) => {
+                return Ok(ApiResponse {
+                    success: false,
+                    data: None,
+                    status: None,
+                    status_text: None,
+                    headers: HashMap::new(),
+                    set_cookies: vec![],
+                    message: Some(message),
+                    ttfb: None,
+                    size: None,
+                    timings,
+                    cancelled: None,
+                });
+            }
+        }
     }
 
     // Disable redirect following if requested
@@ -993,5 +1108,154 @@ pub async fn cancel_api_request(
         Ok(serde_json::json!({ "success": true, "message": "Request cancelled" }))
     } else {
         Ok(serde_json::json!({ "success": false, "message": "No active request to cancel" }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn client_cert_config_deserializes_camel_case() {
+        let json = serde_json::json!({
+            "certPath": "/certs/client.crt",
+            "keyPath": "/certs/client.key",
+            "caPath": "/certs/ca.pem",
+        });
+        let cfg: ClientCertConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(cfg.cert_path.as_deref(), Some("/certs/client.crt"));
+        assert_eq!(cfg.key_path.as_deref(), Some("/certs/client.key"));
+        assert_eq!(cfg.ca_path.as_deref(), Some("/certs/ca.pem"));
+    }
+
+    #[test]
+    fn is_active_reflects_cert_or_ca_presence() {
+        let empty = ClientCertConfig {
+            cert_path: None,
+            key_path: None,
+            ca_path: Some(String::new()),
+        };
+        assert!(!empty.is_active());
+
+        let with_cert = ClientCertConfig {
+            cert_path: Some("/certs/client.crt".into()),
+            key_path: Some("/certs/client.key".into()),
+            ca_path: None,
+        };
+        assert!(with_cert.is_active());
+
+        let ca_only = ClientCertConfig {
+            cert_path: None,
+            key_path: None,
+            ca_path: Some("/certs/ca.pem".into()),
+        };
+        assert!(ca_only.is_active());
+    }
+
+    #[test]
+    fn apply_client_cert_requires_both_cert_and_key() {
+        let cfg = ClientCertConfig {
+            cert_path: Some("/certs/client.crt".into()),
+            key_path: None,
+            ca_path: None,
+        };
+        let err = apply_client_cert(Client::builder(), &cfg).unwrap_err();
+        assert!(err.contains("both a certificate and a key"));
+    }
+
+    #[test]
+    fn apply_client_cert_reports_missing_file() {
+        let cfg = ClientCertConfig {
+            cert_path: Some("/nonexistent/client.crt".into()),
+            key_path: Some("/nonexistent/client.key".into()),
+            ca_path: None,
+        };
+        let err = apply_client_cert(Client::builder(), &cfg).unwrap_err();
+        assert!(err.contains("could not be read"));
+    }
+
+    #[test]
+    fn apply_client_cert_noop_when_empty() {
+        let cfg = ClientCertConfig {
+            cert_path: None,
+            key_path: None,
+            ca_path: None,
+        };
+        // Should succeed and leave the builder usable.
+        let builder = apply_client_cert(Client::builder(), &cfg).unwrap();
+        assert!(builder.build().is_ok());
+    }
+
+    /// End-to-end check that the production loader parses real PEM material:
+    /// generate a self-signed cert + unencrypted PKCS#8 key with `openssl`, then
+    /// assert the client identity and a custom CA both load and build a client.
+    /// Skipped automatically when `openssl` is unavailable.
+    #[test]
+    fn apply_client_cert_loads_real_pem_material() {
+        use std::process::Command;
+
+        let openssl_ok = Command::new("openssl")
+            .arg("version")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if !openssl_ok {
+            eprintln!("skipping apply_client_cert_loads_real_pem_material: openssl not available");
+            return;
+        }
+
+        let dir = std::env::temp_dir().join(format!("resonance-mtls-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let cert_path = dir.join("cert.pem");
+        let key_path = dir.join("key.pem");
+
+        // Self-signed cert with an unencrypted PKCS#8 EC key (-nodes).
+        let status = Command::new("openssl")
+            .args([
+                "req",
+                "-x509",
+                "-newkey",
+                "ec",
+                "-pkeyopt",
+                "ec_paramgen_curve:prime256v1",
+                "-nodes",
+                "-keyout",
+                key_path.to_str().unwrap(),
+                "-out",
+                cert_path.to_str().unwrap(),
+                "-days",
+                "1",
+                "-subj",
+                "/CN=resonance-mtls-test",
+            ])
+            .output()
+            .expect("run openssl");
+        assert!(
+            status.status.success(),
+            "openssl failed: {}",
+            String::from_utf8_lossy(&status.stderr)
+        );
+
+        // Client identity (cert chain + key) loads and builds.
+        let identity_cfg = ClientCertConfig {
+            cert_path: Some(cert_path.to_string_lossy().into()),
+            key_path: Some(key_path.to_string_lossy().into()),
+            ca_path: None,
+        };
+        let builder = apply_client_cert(Client::builder(), &identity_cfg)
+            .expect("client identity should load from real PEM");
+        assert!(builder.build().is_ok());
+
+        // The same self-signed cert is a valid single-entry CA bundle.
+        let ca_cfg = ClientCertConfig {
+            cert_path: None,
+            key_path: None,
+            ca_path: Some(cert_path.to_string_lossy().into()),
+        };
+        let builder = apply_client_cert(Client::builder(), &ca_cfg)
+            .expect("custom CA should load from real PEM");
+        assert!(builder.build().is_ok());
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

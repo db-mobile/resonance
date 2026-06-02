@@ -5,6 +5,7 @@ mod commands;
 use commands::{
     api_request::{cancel_api_request, send_api_request, RequestState},
     app::app_get_version,
+    certificates::pick_certificate_file,
     collections::{
         collection_delete, collection_delete_endpoint_data, collection_get,
         collection_get_endpoint_data, collection_get_variables, collection_save,
@@ -103,6 +104,8 @@ fn main() {
             grpc_proto_invoke_unary,
             grpc_list_loaded_protos,
             grpc_unload_proto,
+            // Client certificates (mTLS)
+            pick_certificate_file,
             // gRPC Streaming
             grpc_stream_start,
             grpc_stream_send,

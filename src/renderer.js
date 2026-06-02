@@ -43,6 +43,9 @@ import { ContextMenu } from './modules/ui/ContextMenu.js';
 import { ProxyController } from './modules/controllers/ProxyController.js';
 import { ProxyRepository } from './modules/storage/ProxyRepository.js';
 import { ProxyService } from './modules/services/ProxyService.js';
+import { CertificateController } from './modules/controllers/CertificateController.js';
+import { CertificateRepository } from './modules/storage/CertificateRepository.js';
+import { CertificateService } from './modules/services/CertificateService.js';
 import { StatusDisplayAdapter } from './modules/interfaces/IStatusDisplay.js';
 import { keyboardShortcuts } from './modules/keyboardShortcuts.js';
 import { WorkspaceTabRepository } from './modules/storage/WorkspaceTabRepository.js';
@@ -88,6 +91,14 @@ const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
 const proxyRepository = new ProxyRepository(window.backendAPI);
 const proxyService = new ProxyService(proxyRepository, statusDisplayAdapter);
 const proxyController = new ProxyController(proxyService);
+
+// Initialize client certificate (mTLS) system
+const certificateRepository = new CertificateRepository(window.backendAPI);
+const certificateService = new CertificateService(certificateRepository);
+const certificateController = new CertificateController(certificateService);
+certificateController.initialize();
+// Expose for the request path (apiHandler resolves a cert by host before sending)
+window.certificateController = certificateController;
 
 // Initialize environment system
 const environmentRepository = new EnvironmentRepository(window.backendAPI);
@@ -168,7 +179,7 @@ formBodyManager.initialize();
 window.formBodyManager = formBodyManager;
 
 // Initialize settings modal with all managers
-const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager, proxyController);
+const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager, proxyController, certificateController);
 
 // Initialize mock server system
 const collectionRepository = new CollectionRepository(window.backendAPI);

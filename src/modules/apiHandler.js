@@ -4,7 +4,6 @@ import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './s
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { saveAllRequestModifications } from './collectionManager.js';
 
-// Debounce timer for auto-save operations
 let _saveDebounceTimer = null;
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -49,17 +48,14 @@ import { cancelStream as cancelGrpcStream, hasActiveStream as hasActiveGrpcStrea
 import { RequestBuilderService } from './services/RequestBuilderService.js';
 import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes } from './ResponseDisplayHelper.js';
 
-// Initialize CodeMirror editor for response display
 let responseEditor = null;
 
-// GraphQL body manager instance (set by renderer)
 let graphqlBodyManager = null;
 
 export function setGraphQLBodyManager(manager) {
     graphqlBodyManager = manager;
 }
 
-// Module-level singletons — created once, reused on every request
 let _variableService = null;
 let _mockServerService = null;
 let _collectionRepository = null;
@@ -130,15 +126,12 @@ export function initResponseEditor() {
     if (!responseEditor && responseBodyContainer) {
         responseEditor = new ResponseEditor(responseBodyContainer);
 
-        // Set up callback to update dropdown when language changes
         responseEditor.onLanguageChange((languageType) => {
             if (languageSelector) {
-                // Show the detected language type (e.g., 'json', 'xml', 'html')
                 languageSelector.value = languageType || 'text';
             }
         });
 
-        // Set up language selector event listener
         if (languageSelector) {
             languageSelector.addEventListener('change', (e) => {
                 const selectedLanguage = e.target.value;
@@ -197,10 +190,8 @@ export function clearSchemaValidationBadge(tabId = null) {
  * @param {string|null} tabId - Workspace tab ID
  */
 function displaySchemaValidationResult(validationResult, tabId = null) {
-    // Clear existing badge first
     clearSchemaValidationBadge(tabId);
 
-    // Don't show anything if no schema is defined
     if (!validationResult.hasSchema) {
         return;
     }
@@ -214,7 +205,6 @@ function displaySchemaValidationResult(validationResult, tabId = null) {
         return;
     }
 
-    // Create validation badge
     const badge = document.createElement('span');
     badge.className = `response-validation-badge ${validationResult.valid ? 'valid' : 'invalid'}`;
     badge.textContent = validationResult.valid ? 'Schema Valid' : `Schema Invalid (${validationResult.errors.length})`;
@@ -226,24 +216,19 @@ function displaySchemaValidationResult(validationResult, tabId = null) {
     statusContainer.appendChild(badge);
 }
 
-export function displayResponseWithLineNumbersForTab(content, contentType = null, tabId = null) {
-    // Use per-tab editor if available, otherwise fall back to global editor
+export function displayResponseWithLineNumbersForTab(content, contentType = null, tabId = null, languageHint = undefined) {
     const containerElements = tabId
         ? window.responseContainerManager?.getOrCreateContainer(tabId)
         : window.responseContainerManager?.getActiveElements();
 
     if (containerElements && containerElements.editor) {
-        containerElements.editor.setContent(content, contentType);
+        containerElements.editor.setContent(content, contentType, languageHint);
 
-        // Update preview management
         if (containerElements.previewManager && containerElements.tabId) {
             const language = containerElements.editor.currentLanguage;
 
-            // Enable/disable preview button based on content type
             containerElements.previewManager.updateButtonState(containerElements.tabId, language);
 
-            // Always update preview content if content is previewable, regardless of current view mode
-            // This ensures preview is ready when user switches to it
             if (containerElements.previewManager.isPreviewable(language)) {
                 containerElements.previewManager.refreshPreviewContent(containerElements.tabId, content, language);
             } else {
@@ -255,7 +240,7 @@ export function displayResponseWithLineNumbersForTab(content, contentType = null
         // Fallback to global editor
         initResponseEditor();
         if (responseEditor) {
-            responseEditor.setContent(content, contentType);
+            responseEditor.setContent(content, contentType, languageHint);
         }
     }
 }
@@ -436,21 +421,17 @@ export async function handleSendRequest() {
         return;
     }
 
-    // Show cancel button immediately so the UI feels responsive
     setRequestInProgress(true);
 
     if (window.currentEndpoint) {
-        // Fire-and-forget: don't block request on save
         debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
     }
 
-    // Get URL from input - fall back to default attribute if value was cleared
     let url = urlInput?.value?.trim() || '';
     if (!url && urlInput) {
-        // Fall back to the default value attribute if the current value is empty
         url = urlInput.getAttribute('value') || '';
     }
-    // Preserve the raw (unresolved) URL so history can restore template variables
+
     const rawUrl = url;
 
     const method = methodSelect.value;
@@ -465,9 +446,6 @@ export async function handleSendRequest() {
     const builder = getRequestBuilderService();
     builder.mergeAuthData(headers, queryParams, authData);
 
-    // Resolve variables and process all request components (URL, headers, query params)
-    // A fresh VariableProcessor is created per request to ensure dynamic variables
-    // (like {{$uuid}}) resolve consistently throughout the request
     let processor;
     let _resolvedVariables = null;
     let queryString = '';
@@ -510,13 +488,11 @@ export async function handleSendRequest() {
                     }
                     
                     if (endpoint && endpoint.path) {
-                        // Replace path parameters in the endpoint path
                         let mockPath = endpoint.path;
                         for (const [key, value] of Object.entries(pathParams)) {
                             mockPath = mockPath.replace(`{${key}}`, value);
                         }
-                        
-                        // Build mock URL with query string
+
                         url = queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`;
                     }
                 }
@@ -526,11 +502,9 @@ export async function handleSendRequest() {
         }
     }
 
-    // Handle request body (supports JSON, GraphQL, Form Data, and URL Encoded modes)
     const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
     if (['POST', 'PUT', 'PATCH'].includes(method) || bodyMode === 'formdata' || bodyMode === 'urlencoded') {
         try {
-            // Reuse variables already fetched above — avoids a duplicate IPC call
             let variables = _resolvedVariables;
             if (variables === null) {
                 const variableService = getVariableService();
@@ -541,19 +515,13 @@ export async function handleSendRequest() {
                 }
             }
 
-            // Note: reusing the same processor from above to maintain consistent dynamic variable values
-
-            // Check if GraphQL mode is active
             if (graphqlBodyManager && graphqlBodyManager.isGraphQLMode()) {
-                // GraphQL mode: construct { query, variables } body
                 let queryText = graphqlBodyManager.getGraphQLQuery().trim();
                 let variablesText = graphqlBodyManager.getGraphQLVariables().trim();
 
-                // Apply variable substitution to query and variables
                 queryText = processor.processTemplate(queryText, variables);
                 variablesText = processor.processTemplate(variablesText, variables);
 
-                // Parse variables JSON
                 let parsedVariables = {};
                 if (variablesText) {
                     try {
@@ -566,13 +534,11 @@ export async function handleSendRequest() {
                     }
                 }
 
-                // Construct GraphQL request body
                 body = {
                     query: queryText,
                     variables: parsedVariables
                 };
             } else if ((bodyMode === 'formdata' || bodyMode === 'urlencoded') && window.formBodyManager) {
-                // Form Data / URL Encoded mode: read key-value pairs
                 const rawFields = bodyMode === 'formdata'
                     ? window.formBodyManager.getFormDataFields()
                     : window.formBodyManager.getUrlencodedFields();
@@ -585,7 +551,6 @@ export async function handleSendRequest() {
                     body = processed;
                 }
             } else if (bodyMode === 'text') {
-                // Plain Text mode: send raw string body
                 const rawText = window.requestBodyTextEditor
                     ? window.requestBodyTextEditor.getContent()
                     : '';
@@ -593,7 +558,6 @@ export async function handleSendRequest() {
                     body = processor.processTemplate(rawText, variables);
                 }
             } else {
-                // JSON mode: existing behavior
                 let bodyText = getRequestBodyContent().trim();
                 if (bodyText) {
                     bodyText = processor.processTemplate(bodyText, variables);
@@ -616,9 +580,8 @@ export async function handleSendRequest() {
         }
     }
 
-    // Get HTTP version and timeout settings (cached — invalidated by settings saves)
     let httpVersion = 'auto';
-    let timeout = 30000; // Default 30 seconds
+    let timeout = 30000;
     let verifySsl = true;
     let followRedirects = true;
     try {
@@ -627,8 +590,6 @@ export async function handleSendRequest() {
         }
         const settings = _settingsCache;
         httpVersion = settings.httpVersion || 'auto';
-        // TimeoutManager saves as requestTimeout, store default uses timeout
-        // 0 means no timeout - pass null to backend to disable timeout
         const savedTimeout = settings.requestTimeout ?? settings.timeout;
         timeout = savedTimeout === 0 ? null : (savedTimeout ?? 30000);
         verifySsl = settings.verifySsl !== false;
@@ -637,8 +598,6 @@ export async function handleSendRequest() {
         void e;
     }
 
-    // Define requestConfig outside try block so it's accessible in catch block
-    // Note: using let instead of const to allow pre-request scripts to modify the config
     let requestConfig = {
         method,
         url,
@@ -652,8 +611,18 @@ export async function handleSendRequest() {
         followRedirects
     };
 
-    // Capture the originating workspace tab at send time.
-    // This prevents async completion from writing into whatever tab happens to be active later.
+    // Apply a client certificate / custom CA configured for this request's host (mTLS).
+    if (window.certificateController) {
+        try {
+            const clientCert = window.certificateController.getForHost(new URL(url).host);
+            if (clientCert) {
+                requestConfig.clientCert = clientCert;
+            }
+        } catch (e) {
+            void e;
+        }
+    }
+
     const requestTabId = window.workspaceTabController
         ? await window.workspaceTabController.service.getActiveTabId()
         : null;
@@ -663,7 +632,6 @@ export async function handleSendRequest() {
 
         displayResponseWithLineNumbersForTab('Sending request...', null, requestTabId);
 
-        // Clear response displays
         clearResponsePanes(requestTabId, globalResponseElements());
 
         if (authData.authConfig) {
@@ -674,7 +642,6 @@ export async function handleSendRequest() {
             requestConfig.awsAuth = authData.awsAuth;
         }
 
-        // Execute pre-request script if exists
         if (window.currentEndpoint && window.scriptController) {
             try {
                 requestConfig = await window.scriptController.executePreRequest(
@@ -684,11 +651,9 @@ export async function handleSendRequest() {
                 );
             } catch (error) {
                 updateStatusDisplay(`Pre-request script error: ${error.message}`, null);
-                // Continue anyway (non-blocking)
             }
         }
 
-        // Inject cookies from jar before sending
         if (window.cookieController) {
             const cookieHeader = await window.cookieController.getCookieHeader(url);
             if (cookieHeader) {
@@ -703,52 +668,43 @@ export async function handleSendRequest() {
         const result = await window.backendAPI.sendApiRequest(requestConfig);
 
         if (result.success) {
-            // Extract content-type from response headers
             let contentType = null;
             if (result.headers && result.headers['content-type']) {
                 contentType = result.headers['content-type'];
             }
 
-            // Format response based on content type
-            // For text-based formats (HTML, XML, plain text, etc.), use raw string
-            // For JSON and other structured data, use formatted JSON
             let formattedResponse;
+            let languageHint;
             if (typeof result.data === 'string') {
-                // Already a string (HTML, XML, plain text, etc.) - use as-is
                 formattedResponse = result.data;
             } else {
-                // Object or other data type - format as JSON
                 formattedResponse = JSON.stringify(result.data, null, 2);
+                languageHint = 'json';
             }
 
-            displayResponseWithLineNumbersForTab(formattedResponse, contentType, requestTabId);
+            displayResponseWithLineNumbersForTab(formattedResponse, contentType, requestTabId, languageHint);
 
-            // Store response body for schema inference and validate against schema
             if (window.schemaController) {
                 window.schemaController.setLastResponseBody(result.data);
                 const validationResult = window.schemaController.validateResponse(result.data);
                 displaySchemaValidationResult(validationResult, requestTabId);
             }
 
-            // Display headers, cookies, and performance metrics
             displayResponsePanes(requestTabId, globalResponseElements(), {
                 headers: result.headers,
                 timings: result.timings,
                 size: result.size
             });
 
-            // Persist cookies from response into the jar
             if (window.cookieController && result.setCookies && result.setCookies.length > 0) {
                 window.cookieController.handleCookiesFromResponse(result.setCookies, url);
             }
 
-            // Restore UI immediately — status bar and Send button are not gated on storage
             updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
             updateResponseTime(result.ttfb);
             updateResponseSize(result.size);
             setRequestInProgress(false);
 
-            // Persist response data to workspace tab in the background (non-blocking)
             if (window.workspaceTabController && requestTabId) {
                 window.workspaceTabController.service.updateTab(requestTabId, {
                     response: {
@@ -768,13 +724,11 @@ export async function handleSendRequest() {
                 }
             }
 
-            // Add to history in the background — does not need to block the response display
             if (window.historyController) {
                 const _activeEnvName = await window.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
                 window.historyController.addHistoryEntry(requestConfig, result, window.currentEndpoint, _activeEnvName).catch(() => { /* fire-and-forget */ });
             }
 
-            // Execute test script if exists
             if (window.currentEndpoint && window.scriptController) {
                 try {
                     await window.scriptController.executeTest(
@@ -821,7 +775,6 @@ export async function handleSendRequest() {
             errorContent = `Error: ${errorMessage}`;
         }
 
-        // Extract content-type from error headers if available
         let contentType = null;
         if (error.headers && error.headers['content-type']) {
             contentType = error.headers['content-type'];
@@ -829,7 +782,6 @@ export async function handleSendRequest() {
 
         displayResponseWithLineNumbersForTab(errorContent, contentType, requestTabId);
 
-        // Display error response headers, cookies, and performance metrics
         displayErrorResponsePanes(requestTabId, globalResponseElements(), error);
 
         let statusDisplayText = 'Request Failed';
@@ -843,13 +795,11 @@ export async function handleSendRequest() {
             updateResponseSize(error.size);
         }
 
-        // Add error to history in the background
         if (window.historyController) {
             const _activeEnvName = await window.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
             window.historyController.addHistoryEntry(requestConfig, error, window.currentEndpoint, _activeEnvName).catch(() => { /* fire-and-forget */ });
         }
 
-        // Execute test script for error responses as well (e.g. assert 400/401/etc)
         if (window.currentEndpoint && window.scriptController) {
             try {
                 await window.scriptController.executeTest(
@@ -869,7 +819,7 @@ export async function handleSendRequest() {
 
 export async function handleGenerateCurl() {
     if (window.currentEndpoint) {
-        await saveAllRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+        debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
     }
 
     let url = urlInput.value.trim();
@@ -886,7 +836,6 @@ export async function handleGenerateCurl() {
     const builder = getRequestBuilderService();
     builder.mergeAuthData(headers, queryParams, authData);
 
-    // Resolve variables and process all request components
     let processor;
     let resolvedVariables;
     try {
@@ -908,7 +857,6 @@ export async function handleGenerateCurl() {
         try {
             let bodyText = getRequestBodyContent().trim();
 
-            // Reuse the same processor to maintain consistent dynamic variable values
             const variableService = getVariableService();
             let variables = {};
 
