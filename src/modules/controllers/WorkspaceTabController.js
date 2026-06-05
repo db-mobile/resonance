@@ -152,6 +152,22 @@ export class WorkspaceTabController {
                         useTls: false
                     }
                 };
+            } else if (protocol === 'mqtt') {
+                tabOptions.name = tabOptions.name || 'New MQTT';
+                tabOptions.request = {
+                    protocol: 'mqtt',
+                    broker: '',
+                    method: 'MQTT',
+                    clientId: '',
+                    username: '',
+                    password: '',
+                    subscribeTopic: '',
+                    publishTopic: '',
+                    qos: 0,
+                    body: { mode: 'json', content: '' },
+                    authType: 'none',
+                    authConfig: {}
+                };
             }
 
             const newTab = await this.service.createTab(tabOptions);
@@ -304,6 +320,11 @@ export class WorkspaceTabController {
     _cleanupClosedTabUI(tabId) {
         if (this.runnerControllers.has(tabId)) {
             this._cleanupRunnerTab(tabId);
+        }
+        // Tear down any live streaming connection bound to this tab so it stops
+        // receiving (e.g. an MQTT subscription) once the tab is gone.
+        if (window.backendAPI?.mqtt) {
+            window.backendAPI.mqtt.close(tabId);
         }
         this.responseContainerManager.removeContainer(tabId);
     }

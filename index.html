@@ -201,6 +201,14 @@
                         Metadata
                     </button>
                     <button class="tab-button"
+                            data-tab="mqtt"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="mqtt"
+                            data-i18n="tabs.mqtt">
+                        MQTT
+                    </button>
+                    <button class="tab-button"
                             data-tab="scripts"
                             role="tab"
                             aria-selected="false"
@@ -427,6 +435,61 @@
                     <h3>Metadata</h3>
                     <ul id="grpc-metadata-list" class="key-value-list" aria-label="gRPC Metadata"></ul>
                     <button type="button" id="grpc-add-metadata-btn" class="btn-sm btn-secondary">+ Add Metadata</button>
+                </div>
+
+                <div class="tab-content" id="mqtt" role="tabpanel" aria-labelledby="mqtt-tab">
+                    <div class="mqtt-panel-header u-flex u-items-center u-justify-between">
+                        <div class="mqtt-title-group u-flex u-items-center">
+                            <h3 data-i18n="mqtt.title">MQTT</h3>
+                            <span id="mqtt-status-pill" class="mqtt-status-pill" data-state="disconnected" role="status" aria-live="polite">
+                                <span class="mqtt-status-dot" aria-hidden="true"></span>
+                                <span id="mqtt-status-text" data-i18n="mqtt.status_disconnected">Disconnected</span>
+                            </span>
+                        </div>
+                        <button type="button" id="mqtt-disconnect-btn" class="btn-sm btn-danger"
+                                data-i18n="mqtt.disconnect" aria-label="Disconnect from MQTT broker"
+                                style="display: none;">
+                            Disconnect
+                        </button>
+                    </div>
+                    <div class="mqtt-config u-flex u-flex-col">
+                        <div class="mqtt-field">
+                            <label for="mqtt-subscribe-input" data-i18n="mqtt.subscribe_topic">Subscribe Topic</label>
+                            <input type="text" id="mqtt-subscribe-input" class="input-base"
+                                   placeholder="sensors/#" aria-label="MQTT Subscribe Topic">
+                        </div>
+                        <div class="mqtt-field">
+                            <label for="mqtt-topic-input" data-i18n="mqtt.publish_topic">Publish Topic</label>
+                            <input type="text" id="mqtt-topic-input" class="input-base"
+                                   placeholder="sensors/temperature" aria-label="MQTT Publish Topic">
+                        </div>
+                        <div class="mqtt-field">
+                            <label for="mqtt-qos-select" data-i18n="mqtt.qos">QoS</label>
+                            <div class="select-wrapper">
+                                <select id="mqtt-qos-select" class="select-base" aria-label="MQTT QoS Level">
+                                    <option value="0">0 — At most once</option>
+                                    <option value="1">1 — At least once</option>
+                                    <option value="2">2 — Exactly once</option>
+                                </select>
+                                <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                            </div>
+                        </div>
+                        <div class="mqtt-field">
+                            <label for="mqtt-client-id-input" data-i18n="mqtt.client_id">Client ID</label>
+                            <input type="text" id="mqtt-client-id-input" class="input-base"
+                                   placeholder="auto-generated" aria-label="MQTT Client ID">
+                        </div>
+                        <div class="mqtt-field">
+                            <label for="mqtt-username-input" data-i18n="mqtt.username">Username</label>
+                            <input type="text" id="mqtt-username-input" class="input-base"
+                                   placeholder="(optional)" autocomplete="off" aria-label="MQTT Username">
+                        </div>
+                        <div class="mqtt-field">
+                            <label for="mqtt-password-input" data-i18n="mqtt.password">Password</label>
+                            <input type="password" id="mqtt-password-input" class="input-base"
+                                   placeholder="(optional)" autocomplete="off" aria-label="MQTT Password">
+                        </div>
+                    </div>
                 </div>
 
                 <div class="tab-content" id="scripts" role="tabpanel" aria-labelledby="scripts-tab">

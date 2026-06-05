@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "2.9.4"
+version = "2.10.0"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -26,6 +26,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "mul
 tokio = { version = "1", features = ["full"] }
 tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
 futures-util = "0.3"
+# MQTT client (async, rustls to match project TLS stack — no OpenSSL)
+rumqttc = { version = "0.25", default-features = false, features = ["use-rustls"] }
 
 # gRPC client
 tonic = { version = "0.11", default-features = false, features = ["codegen", "prost", "transport", "tls", "tls-roots"] }

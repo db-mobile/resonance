@@ -40,10 +40,11 @@ import { extractCookies } from './cookieParser.js';
 import { getRequestBodyContent } from './requestBodyHelper.js';
 import { MockServerRepository } from './storage/MockServerRepository.js';
 import { MockServerService } from './services/MockServerService.js';
-import { isGrpcMode, isSseMode, isWebSocketMode } from './requestModeManager.js';
+import { isGrpcMode, isMqttMode, isSseMode, isWebSocketMode } from './requestModeManager.js';
 import { handleGrpcSend } from './grpcHandler.js';
 import { handleWebSocketCancel, handleWebSocketSend } from './websocketHandler.js';
 import { handleSseCancel, handleSseConnect } from './sseHandler.js';
+import { handleMqttCancel, handleMqttSend } from './mqttHandler.js';
 import { cancelStream as cancelGrpcStream, hasActiveStream as hasActiveGrpcStream } from './grpcStreamHandler.js';
 import { RequestBuilderService } from './services/RequestBuilderService.js';
 import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes } from './ResponseDisplayHelper.js';
@@ -266,7 +267,7 @@ export function clearResponseDisplayForTab(tabId = null) {
     }
 }
 
-function setRequestInProgress(inProgress) {
+export function setRequestInProgress(inProgress) {
     if (inProgress) {
         sendRequestBtn.style.display = 'none';
         cancelRequestBtn.style.display = 'inline-block';
@@ -287,6 +288,12 @@ export async function handleCancelRequest() {
 
     if (isSseMode()) {
         await handleSseCancel();
+        setRequestInProgress(false);
+        return;
+    }
+
+    if (isMqttMode()) {
+        await handleMqttCancel();
         setRequestInProgress(false);
         return;
     }
@@ -415,6 +422,53 @@ export async function handleSendRequest() {
         setRequestInProgress(true);
         try {
             await handleSseConnect(sseUrl, headers);
+        } finally {
+            setRequestInProgress(false);
+        }
+        return;
+    }
+
+    if (isMqttMode()) {
+        if (window.currentEndpoint) {
+            debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+        }
+
+        const brokerInput = document.getElementById('mqtt-broker-input');
+        let broker = brokerInput?.value?.trim() || urlInput?.value?.trim() || '';
+
+        const builder = getRequestBuilderService();
+        try {
+            const { variables, processor } = await builder.resolveVariables(
+                window.currentEndpoint, {}
+            );
+            const result = builder.processRequestComponents({
+                url: broker,
+                pathParams: {},
+                headers: {},
+                queryParams: {},
+                variables,
+                processor
+            });
+            broker = result.url;
+        } catch (error) {
+            updateStatusDisplay(`Variable processing error: ${error.message}`, null);
+            return;
+        }
+
+        // The MQTT connection persists after Send (pub/sub). Disconnecting is done
+        // via the dedicated Disconnect button in the MQTT panel, not the shared
+        // Send/Stop button — so restore the Send button once the connect returns.
+        setRequestInProgress(true);
+        try {
+            await handleMqttSend(broker, {
+                clientId: document.getElementById('mqtt-client-id-input')?.value?.trim() || '',
+                username: document.getElementById('mqtt-username-input')?.value || '',
+                password: document.getElementById('mqtt-password-input')?.value || '',
+                subscribeTopic: document.getElementById('mqtt-subscribe-input')?.value?.trim() || '',
+                publishTopic: document.getElementById('mqtt-topic-input')?.value?.trim() || '',
+                qos: Number(document.getElementById('mqtt-qos-select')?.value) || 0,
+                payload: getRequestBodyContent() || ''
+            });
         } finally {
             setRequestInProgress(false);
         }

@@ -376,7 +376,8 @@ export class WorkspaceTabBar {
             { label: 'HTTP', protocol: 'http' },
             { label: 'WebSocket', protocol: 'websocket' },
             { label: 'SSE', protocol: 'sse' },
-            { label: 'gRPC', protocol: 'grpc' }
+            { label: 'gRPC', protocol: 'grpc' },
+            { label: 'MQTT', protocol: 'mqtt' }
         ];
 
         protocols.forEach(({ label, protocol }) => {

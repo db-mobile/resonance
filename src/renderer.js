@@ -23,6 +23,7 @@ import { initGrpcUI, setGrpcMetadata, setGrpcTls } from './modules/grpcHandler.j
 import { initRequestModeManager } from './modules/requestModeManager.js';
 import { initWebSocketHandler } from './modules/websocketHandler.js';
 import { initSseHandler } from './modules/sseHandler.js';
+import { initMqttHandler, handleMqttCancel } from './modules/mqttHandler.js';
 import { initGrpcStreamHandler } from './modules/grpcStreamHandler.js';
 import { loadCollections, importOpenApiFile, importPostmanCollection, importPostmanEnvironment, importCurl, initializeBodyTracking } from './modules/collectionManager.js';
 import { ThemeManager, SettingsModal } from './modules/themeManager.js';
@@ -594,6 +595,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     sendRequestBtn.addEventListener('click', handleSendRequest);
     cancelRequestBtn.addEventListener('click', handleCancelRequest);
 
+    const mqttDisconnectBtn = document.getElementById('mqtt-disconnect-btn');
+    if (mqttDisconnectBtn) {
+        mqttDisconnectBtn.addEventListener('click', () => handleMqttCancel());
+    }
+
     // Initialize request mode UI (needed for tab visibility)
     initGrpcUI();
     initRequestModeManager();
@@ -891,6 +897,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Initialize SSE handler
         await initSseHandler();
+
+        // Initialize MQTT handler
+        await initMqttHandler();
 
         // Initialize gRPC streaming handler
         await initGrpcStreamHandler();

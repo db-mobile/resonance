@@ -222,3 +222,10 @@ export const grpcLoadProtoBtn = document.getElementById('grpc-load-proto-btn');
 export const grpcClearProtoBtn = document.getElementById('grpc-clear-proto-btn');
 export const grpcProtoFilename = document.getElementById('grpc-proto-filename');
 export const grpcProtoStatus = document.getElementById('grpc-proto-status');
+
+export const mqttSubscribeInput = document.getElementById('mqtt-subscribe-input');
+export const mqttTopicInput = document.getElementById('mqtt-topic-input');
+export const mqttQosSelect = document.getElementById('mqtt-qos-select');
+export const mqttClientIdInput = document.getElementById('mqtt-client-id-input');
+export const mqttUsernameInput = document.getElementById('mqtt-username-input');
+export const mqttPasswordInput = document.getElementById('mqtt-password-input');

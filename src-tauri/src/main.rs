@@ -31,6 +31,7 @@ use commands::{
         mock_server_clear_logs, mock_server_logs, mock_server_reload_settings, mock_server_start,
         mock_server_status, mock_server_stop,
     },
+    mqtt::{mqtt_close, mqtt_connect, mqtt_publish, MqttState},
     oauth::{
         oauth2_build_authorization_url, oauth2_generate_pkce, oauth2_generate_state,
         oauth2_get_pkce_verifier, oauth2_get_token, oauth2_store_pkce_verifier, OAuth2State,
@@ -66,6 +67,7 @@ fn main() {
         .manage(GrpcStreamingState::default())
         .manage(WebSocketState::default())
         .manage(SseState::default())
+        .manage(MqttState::default())
         .manage(PendingUpdate::default())
         .manage(OAuth2State::default())
         .invoke_handler(tauri::generate_handler![
@@ -128,6 +130,10 @@ fn main() {
             // SSE
             sse_connect,
             sse_close,
+            // MQTT
+            mqtt_connect,
+            mqtt_publish,
+            mqtt_close,
             // OAuth 2.0
             oauth2_generate_pkce,
             oauth2_generate_state,

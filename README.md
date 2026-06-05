@@ -151,6 +151,19 @@ The built application will be in `src-tauri/target/release/bundle/`.
   - Message sending with transcript-style response display
   - Request creation and persistence alongside HTTP and gRPC requests
 
+### MQTT Support
+
+- **Native MQTT Integration**: Connect to MQTT brokers and exchange messages over a persistent backend connection
+  - Plaintext (`mqtt://`, default port 1883) and TLS (`mqtts://`, default port 8883) brokers, plus bare `host:port`
+  - Subscribe to topics (with wildcards like `sensors/#`) and publish messages
+  - QoS level selection (0, 1, 2) for subscriptions and published messages
+  - Retain flag for published messages
+  - Optional client ID (auto-generated when omitted), username, and password authentication
+  - Configurable keep-alive interval
+  - Live connection status indicator with received-message count and incoming-message flash
+  - Transcript-style display of published and received messages with topics and timestamps
+  - Per-tab connection state with request creation and persistence alongside other protocols
+
 ### Server-Sent Events (SSE) Support
 
 - **Native SSE Integration**: Stream `text/event-stream` responses over a persistent backend connection
@@ -243,7 +256,7 @@ The built application will be in `src-tauri/target/release/bundle/`.
 4. **Switch Environments**: Use the environment selector dropdown to quickly switch between different API contexts
 5. **Make Requests**: Select endpoints from the collections sidebar and configure path params, query params, headers, body, auth, and scripts
 6. **Add Scripts (Optional)**: Write pre-request scripts to modify requests dynamically or test scripts to validate responses
-7. **View Responses**: Examine response data in the tabbed viewer (Body, Headers, Cookies, Performance, Scripts for HTTP; Body transcript for WebSocket and SSE; Body, Metadata, Trailers for gRPC)
+7. **View Responses**: Examine response data in the tabbed viewer (Body, Headers, Cookies, Performance, Scripts for HTTP; Body transcript for WebSocket, SSE, and MQTT; Body, Metadata, Trailers for gRPC)
 8. **Export Code**: Generate request code in your preferred language for documentation or automation
 
 ### Environment Management
@@ -736,6 +749,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] gRPC support with server reflection and unary RPC
 - [x] WebSocket support with native backend transport and handshake headers
 - [x] Server-Sent Events (SSE) support with automatic reconnection and Last-Event-ID resumption
+- [x] MQTT support with topic subscribe/publish, QoS levels, retain, and TLS brokers
 - [x] Collection runner for batch request execution with variable chaining
 
 ### Planned
