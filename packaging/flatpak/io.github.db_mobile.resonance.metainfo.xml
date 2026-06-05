@@ -23,6 +23,9 @@
       <li>Generate code snippets in 9 languages: cURL, Python, JavaScript (Fetch), JavaScript (Axios), Node.js, Go, PHP, Ruby, and Java</li>
       <li>GraphQL support with dedicated query editor and syntax highlighting</li>
       <li>gRPC support for exploring and testing gRPC services</li>
+      <li>WebSocket support with persistent connections and handshake headers</li>
+      <li>Server-Sent Events (SSE) support with automatic reconnection</li>
+      <li>MQTT support with topic subscribe/publish, QoS levels, and TLS brokers</li>
       <li>Collection runner for batch request execution with variable chaining between requests</li>
       <li>Built-in mock server for testing without a backend, with custom responses and configurable delays</li>
       <li>Workspace tabs for managing multiple concurrent requests with independent state</li>
@@ -96,6 +99,14 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.10.0" date="2026-06-05">
+      <description>
+        <p>New features introduced</p>
+        <ul>
+          <li>Add support for MQTT</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.9.4" date="2026-06-02">
       <description>
         <p>Improvements</p>
