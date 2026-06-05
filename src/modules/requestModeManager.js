@@ -13,7 +13,8 @@ export const RequestMode = {
     HTTP: 'http',
     WEBSOCKET: 'websocket',
     GRPC: 'grpc',
-    SSE: 'sse'
+    SSE: 'sse',
+    MQTT: 'mqtt'
 };
 
 /**
@@ -39,6 +40,12 @@ const HTTP_AND_WEBSOCKET_TABS = ['query-params', 'headers', 'body'];
  * @type {string[]}
  */
 const SSE_TABS = ['query-params', 'headers'];
+
+/**
+ * Tabs shown in MQTT mode (broker config tab + message payload)
+ * @type {string[]}
+ */
+const MQTT_TABS = ['mqtt', 'body'];
 
 /**
  * gRPC-specific tab IDs that should be hidden in HTTP mode
@@ -91,6 +98,14 @@ export function isSseMode() {
 }
 
 /**
+ * Check if current mode is MQTT
+ * @returns {boolean}
+ */
+export function isMqttMode() {
+    return currentMode === RequestMode.MQTT;
+}
+
+/**
  * Check if current mode is HTTP
  * @returns {boolean}
  */
@@ -106,7 +121,8 @@ export function setRequestMode(mode) {
     if (mode !== RequestMode.HTTP
         && mode !== RequestMode.WEBSOCKET
         && mode !== RequestMode.GRPC
-        && mode !== RequestMode.SSE) {
+        && mode !== RequestMode.SSE
+        && mode !== RequestMode.MQTT) {
         console.warn(`Invalid request mode: ${mode}, defaulting to HTTP`);
         mode = RequestMode.HTTP;
     }
@@ -150,6 +166,7 @@ function updateUIForMode(mode) {
         showGrpcUrlSection(true);
         showWebSocketUrlSection(false);
         showSseUrlSection(false);
+        showMqttUrlSection(false);
         
         // Update tab visibility - show gRPC tabs, hide HTTP-only tabs
         tabButtons.forEach(btn => {
@@ -193,6 +210,7 @@ function updateUIForMode(mode) {
         showGrpcUrlSection(false);
         showWebSocketUrlSection(false);
         showSseUrlSection(true);
+        showMqttUrlSection(false);
 
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
@@ -228,6 +246,7 @@ function updateUIForMode(mode) {
         showGrpcUrlSection(false);
         showWebSocketUrlSection(true);
         showSseUrlSection(false);
+        showMqttUrlSection(false);
 
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
@@ -259,6 +278,49 @@ function updateUIForMode(mode) {
         if (!activeTab || activeTab.style.display === 'none') {
             activateTab('body');
         }
+    } else if (mode === RequestMode.MQTT) {
+        if (methodSelectContainer) {
+            methodSelectContainer.style.display = 'none';
+        }
+        if (urlInputContainer) {
+            urlInputContainer.style.display = 'none';
+        }
+        if (curlBtn) {
+            curlBtn.style.display = 'none';
+        }
+
+        showGrpcUrlSection(false);
+        showWebSocketUrlSection(false);
+        showSseUrlSection(false);
+        showMqttUrlSection(true);
+
+        tabButtons.forEach(btn => {
+            const tabId = btn.dataset.tab;
+            if (MQTT_TABS.includes(tabId)) {
+                btn.style.display = '';
+            } else {
+                btn.style.display = 'none';
+            }
+        });
+
+        if (bodyModeSelect) {
+            bodyModeSelect.value = 'json';
+            bodyModeSelect.disabled = true;
+        }
+        if (bodyModeContainer) {
+            bodyModeContainer.style.display = 'none';
+        }
+        if (window.graphqlBodyManager) {
+            window.graphqlBodyManager.setGraphQLModeEnabled(false);
+        }
+        if (bodyTitle) {
+            bodyTitle.textContent = 'Payload';
+        }
+
+        const activeTab = document.querySelector('.request-config .tab-nav .tab-button.active');
+        if (!activeTab || activeTab.style.display === 'none') {
+            activateTab('mqtt');
+        }
     } else {
         // Show HTTP-specific URL section elements
         if (methodSelectContainer) {
@@ -275,6 +337,7 @@ function updateUIForMode(mode) {
         showGrpcUrlSection(false);
         showWebSocketUrlSection(false);
         showSseUrlSection(false);
+        showMqttUrlSection(false);
         
         // Update tab visibility - show HTTP tabs, hide gRPC-only tabs
         tabButtons.forEach(btn => {
@@ -554,6 +617,84 @@ function syncSseUrlInput() {
 
     if (existingUrlInput && sseUrlInput) {
         sseUrlInput.value = existingUrlInput.value;
+    }
+}
+
+function showMqttUrlSection(show) {
+    let mqttUrlSection = document.getElementById('mqtt-url-section');
+
+    if (show) {
+        if (!mqttUrlSection) {
+            mqttUrlSection = createMqttUrlSection();
+        }
+        if (mqttUrlSection) {
+            syncMqttBrokerInput();
+            mqttUrlSection.style.display = 'flex';
+        }
+    } else if (mqttUrlSection) {
+        mqttUrlSection.style.display = 'none';
+    }
+}
+
+function createMqttUrlSection() {
+    const requestUrlSection = document.querySelector('.request-url-section');
+    if (!requestUrlSection) {
+        return null;
+    }
+
+    const mqttSection = document.createElement('div');
+    mqttSection.id = 'mqtt-url-section';
+    mqttSection.className = 'grpc-url-section';
+    mqttSection.style.display = 'none';
+
+    const badge = document.createElement('span');
+    badge.className = 'protocol-url-badge protocol-url-badge-mqtt';
+    badge.textContent = 'MQTT';
+
+    const targetWrapper = document.createElement('div');
+    targetWrapper.className = 'grpc-target-wrapper';
+
+    const existingUrlInput = document.getElementById('url-input');
+    const brokerInput = document.createElement('input');
+    brokerInput.type = 'text';
+    brokerInput.id = 'mqtt-broker-input';
+    brokerInput.className = 'input-base url-input';
+    brokerInput.placeholder = 'mqtt://localhost:1883';
+    brokerInput.setAttribute('aria-label', 'MQTT Broker URL');
+
+    if (existingUrlInput) {
+        brokerInput.value = existingUrlInput.value;
+        brokerInput.addEventListener('input', () => {
+            existingUrlInput.value = brokerInput.value;
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
+        existingUrlInput.addEventListener('input', () => {
+            brokerInput.value = existingUrlInput.value;
+        });
+    }
+
+    targetWrapper.appendChild(brokerInput);
+    mqttSection.appendChild(badge);
+    mqttSection.appendChild(targetWrapper);
+
+    const methodSelectContainer = document.querySelector('.method-select-container');
+    if (methodSelectContainer) {
+        methodSelectContainer.after(mqttSection);
+    } else {
+        requestUrlSection.prepend(mqttSection);
+    }
+
+    return mqttSection;
+}
+
+function syncMqttBrokerInput() {
+    const existingUrlInput = document.getElementById('url-input');
+    const mqttBrokerInput = document.getElementById('mqtt-broker-input');
+
+    if (existingUrlInput && mqttBrokerInput) {
+        mqttBrokerInput.value = existingUrlInput.value;
     }
 }
 

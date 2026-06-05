@@ -28,7 +28,7 @@ export class WorkspaceTabStateManager {
      * @returns {Promise<Object>}
      */
     async captureCurrentState() {
-        const { isGrpcMode, isWebSocketMode, isSseMode } = await import('./requestModeManager.js');
+        const { isGrpcMode, isWebSocketMode, isSseMode, isMqttMode } = await import('./requestModeManager.js');
         
         if (isGrpcMode()) {
             const grpcRequestJson = window.grpcBodyEditor
@@ -122,6 +122,38 @@ export class WorkspaceTabStateManager {
                           collectionId: window.currentEndpoint.collectionId,
                           endpointId: window.currentEndpoint.endpointId,
                           protocol: 'websocket'
+                      }
+                    : null,
+                activeResponseTab: this._getActiveResponseTab()
+            };
+        }
+
+        if (isMqttMode()) {
+            const mqttBrokerInput = document.getElementById('mqtt-broker-input');
+
+            return {
+                request: {
+                    protocol: 'mqtt',
+                    broker: mqttBrokerInput?.value || this.dom.urlInput?.value || '',
+                    method: 'MQTT',
+                    clientId: document.getElementById('mqtt-client-id-input')?.value || '',
+                    username: document.getElementById('mqtt-username-input')?.value || '',
+                    password: document.getElementById('mqtt-password-input')?.value || '',
+                    subscribeTopic: document.getElementById('mqtt-subscribe-input')?.value || '',
+                    publishTopic: document.getElementById('mqtt-topic-input')?.value || '',
+                    qos: Number(document.getElementById('mqtt-qos-select')?.value) || 0,
+                    body: {
+                        mode: 'json',
+                        content: getRequestBodyContent() || ''
+                    },
+                    authType: 'none',
+                    authConfig: {}
+                },
+                endpoint: window.currentEndpoint
+                    ? {
+                          collectionId: window.currentEndpoint.collectionId,
+                          endpointId: window.currentEndpoint.endpointId,
+                          protocol: 'mqtt'
                       }
                     : null,
                 activeResponseTab: this._getActiveResponseTab()
@@ -391,7 +423,55 @@ export class WorkspaceTabStateManager {
             }
             return;
         }
-        
+
+        if (request.protocol === 'mqtt') {
+            setRequestMode(RequestMode.MQTT);
+
+            if (this.dom.urlInput) {
+                this.dom.urlInput.value = request.broker || '';
+            }
+            const mqttBrokerInput = document.getElementById('mqtt-broker-input');
+            if (mqttBrokerInput) {
+                mqttBrokerInput.value = request.broker || '';
+            }
+
+            const setFieldValue = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.value = value;
+                }
+            };
+            setFieldValue('mqtt-client-id-input', request.clientId || '');
+            setFieldValue('mqtt-username-input', request.username || '');
+            setFieldValue('mqtt-password-input', request.password || '');
+            setFieldValue('mqtt-subscribe-input', request.subscribeTopic || '');
+            setFieldValue('mqtt-topic-input', request.publishTopic || '');
+            setFieldValue('mqtt-qos-select', String(request.qos ?? 0));
+
+            if (this.graphqlBodyManager) {
+                this.graphqlBodyManager.setGraphQLModeEnabled(false);
+            }
+            setRequestBodyContent(request.body?.content || '');
+
+            const activeResponseTab = tab.activeResponseTab || 'response-body';
+            activateTab('response', activeResponseTab);
+
+            if (response) {
+                await this._restoreResponse(response, tab.id);
+            } else {
+                this._clearResponse(tab.id);
+            }
+
+            // Sync the connection indicator (pill + Disconnect button) to this tab's
+            // live MQTT state, so switching tabs reflects the correct connection.
+            import('./mqttHandler.js').then(m => m.refreshMqttConnectionUi(tab.id));
+
+            if (endpoint) {
+                window.currentEndpoint = endpoint;
+            }
+            return;
+        }
+
         // Set UI to HTTP mode
         setRequestMode(RequestMode.HTTP);
 

@@ -59,6 +59,11 @@ if (isTauri) {
             connect: (request) => invoke('sse_connect', { request }),
             close: (tabId) => invoke('sse_close', { tabId })
         },
+        mqtt: {
+            connect: (request) => invoke('mqtt_connect', { request }),
+            publish: (request) => invoke('mqtt_publish', { request }),
+            close: (tabId) => invoke('mqtt_close', { tabId })
+        },
         store: {
             get: (key) => invoke('store_get', { key }),
             set: (key, value) => invoke('store_set', { key, value })

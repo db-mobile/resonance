@@ -177,7 +177,8 @@
     "grpc_metadata": "Metadatos",
     "response_body": "Cuerpo",
     "response_headers": "Encabezados",
-    "schema": "Esquema"
+    "schema": "Esquema",
+    "mqtt": "MQTT"
   },
   "schema": {
     "title": "Esquema de Respuesta",
@@ -426,5 +427,19 @@
     "cookie_domain": "Dominio",
     "cookie_path": "Ruta",
     "no_cookies": "No hay cookies en la respuesta"
+  },
+  "mqtt": {
+    "title": "MQTT",
+    "subscribe_topic": "Tema de suscripción",
+    "publish_topic": "Tema de publicación",
+    "qos": "QoS",
+    "client_id": "ID de cliente",
+    "username": "Usuario",
+    "password": "Contraseña",
+    "disconnect": "Desconectar",
+    "status_disconnected": "Desconectado",
+    "status_connecting": "Conectando…",
+    "status_connected": "Conectado",
+    "status_connected_count": "Conectado · {{count}} recibidos"
   }
 }

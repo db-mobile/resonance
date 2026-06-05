@@ -26,6 +26,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "mul
 tokio = { version = "1", features = ["full"] }
 tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
 futures-util = "0.3"
+# MQTT client (async, rustls to match project TLS stack — no OpenSSL)
+rumqttc = { version = "0.25", default-features = false, features = ["use-rustls"] }
 
 # gRPC client
 tonic = { version = "0.11", default-features = false, features = ["codegen", "prost", "transport", "tls", "tls-roots"] }

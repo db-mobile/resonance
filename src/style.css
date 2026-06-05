@@ -5883,6 +5883,137 @@ code {
   background: var(--accent-blue, #3b82f6);
 }
 
+.protocol-url-badge-mqtt {
+  background: var(--accent-teal, #0d9488);
+}
+
+.mqtt-config {
+  gap: 14px;
+}
+
+.mqtt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mqtt-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.mqtt-field .select-wrapper {
+  max-width: 260px;
+}
+
+.mqtt-panel-header {
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.mqtt-title-group {
+  gap: 12px;
+  min-width: 0;
+}
+
+.mqtt-panel-header h3 {
+  margin: 0;
+}
+
+.mqtt-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.mqtt-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* Disconnected — neutral/grey */
+.mqtt-status-pill[data-state="disconnected"] {
+  background: var(--bg-tertiary, rgba(127, 127, 127, 0.12));
+  color: var(--text-secondary, #6b7280);
+}
+
+/* Connecting — amber, pulsing dot */
+.mqtt-status-pill[data-state="connecting"] {
+  background: rgba(217, 119, 6, 0.14);
+  color: var(--accent-amber, #d97706);
+}
+
+.mqtt-status-pill[data-state="connecting"] .mqtt-status-dot {
+  animation: mqtt-dot-pulse 1s ease-in-out infinite;
+}
+
+/* Connected — green, live pulsing dot */
+.mqtt-status-pill[data-state="connected"] {
+  background: rgba(13, 148, 136, 0.16);
+  color: var(--accent-teal, #0d9488);
+}
+
+.mqtt-status-pill[data-state="connected"] .mqtt-status-dot {
+  animation: mqtt-dot-pulse 1.4s ease-in-out infinite;
+}
+
+/* Brief flash when a new message arrives */
+.mqtt-status-pill.is-receiving {
+  animation: mqtt-pill-flash 0.4s ease-out;
+}
+
+@keyframes mqtt-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+
+@keyframes mqtt-pill-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 8px rgba(13, 148, 136, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mqtt-status-pill[data-state] .mqtt-status-dot,
+  .mqtt-status-pill.is-receiving {
+    animation: none;
+  }
+}
+
+/* Prominent disconnect affordance — a danger tint applied through the shared
+   button token system (ID selector outranks the neutral .btn-danger variant). */
+#mqtt-disconnect-btn {
+  --btn-bg: rgba(220, 38, 38, 0.12);
+  --btn-bg-hover: rgba(220, 38, 38, 0.2);
+  --btn-color: var(--accent-red, #dc2626);
+  --btn-color-hover: var(--accent-red, #dc2626);
+  --btn-border: rgba(220, 38, 38, 0.32);
+  --btn-border-hover: rgba(220, 38, 38, 0.5);
+  font-weight: 600;
+}
+
 .grpc-url-section input[type="text"] {
   flex: 1;
   min-width: 200px;

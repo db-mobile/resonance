@@ -7,6 +7,7 @@ pub mod grpc_reflection;
 pub mod grpc_streaming;
 pub mod import_export;
 pub mod mock_server;
+pub mod mqtt;
 pub mod oauth;
 pub mod proxy;
 pub mod scripts;
