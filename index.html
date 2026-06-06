@@ -452,43 +452,62 @@
                             Disconnect
                         </button>
                     </div>
-                    <div class="mqtt-config u-flex u-flex-col">
-                        <div class="mqtt-field">
-                            <label for="mqtt-subscribe-input" data-i18n="mqtt.subscribe_topic">Subscribe Topic</label>
-                            <input type="text" id="mqtt-subscribe-input" class="input-base"
-                                   placeholder="sensors/#" aria-label="MQTT Subscribe Topic">
-                        </div>
-                        <div class="mqtt-field">
-                            <label for="mqtt-topic-input" data-i18n="mqtt.publish_topic">Publish Topic</label>
-                            <input type="text" id="mqtt-topic-input" class="input-base"
-                                   placeholder="sensors/temperature" aria-label="MQTT Publish Topic">
-                        </div>
-                        <div class="mqtt-field">
-                            <label for="mqtt-qos-select" data-i18n="mqtt.qos">QoS</label>
-                            <div class="select-wrapper">
-                                <select id="mqtt-qos-select" class="select-base" aria-label="MQTT QoS Level">
-                                    <option value="0">0 — At most once</option>
-                                    <option value="1">1 — At least once</option>
-                                    <option value="2">2 — Exactly once</option>
-                                </select>
-                                <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                    <div class="mqtt-cards u-flex u-flex-col">
+                        <article class="grpc-source-card mqtt-card">
+                            <header class="grpc-source-card-header">
+                                <h4 class="grpc-source-card-title" data-i18n="mqtt.section_messaging">Messaging</h4>
+                            </header>
+                            <div class="grpc-source-card-body">
+                                <label class="grpc-field">
+                                    <span class="grpc-field-label" data-i18n="mqtt.subscribe_topic">Subscribe Topic</span>
+                                    <input type="text" id="mqtt-subscribe-input" class="input-base grpc-field-input"
+                                           placeholder="sensors/#" aria-label="MQTT Subscribe Topic">
+                                </label>
+                                <div class="mqtt-field-row">
+                                    <label class="grpc-field mqtt-field-grow">
+                                        <span class="grpc-field-label" data-i18n="mqtt.publish_topic">Publish Topic</span>
+                                        <input type="text" id="mqtt-topic-input" class="input-base grpc-field-input"
+                                               placeholder="sensors/temperature" aria-label="MQTT Publish Topic">
+                                    </label>
+                                    <label class="grpc-field mqtt-field-qos">
+                                        <span class="grpc-field-label" data-i18n="mqtt.qos">QoS</span>
+                                        <div class="select-wrapper">
+                                            <select id="mqtt-qos-select" class="select-base" aria-label="MQTT QoS Level">
+                                                <option value="0">0 — At most once</option>
+                                                <option value="1">1 — At least once</option>
+                                                <option value="2">2 — Exactly once</option>
+                                            </select>
+                                            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                                        </div>
+                                    </label>
+                                </div>
                             </div>
-                        </div>
-                        <div class="mqtt-field">
-                            <label for="mqtt-client-id-input" data-i18n="mqtt.client_id">Client ID</label>
-                            <input type="text" id="mqtt-client-id-input" class="input-base"
-                                   placeholder="auto-generated" aria-label="MQTT Client ID">
-                        </div>
-                        <div class="mqtt-field">
-                            <label for="mqtt-username-input" data-i18n="mqtt.username">Username</label>
-                            <input type="text" id="mqtt-username-input" class="input-base"
-                                   placeholder="(optional)" autocomplete="off" aria-label="MQTT Username">
-                        </div>
-                        <div class="mqtt-field">
-                            <label for="mqtt-password-input" data-i18n="mqtt.password">Password</label>
-                            <input type="password" id="mqtt-password-input" class="input-base"
-                                   placeholder="(optional)" autocomplete="off" aria-label="MQTT Password">
-                        </div>
+                        </article>
+
+                        <article class="grpc-source-card mqtt-card">
+                            <header class="grpc-source-card-header">
+                                <h4 class="grpc-source-card-title" data-i18n="mqtt.section_connection_auth">Connection &amp; Auth</h4>
+                            </header>
+                            <div class="grpc-source-card-body">
+                                <label class="grpc-field">
+                                    <span class="grpc-field-label" data-i18n="mqtt.client_id">Client ID</span>
+                                    <input type="text" id="mqtt-client-id-input" class="input-base grpc-field-input"
+                                           placeholder="auto-generated" aria-label="MQTT Client ID">
+                                </label>
+                                <div class="mqtt-field-row">
+                                    <label class="grpc-field">
+                                        <span class="grpc-field-label" data-i18n="mqtt.username">Username</span>
+                                        <input type="text" id="mqtt-username-input" class="input-base grpc-field-input"
+                                               placeholder="(optional)" autocomplete="off" aria-label="MQTT Username">
+                                    </label>
+                                    <label class="grpc-field">
+                                        <span class="grpc-field-label" data-i18n="mqtt.password">Password</span>
+                                        <input type="password" id="mqtt-password-input" class="input-base grpc-field-input"
+                                               placeholder="(optional)" autocomplete="off" aria-label="MQTT Password">
+                                    </label>
+                                </div>
+                            </div>
+                        </article>
                     </div>
                 </div>
 

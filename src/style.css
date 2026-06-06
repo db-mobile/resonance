@@ -5887,24 +5887,40 @@ code {
   background: var(--accent-teal, #0d9488);
 }
 
-.mqtt-config {
-  gap: 14px;
+/* MQTT config — grouped cards reusing the gRPC card visual language for
+   cross-tab parity. */
+.mqtt-cards {
+  gap: var(--space-4);
 }
 
-.mqtt-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* Two-column field grid (Publish/QoS, Username/Password); collapses to a single
+   column at the same breakpoint the gRPC source cards use. */
+.mqtt-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  align-items: end;
 }
 
-.mqtt-field label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
+@media (max-width: 720px) {
+  .mqtt-field-row {
+    grid-template-columns: 1fr;
+  }
 }
 
-.mqtt-field .select-wrapper {
-  max-width: 260px;
+/* Publish Topic takes the available width; QoS stays compact beside it. */
+.mqtt-field-row:has(.mqtt-field-qos) {
+  grid-template-columns: 1fr minmax(0, 200px);
+}
+
+@media (max-width: 720px) {
+  .mqtt-field-row:has(.mqtt-field-qos) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mqtt-field-qos .select-wrapper {
+  width: 100%;
 }
 
 .mqtt-panel-header {
