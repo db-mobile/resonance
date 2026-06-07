@@ -99,6 +99,14 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.10.1" date="2026-06-07">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Improve stylings</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.10.0" date="2026-06-05">
       <description>
         <p>New features introduced</p>

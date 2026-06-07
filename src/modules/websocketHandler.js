@@ -1,86 +1,26 @@
 import { getRequestBodyContent } from './requestBodyHelper.js';
-import { clearResponseDisplayForTab, displayResponseWithLineNumbersForTab } from './apiHandler.js';
-import { updateResponseSize, updateResponseTime, updateStatusDisplay } from './statusDisplay.js';
+import { clearResponseDisplayForTab } from './apiHandler.js';
+import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
+import {
+    StreamSession,
+    createBackendEventListener,
+    getActiveTabId
+} from './streaming/streamSession.js';
 
-const socketState = new Map();
-let websocketListenerPromise = null;
-
-function getTimestamp() {
-    return new Date().toLocaleTimeString();
-}
-
-async function getActiveTabId() {
-    return window.workspaceTabController
-        ? window.workspaceTabController.service.getActiveTabId()
-        : null;
-}
-
-async function isTabCurrentlyActive(tabId) {
-    if (!tabId || !window.workspaceTabController) {
-        return true;
-    }
-
-    const activeTabId = await window.workspaceTabController.service.getActiveTabId();
-    return activeTabId === tabId;
-}
-
-function getSocketEntry(tabId) {
-    return socketState.get(tabId) || null;
-}
-
-function setSocketEntry(tabId, entry) {
-    socketState.set(tabId, entry);
-}
-
-function removeSocketEntry(tabId) {
-    socketState.delete(tabId);
-}
-
-function buildTranscriptEntry(label, content = '') {
-    const header = `[${getTimestamp()}] ${label}`;
-    return content ? `${header}\n${content}` : header;
-}
-
-async function persistTranscript(tabId, transcript, url, state = 'closed') {
-    if (!window.workspaceTabController || !tabId) {
-        return;
-    }
-
-    const isOpen = state === 'open';
-    await window.workspaceTabController.service.updateTab(tabId, {
-        response: {
-            data: transcript,
-            headers: {},
-            status: isOpen ? 101 : null,
-            statusText: isOpen ? 'Switching Protocols' : '',
-            ttfb: null,
-            size: null,
-            timings: null,
-            cookies: [],
-            websocket: {
-                url,
-                state
-            }
-        }
-    });
-}
-
-async function appendTranscript(tabId, label, content = '', url = '') {
-    const current = getSocketEntry(tabId) || {};
-    const entry = buildTranscriptEntry(label, content);
-    const existing = current.transcript || '';
-    const transcript = existing ? `${existing}\n\n${entry}` : entry;
-    const state = current.state || 'closed';
-
-    setSocketEntry(tabId, {
-        ...current,
-        transcript
-    });
-
-    displayResponseWithLineNumbersForTab(transcript, 'text/plain', tabId);
-    await persistTranscript(tabId, transcript, url || current.url || '', state);
-}
+const session = new StreamSession({
+    buildResponseMeta: (entry, transcript, state) => ({
+        data: transcript,
+        headers: {},
+        status: state === 'open' ? 101 : null,
+        statusText: state === 'open' ? 'Switching Protocols' : '',
+        ttfb: null,
+        size: null,
+        timings: null,
+        cookies: [],
+        websocket: { url: entry.url || '', state }
+    })
+});
 
 function normalizeWebSocketUrl(url) {
     if (!url) {
@@ -98,18 +38,10 @@ function normalizeWebSocketUrl(url) {
     return `ws://${url}`;
 }
 
-async function updateStatusForTab(tabId, text, status = null) {
-    if (await isTabCurrentlyActive(tabId)) {
-        updateStatusDisplay(text, status);
-        updateResponseTime(null);
-        updateResponseSize(null);
-    }
-}
-
 async function handleBackendEvent(event) {
     const payload = event.payload || {};
     const { tabId, url = '' } = payload;
-    const current = getSocketEntry(tabId) || {};
+    const current = session.get(tabId) || {};
 
     if (!tabId) {
         return;
@@ -120,80 +52,63 @@ async function handleBackendEvent(event) {
     }
 
     if (payload.eventType === 'open') {
-        setSocketEntry(tabId, {
+        session.set(tabId, {
             ...current,
             url,
             state: 'open',
             transcript: current.transcript || ''
         });
-        await updateStatusForTab(tabId, 'WebSocket connected', 101);
-        await appendTranscript(tabId, `CONNECTED ${url}`, '', url);
+        await session.updateStatus(tabId, 'WebSocket connected', 101);
+        await session.append(tabId, `CONNECTED ${url}`);
         return;
     }
 
     if (payload.eventType === 'message') {
-        await updateStatusForTab(tabId, 'WebSocket message received', 101);
-        await appendTranscript(tabId, 'RECEIVED', payload.message || '', url);
+        await session.updateStatus(tabId, 'WebSocket message received', 101);
+        await session.append(tabId, 'RECEIVED', payload.message || '');
         return;
     }
 
     if (payload.eventType === 'close') {
-        setSocketEntry(tabId, {
+        session.set(tabId, {
             ...current,
             url,
             state: 'closed',
             transcript: current.transcript || ''
         });
-        await updateStatusForTab(
+        await session.updateStatus(
             tabId,
             `WebSocket closed (${payload.code || 1000})`,
             null
         );
-        await appendTranscript(
+        await session.append(
             tabId,
-            `CLOSED ${payload.code || 1000}${payload.reason ? ` ${payload.reason}` : ''}`,
-            '',
-            url
+            `CLOSED ${payload.code || 1000}${payload.reason ? ` ${payload.reason}` : ''}`
         );
         return;
     }
 
     if (payload.eventType === 'error') {
-        setSocketEntry(tabId, {
+        session.set(tabId, {
             ...current,
             url,
             state: current.state || 'closed',
             transcript: current.transcript || ''
         });
-        await updateStatusForTab(
+        await session.updateStatus(
             tabId,
             `WebSocket error${payload.message ? `: ${payload.message}` : ''}`,
             null
         );
-        await appendTranscript(tabId, 'ERROR', payload.message || 'WebSocket error', url);
+        await session.append(tabId, 'ERROR', payload.message || 'WebSocket error');
     }
 }
 
-export async function initWebSocketHandler() {
-    if (websocketListenerPromise) {
-        return websocketListenerPromise;
-    }
-
-    websocketListenerPromise = (async () => {
-        if (!('__TAURI_INTERNALS__' in window) || !window.backendAPI?.websocket) {
-            return;
-        }
-
-        const { invoke, transformCallback } = window.__TAURI_INTERNALS__;
-        await invoke('plugin:event|listen', {
-            event: 'websocket-event',
-            target: { kind: 'Any' },
-            handler: transformCallback(handleBackendEvent)
-        });
-    })();
-
-    return websocketListenerPromise;
-}
+export const initWebSocketHandler = createBackendEventListener(
+    'websocket-event',
+    () => !!window.backendAPI?.websocket,
+    handleBackendEvent
+);
 
 export async function handleWebSocketSend(url, headers = {}) {
     await initWebSocketHandler();
@@ -211,9 +126,9 @@ export async function handleWebSocketSend(url, headers = {}) {
         return;
     }
 
-    const current = getSocketEntry(tabId);
+    const current = session.get(tabId);
     if (!current || current.url !== normalizedUrl) {
-        setSocketEntry(tabId, {
+        session.set(tabId, {
             url: normalizedUrl,
             state: 'connecting',
             transcript: ''
@@ -236,15 +151,15 @@ export async function handleWebSocketSend(url, headers = {}) {
     }
 
     if (message) {
-        const currentState = getSocketEntry(tabId) || {};
-        setSocketEntry(tabId, {
+        const currentState = session.get(tabId) || {};
+        session.set(tabId, {
             ...currentState,
             url: normalizedUrl
         });
-        await appendTranscript(tabId, 'SENT', message, normalizedUrl);
-        await updateStatusForTab(tabId, 'WebSocket message sent', 101);
+        await session.append(tabId, 'SENT', message);
+        await session.updateStatus(tabId, 'WebSocket message sent', 101);
     } else {
-        await updateStatusForTab(tabId, 'WebSocket connecting...', null);
+        await session.updateStatus(tabId, 'WebSocket connecting...', null);
     }
 }
 
@@ -264,5 +179,5 @@ export async function clearWebSocketState(tabId) {
     if (window.backendAPI?.websocket && tabId) {
         await window.backendAPI.websocket.close(tabId);
     }
-    removeSocketEntry(tabId);
+    session.remove(tabId);
 }

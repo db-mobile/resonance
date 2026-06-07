@@ -1,62 +1,13 @@
 import { displayResponseWithLineNumbersForTab } from './apiHandler.js';
-import { updateResponseSize, updateResponseTime, updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
+import {
+    StreamSession,
+    createBackendEventListener,
+    getActiveTabId
+} from './streaming/streamSession.js';
 
-const streamState = new Map();
-let listenerPromise = null;
-
-function getTimestamp() {
-    return new Date().toLocaleTimeString();
-}
-
-async function getActiveTabId() {
-    return window.workspaceTabController
-        ? window.workspaceTabController.service.getActiveTabId()
-        : null;
-}
-
-async function isTabCurrentlyActive(tabId) {
-    if (!tabId || !window.workspaceTabController) {
-        return true;
-    }
-    const activeTabId = await window.workspaceTabController.service.getActiveTabId();
-    return activeTabId === tabId;
-}
-
-function getEntry(tabId) {
-    return streamState.get(tabId) || null;
-}
-
-function setEntry(tabId, entry) {
-    streamState.set(tabId, entry);
-}
-
-function removeEntry(tabId) {
-    streamState.delete(tabId);
-}
-
-function buildTranscriptEntry(label, content = '') {
-    const header = `[${getTimestamp()}] ${label}`;
-    return content ? `${header}\n${content}` : header;
-}
-
-async function updateStatusForTab(tabId, text) {
-    if (await isTabCurrentlyActive(tabId)) {
-        updateStatusDisplay(text, null);
-        updateResponseTime(null);
-        updateResponseSize(null);
-    }
-}
-
-async function appendTranscript(tabId, label, content = '') {
-    const current = getEntry(tabId) || {};
-    const entry = buildTranscriptEntry(label, content);
-    const existing = current.transcript || '';
-    const transcript = existing ? `${existing}\n\n${entry}` : entry;
-
-    setEntry(tabId, { ...current, transcript });
-    displayResponseWithLineNumbersForTab(transcript, 'text/plain', tabId);
-}
+// gRPC streaming does not persist its transcript onto the tab (no buildResponseMeta).
+const session = new StreamSession();
 
 function formatMessage(message) {
     if (message === null || message === undefined) {
@@ -78,29 +29,29 @@ async function handleBackendEvent(event) {
     if (!tabId) {
         return;
     }
-    const current = getEntry(tabId) || {};
+    const current = session.get(tabId) || {};
 
     if (eventType === 'open') {
-        setEntry(tabId, {
+        session.set(tabId, {
             ...current,
             fullMethod,
             state: 'open',
             transcript: current.transcript || ''
         });
-        await updateStatusForTab(tabId, 'gRPC stream open');
-        await appendTranscript(tabId, `OPEN ${fullMethod}`);
+        await session.updateStatus(tabId, 'gRPC stream open');
+        await session.append(tabId, `OPEN ${fullMethod}`);
         return;
     }
 
     if (eventType === 'message') {
-        await updateStatusForTab(tabId, 'gRPC message received');
-        await appendTranscript(tabId, 'RECEIVED', formatMessage(payload.message));
+        await session.updateStatus(tabId, 'gRPC message received');
+        await session.append(tabId, 'RECEIVED', formatMessage(payload.message));
         return;
     }
 
     if (eventType === 'error') {
-        await updateStatusForTab(tabId, `gRPC error: ${payload.statusMessage || 'unknown'}`);
-        await appendTranscript(
+        await session.updateStatus(tabId, `gRPC error: ${payload.statusMessage || 'unknown'}`);
+        await session.append(
             tabId,
             `ERROR ${payload.status ?? ''}`,
             payload.statusMessage || ''
@@ -109,18 +60,18 @@ async function handleBackendEvent(event) {
     }
 
     if (eventType === 'close') {
-        setEntry(tabId, {
+        session.set(tabId, {
             ...current,
             fullMethod,
             state: 'closed',
             transcript: current.transcript || ''
         });
         const trailerStr = payload.trailers ? `\n${JSON.stringify(payload.trailers, null, 2)}` : '';
-        await updateStatusForTab(
+        await session.updateStatus(
             tabId,
             `gRPC stream closed (${payload.statusMessage || payload.status || 'OK'})`
         );
-        await appendTranscript(
+        await session.append(
             tabId,
             `CLOSED ${payload.status ?? 0} ${payload.statusMessage || ''}`.trim(),
             trailerStr.trim()
@@ -128,33 +79,19 @@ async function handleBackendEvent(event) {
     }
 }
 
-export async function initGrpcStreamHandler() {
-    if (listenerPromise) {
-        return listenerPromise;
-    }
-
-    listenerPromise = (async () => {
-        if (!('__TAURI_INTERNALS__' in window) || !window.backendAPI?.grpc?.streamStart) {
-            return;
-        }
-        const { invoke, transformCallback } = window.__TAURI_INTERNALS__;
-        await invoke('plugin:event|listen', {
-            event: 'grpc-stream-event',
-            target: { kind: 'Any' },
-            handler: transformCallback(handleBackendEvent)
-        });
-    })();
-
-    return listenerPromise;
-}
+export const initGrpcStreamHandler = createBackendEventListener(
+    'grpc-stream-event',
+    () => !!window.backendAPI?.grpc?.streamStart,
+    handleBackendEvent
+);
 
 export function hasActiveStream(tabId) {
-    const entry = getEntry(tabId);
+    const entry = session.get(tabId);
     return !!(entry && entry.state === 'open');
 }
 
 export function getStreamMethod(tabId) {
-    const entry = getEntry(tabId);
+    const entry = session.get(tabId);
     return entry?.fullMethod || null;
 }
 
@@ -177,7 +114,7 @@ export async function startOrSend(opts) {
         return;
     }
 
-    const current = getEntry(tabId);
+    const current = session.get(tabId);
     const sameMethod = current?.fullMethod === opts.fullMethod;
 
     // If a stream that accepts client messages is already open on the same
@@ -185,8 +122,8 @@ export async function startOrSend(opts) {
     if (opts.canSend && current?.state === 'open' && sameMethod) {
         try {
             await window.backendAPI.grpc.streamSend(tabId, opts.requestJson);
-            await appendTranscript(tabId, 'SENT', formatMessage(opts.requestJson));
-            await updateStatusForTab(tabId, 'gRPC message sent');
+            await session.append(tabId, 'SENT', formatMessage(opts.requestJson));
+            await session.updateStatus(tabId, 'gRPC message sent');
         } catch (error) {
             toast.error(`gRPC send error: ${error.message || String(error)}`);
         }
@@ -194,7 +131,7 @@ export async function startOrSend(opts) {
     }
 
     // Otherwise, start a fresh stream (this closes any previous stream for the tab)
-    setEntry(tabId, {
+    session.set(tabId, {
         fullMethod: opts.fullMethod,
         state: 'connecting',
         transcript: ''
@@ -212,14 +149,14 @@ export async function startOrSend(opts) {
             protoPath: opts.protoPath || null
         });
         if (opts.canSend && opts.requestJson !== undefined && opts.requestJson !== null) {
-            await appendTranscript(tabId, 'SENT', formatMessage(opts.requestJson));
+            await session.append(tabId, 'SENT', formatMessage(opts.requestJson));
         }
     } catch (error) {
-        removeEntry(tabId);
+        session.remove(tabId);
         const msg = error.message || String(error);
         toast.error(`gRPC stream error: ${msg}`);
-        await appendTranscript(tabId, 'ERROR', msg);
-        await updateStatusForTab(tabId, `gRPC stream error: ${msg}`);
+        await session.append(tabId, 'ERROR', msg);
+        await session.updateStatus(tabId, `gRPC stream error: ${msg}`);
     }
 }
 
@@ -244,5 +181,5 @@ export async function clearStreamState(tabId) {
             // ignore
         }
     }
-    removeEntry(tabId);
+    session.remove(tabId);
 }
