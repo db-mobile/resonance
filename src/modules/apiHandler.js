@@ -277,6 +277,7 @@ export function setRequestInProgress(inProgress) {
         cancelRequestBtn.style.display = 'none';
         sendRequestBtn.disabled = false;
     }
+    window.statusBar?.setRequestRunning(inProgress);
 }
 
 export async function handleCancelRequest() {

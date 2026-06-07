@@ -4186,6 +4186,34 @@ code {
   flex-shrink: 0;
 }
 
+.status-bar-request {
+  color: var(--color-primary);
+}
+
+.status-bar-request[hidden] {
+  display: none;
+}
+
+.status-bar-request-spinner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--color-primary);
+  border-top-color: transparent;
+  flex-shrink: 0;
+  animation: status-bar-spin 0.7s linear infinite;
+}
+
+#status-bar-request-time {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes status-bar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   :root {

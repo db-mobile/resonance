@@ -104,6 +104,7 @@
         <p>Feature stabilization release</p>
         <ul>
           <li>Improve stylings</li>
+          <li>Elapsed-time indicator</li>
         </ul>
       </description>
     </release>
