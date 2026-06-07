@@ -4,8 +4,11 @@
  */
 
 import { templateLoader } from '../templateLoader.js';
-import { ScriptEditor } from '../scriptEditor.bundle.js';
-import { JSONEditor } from '../jsonEditor.bundle.js';
+import { RunnerResultsPanel } from './runner/RunnerResultsPanel.js';
+import { RequestEditorModal } from './runner/RequestEditorModal.js';
+import { CollectionPalette } from './runner/CollectionPalette.js';
+import { RequestQueue } from './runner/RequestQueue.js';
+import { RunnerSelectorMenu } from './runner/RunnerSelectorMenu.js';
 
 /**
  * UI component for the Collection Runner panel
@@ -22,19 +25,30 @@ export class RunnerPanel {
      */
     constructor(container) {
         this.container = container;
-        this.collections = [];
-        this.selectedRequests = [];
-        this.selectedRequestIndex = -1;
-        this.results = null;
-        this.isShowingResults = false;
-        this.resultsData = [];
-        this.selectedResultIndex = -1;
 
-        // Request editor modal state
-        this.scriptModal = null;
-        this.scriptEditor = null;
-        this.bodyEditor = null;
-        this.editingRequestIndex = -1;
+        // Collection source tree (left) and the selected-requests queue (right)
+        this.palette = new CollectionPalette({
+            onAddEndpoint: (collection, endpoint) => this.queue.addRequest(collection, endpoint)
+        });
+        this.queue = new RequestQueue({
+            onChange: () => this._notifyRequestsChange(),
+            onCountChange: () => this._updateRequestCount(),
+            onEditRequest: (index) => this._openScriptModal(index),
+            onResolveEndpointDefaults: (collectionId, endpointId) =>
+                this.onResolveEndpointDefaults?.(collectionId, endpointId)
+        });
+
+        // Saved-runner dropdown — owns the active-runner id
+        this.menu = new RunnerSelectorMenu({
+            onLoadRunners: () => this.onLoadRunners?.(),
+            onSelect: (runnerId) => this.onRunnerSelect?.(runnerId)
+        });
+
+        // Results panel (list, detail view, resizer) — owns its own state
+        this.resultsView = new RunnerResultsPanel(container);
+
+        // Per-request editor modal (params/headers/body/script) — owns its own DOM
+        this.editorModal = new RequestEditorModal();
 
         // Resolves an endpoint's saved config to seed per-request overrides
         this.onResolveEndpointDefaults = null;
@@ -49,14 +63,20 @@ export class RunnerPanel {
 
         // DOM references
         this.dom = {};
-        this.resultsDom = {};
-        this.resultsPanel = null;
-        this.resultsResizer = null;
+    }
 
-        // Resizer state
-        this._isResizingResults = false;
-        this._resizeStartY = 0;
-        this._resizeStartHeight = 0;
+    /**
+     * The id of the currently loaded saved runner (null when unsaved/new).
+     * Backed by the selector menu, which uses it to highlight the active entry.
+     *
+     * @type {string|null}
+     */
+    get currentRunnerId() {
+        return this.menu.currentRunnerId;
+    }
+
+    set currentRunnerId(runnerId) {
+        this.menu.currentRunnerId = runnerId;
     }
 
     /**
@@ -65,8 +85,6 @@ export class RunnerPanel {
      * @param {Array<Object>} collections - Available collections
      */
     render(collections) {
-        this.collections = collections;
-
         try {
             const fragment = templateLoader.cloneSync(
                 './src/templates/runner/runnerPanel.html',
@@ -78,8 +96,9 @@ export class RunnerPanel {
 
             this._cacheElements();
             this._attachEventListeners();
-            this._renderCollectionTree();
-            this._updateRequestCount();
+            this.menu.mount(this.container);
+            this.palette.render(this.dom.collectionTree, collections);
+            this.queue.mount(this.dom.requestsList);
         } catch (error) {
             console.error('[RunnerPanel] Error rendering:', error);
         }
@@ -97,9 +116,6 @@ export class RunnerPanel {
     _cacheElements() {
         this.dom = {
             nameInput: this.container.querySelector('[data-role="runner-name"]'),
-            runnerSelector: this.container.querySelector('[data-role="runner-selector"]'),
-            runnerDropdown: this.container.querySelector('[data-role="runner-dropdown"]'),
-            runnerList: this.container.querySelector('[data-role="runner-list"]'),
             collectionTree: this.container.querySelector('[data-role="collection-tree"]'),
             requestsList: this.container.querySelector('[data-role="requests-list"]'),
             requestCount: this.container.querySelector('[data-role="request-count"]'),
@@ -116,15 +132,9 @@ export class RunnerPanel {
      * @private
      */
     _attachEventListeners() {
-        // Header actions - Runner selector dropdown
-        this.container.querySelector('[data-action="toggle-dropdown"]')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this._toggleDropdown();
-        });
-
         // New runner button
         this.container.querySelector('[data-action="new-runner"]')?.addEventListener('click', () => {
-            this._handleNewRunner();
+            this.startNewRunner();
         });
 
         // Save runner button
@@ -137,16 +147,9 @@ export class RunnerPanel {
             this._handleDelete();
         });
 
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!this.dom.runnerSelector?.contains(e.target) && !this.dom.runnerDropdown?.contains(e.target)) {
-                this._closeDropdown();
-            }
-        });
-
         // Clear all button
         this.container.querySelector('[data-action="clear-all"]')?.addEventListener('click', () => {
-            this._clearAllRequests();
+            this.queue.clearAll();
         });
 
         // Run/Stop buttons
@@ -160,693 +163,39 @@ export class RunnerPanel {
     }
 
     /**
-     * Renders the collection tree in the left panel
-     *
-     * @private
-     */
-    _renderCollectionTree() {
-        if (!this.dom.collectionTree) {return;}
-
-        if (!this.collections || this.collections.length === 0) {
-            this.dom.collectionTree.innerHTML = `
-                <div class="empty-state-base runner-empty-state">
-                    <span class="icon icon-20 icon-spark"></span>
-                    <p>No collections available</p>
-                </div>
-            `;
-            return;
-        }
-
-        this.dom.collectionTree.innerHTML = '';
-
-        this.collections.forEach(collection => {
-            // Skip collections with no HTTP endpoints
-            const endpoints = this._getAllEndpoints(collection);
-            if (endpoints.length === 0) {return;}
-
-            const collectionEl = this._createCollectionElement(collection);
-            this.dom.collectionTree.appendChild(collectionEl);
-        });
-    }
-
-    /**
-     * Creates a collection element for the tree
-     *
-     * @private
-     * @param {Object} collection - Collection object
-     * @returns {HTMLElement} Collection element
-     */
-    _createCollectionElement(collection) {
-        const fragment = templateLoader.cloneSync(
-            './src/templates/runner/runnerPanel.html',
-            'tpl-runner-collection-item'
-        );
-
-        const el = fragment.firstElementChild;
-        el.dataset.collectionId = collection.id;
-
-        const nameEl = el.querySelector('[data-role="collection-name"]');
-        if (nameEl) {nameEl.textContent = collection.name;}
-
-        const headerEl = el.querySelector('[data-role="collection-header"]');
-        const endpointsContainer = el.querySelector('[data-role="endpoints-container"]');
-
-        // Toggle expansion
-        headerEl?.addEventListener('click', () => {
-            el.classList.toggle('is-expanded');
-            endpointsContainer?.classList.toggle('is-hidden');
-        });
-
-        // Render endpoints
-        if (endpointsContainer) {
-            const endpoints = this._getAllEndpoints(collection);
-            endpoints.forEach(endpoint => {
-                const endpointEl = this._createEndpointElement(collection, endpoint);
-                endpointsContainer.appendChild(endpointEl);
-            });
-        }
-
-        return el;
-    }
-
-    /**
-     * Gets all HTTP endpoints from a collection (including folders), excluding gRPC
-     *
-     * @private
-     * @param {Object} collection - Collection object
-     * @returns {Array<Object>} Array of HTTP endpoints
-     */
-    _getAllEndpoints(collection) {
-        const endpoints = [];
-
-        const isHttp = e => e.protocol !== 'grpc' && e.protocol !== 'websocket';
-
-        if (collection.endpoints) {
-            endpoints.push(...collection.endpoints.filter(isHttp));
-        }
-
-        if (collection.folders) {
-            collection.folders.forEach(folder => {
-                if (folder.endpoints) {
-                    endpoints.push(...folder.endpoints.filter(isHttp));
-                }
-            });
-        }
-
-        return endpoints;
-    }
-
-    /**
-     * Creates an endpoint element for the tree
-     *
-     * @private
-     * @param {Object} collection - Parent collection
-     * @param {Object} endpoint - Endpoint object
-     * @returns {HTMLElement} Endpoint element
-     */
-    _createEndpointElement(collection, endpoint) {
-        const fragment = templateLoader.cloneSync(
-            './src/templates/runner/runnerPanel.html',
-            'tpl-runner-endpoint-item'
-        );
-
-        const el = fragment.firstElementChild;
-        el.dataset.collectionId = collection.id;
-        el.dataset.endpointId = endpoint.id;
-
-        const methodEl = el.querySelector('[data-role="method"]');
-        if (methodEl) {
-            methodEl.textContent = endpoint.method;
-            methodEl.dataset.method = endpoint.method;
-        }
-
-        const nameEl = el.querySelector('[data-role="name"]');
-        if (nameEl) {
-            nameEl.textContent = endpoint.name || endpoint.path;
-        }
-
-        // Add button click
-        const addBtn = el.querySelector('[data-action="add"]');
-        addBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this._addRequest(collection, endpoint);
-        });
-
-        // Click on item also adds
-        el.addEventListener('click', () => {
-            this._addRequest(collection, endpoint);
-        });
-
-        return el;
-    }
-
-    /**
-     * Adds a request to the selected list
-     *
-     * Seeds per-request overrides (path/query params, headers, body) from the
-     * collection's saved config so the request editor opens pre-filled.
-     *
-     * @private
-     * @async
-     * @param {Object} collection - Collection object
-     * @param {Object} endpoint - Endpoint object
-     */
-    async _addRequest(collection, endpoint) {
-        const request = {
-            collectionId: collection.id,
-            endpointId: endpoint.id,
-            name: endpoint.name || endpoint.path,
-            method: endpoint.method,
-            path: endpoint.path,
-            postResponseScript: '',
-            overrides: await this._resolveOverrides(collection.id, endpoint.id)
-        };
-
-        this.selectedRequests.push(request);
-        this._renderRequestsList();
-        this._updateRequestCount();
-        this._notifyRequestsChange();
-    }
-
-    /**
-     * Resolves the initial overrides for a request from the collection's saved config
-     *
-     * @private
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @returns {Promise<Object>} Overrides object
-     */
-    async _resolveOverrides(collectionId, endpointId) {
-        const empty = { pathParams: [], queryParams: [], headers: [], body: '' };
-
-        if (!this.onResolveEndpointDefaults) {
-            return empty;
-        }
-
-        try {
-            const config = await this.onResolveEndpointDefaults(collectionId, endpointId);
-            return {
-                pathParams: (config?.pathParams || []).map(p => ({ key: p.key, value: p.value })),
-                queryParams: (config?.queryParams || []).map(p => ({ key: p.key, value: p.value })),
-                headers: (config?.headers || []).map(p => ({ key: p.key, value: p.value })),
-                body: config?.body || ''
-            };
-        } catch (error) {
-            console.error('[RunnerPanel] Error resolving endpoint defaults:', error);
-            return empty;
-        }
-    }
-
-    /**
-     * Renders the selected requests list
-     *
-     * @private
-     */
-    _renderRequestsList() {
-        if (!this.dom.requestsList) {return;}
-
-        if (this.selectedRequests.length === 0) {
-            this.dom.requestsList.innerHTML = `
-                <div class="empty-state-base runner-empty-state">
-                    <span class="icon icon-20 icon-plus"></span>
-                    <p>Click requests from the left panel to add them</p>
-                </div>
-            `;
-            return;
-        }
-
-        this.dom.requestsList.innerHTML = '';
-
-        this.selectedRequests.forEach((request, index) => {
-            const el = this._createRequestItem(request, index);
-            this.dom.requestsList.appendChild(el);
-        });
-
-        this._setupDragAndDrop();
-    }
-
-    /**
-     * Creates a request item element
-     *
-     * @private
-     * @param {Object} request - Request object
-     * @param {number} index - Request index
-     * @returns {HTMLElement} Request item element
-     */
-    _createRequestItem(request, index) {
-        const fragment = templateLoader.cloneSync(
-            './src/templates/runner/runnerPanel.html',
-            'tpl-runner-request-item'
-        );
-
-        const el = fragment.firstElementChild;
-        el.dataset.index = index;
-
-        if (index === this.selectedRequestIndex) {
-            el.classList.add('is-selected');
-        }
-
-        const methodEl = el.querySelector('[data-role="method"]');
-        if (methodEl) {
-            methodEl.textContent = request.method;
-            methodEl.dataset.method = request.method;
-        }
-
-        const nameEl = el.querySelector('[data-role="name"]');
-        if (nameEl) {
-            nameEl.textContent = request.name;
-        }
-
-        // Edit script button
-        el.querySelector('[data-action="edit-script"]')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this._selectRequest(index);
-        });
-
-        // Remove button
-        el.querySelector('[data-action="remove"]')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this._removeRequest(index);
-        });
-
-        // Click to select
-        el.addEventListener('click', () => {
-            this._selectRequest(index);
-        });
-
-        return el;
-    }
-
-    /**
-     * Sets up drag and drop for request reordering
-     *
-     * @private
-     */
-    _setupDragAndDrop() {
-        const items = this.dom.requestsList.querySelectorAll('.runner-request-item');
-
-        items.forEach(item => {
-            item.addEventListener('dragstart', (e) => {
-                item.classList.add('is-dragging');
-                e.dataTransfer.setData('text/plain', item.dataset.index);
-            });
-
-            item.addEventListener('dragend', () => {
-                item.classList.remove('is-dragging');
-            });
-
-            item.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                const dragging = this.dom.requestsList.querySelector('.is-dragging');
-                if (dragging && dragging !== item) {
-                    const rect = item.getBoundingClientRect();
-                    const midY = rect.top + rect.height / 2;
-                    if (e.clientY < midY) {
-                        item.parentNode.insertBefore(dragging, item);
-                    } else {
-                        item.parentNode.insertBefore(dragging, item.nextSibling);
-                    }
-                }
-            });
-
-            item.addEventListener('drop', (e) => {
-                e.preventDefault();
-                this._reorderFromDOM();
-            });
-        });
-    }
-
-    /**
-     * Reorders requests based on current DOM order
-     *
-     * @private
-     */
-    _reorderFromDOM() {
-        const items = this.dom.requestsList.querySelectorAll('.runner-request-item');
-        const newOrder = [];
-
-        items.forEach(item => {
-            const index = parseInt(item.dataset.index, 10);
-            newOrder.push(this.selectedRequests[index]);
-        });
-
-        this.selectedRequests = newOrder;
-        this._renderRequestsList();
-        this._notifyRequestsChange();
-    }
-
-    /**
-     * Selects a request for script editing (opens modal)
-     *
-     * @private
-     * @param {number} index - Request index
-     */
-    _selectRequest(index) {
-        this.selectedRequestIndex = index;
-        this._renderRequestsList();
-        this._openScriptModal(index);
-    }
-
-    /**
-     * Ensures a request has a complete overrides object (back-compat for older runners)
-     *
-     * @private
-     * @param {Object} request - Request object
-     * @returns {Object} The request's overrides object
-     */
-    _ensureOverrides(request) {
-        if (!request.overrides) {
-            request.overrides = { pathParams: [], queryParams: [], headers: [], body: '' };
-        }
-        const o = request.overrides;
-        o.pathParams = o.pathParams || [];
-        o.queryParams = o.queryParams || [];
-        o.headers = o.headers || [];
-        o.body = o.body || '';
-        return o;
-    }
-
-    /**
-     * Opens the per-request editor modal (params, headers, body, script)
+     * Opens the per-request editor modal (params, headers, body, script) for the
+     * request at the given index, persisting edits back onto it on save.
      *
      * @private
      * @param {number} index - Request index
      */
     _openScriptModal(index) {
-        if (index < 0 || index >= this.selectedRequests.length) {
+        const requests = this.queue.getRequests();
+        if (index < 0 || index >= requests.length) {
             return;
         }
 
-        const request = this.selectedRequests[index];
-        const overrides = this._ensureOverrides(request);
-        this.editingRequestIndex = index;
-
-        // Create modal from template
-        const fragment = templateLoader.cloneSync(
-            './src/templates/runner/runnerPanel.html',
-            'tpl-runner-script-modal'
-        );
-
-        this.scriptModal = fragment.firstElementChild;
-        document.body.appendChild(this.scriptModal);
-
-        // Set request info
-        const methodEl = this.scriptModal.querySelector('[data-role="script-method"]');
-        const pathEl = this.scriptModal.querySelector('[data-role="script-path"]');
-        if (methodEl) {
-            methodEl.textContent = request.method;
-            methodEl.dataset.method = request.method;
-        }
-        if (pathEl) {
-            pathEl.textContent = request.path;
-        }
-
-        // Populate key-value lists from overrides
-        this._renderKvList(this.scriptModal.querySelector('[data-role="path-params-list"]'), overrides.pathParams);
-        this._renderKvList(this.scriptModal.querySelector('[data-role="query-params-list"]'), overrides.queryParams);
-        this._renderKvList(this.scriptModal.querySelector('[data-role="headers-list"]'), overrides.headers);
-
-        // Initialize body editor (CodeMirror JSON)
-        const bodyContainer = this.scriptModal.querySelector('[data-role="override-body-container"]');
-        if (bodyContainer) {
-            this.bodyEditor = new JSONEditor(bodyContainer);
-            this.bodyEditor.setContent(overrides.body || '');
-        }
-
-        // Initialize ScriptEditor (CodeMirror-based)
-        const editorContainer = this.scriptModal.querySelector('[data-role="script-editor-container"]');
-        if (editorContainer) {
-            this.scriptEditor = new ScriptEditor(editorContainer);
-            this.scriptEditor.setContent(request.postResponseScript || '');
-        }
-
-        // Attach modal event listeners
-        this._attachModalEventListeners();
-
-        // Update i18n if available (sets tab labels and input placeholders)
-        if (window.i18n && window.i18n.updateUI) {
-            window.i18n.updateUI(this.scriptModal);
-        }
-    }
-
-    /**
-     * Renders editable key-value rows into a container
-     *
-     * @private
-     * @param {HTMLElement} container - Target container
-     * @param {Array<Object>} rows - Array of {key, value} objects
-     */
-    _renderKvList(container, rows) {
-        if (!container) {return;}
-        container.innerHTML = '';
-        (rows || []).forEach(row => this._addKvRow(container, row.key, row.value));
-    }
-
-    /**
-     * Appends a single editable key-value row to a container
-     *
-     * @private
-     * @param {HTMLElement} container - Target container
-     * @param {string} [key] - Initial key
-     * @param {string} [value] - Initial value
-     */
-    _addKvRow(container, key = '', value = '') {
-        if (!container) {return;}
-
-        const fragment = templateLoader.cloneSync(
-            './src/templates/runner/runnerPanel.html',
-            'tpl-runner-kv-row'
-        );
-        const row = fragment.firstElementChild;
-
-        const keyInput = row.querySelector('[data-role="kv-key"]');
-        const valueInput = row.querySelector('[data-role="kv-value"]');
-        if (keyInput) {
-            keyInput.value = key;
-            keyInput.placeholder = window.i18n?.t('runner.key') || 'Key';
-        }
-        if (valueInput) {
-            valueInput.value = value;
-            valueInput.placeholder = window.i18n?.t('runner.value') || 'Value';
-        }
-
-        row.querySelector('[data-action="remove-kv"]')?.addEventListener('click', () => {
-            row.remove();
-        });
-
-        container.appendChild(row);
-    }
-
-    /**
-     * Collects {key, value} rows from a key-value list, skipping rows with empty keys
-     *
-     * @private
-     * @param {HTMLElement} container - Source container
-     * @returns {Array<Object>} Array of {key, value}
-     */
-    _collectKvList(container) {
-        if (!container) {return [];}
-        const rows = [];
-        container.querySelectorAll('.key-value-row').forEach(row => {
-            const key = row.querySelector('[data-role="kv-key"]')?.value.trim() || '';
-            const value = row.querySelector('[data-role="kv-value"]')?.value || '';
-            if (key) {
-                rows.push({ key, value });
+        const request = requests[index];
+        this.editorModal.open(request, {
+            onSave: () => {
+                if (this.onScriptChange) {
+                    this.onScriptChange(index, request.postResponseScript);
+                }
+                this._notifyRequestsChange();
             }
         });
-        return rows;
     }
 
     /**
-     * Switches the active tab in the request editor modal
-     *
-     * @private
-     * @param {string} tabName - Tab name (params, headers, body, script)
-     */
-    _switchEditorTab(tabName) {
-        if (!this.scriptModal) {return;}
-
-        this.scriptModal.querySelectorAll('.runner-editor-tab').forEach(tab => {
-            tab.classList.toggle('is-active', tab.dataset.editTab === tabName);
-        });
-        this.scriptModal.querySelectorAll('.runner-editor-tab-content').forEach(content => {
-            content.classList.toggle('is-active', content.dataset.editContent === tabName);
-        });
-    }
-
-    /**
-     * Attaches event listeners to the script modal
-     *
-     * @private
-     */
-    _attachModalEventListeners() {
-        if (!this.scriptModal) {return;}
-
-        // Close button
-        this.scriptModal.querySelector('[data-action="close"]')?.addEventListener('click', () => {
-            this._closeScriptModal(false);
-        });
-
-        // Cancel button
-        this.scriptModal.querySelector('[data-action="cancel"]')?.addEventListener('click', () => {
-            this._closeScriptModal(false);
-        });
-
-        // Save button
-        this.scriptModal.querySelector('[data-action="save"]')?.addEventListener('click', () => {
-            this._closeScriptModal(true);
-        });
-
-        // Tab switching
-        this.scriptModal.querySelectorAll('.runner-editor-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                this._switchEditorTab(tab.dataset.editTab);
-            });
-        });
-
-        // Add-row buttons
-        this.scriptModal.querySelector('[data-action="add-path-param"]')?.addEventListener('click', () => {
-            this._addKvRow(this.scriptModal.querySelector('[data-role="path-params-list"]'));
-        });
-        this.scriptModal.querySelector('[data-action="add-query-param"]')?.addEventListener('click', () => {
-            this._addKvRow(this.scriptModal.querySelector('[data-role="query-params-list"]'));
-        });
-        this.scriptModal.querySelector('[data-action="add-header"]')?.addEventListener('click', () => {
-            this._addKvRow(this.scriptModal.querySelector('[data-role="headers-list"]'));
-        });
-
-        // Close on overlay click
-        this.scriptModal.querySelector('[data-role="script-modal-overlay"]')?.addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
-                this._closeScriptModal(false);
-            }
-        });
-
-        // Close on Escape key
-        this._modalKeyHandler = (e) => {
-            if (e.key === 'Escape') {
-                this._closeScriptModal(false);
-            } else if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                this._closeScriptModal(true);
-            }
-        };
-        document.addEventListener('keydown', this._modalKeyHandler);
-    }
-
-    /**
-     * Closes the request editor modal, optionally persisting overrides and script
-     *
-     * @private
-     * @param {boolean} save - Whether to save the edited content
-     */
-    _closeScriptModal(save) {
-        if (save && this.editingRequestIndex >= 0) {
-            const request = this.selectedRequests[this.editingRequestIndex];
-            const overrides = this._ensureOverrides(request);
-
-            overrides.pathParams = this._collectKvList(this.scriptModal?.querySelector('[data-role="path-params-list"]'));
-            overrides.queryParams = this._collectKvList(this.scriptModal?.querySelector('[data-role="query-params-list"]'));
-            overrides.headers = this._collectKvList(this.scriptModal?.querySelector('[data-role="headers-list"]'));
-            overrides.body = this.bodyEditor ? this.bodyEditor.getContent() : (overrides.body || '');
-
-            const script = this.scriptEditor ? this.scriptEditor.getContent() : (request.postResponseScript || '');
-            request.postResponseScript = script;
-
-            if (this.onScriptChange) {
-                this.onScriptChange(this.editingRequestIndex, script);
-            }
-            this._notifyRequestsChange();
-        }
-
-        // Cleanup
-        if (this._modalKeyHandler) {
-            document.removeEventListener('keydown', this._modalKeyHandler);
-            this._modalKeyHandler = null;
-        }
-
-        if (this.bodyEditor) {
-            this.bodyEditor.destroy();
-            this.bodyEditor = null;
-        }
-
-        if (this.scriptEditor) {
-            this.scriptEditor.destroy();
-            this.scriptEditor = null;
-        }
-
-        if (this.scriptModal) {
-            this.scriptModal.remove();
-            this.scriptModal = null;
-        }
-
-        this.editingRequestIndex = -1;
-    }
-
-    /**
-     * Shows the script editor for the selected request (no-op, kept for compatibility)
-     *
-     * @private
-     */
-    _showScriptEditor() {
-        // No-op - script editing is now done via modal
-    }
-
-    /**
-     * Removes a request from the list
-     *
-     * @private
-     * @param {number} index - Request index
-     */
-    _removeRequest(index) {
-        this.selectedRequests.splice(index, 1);
-
-        if (this.selectedRequestIndex === index) {
-            this.selectedRequestIndex = -1;
-            this._showScriptEditor();
-        } else if (this.selectedRequestIndex > index) {
-            this.selectedRequestIndex--;
-        }
-
-        this._renderRequestsList();
-        this._updateRequestCount();
-        this._notifyRequestsChange();
-    }
-
-    /**
-     * Clears all selected requests
-     *
-     * @private
-     */
-    _clearAllRequests() {
-        this.selectedRequests = [];
-        this.selectedRequestIndex = -1;
-        this._renderRequestsList();
-        this._updateRequestCount();
-        this._showScriptEditor();
-        this._notifyRequestsChange();
-    }
-
-    /**
-     * Updates the request count display
+     * Updates the request count display from the queue.
      *
      * @private
      */
     _updateRequestCount() {
         if (this.dom.requestCount) {
-            const count = this.selectedRequests.length;
+            const { count } = this.queue;
             this.dom.requestCount.textContent = `${count} request${count !== 1 ? 's' : ''}`;
         }
-    }
-
-    /**
-     * Handles script change (no-op, kept for compatibility)
-     *
-     * @private
-     */
-    _handleScriptChange() {
-        // No-op - script changes are now handled by the modal save action
     }
 
     /**
@@ -855,9 +204,6 @@ export class RunnerPanel {
      * @private
      */
     _handleSave() {
-        // Save current script first
-        this._handleScriptChange();
-
         const runnerData = this.getRunnerData();
 
         if (this.onRunnerSave) {
@@ -866,109 +212,16 @@ export class RunnerPanel {
     }
 
     /**
-     * Toggles the runner dropdown
-     *
-     * @private
+     * Resets the panel for a brand-new (unsaved) runner. Public so the host can
+     * invoke it after deleting the active runner.
      */
-    _toggleDropdown() {
-        if (this.dom.runnerDropdown?.classList.contains('is-hidden')) {
-            this._openDropdown();
-        } else {
-            this._closeDropdown();
-        }
-    }
-
-    /**
-     * Opens the runner dropdown and populates it
-     *
-     * @private
-     */
-    async _openDropdown() {
-        if (!this.dom.runnerDropdown || !this.dom.runnerList) {return;}
-
-        // Fetch saved runners
-        if (this.onLoadRunners) {
-            const runners = await this.onLoadRunners();
-            this._renderDropdownList(runners || []);
-        }
-
-        this.dom.runnerDropdown.classList.remove('is-hidden');
-    }
-
-    /**
-     * Closes the runner dropdown
-     *
-     * @private
-     */
-    _closeDropdown() {
-        this.dom.runnerDropdown?.classList.add('is-hidden');
-    }
-
-    /**
-     * Renders the dropdown list with saved runners
-     *
-     * @private
-     * @param {Array} runners - List of saved runners
-     */
-    _renderDropdownList(runners) {
-        if (!this.dom.runnerList) {return;}
-
-        if (!runners || runners.length === 0) {
-            this.dom.runnerList.innerHTML = '<div class="runner-dropdown-empty dropdown-empty">No saved runners</div>';
-            return;
-        }
-
-        this.dom.runnerList.innerHTML = runners.map(runner => {
-            const requestCount = runner.requests?.length || 0;
-            const isSelected = this.currentRunnerId === runner.id;
-            return `
-                <div class="runner-dropdown-item dropdown-item u-flex u-items-center u-justify-between ${isSelected ? 'is-selected is-active' : ''}" data-runner-id="${runner.id}">
-                    <span class="runner-dropdown-item-name dropdown-item-label">${this._escapeHtml(runner.name)}</span>
-                    <span class="dropdown-item-meta">${requestCount} requests</span>
-                </div>
-            `;
-        }).join('');
-
-        // Add click handlers
-        this.dom.runnerList.querySelectorAll('.runner-dropdown-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const {runnerId} = item.dataset;
-                this._selectRunner(runnerId);
-                this._closeDropdown();
-            });
-        });
-    }
-
-    /**
-     * Selects a runner from the dropdown
-     *
-     * @private
-     * @param {string} runnerId - Runner ID to select
-     */
-    _selectRunner(runnerId) {
-        this.currentRunnerId = runnerId;
-        if (this.onRunnerSelect) {
-            this.onRunnerSelect(runnerId);
-        }
-    }
-
-    /**
-     * Handles new runner button click
-     *
-     * @private
-     */
-    _handleNewRunner() {
+    startNewRunner() {
         this.currentRunnerId = null;
-        this.selectedRequests = [];
-        this.selectedRequestIndex = -1;
-        
+        this.queue.reset();
+
         if (this.dom.nameInput) {
             this.dom.nameInput.value = '';
         }
-        
-        this._renderRequestsList();
-        this._updateRequestCount();
-        this._showScriptEditor();
 
         if (this.onNewRunner) {
             this.onNewRunner();
@@ -992,28 +245,12 @@ export class RunnerPanel {
     }
 
     /**
-     * Escapes HTML special characters
-     *
-     * @private
-     * @param {string} str - String to escape
-     * @returns {string} Escaped string
-     */
-    _escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str || '';
-        return div.innerHTML;
-    }
-
-    /**
      * Handles run button click
      *
      * @private
      */
     _handleRun() {
-        // Save current script first
-        this._handleScriptChange();
-
-        if (this.selectedRequests.length === 0) {
+        if (this.queue.count === 0) {
             return;
         }
 
@@ -1061,7 +298,7 @@ export class RunnerPanel {
     getRunnerData() {
         return {
             name: this.dom.nameInput?.value || 'Untitled Runner',
-            requests: [...this.selectedRequests],
+            requests: [...this.queue.getRequests()],
             options: {
                 stopOnError: this.dom.stopOnErrorCheckbox?.checked ?? true,
                 delayMs: parseInt(this.dom.delayInput?.value, 10) || 0
@@ -1079,9 +316,6 @@ export class RunnerPanel {
             this.dom.nameInput.value = runner.name || 'Untitled Runner';
         }
 
-        this.selectedRequests = runner.requests ? [...runner.requests] : [];
-        this.selectedRequestIndex = -1;
-
         if (this.dom.stopOnErrorCheckbox) {
             this.dom.stopOnErrorCheckbox.checked = runner.options?.stopOnError ?? true;
         }
@@ -1089,596 +323,63 @@ export class RunnerPanel {
             this.dom.delayInput.value = runner.options?.delayMs || 0;
         }
 
-        this._renderRequestsList();
-        this._updateRequestCount();
-        this._showScriptEditor();
+        this.queue.setRequests(runner.requests);
     }
 
 
     /**
-     * Gets the CSS class for a status code
-     *
-     * @private
-     * @param {number} statusCode - HTTP status code
-     * @returns {string} CSS class suffix
-     */
-    _getStatusCodeClass(statusCode) {
-        if (statusCode >= 200 && statusCode < 300) {return 'success';}
-        if (statusCode >= 300 && statusCode < 400) {return 'redirect';}
-        if (statusCode >= 400 && statusCode < 500) {return 'client-error';}
-        if (statusCode >= 500) {return 'server-error';}
-        return 'unknown';
-    }
-
-    /**
-     * Shows execution results
+     * Shows execution results and restores the idle (not-running) button state.
      *
      * @param {Object} results - Execution results
      */
     showResults(results) {
-        this.results = results;
-        this.isShowingResults = true;
         this._setRunningState(false);
-
-        // Store results data for detail view
-        if (results.requests) {
-            this.resultsData = results.requests;
-            results.requests.forEach((result, index) => {
-                this._updateResultItem(index, result);
-            });
-        }
-
-        // Update summary
-        this._updateResultsSummary(results);
-
+        this.resultsView.show(results);
     }
 
     /**
-     * Shows the results panel at the bottom
+     * Opens the results panel at the bottom, seeded from the queued requests.
      */
     showResultsPanel() {
-        // If panel already exists, clear it for a new run
-        if (this.resultsPanel) {
-            this._clearResultsPanel();
-            this._initializeResultsList();
-            return;
-        }
-
-        const fragment = templateLoader.cloneSync(
-            './src/templates/runner/runnerPanel.html',
-            'tpl-runner-results-panel'
-        );
-
-        const runnerPanel = this.container.querySelector('.runner-panel');
-        if (!runnerPanel) {return;}
-
-        // Append all children from fragment (resizer + container)
-        this.resultsResizer = fragment.querySelector('.runner-results-resizer');
-        this.resultsPanel = fragment.querySelector('.runner-results-container');
-
-        if (this.resultsResizer) {runnerPanel.appendChild(this.resultsResizer);}
-        if (this.resultsPanel) {runnerPanel.appendChild(this.resultsPanel);}
-
-        this._cacheResultsElements();
-        this._attachResultsEventListeners();
-        this._attachResultsResizerListeners();
-        this._initializeResultsList();
-
-        if (window.i18n && window.i18n.updateUI) {
-            window.i18n.updateUI();
-        }
+        this.resultsView.open(this.queue.getRequests());
     }
 
     /**
-     * Clears the results panel for a new run
-     *
-     * @private
-     */
-    _clearResultsPanel() {
-        // Reset data
-        this.resultsData = [];
-        this.selectedResultIndex = -1;
-
-        // Clear summary
-        if (this.resultsDom.passed) {this.resultsDom.passed.textContent = '0';}
-        if (this.resultsDom.failed) {this.resultsDom.failed.textContent = '0';}
-        if (this.resultsDom.totalTime) {this.resultsDom.totalTime.textContent = '—';}
-
-        // Clear results list
-        if (this.resultsDom.resultsList) {
-            this.resultsDom.resultsList.innerHTML = '';
-        }
-
-        // Clear detail panel
-        if (this.resultsDom.detailMethod) {this.resultsDom.detailMethod.textContent = '';}
-        if (this.resultsDom.detailName) {this.resultsDom.detailName.textContent = '';}
-        if (this.resultsDom.detailStatus) {
-            this.resultsDom.detailStatus.textContent = '';
-            this.resultsDom.detailStatus.className = 'runner-results-detail-status';
-        }
-        if (this.resultsDom.detailTime) {this.resultsDom.detailTime.textContent = '';}
-        if (this.resultsDom.bodyContent) {this.resultsDom.bodyContent.textContent = '';}
-        if (this.resultsDom.headersBody) {this.resultsDom.headersBody.innerHTML = '';}
-        if (this.resultsDom.cookiesBody) {this.resultsDom.cookiesBody.innerHTML = '';}
-
-        // Hide detail panel until a result is selected
-        if (this.resultsDom.detailPanel) {
-            this.resultsDom.detailPanel.classList.add('is-hidden');
-        }
-    }
-
-    /**
-     * Hides the results panel
+     * Hides the results panel.
      */
     hideResultsPanel() {
-        if (this.resultsResizer) {
-            this.resultsResizer.remove();
-            this.resultsResizer = null;
-        }
-        if (this.resultsPanel) {
-            this.resultsPanel.remove();
-            this.resultsPanel = null;
-            this.resultsDom = {};
-            this.resultsData = [];
-            this.selectedResultIndex = -1;
-        }
+        this.resultsView.hide();
     }
 
     /**
-     * Caches DOM references for results panel
-     *
-     * @private
-     */
-    _cacheResultsElements() {
-        if (!this.resultsPanel) {return;}
-
-        this.resultsDom = {
-            container: this.resultsPanel,
-            summary: this.resultsPanel.querySelector('[data-role="summary"]'),
-            passed: this.resultsPanel.querySelector('[data-role="passed"]'),
-            failed: this.resultsPanel.querySelector('[data-role="failed"]'),
-            totalTime: this.resultsPanel.querySelector('[data-role="total-time"]'),
-            resultsList: this.resultsPanel.querySelector('[data-role="results-list"]'),
-            detailPanel: this.resultsPanel.querySelector('[data-role="detail-panel"]'),
-            detailMethod: this.resultsPanel.querySelector('[data-role="detail-method"]'),
-            detailName: this.resultsPanel.querySelector('[data-role="detail-name"]'),
-            detailStatus: this.resultsPanel.querySelector('[data-role="detail-status"]'),
-            detailTime: this.resultsPanel.querySelector('[data-role="detail-time"]'),
-            bodyContent: this.resultsPanel.querySelector('[data-role="body-content"]'),
-            headersBody: this.resultsPanel.querySelector('[data-role="headers-body"]'),
-            cookiesBody: this.resultsPanel.querySelector('[data-role="cookies-body"]'),
-            noCookies: this.resultsPanel.querySelector('[data-role="no-cookies"]')
-        };
-    }
-
-    /**
-     * Attaches event listeners for results panel
-     *
-     * @private
-     */
-    _attachResultsEventListeners() {
-        if (!this.resultsPanel) {return;}
-
-        // Tab switching
-        this.resultsPanel.querySelectorAll('.runner-results-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                this._switchResultsTab(tab.dataset.tab);
-            });
-        });
-    }
-
-    /**
-     * Attaches event listeners for results panel resizer
-     *
-     * @private
-     */
-    _attachResultsResizerListeners() {
-        if (!this.resultsResizer || !this.resultsPanel) {return;}
-
-        const runnerMain = this.container.querySelector('.runner-main');
-        if (!runnerMain) {return;}
-
-        this.resultsResizer.addEventListener('mousedown', (e) => {
-            this._isResizingResults = true;
-            this._resizeStartY = e.clientY;
-            this._resizeStartHeight = this.resultsPanel.offsetHeight;
-            this._resizeStartMainHeight = runnerMain.offsetHeight;
-
-            this.resultsResizer.classList.add('is-dragging');
-            document.body.style.userSelect = 'none';
-            document.body.style.cursor = 'row-resize';
-
-            e.preventDefault();
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!this._isResizingResults) {return;}
-
-            const deltaY = this._resizeStartY - e.clientY;
-            const newResultsHeight = this._resizeStartHeight + deltaY;
-            const newMainHeight = this._resizeStartMainHeight - deltaY;
-
-            // Enforce min/max constraints
-            const minResultsHeight = 150;
-            const maxResultsHeight = window.innerHeight * 0.7;
-            const minMainHeight = 200;
-
-            if (newResultsHeight < minResultsHeight || newResultsHeight > maxResultsHeight) {return;}
-            if (newMainHeight < minMainHeight) {return;}
-
-            this.resultsPanel.style.height = `${newResultsHeight}px`;
-            runnerMain.style.flex = `0 0 ${newMainHeight}px`;
-
-            e.preventDefault();
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (!this._isResizingResults) {return;}
-
-            this._isResizingResults = false;
-            this.resultsResizer?.classList.remove('is-dragging');
-            document.body.style.userSelect = '';
-            document.body.style.cursor = '';
-        });
-    }
-
-    /**
-     * Initializes the results list with pending items
-     *
-     * @private
-     */
-    _initializeResultsList() {
-        if (!this.resultsDom.resultsList) {return;}
-
-        this.resultsDom.resultsList.innerHTML = '';
-        this.resultsData = [];
-
-        this.selectedRequests.forEach((request, index) => {
-            const resultData = {
-                index,
-                method: request.method,
-                name: request.name,
-                status: 'pending',
-                statusCode: null,
-                time: null,
-                body: null,
-                headers: null,
-                cookies: null
-            };
-            this.resultsData.push(resultData);
-
-            const el = this._createResultItemElement(resultData, index);
-            this.resultsDom.resultsList.appendChild(el);
-        });
-    }
-
-    /**
-     * Creates a result item element
-     *
-     * @private
-     * @param {Object} result - Result data
-     * @param {number} index - Result index
-     * @returns {HTMLElement} Result item element
-     */
-    _createResultItemElement(result, index) {
-        const fragment = templateLoader.cloneSync(
-            './src/templates/runner/runnerPanel.html',
-            'tpl-runner-result-item'
-        );
-
-        const el = fragment.firstElementChild;
-        el.dataset.index = index;
-
-        const methodEl = el.querySelector('[data-role="method"]');
-        if (methodEl) {
-            methodEl.textContent = result.method;
-            methodEl.dataset.method = result.method;
-        }
-
-        const nameEl = el.querySelector('[data-role="name"]');
-        if (nameEl) {
-            nameEl.textContent = result.name;
-        }
-
-        const statusIcon = el.querySelector('[data-role="status-icon"]');
-        if (statusIcon) {
-            statusIcon.classList.add('is-pending');
-        }
-
-        const statusCodeEl = el.querySelector('[data-role="status-code"]');
-        if (statusCodeEl) {
-            statusCodeEl.style.display = 'none';
-        }
-
-        const timeEl = el.querySelector('[data-role="time"]');
-        if (timeEl) {
-            timeEl.style.display = 'none';
-        }
-
-        // Click to view details
-        el.addEventListener('click', () => {
-            this._selectResultItem(index);
-        });
-
-        return el;
-    }
-
-    /**
-     * Updates a result item in the results panel
-     *
-     * @private
-     * @param {number} index - Result index
-     * @param {Object} result - Result data
-     */
-    _updateResultItem(index, result) {
-        if (!this.resultsDom.resultsList) {return;}
-
-        const el = this.resultsDom.resultsList.querySelector(`[data-index="${index}"]`);
-        if (!el) {return;}
-
-        // Update stored data
-        if (this.resultsData[index]) {
-            Object.assign(this.resultsData[index], result);
-        }
-
-        // Update status icon (and mirror status onto the item for the status rail)
-        const statusIcon = el.querySelector('[data-role="status-icon"]');
-        const statusClass =
-            result.status === 'success' ? 'is-success' :
-            result.status === 'error' ? 'is-error' :
-            result.status === 'running' ? 'is-running' : 'is-pending';
-
-        if (statusIcon) {
-            statusIcon.classList.remove('is-pending', 'is-running', 'is-success', 'is-error');
-            statusIcon.classList.add(statusClass);
-        }
-
-        el.classList.remove('is-pending', 'is-running', 'is-success', 'is-error');
-        el.classList.add(statusClass);
-
-        // Update status code
-        const statusCodeEl = el.querySelector('[data-role="status-code"]');
-        if (statusCodeEl && result.statusCode != null) {
-            statusCodeEl.textContent = result.statusCode;
-            statusCodeEl.style.display = '';
-            statusCodeEl.dataset.statusClass = this._getStatusCodeClass(result.statusCode);
-        }
-
-        // Update time
-        const timeEl = el.querySelector('[data-role="time"]');
-        if (timeEl && result.time != null) {
-            timeEl.textContent = `${result.time}ms`;
-            timeEl.style.display = '';
-        }
-    }
-
-    /**
-     * Selects a result item and shows its details
-     *
-     * @private
-     * @param {number} index - Result index
-     */
-    _selectResultItem(index) {
-        if (index < 0 || index >= this.resultsData.length) {return;}
-
-        this.selectedResultIndex = index;
-
-        // Update selection state
-        this.resultsDom.resultsList?.querySelectorAll('.runner-result-item').forEach((el, i) => {
-            el.classList.toggle('is-selected', i === index);
-        });
-
-        // Show detail panel
-        this.resultsDom.detailPanel?.classList.remove('is-hidden');
-
-        // Populate detail view
-        this._populateResultDetail(this.resultsData[index]);
-    }
-
-    /**
-     * Populates the result detail panel
-     *
-     * @private
-     * @param {Object} result - Result data
-     */
-    _populateResultDetail(result) {
-        if (!result) {return;}
-
-        // Update header info
-        if (this.resultsDom.detailMethod) {
-            this.resultsDom.detailMethod.textContent = result.method;
-            this.resultsDom.detailMethod.dataset.method = result.method;
-        }
-
-        if (this.resultsDom.detailName) {
-            this.resultsDom.detailName.textContent = result.name;
-        }
-
-        if (this.resultsDom.detailStatus) {
-            const statusText = result.statusCode ? `${result.statusCode} ${this._getStatusText(result.statusCode)}` : 'Pending';
-            this.resultsDom.detailStatus.textContent = statusText;
-            this.resultsDom.detailStatus.classList.remove('is-success', 'is-error');
-            if (result.status === 'success') {
-                this.resultsDom.detailStatus.classList.add('is-success');
-            } else if (result.status === 'error') {
-                this.resultsDom.detailStatus.classList.add('is-error');
-            }
-        }
-
-        if (this.resultsDom.detailTime) {
-            this.resultsDom.detailTime.textContent = result.time != null ? `${result.time}ms` : '';
-        }
-
-        // Populate body
-        if (this.resultsDom.bodyContent) {
-            let bodyText = '';
-            if (result.body != null) {
-                if (typeof result.body === 'object') {
-                    try {
-                        bodyText = JSON.stringify(result.body, null, 2);
-                    } catch {
-                        bodyText = String(result.body);
-                    }
-                } else {
-                    bodyText = String(result.body);
-                }
-            }
-            this.resultsDom.bodyContent.textContent = bodyText || '(No response body)';
-        }
-
-        // Populate headers
-        if (this.resultsDom.headersBody) {
-            this.resultsDom.headersBody.innerHTML = '';
-            const headers = result.headers || {};
-            const headerEntries = Object.entries(headers);
-
-            if (headerEntries.length > 0) {
-                headerEntries.forEach(([name, value]) => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `<td>${this._escapeHtml(name)}</td><td>${this._escapeHtml(String(value))}</td>`;
-                    this.resultsDom.headersBody.appendChild(row);
-                });
-            } else {
-                const row = document.createElement('tr');
-                row.innerHTML = '<td colspan="2" class="runner-table-empty-cell">No headers</td>';
-                this.resultsDom.headersBody.appendChild(row);
-            }
-        }
-
-        // Populate cookies
-        if (this.resultsDom.cookiesBody && this.resultsDom.noCookies) {
-            this.resultsDom.cookiesBody.innerHTML = '';
-            const cookies = result.cookies || [];
-
-            if (cookies.length > 0) {
-                this.resultsDom.noCookies.classList.add('is-hidden');
-                cookies.forEach(cookie => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${this._escapeHtml(cookie.name || '')}</td>
-                        <td>${this._escapeHtml(cookie.value || '')}</td>
-                        <td>${this._escapeHtml(cookie.domain || '')}</td>
-                        <td>${this._escapeHtml(cookie.path || '/')}</td>
-                    `;
-                    this.resultsDom.cookiesBody.appendChild(row);
-                });
-            } else {
-                this.resultsDom.noCookies.classList.remove('is-hidden');
-            }
-        }
-    }
-
-    /**
-     * Switches the active tab in the results detail panel
-     *
-     * @private
-     * @param {string} tabName - Tab name (body, headers, cookies)
-     */
-    _switchResultsTab(tabName) {
-        if (!this.resultsPanel) {return;}
-
-        // Update tab buttons
-        this.resultsPanel.querySelectorAll('.runner-results-tab').forEach(tab => {
-            tab.classList.toggle('is-active', tab.dataset.tab === tabName);
-        });
-
-        // Update tab content
-        this.resultsPanel.querySelectorAll('.runner-results-tab-content').forEach(content => {
-            content.classList.toggle('is-active', content.dataset.content === tabName);
-        });
-    }
-
-    /**
-     * Updates the results summary
-     *
-     * @private
-     * @param {Object} results - Results object
-     */
-    _updateResultsSummary(results) {
-        if (this.resultsDom.passed) {
-            this.resultsDom.passed.textContent = `${results.passed || 0}`;
-        }
-        if (this.resultsDom.failed) {
-            this.resultsDom.failed.textContent = `${results.failed || 0}`;
-        }
-        if (this.resultsDom.totalTime) {
-            this.resultsDom.totalTime.textContent = `${results.totalTime || 0}ms`;
-        }
-    }
-
-    /**
-     * Gets HTTP status text for a status code
-     *
-     * @private
-     * @param {number} statusCode - HTTP status code
-     * @returns {string} Status text
-     */
-    _getStatusText(statusCode) {
-        const statusTexts = {
-            200: 'OK',
-            201: 'Created',
-            204: 'No Content',
-            301: 'Moved Permanently',
-            302: 'Found',
-            304: 'Not Modified',
-            400: 'Bad Request',
-            401: 'Unauthorized',
-            403: 'Forbidden',
-            404: 'Not Found',
-            405: 'Method Not Allowed',
-            422: 'Unprocessable Entity',
-            429: 'Too Many Requests',
-            500: 'Internal Server Error',
-            502: 'Bad Gateway',
-            503: 'Service Unavailable',
-            504: 'Gateway Timeout'
-        };
-        return statusTexts[statusCode] || '';
-    }
-
-    /**
-     * Marks a request as running in the results panel
+     * Marks a request as running in the results panel.
      *
      * @param {number} index - Request index
      */
     markRequestRunning(index) {
-        this._updateResultItem(index, { status: 'running' });
+        this.resultsView.markRequestRunning(index);
     }
 
     /**
-     * Updates a request result in the results panel
+     * Updates a request result in the results panel.
      *
      * @param {number} index - Request index
      * @param {Object} result - Result data including body, headers, cookies
      */
     updateResultWithResponse(index, result) {
-        if (this.resultsData[index]) {
-            Object.assign(this.resultsData[index], result);
-        }
-        this._updateResultItem(index, result);
-
-        // If this result is currently selected, refresh the detail view
-        if (this.selectedResultIndex === index) {
-            this._populateResultDetail(this.resultsData[index]);
-        }
+        this.resultsView.updateResultWithResponse(index, result);
     }
 
     /**
      * Resets the panel to initial state
      */
     reset() {
-        this.selectedRequests = [];
-        this.selectedRequestIndex = -1;
-        this.results = null;
-        this.isShowingResults = false;
+        this.queue.reset();
 
         if (this.dom.nameInput) {
             this.dom.nameInput.value = '';
         }
 
-        this._renderRequestsList();
-        this._updateRequestCount();
-        this._showScriptEditor();
         this._setRunningState(false);
         this.hideResultsPanel();
     }
@@ -1690,7 +391,7 @@ export class RunnerPanel {
      */
     _notifyRequestsChange() {
         if (this.onRequestsChange) {
-            this.onRequestsChange(this.selectedRequests);
+            this.onRequestsChange(this.queue.getRequests());
         }
     }
 }

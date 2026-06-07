@@ -1,14 +1,27 @@
-import { clearResponseDisplayForTab, displayResponseWithLineNumbersForTab } from './apiHandler.js';
-import { updateResponseSize, updateResponseTime, updateStatusDisplay } from './statusDisplay.js';
+import { clearResponseDisplayForTab } from './apiHandler.js';
+import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
 import { i18n } from '../i18n/index.js';
+import {
+    StreamSession,
+    createBackendEventListener,
+    getActiveTabId,
+    isTabCurrentlyActive
+} from './streaming/streamSession.js';
 
-const mqttState = new Map();
-let mqttListenerPromise = null;
-
-function getTimestamp() {
-    return new Date().toLocaleTimeString();
-}
+const session = new StreamSession({
+    buildResponseMeta: (entry, transcript, state) => ({
+        data: transcript,
+        headers: {},
+        status: state === 'open' ? 101 : null,
+        statusText: state === 'open' ? 'Connected' : '',
+        ttfb: null,
+        size: null,
+        timings: null,
+        cookies: [],
+        mqtt: { broker: entry.broker || '', state }
+    })
+});
 
 /**
  * Render the MQTT connection indicator (status pill + Disconnect button) from a
@@ -58,7 +71,7 @@ function renderMqttStatus(entry, flash = false) {
  */
 async function updateMqttUiIfActive(tabId, flash = false) {
     if (await isTabCurrentlyActive(tabId)) {
-        renderMqttStatus(getMqttEntry(tabId), flash);
+        renderMqttStatus(session.get(tabId), flash);
     }
 }
 
@@ -69,80 +82,8 @@ async function updateMqttUiIfActive(tabId, flash = false) {
  */
 export async function refreshMqttConnectionUi(tabId) {
     if (await isTabCurrentlyActive(tabId)) {
-        renderMqttStatus(getMqttEntry(tabId));
+        renderMqttStatus(session.get(tabId));
     }
-}
-
-async function getActiveTabId() {
-    return window.workspaceTabController
-        ? window.workspaceTabController.service.getActiveTabId()
-        : null;
-}
-
-async function isTabCurrentlyActive(tabId) {
-    if (!tabId || !window.workspaceTabController) {
-        return true;
-    }
-
-    const activeTabId = await window.workspaceTabController.service.getActiveTabId();
-    return activeTabId === tabId;
-}
-
-function getMqttEntry(tabId) {
-    return mqttState.get(tabId) || null;
-}
-
-function setMqttEntry(tabId, entry) {
-    mqttState.set(tabId, entry);
-}
-
-function removeMqttEntry(tabId) {
-    mqttState.delete(tabId);
-}
-
-function buildTranscriptEntry(label, content = '') {
-    const header = `[${getTimestamp()}] ${label}`;
-    return content ? `${header}\n${content}` : header;
-}
-
-async function persistTranscript(tabId, transcript, broker, state = 'closed') {
-    if (!window.workspaceTabController || !tabId) {
-        return;
-    }
-
-    const isOpen = state === 'open';
-    await window.workspaceTabController.service.updateTab(tabId, {
-        response: {
-            data: transcript,
-            headers: {},
-            status: isOpen ? 101 : null,
-            statusText: isOpen ? 'Connected' : '',
-            ttfb: null,
-            size: null,
-            timings: null,
-            cookies: [],
-            mqtt: {
-                broker,
-                state
-            }
-        }
-    });
-}
-
-async function appendTranscript(tabId, label, content = '', broker = '') {
-    const current = getMqttEntry(tabId) || {};
-    const entry = buildTranscriptEntry(label, content);
-    const existing = current.transcript || '';
-    const transcript = existing ? `${existing}\n\n${entry}` : entry;
-    const state = current.state || 'closed';
-
-    setMqttEntry(tabId, {
-        ...current,
-        transcript
-    });
-
-    displayResponseWithLineNumbersForTab(transcript, 'text/plain', tabId);
-    await persistTranscript(tabId, transcript, broker || current.broker || '', state);
 }
 
 function normalizeMqttBroker(broker) {
@@ -157,38 +98,36 @@ function normalizeMqttBroker(broker) {
     return `mqtt://${broker}`;
 }
 
-async function updateStatusForTab(tabId, text, status = null) {
-    if (await isTabCurrentlyActive(tabId)) {
-        updateStatusDisplay(text, status);
-        updateResponseTime(null);
-        updateResponseSize(null);
-    }
-}
-
 async function handleBackendEvent(event) {
     const payload = event.payload || {};
     const { tabId, broker = '' } = payload;
-    const current = getMqttEntry(tabId) || {};
+    const current = session.get(tabId) || {};
 
     if (!tabId) {
         return;
     }
 
+    // Ignore late events from a previous broker connection on the same tab
+    // (the 'connect' event establishes the new broker, so it is never dropped).
+    if (current.broker && broker && current.broker !== broker && payload.eventType !== 'connect') {
+        return;
+    }
+
     if (payload.eventType === 'connect') {
-        setMqttEntry(tabId, {
+        session.set(tabId, {
             ...current,
             broker,
             state: 'open',
             transcript: current.transcript || ''
         });
-        await updateStatusForTab(tabId, 'MQTT connected', 101);
-        await appendTranscript(tabId, `CONNECTED ${broker}`, '', broker);
+        await session.updateStatus(tabId, 'MQTT connected', 101);
+        await session.append(tabId, `CONNECTED ${broker}`);
         await updateMqttUiIfActive(tabId);
         return;
     }
 
     if (payload.eventType === 'message') {
-        setMqttEntry(tabId, {
+        session.set(tabId, {
             ...current,
             broker: current.broker || broker,
             state: 'open',
@@ -196,21 +135,21 @@ async function handleBackendEvent(event) {
             transcript: current.transcript || ''
         });
         const topic = payload.topic ? ` ${payload.topic}` : '';
-        await updateStatusForTab(tabId, 'MQTT message received', 101);
-        await appendTranscript(tabId, `RECEIVED${topic}`, payload.message || '', broker);
+        await session.updateStatus(tabId, 'MQTT message received', 101);
+        await session.append(tabId, `RECEIVED${topic}`, payload.message || '');
         await updateMqttUiIfActive(tabId, true);
         return;
     }
 
     if (payload.eventType === 'disconnect') {
-        setMqttEntry(tabId, {
+        session.set(tabId, {
             ...current,
             broker,
             state: 'closed',
             transcript: current.transcript || ''
         });
-        await updateStatusForTab(tabId, 'MQTT disconnected', null);
-        await appendTranscript(tabId, 'DISCONNECTED', '', broker);
+        await session.updateStatus(tabId, 'MQTT disconnected', null);
+        await session.append(tabId, 'DISCONNECTED');
         await updateMqttUiIfActive(tabId);
         return;
     }
@@ -218,42 +157,27 @@ async function handleBackendEvent(event) {
     if (payload.eventType === 'error') {
         // Keep the current connection state — a terminal error is followed by a
         // 'disconnect' event, while publish/subscribe errors leave us connected.
-        setMqttEntry(tabId, {
+        session.set(tabId, {
             ...current,
             broker,
             state: current.state || 'closed',
             transcript: current.transcript || ''
         });
-        await updateStatusForTab(
+        await session.updateStatus(
             tabId,
             `MQTT error${payload.message ? `: ${payload.message}` : ''}`,
             null
         );
-        await appendTranscript(tabId, 'ERROR', payload.message || 'MQTT error', broker);
+        await session.append(tabId, 'ERROR', payload.message || 'MQTT error');
         await updateMqttUiIfActive(tabId);
     }
 }
 
-export async function initMqttHandler() {
-    if (mqttListenerPromise) {
-        return mqttListenerPromise;
-    }
-
-    mqttListenerPromise = (async () => {
-        if (!('__TAURI_INTERNALS__' in window) || !window.backendAPI?.mqtt) {
-            return;
-        }
-
-        const { invoke, transformCallback } = window.__TAURI_INTERNALS__;
-        await invoke('plugin:event|listen', {
-            event: 'mqtt-event',
-            target: { kind: 'Any' },
-            handler: transformCallback(handleBackendEvent)
-        });
-    })();
-
-    return mqttListenerPromise;
-}
+export const initMqttHandler = createBackendEventListener(
+    'mqtt-event',
+    () => !!window.backendAPI?.mqtt,
+    handleBackendEvent
+);
 
 /**
  * Connect to an MQTT broker, subscribe to the configured topic, and optionally
@@ -295,9 +219,9 @@ export async function handleMqttSend(broker, options = {}) {
         payload = ''
     } = options;
 
-    const current = getMqttEntry(tabId);
+    const current = session.get(tabId);
     if (!current || current.broker !== normalizedBroker) {
-        setMqttEntry(tabId, {
+        session.set(tabId, {
             broker: normalizedBroker,
             state: 'connecting',
             messageCount: 0,
@@ -305,10 +229,10 @@ export async function handleMqttSend(broker, options = {}) {
         });
         clearResponseDisplayForTab(tabId);
     } else {
-        setMqttEntry(tabId, { ...current, state: 'connecting' });
+        session.set(tabId, { ...current, state: 'connecting' });
     }
 
-    await updateStatusForTab(tabId, 'MQTT connecting...', null);
+    await session.updateStatus(tabId, 'MQTT connecting...', null);
     await updateMqttUiIfActive(tabId);
 
     try {
@@ -323,13 +247,13 @@ export async function handleMqttSend(broker, options = {}) {
         });
     } catch (error) {
         toast.error(`MQTT connection failed: ${error.message || error}`);
-        setMqttEntry(tabId, { ...(getMqttEntry(tabId) || {}), state: 'closed' });
+        session.set(tabId, { ...(session.get(tabId) || {}), state: 'closed' });
         await updateMqttUiIfActive(tabId);
         return false;
     }
 
     if (subscribeTopic) {
-        await appendTranscript(tabId, `SUBSCRIBED ${subscribeTopic}`, '', normalizedBroker);
+        await session.append(tabId, `SUBSCRIBED ${subscribeTopic}`);
     }
 
     if (publishTopic) {
@@ -340,12 +264,7 @@ export async function handleMqttSend(broker, options = {}) {
                 payload,
                 qos: Number(qos) || 0
             });
-            await appendTranscript(
-                tabId,
-                `PUBLISHED ${publishTopic}`,
-                payload || '',
-                normalizedBroker
-            );
+            await session.append(tabId, `PUBLISHED ${publishTopic}`, payload || '');
         } catch (error) {
             toast.error(`MQTT publish failed: ${error.message || error}`);
         }
@@ -362,15 +281,15 @@ export async function handleMqttCancel() {
         return false;
     }
 
-    const current = getMqttEntry(tabId);
+    const current = session.get(tabId);
     const wasActive = current && current.state !== 'closed';
 
     await window.backendAPI.mqtt.close(tabId);
 
     if (wasActive) {
-        setMqttEntry(tabId, { ...current, state: 'closed' });
-        await updateStatusForTab(tabId, 'MQTT disconnected', null);
-        await appendTranscript(tabId, 'DISCONNECTED', '');
+        session.set(tabId, { ...current, state: 'closed' });
+        await session.updateStatus(tabId, 'MQTT disconnected', null);
+        await session.append(tabId, 'DISCONNECTED');
     }
     await updateMqttUiIfActive(tabId);
     return true;
@@ -380,5 +299,5 @@ export async function clearMqttState(tabId) {
     if (window.backendAPI?.mqtt && tabId) {
         await window.backendAPI.mqtt.close(tabId);
     }
-    removeMqttEntry(tabId);
+    session.remove(tabId);
 }

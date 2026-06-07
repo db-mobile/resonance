@@ -433,6 +433,8 @@
     "subscribe_topic": "Abo-Topic",
     "publish_topic": "Veröffentlichungs-Topic",
     "qos": "QoS",
+    "section_messaging": "Nachrichten",
+    "section_connection_auth": "Verbindung & Authentifizierung",
     "client_id": "Client-ID",
     "username": "Benutzername",
     "password": "Passwort",

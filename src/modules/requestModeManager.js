@@ -48,6 +48,12 @@ const SSE_TABS = ['query-params', 'headers'];
 const MQTT_TABS = ['mqtt', 'body'];
 
 /**
+ * MQTT-specific tab IDs that should be hidden in non-MQTT modes
+ * @type {string[]}
+ */
+const MQTT_ONLY_TABS = ['mqtt'];
+
+/**
  * gRPC-specific tab IDs that should be hidden in HTTP mode
  * @type {string[]}
  */
@@ -171,7 +177,7 @@ function updateUIForMode(mode) {
         // Update tab visibility - show gRPC tabs, hide HTTP-only tabs
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
-            if (HTTP_ONLY_TABS.includes(tabId) || HTTP_AND_WEBSOCKET_TABS.includes(tabId) || HTTP_SHARED_TABS.includes(tabId)) {
+            if (HTTP_ONLY_TABS.includes(tabId) || HTTP_AND_WEBSOCKET_TABS.includes(tabId) || HTTP_SHARED_TABS.includes(tabId) || MQTT_ONLY_TABS.includes(tabId)) {
                 btn.style.display = 'none';
             } else if (GRPC_ONLY_TABS.includes(tabId) || SHARED_TABS.includes(tabId)) {
                 btn.style.display = '';
@@ -193,7 +199,8 @@ function updateUIForMode(mode) {
         if (!activeTab
             || HTTP_ONLY_TABS.includes(activeTab.dataset.tab)
             || HTTP_AND_WEBSOCKET_TABS.includes(activeTab.dataset.tab)
-            || HTTP_SHARED_TABS.includes(activeTab.dataset.tab)) {
+            || HTTP_SHARED_TABS.includes(activeTab.dataset.tab)
+            || MQTT_ONLY_TABS.includes(activeTab.dataset.tab)) {
             activateTab('grpc');
         }
     } else if (mode === RequestMode.SSE) {
@@ -253,7 +260,8 @@ function updateUIForMode(mode) {
             if (HTTP_ONLY_TABS.includes(tabId)
                 || GRPC_ONLY_TABS.includes(tabId)
                 || SHARED_TABS.includes(tabId)
-                || HTTP_SHARED_TABS.includes(tabId)) {
+                || HTTP_SHARED_TABS.includes(tabId)
+                || MQTT_ONLY_TABS.includes(tabId)) {
                 btn.style.display = 'none';
             } else if (HTTP_AND_WEBSOCKET_TABS.includes(tabId)) {
                 btn.style.display = '';
@@ -342,7 +350,7 @@ function updateUIForMode(mode) {
         // Update tab visibility - show HTTP tabs, hide gRPC-only tabs
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
-            if (GRPC_ONLY_TABS.includes(tabId)) {
+            if (GRPC_ONLY_TABS.includes(tabId) || MQTT_ONLY_TABS.includes(tabId)) {
                 btn.style.display = 'none';
             } else if (HTTP_ONLY_TABS.includes(tabId)
                 || HTTP_AND_WEBSOCKET_TABS.includes(tabId)
@@ -364,7 +372,9 @@ function updateUIForMode(mode) {
         
         // Activate path-params tab if current tab is gRPC-only
         const activeTab = document.querySelector('.request-config .tab-nav .tab-button.active');
-        if (!activeTab || GRPC_ONLY_TABS.includes(activeTab.dataset.tab)) {
+        if (!activeTab
+            || GRPC_ONLY_TABS.includes(activeTab.dataset.tab)
+            || MQTT_ONLY_TABS.includes(activeTab.dataset.tab)) {
             activateHttpTab();
         }
     }

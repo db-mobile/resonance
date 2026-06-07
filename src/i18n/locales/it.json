@@ -433,6 +433,8 @@
     "subscribe_topic": "Topic di sottoscrizione",
     "publish_topic": "Topic di pubblicazione",
     "qos": "QoS",
+    "section_messaging": "Messaggistica",
+    "section_connection_auth": "Connessione e autenticazione",
     "client_id": "ID client",
     "username": "Nome utente",
     "password": "Password",

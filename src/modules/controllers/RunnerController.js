@@ -187,7 +187,7 @@ export class RunnerController {
             }
             await this._saveLastRunnerId(null);
             // Reset the panel
-            this.panel?._handleNewRunner();
+            this.panel?.startNewRunner();
             updateStatusDisplay('Runner deleted', null);
         } catch (error) {
             toast.error(`Error deleting runner: ${error.message}`);

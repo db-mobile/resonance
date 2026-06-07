@@ -4186,6 +4186,34 @@ code {
   flex-shrink: 0;
 }
 
+.status-bar-request {
+  color: var(--color-primary);
+}
+
+.status-bar-request[hidden] {
+  display: none;
+}
+
+.status-bar-request-spinner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--color-primary);
+  border-top-color: transparent;
+  flex-shrink: 0;
+  animation: status-bar-spin 0.7s linear infinite;
+}
+
+#status-bar-request-time {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes status-bar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   :root {
@@ -5887,24 +5915,40 @@ code {
   background: var(--accent-teal, #0d9488);
 }
 
-.mqtt-config {
-  gap: 14px;
+/* MQTT config — grouped cards reusing the gRPC card visual language for
+   cross-tab parity. */
+.mqtt-cards {
+  gap: var(--space-4);
 }
 
-.mqtt-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* Two-column field grid (Publish/QoS, Username/Password); collapses to a single
+   column at the same breakpoint the gRPC source cards use. */
+.mqtt-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  align-items: end;
 }
 
-.mqtt-field label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
+@media (max-width: 720px) {
+  .mqtt-field-row {
+    grid-template-columns: 1fr;
+  }
 }
 
-.mqtt-field .select-wrapper {
-  max-width: 260px;
+/* Publish Topic takes the available width; QoS stays compact beside it. */
+.mqtt-field-row:has(.mqtt-field-qos) {
+  grid-template-columns: 1fr minmax(0, 200px);
+}
+
+@media (max-width: 720px) {
+  .mqtt-field-row:has(.mqtt-field-qos) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mqtt-field-qos .select-wrapper {
+  width: 100%;
 }
 
 .mqtt-panel-header {
@@ -6104,17 +6148,6 @@ code {
 
 .grpc-source-card[data-source="proto"] {
   --source-stripe: color-mix(in srgb, var(--text-secondary) 55%, var(--accent) 45%);
-}
-
-.grpc-source-card:hover,
-.grpc-source-card:focus-within {
-  border-color: color-mix(in srgb, var(--border-light) 45%, var(--accent) 55%);
-  box-shadow: var(--shadow-xs);
-}
-
-.grpc-source-card:hover::before,
-.grpc-source-card:focus-within::before {
-  opacity: 1;
 }
 
 .grpc-source-card-header {

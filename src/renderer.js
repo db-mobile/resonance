@@ -876,6 +876,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Initialize status bar
         const statusBar = new StatusBar(environmentService);
         statusBar.initialize();
+        window.statusBar = statusBar;
 
         // Initialize history controller (needed for history sidebar)
         await historyController.init();

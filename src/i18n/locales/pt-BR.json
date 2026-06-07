@@ -441,6 +441,8 @@
     "subscribe_topic": "Tópico de inscrição",
     "publish_topic": "Tópico de publicação",
     "qos": "QoS",
+    "section_messaging": "Mensagens",
+    "section_connection_auth": "Conexão e autenticação",
     "client_id": "ID do cliente",
     "username": "Usuário",
     "password": "Senha",
