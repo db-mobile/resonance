@@ -6122,17 +6122,6 @@ code {
   --source-stripe: color-mix(in srgb, var(--text-secondary) 55%, var(--accent) 45%);
 }
 
-.grpc-source-card:hover,
-.grpc-source-card:focus-within {
-  border-color: color-mix(in srgb, var(--border-light) 45%, var(--accent) 55%);
-  box-shadow: var(--shadow-xs);
-}
-
-.grpc-source-card:hover::before,
-.grpc-source-card:focus-within::before {
-  opacity: 1;
-}
-
 .grpc-source-card-header {
   display: flex;
   align-items: center;
