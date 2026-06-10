@@ -127,7 +127,7 @@ environmentController = new EnvironmentController(
 // Initialize cookie jar system
 const cookieRepository = new CookieRepository(window.backendAPI);
 const cookieJarService = new CookieJarService(cookieRepository);
-const cookieManagerDialog = new CookieManagerDialog(cookieJarService);
+const cookieManagerDialog = new CookieManagerDialog(cookieJarService, environmentService);
 const cookieController = new CookieController(cookieJarService, cookieManagerDialog);
 cookieController.initialize();
 window.cookieController = cookieController;

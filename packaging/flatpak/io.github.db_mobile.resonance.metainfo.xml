@@ -99,6 +99,14 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.10.2" date="2026-06-10">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Add environment switch to cookie jar</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.10.1" date="2026-06-07">
       <description>
         <p>Feature stabilization release</p>

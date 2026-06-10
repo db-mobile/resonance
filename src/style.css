@@ -638,7 +638,7 @@ code {
 
 .modal-dialog--cookie-manager {
   width: 70vw;
-  max-height: 90vh;
+  height: 80vh;
   overflow: hidden;
 }
 
@@ -862,27 +862,23 @@ code {
   }
 }
 
-.cookie-manager-env-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-light);
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
+.cookie-manager-env-selector {
+  position: relative;
   margin-left: auto;
   margin-right: var(--space-3);
 }
 
-.cookie-manager-env-label {
-  font-weight: 400;
+.cookie-manager-env-button {
+  width: auto;
 }
 
-.cookie-manager-env-name {
-  font-weight: 600;
-  color: var(--text-primary);
+.cookie-manager-env-button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.cookie-manager-env-button:disabled .env-arrow {
+  display: none;
 }
 
 .cookie-manager-toggle-row {
