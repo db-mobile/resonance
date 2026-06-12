@@ -140,10 +140,12 @@ export class VariableService {
      * @async
      * @param {string} collectionId - The collection ID
      * @param {Object} variables - Variables as key-value object
+     * @param {Array<string>} [secretKeys=[]] - Names to store as secret (value kept out
+     *   of the git-friendly variables.json)
      * @returns {Promise<boolean>} True if successful
      * @throws {Error} If any variable name is invalid or save fails
      */
-    async setMultipleVariables(collectionId, variables) {
+    async setMultipleVariables(collectionId, variables, secretKeys = []) {
         try {
             for (const name of Object.keys(variables)) {
                 if (!this.processor.isValidVariableName(name)) {
@@ -151,12 +153,28 @@ export class VariableService {
                 }
             }
 
-            await this.repository.setVariablesForCollection(collectionId, variables);
+            await this.repository.setVariablesForCollection(collectionId, variables, secretKeys);
             this.statusDisplay.update('Variables saved successfully', null);
             return true;
         } catch (error) {
             this.statusDisplay.update(`Error saving variables: ${error.message}`, null);
             throw error;
+        }
+    }
+
+    /**
+     * Returns the collection's variables as editor entries (name, value, secret flag),
+     * with secret values resolved for in-editor display.
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @returns {Promise<Array<{name: string, value: string, secret: boolean}>>}
+     */
+    async getCollectionVariableEntries(collectionId) {
+        try {
+            return await this.repository.getVariableEntriesForCollection(collectionId);
+        } catch (error) {
+            return [];
         }
     }
 

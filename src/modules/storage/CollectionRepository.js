@@ -3,6 +3,8 @@
  * @module storage/CollectionRepository
  */
 
+import { splitAuthSecrets, mergeAuthSecrets, authSecretScope } from '../auth/authSecrets.js';
+
 /**
  * Repository for managing collection data persistence
  *
@@ -33,9 +35,13 @@ export class CollectionRepository {
      * Creates a CollectionRepository instance
      *
      * @param {Object} backendAPI - The backend IPC API bridge
+     * @param {import('./SecretStore.js').SecretStore} [secretStore] - Optional secret
+     *   backend; when provided, literal auth credentials are kept out of the
+     *   git-friendly collection files and rehydrated on read.
      */
-    constructor(backendAPI) {
+    constructor(backendAPI, secretStore = null) {
         this.backendAPI = backendAPI;
+        this.secretStore = secretStore;
         this._byIdCache = new Map();
     }
 
@@ -197,6 +203,9 @@ export class CollectionRepository {
         try {
             await this.backendAPI.collections.delete(id);
             this._byIdCache.delete(id);
+            if (this.secretStore) {
+                await this.secretStore.deleteScopePrefix(`auth:${id}:`);
+            }
             return true;
         } catch (error) {
             throw new Error(`Failed to delete collection: ${error.message || error}`);
@@ -462,7 +471,14 @@ export class CollectionRepository {
     async getPersistedAuthConfig(collectionId, endpointId) {
         try {
             const data = await this._getEndpointData(collectionId, endpointId);
-            return data.authConfig || null;
+            const authConfig = data.authConfig || null;
+            if (!authConfig || !this.secretStore) {
+                return authConfig;
+            }
+            // Literal credentials are stored out of band; merge them back so the UI,
+            // runner, and request builder all see the complete config.
+            const secrets = await this.secretStore.getScope(authSecretScope(collectionId, endpointId));
+            return mergeAuthSecrets(authConfig, secrets);
         } catch (error) {
             return null;
         }
@@ -480,7 +496,26 @@ export class CollectionRepository {
      */
     async savePersistedAuthConfig(collectionId, endpointId, authConfig) {
         try {
-            await this._updateEndpointField(collectionId, endpointId, 'authConfig', authConfig);
+            let toPersist = authConfig;
+            if (authConfig && this.secretStore) {
+                // Pull literal credentials out before they reach the on-disk file.
+                const { redacted, secrets } = splitAuthSecrets(authConfig);
+                const scope = authSecretScope(collectionId, endpointId);
+                const fields = Object.keys(secrets);
+                for (const field of fields) {
+                    await this.secretStore.set(scope, field, secrets[field]);
+                }
+                // Drop any stored secret whose field is no longer a literal (cleared or
+                // replaced with a template reference) to avoid resurrecting stale values.
+                const stored = await this.secretStore.getScope(scope);
+                for (const field of Object.keys(stored)) {
+                    if (!Object.prototype.hasOwnProperty.call(secrets, field)) {
+                        await this.secretStore.delete(scope, field);
+                    }
+                }
+                toPersist = redacted;
+            }
+            await this._updateEndpointField(collectionId, endpointId, 'authConfig', toPersist);
         } catch (error) {
             throw new Error(`Failed to save persisted auth config: ${error.message || error}`);
         }
@@ -590,6 +625,9 @@ export class CollectionRepository {
     async deletePersistedEndpointData(collectionId, endpointId) {
         try {
             await this.backendAPI.collections.deleteEndpointData(collectionId, endpointId);
+            if (this.secretStore) {
+                await this.secretStore.deleteScope(authSecretScope(collectionId, endpointId));
+            }
         } catch (error) {
             throw new Error(`Failed to delete persisted endpoint data: ${error.message || error}`);
         }

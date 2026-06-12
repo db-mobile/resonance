@@ -68,6 +68,13 @@ if (isTauri) {
             get: (key) => invoke('store_get', { key }),
             set: (key, value) => invoke('store_set', { key, value })
         },
+        secrets: {
+            // OS keychain (encryption at rest); account is an opaque `<scope>|<key>` string
+            keychainAvailable: () => invoke('secret_keychain_available'),
+            get: (account) => invoke('secret_get', { account }),
+            set: (account, value) => invoke('secret_set', { account, value }),
+            delete: (account) => invoke('secret_delete', { account })
+        },
         collections: {
             // File-based collection storage
             list: () => invoke('collections_list'),

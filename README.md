@@ -210,13 +210,15 @@ The built application will be in `src-tauri/target/release/bundle/`.
 - **Variable Templating**: Use `{{ variableName }}` syntax for dynamic values in URLs, headers, and request bodies
 - **Dynamic Variables**: Auto-generated values with `{{$variableName}}` syntax (UUID, timestamps, random strings, etc.)
 - **Environment Switching**: Quick dropdown selector to switch between different API contexts
-- **Import/Export**: Share environments with your team or backup as JSON files
+- **Secret Variables**: Flag any environment **or** collection variable as secret — its value is masked in the editor (with a reveal toggle), kept out of exported environment/variable files, and never written into the git-friendly collection files (only an empty placeholder and the secret flag are stored). Secret values are stored in the **OS keychain** (encryption at rest), falling back to local storage only when no keychain is available
+- **Import/Export**: Share environments with your team or backup as JSON files (secret values are omitted; the secret flag is preserved so recipients re-enter their own values)
 
 ### Authentication
 
-- **Multiple Auth Methods**: Bearer Token, Basic Auth, API Key, OAuth 2.0, Digest Auth
+- **Multiple Auth Methods**: Bearer Token, Basic Auth, API Key, OAuth 2.0, Digest Auth, AWS Signature v4
 - **Per-Request Configuration**: Set authentication at request, folder, or collection level
-- **Secure Credential Storage**: All credentials encrypted and stored securely
+- **Credentials Kept Out of Git**: Literal auth credentials (tokens, passwords, client/secret keys) are stored in the OS keychain — never written into the human-readable collection files — so committing a collection won't leak secrets. Reference environment variables (e.g. `{{bearerToken}}`) to keep credentials fully out of collections
+- **OS Keychain Storage**: Secrets are encrypted at rest in the platform credential store — Secret Service (GNOME Keyring / KWallet) on Linux, Keychain on macOS, Credential Manager on Windows — with a local-storage fallback when no keychain is available
 
 ### Client Certificates (mTLS)
 
@@ -317,8 +319,9 @@ Resonance supports multiple authentication methods:
 - **API Key**: Custom header or query parameter authentication
 - **OAuth 2.0**: Flexible OAuth 2.0 authentication with custom prefixes
 - **Digest Auth**: RFC 2617 compliant Digest authentication with MD5 hashing
+- **AWS Signature v4**: Signed requests for AWS services (access key, secret key, optional session token)
 
-All authentication credentials are automatically applied to requests and work seamlessly with the variable templating system.
+All authentication credentials are automatically applied to requests and work seamlessly with the variable templating system. Literal credentials are stored outside the git-friendly collection files; use `{{ variable }}` references for credentials you want to keep entirely out of collections.
 
 ### Client Certificates (mTLS)
 

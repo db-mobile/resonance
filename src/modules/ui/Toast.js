@@ -105,6 +105,16 @@ class Toast {
     info(message) {
         this.show(message, 'info', 4000);
     }
+
+    /**
+     * Shows a warning toast
+     *
+     * @param {string} message
+     * @returns {void}
+     */
+    warning(message) {
+        this.show(message, 'warning', 6000);
+    }
 }
 
 export const toast = new Toast();

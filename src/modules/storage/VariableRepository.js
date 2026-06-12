@@ -17,11 +17,49 @@ export class VariableRepository {
      * Creates a VariableRepository instance
      *
      * @param {Object} backendAPI - The backend IPC API bridge
+     * @param {import('./SecretStore.js').SecretStore} [secretStore] - Optional secret
+     *   backend; when provided, variables flagged secret keep an empty placeholder in the
+     *   git-friendly variables.json and store their value out of band.
      */
-    constructor(backendAPI) {
+    constructor(backendAPI, secretStore = null) {
         this.backendAPI = backendAPI;
+        this.secretStore = secretStore;
         // Per-collection cache: Map<collectionId, variables>
         this._cache = new Map();
+    }
+
+    /**
+     * Builds the SecretStore scope string for a collection's variables.
+     *
+     * @param {string} collectionId
+     * @returns {string}
+     */
+    secretScope(collectionId) {
+        return `collvar:${collectionId}`;
+    }
+
+    /**
+     * Reads the raw on-disk variable entries (array of `{ key, value, secret? }`).
+     *
+     * @private
+     * @param {string} collectionId
+     * @returns {Promise<Array<Object>>}
+     */
+    async _getRawEntries(collectionId) {
+        const variables = await this.backendAPI.collections.getVariables(collectionId);
+        return Array.isArray(variables) ? variables : this._objectToArray(variables);
+    }
+
+    /**
+     * Returns the names of variables currently flagged secret for a collection.
+     *
+     * @private
+     * @param {string} collectionId
+     * @returns {Promise<string[]>}
+     */
+    async _getSecretKeys(collectionId) {
+        const raw = await this._getRawEntries(collectionId);
+        return raw.filter(e => e && e.secret && e.key).map(e => e.key);
     }
 
     /**
@@ -108,12 +146,50 @@ export class VariableRepository {
         }
 
         try {
-            const variables = await this.backendAPI.collections.getVariables(collectionId);
-            const result = this._arrayToObject(variables);
+            const raw = await this._getRawEntries(collectionId);
+            const result = this._arrayToObject(raw);
+            // Secret values are kept out of the variables.json file; merge them back so
+            // {{ collectionVar }} resolves at request time.
+            if (this.secretStore) {
+                const secrets = await this.secretStore.getScope(this.secretScope(collectionId));
+                for (const entry of raw) {
+                    if (entry && entry.secret && entry.key && Object.prototype.hasOwnProperty.call(secrets, entry.key)) {
+                        result[entry.key] = secrets[entry.key];
+                    }
+                }
+            }
             this._cache.set(collectionId, result);
             return result;
         } catch (error) {
             return {};
+        }
+    }
+
+    /**
+     * Returns the collection's variables as editor entries with their secret flag and
+     * resolved (unmasked) values, for the variable manager UI.
+     *
+     * @async
+     * @param {string} collectionId
+     * @returns {Promise<Array<{name: string, value: string, secret: boolean}>>}
+     */
+    async getVariableEntriesForCollection(collectionId) {
+        try {
+            const raw = await this._getRawEntries(collectionId);
+            const secrets = this.secretStore
+                ? await this.secretStore.getScope(this.secretScope(collectionId))
+                : {};
+            return raw
+                .filter(e => e && e.key)
+                .map(e => ({
+                    name: e.key,
+                    secret: Boolean(e.secret),
+                    value: e.secret && Object.prototype.hasOwnProperty.call(secrets, e.key)
+                        ? secrets[e.key]
+                        : (e.value ?? '')
+                }));
+        } catch (error) {
+            return [];
         }
     }
 
@@ -128,12 +204,38 @@ export class VariableRepository {
      * @returns {Promise<void>}
      * @throws {Error} If save operation fails
      */
-    async setVariablesForCollection(collectionId, variables) {
+    async setVariablesForCollection(collectionId, variables, secretKeys = []) {
         try {
-            const arrayFormat = this._objectToArray(variables);
+            const secretSet = new Set(Array.isArray(secretKeys) ? secretKeys : []);
+            const scope = this.secretScope(collectionId);
+
+            // Build the on-disk array, routing secret values out of band and leaving an
+            // empty placeholder so the variables.json file stays git-friendly.
+            const arrayFormat = [];
+            for (const [key, value] of Object.entries(variables || {})) {
+                if (secretSet.has(key)) {
+                    if (this.secretStore) {
+                        await this.secretStore.set(scope, key, value);
+                    }
+                    arrayFormat.push({ key, value: '', secret: true });
+                } else {
+                    arrayFormat.push({ key, value });
+                }
+            }
+
+            // Prune stored secrets that are no longer flagged secret (removed or unmarked).
+            if (this.secretStore) {
+                const stored = await this.secretStore.getScope(scope);
+                for (const key of Object.keys(stored)) {
+                    if (!secretSet.has(key)) {
+                        await this.secretStore.delete(scope, key);
+                    }
+                }
+            }
+
             await this.backendAPI.collections.saveVariables(collectionId, arrayFormat);
-            // Update cache with the new values
-            this._cache.set(collectionId, this._arrayToObject(arrayFormat));
+            // Cache holds resolved (real) values for request-time resolution
+            this._cache.set(collectionId, { ...variables });
         } catch (error) {
             // Invalidate cache on error to ensure consistency
             this._cache.delete(collectionId);
@@ -154,8 +256,9 @@ export class VariableRepository {
     async setVariable(collectionId, name, value) {
         try {
             const variables = await this.getVariablesForCollection(collectionId);
+            const secretKeys = await this._getSecretKeys(collectionId);
             variables[name] = value;
-            await this.setVariablesForCollection(collectionId, variables);
+            await this.setVariablesForCollection(collectionId, variables, secretKeys);
         } catch (error) {
             throw new Error(`Failed to set variable: ${error.message}`);
         }
@@ -173,8 +276,9 @@ export class VariableRepository {
     async deleteVariable(collectionId, name) {
         try {
             const variables = await this.getVariablesForCollection(collectionId);
+            const secretKeys = (await this._getSecretKeys(collectionId)).filter(k => k !== name);
             delete variables[name];
-            await this.setVariablesForCollection(collectionId, variables);
+            await this.setVariablesForCollection(collectionId, variables, secretKeys);
         } catch (error) {
             throw new Error(`Failed to delete variable: ${error.message}`);
         }
@@ -194,6 +298,9 @@ export class VariableRepository {
         try {
             // Save empty array to clear variables for this collection
             await this.backendAPI.collections.saveVariables(collectionId, []);
+            if (this.secretStore) {
+                await this.secretStore.deleteScope(this.secretScope(collectionId));
+            }
         } catch {
             // Ignore errors - collection may already be deleted
         }

@@ -36,6 +36,7 @@ import { initializeCopyHandler } from './modules/copyHandler.js';
 import { HistoryController } from './modules/controllers/HistoryController.js';
 import { EnvironmentController } from './modules/controllers/EnvironmentController.js';
 import { EnvironmentRepository } from './modules/storage/EnvironmentRepository.js';
+import { SecretStore } from './modules/storage/SecretStore.js';
 import { EnvironmentService } from './modules/services/EnvironmentService.js';
 import { EnvironmentManager } from './modules/ui/EnvironmentManager.js';
 import { EnvironmentSelector } from './modules/ui/EnvironmentSelector.js';
@@ -101,8 +102,19 @@ certificateController.initialize();
 // Expose for the request path (apiHandler resolves a cert by host before sending)
 window.certificateController = certificateController;
 
+// Shared secret backend: stores secret values in the OS keychain (encryption at rest),
+// keeping them out of the plaintext store, exports, and git-friendly collection files.
+// Exposed globally for the auth request path. Falls back to encrypted-at-rest-free local
+// storage only when no keychain is available, warning the user once.
+const secretStore = new SecretStore(window.backendAPI, {
+    onFallback: () => toast.warning(
+        'No OS keychain available — secrets are stored locally without encryption at rest.'
+    )
+});
+window.secretStore = secretStore;
+
 // Initialize environment system
-const environmentRepository = new EnvironmentRepository(window.backendAPI);
+const environmentRepository = new EnvironmentRepository(window.backendAPI, secretStore);
 const environmentService = new EnvironmentService(environmentRepository, statusDisplayAdapter);
 const environmentManager = new EnvironmentManager(environmentService);
 
@@ -183,7 +195,7 @@ window.formBodyManager = formBodyManager;
 const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager, proxyController, certificateController);
 
 // Initialize mock server system
-const collectionRepository = new CollectionRepository(window.backendAPI);
+const collectionRepository = new CollectionRepository(window.backendAPI, secretStore);
 const mockServerRepository = new MockServerRepository(window.backendAPI);
 const mockServerService = new MockServerService(mockServerRepository, statusDisplayAdapter);
 const mockServerController = new MockServerController(mockServerService, collectionRepository);

@@ -38,6 +38,7 @@ use commands::{
     },
     proxy::{proxy_get, proxy_set, proxy_test, ProxyState},
     scripts::{script_execute_pre_request, script_execute_test, script_get, script_save},
+    secrets::{secret_delete, secret_get, secret_keychain_available, secret_set},
     sse::{sse_close, sse_connect, SseState},
     store::{settings_get, settings_set, store_get, store_set},
     updater::{
@@ -78,6 +79,11 @@ fn main() {
             store_set,
             settings_get,
             settings_set,
+            // Secrets (OS keychain)
+            secret_set,
+            secret_get,
+            secret_delete,
+            secret_keychain_available,
             // API Requests
             send_api_request,
             cancel_api_request,

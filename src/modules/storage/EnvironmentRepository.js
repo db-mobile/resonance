@@ -18,11 +18,25 @@ export class EnvironmentRepository {
      * Creates an EnvironmentRepository instance
      *
      * @param {Object} backendAPI - The backend IPC API bridge
+     * @param {import('./SecretStore.js').SecretStore} [secretStore] - Optional secret
+     *   backend; when provided, variables flagged in `secretKeys` are stored out of band
+     *   and hydrated at resolution time instead of living in the plaintext store.
      */
-    constructor(backendAPI) {
+    constructor(backendAPI, secretStore = null) {
         this.backendAPI = backendAPI;
         this.ENVIRONMENTS_KEY = 'environments';
+        this.secretStore = secretStore;
         this._cache = null;
+    }
+
+    /**
+     * Builds the SecretStore scope string for an environment.
+     *
+     * @param {string} environmentId
+     * @returns {string}
+     */
+    secretScope(environmentId) {
+        return `env:${environmentId}`;
     }
 
     /**
@@ -33,12 +47,33 @@ export class EnvironmentRepository {
      * @returns {Object}
      */
     _normalizeEnvironment(environment) {
+        const variables = environment?.variables && typeof environment.variables === 'object' ? environment.variables : {};
         return {
             id: environment?.id,
             name: environment?.name || 'Environment',
-            variables: environment?.variables && typeof environment.variables === 'object' ? environment.variables : {},
+            variables: variables,
+            secretKeys: this._normalizeSecretKeys(environment?.secretKeys, variables),
             color: this._normalizeColor(environment?.color)
         };
+    }
+
+    /**
+     * Normalize the list of variable names flagged as secret.
+     *
+     * Keeps only names that still correspond to a defined variable and removes
+     * duplicates, so the secret flag can never reference a deleted variable.
+     *
+     * @private
+     * @param {Array<string>|undefined} secretKeys
+     * @param {Object} variables
+     * @returns {Array<string>}
+     */
+    _normalizeSecretKeys(secretKeys, variables) {
+        if (!Array.isArray(secretKeys)) {
+            return [];
+        }
+        const known = new Set(Object.keys(variables || {}));
+        return [...new Set(secretKeys.filter(name => typeof name === 'string' && known.has(name)))];
     }
 
     /**
@@ -301,6 +336,11 @@ export class EnvironmentRepository {
                 data.activeEnvironmentId = data.items[0].id;
             }
 
+            // Drop any secret values that belonged to this environment
+            if (this.secretStore) {
+                await this.secretStore.deleteScope(this.secretScope(environmentId));
+            }
+
             await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data);
             return true;
         } catch (error) {
@@ -326,13 +366,129 @@ export class EnvironmentRepository {
                 throw new Error(`Environment with ID ${environmentId} not found`);
             }
 
-            return await this.createEnvironment(
+            const duplicate = await this.createEnvironment(
                 newName || `${environment.name} (Copy)`,
                 { ...environment.variables },
                 environment.color
             );
+
+            // Carry over secret flags and copy secret values into the new scope
+            const secretKeys = Array.isArray(environment.secretKeys) ? environment.secretKeys : [];
+            if (secretKeys.length === 0) {
+                return duplicate;
+            }
+
+            await this._copySecretScope(environmentId, duplicate.id, secretKeys);
+            await this.updateEnvironment(duplicate.id, { secretKeys: [...secretKeys] });
+            return await this.getEnvironmentById(duplicate.id);
         } catch (error) {
             throw new Error(`Failed to duplicate environment: ${error.message}`);
+        }
+    }
+
+    /**
+     * Creates or updates a single variable, honoring its secret flag.
+     *
+     * Secret variables keep an empty placeholder in the persisted `variables` map and
+     * store their real value in the SecretStore, so the value never lands in the
+     * plaintext store, exports, or git-friendly collection files. Non-secret variables
+     * store their value inline and drop any prior secret copy.
+     *
+     * @async
+     * @param {string} environmentId
+     * @param {string} name
+     * @param {string} value
+     * @param {boolean} [isSecret=false]
+     * @returns {Promise<Object>} The updated environment
+     * @throws {Error} If the environment is not found
+     */
+    async setEnvironmentVariable(environmentId, name, value, isSecret = false) {
+        const env = await this.getEnvironmentById(environmentId);
+        if (!env) {
+            throw new Error(`Environment with ID ${environmentId} not found`);
+        }
+
+        const variables = { ...env.variables };
+        let secretKeys = Array.isArray(env.secretKeys) ? [...env.secretKeys] : [];
+
+        if (isSecret) {
+            if (this.secretStore) {
+                await this.secretStore.set(this.secretScope(environmentId), name, value);
+            }
+            variables[name] = '';
+            if (!secretKeys.includes(name)) {
+                secretKeys.push(name);
+            }
+        } else {
+            if (this.secretStore) {
+                await this.secretStore.delete(this.secretScope(environmentId), name);
+            }
+            variables[name] = value;
+            secretKeys = secretKeys.filter(n => n !== name);
+        }
+
+        return this.updateEnvironment(environmentId, { variables, secretKeys });
+    }
+
+    /**
+     * Deletes a single variable and any secret value behind it.
+     *
+     * @async
+     * @param {string} environmentId
+     * @param {string} name
+     * @returns {Promise<Object|undefined>} The updated environment, or undefined if not found
+     */
+    async deleteEnvironmentVariable(environmentId, name) {
+        const env = await this.getEnvironmentById(environmentId);
+        if (!env) {
+            return undefined;
+        }
+
+        const variables = { ...env.variables };
+        delete variables[name];
+        const secretKeys = (Array.isArray(env.secretKeys) ? env.secretKeys : []).filter(n => n !== name);
+
+        if (this.secretStore) {
+            await this.secretStore.delete(this.secretScope(environmentId), name);
+        }
+
+        return this.updateEnvironment(environmentId, { variables, secretKeys });
+    }
+
+    /**
+     * Retrieves the stored secret value for a variable, for in-editor display.
+     *
+     * @async
+     * @param {string} environmentId
+     * @param {string} name
+     * @returns {Promise<string>} The secret value, or '' if none/unavailable
+     */
+    async getEnvironmentSecretValue(environmentId, name) {
+        if (!this.secretStore) {
+            return '';
+        }
+        const value = await this.secretStore.get(this.secretScope(environmentId), name);
+        return value === undefined || value === null ? '' : value;
+    }
+
+    /**
+     * Copies secret values from one environment scope to another.
+     *
+     * @private
+     * @param {string} fromId
+     * @param {string} toId
+     * @param {Array<string>} secretKeys
+     * @returns {Promise<void>}
+     */
+    async _copySecretScope(fromId, toId, secretKeys) {
+        if (!this.secretStore) {
+            return;
+        }
+        const secrets = await this.secretStore.getScope(this.secretScope(fromId));
+        for (const name of secretKeys) {
+            if (Object.prototype.hasOwnProperty.call(secrets, name)) {
+                await this.secretStore.set(this.secretScope(toId), name, secrets[name]);
+            }
         }
     }
 
@@ -347,10 +503,41 @@ export class EnvironmentRepository {
     async getActiveEnvironmentVariables() {
         try {
             const activeEnv = await this.getActiveEnvironment();
-            return activeEnv?.variables || {};
+            if (!activeEnv) {
+                return {};
+            }
+            return await this._hydrateSecrets(activeEnv);
         } catch (error) {
             return {};
         }
+    }
+
+    /**
+     * Returns an environment's variable map with secret values merged back in from
+     * the SecretStore. The stored `variables` map holds empty placeholders for secret
+     * keys; this resolves them for request building, the runner, and scripts.
+     *
+     * Used only on resolution paths — never on the editor read paths
+     * (`getAllEnvironments`/`getEnvironmentById`) which must stay masked.
+     *
+     * @private
+     * @param {Object} environment
+     * @returns {Promise<Object>} Variable map with secrets resolved
+     */
+    async _hydrateSecrets(environment) {
+        const variables = { ...(environment.variables || {}) };
+        const secretKeys = Array.isArray(environment.secretKeys) ? environment.secretKeys : [];
+        if (!this.secretStore || secretKeys.length === 0) {
+            return variables;
+        }
+
+        const secrets = await this.secretStore.getScope(this.secretScope(environment.id));
+        for (const name of secretKeys) {
+            if (Object.prototype.hasOwnProperty.call(secrets, name)) {
+                variables[name] = secrets[name];
+            }
+        }
+        return variables;
     }
 
     /**
