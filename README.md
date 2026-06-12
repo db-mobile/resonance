@@ -34,6 +34,14 @@ Install from Snap Store:
 snap install db-mobile-resonance
 ```
 
+To store secret variables and credentials in the OS keychain (encryption at rest), connect the password-manager interface after installing:
+
+```bash
+snap connect db-mobile-resonance:password-manager-service
+```
+
+Without this connection the strict snap cannot reach the Secret Service (GNOME Keyring / KWallet), and secrets fall back to unencrypted local storage. Verify the connection with `snap connections db-mobile-resonance`.
+
 #### AUR (Arch Linux)
 
 Install via an AUR helper like `yay` or `paru`:
