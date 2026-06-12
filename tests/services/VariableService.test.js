@@ -109,7 +109,7 @@ describe('VariableService', () => {
             expect(result).toBe(true);
             expect(mockProcessor.isValidVariableName).toHaveBeenCalledWith('apiKey');
             expect(mockProcessor.isValidVariableName).toHaveBeenCalledWith('baseUrl');
-            expect(mockRepository.setVariablesForCollection).toHaveBeenCalledWith('collection-1', variables);
+            expect(mockRepository.setVariablesForCollection).toHaveBeenCalledWith('collection-1', variables, []);
             expect(mockStatusDisplay.update).toHaveBeenCalledWith('Variables saved successfully', null);
         });
 
@@ -252,7 +252,7 @@ describe('VariableService', () => {
             const result = await service.importVariables('collection-1', variables, false);
 
             expect(result).toBe(true);
-            expect(mockRepository.setVariablesForCollection).toHaveBeenCalledWith('collection-1', variables);
+            expect(mockRepository.setVariablesForCollection).toHaveBeenCalledWith('collection-1', variables, []);
         });
 
         test('should import variables with merge', async () => {
@@ -267,7 +267,7 @@ describe('VariableService', () => {
             const result = await service.importVariables('collection-1', newVariables, true);
 
             expect(result).toBe(true);
-            expect(mockRepository.setVariablesForCollection).toHaveBeenCalledWith('collection-1', mergedVariables);
+            expect(mockRepository.setVariablesForCollection).toHaveBeenCalledWith('collection-1', mergedVariables, []);
         });
 
         test('should handle import errors', async () => {

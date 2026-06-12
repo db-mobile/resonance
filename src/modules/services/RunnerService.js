@@ -36,9 +36,9 @@ export class RunnerService {
         this.backendAPI = backendAPI;
         this.statusDisplay = statusDisplay;
         this.variableProcessor = new VariableProcessor();
-        this.variableRepository = new VariableRepository(backendAPI);
-        this.environmentRepository = new EnvironmentRepository(backendAPI);
-        this.collectionRepository = new CollectionRepository(backendAPI);
+        this.variableRepository = new VariableRepository(backendAPI, window.secretStore);
+        this.environmentRepository = new EnvironmentRepository(backendAPI, window.secretStore);
+        this.collectionRepository = new CollectionRepository(backendAPI, window.secretStore);
         this.certificateService = new CertificateService(new CertificateRepository(backendAPI));
 
         // Execution state

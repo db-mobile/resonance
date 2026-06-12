@@ -1,6 +1,6 @@
 name: db-mobile-resonance
 base: core22
-version: '2.10.2'
+version: '2.11.0'
 title: Resonance
 summary: Test and explore web services
 description: |
@@ -71,6 +71,7 @@ apps:
       - gsettings
       - network
       - network-bind
+      - password-manager-service
 
 package-repositories:
   - type: apt

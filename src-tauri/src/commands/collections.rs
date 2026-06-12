@@ -156,6 +156,56 @@ fn write_json_file<T: Serialize>(path: &PathBuf, data: &T) -> Result<(), String>
     Ok(())
 }
 
+/// Secret credential fields per auth type. Kept in sync with the frontend list in
+/// `src/modules/auth/authSecrets.js`.
+fn secret_auth_fields(auth_type: &str) -> &'static [&'static str] {
+    match auth_type {
+        "bearer" => &["token"],
+        "basic" => &["password"],
+        "api-key" => &["keyValue"],
+        "oauth2" => &["clientSecret", "password", "token", "refreshToken"],
+        "digest" => &["password"],
+        "aws-v4" => &["secretAccessKey", "sessionToken"],
+        _ => &[],
+    }
+}
+
+/// A `{{ ... }}` reference resolves from a variable at request time and carries no
+/// secret itself, so it is safe to leave on disk.
+fn is_template_ref(value: &str) -> bool {
+    match value.find("{{") {
+        Some(start) => value[start..].contains("}}"),
+        None => false,
+    }
+}
+
+/// Defense in depth: blank literal credential fields so they never reach the
+/// git-friendly collection files even if the frontend fails to redact them. Template
+/// references and empty values are preserved. The real values are kept in the
+/// frontend SecretStore and rehydrated on read.
+fn redact_auth_secrets(auth_config: &mut Value) {
+    let auth_type = match auth_config.get("type").and_then(|t| t.as_str()) {
+        Some(t) => t.to_string(),
+        None => return,
+    };
+    let fields = secret_auth_fields(&auth_type);
+    if fields.is_empty() {
+        return;
+    }
+    if let Some(config) = auth_config
+        .get_mut("config")
+        .and_then(|c| c.as_object_mut())
+    {
+        for field in fields {
+            if let Some(Value::String(s)) = config.get(*field) {
+                if !s.is_empty() && !is_template_ref(s) {
+                    config.insert((*field).to_string(), Value::String(String::new()));
+                }
+            }
+        }
+    }
+}
+
 fn read_json_file<T: for<'de> Deserialize<'de>>(path: &PathBuf) -> Result<T, String> {
     let content = fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;
     serde_json::from_str(&content).map_err(|e| format!("Failed to parse JSON: {}", e))
@@ -556,8 +606,13 @@ pub async fn collection_save_endpoint_data(
     app: AppHandle,
     collection_id: String,
     endpoint_id: String,
-    data: EndpointData,
+    mut data: EndpointData,
 ) -> Result<(), String> {
+    // Defense in depth: ensure literal credentials never land in the on-disk file.
+    if let Some(auth) = data.auth_config.as_mut() {
+        redact_auth_secrets(auth);
+    }
+
     let collection = collection_get(app.clone(), collection_id.clone()).await?;
     let collection_dir = PathBuf::from(
         collection
@@ -628,10 +683,20 @@ pub async fn collection_get_variables(
 pub async fn collection_save_variables(
     app: AppHandle,
     collection_id: String,
-    variables: Vec<Value>,
+    mut variables: Vec<Value>,
 ) -> Result<(), String> {
     let collection_dir = resolve_collection_dir(&app, &collection_id)?
         .ok_or_else(|| format!("Collection {} not found", collection_id))?;
+
+    // Defense in depth: a variable flagged secret must never carry its value into the
+    // git-friendly variables.json. The real value lives in the frontend SecretStore.
+    for entry in variables.iter_mut() {
+        if let Some(obj) = entry.as_object_mut() {
+            if obj.get("secret").and_then(|s| s.as_bool()) == Some(true) {
+                obj.insert("value".to_string(), Value::String(String::new()));
+            }
+        }
+    }
 
     let variables_file = collection_dir.join("variables.json");
     write_json_file(&variables_file, &variables)?;
@@ -764,7 +829,7 @@ fn migrate_endpoint_data(
     for endpoint_id in endpoint_ids {
         let key = format!("{}_{}", collection_id, endpoint_id);
 
-        let endpoint_data = EndpointData {
+        let mut endpoint_data = EndpointData {
             modified_body: modified_bodies
                 .get(&key)
                 .and_then(|v| v.as_str())
@@ -806,6 +871,9 @@ fn migrate_endpoint_data(
             || endpoint_data.graphql_data.is_some()
             || endpoint_data.grpc_data.is_some()
         {
+            if let Some(auth) = endpoint_data.auth_config.as_mut() {
+                redact_auth_secrets(auth);
+            }
             let endpoint_file = requests_dir.join(format!("{}.json", endpoint_id));
             write_json_file(&endpoint_file, &endpoint_data)?;
         }

@@ -25,13 +25,35 @@ export class VariableManager {
         this.keyDownHandler = null;
     }
 
-    show(collectionName, variables = {}, options = {}) {
+    /**
+     * @param {string} collectionName
+     * @param {Array<{name: string, value: string, secret?: boolean}>} entries - Variable
+     *   editor entries. (A plain `{name: value}` object is also accepted for convenience.)
+     * @param {Object} [options]
+     * @returns {Promise<{variables: Object, secretKeys: string[]}|null>} The edited
+     *   variables and the names flagged secret, or null if cancelled.
+     */
+    show(collectionName, entries = [], options = {}) {
         return new Promise((resolve, _reject) => {
             this.onSave = resolve;
             this.onCancel = () => resolve(null);
 
-            this.createDialog(collectionName, variables, options);
+            this.createDialog(collectionName, this._normalizeEntries(entries), options);
         });
+    }
+
+    /**
+     * Accepts either editor entries or a legacy flat `{name: value}` object.
+     *
+     * @private
+     * @param {Array|Object} entries
+     * @returns {Array<{name: string, value: string, secret: boolean}>}
+     */
+    _normalizeEntries(entries) {
+        if (Array.isArray(entries)) {
+            return entries.map(e => ({ name: e.name, value: e.value ?? '', secret: Boolean(e.secret) }));
+        }
+        return Object.entries(entries || {}).map(([name, value]) => ({ name, value, secret: false }));
     }
 
     createDialog(collectionName, variables, options) {
@@ -61,20 +83,21 @@ export class VariableManager {
         this.setupEventListeners(dialogContent);
     }
 
-    populateVariables(variables) {
+    populateVariables(entries) {
         const container = this.dialog.querySelector('#variables-container');
-        
-        if (Object.keys(variables).length === 0) {
+        const list = this._normalizeEntries(entries);
+
+        if (list.length === 0) {
             this.addVariableRow(container);
         } else {
-            Object.entries(variables).forEach(([name, value]) => {
-                this.addVariableRow(container, name, value);
+            list.forEach(entry => {
+                this.addVariableRow(container, entry.name, entry.value, entry.secret);
             });
             this.addVariableRow(container);
         }
     }
 
-    addVariableRow(container, name = '', value = '') {
+    addVariableRow(container, name = '', value = '', secret = false) {
         const fragment = templateLoader.cloneSync(
             './src/templates/variables/variableManager.html',
             'tpl-variable-manager-row'
@@ -91,12 +114,13 @@ export class VariableManager {
         // Set values directly via .value property to preserve special characters like {{ }}
         if (nameInput) {nameInput.value = name;}
         if (valueInput) {valueInput.value = value;}
-        
+
+        this._applySecretState(row, secret);
+        this._setupSecretControls(row);
+
         const autoAddRow = () => {
             const allRows = container.querySelectorAll('.variable-row');
             const lastRow = allRows[allRows.length - 1];
-            const _lastNameInput = lastRow.querySelector('.variable-name');
-            const _lastValueInput = lastRow.querySelector('.variable-value');
 
             if (row === lastRow && (nameInput.value.trim() || valueInput.value.trim())) {
                 this.addVariableRow(container);
@@ -107,6 +131,61 @@ export class VariableManager {
         valueInput.addEventListener('input', autoAddRow);
 
         container.appendChild(row);
+    }
+
+    /**
+     * Reflects a row's secret state: masks the value, shows the reveal toggle, and
+     * highlights the lock button.
+     *
+     * @private
+     */
+    _applySecretState(row, isSecret) {
+        const valueInput = row.querySelector('.variable-value');
+        const secretBtn = row.querySelector('.variable-secret-btn');
+        const revealBtn = row.querySelector('.variable-reveal-btn');
+
+        row.dataset.secret = isSecret ? 'true' : 'false';
+        if (secretBtn) {secretBtn.classList.toggle('is-secret', isSecret);}
+        if (revealBtn) {revealBtn.classList.toggle('is-hidden', !isSecret);}
+        if (valueInput) {valueInput.type = isSecret ? 'password' : 'text';}
+        if (revealBtn) {
+            const icon = revealBtn.querySelector('.icon');
+            if (icon) {
+                icon.classList.toggle('icon-eye', true);
+                icon.classList.toggle('icon-eye-off', false);
+            }
+            revealBtn.title = 'Show value';
+        }
+    }
+
+    /**
+     * Wires the per-row secret toggle and reveal toggle.
+     *
+     * @private
+     */
+    _setupSecretControls(row) {
+        const valueInput = row.querySelector('.variable-value');
+        const secretBtn = row.querySelector('.variable-secret-btn');
+        const revealBtn = row.querySelector('.variable-reveal-btn');
+
+        if (secretBtn) {
+            secretBtn.addEventListener('click', () => {
+                this._applySecretState(row, row.dataset.secret !== 'true');
+            });
+        }
+
+        if (revealBtn) {
+            revealBtn.addEventListener('click', () => {
+                const showing = valueInput.type === 'text';
+                valueInput.type = showing ? 'password' : 'text';
+                const icon = revealBtn.querySelector('.icon');
+                if (icon) {
+                    icon.classList.toggle('icon-eye', showing);
+                    icon.classList.toggle('icon-eye-off', !showing);
+                }
+                revealBtn.title = showing ? 'Show value' : 'Hide value';
+            });
+        }
     }
 
     setupEventListeners(dialogContent) {
@@ -147,6 +226,7 @@ export class VariableManager {
         const container = this.dialog.querySelector('#variables-container');
         const rows = container.querySelectorAll('.variable-row');
         const variables = {};
+        const secretKeys = [];
         const errors = [];
 
         rows.forEach((row, index) => {
@@ -154,6 +234,7 @@ export class VariableManager {
             const valueInput = row.querySelector('.variable-value');
             const name = nameInput.value.trim();
             const value = valueInput.value.trim();
+            const isSecret = row.dataset.secret === 'true';
 
             if (name || value) {
                 if (!name) {
@@ -172,6 +253,9 @@ export class VariableManager {
                 }
 
                 variables[name] = value;
+                if (isSecret) {
+                    secretKeys.push(name);
+                }
             }
         });
 
@@ -181,7 +265,7 @@ export class VariableManager {
         }
 
         if (this.onSave) {
-            this.onSave(variables);
+            this.onSave({ variables, secretKeys });
         }
         this.cleanup();
     }
@@ -256,8 +340,10 @@ export class VariableManager {
         rows.forEach(row => {
             const name = row.querySelector('.variable-name').value.trim();
             const value = row.querySelector('.variable-value').value.trim();
+            const isSecret = row.dataset.secret === 'true';
             if (name) {
-                variables[name] = value;
+                // Secret values are never written to exported files
+                variables[name] = isSecret ? '' : value;
             }
         });
 

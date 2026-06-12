@@ -45,8 +45,16 @@
 <template id="tpl-variable-manager-row">
     <div class="variable-row">
         <input type="text" class="input-base variable-name" placeholder="Variable name">
-        <input type="text" class="input-base variable-value" placeholder="Variable value">
-        <button class="btn-delete remove-variable-btn">Remove</button>
+        <div class="var-value-wrap">
+            <input type="text" class="input-base variable-value" placeholder="Variable value">
+            <button type="button" class="btn btn-icon variable-reveal-btn is-hidden" title="Show value" tabindex="-1">
+                <span class="icon icon-14 icon-eye"></span>
+            </button>
+        </div>
+        <button type="button" class="btn btn-icon variable-secret-btn" title="Mark as secret (kept out of collection files and exports)">
+            <span class="icon icon-14 icon-lock"></span>
+        </button>
+        <button class="btn-delete remove-variable-btn">×</button>
     </div>
 </template>
 

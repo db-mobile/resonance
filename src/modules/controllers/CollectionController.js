@@ -43,8 +43,8 @@ export class CollectionController {
      */
     constructor(backendAPI, updateStatusDisplay) {
         this.backendAPI = backendAPI;
-        this.repository = new CollectionRepository(backendAPI);
-        this.variableRepository = new VariableRepository(backendAPI);
+        this.repository = new CollectionRepository(backendAPI, window.secretStore);
+        this.variableRepository = new VariableRepository(backendAPI, window.secretStore);
         this.schemaProcessor = new SchemaProcessor();
         this.variableProcessor = new VariableProcessor();
         this.statusDisplay = new StatusDisplayAdapter(updateStatusDisplay);
@@ -449,11 +449,11 @@ export class CollectionController {
      */
     async handleVariables(collection) {
         try {
-            const currentVariables = await this.variableService.getVariablesForCollection(collection.id);
-            const newVariables = await this.variableManager.show(collection.name, currentVariables);
-            
-            if (newVariables !== null) {
-                await this.variableService.setMultipleVariables(collection.id, newVariables);
+            const currentEntries = await this.variableService.getCollectionVariableEntries(collection.id);
+            const result = await this.variableManager.show(collection.name, currentEntries);
+
+            if (result !== null) {
+                await this.variableService.setMultipleVariables(collection.id, result.variables, result.secretKeys);
 
                 // Don't substitute variables in the form - they should stay as {{...}} placeholders
                 // Variable substitution happens at request time in apiHandler.js

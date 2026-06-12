@@ -221,7 +221,7 @@ export class EnvironmentManager {
             this.setupDetailEventListeners(environment);
 
             // Load variables
-            this.loadVariables(environment.variables);
+            this.loadVariables(environment);
         } catch (error) {
             void error;
         }
@@ -390,14 +390,25 @@ export class EnvironmentManager {
 
     /**
      * Load variables for environment
+     *
+     * @param {Object} environment - The environment whose variables to render
      */
-    loadVariables(variables) {
+    async loadVariables(environment) {
         const container = this.dialog.querySelector('#env-variables-container');
         container.innerHTML = '';
 
-        Object.entries(variables).forEach(([name, value]) => {
-            this.addVariableRow({ name, value }, container);
-        });
+        const variables = environment?.variables || {};
+        const secretKeys = Array.isArray(environment?.secretKeys) ? environment.secretKeys : [];
+
+        for (const [name, value] of Object.entries(variables)) {
+            const isSecret = secretKeys.includes(name);
+            // Secret values live in the SecretStore, not in the variables map; fetch the
+            // real value for in-editor display (rendered masked behind a reveal toggle).
+            const resolvedValue = isSecret
+                ? await this.service.getSecretValue(environment.id, name)
+                : value;
+            this.addVariableRow({ name, value: resolvedValue, isSecret }, container);
+        }
 
         // Add empty row for new variable
         this.addVariableRow({}, container);
@@ -406,7 +417,7 @@ export class EnvironmentManager {
     /**
      * Add variable input row
      */
-    addVariableRow({ name = '', value = '' }, container = null) {
+    addVariableRow({ name = '', value = '', isSecret = false }, container = null) {
         if (!container) {
             container = this.dialog.querySelector('#env-variables-container');
         }
@@ -423,6 +434,8 @@ export class EnvironmentManager {
                 if (nameInput) {nameInput.value = name;}
                 if (valueInput) {valueInput.value = value;}
 
+                this.applySecretState(row, isSecret);
+
                 // Setup variable row event listeners
                 this.setupVariableRowListeners(row, name);
             })
@@ -432,12 +445,45 @@ export class EnvironmentManager {
     }
 
     /**
+     * Reflects a row's secret state in the DOM: masks the value, shows the reveal
+     * toggle, and highlights the lock button.
+     *
+     * @param {HTMLElement} row
+     * @param {boolean} isSecret
+     */
+    applySecretState(row, isSecret) {
+        const valueInput = row.querySelector('.var-value-input');
+        const secretBtn = row.querySelector('.var-secret-btn');
+        const revealBtn = row.querySelector('.var-reveal-btn');
+
+        row.dataset.secret = isSecret ? 'true' : 'false';
+        if (secretBtn) {secretBtn.classList.toggle('is-secret', isSecret);}
+        if (revealBtn) {revealBtn.classList.toggle('is-hidden', !isSecret);}
+        if (valueInput) {
+            valueInput.type = isSecret ? 'password' : 'text';
+        }
+        // Reset reveal toggle to hidden whenever secret state changes
+        if (revealBtn) {
+            const icon = revealBtn.querySelector('.icon');
+            if (icon) {
+                icon.classList.toggle('icon-eye', true);
+                icon.classList.toggle('icon-eye-off', false);
+            }
+            revealBtn.title = 'Show value';
+        }
+    }
+
+    /**
      * Setup event listeners for variable row
      */
     setupVariableRowListeners(row, originalName) {
         const nameInput = row.querySelector('.var-name-input');
         const valueInput = row.querySelector('.var-value-input');
         const deleteBtn = row.querySelector('.var-delete-btn');
+        const secretBtn = row.querySelector('.var-secret-btn');
+        const revealBtn = row.querySelector('.var-reveal-btn');
+
+        const isSecret = () => row.dataset.secret === 'true';
 
         const saveVariable = async () => {
             const name = nameInput.value.trim();
@@ -456,7 +502,7 @@ export class EnvironmentManager {
                 await this.deleteVariable(originalName);
             }
 
-            await this.setVariable(name, value);
+            await this.setVariable(name, value, isSecret());
         };
 
         nameInput.addEventListener('blur', saveVariable);
@@ -470,6 +516,32 @@ export class EnvironmentManager {
             if (e.key === 'Enter') {saveVariable();}
         });
 
+        // Toggle the secret flag; persists immediately when the row has a name
+        if (secretBtn) {
+            secretBtn.addEventListener('click', async () => {
+                const next = !isSecret();
+                this.applySecretState(row, next);
+                const name = nameInput.value.trim();
+                if (name) {
+                    await this.setVariable(name, valueInput.value.trim(), next);
+                }
+            });
+        }
+
+        // Reveal/hide a secret value while editing
+        if (revealBtn) {
+            revealBtn.addEventListener('click', () => {
+                const showing = valueInput.type === 'text';
+                valueInput.type = showing ? 'password' : 'text';
+                const icon = revealBtn.querySelector('.icon');
+                if (icon) {
+                    icon.classList.toggle('icon-eye', showing);
+                    icon.classList.toggle('icon-eye-off', !showing);
+                }
+                revealBtn.title = showing ? 'Show value' : 'Hide value';
+            });
+        }
+
         deleteBtn.addEventListener('click', async () => {
             if (originalName) {
                 await this.deleteVariable(originalName);
@@ -480,17 +552,15 @@ export class EnvironmentManager {
 
     /**
      * Set variable in current environment
+     *
+     * @param {string} name
+     * @param {string} value
+     * @param {boolean} [isSecret=false]
      */
-    async setVariable(name, value) {
+    async setVariable(name, value, isSecret = false) {
         try {
-            const environment = await this.service.getAllEnvironments().then(envs =>
-                envs.find(e => e.id === this.currentEnvironmentId)
-            );
-
-            if (!environment) {return;}
-
-            const variables = { ...environment.variables, [name]: value };
-            await this.service.updateEnvironment(this.currentEnvironmentId, { variables });
+            if (!this.currentEnvironmentId) {return;}
+            await this.service.setVariable(this.currentEnvironmentId, name, value, isSecret);
         } catch (error) {
             this.showAlert(error.message);
         }
@@ -501,15 +571,8 @@ export class EnvironmentManager {
      */
     async deleteVariable(name) {
         try {
-            const environment = await this.service.getAllEnvironments().then(envs =>
-                envs.find(e => e.id === this.currentEnvironmentId)
-            );
-
-            if (!environment) {return;}
-
-            const variables = { ...environment.variables };
-            delete variables[name];
-            await this.service.updateEnvironment(this.currentEnvironmentId, { variables });
+            if (!this.currentEnvironmentId) {return;}
+            await this.service.deleteVariable(this.currentEnvironmentId, name);
         } catch (error) {
             this.showAlert(error.message);
         }

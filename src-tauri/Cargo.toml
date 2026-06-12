@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "2.10.2"
+version = "2.11.0"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -76,6 +76,18 @@ protoc-bin-vendored = "3"
 
 # JavaScript engine for script execution
 boa_engine = "0.19"
+
+# OS keychain for secret storage (encryption at rest). Pinned OpenSSL-free to match the
+# project's rustls/ring-only TLS stack: Linux uses the D-Bus Secret Service with RustCrypto
+# (zbus, no OpenSSL); macOS/Windows use their native credential stores.
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", default-features = false, features = ["sync-secret-service", "crypto-rust"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", default-features = false, features = ["apple-native"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", default-features = false, features = ["windows-native"] }
 
 [features]
 default = ["custom-protocol"]

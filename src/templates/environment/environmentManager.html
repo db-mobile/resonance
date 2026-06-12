@@ -82,7 +82,15 @@
 <template id="tpl-environment-manager-variable-row">
     <div class="env-variable-row">
         <input type="text" class="input-base var-name-input" placeholder="Variable name" />
-        <input type="text" class="input-base var-value-input" placeholder="Value" />
+        <div class="var-value-wrap">
+            <input type="text" class="input-base var-value-input" placeholder="Value" />
+            <button type="button" class="btn btn-icon var-reveal-btn is-hidden" title="Show value" tabindex="-1">
+                <span class="icon icon-14 icon-eye"></span>
+            </button>
+        </div>
+        <button type="button" class="btn btn-icon var-secret-btn" title="Mark as secret (kept out of collection files and exports)">
+            <span class="icon icon-14 icon-lock"></span>
+        </button>
         <button class="btn-delete var-delete-btn">×</button>
     </div>
 </template>

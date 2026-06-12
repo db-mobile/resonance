@@ -78,8 +78,8 @@ export function getSettingsCache() {
 
 function getVariableService() {
     if (!_variableService) {
-        const variableRepository = new VariableRepository(window.backendAPI);
-        const environmentRepository = new EnvironmentRepository(window.backendAPI);
+        const variableRepository = new VariableRepository(window.backendAPI, window.secretStore);
+        const environmentRepository = new EnvironmentRepository(window.backendAPI, window.secretStore);
         const variableProcessor = new VariableProcessor();
         const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
         _variableService = new VariableService(variableRepository, variableProcessor, statusDisplayAdapter, environmentRepository);
@@ -98,7 +98,7 @@ function getMockServerService() {
 
 function getCollectionRepository() {
     if (!_collectionRepository) {
-        _collectionRepository = new CollectionRepository(window.backendAPI);
+        _collectionRepository = new CollectionRepository(window.backendAPI, window.secretStore);
     }
     return _collectionRepository;
 }
