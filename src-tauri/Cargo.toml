@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "2.11.0"
+version = "2.11.1"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -82,6 +82,12 @@ boa_engine = "0.19"
 # (zbus, no OpenSSL); macOS/Windows use their native credential stores.
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3", default-features = false, features = ["sync-secret-service", "crypto-rust"] }
+# Secret portal backend, used only when running inside a Flatpak sandbox so the app can
+# encrypt secrets at rest without a `--talk-name=org.freedesktop.secrets` permission
+# (which flags the app as using a non-portal service on Flathub). `native_crypto` is the
+# RustCrypto backend (the `openssl_crypto` feature is the OpenSSL one) — keep it that way
+# to match the project's OpenSSL-free tree; verify with `cargo tree -i openssl-sys`.
+oo7 = { version = "0.3", default-features = false, features = ["tokio", "native_crypto"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", default-features = false, features = ["apple-native"] }
