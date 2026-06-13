@@ -99,6 +99,14 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.11.1" date="2026-06-13">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Use Secret portal for keychain</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.11.0" date="2026-06-12">
       <description>
         <p>New features introduced</p>

@@ -330,13 +330,29 @@ export class PreviewRenderer {
         iframe.className = 'response-preview-iframe';
         iframe.setAttribute('sandbox', 'allow-same-origin');
 
-        // Inject CSP to block images
-        const cspMeta = '<meta http-equiv="Content-Security-Policy" content="img-src \'none\';">';
-        const modifiedContent = this._injectCSP(content, cspMeta);
+        // Inject CSP to block images and scripts
+        const cspMeta = '<meta http-equiv="Content-Security-Policy" content="img-src \'none\'; script-src \'none\';">';
+        const sanitizedContent = this._stripScripts(content);
+        const modifiedContent = this._injectCSP(sanitizedContent, cspMeta);
 
         iframe.srcdoc = modifiedContent;
 
         this.container.appendChild(iframe);
+    }
+
+    /**
+     * Remove script tags so the sandboxed iframe never attempts to execute
+     * them (avoids the browser's "Blocked script execution" console warning).
+     * @private
+     * @param {string} content - Original HTML content
+     * @returns {string} HTML content with script elements removed
+     */
+    _stripScripts(content) {
+        return content
+            // Remove well-formed <script>...</script> blocks
+            .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
+            // Remove any remaining/unclosed <script ...> opening tags
+            .replace(/<script\b[^>]*>/gi, '');
     }
 
     /**
