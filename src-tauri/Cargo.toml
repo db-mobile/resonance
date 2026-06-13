@@ -98,3 +98,11 @@ keyring = { version = "3", default-features = false, features = ["windows-native
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+opt-level = "s"    # Optimize for binary size
+lto = true         # Link-time optimization
+codegen-units = 1  # Maximize cross-module optimization (slower compile)
+strip = true       # Strip symbols from the binary
+# panic = "abort" intentionally omitted: the Boa script sandbox relies on
+# unwinding worker-thread panics, which abort would escalate to a full crash.
