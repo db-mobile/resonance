@@ -40,7 +40,7 @@ import { extractCookies } from './cookieParser.js';
 import { getRequestBodyContent } from './requestBodyHelper.js';
 import { MockServerRepository } from './storage/MockServerRepository.js';
 import { MockServerService } from './services/MockServerService.js';
-import { isGrpcMode, isMqttMode, isSseMode, isWebSocketMode } from './requestModeManager.js';
+import { isGrpcMode, isMqttMode, isSseMode, isWebSocketMode, isGraphQLMode } from './requestModeManager.js';
 import { handleGrpcSend } from './grpcHandler.js';
 import { handleWebSocketCancel, handleWebSocketSend } from './websocketHandler.js';
 import { handleSseCancel, handleSseConnect } from './sseHandler.js';
@@ -48,6 +48,7 @@ import { handleMqttCancel, handleMqttSend } from './mqttHandler.js';
 import { cancelStream as cancelGrpcStream, hasActiveStream as hasActiveGrpcStream } from './grpcStreamHandler.js';
 import { RequestBuilderService } from './services/RequestBuilderService.js';
 import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes } from './ResponseDisplayHelper.js';
+import { getIntrospectionQuery, buildClientSchema } from 'graphql';
 
 let responseEditor = null;
 
@@ -109,6 +110,112 @@ function getRequestBuilderService() {
         _requestBuilderService = new RequestBuilderService(getVariableService, getCollectionRepository);
     }
     return _requestBuilderService;
+}
+
+/**
+ * Fetches the GraphQL schema for the current endpoint by POSTing the standard
+ * introspection query. Reuses the same URL/header/auth/variable resolution as the
+ * main send path so it honours the user's configured auth, headers and variables.
+ *
+ * Does not mutate any shared send state and never throws — failures are returned
+ * as { error }.
+ *
+ * @returns {Promise<{schema?: import('graphql').GraphQLSchema, url?: string, error?: string}>}
+ */
+export async function fetchGraphQLIntrospection() {
+    const url = urlInput?.value?.trim() || urlInput?.getAttribute('value') || '';
+    if (!url) {
+        return { error: 'Enter a URL before fetching the schema' };
+    }
+
+    const headers = parseKeyValuePairs(document.getElementById('headers-list'));
+    const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
+
+    const authData = authManager.generateAuthData();
+    const builder = getRequestBuilderService();
+    builder.mergeAuthData(headers, queryParams, authData);
+
+    let resolvedUrl = url;
+    try {
+        const { variables, processor } = await builder.resolveVariables(window.currentEndpoint, headers);
+        ({ url: resolvedUrl } = builder.processRequestComponents({
+            url, pathParams: {}, headers, queryParams, variables, processor
+        }));
+    } catch (error) {
+        return { error: `Variable processing error: ${error.message}` };
+    }
+
+    let timeout = 30000;
+    let verifySsl = true;
+    let followRedirects = true;
+    try {
+        if (!_settingsCache) {
+            _settingsCache = await window.backendAPI.settings.get();
+        }
+        const settings = _settingsCache;
+        const savedTimeout = settings.requestTimeout ?? settings.timeout;
+        timeout = savedTimeout === 0 ? null : (savedTimeout ?? 30000);
+        verifySsl = settings.verifySsl !== false;
+        followRedirects = settings.followRedirects !== false;
+    } catch (e) {
+        void e;
+    }
+
+    const requestConfig = {
+        method: 'POST',
+        url: resolvedUrl,
+        rawUrl: url,
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: { query: getIntrospectionQuery(), variables: {} },
+        timeout,
+        verifySsl,
+        followRedirects
+    };
+
+    if (authData.authConfig) {
+        requestConfig.auth = authData.authConfig;
+    }
+    if (authData.awsAuth) {
+        requestConfig.awsAuth = authData.awsAuth;
+    }
+    if (window.certificateController) {
+        try {
+            const clientCert = window.certificateController.getForHost(new URL(resolvedUrl).host);
+            if (clientCert) {
+                requestConfig.clientCert = clientCert;
+            }
+        } catch (e) {
+            void e;
+        }
+    }
+
+    let result;
+    try {
+        result = await window.backendAPI.sendApiRequest(requestConfig);
+    } catch (error) {
+        return { error: `Request failed: ${error.message || error}` };
+    }
+
+    if (!result || !result.success) {
+        const status = result?.status ? ` (HTTP ${result.status})` : '';
+        return { error: `${result?.message || 'Introspection request failed'}${status}` };
+    }
+
+    const payload = result.data;
+    if (payload && Array.isArray(payload.errors) && payload.errors.length > 0) {
+        return { error: `GraphQL error: ${payload.errors[0].message || 'introspection rejected'}` };
+    }
+
+    const introspection = payload?.data;
+    if (!introspection || !introspection.__schema) {
+        return { error: 'Response did not contain a GraphQL schema (introspection may be disabled)' };
+    }
+
+    try {
+        return { schema: buildClientSchema(introspection), url: resolvedUrl };
+    } catch (error) {
+        return { error: `Could not parse schema: ${error.message}` };
+    }
 }
 
 /**
@@ -209,10 +316,66 @@ function displaySchemaValidationResult(validationResult, tabId = null) {
     const badge = document.createElement('span');
     badge.className = `response-validation-badge ${validationResult.valid ? 'valid' : 'invalid'}`;
     badge.textContent = validationResult.valid ? 'Schema Valid' : `Schema Invalid (${validationResult.errors.length})`;
-    
+
     if (!validationResult.valid && validationResult.errors.length > 0) {
         badge.title = validationResult.errors.map(e => `${e.path}: ${e.message}`).join('\n');
     }
+
+    statusContainer.appendChild(badge);
+}
+
+/**
+ * Removes the GraphQL errors badge from the response status area.
+ * @param {string|null} tabId - Workspace tab ID
+ */
+export function clearGraphQLErrorsBadge(tabId = null) {
+    const containerElements = tabId
+        ? window.responseContainerManager?.getOrCreateContainer(tabId)
+        : window.responseContainerManager?.getActiveElements();
+
+    const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
+    const existingBadge = statusContainer?.querySelector('.graphql-errors-badge');
+    if (existingBadge) {
+        existingBadge.remove();
+    }
+}
+
+/**
+ * Surfaces top-level GraphQL `errors` from a response. GraphQL servers return
+ * HTTP 200 even when a query fails, so without this a failed query looks like a
+ * successful request. Only acts when the request was sent in GraphQL mode.
+ *
+ * @param {Object} result - The backend ApiResponse (result.data is the parsed body)
+ * @param {string|null} tabId - Workspace tab ID
+ */
+function displayGraphQLErrorsBadge(result, tabId = null) {
+    clearGraphQLErrorsBadge(tabId);
+
+    if (!graphqlBodyManager || !graphqlBodyManager.isGraphQLMode()) {
+        return;
+    }
+
+    const data = result?.data;
+    const errors = (data && typeof data === 'object' && !Array.isArray(data)) ? data.errors : null;
+    if (!Array.isArray(errors) || errors.length === 0) {
+        return;
+    }
+
+    const containerElements = tabId
+        ? window.responseContainerManager?.getOrCreateContainer(tabId)
+        : window.responseContainerManager?.getActiveElements();
+
+    const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
+    if (!statusContainer) {
+        return;
+    }
+
+    const badge = document.createElement('span');
+    badge.className = 'graphql-errors-badge';
+    badge.textContent = `GraphQL Errors (${errors.length})`;
+    badge.title = errors
+        .map(e => (e && typeof e.message === 'string') ? e.message : JSON.stringify(e))
+        .join('\n');
 
     statusContainer.appendChild(badge);
 }
@@ -489,7 +652,8 @@ export async function handleSendRequest() {
 
     const rawUrl = url;
 
-    const method = methodSelect.value;
+    // GraphQL is always an HTTP POST under the hood; the method dropdown is hidden.
+    const method = isGraphQLMode() ? 'POST' : methodSelect.value;
     let body = undefined;
 
     const pathParams = parseKeyValuePairs(document.getElementById('path-params-list'));
@@ -570,7 +734,7 @@ export async function handleSendRequest() {
                 }
             }
 
-            if (graphqlBodyManager && graphqlBodyManager.isGraphQLMode()) {
+            if (isGraphQLMode() && graphqlBodyManager) {
                 let queryText = graphqlBodyManager.getGraphQLQuery().trim();
                 let variablesText = graphqlBodyManager.getGraphQLVariables().trim();
 
@@ -593,6 +757,12 @@ export async function handleSendRequest() {
                     query: queryText,
                     variables: parsedVariables
                 };
+
+                // Include operationName so servers can disambiguate multi-operation documents
+                const operationName = graphqlBodyManager.getSelectedOperationName?.();
+                if (operationName) {
+                    body.operationName = operationName;
+                }
             } else if ((bodyMode === 'formdata' || bodyMode === 'urlencoded') && window.formBodyManager) {
                 const rawFields = bodyMode === 'formdata'
                     ? window.formBodyManager.getFormDataFields()
@@ -745,6 +915,9 @@ export async function handleSendRequest() {
                 displaySchemaValidationResult(validationResult, requestTabId);
             }
 
+            // GraphQL servers return HTTP 200 even on failure; surface any top-level errors
+            displayGraphQLErrorsBadge(result, requestTabId);
+
             displayResponsePanes(requestTabId, globalResponseElements(), {
                 headers: result.headers,
                 timings: result.timings,
@@ -804,6 +977,7 @@ export async function handleSendRequest() {
             }
             displayResponseWithLineNumbersForTab('Request was cancelled', null, requestTabId);
             clearResponsePanes(requestTabId, globalResponseElements());
+            clearGraphQLErrorsBadge(requestTabId);
             setRequestInProgress(false);
         } else {
             throw result;
@@ -838,6 +1012,7 @@ export async function handleSendRequest() {
         displayResponseWithLineNumbersForTab(errorContent, contentType, requestTabId);
 
         displayErrorResponsePanes(requestTabId, globalResponseElements(), error);
+        clearGraphQLErrorsBadge(requestTabId);
 
         let statusDisplayText = 'Request Failed';
         if (status) {

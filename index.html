@@ -289,7 +289,6 @@
                         <div class="body-mode-selector-container u-flex u-items-center">
                             <select id="body-mode-select" class="body-mode-select" aria-label="Body Mode">
                                 <option value="json">JSON</option>
-                                <option value="graphql">GraphQL</option>
                                 <option value="formdata">Form Data</option>
                                 <option value="urlencoded">URL Encoded</option>
                                 <option value="text">Text</option>
@@ -327,25 +326,60 @@
 
                     <!-- GraphQL Mode (new) -->
                     <div class="body-mode-panel graphql-body-container" id="body-graphql-section" data-mode="graphql">
-                        <!-- Query Section -->
-                        <div class="graphql-query-section u-flex u-flex-col">
-                            <div class="graphql-section-header u-flex u-items-center u-justify-between">
-                                <label for="graphql-query-editor">Query</label>
-                                <div class="graphql-section-actions">
-                                    <button id="graphql-format-btn" class="btn-sm btn-secondary" title="Format Query">
-                                        Format
-                                    </button>
-                                </div>
+                        <!-- Workbench toolbar -->
+                        <div class="graphql-toolbar u-flex u-items-center u-justify-between">
+                            <div class="graphql-toolbar-left u-flex u-items-center">
+                                <select id="graphql-operation-select" class="body-mode-select" aria-label="Operation to run" title="Operation to run" style="display: none;"></select>
                             </div>
-                            <div id="graphql-query-editor" class="graphql-editor"></div>
+                            <div class="graphql-toolbar-right u-flex u-items-center">
+                                <button id="graphql-fetch-schema-btn" class="btn-sm btn-secondary" title="Fetch schema via introspection">
+                                    Schema
+                                </button>
+                                <button id="graphql-format-btn" class="btn-sm btn-secondary" title="Format Query">
+                                    Format
+                                </button>
+                                <button id="graphql-docs-toggle" class="btn-sm btn-secondary" title="Schema docs" aria-pressed="false">
+                                    Docs
+                                </button>
+                                <button id="graphql-run-btn" class="btn btn-sm btn-primary" title="Run (send request)">
+                                    <span class="icon icon-12 icon-play"></span> Run
+                                </button>
+                            </div>
                         </div>
 
-                        <!-- Variables Section -->
-                        <div class="graphql-variables-section u-flex u-flex-col">
-                            <div class="graphql-section-header u-flex u-items-center u-justify-between">
-                                <label for="graphql-variables-editor">Variables</label>
+                        <!-- Workbench body: editor column + (optional) docs rail -->
+                        <div class="graphql-workbench-body u-flex">
+                            <div class="graphql-main u-flex u-flex-col">
+                                <!-- Query hero -->
+                                <div class="graphql-query-section u-flex u-flex-col">
+                                    <div id="graphql-query-editor" class="graphql-editor"></div>
+                                </div>
+
+                                <!-- Resizer between Query and the drawer -->
+                                <div class="resizer-handle" id="graphql-resizer-handle">
+                                    <div class="resizer-grip u-flex u-items-center u-justify-center">
+                                        <div class="resizer-line"></div>
+                                        <div class="resizer-line"></div>
+                                        <div class="resizer-line"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Bottom drawer: Variables (collapsed by default) -->
+                                <div class="graphql-variables-section graphql-drawer collapsed u-flex u-flex-col" id="graphql-drawer">
+                                    <div class="graphql-drawer-tabs u-flex u-items-center" id="graphql-drawer-tabs" role="tablist">
+                                        <button type="button" class="graphql-drawer-tab active" id="graphql-drawer-tab-variables" data-drawer="variables" role="tab" aria-selected="true">Variables</button>
+                                        <span class="graphql-drawer-chevron icon icon-12 icon-chevron-down" aria-hidden="true"></span>
+                                    </div>
+                                    <div class="graphql-drawer-panes u-flex u-flex-col">
+                                        <div class="graphql-drawer-pane active" data-drawer-pane="variables">
+                                            <div id="graphql-variables-editor" class="graphql-editor"></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div id="graphql-variables-editor" class="graphql-editor"></div>
+
+                            <!-- Schema docs explorer (minimal overview for now) -->
+                            <div class="graphql-docs-rail" id="graphql-docs-rail" style="display: none;"></div>
                         </div>
                     </div>
                 </div>

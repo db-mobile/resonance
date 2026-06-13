@@ -77,12 +77,22 @@ export class CollectionEndpointLoaderService {
 
         const isGrpc = endpoint.protocol === 'grpc';
         const isWebSocket = endpoint.protocol === 'websocket';
+        const isGraphQL = endpoint.protocol === 'graphql';
         const persistedData = await this.repository.getAllPersistedEndpointData(collection.id, endpoint.id);
+
+        let protocol = 'http';
+        if (isGrpc) {
+            protocol = 'grpc';
+        } else if (isWebSocket) {
+            protocol = 'websocket';
+        } else if (isGraphQL) {
+            protocol = 'graphql';
+        }
 
         const endpointData = {
             ...endpoint,
             collectionId: collection.id,
-            protocol: isGrpc ? 'grpc' : (isWebSocket ? 'websocket' : 'http'),
+            protocol,
             collectionBaseUrl: collection.baseUrl,
             collectionDefaultHeaders: collection.defaultHeaders,
             path: endpoint.path,
@@ -90,8 +100,8 @@ export class CollectionEndpointLoaderService {
             requestBodyString,
             persistedUrl: isGrpc ? null : persistedData.url,
             persistedAuthConfig: (isGrpc || isWebSocket) ? null : persistedData.authConfig,
-            persistedPathParams: (isGrpc || isWebSocket) ? [] : persistedData.pathParams,
-            persistedQueryParams: isGrpc ? [] : persistedData.queryParams,
+            persistedPathParams: (isGrpc || isWebSocket || isGraphQL) ? [] : persistedData.pathParams,
+            persistedQueryParams: (isGrpc || isGraphQL) ? [] : persistedData.queryParams,
             persistedHeaders: isGrpc ? [] : persistedData.headers,
             persistedBody: isGrpc ? null : persistedData.modifiedBody,
             persistedFormBodyData: (isGrpc || isWebSocket) ? null : persistedData.formBodyData,

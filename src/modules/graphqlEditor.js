@@ -5,9 +5,27 @@
 
 import { EditorView, lineNumbers, placeholder, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
-import { graphql } from 'cm6-graphql';
+import { graphql, updateSchema } from 'cm6-graphql';
+import { parse, print } from 'graphql';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
+import { autocompletion, completionKeymap } from '@codemirror/autocomplete';
 import { createThemedHighlighting } from './editorTheme.js';
+
+/**
+ * Build a placeholder element for a multi-line example query. CodeMirror renders a
+ * multi-line string placeholder inside the (single) empty first line, which inflates
+ * that line's height and makes the caret span the whole example. Rendering it as a
+ * zero-height, overflow-visible block keeps the example visible while leaving the
+ * caret at the normal single-line height.
+ * @param {string} text - Multi-line placeholder text
+ * @returns {HTMLElement}
+ */
+function createPlaceholderElement(text) {
+    const el = document.createElement('div');
+    el.textContent = text;
+    el.style.cssText = 'display:block; height:0; overflow:visible; white-space:pre;';
+    return el;
+}
 
 /**
  * GraphQLEditor - CodeMirror editor for GraphQL queries
@@ -73,10 +91,11 @@ export class GraphQLEditor {
         const extensions = [
             lineNumbers(),
             history(),
-            keymap.of([...defaultKeymap, ...historyKeymap]),
+            autocompletion(),
+            keymap.of([...defaultKeymap, ...historyKeymap, ...completionKeymap]),
             EditorView.lineWrapping,
             graphql(),
-            placeholder('query {\n  user(id: 1) {\n    name\n    email\n  }\n}'),
+            placeholder(createPlaceholderElement('query {\n  user(id: 1) {\n    name\n    email\n  }\n}')),
             EditorView.updateListener.of((update) => {
                 // Call change callback if content changed
                 if (update.docChanged && this.changeCallback) {
@@ -141,6 +160,26 @@ export class GraphQLEditor {
     }
 
     /**
+     * Parse the document and return its operation definitions.
+     * @returns {Array<{name: string|null, type: string}>|null}
+     *   One entry per operation (in document order); `null` if the document
+     *   cannot be parsed, `[]` if it is empty.
+     */
+    getOperations() {
+        const content = this.getContent().trim();
+        if (!content) {
+            return [];
+        }
+        try {
+            return parse(content).definitions
+                .filter(def => def.kind === 'OperationDefinition')
+                .map(def => ({ name: def.name ? def.name.value : null, type: def.operation }));
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    /**
      * Clear editor content
      */
     clear() {
@@ -155,34 +194,41 @@ export class GraphQLEditor {
     }
 
     /**
-     * Format the GraphQL query
+     * Apply a GraphQL schema to the editor for autocomplete, validation and hover docs.
+     * @param {import('graphql').GraphQLSchema} schema - Schema built via buildClientSchema()
+     */
+    setSchema(schema) {
+        if (this.view) {
+            updateSchema(this.view, schema);
+        }
+    }
+
+    /**
+     * Remove any schema previously applied to the editor.
+     */
+    clearSchema() {
+        if (this.view) {
+            updateSchema(this.view, undefined);
+        }
+    }
+
+    /**
+     * Format the GraphQL query by parsing it into an AST and pretty-printing.
+     * Returns the parse error (if any) so callers can surface invalid syntax;
+     * the document is left untouched when it cannot be parsed.
+     * @returns {Error|null} The parse error, or null if formatting succeeded.
      */
     formatQuery() {
+        const content = this.getContent().trim();
+        if (!content) {
+            return null;
+        }
+
         try {
-            const content = this.getContent().trim();
-            if (!content) {
-                return;
-            }
-
-            // Basic formatting: add proper indentation
-            // This is a simple implementation - for production use a proper GraphQL formatter
-            const lines = content.split('\n');
-            let indent = 0;
-            const formatted = lines.map(line => {
-                const trimmed = line.trim();
-                if (trimmed.endsWith('}')) {
-                    indent = Math.max(0, indent - 1);
-                }
-                const result = '  '.repeat(indent) + trimmed;
-                if (trimmed.endsWith('{')) {
-                    indent++;
-                }
-                return result;
-            }).join('\n');
-
-            this.setContent(formatted);
+            this.setContent(print(parse(content)));
+            return null;
         } catch (error) {
-            void error;
+            return error;
         }
     }
 }

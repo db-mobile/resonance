@@ -56,7 +56,39 @@ export class WorkspaceTabEndpointLoaderService {
             return this.createWebSocketTabUpdate(endpoint);
         }
 
+        if (endpoint.protocol === 'graphql') {
+            return this.createGraphQLTabUpdate(endpoint);
+        }
+
         return this.createHttpTabUpdate(endpoint);
+    }
+
+    createGraphQLTabUpdate(endpoint) {
+        const tabName = endpoint.name || 'GraphQL Request';
+        const { authType, authConfig } = this.buildHttpAuth(endpoint);
+        const graphql = endpoint.persistedGraphQLData || {};
+
+        return {
+            name: tabName,
+            type: 'request',
+            endpoint: {
+                collectionId: endpoint.collectionId,
+                endpointId: endpoint.id,
+                protocol: 'graphql'
+            },
+            request: {
+                protocol: 'graphql',
+                url: endpoint.persistedUrl || endpoint.path || '',
+                method: 'POST',
+                query: graphql.query || '',
+                variables: graphql.variables || '',
+                operationName: graphql.operationName || null,
+                headers: this.buildHttpHeaders(endpoint),
+                authType,
+                authConfig
+            },
+            isModified: false
+        };
     }
 
     createGrpcTabUpdate(endpoint) {

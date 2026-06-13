@@ -152,6 +152,19 @@ export class WorkspaceTabController {
                         useTls: false
                     }
                 };
+            } else if (protocol === 'graphql') {
+                tabOptions.name = tabOptions.name || 'New GraphQL';
+                tabOptions.request = {
+                    protocol: 'graphql',
+                    url: '',
+                    method: 'POST',
+                    query: '',
+                    variables: '',
+                    operationName: null,
+                    headers: {},
+                    authType: 'none',
+                    authConfig: {}
+                };
             } else if (protocol === 'mqtt') {
                 tabOptions.name = tabOptions.name || 'New MQTT';
                 tabOptions.request = {

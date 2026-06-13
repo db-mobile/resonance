@@ -374,6 +374,7 @@ export class WorkspaceTabBar {
 
         const protocols = [
             { label: 'HTTP', protocol: 'http' },
+            { label: 'GraphQL', protocol: 'graphql' },
             { label: 'WebSocket', protocol: 'websocket' },
             { label: 'SSE', protocol: 'sse' },
             { label: 'gRPC', protocol: 'grpc' },
