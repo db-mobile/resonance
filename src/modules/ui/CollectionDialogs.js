@@ -148,20 +148,28 @@ export class CollectionDialogs {
             const updateProtocolUI = () => {
                 const isGrpc = protocolSelect.value === 'grpc';
                 const isWebSocket = protocolSelect.value === 'websocket';
-                methodGroup?.classList.toggle('is-hidden', isGrpc || isWebSocket);
+                const isGraphQL = protocolSelect.value === 'graphql';
+                const isUrlBased = isWebSocket || isGraphQL;
+                methodGroup?.classList.toggle('is-hidden', isGrpc || isUrlBased);
                 pathInput.parentElement.classList.toggle('is-hidden', isGrpc);
                 grpcTargetGroup.classList.toggle('is-hidden', !isGrpc);
                 if (pathLabel) {
-                    pathLabel.textContent = isWebSocket ? 'URL:' : 'Path:';
+                    pathLabel.textContent = isUrlBased ? 'URL:' : 'Path:';
                 }
-                pathInput.placeholder = isWebSocket ? 'wss://echo.websocket.events' : '/api/endpoint';
+                if (isGraphQL) {
+                    pathInput.placeholder = 'https://api.example.com/graphql';
+                } else if (isWebSocket) {
+                    pathInput.placeholder = 'wss://echo.websocket.events';
+                } else {
+                    pathInput.placeholder = '/api/endpoint';
+                }
 
                 if (isGrpc) {
                     methodSelect.required = false;
                     pathInput.required = false;
                     grpcTargetInput.required = true;
                 } else {
-                    methodSelect.required = !isWebSocket;
+                    methodSelect.required = !isUrlBased;
                     pathInput.required = true;
                     grpcTargetInput.required = false;
                 }
@@ -192,6 +200,15 @@ export class CollectionDialogs {
                         finish({
                             name,
                             protocol: 'websocket',
+                            url
+                        });
+                    }
+                } else if (protocol === 'graphql') {
+                    const url = pathInput.value.trim();
+                    if (name && url) {
+                        finish({
+                            name,
+                            protocol: 'graphql',
                             url
                         });
                     }
@@ -359,6 +376,13 @@ export class CollectionDialogs {
 
                     if (requestData.protocol === 'websocket') {
                         endpointData.url = requestData.url;
+                    }
+
+                    if (requestData.protocol === 'graphql') {
+                        endpointData.url = requestData.url;
+                        endpointData.query = requestData.query || '';
+                        endpointData.variables = requestData.variables || '';
+                        endpointData.operationName = requestData.operationName || null;
                     }
 
                     const newEndpoint = await this.collectionService.addRequestToCollection(targetCollectionId, endpointData);

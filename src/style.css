@@ -3426,26 +3426,142 @@ code {
   flex-direction: column;
 }
 
-.graphql-query-section {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-}
-
-.graphql-variables-section {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-}
-
-.graphql-section-header {
-  margin-bottom: var(--space-2);
+/* GraphQL Workbench toolbar (operation picker + Schema/Format/Docs/Run) */
+.graphql-toolbar {
   flex-shrink: 0;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
-.graphql-section-header label {
+.graphql-toolbar-left,
+.graphql-toolbar-right {
+  gap: var(--space-2);
+}
+
+#graphql-run-btn {
+  gap: var(--space-1);
+}
+
+/* Workbench body: editor column (left) + docs rail (right) */
+.graphql-workbench-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.graphql-main {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Query hero — fills the workbench */
+.graphql-query-section {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 80px;
+}
+
+/* Bottom drawer hosting Variables / Headers, collapsed by default so the
+   query keeps all the height; resized via #graphql-resizer-handle */
+.graphql-drawer {
+  flex: 0 1 170px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.graphql-drawer.collapsed {
+  flex: 0 0 auto;
+}
+
+.graphql-drawer.collapsed .graphql-drawer-panes {
+  display: none;
+}
+
+.graphql-drawer-tabs {
+  flex-shrink: 0;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.graphql-drawer-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.graphql-drawer-tab.active {
   color: var(--text-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.graphql-drawer-chevron {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  transition: transform var(--transition-fast);
+  pointer-events: none;
+}
+
+.graphql-drawer.collapsed .graphql-drawer-chevron {
+  transform: rotate(-90deg);
+}
+
+.graphql-drawer-panes {
+  flex: 1;
+  min-height: 0;
+}
+
+.graphql-drawer-pane {
+  display: none;
+  flex: 1;
+  min-height: 0;
+}
+
+.graphql-drawer-pane.active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The Headers list, while re-parented into the drawer, scrolls within the pane */
+.graphql-drawer-pane[data-drawer-pane="headers"] {
+  overflow: auto;
+}
+
+/* Schema docs explorer right rail (minimal root-field overview for now) */
+.graphql-docs-rail {
+  flex: 0 0 280px;
+  min-height: 0;
+  overflow: auto;
+  border-left: 1px solid var(--border-light);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.graphql-docs-empty {
+  color: var(--text-secondary);
+}
+
+.graphql-docs-section h4 {
+  margin: var(--space-2) 0 var(--space-1);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.graphql-docs-section ul {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-3);
+  color: var(--text-secondary);
+  font-family: "Fira Code", "Courier New", monospace;
+}
+
+/* Workbench state: trim redundant chrome so the query gets more room */
+.workbench-active #body .body-header h3 {
+  display: none;
 }
 
 /* GraphQL Editor (CodeMirror container) */
@@ -3605,6 +3721,21 @@ code {
 }
 
 .response-validation-badge.invalid {
+  background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
+  color: var(--color-error, #ef4444);
+}
+
+/* GraphQL top-level errors indicator (servers return HTTP 200 even on failure) */
+.graphql-errors-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  margin-left: 8px;
+  cursor: help;
   background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
   color: var(--color-error, #ef4444);
 }
@@ -5934,6 +6065,10 @@ code {
 
 .protocol-url-badge-mqtt {
   background: var(--accent-teal, #0d9488);
+}
+
+.protocol-url-badge-graphql {
+  background: var(--accent-pink, #e535ab);
 }
 
 /* MQTT config — grouped cards reusing the gRPC card visual language for

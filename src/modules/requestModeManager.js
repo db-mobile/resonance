@@ -14,7 +14,8 @@ export const RequestMode = {
     WEBSOCKET: 'websocket',
     GRPC: 'grpc',
     SSE: 'sse',
-    MQTT: 'mqtt'
+    MQTT: 'mqtt',
+    GRAPHQL: 'graphql'
 };
 
 /**
@@ -72,6 +73,14 @@ const SHARED_TABS = ['authorization'];
 const HTTP_SHARED_TABS = ['scripts', 'schema'];
 
 /**
+ * Tabs shown in GraphQL mode. The query lives in the Body panel (the Workbench);
+ * Headers/Authorization/Scripts are normal tabs (same as HTTP), since the transport
+ * is HTTP. Only GraphQL Variables live in the Workbench drawer.
+ * @type {string[]}
+ */
+const GRAPHQL_TABS = ['body', 'headers', 'authorization', 'scripts'];
+
+/**
  * Get the current request mode
  * @returns {string}
  */
@@ -112,6 +121,14 @@ export function isMqttMode() {
 }
 
 /**
+ * Check if current mode is GraphQL
+ * @returns {boolean}
+ */
+export function isGraphQLMode() {
+    return currentMode === RequestMode.GRAPHQL;
+}
+
+/**
  * Check if current mode is HTTP
  * @returns {boolean}
  */
@@ -128,7 +145,8 @@ export function setRequestMode(mode) {
         && mode !== RequestMode.WEBSOCKET
         && mode !== RequestMode.GRPC
         && mode !== RequestMode.SSE
-        && mode !== RequestMode.MQTT) {
+        && mode !== RequestMode.MQTT
+        && mode !== RequestMode.GRAPHQL) {
         console.warn(`Invalid request mode: ${mode}, defaulting to HTTP`);
         mode = RequestMode.HTTP;
     }
@@ -155,7 +173,15 @@ function updateUIForMode(mode) {
     
     // Get all request config tab buttons
     const tabButtons = document.querySelectorAll('.request-config .tab-nav .tab-button');
-    
+
+    // Switching to any non-GraphQL mode tears down the GraphQL Workbench first. The
+    // teardown re-shows the method dropdown (correct for HTTP), so it must run before
+    // the per-mode layout below — otherwise gRPC/WS/SSE/MQTT hide the method dropdown
+    // and the teardown immediately un-hides it.
+    if (mode !== RequestMode.GRAPHQL && window.graphqlBodyManager?.isGraphQLMode?.()) {
+        window.graphqlBodyManager.setGraphQLModeEnabled(false);
+    }
+
     if (mode === RequestMode.GRPC) {
         // Hide HTTP-specific URL section elements
         if (methodSelectContainer) {
@@ -167,13 +193,14 @@ function updateUIForMode(mode) {
         if (curlBtn) {
             curlBtn.style.display = 'none';
         }
-        
+
         // Show gRPC target input in URL section
         showGrpcUrlSection(true);
         showWebSocketUrlSection(false);
         showSseUrlSection(false);
         showMqttUrlSection(false);
-        
+        showGraphQLUrlSection(false);
+
         // Update tab visibility - show gRPC tabs, hide HTTP-only tabs
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
@@ -218,6 +245,7 @@ function updateUIForMode(mode) {
         showWebSocketUrlSection(false);
         showSseUrlSection(true);
         showMqttUrlSection(false);
+        showGraphQLUrlSection(false);
 
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
@@ -254,6 +282,7 @@ function updateUIForMode(mode) {
         showWebSocketUrlSection(true);
         showSseUrlSection(false);
         showMqttUrlSection(false);
+        showGraphQLUrlSection(false);
 
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
@@ -301,6 +330,7 @@ function updateUIForMode(mode) {
         showWebSocketUrlSection(false);
         showSseUrlSection(false);
         showMqttUrlSection(true);
+        showGraphQLUrlSection(false);
 
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
@@ -329,6 +359,48 @@ function updateUIForMode(mode) {
         if (!activeTab || activeTab.style.display === 'none') {
             activateTab('mqtt');
         }
+    } else if (mode === RequestMode.GRAPHQL) {
+        // GraphQL is HTTP POST under the hood. The Workbench (activated below) owns the
+        // method dropdown and re-parents the Headers list into its drawer.
+        if (methodSelectContainer) {
+            methodSelectContainer.style.display = 'none';
+        }
+        if (urlInputContainer) {
+            urlInputContainer.style.display = 'none';
+        }
+        if (curlBtn) {
+            curlBtn.style.display = 'none';
+        }
+
+        showGrpcUrlSection(false);
+        showWebSocketUrlSection(false);
+        showSseUrlSection(false);
+        showMqttUrlSection(false);
+        showGraphQLUrlSection(true);
+
+        // Activate the Workbench: forces POST, hides method, moves Headers into the
+        // drawer, and shows the graphql body panel.
+        if (window.graphqlBodyManager) {
+            window.graphqlBodyManager.setGraphQLModeEnabled(true);
+        }
+
+        // The body-mode selector is gone for GraphQL (it's a protocol, not a body type).
+        if (bodyModeContainer) {
+            bodyModeContainer.style.display = 'none';
+        }
+
+        // Show Body (the Workbench), Headers, Authorization and Scripts as normal tabs;
+        // hide everything else. Only GraphQL Variables live in the Workbench drawer.
+        tabButtons.forEach(btn => {
+            const tabId = btn.dataset.tab;
+            btn.style.display = GRAPHQL_TABS.includes(tabId) ? '' : 'none';
+        });
+
+        if (bodyTitle) {
+            bodyTitle.textContent = 'Query';
+        }
+
+        activateTab('body');
     } else {
         // Show HTTP-specific URL section elements
         if (methodSelectContainer) {
@@ -337,16 +409,23 @@ function updateUIForMode(mode) {
         if (urlInputContainer) {
             urlInputContainer.style.display = '';
         }
+        // The URL autocomplete wrapper is created after the first mode switch, so if a
+        // non-HTTP mode hid #url-input directly (before the wrapper existed), showing the
+        // wrapper alone leaves a stale inline display:none on the input. Clear it too.
+        if (urlInput && urlInput !== urlInputContainer && urlInput.style.display === 'none') {
+            urlInput.style.display = '';
+        }
         if (curlBtn) {
             curlBtn.style.display = '';
         }
-        
+
         // Hide gRPC target input from URL section
         showGrpcUrlSection(false);
         showWebSocketUrlSection(false);
         showSseUrlSection(false);
         showMqttUrlSection(false);
-        
+        showGraphQLUrlSection(false);
+
         // Update tab visibility - show HTTP tabs, hide gRPC-only tabs
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
@@ -627,6 +706,84 @@ function syncSseUrlInput() {
 
     if (existingUrlInput && sseUrlInput) {
         sseUrlInput.value = existingUrlInput.value;
+    }
+}
+
+function showGraphQLUrlSection(show) {
+    let graphqlUrlSection = document.getElementById('graphql-url-section');
+
+    if (show) {
+        if (!graphqlUrlSection) {
+            graphqlUrlSection = createGraphQLUrlSection();
+        }
+        if (graphqlUrlSection) {
+            syncGraphQLUrlInput();
+            graphqlUrlSection.style.display = 'flex';
+        }
+    } else if (graphqlUrlSection) {
+        graphqlUrlSection.style.display = 'none';
+    }
+}
+
+function createGraphQLUrlSection() {
+    const requestUrlSection = document.querySelector('.request-url-section');
+    if (!requestUrlSection) {
+        return null;
+    }
+
+    const graphqlSection = document.createElement('div');
+    graphqlSection.id = 'graphql-url-section';
+    graphqlSection.className = 'grpc-url-section';
+    graphqlSection.style.display = 'none';
+
+    const badge = document.createElement('span');
+    badge.className = 'protocol-url-badge protocol-url-badge-graphql';
+    badge.textContent = 'GraphQL';
+
+    const targetWrapper = document.createElement('div');
+    targetWrapper.className = 'grpc-target-wrapper';
+
+    const existingUrlInput = document.getElementById('url-input');
+    const urlInput = document.createElement('input');
+    urlInput.type = 'url';
+    urlInput.id = 'graphql-url-input';
+    urlInput.className = 'input-base url-input';
+    urlInput.placeholder = 'https://api.example.com/graphql';
+    urlInput.setAttribute('aria-label', 'GraphQL Endpoint URL');
+
+    if (existingUrlInput) {
+        urlInput.value = existingUrlInput.value;
+        urlInput.addEventListener('input', () => {
+            existingUrlInput.value = urlInput.value;
+            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
+                window.workspaceTabController.markCurrentTabModified();
+            }
+        });
+        existingUrlInput.addEventListener('input', () => {
+            urlInput.value = existingUrlInput.value;
+        });
+    }
+
+    targetWrapper.appendChild(urlInput);
+    graphqlSection.appendChild(badge);
+    graphqlSection.appendChild(targetWrapper);
+
+    const methodSelectContainer = document.querySelector('.method-select-container');
+    if (methodSelectContainer) {
+        methodSelectContainer.after(graphqlSection);
+    } else {
+        requestUrlSection.prepend(graphqlSection);
+    }
+
+    return graphqlSection;
+}
+
+function syncGraphQLUrlInput() {
+    const existingUrlInput = document.getElementById('url-input');
+    const graphqlUrlInput = document.getElementById('graphql-url-input');
+
+    if (existingUrlInput && graphqlUrlInput) {
+        graphqlUrlInput.value = existingUrlInput.value;
     }
 }
 

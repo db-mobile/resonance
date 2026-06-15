@@ -257,13 +257,27 @@ export class CollectionService {
 
             const isGrpc = requestData.protocol === 'grpc';
             const isWebSocket = requestData.protocol === 'websocket';
+            const isGraphQL = requestData.protocol === 'graphql';
+
+            let protocol = 'http';
+            let { method } = requestData;
+            if (isGrpc) {
+                protocol = 'grpc';
+                method = 'GRPC';
+            } else if (isWebSocket) {
+                protocol = 'websocket';
+                method = 'WS';
+            } else if (isGraphQL) {
+                protocol = 'graphql';
+                method = 'GQL';
+            }
 
             const newEndpoint = {
                 id: this.generateEndpointId(collection),
                 name: requestData.name,
-                protocol: isGrpc ? 'grpc' : (isWebSocket ? 'websocket' : 'http'),
-                method: isGrpc ? 'GRPC' : (isWebSocket ? 'WS' : requestData.method),
-                path: isGrpc ? requestData.fullMethod : (isWebSocket ? (requestData.url || requestData.path) : requestData.path),
+                protocol,
+                method,
+                path: isGrpc ? requestData.fullMethod : ((isWebSocket || isGraphQL) ? (requestData.url || requestData.path) : requestData.path),
                 description: '',
                 parameters: {
                     query: {},
@@ -279,7 +293,7 @@ export class CollectionService {
 
             if (collection.folders && collection.folders.length > 0) {
                 const basePath = this.extractBasePath(
-                    isGrpc ? '/grpc' : (isWebSocket ? '/websocket' : requestData.path)
+                    isGrpc ? '/grpc' : (isWebSocket ? '/websocket' : (isGraphQL ? '/graphql' : requestData.path))
                 );
                 
                 let targetFolder = collection.folders.find(folder => folder.name === basePath);
@@ -311,8 +325,19 @@ export class CollectionService {
                     newEndpoint.id,
                     requestData.url || requestData.path || ''
                 );
+            } else if (isGraphQL) {
+                await this.repository.savePersistedUrl(
+                    collectionId,
+                    newEndpoint.id,
+                    requestData.url || requestData.path || ''
+                );
+                await this.repository.saveGraphQLData(collectionId, newEndpoint.id, {
+                    query: requestData.query || '',
+                    variables: requestData.variables || '',
+                    operationName: requestData.operationName || null
+                });
             }
-            
+
             this.statusDisplay.update(`Added new request: ${requestData.name}`, null);
             return newEndpoint;
         } catch (error) {

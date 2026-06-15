@@ -6,7 +6,7 @@
  */
 import { parseKeyValuePairs, populateKeyValueList, clearKeyValueList, addKeyValueRow, updateUrlFromQueryParams } from './keyValueManager.js';
 import { authManager } from './authManager.js';
-import { displayResponseWithLineNumbersForTab, clearResponseDisplayForTab, clearSchemaValidationBadge } from './apiHandler.js';
+import { displayResponseWithLineNumbersForTab, clearResponseDisplayForTab, clearSchemaValidationBadge, clearGraphQLErrorsBadge } from './apiHandler.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import logger from './logger.js';
 
@@ -28,7 +28,7 @@ export class WorkspaceTabStateManager {
      * @returns {Promise<Object>}
      */
     async captureCurrentState() {
-        const { isGrpcMode, isWebSocketMode, isSseMode, isMqttMode } = await import('./requestModeManager.js');
+        const { isGrpcMode, isWebSocketMode, isSseMode, isMqttMode, isGraphQLMode } = await import('./requestModeManager.js');
         
         if (isGrpcMode()) {
             const grpcRequestJson = window.grpcBodyEditor
@@ -160,6 +160,33 @@ export class WorkspaceTabStateManager {
             };
         }
 
+        if (isGraphQLMode()) {
+            const graphqlUrlInput = document.getElementById('graphql-url-input');
+            const authConfig = authManager.getAuthConfig();
+
+            return {
+                request: {
+                    protocol: 'graphql',
+                    url: graphqlUrlInput?.value || this.dom.urlInput?.value || '',
+                    method: 'POST',
+                    query: this.graphqlBodyManager ? this.graphqlBodyManager.getGraphQLQuery() : '',
+                    variables: this.graphqlBodyManager ? this.graphqlBodyManager.getGraphQLVariables() : '',
+                    operationName: this.graphqlBodyManager ? this.graphqlBodyManager.getSelectedOperationName() : null,
+                    headers: parseKeyValuePairs(this.dom.headersList),
+                    authType: authConfig.type || 'none',
+                    authConfig: authConfig.config || {}
+                },
+                endpoint: window.currentEndpoint
+                    ? {
+                          collectionId: window.currentEndpoint.collectionId,
+                          endpointId: window.currentEndpoint.endpointId,
+                          protocol: 'graphql'
+                      }
+                    : null,
+                activeResponseTab: this._getActiveResponseTab()
+            };
+        }
+
         const pathParams = parseKeyValuePairs(this.dom.pathParamsList);
         const queryParams = parseKeyValuePairs(this.dom.queryParamsList);
         const headers = parseKeyValuePairs(this.dom.headersList);
@@ -174,13 +201,7 @@ export class WorkspaceTabStateManager {
         const bodyModeSelect = document.getElementById('body-mode-select');
         const currentBodyMode = bodyModeSelect?.value || 'json';
         let bodyData;
-        if (currentBodyMode === 'graphql' && this.graphqlBodyManager) {
-            bodyData = {
-                mode: 'graphql',
-                query: this.graphqlBodyManager.getGraphQLQuery(),
-                variables: this.graphqlBodyManager.getGraphQLVariables()
-            };
-        } else if (currentBodyMode === 'formdata' && window.formBodyManager) {
+        if (currentBodyMode === 'formdata' && window.formBodyManager) {
             bodyData = {
                 mode: 'formdata',
                 fields: window.formBodyManager.getFormDataFields()
@@ -424,6 +445,64 @@ export class WorkspaceTabStateManager {
             return;
         }
 
+        if (request.protocol === 'graphql') {
+            setRequestMode(RequestMode.GRAPHQL);
+
+            if (this.dom.urlInput) {
+                this.dom.urlInput.value = request.url || '';
+            }
+            const graphqlUrlInput = document.getElementById('graphql-url-input');
+            if (graphqlUrlInput) {
+                graphqlUrlInput.value = request.url || '';
+            }
+
+            // GraphQL has no path/query params; clear the shared lists so values from a
+            // previously-viewed HTTP tab don't leak into the GraphQL request.
+            if (this.dom.pathParamsList) {
+                clearKeyValueList(this.dom.pathParamsList);
+            }
+            if (this.dom.queryParamsList) {
+                clearKeyValueList(this.dom.queryParamsList);
+            }
+
+            if (this.graphqlBodyManager) {
+                this.graphqlBodyManager.setGraphQLQuery(request.query || '');
+                this.graphqlBodyManager.setGraphQLVariables(request.variables || '');
+                this.graphqlBodyManager.selectedOperationName = request.operationName || null;
+                this.graphqlBodyManager.updateOperationPicker();
+            }
+
+            if (this.dom.headersList) {
+                clearKeyValueList(this.dom.headersList);
+                if (request.headers && Object.keys(request.headers).length > 0) {
+                    populateKeyValueList(this.dom.headersList, request.headers);
+                } else {
+                    addKeyValueRow(this.dom.headersList);
+                }
+            }
+
+            if (authManager) {
+                authManager.loadAuthConfig({
+                    type: request.authType || 'none',
+                    config: request.authConfig || {}
+                });
+            }
+
+            const activeResponseTab = tab.activeResponseTab || 'response-body';
+            activateTab('response', activeResponseTab);
+
+            if (response) {
+                await this._restoreResponse(response, tab.id);
+            } else {
+                this._clearResponse(tab.id);
+            }
+
+            if (endpoint) {
+                window.currentEndpoint = endpoint;
+            }
+            return;
+        }
+
         if (request.protocol === 'mqtt') {
             setRequestMode(RequestMode.MQTT);
 
@@ -487,11 +566,7 @@ export class WorkspaceTabStateManager {
         // Restore body based on mode
         if (request.body && typeof request.body === 'object' && request.body.mode) {
             const { mode } = request.body;
-            if (mode === 'graphql' && this.graphqlBodyManager) {
-                this.graphqlBodyManager.setGraphQLModeEnabled(true);
-                this.graphqlBodyManager.setGraphQLQuery(request.body.query || '');
-                this.graphqlBodyManager.setGraphQLVariables(request.body.variables || '');
-            } else if (mode === 'formdata' && window.formBodyManager) {
+            if (mode === 'formdata' && window.formBodyManager) {
                 this.graphqlBodyManager?.switchMode('formdata');
                 window.formBodyManager.setFormDataFields(request.body.fields || {});
             } else if (mode === 'urlencoded' && window.formBodyManager) {
@@ -589,6 +664,7 @@ export class WorkspaceTabStateManager {
 
             // Clear schema validation badge when switching endpoints
             clearSchemaValidationBadge();
+            clearGraphQLErrorsBadge();
 
             // Load scripts for this endpoint
             if (window.inlineScriptManager && endpoint.collectionId && endpoint.endpointId) {
@@ -605,6 +681,7 @@ export class WorkspaceTabStateManager {
 
             // Clear schema validation badge when no endpoint
             clearSchemaValidationBadge();
+            clearGraphQLErrorsBadge();
 
             // Clear scripts when no endpoint
             if (window.inlineScriptManager) {

@@ -16,10 +16,16 @@ if (!fs.existsSync('dist/assets')) {
     fs.mkdirSync('dist/assets', { recursive: true });
 }
 
+// Paths excluded from the dist copy (marketing/README assets not used by the app)
+const COPY_EXCLUDE = new Set([
+    path.normalize('assets/screenshots'),
+]);
+
 // Copy static files to dist
 function copyRecursive(src, dest) {
     if (!fs.existsSync(src)) return;
-    
+    if (COPY_EXCLUDE.has(path.normalize(src))) return;
+
     if (fs.statSync(src).isDirectory()) {
         if (!fs.existsSync(dest)) {
             fs.mkdirSync(dest, { recursive: true });

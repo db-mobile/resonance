@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "2.11.1"
+version = "2.11.2"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -98,3 +98,11 @@ keyring = { version = "3", default-features = false, features = ["windows-native
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+opt-level = "s"    # Optimize for binary size
+lto = true         # Link-time optimization
+codegen-units = 1  # Maximize cross-module optimization (slower compile)
+strip = true       # Strip symbols from the binary
+# panic = "abort" intentionally omitted: the Boa script sandbox relies on
+# unwinding worker-thread panics, which abort would escalate to a full crash.

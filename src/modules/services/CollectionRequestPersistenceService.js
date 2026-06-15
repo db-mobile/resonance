@@ -45,6 +45,7 @@ export class CollectionRequestPersistenceService {
             const endpoint = endpointLocations.length > 0 ? endpointLocations[0].endpoint : null;
             const isGrpc = endpoint && endpoint.protocol === 'grpc';
             const isWebSocket = endpoint && endpoint.protocol === 'websocket';
+            const isGraphQL = endpoint && endpoint.protocol === 'graphql';
 
             if (isGrpc) {
                 await this.saveGrpcRequest(collectionId, endpointId, endpoint, endpointLocations, collections);
@@ -53,6 +54,11 @@ export class CollectionRequestPersistenceService {
 
             if (isWebSocket) {
                 await this.saveWebSocketRequest(collectionId, endpointId, parseKeyValuePairs);
+                return;
+            }
+
+            if (isGraphQL) {
+                await this.saveGraphQLRequest(collectionId, endpointId, parseKeyValuePairs, authManager);
                 return;
             }
 
@@ -124,6 +130,36 @@ export class CollectionRequestPersistenceService {
 
         if (bodyInput) {
             await this.collectionService.saveRequestBodyModification(collectionId, endpointId, bodyInput);
+        }
+
+        await this.refreshCollections();
+    }
+
+    async saveGraphQLRequest(collectionId, endpointId, parseKeyValuePairs, authManager) {
+        const { urlInput, headersList } = this.getRequestFormElements();
+        const graphqlBodyManager = window.domElements?.graphqlBodyManager;
+
+        if (urlInput && urlInput.value) {
+            await this.repository.savePersistedUrl(collectionId, endpointId, urlInput.value);
+        }
+
+        if (headersList) {
+            const headers = parseKeyValuePairs(headersList);
+            const headersArray = Object.entries(headers).map(([key, value]) => ({ key, value }));
+            await this.repository.savePersistedHeaders(collectionId, endpointId, headersArray);
+        }
+
+        const authConfig = authManager.getAuthConfig();
+        if (authConfig) {
+            await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
+        }
+
+        if (graphqlBodyManager) {
+            await this.repository.saveGraphQLData(collectionId, endpointId, {
+                query: graphqlBodyManager.getGraphQLQuery(),
+                variables: graphqlBodyManager.getGraphQLVariables(),
+                operationName: graphqlBodyManager.getSelectedOperationName?.() || null
+            });
         }
 
         await this.refreshCollections();
@@ -263,21 +299,10 @@ export class CollectionRequestPersistenceService {
         }
 
         if (bodyInput) {
-            const graphqlBodyManager = window.domElements?.graphqlBodyManager;
-            const isGraphQLMode = graphqlBodyManager && graphqlBodyManager.isGraphQLMode();
-
-            if (isGraphQLMode) {
-                updatedRequest.body = {
-                    mode: 'graphql',
-                    query: graphqlBodyManager.getGraphQLQuery(),
-                    variables: graphqlBodyManager.getGraphQLVariables()
-                };
-            } else {
-                updatedRequest.body = {
-                    mode: 'json',
-                    content: getRequestBodyContent()
-                };
-            }
+            updatedRequest.body = {
+                mode: 'json',
+                content: getRequestBodyContent()
+            };
             hasChanges = true;
         }
 
