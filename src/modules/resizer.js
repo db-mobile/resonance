@@ -199,7 +199,7 @@ export class HorizontalResizer {
     _saveWidth(width) {
         clearTimeout(this._saveTimer);
         this._saveTimer = setTimeout(() => {
-            window.backendAPI.store.set('sidebarWidth', width).catch(() => {});
+            window.backendAPI.store.set('sidebarWidth', width).catch((error) => void error);
         }, 300);
     }
 
@@ -295,7 +295,7 @@ export class HistoryResizer {
     _saveWidth(width) {
         clearTimeout(this._saveTimer);
         this._saveTimer = setTimeout(() => {
-            window.backendAPI.store.set('historySidebarWidth', width).catch(() => {});
+            window.backendAPI.store.set('historySidebarWidth', width).catch((error) => void error);
         }, 300);
     }
 
