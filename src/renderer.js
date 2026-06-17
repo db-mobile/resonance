@@ -736,51 +736,72 @@ document.addEventListener('DOMContentLoaded', async () => {
         }).catch(() => { /* non-blocking */ })
     ]);
 
-    // Initialize body editors BEFORE workspace tabs so they're available during tab state restoration
-    // Initialize request body editor (JSON mode)
+    // Initialize body editors lazily - CodeMirror is heavy and most editors
+    // aren't needed until the user interacts with a specific body mode.
+    // Each lazy editor defers construction until first real access (setContent/getContent/etc.)
+    let isInitializingEditor = false;
+    let isInitializingGrpcEditor = false;
+
+    function createLazyEditor(container, options, changeCallback) {
+        let instance = null;
+        const proxy = {
+            _ensureInstance() {
+                if (!instance && container) {
+                    instance = new RequestBodyEditor(container, options);
+                    if (changeCallback) {
+                        instance.onChange(changeCallback);
+                    }
+                }
+                return instance;
+            },
+            setContent(content) { this._ensureInstance()?.setContent(content); },
+            getContent() { return this._ensureInstance()?.getContent() ?? ''; },
+            clear() { this._ensureInstance()?.clear(); },
+            onChange(cb) {
+                changeCallback = cb;
+                if (instance) { instance.onChange(cb); }
+            },
+            formatJSON() { return this._ensureInstance()?.formatJSON() ?? true; },
+            focus() { this._ensureInstance()?.focus(); },
+            destroy() { instance?.destroy(); instance = null; }
+        };
+        return proxy;
+    }
+
+    // JSON body editor (lazy)
     let requestBodyEditor = null;
-    let isInitializingEditor = false; // Flag to prevent marking tab as modified during init
     if (bodyEditorContainer) {
-        requestBodyEditor = new RequestBodyEditor(bodyEditorContainer);
-
-        // Make globally available
-        window.requestBodyEditor = requestBodyEditor;
-
-        // Set up change callback to keep textarea in sync (for backward compatibility)
-        requestBodyEditor.onChange((content) => {
+        requestBodyEditor = createLazyEditor(bodyEditorContainer, {}, (content) => {
             if (bodyInput) {
                 bodyInput.value = content;
             }
-            // Mark workspace tab as modified (but not during initialization or state restoration)
             if (window.workspaceTabController &&
                 !isInitializingEditor &&
                 !window.workspaceTabController.isRestoringState) {
                 window.workspaceTabController.markCurrentTabModified();
             }
         });
+        window.requestBodyEditor = requestBodyEditor;
     }
 
-    // Initialize plain-text body editor (CodeMirror without language extension)
+    // Plain-text body editor (lazy)
     if (bodyTextEditorContainer) {
-        const requestBodyTextEditor = new RequestBodyEditor(bodyTextEditorContainer, { language: 'plain' });
-        window.requestBodyTextEditor = requestBodyTextEditor;
-
-        requestBodyTextEditor.onChange((_content) => {
-            if (window.workspaceTabController &&
-                !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+        window.requestBodyTextEditor = createLazyEditor(
+            bodyTextEditorContainer,
+            { language: 'plain' },
+            (_content) => {
+                if (window.workspaceTabController &&
+                    !window.workspaceTabController.isRestoringState) {
+                    window.workspaceTabController.markCurrentTabModified();
+                }
             }
-        });
+        );
     }
 
-    // Initialize gRPC body editor
+    // gRPC body editor (lazy)
     let grpcBodyEditor = null;
-    let isInitializingGrpcEditor = false;
     if (grpcBodyEditorContainer) {
-        grpcBodyEditor = new RequestBodyEditor(grpcBodyEditorContainer);
-        window.grpcBodyEditor = grpcBodyEditor;
-
-        grpcBodyEditor.onChange((content) => {
+        grpcBodyEditor = createLazyEditor(grpcBodyEditorContainer, {}, (content) => {
             if (grpcBodyInput) {
                 grpcBodyInput.value = content;
             }
@@ -790,6 +811,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.workspaceTabController.markCurrentTabModified();
             }
         });
+        window.grpcBodyEditor = grpcBodyEditor;
     }
 
     // Initialize workspace tabs (restores user's last state - critical for UX)

@@ -3858,7 +3858,10 @@ code {
 }
 
 .cm-editor .cm-panel.cm-search button {
-  background-color: var(--bg-tertiary);
+  /* `background` shorthand (not `background-color`) is required to override
+     CodeMirror's base-theme `background-image` gradient on `.cm-button`,
+     which otherwise paints over our fill and leaves the label unreadable. */
+  background: var(--bg-tertiary);
   color: var(--text-primary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
@@ -3868,7 +3871,11 @@ code {
 }
 
 .cm-editor .cm-panel.cm-search button:hover {
-  background-color: var(--bg-hover);
+  background: var(--bg-hover);
+}
+
+.cm-editor .cm-panel.cm-search button:active {
+  background: var(--bg-hover);
 }
 
 .cm-editor .cm-panel.cm-search label {
