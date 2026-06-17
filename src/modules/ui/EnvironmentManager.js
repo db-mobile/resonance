@@ -807,15 +807,6 @@ export class EnvironmentManager {
     }
 
     /**
-     * Escape HTML
-     */
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    /**
      * Close dialog
      */
     close(changed = false) {

@@ -122,7 +122,7 @@ export class SchemaController {
         }
 
         if (!this.editor.isValidJson()) {
-            statusEl.className = 'schema-validation-status schema-status-error';
+            statusEl.className = 'schema-validation-status is-error';
             statusEl.textContent = 'Invalid JSON syntax';
             return;
         }
@@ -134,7 +134,7 @@ export class SchemaController {
             return;
         }
 
-        statusEl.className = 'schema-validation-status schema-status-valid';
+        statusEl.className = 'schema-validation-status is-success';
         statusEl.textContent = 'Valid JSON Schema';
     }
 

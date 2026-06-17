@@ -314,7 +314,7 @@ function displaySchemaValidationResult(validationResult, tabId = null) {
     }
 
     const badge = document.createElement('span');
-    badge.className = `response-validation-badge ${validationResult.valid ? 'valid' : 'invalid'}`;
+    badge.className = `status-badge response-validation-badge ${validationResult.valid ? 'is-success' : 'is-error'}`;
     badge.textContent = validationResult.valid ? 'Schema Valid' : `Schema Invalid (${validationResult.errors.length})`;
 
     if (!validationResult.valid && validationResult.errors.length > 0) {
@@ -371,7 +371,7 @@ function displayGraphQLErrorsBadge(result, tabId = null) {
     }
 
     const badge = document.createElement('span');
-    badge.className = 'graphql-errors-badge';
+    badge.className = 'status-badge graphql-errors-badge is-error';
     badge.textContent = `GraphQL Errors (${errors.length})`;
     badge.title = errors
         .map(e => (e && typeof e.message === 'string') ? e.message : JSON.stringify(e))

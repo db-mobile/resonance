@@ -249,13 +249,4 @@ export class EnvironmentSelector {
             void error;
         }
     }
-
-    /**
-     * Escape HTML
-     */
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 }

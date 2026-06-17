@@ -159,41 +159,41 @@
         <div class="cert-entry-header u-flex u-items-center u-justify-between">
             <div class="cert-field cert-field-grow">
                 <label data-i18n="settings.certs_host">Host</label>
-                <input type="text" name="certHost" placeholder="api.example.com" autocomplete="off">
+                <input type="text" class="input-base" name="certHost" placeholder="api.example.com" autocomplete="off">
             </div>
             <label class="toggle-switch cert-enabled-toggle">
                 <input type="checkbox" name="certEnabled" checked>
                 <span class="toggle-track"></span>
                 <span data-i18n="settings.certs_enabled">Enabled</span>
             </label>
-            <button type="button" class="icon-btn cert-remove-btn" data-role="cert-remove" aria-label="Remove" data-i18n-aria="settings.certs_remove">
+            <button type="button" class="btn btn-icon cert-remove-btn" data-role="cert-remove" aria-label="Remove" data-i18n-aria="settings.certs_remove">
                 <span class="icon icon-16 icon-trash"></span>
             </button>
         </div>
 
         <div class="cert-file-row u-flex u-items-center" data-file="cert">
             <label data-i18n="settings.certs_cert_file">Certificate (PEM)</label>
-            <input type="text" name="certCertPath" readonly placeholder="—">
+            <input type="text" class="input-base" name="certCertPath" readonly placeholder="—">
             <button type="button" class="btn btn-secondary btn-xs" data-role="cert-pick" data-kind="cert" data-i18n="settings.certs_choose">Choose…</button>
-            <button type="button" class="icon-btn" data-role="cert-clear" data-kind="cert" aria-label="Clear" data-i18n-aria="settings.certs_clear">
+            <button type="button" class="btn btn-icon" data-role="cert-clear" data-kind="cert" aria-label="Clear" data-i18n-aria="settings.certs_clear">
                 <span class="icon icon-14 icon-x"></span>
             </button>
         </div>
 
         <div class="cert-file-row u-flex u-items-center" data-file="key">
             <label data-i18n="settings.certs_key_file">Private Key (PEM, unencrypted)</label>
-            <input type="text" name="certKeyPath" readonly placeholder="—">
+            <input type="text" class="input-base" name="certKeyPath" readonly placeholder="—">
             <button type="button" class="btn btn-secondary btn-xs" data-role="cert-pick" data-kind="key" data-i18n="settings.certs_choose">Choose…</button>
-            <button type="button" class="icon-btn" data-role="cert-clear" data-kind="key" aria-label="Clear" data-i18n-aria="settings.certs_clear">
+            <button type="button" class="btn btn-icon" data-role="cert-clear" data-kind="key" aria-label="Clear" data-i18n-aria="settings.certs_clear">
                 <span class="icon icon-14 icon-x"></span>
             </button>
         </div>
 
         <div class="cert-file-row u-flex u-items-center" data-file="ca">
             <label data-i18n="settings.certs_ca_file">CA Bundle (PEM, optional)</label>
-            <input type="text" name="certCaPath" readonly placeholder="—">
+            <input type="text" class="input-base" name="certCaPath" readonly placeholder="—">
             <button type="button" class="btn btn-secondary btn-xs" data-role="cert-pick" data-kind="ca" data-i18n="settings.certs_choose">Choose…</button>
-            <button type="button" class="icon-btn" data-role="cert-clear" data-kind="ca" aria-label="Clear" data-i18n-aria="settings.certs_clear">
+            <button type="button" class="btn btn-icon" data-role="cert-clear" data-kind="ca" aria-label="Clear" data-i18n-aria="settings.certs_clear">
                 <span class="icon icon-14 icon-x"></span>
             </button>
         </div>

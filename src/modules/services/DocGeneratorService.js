@@ -4,6 +4,7 @@
  */
 
 import { generateCode, SUPPORTED_LANGUAGES } from '../codeGenerator.js';
+import { escapeHtml } from '../htmlUtils.js';
 
 /**
  * Service for generating API documentation from collections
@@ -202,12 +203,12 @@ export class DocGeneratorService {
         const template = await this._loadTemplate('./src/templates/docs/docTemplate.html');
 
         // Generate dynamic content
-        const title = this._escapeHtml(collection.name);
+        const title = escapeHtml(collection.name);
         const description = collection.description 
-            ? `<p class="description">${this._escapeHtml(collection.description)}</p>` 
+            ? `<p class="description">${escapeHtml(collection.description)}</p>` 
             : '';
         const baseUrl = collection.baseUrl 
-            ? `<p class="base-url"><strong>Base URL:</strong> <code>${this._escapeHtml(collection.baseUrl)}</code></p>` 
+            ? `<p class="base-url"><strong>Base URL:</strong> <code>${escapeHtml(collection.baseUrl)}</code></p>` 
             : '';
         const toc = this._generateHtmlToc(collection);
         const content = await this._generateHtmlContent(collection, endpoints, languages);
@@ -441,11 +442,11 @@ export class DocGeneratorService {
                 if (httpEndpoints.length === 0) {continue;}
                 
                 const folderId = this._slugify(folder.name);
-                items.push(`<li><a href="#${folderId}">${this._escapeHtml(folder.name)}</a>`);
+                items.push(`<li><a href="#${folderId}">${escapeHtml(folder.name)}</a>`);
                 items.push('<ul>');
                 for (const endpoint of httpEndpoints) {
                     const endpointId = this._slugify(`${endpoint.method}-${endpoint.name || endpoint.path}`);
-                    items.push(`<li><a href="#${endpointId}"><span class="method method-${endpoint.method.toLowerCase()}">${endpoint.method}</span> ${this._escapeHtml(endpoint.name || endpoint.path)}</a></li>`);
+                    items.push(`<li><a href="#${endpointId}"><span class="method method-${endpoint.method.toLowerCase()}">${endpoint.method}</span> ${escapeHtml(endpoint.name || endpoint.path)}</a></li>`);
                 }
                 items.push('</ul></li>');
             }
@@ -453,7 +454,7 @@ export class DocGeneratorService {
             const httpEndpoints = this._filterHttpEndpoints(collection.endpoints);
             for (const endpoint of httpEndpoints) {
                 const endpointId = this._slugify(`${endpoint.method}-${endpoint.name || endpoint.path}`);
-                items.push(`<li><a href="#${endpointId}"><span class="method method-${endpoint.method.toLowerCase()}">${endpoint.method}</span> ${this._escapeHtml(endpoint.name || endpoint.path)}</a></li>`);
+                items.push(`<li><a href="#${endpointId}"><span class="method method-${endpoint.method.toLowerCase()}">${endpoint.method}</span> ${escapeHtml(endpoint.name || endpoint.path)}</a></li>`);
             }
         }
 
@@ -477,7 +478,7 @@ export class DocGeneratorService {
                 currentFolder = endpoint.folderName;
                 const folderId = this._slugify(endpoint.folderName);
                 sections.push(`<section class="folder" id="${folderId}">`);
-                sections.push(`<h2>${this._escapeHtml(endpoint.folderName)}</h2>`);
+                sections.push(`<h2>${escapeHtml(endpoint.folderName)}</h2>`);
             }
 
             sections.push(await this._generateEndpointHtml(collection, endpoint, languages));
@@ -506,13 +507,13 @@ export class DocGeneratorService {
 
         const html = [];
         html.push(`<article class="endpoint" id="${endpointId}">`);
-        html.push(`<h3><span class="method method-${endpoint.method.toLowerCase()}">${endpoint.method}</span> ${this._escapeHtml(displayName)}</h3>`);
+        html.push(`<h3><span class="method method-${endpoint.method.toLowerCase()}">${endpoint.method}</span> ${escapeHtml(displayName)}</h3>`);
 
         if (endpoint.description || endpoint.summary) {
-            html.push(`<p class="endpoint-description">${this._escapeHtml(endpoint.description || endpoint.summary)}</p>`);
+            html.push(`<p class="endpoint-description">${escapeHtml(endpoint.description || endpoint.summary)}</p>`);
         }
 
-        html.push(`<p class="endpoint-url"><strong>URL:</strong> <code>${this._escapeHtml(fullUrl)}</code></p>`);
+        html.push(`<p class="endpoint-url"><strong>URL:</strong> <code>${escapeHtml(fullUrl)}</code></p>`);
 
         // Path Parameters
         const pathParams = this._getPathParams(endpoint, persistedData);
@@ -547,10 +548,10 @@ export class DocGeneratorService {
             html.push('<div class="body-section">');
             html.push('<h4>Request Body</h4>');
             if (requestBody.contentType) {
-                html.push(`<p><strong>Content-Type:</strong> <code>${this._escapeHtml(requestBody.contentType)}</code></p>`);
+                html.push(`<p><strong>Content-Type:</strong> <code>${escapeHtml(requestBody.contentType)}</code></p>`);
             }
             if (requestBody.example) {
-                html.push(`<pre><code class="language-json">${this._escapeHtml(requestBody.example)}</code></pre>`);
+                html.push(`<pre><code class="language-json">${escapeHtml(requestBody.example)}</code></pre>`);
             }
             html.push('</div>');
         }
@@ -567,7 +568,7 @@ export class DocGeneratorService {
         if (responseSchema) {
             html.push('<details class="schema-section">');
             html.push('<summary><h4>Response Schema</h4></summary>');
-            html.push(`<pre><code class="language-json">${this._escapeHtml(JSON.stringify(responseSchema, null, 2))}</code></pre>`);
+            html.push(`<pre><code class="language-json">${escapeHtml(JSON.stringify(responseSchema, null, 2))}</code></pre>`);
             html.push('</details>');
         }
 
@@ -586,7 +587,7 @@ export class DocGeneratorService {
                 const lang = SUPPORTED_LANGUAGES.find(l => l.id === langId);
                 if (!lang) {continue;}
                 const activeClass = isFirst ? ' active' : '';
-                html.push(`<button class="tab-btn${activeClass}" data-lang="${langId}">${this._escapeHtml(lang.name)}</button>`);
+                html.push(`<button class="tab-btn${activeClass}" data-lang="${langId}">${escapeHtml(lang.name)}</button>`);
                 isFirst = false;
             }
             html.push('</div>');
@@ -601,7 +602,7 @@ export class DocGeneratorService {
                     const code = generateCode(langId, config);
                     const activeClass = isFirst ? ' active' : '';
                     html.push(`<div class="tab-content${activeClass}" data-lang="${langId}">`);
-                    html.push(`<pre><code class="language-${this._getCodeBlockLang(langId)}">${this._escapeHtml(code)}</code></pre>`);
+                    html.push(`<pre><code class="language-${this._getCodeBlockLang(langId)}">${escapeHtml(code)}</code></pre>`);
                     html.push('</div>');
                     isFirst = false;
                 } catch (error) {
@@ -624,7 +625,7 @@ export class DocGeneratorService {
      */
     _generateParamsTable(params) {
         const rows = params.map(p => 
-            `<tr><td><code>${this._escapeHtml(p.name)}</code></td><td>${this._escapeHtml(p.type)}</td><td>${p.required ? 'Yes' : 'No'}</td><td>${this._escapeHtml(p.description || '-')}</td></tr>`
+            `<tr><td><code>${escapeHtml(p.name)}</code></td><td>${escapeHtml(p.type)}</td><td>${p.required ? 'Yes' : 'No'}</td><td>${escapeHtml(p.description || '-')}</td></tr>`
         ).join('');
 
         return `<table><thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -636,7 +637,7 @@ export class DocGeneratorService {
      */
     _generateHeadersTable(headers) {
         const rows = headers.map(h => 
-            `<tr><td><code>${this._escapeHtml(h.name)}</code></td><td>${this._escapeHtml(h.value || '-')}</td><td>${this._escapeHtml(h.description || '-')}</td></tr>`
+            `<tr><td><code>${escapeHtml(h.name)}</code></td><td>${escapeHtml(h.value || '-')}</td><td>${escapeHtml(h.description || '-')}</td></tr>`
         ).join('');
 
         return `<table><thead><tr><th>Name</th><th>Value</th><th>Description</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -847,20 +848,6 @@ export class DocGeneratorService {
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-|-$/g, '');
-    }
-
-    /**
-     * Escapes HTML special characters
-     * @private
-     */
-    _escapeHtml(text) {
-        if (!text) {return '';}
-        return String(text)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
     }
 
 }

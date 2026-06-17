@@ -363,10 +363,4 @@ export class VariableManager {
             toast.error('Native export is not available in this runtime');
         }
     }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 }

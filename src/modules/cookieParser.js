@@ -2,6 +2,8 @@
  * Parses Set-Cookie headers and extracts cookie information
  */
 
+import { escapeHtml } from './htmlUtils.js';
+
 /**
  * Parse a single Set-Cookie header value
  * @param {string} cookieString - The Set-Cookie header value
@@ -215,17 +217,4 @@ export function formatCookiesAsHtml(cookies) {
 
     html += '</tbody></table>';
     return html;
-}
-
-/**
- * Escape HTML special characters
- * @param {string} str - String to escape
- * @returns {string} Escaped string
- */
-function escapeHtml(str) {
-    if (str == null) {return '';}
-
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
 }

@@ -934,10 +934,6 @@ code {
   overflow: auto;
 }
 
-.runner-script-editor-container .cm-editor {
-  height: 100%;
-}
-
 .runner-script-modal-hint {
   padding: 12px 0;
   font-size: 12px;
@@ -2364,6 +2360,17 @@ code {
   background: var(--bg-tertiary);
   color: var(--text-primary);
 }
+/* Accent modifiers for icon buttons */
+.btn-icon.is-primary {
+  color: var(--accent);
+}
+.btn-icon.is-primary:hover:not(:disabled) {
+  background: var(--accent-light);
+}
+.btn-icon.is-danger:hover:not(:disabled) {
+  background: var(--color-error-light);
+  color: var(--color-error);
+}
 
 /* Variant: Icon Bordered */
 .btn-icon-bordered {
@@ -3146,7 +3153,9 @@ code {
 
 .tab-button,
 .script-tab-btn,
-.settings-tab {
+.settings-tab,
+.graphql-drawer-tab,
+.script-sub-tab {
   border: none;
   border-bottom: 2px solid transparent;
   background: none;
@@ -3390,16 +3399,9 @@ code {
   margin-bottom: var(--space-2);
 }
 
+/* Base look from the shared tab system; only padding + active tint differ */
 .graphql-drawer-tab {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
   padding: var(--space-1) var(--space-2);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-secondary);
 }
 
 .graphql-drawer-tab.active {
@@ -3471,13 +3473,14 @@ code {
   display: none;
 }
 
-/* GraphQL Editor (CodeMirror container) */
-.graphql-editor {
+/* Bordered CodeMirror container — shared by the GraphQL and schema editors.
+   The inner .cm-editor already fills its host via the global .cm-editor rule. */
+.editor-shell {
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
-  overflow: hidden;
-  min-height: 0;
 }
 
 /* Script Sub-tabs */
@@ -3489,16 +3492,9 @@ code {
   background: var(--bg-primary);
 }
 
+/* Base look from the shared tab system; padding + hover/active are sub-tab-specific */
 .script-sub-tab {
   padding: var(--space-2) var(--space-3);
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-base);
   white-space: nowrap;
 }
 
@@ -3527,14 +3523,11 @@ code {
 }
 
 /* Script Editor Container (CodeMirror) */
+/* Borderless editor area (no .editor-shell); .cm-editor fills it via the global rule */
 .script-editor-container {
   flex: 1;
   min-height: 200px;
   overflow: hidden;
-}
-
-.script-editor-container .cm-editor {
-  height: 100%;
 }
 
 /* Schema Tab Styles */
@@ -3558,16 +3551,9 @@ code {
   gap: 8px;
 }
 
+/* Shape from .editor-shell; only the taller minimum is schema-specific */
 .schema-editor-container {
-  flex: 1;
   min-height: 150px;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-
-.schema-editor-container .cm-editor {
-  height: 100%;
 }
 
 .schema-validation-status {
@@ -3582,18 +3568,9 @@ code {
   display: none;
 }
 
-.schema-status-valid {
-  background-color: var(--color-success-light, rgba(16, 185, 129, 0.1));
-  color: var(--color-success, #10b981);
-}
-
-.schema-status-error {
-  background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
-  color: var(--color-error, #ef4444);
-}
-
-/* Response validation indicator */
-.response-validation-badge {
+/* Status badge — inline pill for validation / error indicators. The
+   success/error tints are shared with the schema validation status box. */
+.status-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -3601,32 +3578,29 @@ code {
   font-size: 11px;
   font-weight: 500;
   border-radius: var(--radius-sm);
-  margin-left: 8px;
 }
 
-.response-validation-badge.valid {
+.status-badge.is-success,
+.schema-validation-status.is-success {
   background-color: var(--color-success-light, rgba(16, 185, 129, 0.1));
   color: var(--color-success, #10b981);
 }
 
-.response-validation-badge.invalid {
+.status-badge.is-error,
+.schema-validation-status.is-error {
   background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
   color: var(--color-error, #ef4444);
+}
+
+/* Response validation indicator — shape from .status-badge */
+.response-validation-badge {
+  margin-left: 8px;
 }
 
 /* GraphQL top-level errors indicator (servers return HTTP 200 even on failure) */
 .graphql-errors-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 500;
-  border-radius: var(--radius-sm);
   margin-left: 8px;
   cursor: help;
-  background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
-  color: var(--color-error, #ef4444);
 }
 
 /* CodeMirror Editor Base Styles */
@@ -5634,20 +5608,10 @@ code {
   color: var(--text-secondary);
 }
 
-.cert-entry input[type="text"] {
-  padding: var(--space-2);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-sm);
-  background-color: var(--bg-white);
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
-  transition: all var(--transition-base);
-}
-
-.cert-entry input[type="text"]:focus {
-  outline: none;
-  border-color: var(--border-focus);
-  box-shadow: var(--shadow-focus);
+/* Inputs reuse .input-base; only the compact sizing differs */
+.cert-entry .input-base {
+  --input-padding: var(--space-2);
+  --input-radius: var(--radius-sm);
 }
 
 .cert-file-row {
@@ -5668,23 +5632,9 @@ code {
   flex-shrink: 0;
 }
 
-.cert-entry .icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-1);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: all var(--transition-base);
+/* Icon buttons (remove/clear) use the shared .btn .btn-icon system */
+.cert-entry .btn-icon {
   flex-shrink: 0;
-}
-
-.cert-entry .icon-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
 }
 
 .cert-entry-error {
@@ -6585,36 +6535,11 @@ code {
   border-radius: var(--radius-md);
 }
 
+/* Base look/hover/accents come from the shared .btn .btn-icon system;
+   only the fixed toolbar sizing is runner-specific */
 .runner-icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 30px;
   height: 28px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition-base);
-}
-
-.runner-icon-btn:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.runner-icon-btn.is-primary {
-  color: var(--accent);
-}
-
-.runner-icon-btn.is-primary:hover {
-  background: var(--accent-light);
-}
-
-.runner-icon-btn.is-danger:hover {
-  background: var(--color-error-light);
-  color: var(--color-error);
 }
 
 /* Config chips */
