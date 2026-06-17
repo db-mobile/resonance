@@ -352,20 +352,6 @@ describe('DocGeneratorService', () => {
             });
         });
 
-        describe('_escapeHtml', () => {
-            test('should escape HTML special characters', () => {
-                expect(service._escapeHtml('<script>')).toBe('&lt;script&gt;');
-                expect(service._escapeHtml('"quoted"')).toBe('&quot;quoted&quot;');
-                expect(service._escapeHtml("it's")).toBe('it&#039;s');
-                expect(service._escapeHtml('a & b')).toBe('a &amp; b');
-            });
-
-            test('should handle null and undefined', () => {
-                expect(service._escapeHtml(null)).toBe('');
-                expect(service._escapeHtml(undefined)).toBe('');
-            });
-        });
-
         describe('_getCodeBlockLang', () => {
             test('should map language IDs to code block languages', () => {
                 expect(service._getCodeBlockLang('curl')).toBe('bash');

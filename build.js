@@ -12,19 +12,12 @@ if (!fs.existsSync('dist')) {
 if (!fs.existsSync('dist/src/modules')) {
     fs.mkdirSync('dist/src/modules', { recursive: true });
 }
-if (!fs.existsSync('dist/assets')) {
-    fs.mkdirSync('dist/assets', { recursive: true });
-}
 
-// Paths excluded from the dist copy (marketing/README assets not used by the app)
-const COPY_EXCLUDE = new Set([
-    path.normalize('assets/screenshots'),
-]);
+const COPY_SKIP_FILE = /\.(js|map)$/;
 
 // Copy static files to dist
 function copyRecursive(src, dest) {
     if (!fs.existsSync(src)) return;
-    if (COPY_EXCLUDE.has(path.normalize(src))) return;
 
     if (fs.statSync(src).isDirectory()) {
         if (!fs.existsSync(dest)) {
@@ -34,13 +27,13 @@ function copyRecursive(src, dest) {
             copyRecursive(path.join(src, file), path.join(dest, file));
         }
     } else {
+        if (COPY_SKIP_FILE.test(src)) return;
         fs.copyFileSync(src, dest);
     }
 }
 
-// Copy index.html and assets
 fs.copyFileSync('index.html', 'dist/index.html');
-copyRecursive('assets', 'dist/assets');
+copyRecursive('assets/ui', 'dist/assets/ui');
 copyRecursive('src', 'dist/src');
 
 console.log('✓ Static files copied to dist/');
@@ -70,9 +63,6 @@ const bundleAliasPlugin = {
     }
 };
 
-// Build renderer.js and all editor modules together with code splitting
-// This bundles the entire module graph into a single entry point + shared chunks,
-// eliminating the ~100-file waterfall of individual ES module requests on startup
 await esbuild.build({
     ...sharedBuildOptions,
     entryPoints: [

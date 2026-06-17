@@ -934,18 +934,6 @@ export class MockServerDialog {
     }
 
     /**
-     * Escapes HTML to prevent XSS
-     *
-     * @param {string} text - Text to escape
-     * @returns {string} Escaped text
-     */
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    /**
      * Closes the dialog
      */
     close() {

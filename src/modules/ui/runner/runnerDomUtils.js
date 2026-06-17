@@ -3,17 +3,7 @@
  * @module ui/runner/runnerDomUtils
  */
 
-/**
- * Escapes HTML special characters by round-tripping through a text node.
- *
- * @param {string} str - String to escape
- * @returns {string} Escaped string
- */
-export function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str || '';
-    return div.innerHTML;
-}
+export { escapeHtml } from '../../htmlUtils.js';
 
 /**
  * Maps an HTTP status code to a CSS class suffix used for colouring.

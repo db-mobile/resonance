@@ -228,23 +228,6 @@ export class HistoryController {
     }
 
     /**
-     * Escapes HTML special characters in text
-     *
-     * @param {string} text - Text to escape
-     * @returns {string} HTML-safe escaped text
-     */
-    escapeHtml(text) {
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
-        };
-        return String(text).replace(/[&<>"']/g, m => map[m]);
-    }
-
-    /**
      * Shows the request section in the UI
      *
      * Placeholder method for switching UI views from history to request section.

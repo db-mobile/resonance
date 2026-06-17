@@ -167,6 +167,7 @@ export class HorizontalResizer {
         this.startSidebarWidth = 0;
         this.minWidth = 200;
         this.maxWidth = 600;
+        this._saveTimer = null;
 
         this.init();
     }
@@ -180,6 +181,26 @@ export class HorizontalResizer {
         }
 
         this.setupEventListeners();
+        this._restoreWidth();
+    }
+
+    async _restoreWidth() {
+        try {
+            const saved = await window.backendAPI.store.get('sidebarWidth');
+            if (saved && saved >= this.minWidth && saved <= this.maxWidth) {
+                this.sidebar.style.width = `${saved}px`;
+                this.sidebar.style.flex = `0 0 ${saved}px`;
+            }
+        } catch (error) {
+            void error;
+        }
+    }
+
+    _saveWidth(width) {
+        clearTimeout(this._saveTimer);
+        this._saveTimer = setTimeout(() => {
+            window.backendAPI.store.set('sidebarWidth', width).catch((error) => void error);
+        }, 300);
     }
 
     setupEventListeners() {
@@ -225,6 +246,8 @@ export class HorizontalResizer {
         this.horizontalResizerHandle.classList.remove('dragging');
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
+
+        this._saveWidth(this.sidebar.offsetWidth);
     }
 
     reset() {
@@ -240,6 +263,7 @@ export class HistoryResizer {
         this.startSidebarWidth = 0;
         this.minWidth = 200;
         this.maxWidth = 600;
+        this._saveTimer = null;
 
         this.init();
     }
@@ -253,6 +277,26 @@ export class HistoryResizer {
         }
 
         this.setupEventListeners();
+        this._restoreWidth();
+    }
+
+    async _restoreWidth() {
+        try {
+            const saved = await window.backendAPI.store.get('historySidebarWidth');
+            if (saved && saved >= this.minWidth && saved <= this.maxWidth) {
+                this.sidebar.style.width = `${saved}px`;
+                this.sidebar.style.flex = `0 0 ${saved}px`;
+            }
+        } catch (error) {
+            void error;
+        }
+    }
+
+    _saveWidth(width) {
+        clearTimeout(this._saveTimer);
+        this._saveTimer = setTimeout(() => {
+            window.backendAPI.store.set('historySidebarWidth', width).catch((error) => void error);
+        }, 300);
     }
 
     setupEventListeners() {
@@ -299,6 +343,8 @@ export class HistoryResizer {
         this.resizerHandle.classList.remove('dragging');
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
+
+        this._saveWidth(this.sidebar.offsetWidth);
     }
 
     reset() {

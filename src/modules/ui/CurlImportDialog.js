@@ -3,8 +3,8 @@
  * @module ui/CurlImportDialog
  */
 
-import { templateLoader } from '../templateLoader.js';
 import { CurlParser } from '../CurlParser.js';
+import { BaseModal } from './BaseModal.js';
 
 /**
  * Dialog for importing cURL commands
@@ -12,58 +12,49 @@ import { CurlParser } from '../CurlParser.js';
  * @class
  * @classdesc Provides a modal dialog for pasting cURL commands and importing
  * them into new or existing collections. Includes real-time parsing preview
- * and collection selection.
+ * and collection selection. Escape and click-outside cancel via {@link BaseModal}.
+ * @augments BaseModal
  */
-export class CurlImportDialog {
+export class CurlImportDialog extends BaseModal {
     /**
      * Creates a CurlImportDialog instance
      */
     constructor() {
-        this.overlay = null;
-        this.onConfirm = null;
-        this.onCancel = null;
+        super();
+        /** @type {Function|null} Pending promise resolver. */
+        this.resolve = null;
         this.parsedRequest = null;
     }
 
     /**
-     * Shows the cURL import dialog
+     * Shows the cURL import dialog.
      *
-     * @param {Array<Object>} collections - Available collections for import target
-     * @param {Object} [options={}] - Dialog options
-     * @param {string} [options.targetCollectionId] - Pre-selected collection ID
-     * @returns {Promise<Object|null>} Resolves to import result or null if cancelled
+     * @param {Array<Object>} collections - Available collections for import target.
+     * @param {Object} [options={}] - Dialog options.
+     * @param {string} [options.targetCollectionId] - Pre-selected collection ID.
+     * @returns {Promise<Object|null>} Resolves to import result or null if cancelled.
      */
     show(collections, options = {}) {
         return new Promise((resolve) => {
-            this.onConfirm = resolve;
-            this.onCancel = () => resolve(null);
-
+            this.resolve = resolve;
             this.createDialog(collections, options);
         });
     }
 
     /**
-     * Creates and displays the dialog DOM elements
+     * Builds and displays the dialog.
      *
      * @private
-     * @param {Array<Object>} collections - Available collections
-     * @param {Object} options - Dialog options
+     * @param {Array<Object>} collections - Available collections.
+     * @param {Object} options - Dialog options.
      */
     createDialog(collections, options) {
-        this.overlay = document.createElement('div');
-        this.overlay.className = 'curl-import-dialog-overlay modal-overlay';
-
-        const dialog = document.createElement('div');
-        dialog.className = 'curl-import-dialog modal-dialog modal-dialog--lg';
-
-        const fragment = templateLoader.cloneSync(
-            './src/templates/curl/curlImportDialog.html',
-            'tpl-curl-import-dialog'
-        );
-        dialog.appendChild(fragment);
-
-        this.overlay.appendChild(dialog);
-        document.body.appendChild(this.overlay);
+        const dialog = this.mount({
+            overlayClass: 'curl-import-dialog-overlay',
+            dialogClass: 'curl-import-dialog modal-dialog modal-dialog--lg',
+            templatePath: './src/templates/curl/curlImportDialog.html',
+            templateId: 'tpl-curl-import-dialog'
+        });
 
         if (window.i18n && window.i18n.updateUI) {
             window.i18n.updateUI();
@@ -92,8 +83,8 @@ export class CurlImportDialog {
 
         const newCollectionOption = document.createElement('option');
         newCollectionOption.value = '__new__';
-        newCollectionOption.textContent = window.i18n ? 
-            window.i18n.t('curl_import.new_collection') : 
+        newCollectionOption.textContent = window.i18n ?
+            window.i18n.t('curl_import.new_collection') :
             'Create New Collection';
         select.appendChild(newCollectionOption);
 
@@ -121,7 +112,7 @@ export class CurlImportDialog {
         const select = dialog.querySelector('#curl-import-collection');
         const newCollectionGroup = dialog.querySelector('#new-collection-group');
         const newCollectionLocationGroup = dialog.querySelector('#new-collection-location-group');
-        
+
         const isNewCollection = select?.value === '__new__';
         if (newCollectionGroup) {
             newCollectionGroup.classList.toggle('is-hidden', !isNewCollection);
@@ -132,7 +123,8 @@ export class CurlImportDialog {
     }
 
     /**
-     * Attaches event listeners for dialog interactions
+     * Attaches event listeners specific to the import flow. Escape/backdrop
+     * dismissal is handled by {@link BaseModal}.
      *
      * @private
      * @param {HTMLElement} dialog - Dialog element
@@ -174,30 +166,16 @@ export class CurlImportDialog {
         }
 
         if (cancelBtn) {
-            cancelBtn.addEventListener('click', () => this.close());
+            cancelBtn.addEventListener('click', () => this.onDismiss());
         }
 
         if (closeBtn) {
-            closeBtn.addEventListener('click', () => this.close());
+            closeBtn.addEventListener('click', () => this.onDismiss());
         }
 
         if (importBtn) {
             importBtn.addEventListener('click', () => this.handleImport(dialog, collections));
         }
-
-        this.overlay.addEventListener('click', (e) => {
-            if (e.target === this.overlay) {
-                this.close();
-            }
-        });
-
-        const escapeHandler = (e) => {
-            if (e.key === 'Escape') {
-                this.close();
-                document.removeEventListener('keydown', escapeHandler);
-            }
-        };
-        document.addEventListener('keydown', escapeHandler);
     }
 
     /**
@@ -230,12 +208,12 @@ export class CurlImportDialog {
 
         try {
             this.parsedRequest = CurlParser.parse(curlCommand);
-            
+
             if (previewMethod) {
                 previewMethod.textContent = this.parsedRequest.method;
                 previewMethod.dataset.method = this.parsedRequest.method.toLowerCase();
             }
-            
+
             if (previewUrl) {
                 let displayUrl = this.parsedRequest.url;
                 if (Object.keys(this.parsedRequest.queryParams).length > 0) {
@@ -249,8 +227,8 @@ export class CurlImportDialog {
 
             if (previewHeaders) {
                 const headerCount = Object.keys(this.parsedRequest.headers).length;
-                previewHeaders.textContent = headerCount > 0 ? 
-                    `${headerCount} header${headerCount !== 1 ? 's' : ''}` : 
+                previewHeaders.textContent = headerCount > 0 ?
+                    `${headerCount} header${headerCount !== 1 ? 's' : ''}` :
                     'No headers';
             }
 
@@ -287,11 +265,11 @@ export class CurlImportDialog {
     }
 
     /**
-     * Handles the import action
+     * Handles the import action, resolving with the import result.
      *
      * @private
      * @param {HTMLElement} dialog - Dialog element
-     * @param {Array<Object>} collections - Available collections
+     * @param {Array<Object>} _collections - Available collections
      */
     handleImport(dialog, _collections) {
         if (!this.parsedRequest) {
@@ -327,10 +305,7 @@ export class CurlImportDialog {
             auth: this.parsedRequest.auth
         };
 
-        if (this.onConfirm) {
-            this.onConfirm(result);
-        }
-        this.cleanup();
+        this._settle(result);
     }
 
     /**
@@ -347,29 +322,28 @@ export class CurlImportDialog {
     }
 
     /**
-     * Handles cancel action
+     * Cancels the dialog (Escape / backdrop / cancel button), resolving with null.
      *
-     * @private
+     * @protected
+     * @returns {void}
      */
-    close() {
-        if (this.onCancel) {
-            this.onCancel();
-        }
-        this.cleanup();
+    onDismiss() {
+        this._settle(null);
     }
 
     /**
-     * Removes dialog from DOM and cleans up
+     * Resolves the pending promise once and tears the dialog down.
      *
      * @private
+     * @param {Object|null} value - Value to resolve with.
+     * @returns {void}
      */
-    cleanup() {
-        if (this.overlay) {
-            this.overlay.remove();
-            this.overlay = null;
+    _settle(value) {
+        if (this.resolve) {
+            this.resolve(value);
+            this.resolve = null;
         }
-        this.onConfirm = null;
-        this.onCancel = null;
         this.parsedRequest = null;
+        this.destroy();
     }
 }

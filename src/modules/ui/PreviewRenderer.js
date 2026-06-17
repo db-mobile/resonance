@@ -577,16 +577,6 @@ export class PreviewRenderer {
     }
 
     /**
-     * Escape HTML for safe rendering
-     * @private
-     */
-    _escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    /**
      * Clear preview container
      */
     clear() {

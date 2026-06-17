@@ -6,6 +6,7 @@
 import { generateCode, SUPPORTED_LANGUAGES } from '../codeGenerator.js';
 import { templateLoader } from '../templateLoader.js';
 import { toast } from './Toast.js';
+import { BaseModal } from './BaseModal.js';
 
 /**
  * Multi-language code snippet generator dialog
@@ -13,14 +14,15 @@ import { toast } from './Toast.js';
  * @class
  * @classdesc Displays generated code snippets for API requests in multiple languages
  * (cURL, JavaScript, Python, etc.). Provides language selector, syntax highlighting,
- * and copy-to-clipboard functionality.
+ * and copy-to-clipboard. Escape and click-outside-to-close are handled by {@link BaseModal}.
+ * @augments BaseModal
  */
-export class CodeSnippetDialog {
+export class CodeSnippetDialog extends BaseModal {
     /**
      * Creates a CodeSnippetDialog instance
      */
     constructor() {
-        this.overlay = null;
+        super();
         this.currentLanguage = 'curl'; // Default language
         this.config = null;
     }
@@ -28,21 +30,13 @@ export class CodeSnippetDialog {
     show(config, initialLanguage = 'curl') {
         this.config = config;
         this.currentLanguage = initialLanguage;
-        this.createDialog();
-    }
 
-    createDialog() {
-        this.overlay = document.createElement('div');
-        this.overlay.className = 'code-snippet-dialog-overlay modal-overlay';
-
-        const dialog = document.createElement('div');
-        dialog.className = 'code-snippet-dialog modal-dialog modal-dialog--code-snippet';
-
-        const fragment = templateLoader.cloneSync(
-            './src/templates/codeSnippets/codeSnippetDialog.html',
-            'tpl-code-snippet-dialog'
-        );
-        dialog.appendChild(fragment);
+        const dialog = this.mount({
+            overlayClass: 'code-snippet-dialog-overlay',
+            dialogClass: 'code-snippet-dialog modal-dialog modal-dialog--code-snippet',
+            templatePath: './src/templates/codeSnippets/codeSnippetDialog.html',
+            templateId: 'tpl-code-snippet-dialog'
+        });
 
         const languageSelector = dialog.querySelector('#language-selector');
         if (languageSelector) {
@@ -61,13 +55,7 @@ export class CodeSnippetDialog {
             });
         }
 
-        this.overlay.appendChild(dialog);
-        document.body.appendChild(this.overlay);
-
-        // Update code display
         this.updateCodeDisplay(dialog);
-
-        // Setup event listeners
         this.setupEventListeners(dialog);
     }
 
@@ -89,8 +77,8 @@ export class CodeSnippetDialog {
         const commandDisplay = dialog.querySelector('#code-snippet-display');
 
         // Close buttons
-        closeBtn.addEventListener('click', () => this.close());
-        closeBottomBtn.addEventListener('click', () => this.close());
+        closeBtn.addEventListener('click', () => this.destroy());
+        closeBottomBtn.addEventListener('click', () => this.destroy());
 
         // Language selector
         languageSelector.addEventListener('change', (e) => {
@@ -118,32 +106,5 @@ export class CodeSnippetDialog {
                 toast.error('Failed to copy to clipboard');
             }
         });
-
-        // Keyboard shortcuts
-        const handleKeyDown = (e) => {
-            if (e.key === 'Escape') {
-                this.close();
-                document.removeEventListener('keydown', handleKeyDown);
-            }
-        };
-        document.addEventListener('keydown', handleKeyDown);
-
-        // Click outside to close
-        this.overlay.addEventListener('click', (e) => {
-            if (e.target === this.overlay) {
-                this.close();
-            }
-        });
-    }
-
-    close() {
-        this.cleanup();
-    }
-
-    cleanup() {
-        if (this.overlay) {
-            this.overlay.remove();
-            this.overlay = null;
-        }
     }
 }

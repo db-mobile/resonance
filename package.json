@@ -1,6 +1,6 @@
 {
   "name": "resonance",
-  "version": "2.11.2",
+  "version": "2.11.3",
   "description": "Resonance - A local-first, zero-account API client with excellent user experience",
   "license": "MIT",
   "engines": {
@@ -23,6 +23,11 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{js,json,md,css,html}\"",
     "format:check": "prettier --check \"**/*.{js,json,md,css,html}\""
+  },
+  "overrides": {
+    "@istanbuljs/load-nyc-config": {
+      "js-yaml": "^4.2.0"
+    }
   },
   "devDependencies": {
     "@babel/core": "^7.28.0",

@@ -3,89 +3,68 @@
  * @module ui/RenameDialog
  */
 
+import { BaseModal } from './BaseModal.js';
+
 /**
  * Modal rename dialog with text input validation
  *
  * @class
  * @classdesc Provides a modal dialog for renaming items with keyboard support,
- * input validation, and auto-focus. Supports Enter/Escape shortcuts and preserves
- * special characters like template variables.
+ * input validation, and auto-focus. Enter confirms; Escape and click-outside
+ * (handled by {@link BaseModal}) cancel. Preserves special characters like
+ * template variables.
+ * @augments BaseModal
  */
-import { templateLoader } from '../templateLoader.js';
-
-export class RenameDialog {
+export class RenameDialog extends BaseModal {
     /**
      * Creates a RenameDialog instance
      */
     constructor() {
-        /** @type {HTMLElement|null} The dialog overlay element */
-        this.overlay = null;
-        /** @type {Function|null} Callback for confirm action */
-        this.onConfirm = null;
-        /** @type {Function|null} Callback for cancel action */
-        this.onCancel = null;
+        super();
+        /** @type {Function|null} Pending promise resolver. */
+        this.resolve = null;
     }
 
     /**
-     * Shows rename dialog and waits for user input
+     * Shows the rename dialog and waits for user input.
      *
-     * Displays a modal dialog with text input pre-filled with current name.
-     * Returns a promise that resolves to the new name (trimmed) or null if cancelled.
-     *
-     * @param {string} currentName - The current name to pre-fill
-     * @param {Object} [options={}] - Dialog configuration options
-     * @param {string} [options.title='Rename Collection'] - Dialog title
-     * @param {string} [options.label='Collection Name:'] - Input field label
-     * @param {string} [options.confirmText='Rename'] - Confirm button label
-     * @returns {Promise<string|null>} Resolves to new name (trimmed) or null if cancelled
+     * @param {string} currentName - The current name to pre-fill.
+     * @param {Object} [options={}] - Dialog configuration options.
+     * @param {string} [options.title='Rename Collection'] - Dialog title.
+     * @param {string} [options.label='Collection Name:'] - Input field label.
+     * @param {string} [options.confirmText='Rename'] - Confirm button label.
+     * @returns {Promise<string|null>} Resolves to the new name (trimmed) or null if cancelled.
      */
     show(currentName, options = {}) {
-        return new Promise((resolve, _reject) => {
-            this.onConfirm = resolve;
-            this.onCancel = () => resolve(null);
-
+        return new Promise((resolve) => {
+            this.resolve = resolve;
             this.createDialog(currentName, options);
         });
     }
 
     /**
-     * Creates and displays the rename dialog DOM elements
-     *
-     * Builds dialog with inline styles for theme compatibility. Sets input value
-     * using .value property to preserve special characters like {{ and }}.
+     * Builds and displays the rename dialog.
      *
      * @private
-     * @param {string} currentName - Current name to pre-fill
-     * @param {Object} options - Dialog options
+     * @param {string} currentName - Current name to pre-fill.
+     * @param {Object} options - Dialog options.
      * @returns {void}
      */
     createDialog(currentName, options) {
-        this.overlay = document.createElement('div');
-        this.overlay.className = 'rename-dialog-overlay modal-overlay';
-
-        const dialog = document.createElement('div');
-        dialog.className = 'rename-dialog modal-dialog modal-dialog--sm';
-
-        const title = options.title || 'Rename Collection';
-        const label = options.label || 'Collection Name:';
-        const confirmText = options.confirmText || 'Rename';
-
-        const fragment = templateLoader.cloneSync(
-            './src/templates/dialogs/renameDialog.html',
-            'tpl-rename-dialog'
-        );
-        dialog.appendChild(fragment);
+        const dialog = this.mount({
+            overlayClass: 'rename-dialog-overlay',
+            dialogClass: 'rename-dialog modal-dialog modal-dialog--sm',
+            templatePath: './src/templates/dialogs/renameDialog.html',
+            templateId: 'tpl-rename-dialog'
+        });
 
         const titleEl = dialog.querySelector('[data-role="title"]');
         const labelEl = dialog.querySelector('[data-role="label"]');
         const confirmEl = dialog.querySelector('[data-role="confirm"]');
 
-        if (titleEl) {titleEl.textContent = title;}
-        if (labelEl) {labelEl.textContent = label;}
-        if (confirmEl) {confirmEl.textContent = confirmText;}
-
-        this.overlay.appendChild(dialog);
-        document.body.appendChild(this.overlay);
+        if (titleEl) {titleEl.textContent = options.title || 'Rename Collection';}
+        if (labelEl) {labelEl.textContent = options.label || 'Collection Name:';}
+        if (confirmEl) {confirmEl.textContent = options.confirmText || 'Rename';}
 
         // Set value directly via .value property to preserve special characters like {{ }}
         const input = dialog.querySelector('#rename-input');
@@ -96,12 +75,10 @@ export class RenameDialog {
     }
 
     /**
-     * Attaches event listeners for dialog interactions
-     *
-     * Handles button clicks, Enter/Escape keyboard shortcuts, and click-outside-to-close.
+     * Attaches button and keyboard listeners specific to the rename flow.
      *
      * @private
-     * @param {HTMLElement} dialog - Dialog element
+     * @param {HTMLElement} dialog - Dialog element.
      * @returns {void}
      */
     setupEventListeners(dialog) {
@@ -109,30 +86,21 @@ export class RenameDialog {
         const cancelBtn = dialog.querySelector('#rename-cancel-btn');
         const confirmBtn = dialog.querySelector('#rename-confirm-btn');
 
-        cancelBtn.addEventListener('click', () => this.close());
-        
+        cancelBtn.addEventListener('click', () => this.onDismiss());
         confirmBtn.addEventListener('click', () => this.confirm(nameInput.value));
 
         nameInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 this.confirm(nameInput.value);
-            } else if (e.key === 'Escape') {
-                this.close();
-            }
-        });
-
-        this.overlay.addEventListener('click', (e) => {
-            if (e.target === this.overlay) {
-                this.close();
             }
         });
     }
 
     /**
-     * Focuses and selects text in the rename input
+     * Focuses and selects text in the rename input.
      *
      * @private
-     * @param {HTMLElement} dialog - Dialog element
+     * @param {HTMLElement} dialog - Dialog element.
      * @returns {void}
      */
     focusInput(dialog) {
@@ -142,67 +110,41 @@ export class RenameDialog {
     }
 
     /**
-     * Handles confirm action with validation
-     *
-     * Trims whitespace and rejects empty names. Resolves promise with
-     * the new name and closes dialog.
+     * Validates and resolves with the new name. No-op for empty names.
      *
      * @private
-     * @param {string} newName - The entered name
+     * @param {string} newName - The entered name.
      * @returns {void}
      */
     confirm(newName) {
         const trimmedName = newName.trim();
         if (trimmedName) {
-            if (this.onConfirm) {
-                this.onConfirm(trimmedName);
-            }
-        } else {
-            return;
+            this._settle(trimmedName);
         }
-        this.cleanup();
     }
 
     /**
-     * Handles cancel action
+     * Cancels the dialog (Escape / backdrop / cancel button), resolving with null.
      *
-     * Resolves promise with null and closes dialog.
-     *
-     * @private
+     * @protected
      * @returns {void}
      */
-    close() {
-        if (this.onCancel) {
-            this.onCancel();
-        }
-        this.cleanup();
+    onDismiss() {
+        this._settle(null);
     }
 
     /**
-     * Removes dialog from DOM and cleans up callbacks
+     * Resolves the pending promise once and tears the dialog down.
      *
      * @private
+     * @param {string|null} value - Value to resolve with.
      * @returns {void}
      */
-    cleanup() {
-        if (this.overlay) {
-            this.overlay.remove();
-            this.overlay = null;
+    _settle(value) {
+        if (this.resolve) {
+            this.resolve(value);
+            this.resolve = null;
         }
-        this.onConfirm = null;
-        this.onCancel = null;
-    }
-
-    /**
-     * Escapes HTML characters in text for safe display
-     *
-     * @private
-     * @param {string} text - Text to escape
-     * @returns {string} HTML-escaped text
-     */
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        this.destroy();
     }
 }

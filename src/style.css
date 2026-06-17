@@ -460,9 +460,6 @@ code {
 .u-flex {
   display: flex;
 }
-.u-inline-flex {
-  display: inline-flex;
-}
 .u-flex-col {
   flex-direction: column;
 }
@@ -471,12 +468,6 @@ code {
 }
 .u-min-h-0 {
   min-height: 0;
-}
-.u-w-full {
-  width: 100%;
-}
-.u-h-full {
-  height: 100%;
 }
 .u-items-start {
   align-items: flex-start;
@@ -511,71 +502,26 @@ code {
 .u-gap-6 {
   gap: var(--space-6);
 }
-.u-wrap {
-  flex-wrap: wrap;
-}
 .u-overflow-hidden {
   overflow: hidden;
 }
 .u-overflow-y-auto {
   overflow-y: auto;
 }
-.u-mt-4 {
-  margin-top: var(--space-4);
-}
-.u-mb-3 {
-  margin-bottom: var(--space-3);
-}
 .u-mb-4 {
   margin-bottom: var(--space-4);
-}
-.u-mb-5 {
-  margin-bottom: var(--space-5);
-}
-.u-pt-2 {
-  padding-top: var(--space-2);
-}
-.u-pt-4 {
-  padding-top: var(--space-4);
-}
-.u-border-top {
-  border-top: 1px solid var(--border-light);
-}
-.u-text-secondary {
-  color: var(--text-secondary);
-}
-.u-font-mono {
-  font-family: var(--font-family-mono);
 }
 .u-hidden {
   display: none;
 }
-.u-block {
-  display: block;
-}
 .u-min-w-0 {
   min-width: 0;
-}
-.u-flex-shrink-0 {
-  flex-shrink: 0;
-}
-.u-overflow-auto {
-  overflow: auto;
-}
-.u-gap-5 {
-  gap: var(--space-5);
 }
 .u-gap-8 {
   gap: var(--space-8);
 }
 .u-mt-2 {
   margin-top: var(--space-2);
-}
-.u-mb-2 {
-  margin-bottom: var(--space-2);
-}
-.u-mb-6 {
-  margin-bottom: var(--space-6);
 }
 
 .modal-overlay {
@@ -983,21 +929,9 @@ code {
   font-family: var(--font-family-mono);
 }
 
-.runner-script-modal-body {
-  flex: 1;
-  min-height: 0;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
 .runner-script-editor-container {
   height: 100%;
   overflow: auto;
-}
-
-.runner-script-editor-container .cm-editor {
-  height: 100%;
 }
 
 .runner-script-modal-hint {
@@ -1110,15 +1044,6 @@ code {
   width: 100%;
 }
 
-.grpc-badge {
-  background: var(--accent);
-  color: var(--text-inverse);
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-weight: 600;
-}
-
 .grpc-target-wrapper {
   flex: 1 1 0;
   display: flex;
@@ -1158,12 +1083,6 @@ code {
 .dialog-title {
   margin: 0;
   color: var(--text-primary);
-}
-
-.dialog-title-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
 }
 
 .dialog-subtitle {
@@ -1598,10 +1517,6 @@ code {
   font-size: 13px;
 }
 
-.mock-server-endpoint-method {
-  --method-pill-radius: var(--radius-sm);
-}
-
 .mock-server-endpoint-path {
   flex: 1;
   color: var(--text-secondary);
@@ -1887,18 +1802,6 @@ code {
   line-height: 1.6;
 }
 
-
-.script-editor-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.script-editor-title {
-  margin: 0;
-  color: var(--text-primary);
-}
 
 .script-tabs {
   margin-bottom: 16px;
@@ -2456,6 +2359,17 @@ code {
 .btn-icon.active {
   background: var(--bg-tertiary);
   color: var(--text-primary);
+}
+/* Accent modifiers for icon buttons */
+.btn-icon.is-primary {
+  color: var(--accent);
+}
+.btn-icon.is-primary:hover:not(:disabled) {
+  background: var(--accent-light);
+}
+.btn-icon.is-danger:hover:not(:disabled) {
+  background: var(--color-error-light);
+  color: var(--color-error);
 }
 
 /* Variant: Icon Bordered */
@@ -3239,7 +3153,9 @@ code {
 
 .tab-button,
 .script-tab-btn,
-.settings-tab {
+.settings-tab,
+.graphql-drawer-tab,
+.script-sub-tab {
   border: none;
   border-bottom: 2px solid transparent;
   background: none;
@@ -3483,16 +3399,9 @@ code {
   margin-bottom: var(--space-2);
 }
 
+/* Base look from the shared tab system; only padding + active tint differ */
 .graphql-drawer-tab {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
   padding: var(--space-1) var(--space-2);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-secondary);
 }
 
 .graphql-drawer-tab.active {
@@ -3564,13 +3473,14 @@ code {
   display: none;
 }
 
-/* GraphQL Editor (CodeMirror container) */
-.graphql-editor {
+/* Bordered CodeMirror container — shared by the GraphQL and schema editors.
+   The inner .cm-editor already fills its host via the global .cm-editor rule. */
+.editor-shell {
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
-  overflow: hidden;
-  min-height: 0;
 }
 
 /* Script Sub-tabs */
@@ -3582,16 +3492,9 @@ code {
   background: var(--bg-primary);
 }
 
+/* Base look from the shared tab system; padding + hover/active are sub-tab-specific */
 .script-sub-tab {
   padding: var(--space-2) var(--space-3);
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-base);
   white-space: nowrap;
 }
 
@@ -3619,22 +3522,12 @@ code {
   flex-direction: column;
 }
 
-/* Script Textarea */
-.script-textarea {
-  flex: 1;
-  min-height: 200px;
-  --textarea-bg: var(--bg-white);
-}
-
 /* Script Editor Container (CodeMirror) */
+/* Borderless editor area (no .editor-shell); .cm-editor fills it via the global rule */
 .script-editor-container {
   flex: 1;
   min-height: 200px;
   overflow: hidden;
-}
-
-.script-editor-container .cm-editor {
-  height: 100%;
 }
 
 /* Schema Tab Styles */
@@ -3658,22 +3551,9 @@ code {
   gap: 8px;
 }
 
-.schema-description {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 0 0 12px 0;
-}
-
+/* Shape from .editor-shell; only the taller minimum is schema-specific */
 .schema-editor-container {
-  flex: 1;
   min-height: 150px;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-
-.schema-editor-container .cm-editor {
-  height: 100%;
 }
 
 .schema-validation-status {
@@ -3688,23 +3568,9 @@ code {
   display: none;
 }
 
-.schema-status-valid {
-  background-color: var(--color-success-light, rgba(16, 185, 129, 0.1));
-  color: var(--color-success, #10b981);
-}
-
-.schema-status-error {
-  background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
-  color: var(--color-error, #ef4444);
-}
-
-.schema-status-warning {
-  background-color: var(--color-warning-light, rgba(234, 179, 8, 0.1));
-  color: var(--color-warning, #eab308);
-}
-
-/* Response validation indicator */
-.response-validation-badge {
+/* Status badge — inline pill for validation / error indicators. The
+   success/error tints are shared with the schema validation status box. */
+.status-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -3712,51 +3578,29 @@ code {
   font-size: 11px;
   font-weight: 500;
   border-radius: var(--radius-sm);
-  margin-left: 8px;
 }
 
-.response-validation-badge.valid {
+.status-badge.is-success,
+.schema-validation-status.is-success {
   background-color: var(--color-success-light, rgba(16, 185, 129, 0.1));
   color: var(--color-success, #10b981);
 }
 
-.response-validation-badge.invalid {
+.status-badge.is-error,
+.schema-validation-status.is-error {
   background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
   color: var(--color-error, #ef4444);
+}
+
+/* Response validation indicator — shape from .status-badge */
+.response-validation-badge {
+  margin-left: 8px;
 }
 
 /* GraphQL top-level errors indicator (servers return HTTP 200 even on failure) */
 .graphql-errors-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 500;
-  border-radius: var(--radius-sm);
   margin-left: 8px;
   cursor: help;
-  background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
-  color: var(--color-error, #ef4444);
-}
-
-.response-validation-errors {
-  margin-top: 8px;
-  padding: 8px 12px;
-  background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
-  border: 1px solid var(--color-error, #ef4444);
-  border-radius: var(--radius-md);
-  font-size: 12px;
-  color: var(--color-error, #ef4444);
-}
-
-.response-validation-errors ul {
-  margin: 4px 0 0 0;
-  padding-left: 16px;
-}
-
-.response-validation-errors li {
-  margin: 2px 0;
 }
 
 /* CodeMirror Editor Base Styles */
@@ -3858,7 +3702,10 @@ code {
 }
 
 .cm-editor .cm-panel.cm-search button {
-  background-color: var(--bg-tertiary);
+  /* `background` shorthand (not `background-color`) is required to override
+     CodeMirror's base-theme `background-image` gradient on `.cm-button`,
+     which otherwise paints over our fill and leaves the label unreadable. */
+  background: var(--bg-tertiary);
   color: var(--text-primary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
@@ -3868,7 +3715,11 @@ code {
 }
 
 .cm-editor .cm-panel.cm-search button:hover {
-  background-color: var(--bg-hover);
+  background: var(--bg-hover);
+}
+
+.cm-editor .cm-panel.cm-search button:active {
+  background: var(--bg-hover);
 }
 
 .cm-editor .cm-panel.cm-search label {
@@ -5757,20 +5608,10 @@ code {
   color: var(--text-secondary);
 }
 
-.cert-entry input[type="text"] {
-  padding: var(--space-2);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-sm);
-  background-color: var(--bg-white);
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
-  transition: all var(--transition-base);
-}
-
-.cert-entry input[type="text"]:focus {
-  outline: none;
-  border-color: var(--border-focus);
-  box-shadow: var(--shadow-focus);
+/* Inputs reuse .input-base; only the compact sizing differs */
+.cert-entry .input-base {
+  --input-padding: var(--space-2);
+  --input-radius: var(--radius-sm);
 }
 
 .cert-file-row {
@@ -5791,23 +5632,9 @@ code {
   flex-shrink: 0;
 }
 
-.cert-entry .icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-1);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: all var(--transition-base);
+/* Icon buttons (remove/clear) use the shared .btn .btn-icon system */
+.cert-entry .btn-icon {
   flex-shrink: 0;
-}
-
-.cert-entry .icon-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
 }
 
 .cert-entry-error {
@@ -6708,36 +6535,11 @@ code {
   border-radius: var(--radius-md);
 }
 
+/* Base look/hover/accents come from the shared .btn .btn-icon system;
+   only the fixed toolbar sizing is runner-specific */
 .runner-icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 30px;
   height: 28px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition-base);
-}
-
-.runner-icon-btn:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.runner-icon-btn.is-primary {
-  color: var(--accent);
-}
-
-.runner-icon-btn.is-primary:hover {
-  background: var(--accent-light);
-}
-
-.runner-icon-btn.is-danger:hover {
-  background: var(--color-error-light);
-  color: var(--color-error);
 }
 
 /* Config chips */
@@ -7574,23 +7376,6 @@ code {
 
 .runner-results-no-cookies.is-hidden {
   display: none;
-}
-
-/* Empty state for results */
-.runner-results-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-6);
-  color: var(--text-tertiary);
-  text-align: center;
-}
-
-.runner-results-empty .icon {
-  font-size: 32px;
-  margin-bottom: var(--space-2);
-  opacity: 0.5;
 }
 
 /* Saved Runners Dialog */
