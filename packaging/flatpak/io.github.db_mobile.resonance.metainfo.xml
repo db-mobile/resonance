@@ -99,6 +99,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.11.3" date="2026-06-17">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Persist sidebar width</li>
+          <li>Optimize production build</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.11.2" date="2026-06-15">
       <description>
         <p>Feature stabilization release</p>
