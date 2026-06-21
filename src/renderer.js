@@ -23,6 +23,7 @@ import { FormBodyManager } from './modules/formBodyManager.js';
 import { initGrpcUI, setGrpcMetadata, setGrpcTls } from './modules/grpcHandler.js';
 import { initRequestModeManager } from './modules/requestModeManager.js';
 import { initWebSocketHandler } from './modules/websocketHandler.js';
+import { initGraphQLSubscriptionHandler } from './modules/graphqlSubscriptionHandler.js';
 import { initSseHandler } from './modules/sseHandler.js';
 import { initMqttHandler, handleMqttCancel } from './modules/mqttHandler.js';
 import { initGrpcStreamHandler } from './modules/grpcStreamHandler.js';
@@ -759,6 +760,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         await mockServerController.initialize();
 
         await initWebSocketHandler();
+
+        await initGraphQLSubscriptionHandler();
 
         await initSseHandler();
 

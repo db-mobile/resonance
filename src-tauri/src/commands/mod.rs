@@ -2,6 +2,7 @@ pub mod api_request;
 pub mod app;
 pub mod certificates;
 pub mod collections;
+pub mod graphql_subscription;
 pub mod grpc_proto;
 pub mod grpc_reflection;
 pub mod grpc_streaming;

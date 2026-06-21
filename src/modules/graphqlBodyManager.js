@@ -7,7 +7,10 @@ import { app } from './appContext.js';
 import { GraphQLEditor } from './graphqlEditor.bundle.js';
 import { JSONEditor } from './jsonEditor.bundle.js';
 import { toast } from './ui/Toast.js';
-import { fetchGraphQLIntrospection } from './apiHandler.js';
+import { fetchGraphQLIntrospection, buildSchemaFromIntrospection } from './apiHandler.js';
+
+const SCHEMA_STORE_KEY = 'graphqlSchemaCache';
+const SCHEMA_STORE_LIMIT = 50;
 
 export class GraphQLBodyManager {
     constructor(domElements) {
@@ -20,6 +23,8 @@ export class GraphQLBodyManager {
         this.schemaCache = new Map();
         this.currentSchema = null;
         this.isFetchingSchema = false;
+        this._autoFetchedUrls = new Set();
+        this._urlDebounce = null;
 
         this.selectedOperationName = null;
 
@@ -101,6 +106,18 @@ export class GraphQLBodyManager {
         if (this.docsToggle) {
             this.docsToggle.addEventListener('click', () => this.toggleDocs());
         }
+
+        document.addEventListener('input', (e) => {
+            const id = e.target?.id;
+            if (id !== 'url-input' && id !== 'graphql-url-input') {
+                return;
+            }
+            if (!this.isGraphQLMode()) {
+                return;
+            }
+            clearTimeout(this._urlDebounce);
+            this._urlDebounce = setTimeout(() => this.autoApplySchemaForUrl(), 500);
+        });
     }
 
     /**
@@ -323,14 +340,19 @@ export class GraphQLBodyManager {
         }
 
         try {
-            const { schema, url, error } = await fetchGraphQLIntrospection();
+            const cacheKey = this._getCurrentUrl();
+            const { schema, introspection, error } = await fetchGraphQLIntrospection();
             if (error) {
                 toast.error(error);
                 return;
             }
             this.currentSchema = schema;
-            if (url) {
-                this.schemaCache.set(url, schema);
+            if (cacheKey) {
+                this.schemaCache.set(cacheKey, schema);
+                this._autoFetchedUrls.add(cacheKey);
+                if (introspection) {
+                    this._saveSchemaToStore(cacheKey, introspection);
+                }
             }
             this.applySchemaToEditor();
             if (this.docsRail && this.docsRail.style.display !== 'none') {
@@ -353,6 +375,126 @@ export class GraphQLBodyManager {
     applySchemaToEditor() {
         if (this.graphqlEditor && this.currentSchema) {
             this.graphqlEditor.setSchema(this.currentSchema);
+        }
+    }
+
+    /**
+     * Read the current endpoint URL. In GraphQL mode the shared `#url-input`
+     * remains the source of truth (the visible `#graphql-url-input` mirrors it).
+     * @returns {string} The trimmed URL, or '' when unavailable.
+     */
+    _getCurrentUrl() {
+        return document.getElementById('url-input')?.value?.trim() || '';
+    }
+
+    /**
+     * Load the persisted per-URL introspection cache from the backend store.
+     * @returns {Promise<Object>} A `{ [url]: introspectionJson }` map (possibly empty).
+     */
+    async _loadSchemaStore() {
+        try {
+            const store = await window.backendAPI?.store?.get(SCHEMA_STORE_KEY);
+            return store && typeof store === 'object' ? store : {};
+        } catch (_e) {
+            return {};
+        }
+    }
+
+    /**
+     * Persist a raw introspection result keyed by URL, capped to the most-recent
+     * {@link SCHEMA_STORE_LIMIT} endpoints (LRU by re-insertion order).
+     * @param {string} url
+     * @param {object} introspection - The serializable `data` of an introspection query.
+     */
+    async _saveSchemaToStore(url, introspection) {
+        if (!url || !introspection || !window.backendAPI?.store) {
+            return;
+        }
+        try {
+            const store = await this._loadSchemaStore();
+            delete store[url];
+            store[url] = introspection;
+            const keys = Object.keys(store);
+            let toSave = store;
+            if (keys.length > SCHEMA_STORE_LIMIT) {
+                toSave = {};
+                keys.slice(keys.length - SCHEMA_STORE_LIMIT).forEach((k) => {
+                    toSave[k] = store[k];
+                });
+            }
+            await window.backendAPI.store.set(SCHEMA_STORE_KEY, toSave);
+        } catch (_e) {
+            void _e;
+        }
+    }
+
+    /**
+     * Apply the best available schema for the given (or current) URL to the editor:
+     * in-memory cache → persisted store → silent background introspection.
+     * Keeps autocomplete current without forcing the user to click Schema.
+     * @param {string} [url] - Defaults to the current endpoint URL.
+     */
+    async autoApplySchemaForUrl(url) {
+        const targetUrl = (url || this._getCurrentUrl()).trim();
+        if (!targetUrl) {
+            return;
+        }
+
+        if (this.schemaCache.has(targetUrl)) {
+            this.currentSchema = this.schemaCache.get(targetUrl);
+            this.applySchemaToEditor();
+            return;
+        }
+
+        const store = await this._loadSchemaStore();
+        const introspection = store[targetUrl];
+        if (introspection) {
+            const schema = buildSchemaFromIntrospection(introspection);
+            if (schema) {
+                this.schemaCache.set(targetUrl, schema);
+                this.currentSchema = schema;
+                this.applySchemaToEditor();
+                return;
+            }
+        }
+
+        this.currentSchema = null;
+        this.graphqlEditor?.clearSchema?.();
+        this._backgroundIntrospect(targetUrl);
+    }
+
+    /**
+     * Fetch and cache the schema for a URL without surfacing toasts. Runs at most
+     * once per URL and only for absolute http(s) endpoints.
+     * @param {string} targetUrl
+     */
+    async _backgroundIntrospect(targetUrl) {
+        if (this.isFetchingSchema || this._autoFetchedUrls.has(targetUrl)) {
+            return;
+        }
+        if (!/^https?:\/\//i.test(targetUrl)) {
+            return;
+        }
+        this.isFetchingSchema = true;
+        try {
+            const { schema, introspection, error } = await fetchGraphQLIntrospection();
+            if (error || !schema) {
+                return;
+            }
+            if (this._getCurrentUrl() !== targetUrl) {
+                return;
+            }
+            this.schemaCache.set(targetUrl, schema);
+            this.currentSchema = schema;
+            if (introspection) {
+                this._saveSchemaToStore(targetUrl, introspection);
+            }
+            this.applySchemaToEditor();
+        } catch (_e) {
+            void _e;
+        } finally {
+            this.isFetchingSchema = false;
+            this._autoFetchedUrls.add(targetUrl);
         }
     }
 
@@ -382,6 +524,10 @@ export class GraphQLBodyManager {
         }
 
         this.setWorkbenchActive(mode === 'graphql');
+
+        if (mode === 'graphql') {
+            this.autoApplySchemaForUrl();
+        }
     }
 
     /**

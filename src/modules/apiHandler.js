@@ -46,6 +46,12 @@ import { handleGrpcSend } from './grpcHandler.js';
 import { handleWebSocketCancel, handleWebSocketSend } from './websocketHandler.js';
 import { handleSseCancel, handleSseConnect } from './sseHandler.js';
 import { handleMqttCancel, handleMqttSend } from './mqttHandler.js';
+import {
+    handleGraphQLSubscriptionStart,
+    handleGraphQLSubscriptionCancel,
+    isSubscriptionActive
+} from './graphqlSubscriptionHandler.js';
+import { selectActiveOperationType } from './graphqlTransportWs.js';
 import { cancelStream as cancelGrpcStream, hasActiveStream as hasActiveGrpcStream } from './grpcStreamHandler.js';
 import { RequestBuilderService } from './services/RequestBuilderService.js';
 import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes } from './ResponseDisplayHelper.js';
@@ -213,9 +219,27 @@ export async function fetchGraphQLIntrospection() {
     }
 
     try {
-        return { schema: buildClientSchema(introspection), url: resolvedUrl };
+        return { schema: buildClientSchema(introspection), introspection, url: resolvedUrl };
     } catch (error) {
         return { error: `Could not parse schema: ${error.message}` };
+    }
+}
+
+/**
+ * Rebuild a GraphQLSchema from a previously fetched (and persisted) raw
+ * introspection result. Used by the autocomplete cache load path.
+ *
+ * @param {object} introspection - The `data` payload of an introspection query.
+ * @returns {import('graphql').GraphQLSchema|null} The schema, or null if invalid.
+ */
+export function buildSchemaFromIntrospection(introspection) {
+    if (!introspection || !introspection.__schema) {
+        return null;
+    }
+    try {
+        return buildClientSchema(introspection);
+    } catch (_error) {
+        return null;
     }
 }
 
@@ -495,9 +519,88 @@ export async function handleCancelRequest() {
     }
 }
 
+/**
+ * Determine the operation type the Run button should execute in GraphQL mode,
+ * based on the editor's parsed operations and the operation picker selection.
+ * @returns {string|null} 'query' | 'mutation' | 'subscription' | null
+ */
+function getActiveGraphQLOperationType() {
+    if (!graphqlBodyManager) {
+        return null;
+    }
+    const operations = graphqlBodyManager.graphqlEditor?.getOperations?.() || null;
+    const selected = graphqlBodyManager.getSelectedOperationName?.() || null;
+    return selectActiveOperationType(operations, selected);
+}
+
+/**
+ * Open (or toggle off) a GraphQL subscription over WebSocket. Resolves variables,
+ * headers, auth and the query exactly like the HTTP send path before connecting.
+ */
+async function handleGraphQLSubscriptionRequest() {
+    const tabId = app.workspaceTabController
+        ? await app.workspaceTabController.service.getActiveTabId()
+        : null;
+
+    if (tabId && isSubscriptionActive(tabId)) {
+        await handleGraphQLSubscriptionCancel();
+        return;
+    }
+
+    if (getCurrentEndpoint()) {
+        debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
+    }
+
+    let url = urlInput?.value?.trim() || urlInput?.getAttribute('value') || '';
+    const headers = parseKeyValuePairs(document.getElementById('headers-list'));
+    const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
+    const authData = authManager.generateAuthData();
+    const builder = getRequestBuilderService();
+    builder.mergeAuthData(headers, queryParams, authData);
+
+    let query = graphqlBodyManager.getGraphQLQuery().trim();
+    const variablesText = graphqlBodyManager.getGraphQLVariables().trim();
+    const operationName = graphqlBodyManager.getSelectedOperationName?.() || null;
+
+    try {
+        const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
+        ({ url } = builder.processRequestComponents({
+            url, pathParams: {}, headers, queryParams, variables, processor
+        }));
+        query = processor.processTemplate(query, variables);
+
+        let parsedVariables = {};
+        if (variablesText) {
+            const resolvedVarsText = processor.processTemplate(variablesText, variables);
+            try {
+                parsedVariables = JSON.parse(resolvedVarsText);
+            } catch (e) {
+                toast.error(`Invalid GraphQL Variables JSON: ${e.message}`);
+                return;
+            }
+        }
+
+        await handleGraphQLSubscriptionStart({
+            url, headers, query, variables: parsedVariables, operationName
+        });
+    } catch (error) {
+        updateStatusDisplay(`Variable processing error: ${error.message}`, null);
+    }
+}
+
 export async function handleSendRequest() {
     if (isGrpcMode()) {
         return handleGrpcSend();
+    }
+
+    if (isGraphQLMode()) {
+        const gqlTabId = app.workspaceTabController
+            ? await app.workspaceTabController.service.getActiveTabId()
+            : null;
+        if ((gqlTabId && isSubscriptionActive(gqlTabId))
+            || getActiveGraphQLOperationType() === 'subscription') {
+            return handleGraphQLSubscriptionRequest();
+        }
     }
 
     if (isWebSocketMode()) {

@@ -19,6 +19,11 @@ export class UrlAutocomplete {
         this.urlInput.parentNode.insertBefore(wrapper, this.urlInput);
         wrapper.appendChild(this.urlInput);
 
+        if (this.urlInput.style.display === 'none') {
+            wrapper.style.display = 'none';
+            this.urlInput.style.display = '';
+        }
+
         this.dropdown = document.createElement('ul');
         this.dropdown.className = 'url-autocomplete-dropdown';
         this.dropdown.setAttribute('role', 'listbox');

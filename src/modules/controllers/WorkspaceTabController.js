@@ -14,6 +14,7 @@
  */
 import { app } from '../appContext.js';
 import { WorkspaceTabEndpointLoaderService } from '../services/WorkspaceTabEndpointLoaderService.js';
+import { handleGraphQLSubscriptionCancel, isSubscriptionActive } from '../graphqlSubscriptionHandler.js';
 
 export class WorkspaceTabController {
     /**
@@ -311,6 +312,9 @@ export class WorkspaceTabController {
         if (window.backendAPI?.mqtt) {
             window.backendAPI.mqtt.close(tabId);
         }
+        if (window.backendAPI?.graphqlSubscription) {
+            window.backendAPI.graphqlSubscription.close(tabId);
+        }
         this.responseContainerManager.removeContainer(tabId);
     }
 
@@ -366,6 +370,10 @@ export class WorkspaceTabController {
 
             if (currentTabId === tabId) {
                 return;
+            }
+
+            if (currentTabId && isSubscriptionActive(currentTabId)) {
+                await handleGraphQLSubscriptionCancel();
             }
 
             await this._saveCurrentTabState();

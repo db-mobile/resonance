@@ -51,6 +51,10 @@ if (isTauri) {
             send: (request) => invoke('websocket_send', { request }),
             close: (tabId) => invoke('websocket_close', { tabId })
         },
+        graphqlSubscription: {
+            send: (request) => invoke('graphql_subscription_send', { request }),
+            close: (tabId) => invoke('graphql_subscription_close', { tabId })
+        },
         sse: {
             connect: (request) => invoke('sse_connect', { request }),
             close: (tabId) => invoke('sse_close', { tabId })
