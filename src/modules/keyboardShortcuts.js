@@ -6,6 +6,7 @@
  * and a help dialog to display available shortcuts.
  */
 
+import { app } from './appContext.js';
 import { templateLoader } from './templateLoader.js';
 
 class KeyboardShortcutsManager {
@@ -169,8 +170,8 @@ class KeyboardShortcutsManager {
         this.helpDialogVisible = true;
 
         // Apply i18n if available
-        if (window.i18n) {
-            window.i18n.updateUI(overlay);
+        if (app.i18n) {
+            app.i18n.updateUI(overlay);
         }
 
         const closeBtn = overlay.querySelector('#close-shortcuts-btn');

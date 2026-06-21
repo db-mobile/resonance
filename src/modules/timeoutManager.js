@@ -1,3 +1,5 @@
+import { app } from './appContext.js';
+
 export class TimeoutManager {
     constructor() {
         this.currentTimeout = 0; // 0 means no timeout
@@ -22,7 +24,7 @@ export class TimeoutManager {
             const settings = await window.backendAPI.settings.get();
             settings.requestTimeout = timeout;
             await window.backendAPI.settings.set(settings);
-            window.invalidateApiHandlerSettingsCache?.();
+            app.invalidateApiHandlerSettingsCache?.();
         } catch (error) {
             void error;
         }

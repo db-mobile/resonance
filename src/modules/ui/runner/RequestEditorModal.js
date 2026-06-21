@@ -6,6 +6,7 @@
  * @module ui/runner/RequestEditorModal
  */
 
+import { app } from '../../appContext.js';
 import { templateLoader } from '../../templateLoader.js';
 import { ScriptEditor } from '../../scriptEditor.bundle.js';
 import { JSONEditor } from '../../jsonEditor.bundle.js';
@@ -81,8 +82,8 @@ export class RequestEditorModal {
         this._attachEventListeners();
 
         // Update i18n if available (sets tab labels and input placeholders)
-        if (window.i18n && window.i18n.updateUI) {
-            window.i18n.updateUI(this.modal);
+        if (app.i18n && app.i18n.updateUI) {
+            app.i18n.updateUI(this.modal);
         }
     }
 
@@ -187,11 +188,11 @@ export class RequestEditorModal {
         const valueInput = row.querySelector('[data-role="kv-value"]');
         if (keyInput) {
             keyInput.value = key;
-            keyInput.placeholder = window.i18n?.t('runner.key') || 'Key';
+            keyInput.placeholder = app.i18n?.t('runner.key') || 'Key';
         }
         if (valueInput) {
             valueInput.value = value;
-            valueInput.placeholder = window.i18n?.t('runner.value') || 'Value';
+            valueInput.placeholder = app.i18n?.t('runner.value') || 'Value';
         }
 
         row.querySelector('[data-action="remove-kv"]')?.addEventListener('click', () => {

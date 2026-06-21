@@ -3,6 +3,7 @@
  * @module ui/CookieManagerDialog
  */
 
+import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 
 export class CookieManagerDialog {
@@ -281,7 +282,7 @@ export class CookieManagerDialog {
                     const settings = await window.backendAPI.settings.get();
                     settings.cookieJarEnabled = e.target.checked;
                     await window.backendAPI.settings.set(settings);
-                    window.invalidateApiHandlerSettingsCache?.();
+                    app.invalidateApiHandlerSettingsCache?.();
                 } catch (_e) { /* non-blocking */ }
             });
         }

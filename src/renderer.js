@@ -8,6 +8,7 @@
  */
 
 // Import ipcBridge first to set up window.backendAPI before any other modules
+import { app } from './modules/appContext.js';
 import './modules/ipcBridge.js';
 
 import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, bodyEditorContainer, bodyTextEditorContainer, grpcBodyInput, grpcBodyEditorContainer } from './modules/domElements.js';
@@ -59,9 +60,9 @@ const timeoutManager = new TimeoutManager();
 
 // Expose settings cache invalidation so themeManager/httpVersionManager/timeoutManager
 // can bust it when the user saves new settings
-window.invalidateApiHandlerSettingsCache = invalidateSettingsCache;
-window.getApiHandlerSettingsCache = getSettingsCache;
-window.invalidateApiHandlerEnvironmentCache = invalidateEnvironmentCache;
+app.invalidateApiHandlerSettingsCache = invalidateSettingsCache;
+app.getApiHandlerSettingsCache = getSettingsCache;
+app.invalidateApiHandlerEnvironmentCache = invalidateEnvironmentCache;
 
 // Initialize shared status display adapter
 const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
@@ -75,7 +76,7 @@ const secretStore = new SecretStore(window.backendAPI, {
         'No OS keychain available — secrets are stored locally without encryption at rest.'
     )
 });
-window.secretStore = secretStore;
+app.secretStore = secretStore;
 
 // Shared singletons consumed by registry features but not themselves registry-managed:
 // the collection repository (mock-server + schema) and the GraphQL body manager (workspace
@@ -91,7 +92,7 @@ const graphqlBodyManager = new GraphQLBodyManager({
 });
 graphqlBodyManager.initialize();
 setGraphQLBodyManager(graphqlBodyManager);
-window.graphqlBodyManager = graphqlBodyManager;
+app.graphqlBodyManager = graphqlBodyManager;
 
 // Registry-managed features: each declares its own wiring in a co-located *.feature.js
 // descriptor (Repository → Service → Controller → UI), so adding/removing one no longer
@@ -150,7 +151,7 @@ const workspaceTabStateManager = workspaceTab.stateManager;
 // Initialize form-data / URL-encoded body manager
 const formBodyManager = new FormBodyManager();
 formBodyManager.initialize();
-window.formBodyManager = formBodyManager;
+app.formBodyManager = formBodyManager;
 
 // Initialize settings modal with all managers
 const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager, proxyController, certificateController);
@@ -193,15 +194,15 @@ function initKeyboardShortcuts() {
                     window.currentEndpoint.collectionId,
                     window.currentEndpoint.endpointId
                 );
-                if (window.workspaceTabController) {
-                    await window.workspaceTabController.markCurrentTabUnmodified();
+                if (app.workspaceTabController) {
+                    await app.workspaceTabController.markCurrentTabUnmodified();
                 }
-            } else if (window.workspaceTabController) {
+            } else if (app.workspaceTabController) {
                 // No endpoint loaded - show "Save to Collection" dialog
                 const { saveRequestToCollection } = await import('./modules/collectionManager.js');
-                const activeTab = await window.workspaceTabController.service.getActiveTab();
+                const activeTab = await app.workspaceTabController.service.getActiveTab();
                 if (activeTab && activeTab.type !== 'runner') {
-                    const state = await window.workspaceTabController.stateManager.captureCurrentState();
+                    const state = await app.workspaceTabController.stateManager.captureCurrentState();
                     const requestData = {
                         name: activeTab.name,
                         ...state.request
@@ -213,7 +214,7 @@ function initKeyboardShortcuts() {
                             collectionId: result.collectionId,
                             endpointId: result.endpointId
                         };
-                        await window.workspaceTabController.service.updateTab(activeTab.id, {
+                        await app.workspaceTabController.service.updateTab(activeTab.id, {
                             name: result.name,
                             endpoint: {
                                 collectionId: result.collectionId,
@@ -221,8 +222,8 @@ function initKeyboardShortcuts() {
                                 protocol: state.request.protocol || 'http'
                             }
                         });
-                        window.workspaceTabController.tabBar.updateTab(activeTab.id, { name: result.name });
-                        await window.workspaceTabController.markCurrentTabUnmodified();
+                        app.workspaceTabController.tabBar.updateTab(activeTab.id, { name: result.name });
+                        await app.workspaceTabController.markCurrentTabUnmodified();
                     }
                 }
             }
@@ -280,8 +281,8 @@ function initKeyboardShortcuts() {
     keyboardShortcuts.register('KeyJ', {
         ctrl: true,
         handler: () => {
-            if (window.cookieController) {
-                window.cookieController.openCookieManager();
+            if (app.cookieController) {
+                app.cookieController.openCookieManager();
             }
         },
         description: 'Open cookie jar',
@@ -575,8 +576,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const runnerBtn = document.getElementById('runner-btn');
     if (runnerBtn) {
         runnerBtn.addEventListener('click', () => {
-            if (window.workspaceTabController) {
-                window.workspaceTabController.createRunnerTab();
+            if (app.workspaceTabController) {
+                app.workspaceTabController.createRunnerTab();
             }
         });
     }
@@ -623,17 +624,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Expose global references. Feature controllers (history, environment, script,
     // workspace tab) are exposed by the registry's `globals` map at boot; only non-feature
     // globals remain here.
-    window.authManager = authManager;
-    window.setUrlUpdating = setUrlUpdating;
-    window.setGrpcMetadata = setGrpcMetadata;
-    window.setGrpcTls = setGrpcTls;
+    app.authManager = authManager;
+    app.setUrlUpdating = setUrlUpdating;
+    app.setGrpcMetadata = setGrpcMetadata;
+    app.setGrpcTls = setGrpcTls;
 
     // Initialize environment selector (needed for environment switching)
     environmentSelector.initialize('environment-selector-container');
 
     // Parallelize independent IPC calls: i18n, environment controller, and cookie jar sync
     await Promise.all([
-        i18n.init().then(() => { window.i18n = i18n; }),
+        i18n.init().then(() => { app.i18n = i18n; }),
         environmentController.initialize(),
         environmentService.getActiveEnvironment().then(activeEnv => {
             if (activeEnv) {
@@ -681,24 +682,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (bodyInput) {
                 bodyInput.value = content;
             }
-            if (window.workspaceTabController &&
+            if (app.workspaceTabController &&
                 !isInitializingEditor &&
-                !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+                !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
-        window.requestBodyEditor = requestBodyEditor;
+        app.requestBodyEditor = requestBodyEditor;
     }
 
     // Plain-text body editor (lazy)
     if (bodyTextEditorContainer) {
-        window.requestBodyTextEditor = createLazyEditor(
+        app.requestBodyTextEditor = createLazyEditor(
             bodyTextEditorContainer,
             { language: 'plain' },
             (_content) => {
-                if (window.workspaceTabController &&
-                    !window.workspaceTabController.isRestoringState) {
-                    window.workspaceTabController.markCurrentTabModified();
+                if (app.workspaceTabController &&
+                    !app.workspaceTabController.isRestoringState) {
+                    app.workspaceTabController.markCurrentTabModified();
                 }
             }
         );
@@ -711,13 +712,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (grpcBodyInput) {
                 grpcBodyInput.value = content;
             }
-            if (window.workspaceTabController &&
+            if (app.workspaceTabController &&
                 !isInitializingGrpcEditor &&
-                !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+                !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
-        window.grpcBodyEditor = grpcBodyEditor;
+        app.grpcBodyEditor = grpcBodyEditor;
     }
 
     // Initialize workspace tabs (restores user's last state - critical for UX)
@@ -769,24 +770,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Track changes to mark tabs as modified
     if (urlInput) {
         urlInput.addEventListener('input', () => {
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
     }
 
     if (bodyInput) {
         bodyInput.addEventListener('input', () => {
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
     }
 
     if (methodSelect) {
         methodSelect.addEventListener('change', () => {
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
     }
@@ -816,7 +817,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Initialize status bar
         const statusBar = new StatusBar(environmentService);
         statusBar.initialize();
-        window.statusBar = statusBar;
+        app.statusBar = statusBar;
 
         // Initialize history controller (needed for history sidebar)
         await historyController.init();
@@ -906,7 +907,7 @@ async function checkForUpdatesOnLaunch() {
         // Check for updates
         const update = await window.backendAPI.updater.check();
         if (update?.available) {
-            const message = window.i18n?.t('settings.update_available', { version: update.version }) || `Update available: v${update.version}`;
+            const message = app.i18n?.t('settings.update_available', { version: update.version }) || `Update available: v${update.version}`;
             toast.info(message);
         }
     } catch (error) {

@@ -12,6 +12,7 @@
  * closing, renaming, and duplication. Manages synchronization between tab state
  * and form UI, and coordinates with response container visibility.
  */
+import { app } from '../appContext.js';
 import { WorkspaceTabEndpointLoaderService } from '../services/WorkspaceTabEndpointLoaderService.js';
 
 export class WorkspaceTabController {
@@ -200,8 +201,8 @@ export class WorkspaceTabController {
             await this._restoreTabStateSafely(newTab);
 
             // Clear scripts for new tab (no endpoint selected)
-            if (window.scriptController) {
-                window.scriptController.clearScripts();
+            if (app.scriptController) {
+                app.scriptController.clearScripts();
             }
 
             return newTab;
@@ -432,14 +433,14 @@ export class WorkspaceTabController {
             await this._restoreTabStateSafely(tab);
 
             // Load scripts for this tab's endpoint, or clear if no endpoint
-            if (window.scriptController) {
+            if (app.scriptController) {
                 if (tab.endpoint && tab.endpoint.collectionId && tab.endpoint.endpointId) {
-                    await window.scriptController.loadScriptsForEndpoint(
+                    await app.scriptController.loadScriptsForEndpoint(
                         tab.endpoint.collectionId,
                         tab.endpoint.endpointId
                     );
                 } else {
-                    window.scriptController.clearScripts();
+                    app.scriptController.clearScripts();
                 }
             }
         } catch (error) {
@@ -764,8 +765,8 @@ export class WorkspaceTabController {
             await this.service.updateTab(activeTabId, currentState);
 
             const ep = currentState.endpoint;
-            if (ep && ep.collectionId && ep.endpointId && window.collectionController) {
-                await window.collectionController.saveRequestBodyModification(
+            if (ep && ep.collectionId && ep.endpointId && app.collectionController) {
+                await app.collectionController.saveRequestBodyModification(
                     ep.collectionId,
                     ep.endpointId
                 );

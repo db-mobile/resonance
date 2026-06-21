@@ -3,6 +3,7 @@
  * @module services/RunnerService
  */
 
+import { app } from '../appContext.js';
 import { VariableProcessor } from '../variables/VariableProcessor.js';
 import { VariableRepository } from '../storage/VariableRepository.js';
 import { EnvironmentRepository } from '../storage/EnvironmentRepository.js';
@@ -36,9 +37,9 @@ export class RunnerService {
         this.backendAPI = backendAPI;
         this.statusDisplay = statusDisplay;
         this.variableProcessor = new VariableProcessor();
-        this.variableRepository = new VariableRepository(backendAPI, window.secretStore);
-        this.environmentRepository = new EnvironmentRepository(backendAPI, window.secretStore);
-        this.collectionRepository = new CollectionRepository(backendAPI, window.secretStore);
+        this.variableRepository = new VariableRepository(backendAPI, app.secretStore);
+        this.environmentRepository = new EnvironmentRepository(backendAPI, app.secretStore);
+        this.collectionRepository = new CollectionRepository(backendAPI, app.secretStore);
         this.certificateService = new CertificateService(new CertificateRepository(backendAPI));
 
         // Execution state

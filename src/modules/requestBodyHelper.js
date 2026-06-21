@@ -4,14 +4,16 @@
  * @module modules/requestBodyHelper
  */
 
+import { app } from './appContext.js';
+
 /**
  * Get the current request body content
  * Prioritizes CodeMirror editor, falls back to textarea
  * @returns {string}
  */
 export function getRequestBodyContent() {
-    if (window.requestBodyEditor) {
-        return window.requestBodyEditor.getContent();
+    if (app.requestBodyEditor) {
+        return app.requestBodyEditor.getContent();
     }
     const bodyInput = document.getElementById('body-input');
     return bodyInput ? bodyInput.value : '';
@@ -31,8 +33,8 @@ export function setRequestBodyContent(content) {
     }
 
     // Update CodeMirror editor
-    if (window.requestBodyEditor) {
-        window.requestBodyEditor.setContent(content);
+    if (app.requestBodyEditor) {
+        app.requestBodyEditor.setContent(content);
     }
 }
 
@@ -48,8 +50,8 @@ export function clearRequestBodyContent() {
  * @returns {boolean} - True if formatting succeeded, false otherwise
  */
 export function formatRequestBodyJSON() {
-    if (window.requestBodyEditor) {
-        return window.requestBodyEditor.formatJSON();
+    if (app.requestBodyEditor) {
+        return app.requestBodyEditor.formatJSON();
     }
 
     // Fallback: try to format textarea content

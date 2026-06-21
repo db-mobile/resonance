@@ -3,6 +3,7 @@
  * @module modules/requestModeManager
  */
 
+import { app } from './appContext.js';
 import { setResponseTabsForProtocol } from './tabManager.js';
 
 /**
@@ -178,8 +179,8 @@ function updateUIForMode(mode) {
     // teardown re-shows the method dropdown (correct for HTTP), so it must run before
     // the per-mode layout below — otherwise gRPC/WS/SSE/MQTT hide the method dropdown
     // and the teardown immediately un-hides it.
-    if (mode !== RequestMode.GRAPHQL && window.graphqlBodyManager?.isGraphQLMode?.()) {
-        window.graphqlBodyManager.setGraphQLModeEnabled(false);
+    if (mode !== RequestMode.GRAPHQL && app.graphqlBodyManager?.isGraphQLMode?.()) {
+        app.graphqlBodyManager.setGraphQLModeEnabled(false);
     }
 
     if (mode === RequestMode.GRPC) {
@@ -259,8 +260,8 @@ function updateUIForMode(mode) {
         if (bodyModeContainer) {
             bodyModeContainer.style.display = 'none';
         }
-        if (window.graphqlBodyManager) {
-            window.graphqlBodyManager.setGraphQLModeEnabled(false);
+        if (app.graphqlBodyManager) {
+            app.graphqlBodyManager.setGraphQLModeEnabled(false);
         }
 
         const activeTab = document.querySelector('.request-config .tab-nav .tab-button.active');
@@ -304,8 +305,8 @@ function updateUIForMode(mode) {
         if (bodyModeContainer) {
             bodyModeContainer.style.display = 'none';
         }
-        if (window.graphqlBodyManager) {
-            window.graphqlBodyManager.setGraphQLModeEnabled(false);
+        if (app.graphqlBodyManager) {
+            app.graphqlBodyManager.setGraphQLModeEnabled(false);
         }
         if (bodyTitle) {
             bodyTitle.textContent = 'Message';
@@ -348,8 +349,8 @@ function updateUIForMode(mode) {
         if (bodyModeContainer) {
             bodyModeContainer.style.display = 'none';
         }
-        if (window.graphqlBodyManager) {
-            window.graphqlBodyManager.setGraphQLModeEnabled(false);
+        if (app.graphqlBodyManager) {
+            app.graphqlBodyManager.setGraphQLModeEnabled(false);
         }
         if (bodyTitle) {
             bodyTitle.textContent = 'Payload';
@@ -380,8 +381,8 @@ function updateUIForMode(mode) {
 
         // Activate the Workbench: forces POST, hides method, moves Headers into the
         // drawer, and shows the graphql body panel.
-        if (window.graphqlBodyManager) {
-            window.graphqlBodyManager.setGraphQLModeEnabled(true);
+        if (app.graphqlBodyManager) {
+            app.graphqlBodyManager.setGraphQLModeEnabled(true);
         }
 
         // The body-mode selector is gone for GraphQL (it's a protocol, not a body type).
@@ -548,8 +549,8 @@ function createGrpcUrlSection() {
         targetInput.addEventListener('input', () => {
             existingTarget.value = targetInput.value;
             // Mark tab as modified when gRPC target changes
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
         existingTarget.addEventListener('input', () => {
@@ -608,8 +609,8 @@ function createWebSocketUrlSection() {
         urlInput.addEventListener('input', () => {
             existingUrlInput.value = urlInput.value;
             // Mark tab as modified when WebSocket URL changes
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
         existingUrlInput.addEventListener('input', () => {
@@ -677,8 +678,8 @@ function createSseUrlSection() {
         urlInput.value = existingUrlInput.value;
         urlInput.addEventListener('input', () => {
             existingUrlInput.value = urlInput.value;
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
         existingUrlInput.addEventListener('input', () => {
@@ -755,8 +756,8 @@ function createGraphQLUrlSection() {
         urlInput.value = existingUrlInput.value;
         urlInput.addEventListener('input', () => {
             existingUrlInput.value = urlInput.value;
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
         existingUrlInput.addEventListener('input', () => {
@@ -833,8 +834,8 @@ function createMqttUrlSection() {
         brokerInput.value = existingUrlInput.value;
         brokerInput.addEventListener('input', () => {
             existingUrlInput.value = brokerInput.value;
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
         existingUrlInput.addEventListener('input', () => {

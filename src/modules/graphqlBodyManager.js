@@ -3,6 +3,7 @@
  * @module graphqlBodyManager
  */
 
+import { app } from './appContext.js';
 import { GraphQLEditor } from './graphqlEditor.bundle.js';
 import { JSONEditor } from './jsonEditor.bundle.js';
 import { toast } from './ui/Toast.js';
@@ -59,8 +60,8 @@ export class GraphQLBodyManager {
             modeSelect.addEventListener('change', (e) => {
                 const mode = e.target.value;
                 this.switchMode(mode);
-                if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                    window.workspaceTabController.markCurrentTabModified();
+                if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                    app.workspaceTabController.markCurrentTabModified();
                 }
             });
         }

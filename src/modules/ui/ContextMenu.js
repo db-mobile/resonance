@@ -11,6 +11,7 @@
  * and automatic positioning to stay within viewport bounds. Handles click
  * outside to dismiss and provides static helper methods for common icons.
  */
+import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 
 export class ContextMenu {
@@ -56,8 +57,8 @@ export class ContextMenu {
         document.body.appendChild(menu);
         this.currentMenu = menu;
 
-        if (window.i18n && window.i18n.updateUI) {
-            window.i18n.updateUI();
+        if (app.i18n && app.i18n.updateUI) {
+            app.i18n.updateUI();
         }
 
         this.adjustPosition(menu, event);

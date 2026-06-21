@@ -1,3 +1,5 @@
+import { app } from './appContext.js';
+
 export class Resizer {
     constructor() {
         this.isDragging = false;
@@ -422,8 +424,8 @@ export class GraphQLEditorResizer {
         document.body.style.cursor = '';
 
         // CodeMirror needs to re-measure after its container changes height
-        window.graphqlBodyManager?.graphqlEditor?.view?.requestMeasure?.();
-        window.graphqlBodyManager?.variablesEditor?.view?.requestMeasure?.();
+        app.graphqlBodyManager?.graphqlEditor?.view?.requestMeasure?.();
+        app.graphqlBodyManager?.variablesEditor?.view?.requestMeasure?.();
     }
 }
 

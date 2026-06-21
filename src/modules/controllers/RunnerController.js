@@ -3,6 +3,7 @@
  * @module controllers/RunnerController
  */
 
+import { app } from '../appContext.js';
 import { RunnerRepository } from '../storage/RunnerRepository.js';
 import { RunnerService } from '../services/RunnerService.js';
 import { RunnerPanel } from '../ui/RunnerPanel.js';
@@ -238,8 +239,8 @@ export class RunnerController {
             listContainer.appendChild(itemEl);
         });
 
-        if (window.i18n && window.i18n.updateUI) {
-            window.i18n.updateUI();
+        if (app.i18n && app.i18n.updateUI) {
+            app.i18n.updateUI();
         }
     }
 

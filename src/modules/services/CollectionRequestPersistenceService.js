@@ -3,6 +3,7 @@
  * @module services/CollectionRequestPersistenceService
  */
 
+import { app } from '../appContext.js';
 import { getRequestBodyContent } from '../requestBodyHelper.js';
 
 /**
@@ -88,8 +89,8 @@ export class CollectionRequestPersistenceService {
             });
         }
 
-        const requestJson = window.grpcBodyEditor
-            ? window.grpcBodyEditor.getContent()
+        const requestJson = app.grpcBodyEditor
+            ? app.grpcBodyEditor.getContent()
             : (grpcBodyInput?.value || '{}');
 
         await this.repository.saveGrpcData(collectionId, endpointId, {
@@ -266,11 +267,11 @@ export class CollectionRequestPersistenceService {
         headers,
         authConfig
     }) {
-        if (!window.workspaceTabController) {
+        if (!app.workspaceTabController) {
             return;
         }
 
-        const activeTab = await window.workspaceTabController.getActiveTab();
+        const activeTab = await app.workspaceTabController.getActiveTab();
         if (!activeTab || !activeTab.request) {
             return;
         }
@@ -316,12 +317,12 @@ export class CollectionRequestPersistenceService {
             return;
         }
 
-        const activeTabId = await window.workspaceTabController.service.getActiveTabId();
+        const activeTabId = await app.workspaceTabController.service.getActiveTabId();
         if (!activeTabId) {
             return;
         }
 
-        await window.workspaceTabController.service.updateTab(activeTabId, {
+        await app.workspaceTabController.service.updateTab(activeTabId, {
             request: updatedRequest
         });
     }

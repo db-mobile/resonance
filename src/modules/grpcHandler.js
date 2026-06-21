@@ -1,3 +1,4 @@
+import { app } from './appContext.js';
 import {
     grpcTargetInput,
     grpcTlsCheckbox,
@@ -251,7 +252,7 @@ export async function handleGrpcSend() {
     }
 
     let requestJson = {};
-    const raw = (window.grpcBodyEditor ? window.grpcBodyEditor.getContent() : grpcBodyInput?.value || '').trim();
+    const raw = (app.grpcBodyEditor ? app.grpcBodyEditor.getContent() : grpcBodyInput?.value || '').trim();
     if (raw) {
         try {
             requestJson = JSON.parse(raw);
@@ -310,7 +311,7 @@ export async function handleGrpcSend() {
         displayResponseWithLineNumbersForTab(formatted, 'application/json', null);
 
         // Populate metadata and trailers displays
-        const containerElements = window.responseContainerManager?.getActiveElements();
+        const containerElements = app.responseContainerManager?.getActiveElements();
         if (containerElements) {
             // Display response metadata (headers)
             if (containerElements.metadataDisplay) {
@@ -456,8 +457,8 @@ export function initGrpcUI() {
     // Mark tab as modified when TLS checkbox is toggled
     if (grpcTlsCheckbox) {
         grpcTlsCheckbox.addEventListener('change', () => {
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
     }
@@ -465,8 +466,8 @@ export function initGrpcUI() {
     // Mark tab as modified when gRPC target input changes
     if (grpcTargetInput) {
         grpcTargetInput.addEventListener('input', () => {
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
         if (!grpcTargetInput.value) {
@@ -477,8 +478,8 @@ export function initGrpcUI() {
     // Mark tab as modified when service or method selection changes
     if (grpcServiceSelect) {
         grpcServiceSelect.addEventListener('change', () => {
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
     }
@@ -486,8 +487,8 @@ export function initGrpcUI() {
     if (grpcMethodSelect) {
         grpcMethodSelect.addEventListener('change', () => {
             updateMethodKindBadge(grpcMethodSelect.value);
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
     }
@@ -497,8 +498,8 @@ export function initGrpcUI() {
     if (grpcMetadataList) {
         grpcMetadataList.addEventListener('input', (event) => {
             if ((event.target.classList.contains('key-input') || event.target.classList.contains('value-input')) &&
-                window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+                app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
     }
@@ -536,8 +537,8 @@ async function onGenerateSkeleton() {
             grpcBodyInput.value = formatted;
         }
 
-        if (window.grpcBodyEditor) {
-            window.grpcBodyEditor.setContent(formatted);
+        if (app.grpcBodyEditor) {
+            app.grpcBodyEditor.setContent(formatted);
         }
 
         updateStatusDisplay('Input skeleton generated', null);

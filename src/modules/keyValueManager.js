@@ -1,3 +1,4 @@
+import { app } from './appContext.js';
 import { pathParamsList, addPathParamBtn, headersList, addHeaderBtn, queryParamsList, addQueryParamBtn, urlInput } from './domElements.js';
 
 // Flag to prevent circular updates between query params and URL
@@ -227,8 +228,8 @@ export function initKeyValueListeners() {
         if (event.target.classList.contains('key-input') ||
             event.target.classList.contains('value-input')) {
             debounceAutoSave(() => autoSavePathParams());
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         }
     });
@@ -238,8 +239,8 @@ export function initKeyValueListeners() {
             event.target.classList.contains('value-input')) {
             updateUrlFromQueryParams();
             debounceAutoSave(() => autoSaveQueryParams());
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         }
     });
@@ -248,8 +249,8 @@ export function initKeyValueListeners() {
         if (event.target.classList.contains('key-input') ||
             event.target.classList.contains('value-input')) {
             debounceAutoSave(() => autoSaveHeaders());
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         }
     });
@@ -284,11 +285,11 @@ function debounceAutoSave(callback) {
 }
 
 async function autoSavePathParams() {
-    if (window.currentEndpoint && window.collectionService) {
+    if (window.currentEndpoint && app.collectionService) {
         const formElements = {
             pathParamsList: pathParamsList
         };
-        await window.collectionService.saveCurrentPathParams(
+        await app.collectionService.saveCurrentPathParams(
             window.currentEndpoint.collectionId,
             window.currentEndpoint.endpointId,
             formElements
@@ -297,11 +298,11 @@ async function autoSavePathParams() {
 }
 
 async function autoSaveQueryParams() {
-    if (window.currentEndpoint && window.collectionService) {
+    if (window.currentEndpoint && app.collectionService) {
         const formElements = {
             queryParamsList: queryParamsList
         };
-        await window.collectionService.saveCurrentQueryParams(
+        await app.collectionService.saveCurrentQueryParams(
             window.currentEndpoint.collectionId,
             window.currentEndpoint.endpointId,
             formElements
@@ -310,11 +311,11 @@ async function autoSaveQueryParams() {
 }
 
 async function autoSaveHeaders() {
-    if (window.currentEndpoint && window.collectionService) {
+    if (window.currentEndpoint && app.collectionService) {
         const formElements = {
             headersList: headersList
         };
-        await window.collectionService.saveCurrentHeaders(
+        await app.collectionService.saveCurrentHeaders(
             window.currentEndpoint.collectionId,
             window.currentEndpoint.endpointId,
             formElements

@@ -5,6 +5,7 @@
  * @module ui/runner/RunnerResultsPanel
  */
 
+import { app } from '../../appContext.js';
 import { templateLoader } from '../../templateLoader.js';
 import { escapeHtml, getStatusCodeClass, getStatusText } from './runnerDomUtils.js';
 
@@ -72,8 +73,8 @@ export class RunnerResultsPanel {
         this._attachResizerListeners();
         this._initializeResultsList();
 
-        if (window.i18n && window.i18n.updateUI) {
-            window.i18n.updateUI();
+        if (app.i18n && app.i18n.updateUI) {
+            app.i18n.updateUI();
         }
     }
 

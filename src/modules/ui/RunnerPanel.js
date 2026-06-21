@@ -3,6 +3,7 @@
  * @module ui/RunnerPanel
  */
 
+import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { RunnerResultsPanel } from './runner/RunnerResultsPanel.js';
 import { RequestEditorModal } from './runner/RequestEditorModal.js';
@@ -103,8 +104,8 @@ export class RunnerPanel {
             console.error('[RunnerPanel] Error rendering:', error);
         }
 
-        if (window.i18n && window.i18n.updateUI) {
-            window.i18n.updateUI();
+        if (app.i18n && app.i18n.updateUI) {
+            app.i18n.updateUI();
         }
     }
 

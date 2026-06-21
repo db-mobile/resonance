@@ -3,6 +3,8 @@
  * @module services/WorkspaceTabEndpointLoaderService
  */
 
+import { app } from '../appContext.js';
+
 /**
  * Handles protocol-specific endpoint mapping and tab restoration for workspace tabs.
  */
@@ -325,8 +327,8 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     async loadScriptsForEndpoint(endpoint) {
-        if (window.scriptController && endpoint.collectionId && endpoint.id) {
-            await window.scriptController.loadScriptsForEndpoint(endpoint.collectionId, endpoint.id);
+        if (app.scriptController && endpoint.collectionId && endpoint.id) {
+            await app.scriptController.loadScriptsForEndpoint(endpoint.collectionId, endpoint.id);
         }
     }
 }

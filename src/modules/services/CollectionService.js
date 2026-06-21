@@ -3,6 +3,7 @@
  * @module services/CollectionService
  */
 
+import { app } from '../appContext.js';
 import { setRequestBodyContent, getRequestBodyContent } from '../requestBodyHelper.js';
 import { toast } from '../ui/Toast.js';
 
@@ -717,21 +718,21 @@ export class CollectionService {
 
             // Import setUrlUpdating to prevent circular update
             // Set flag before updating URL to prevent triggering updateQueryParamsFromUrl
-            if (typeof window !== 'undefined' && window.setUrlUpdating) {
-                window.setUrlUpdating(true);
+            if (typeof window !== 'undefined' && app.setUrlUpdating) {
+                app.setUrlUpdating(true);
             }
 
             formElements.urlInput.value = queryString ? `${baseUrl}?${queryString}` : baseUrl;
 
             // Clear flag after event loop
-            if (typeof window !== 'undefined' && window.setUrlUpdating) {
+            if (typeof window !== 'undefined' && app.setUrlUpdating) {
                 setTimeout(() => {
-                    window.setUrlUpdating(false);
+                    app.setUrlUpdating(false);
                 }, 0);
             }
         } catch (error) {
-            if (typeof window !== 'undefined' && window.setUrlUpdating) {
-                window.setUrlUpdating(false);
+            if (typeof window !== 'undefined' && app.setUrlUpdating) {
+                app.setUrlUpdating(false);
             }
         }
     }
@@ -785,14 +786,14 @@ export class CollectionService {
         const formBodyData = await this.repository.getFormBodyData(collection.id, endpoint.id);
 
         if (formBodyData && (formBodyData.mode === 'formdata' || formBodyData.mode === 'urlencoded')) {
-            if (window.graphqlBodyManager) {
-                window.graphqlBodyManager.switchMode(formBodyData.mode);
+            if (app.graphqlBodyManager) {
+                app.graphqlBodyManager.switchMode(formBodyData.mode);
             }
-            if (window.formBodyManager) {
+            if (app.formBodyManager) {
                 if (formBodyData.mode === 'formdata') {
-                    window.formBodyManager.setFormDataFields(formBodyData.fields || {});
+                    app.formBodyManager.setFormDataFields(formBodyData.fields || {});
                 } else {
-                    window.formBodyManager.setUrlencodedFields(formBodyData.fields || {});
+                    app.formBodyManager.setUrlencodedFields(formBodyData.fields || {});
                 }
             }
             const key = `${collection.id}_${endpoint.id}`;
@@ -801,11 +802,11 @@ export class CollectionService {
         }
 
         if (formBodyData && formBodyData.mode === 'text') {
-            if (window.graphqlBodyManager) {
-                window.graphqlBodyManager.switchMode('text');
+            if (app.graphqlBodyManager) {
+                app.graphqlBodyManager.switchMode('text');
             }
-            if (window.requestBodyTextEditor) {
-                window.requestBodyTextEditor.setContent(formBodyData.content || '');
+            if (app.requestBodyTextEditor) {
+                app.requestBodyTextEditor.setContent(formBodyData.content || '');
             }
             const key = `${collection.id}_${endpoint.id}`;
             this.originalBodyValues.set(key, formBodyData.content || '');
@@ -815,14 +816,14 @@ export class CollectionService {
         // Check if the endpoint's requestBody was imported from a form-data or urlencoded source
         const importedBodyType = endpoint.requestBody?.type;
         if (importedBodyType === 'formdata' || importedBodyType === 'urlencoded') {
-            if (window.graphqlBodyManager) {
-                window.graphqlBodyManager.switchMode(importedBodyType);
+            if (app.graphqlBodyManager) {
+                app.graphqlBodyManager.switchMode(importedBodyType);
             }
-            if (window.formBodyManager) {
+            if (app.formBodyManager) {
                 if (importedBodyType === 'formdata') {
-                    window.formBodyManager.setFormDataFields(endpoint.requestBody.fields || {});
+                    app.formBodyManager.setFormDataFields(endpoint.requestBody.fields || {});
                 } else {
-                    window.formBodyManager.setUrlencodedFields(endpoint.requestBody.fields || {});
+                    app.formBodyManager.setUrlencodedFields(endpoint.requestBody.fields || {});
                 }
             }
             const key = `${collection.id}_${endpoint.id}`;
@@ -835,18 +836,18 @@ export class CollectionService {
 
         if (graphqlData && graphqlData.mode === 'graphql') {
             // Switch to GraphQL mode and populate GraphQL editors
-            if (window.graphqlBodyManager) {
-                window.graphqlBodyManager.setGraphQLModeEnabled(true);
-                window.graphqlBodyManager.setGraphQLQuery(graphqlData.query || '');
-                window.graphqlBodyManager.setGraphQLVariables(graphqlData.variables || '');
+            if (app.graphqlBodyManager) {
+                app.graphqlBodyManager.setGraphQLModeEnabled(true);
+                app.graphqlBodyManager.setGraphQLQuery(graphqlData.query || '');
+                app.graphqlBodyManager.setGraphQLVariables(graphqlData.variables || '');
             }
 
             const key = `${collection.id}_${endpoint.id}`;
             this.originalBodyValues.set(key, graphqlData.query || '');
         } else {
             // Switch to JSON mode and populate JSON editor
-            if (window.graphqlBodyManager) {
-                window.graphqlBodyManager.setGraphQLModeEnabled(false);
+            if (app.graphqlBodyManager) {
+                app.graphqlBodyManager.setGraphQLModeEnabled(false);
             }
 
             const persistedBody = await this.repository.getModifiedRequestBody(collection.id, endpoint.id);
@@ -922,28 +923,28 @@ export class CollectionService {
 
         const state = { modifiedBody: null, formBodyData: null, graphqlData: null };
 
-        if (bodyMode === 'formdata' && window.formBodyManager) {
+        if (bodyMode === 'formdata' && app.formBodyManager) {
             state.formBodyData = {
                 mode: 'formdata',
-                fields: window.formBodyManager.getFormDataFields()
+                fields: app.formBodyManager.getFormDataFields()
             };
-        } else if (bodyMode === 'urlencoded' && window.formBodyManager) {
+        } else if (bodyMode === 'urlencoded' && app.formBodyManager) {
             state.formBodyData = {
                 mode: 'urlencoded',
-                fields: window.formBodyManager.getUrlencodedFields()
+                fields: app.formBodyManager.getUrlencodedFields()
             };
         } else if (bodyMode === 'text') {
             state.formBodyData = {
                 mode: 'text',
-                content: window.requestBodyTextEditor
-                    ? window.requestBodyTextEditor.getContent()
+                content: app.requestBodyTextEditor
+                    ? app.requestBodyTextEditor.getContent()
                     : ''
             };
-        } else if (window.graphqlBodyManager && window.graphqlBodyManager.isGraphQLMode()) {
+        } else if (app.graphqlBodyManager && app.graphqlBodyManager.isGraphQLMode()) {
             state.graphqlData = {
                 mode: 'graphql',
-                query: window.graphqlBodyManager.getGraphQLQuery(),
-                variables: window.graphqlBodyManager.getGraphQLVariables()
+                query: app.graphqlBodyManager.getGraphQLQuery(),
+                variables: app.graphqlBodyManager.getGraphQLVariables()
             };
         } else {
             const currentBody = getRequestBodyContent().trim();
@@ -1068,8 +1069,8 @@ export class CollectionService {
      */
     async saveCurrentAuthConfig(collectionId, endpointId) {
         try {
-            if (window.authManager) {
-                const authConfig = window.authManager.getAuthConfig();
+            if (app.authManager) {
+                const authConfig = app.authManager.getAuthConfig();
                 await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
             }
         } catch (error) {
@@ -1088,18 +1089,18 @@ export class CollectionService {
      */
     async populateAuthConfig(collectionId, endpointId) {
         try {
-            if (window.authManager) {
+            if (app.authManager) {
                 const authConfig = await this.repository.getPersistedAuthConfig(collectionId, endpointId);
                 if (authConfig) {
-                    window.authManager.loadAuthConfig(authConfig);
+                    app.authManager.loadAuthConfig(authConfig);
                 } else {
                     const collection = await this.repository.getById(collectionId);
                     const endpoint = collection?.endpoints?.find(ep => ep.id === endpointId);
 
                     if (endpoint?.security) {
-                        window.authManager.loadAuthConfig(endpoint.security);
+                        app.authManager.loadAuthConfig(endpoint.security);
                     } else {
-                        window.authManager.resetAuthConfig();
+                        app.authManager.resetAuthConfig();
                     }
                 }
             }

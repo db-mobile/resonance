@@ -3,6 +3,7 @@
  * @module ui/WorkspaceTabBar
  */
 
+import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 
 /**
@@ -609,13 +610,13 @@ export class WorkspaceTabBar {
                     if (tab.endpoint && tab.endpoint.collectionId && tab.endpoint.endpointId) {
                         const { saveAllRequestModifications } = await import('../collectionManager.js');
                         await saveAllRequestModifications(tab.endpoint.collectionId, tab.endpoint.endpointId);
-                        if (window.workspaceTabController) {
-                            await window.workspaceTabController.markCurrentTabUnmodified();
+                        if (app.workspaceTabController) {
+                            await app.workspaceTabController.markCurrentTabUnmodified();
                         }
-                    } else if (window.workspaceTabController && tab.type !== 'runner') {
+                    } else if (app.workspaceTabController && tab.type !== 'runner') {
                         // No endpoint - show "Save to Collection" dialog
                         const { saveRequestToCollection } = await import('../collectionManager.js');
-                        const state = await window.workspaceTabController.stateManager.captureCurrentState();
+                        const state = await app.workspaceTabController.stateManager.captureCurrentState();
                         const requestData = {
                             name: tab.name,
                             ...state.request
@@ -627,7 +628,7 @@ export class WorkspaceTabBar {
                                 collectionId: result.collectionId,
                                 endpointId: result.endpointId
                             };
-                            await window.workspaceTabController.service.updateTab(tab.id, {
+                            await app.workspaceTabController.service.updateTab(tab.id, {
                                 name: result.name,
                                 endpoint: {
                                     collectionId: result.collectionId,
@@ -635,10 +636,10 @@ export class WorkspaceTabBar {
                                     protocol: state.request.protocol || 'http'
                                 }
                             });
-                            await window.workspaceTabController.markCurrentTabUnmodified();
+                            await app.workspaceTabController.markCurrentTabUnmodified();
                             // Re-render tab bar to update the tab with new name
-                            const tabs = await window.workspaceTabController.service.getAllTabs();
-                            const activeTabId = await window.workspaceTabController.service.getActiveTabId();
+                            const tabs = await app.workspaceTabController.service.getAllTabs();
+                            const activeTabId = await app.workspaceTabController.service.getActiveTabId();
                             this.render(tabs, activeTabId);
                         }
                     }

@@ -10,6 +10,7 @@
  * @class
  * @classdesc Manages console output and test result display
  */
+import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 
 export class ScriptConsolePanel {
@@ -35,7 +36,7 @@ export class ScriptConsolePanel {
         }
 
         // Otherwise, get the active workspace tab's container
-        const containerElements = window.responseContainerManager?.getActiveElements();
+        const containerElements = app.responseContainerManager?.getActiveElements();
 
         if (containerElements && containerElements.scriptsDisplay) {
             return containerElements.scriptsDisplay;

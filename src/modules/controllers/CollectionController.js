@@ -3,6 +3,7 @@
  * @module controllers/CollectionController
  */
 
+import { app } from '../appContext.js';
 import { CollectionRepository } from '../storage/CollectionRepository.js';
 import { VariableRepository } from '../storage/VariableRepository.js';
 import { SchemaProcessor } from '../schema/SchemaProcessor.js';
@@ -43,8 +44,8 @@ export class CollectionController {
      */
     constructor(backendAPI, updateStatusDisplay) {
         this.backendAPI = backendAPI;
-        this.repository = new CollectionRepository(backendAPI, window.secretStore);
-        this.variableRepository = new VariableRepository(backendAPI, window.secretStore);
+        this.repository = new CollectionRepository(backendAPI, app.secretStore);
+        this.variableRepository = new VariableRepository(backendAPI, app.secretStore);
         this.schemaProcessor = new SchemaProcessor();
         this.variableProcessor = new VariableProcessor();
         this.statusDisplay = new StatusDisplayAdapter(updateStatusDisplay);
@@ -579,20 +580,20 @@ export class CollectionController {
      * @returns {Promise<void>}
      */
     async handleDelete(collection) {
-        const confirmMessage = window.i18n ?
-            window.i18n.t('collection.confirm_delete', { name: collection.name }) :
+        const confirmMessage = app.i18n ?
+            app.i18n.t('collection.confirm_delete', { name: collection.name }) :
             `Are you sure you want to delete the collection "${collection.name}"?\n\nThis action cannot be undone.`;
 
-        const title = window.i18n ?
-            window.i18n.t('collection.delete_title') || 'Delete Collection' :
+        const title = app.i18n ?
+            app.i18n.t('collection.delete_title') || 'Delete Collection' :
             'Delete Collection';
 
-        const confirmText = window.i18n ?
-            window.i18n.t('common.delete') || 'Delete' :
+        const confirmText = app.i18n ?
+            app.i18n.t('common.delete') || 'Delete' :
             'Delete';
 
-        const cancelText = window.i18n ?
-            window.i18n.t('common.cancel') || 'Cancel' :
+        const cancelText = app.i18n ?
+            app.i18n.t('common.cancel') || 'Cancel' :
             'Cancel';
 
         const confirmed = await this.confirmDialog.show(confirmMessage, {
@@ -669,16 +670,16 @@ export class CollectionController {
      */
     async handleRenameRequest(collection, endpoint) {
         try {
-            const title = window.i18n ?
-                window.i18n.t('endpoint.rename_title') || 'Rename Request' :
+            const title = app.i18n ?
+                app.i18n.t('endpoint.rename_title') || 'Rename Request' :
                 'Rename Request';
 
-            const label = window.i18n ?
-                window.i18n.t('endpoint.rename_label') || 'Request Name:' :
+            const label = app.i18n ?
+                app.i18n.t('endpoint.rename_label') || 'Request Name:' :
                 'Request Name:';
 
-            const confirmText = window.i18n ?
-                window.i18n.t('common.rename') || 'Rename' :
+            const confirmText = app.i18n ?
+                app.i18n.t('common.rename') || 'Rename' :
                 'Rename';
 
             const currentName = endpoint.name || endpoint.path;
@@ -695,18 +696,18 @@ export class CollectionController {
             await this.loadCollectionsWithExpansionState();
 
             // Update any open tabs that reference this endpoint
-            if (!window.workspaceTabController) {
+            if (!app.workspaceTabController) {
                 return;
             }
-            const tabs = await window.workspaceTabController.service.getAllTabs();
+            const tabs = await app.workspaceTabController.service.getAllTabs();
             const matchingTabs = tabs.filter(tab => 
                 tab.endpoint && 
                 tab.endpoint.collectionId === collection.id && 
                 tab.endpoint.endpointId === endpoint.id
             );
             for (const tab of matchingTabs) {
-                await window.workspaceTabController.service.updateTab(tab.id, { name: newName });
-                window.workspaceTabController.tabBar.updateTab(tab.id, { name: newName });
+                await app.workspaceTabController.service.updateTab(tab.id, { name: newName });
+                app.workspaceTabController.tabBar.updateTab(tab.id, { name: newName });
             }
         } catch (error) {
             void error;
@@ -725,20 +726,20 @@ export class CollectionController {
      * @returns {Promise<void>}
      */
     async handleDeleteRequest(collection, endpoint) {
-        const confirmMessage = window.i18n ?
-            window.i18n.t('endpoint.confirm_delete', { name: endpoint.name || endpoint.path }) :
+        const confirmMessage = app.i18n ?
+            app.i18n.t('endpoint.confirm_delete', { name: endpoint.name || endpoint.path }) :
             `Are you sure you want to delete the request "${endpoint.name || endpoint.path}"?\n\nThis action cannot be undone.`;
 
-        const title = window.i18n ?
-            window.i18n.t('endpoint.delete_title') || 'Delete Request' :
+        const title = app.i18n ?
+            app.i18n.t('endpoint.delete_title') || 'Delete Request' :
             'Delete Request';
 
-        const confirmText = window.i18n ?
-            window.i18n.t('common.delete') || 'Delete' :
+        const confirmText = app.i18n ?
+            app.i18n.t('common.delete') || 'Delete' :
             'Delete';
 
-        const cancelText = window.i18n ?
-            window.i18n.t('common.cancel') || 'Cancel' :
+        const cancelText = app.i18n ?
+            app.i18n.t('common.cancel') || 'Cancel' :
             'Cancel';
 
         const confirmed = await this.confirmDialog.show(confirmMessage, {

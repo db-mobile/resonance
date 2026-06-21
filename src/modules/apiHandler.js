@@ -1,3 +1,4 @@
+import { app } from './appContext.js';
 import { urlInput, methodSelect, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, responseCookiesDisplay, responsePerformanceDisplay, languageSelector } from './domElements.js';
 import { toast } from './ui/Toast.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
@@ -79,8 +80,8 @@ export function getSettingsCache() {
 
 function getVariableService() {
     if (!_variableService) {
-        const variableRepository = new VariableRepository(window.backendAPI, window.secretStore);
-        const environmentRepository = new EnvironmentRepository(window.backendAPI, window.secretStore);
+        const variableRepository = new VariableRepository(window.backendAPI, app.secretStore);
+        const environmentRepository = new EnvironmentRepository(window.backendAPI, app.secretStore);
         const variableProcessor = new VariableProcessor();
         const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
         _variableService = new VariableService(variableRepository, variableProcessor, statusDisplayAdapter, environmentRepository);
@@ -99,7 +100,7 @@ function getMockServerService() {
 
 function getCollectionRepository() {
     if (!_collectionRepository) {
-        _collectionRepository = new CollectionRepository(window.backendAPI, window.secretStore);
+        _collectionRepository = new CollectionRepository(window.backendAPI, app.secretStore);
     }
     return _collectionRepository;
 }
@@ -178,9 +179,9 @@ export async function fetchGraphQLIntrospection() {
     if (authData.awsAuth) {
         requestConfig.awsAuth = authData.awsAuth;
     }
-    if (window.certificateController) {
+    if (app.certificateController) {
         try {
-            const clientCert = window.certificateController.getForHost(new URL(resolvedUrl).host);
+            const clientCert = app.certificateController.getForHost(new URL(resolvedUrl).host);
             if (clientCert) {
                 requestConfig.clientCert = clientCert;
             }
@@ -250,10 +251,10 @@ export function initResponseEditor() {
 }
 
 async function isTabCurrentlyActive(tabId) {
-    if (!tabId || !window.workspaceTabController) {
+    if (!tabId || !app.workspaceTabController) {
         return true;
     }
-    const activeTabId = await window.workspaceTabController.service.getActiveTabId();
+    const activeTabId = await app.workspaceTabController.service.getActiveTabId();
     return activeTabId === tabId;
 }
 
@@ -278,8 +279,8 @@ export function displayResponseWithLineNumbers(content, contentType = null) {
  */
 export function clearSchemaValidationBadge(tabId = null) {
     const containerElements = tabId
-        ? window.responseContainerManager?.getOrCreateContainer(tabId)
-        : window.responseContainerManager?.getActiveElements();
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
 
     const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
     if (!statusContainer) {
@@ -305,8 +306,8 @@ function displaySchemaValidationResult(validationResult, tabId = null) {
     }
 
     const containerElements = tabId
-        ? window.responseContainerManager?.getOrCreateContainer(tabId)
-        : window.responseContainerManager?.getActiveElements();
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
 
     const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
     if (!statusContainer) {
@@ -330,8 +331,8 @@ function displaySchemaValidationResult(validationResult, tabId = null) {
  */
 export function clearGraphQLErrorsBadge(tabId = null) {
     const containerElements = tabId
-        ? window.responseContainerManager?.getOrCreateContainer(tabId)
-        : window.responseContainerManager?.getActiveElements();
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
 
     const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
     const existingBadge = statusContainer?.querySelector('.graphql-errors-badge');
@@ -362,8 +363,8 @@ function displayGraphQLErrorsBadge(result, tabId = null) {
     }
 
     const containerElements = tabId
-        ? window.responseContainerManager?.getOrCreateContainer(tabId)
-        : window.responseContainerManager?.getActiveElements();
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
 
     const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
     if (!statusContainer) {
@@ -382,8 +383,8 @@ function displayGraphQLErrorsBadge(result, tabId = null) {
 
 export function displayResponseWithLineNumbersForTab(content, contentType = null, tabId = null, languageHint = undefined) {
     const containerElements = tabId
-        ? window.responseContainerManager?.getOrCreateContainer(tabId)
-        : window.responseContainerManager?.getActiveElements();
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
 
     if (containerElements && containerElements.editor) {
         containerElements.editor.setContent(content, contentType, languageHint);
@@ -416,8 +417,8 @@ export function clearResponseDisplay() {
 export function clearResponseDisplayForTab(tabId = null) {
     // Use per-tab editor if available, otherwise fall back to global editor
     const containerElements = tabId
-        ? window.responseContainerManager?.getOrCreateContainer(tabId)
-        : window.responseContainerManager?.getActiveElements();
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
 
     if (containerElements && containerElements.editor) {
         containerElements.editor.clear();
@@ -440,7 +441,7 @@ export function setRequestInProgress(inProgress) {
         cancelRequestBtn.style.display = 'none';
         sendRequestBtn.disabled = false;
     }
-    window.statusBar?.setRequestRunning(inProgress);
+    app.statusBar?.setRequestRunning(inProgress);
 }
 
 export async function handleCancelRequest() {
@@ -463,8 +464,8 @@ export async function handleCancelRequest() {
     }
 
     if (isGrpcMode()) {
-        const tabId = window.workspaceTabController
-            ? await window.workspaceTabController.service.getActiveTabId()
+        const tabId = app.workspaceTabController
+            ? await app.workspaceTabController.service.getActiveTabId()
             : null;
         if (tabId && hasActiveGrpcStream(tabId)) {
             await cancelGrpcStream(tabId);
@@ -474,8 +475,8 @@ export async function handleCancelRequest() {
     }
 
     try {
-        const requestTabId = window.workspaceTabController
-            ? await window.workspaceTabController.service.getActiveTabId()
+        const requestTabId = app.workspaceTabController
+            ? await app.workspaceTabController.service.getActiveTabId()
             : null;
 
         const result = await window.backendAPI.cancelApiRequest();
@@ -763,10 +764,10 @@ export async function handleSendRequest() {
                 if (operationName) {
                     body.operationName = operationName;
                 }
-            } else if ((bodyMode === 'formdata' || bodyMode === 'urlencoded') && window.formBodyManager) {
+            } else if ((bodyMode === 'formdata' || bodyMode === 'urlencoded') && app.formBodyManager) {
                 const rawFields = bodyMode === 'formdata'
-                    ? window.formBodyManager.getFormDataFields()
-                    : window.formBodyManager.getUrlencodedFields();
+                    ? app.formBodyManager.getFormDataFields()
+                    : app.formBodyManager.getUrlencodedFields();
                 const processed = {};
                 for (const [k, v] of Object.entries(rawFields)) {
                     processed[processor.processTemplate(k, variables)]
@@ -776,8 +777,8 @@ export async function handleSendRequest() {
                     body = processed;
                 }
             } else if (bodyMode === 'text') {
-                const rawText = window.requestBodyTextEditor
-                    ? window.requestBodyTextEditor.getContent()
+                const rawText = app.requestBodyTextEditor
+                    ? app.requestBodyTextEditor.getContent()
                     : '';
                 if (rawText) {
                     body = processor.processTemplate(rawText, variables);
@@ -837,9 +838,9 @@ export async function handleSendRequest() {
     };
 
     // Apply a client certificate / custom CA configured for this request's host (mTLS).
-    if (window.certificateController) {
+    if (app.certificateController) {
         try {
-            const clientCert = window.certificateController.getForHost(new URL(url).host);
+            const clientCert = app.certificateController.getForHost(new URL(url).host);
             if (clientCert) {
                 requestConfig.clientCert = clientCert;
             }
@@ -848,8 +849,8 @@ export async function handleSendRequest() {
         }
     }
 
-    const requestTabId = window.workspaceTabController
-        ? await window.workspaceTabController.service.getActiveTabId()
+    const requestTabId = app.workspaceTabController
+        ? await app.workspaceTabController.service.getActiveTabId()
         : null;
 
     try {
@@ -867,9 +868,9 @@ export async function handleSendRequest() {
             requestConfig.awsAuth = authData.awsAuth;
         }
 
-        if (window.currentEndpoint && window.scriptController) {
+        if (window.currentEndpoint && app.scriptController) {
             try {
-                requestConfig = await window.scriptController.executePreRequest(
+                requestConfig = await app.scriptController.executePreRequest(
                     window.currentEndpoint.collectionId,
                     window.currentEndpoint.endpointId,
                     requestConfig
@@ -879,8 +880,8 @@ export async function handleSendRequest() {
             }
         }
 
-        if (window.cookieController) {
-            const cookieHeader = await window.cookieController.getCookieHeader(url);
+        if (app.cookieController) {
+            const cookieHeader = await app.cookieController.getCookieHeader(url);
             if (cookieHeader) {
                 requestConfig.headers = requestConfig.headers || {};
                 // Don't overwrite a manually set Cookie header
@@ -909,9 +910,9 @@ export async function handleSendRequest() {
 
             displayResponseWithLineNumbersForTab(formattedResponse, contentType, requestTabId, languageHint);
 
-            if (window.schemaController) {
-                window.schemaController.setLastResponseBody(result.data);
-                const validationResult = window.schemaController.validateResponse(result.data);
+            if (app.schemaController) {
+                app.schemaController.setLastResponseBody(result.data);
+                const validationResult = app.schemaController.validateResponse(result.data);
                 displaySchemaValidationResult(validationResult, requestTabId);
             }
 
@@ -924,8 +925,8 @@ export async function handleSendRequest() {
                 size: result.size
             });
 
-            if (window.cookieController && result.setCookies && result.setCookies.length > 0) {
-                window.cookieController.handleCookiesFromResponse(result.setCookies, url);
+            if (app.cookieController && result.setCookies && result.setCookies.length > 0) {
+                app.cookieController.handleCookiesFromResponse(result.setCookies, url);
             }
 
             updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
@@ -933,8 +934,8 @@ export async function handleSendRequest() {
             updateResponseSize(result.size);
             setRequestInProgress(false);
 
-            if (window.workspaceTabController && requestTabId) {
-                window.workspaceTabController.service.updateTab(requestTabId, {
+            if (app.workspaceTabController && requestTabId) {
+                app.workspaceTabController.service.updateTab(requestTabId, {
                     response: {
                         data: result.data,
                         headers: result.headers || {},
@@ -947,19 +948,19 @@ export async function handleSendRequest() {
                     },
                     isModified: false
                 }).catch(() => { /* fire-and-forget */ });
-                if (window.workspaceTabController.tabBar?.updateTab) {
-                    window.workspaceTabController.tabBar.updateTab(requestTabId, { isModified: false });
+                if (app.workspaceTabController.tabBar?.updateTab) {
+                    app.workspaceTabController.tabBar.updateTab(requestTabId, { isModified: false });
                 }
             }
 
-            if (window.historyController) {
-                const _activeEnvName = await window.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
-                window.historyController.addHistoryEntry(requestConfig, result, window.currentEndpoint, _activeEnvName).catch(() => { /* fire-and-forget */ });
+            if (app.historyController) {
+                const _activeEnvName = await app.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
+                app.historyController.addHistoryEntry(requestConfig, result, window.currentEndpoint, _activeEnvName).catch(() => { /* fire-and-forget */ });
             }
 
-            if (window.currentEndpoint && window.scriptController) {
+            if (window.currentEndpoint && app.scriptController) {
                 try {
-                    await window.scriptController.executeTest(
+                    await app.scriptController.executeTest(
                         window.currentEndpoint.collectionId,
                         window.currentEndpoint.endpointId,
                         requestConfig,
@@ -1025,14 +1026,14 @@ export async function handleSendRequest() {
             updateResponseSize(error.size);
         }
 
-        if (window.historyController) {
-            const _activeEnvName = await window.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
-            window.historyController.addHistoryEntry(requestConfig, error, window.currentEndpoint, _activeEnvName).catch(() => { /* fire-and-forget */ });
+        if (app.historyController) {
+            const _activeEnvName = await app.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
+            app.historyController.addHistoryEntry(requestConfig, error, window.currentEndpoint, _activeEnvName).catch(() => { /* fire-and-forget */ });
         }
 
-        if (window.currentEndpoint && window.scriptController) {
+        if (window.currentEndpoint && app.scriptController) {
             try {
-                await window.scriptController.executeTest(
+                await app.scriptController.executeTest(
                     window.currentEndpoint.collectionId,
                     window.currentEndpoint.endpointId,
                     requestConfig,

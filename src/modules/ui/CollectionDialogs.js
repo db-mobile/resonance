@@ -3,6 +3,7 @@
  * @module ui/CollectionDialogs
  */
 
+import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { DocGeneratorService } from '../services/DocGeneratorService.js';
 
@@ -34,8 +35,8 @@ export class CollectionDialogs {
 
             document.body.appendChild(dialog);
 
-            if (window.i18n && window.i18n.updateUI) {
-                window.i18n.updateUI();
+            if (app.i18n && app.i18n.updateUI) {
+                app.i18n.updateUI();
             }
 
             const form = dialog.querySelector('#new-collection-form');
@@ -111,8 +112,8 @@ export class CollectionDialogs {
 
             document.body.appendChild(dialog);
 
-            if (window.i18n && window.i18n.updateUI) {
-                window.i18n.updateUI();
+            if (app.i18n && app.i18n.updateUI) {
+                app.i18n.updateUI();
             }
 
             const form = dialog.querySelector('#new-request-form');
@@ -253,8 +254,8 @@ export class CollectionDialogs {
 
             document.body.appendChild(dialog);
 
-            if (window.i18n && window.i18n.updateUI) {
-                window.i18n.updateUI();
+            if (app.i18n && app.i18n.updateUI) {
+                app.i18n.updateUI();
             }
 
             const form = dialog.querySelector('#save-to-collection-form');
@@ -297,7 +298,7 @@ export class CollectionDialogs {
 
             const newCollectionOption = document.createElement('option');
             newCollectionOption.value = '__new__';
-            newCollectionOption.textContent = window.i18n?.t('save_to_collection.create_new') || '+ Create new collection';
+            newCollectionOption.textContent = app.i18n?.t('save_to_collection.create_new') || '+ Create new collection';
             collectionSelect.appendChild(newCollectionOption);
 
             nameInput.focus();
@@ -451,8 +452,8 @@ export class CollectionDialogs {
 
             document.body.appendChild(dialog);
 
-            if (window.i18n && window.i18n.updateUI) {
-                window.i18n.updateUI();
+            if (app.i18n && app.i18n.updateUI) {
+                app.i18n.updateUI();
             }
 
             const form = dialog.querySelector('#doc-options-form');
@@ -560,11 +561,11 @@ export class CollectionDialogs {
             let dialogClosed = false;
             const keydownController = new AbortController();
 
-            if (window.i18n && window.i18n.updateUI) {
-                window.i18n.updateUI(dialog);
+            if (app.i18n && app.i18n.updateUI) {
+                app.i18n.updateUI(dialog);
             }
 
-            const t = (key, fallback) => (window.i18n && window.i18n.t) ? window.i18n.t(key) : fallback;
+            const t = (key, fallback) => (app.i18n && app.i18n.t) ? app.i18n.t(key) : fallback;
             if (importKind === 'openapi') {
                 titleElement.textContent = t('import_dialog.title_openapi', 'Import OpenAPI Collection');
                 subtitleElement.textContent = t('import_dialog.subtitle_openapi', 'Choose an OpenAPI file and where the collection should be stored.');

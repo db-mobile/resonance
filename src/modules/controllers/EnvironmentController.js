@@ -12,6 +12,7 @@
  * switching, import/export, and change notifications. Listens for service events
  * and synchronizes UI state accordingly.
  */
+import { app } from '../appContext.js';
 import { toast } from '../ui/Toast.js';
 
 export class EnvironmentController {
@@ -96,7 +97,7 @@ export class EnvironmentController {
      */
     async onEnvironmentSwitched(_event) {
         try {
-            window.invalidateApiHandlerEnvironmentCache?.();
+            app.invalidateApiHandlerEnvironmentCache?.();
             const environment = await this.service.getActiveEnvironment();
             if (environment) {
                 this.selector.setActiveEnvironment(environment);
@@ -117,7 +118,7 @@ export class EnvironmentController {
      */
     async onEnvironmentsChanged() {
         try {
-            window.invalidateApiHandlerEnvironmentCache?.();
+            app.invalidateApiHandlerEnvironmentCache?.();
             const activeEnvironment = await this.service.getActiveEnvironment();
             if (activeEnvironment) {
                 this.selector.setActiveEnvironment(activeEnvironment);

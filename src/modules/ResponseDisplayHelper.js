@@ -3,6 +3,7 @@
  * @module ResponseDisplayHelper
  */
 
+import { app } from './appContext.js';
 import { extractCookies, renderCookies } from './cookieParser.js';
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
 
@@ -19,8 +20,8 @@ import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanc
  */
 export function getResponseElements(tabId, globalElements = {}) {
     const containerElements = tabId
-        ? window.responseContainerManager?.getOrCreateContainer(tabId)
-        : window.responseContainerManager?.getActiveElements();
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
 
     if (containerElements) {
         return {

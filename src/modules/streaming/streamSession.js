@@ -1,3 +1,4 @@
+import { app } from '../appContext.js';
 import { displayResponseWithLineNumbersForTab } from '../apiHandler.js';
 import { updateResponseSize, updateResponseTime, updateStatusDisplay } from '../statusDisplay.js';
 
@@ -11,8 +12,8 @@ import { updateResponseSize, updateResponseTime, updateStatusDisplay } from '../
 
 /** @returns {Promise<string|null>} the active workspace tab id, if known. */
 export async function getActiveTabId() {
-    return window.workspaceTabController
-        ? window.workspaceTabController.service.getActiveTabId()
+    return app.workspaceTabController
+        ? app.workspaceTabController.service.getActiveTabId()
         : null;
 }
 
@@ -24,10 +25,10 @@ export async function getActiveTabId() {
  * @returns {Promise<boolean>}
  */
 export async function isTabCurrentlyActive(tabId) {
-    if (!tabId || !window.workspaceTabController) {
+    if (!tabId || !app.workspaceTabController) {
         return true;
     }
-    const activeTabId = await window.workspaceTabController.service.getActiveTabId();
+    const activeTabId = await app.workspaceTabController.service.getActiveTabId();
     return activeTabId === tabId;
 }
 
@@ -125,7 +126,7 @@ export class StreamSession {
     }
 
     async _persist(tabId, transcript) {
-        if (!this._buildResponseMeta || !window.workspaceTabController || !tabId) {
+        if (!this._buildResponseMeta || !app.workspaceTabController || !tabId) {
             return;
         }
         const entry = this.get(tabId) || {};
@@ -133,6 +134,6 @@ export class StreamSession {
         if (!response) {
             return;
         }
-        await window.workspaceTabController.service.updateTab(tabId, { response });
+        await app.workspaceTabController.service.updateTab(tabId, { response });
     }
 }

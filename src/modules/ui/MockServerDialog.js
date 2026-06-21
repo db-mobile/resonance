@@ -3,6 +3,7 @@
  * @module ui/MockServerDialog
  */
 
+import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { SchemaProcessor } from '../schema/SchemaProcessor.js';
 
@@ -54,7 +55,7 @@ export class MockServerDialog {
         const dialogContent = document.createElement('div');
         dialogContent.className = 'mock-server-dialog modal-dialog modal-dialog--mock-server';
 
-        const t = (key, fallback) => window.i18n ? window.i18n.t(key) || fallback : fallback;
+        const t = (key, fallback) => app.i18n ? app.i18n.t(key) || fallback : fallback;
 
         const fragment = templateLoader.cloneSync(
             './src/templates/mockServer/mockServerDialog.html',
@@ -198,7 +199,7 @@ export class MockServerDialog {
      */
     async renderCollections(collections, settings) {
         const container = this.dialog.querySelector('#mock-server-collections');
-        const t = (key, fallback) => window.i18n ? window.i18n.t(key) || fallback : fallback;
+        const t = (key, fallback) => app.i18n ? app.i18n.t(key) || fallback : fallback;
 
         if (collections.length === 0) {
             const fragment = templateLoader.cloneSync(
@@ -314,8 +315,8 @@ export class MockServerDialog {
                 if (httpEndpoints.length > 10 && !collection._showAllEndpoints) {
                     const moreDiv = document.createElement('div');
                     moreDiv.className = 'mock-server-endpoints-toggle u-flex u-items-center u-gap-1';
-                    const showAllText = window.i18n ?
-                        window.i18n.t('mock_server.show_all_endpoints', { count: httpEndpoints.length }) || `Show all ${httpEndpoints.length} endpoints` :
+                    const showAllText = app.i18n ?
+                        app.i18n.t('mock_server.show_all_endpoints', { count: httpEndpoints.length }) || `Show all ${httpEndpoints.length} endpoints` :
                         `Show all ${httpEndpoints.length} endpoints`;
                     {
                         const labelEl = document.createElement('span');
@@ -383,7 +384,7 @@ export class MockServerDialog {
 
             toggleBtn.disabled = false;
         } catch (error) {
-            const t = (key, fallback) => window.i18n ? window.i18n.t(key) || fallback : fallback;
+            const t = (key, fallback) => app.i18n ? app.i18n.t(key) || fallback : fallback;
             this.showAlert(error.message || t('mock_server.error_toggle_server', 'Failed to toggle server'));
         }
     }
@@ -510,7 +511,7 @@ export class MockServerDialog {
         const urlText = this.dialog.querySelector('#mock-server-url');
         const toggleBtn = this.dialog.querySelector('#mock-server-toggle-btn');
         const portInput = this.dialog.querySelector('#mock-server-port-input');
-        const t = (key, fallback) => window.i18n ? window.i18n.t(key) || fallback : fallback;
+        const t = (key, fallback) => app.i18n ? app.i18n.t(key) || fallback : fallback;
 
         if (status.running) {
             indicator.textContent = '●';
@@ -542,7 +543,7 @@ export class MockServerDialog {
         try {
             const logs = await this.controller.getRequestLogs(20);
             const container = this.dialog.querySelector('#mock-server-logs');
-            const t = (key, fallback) => window.i18n ? window.i18n.t(key) || fallback : fallback;
+            const t = (key, fallback) => app.i18n ? app.i18n.t(key) || fallback : fallback;
 
             if (!container) {
                 return;
@@ -628,7 +629,7 @@ export class MockServerDialog {
      * @param {string} message - Alert message
      */
     showAlert(message) {
-        const t = (key, fallback) => window.i18n ? window.i18n.t(key) || fallback : fallback;
+        const t = (key, fallback) => app.i18n ? app.i18n.t(key) || fallback : fallback;
         const overlay = document.createElement('div');
         overlay.className = 'modal-overlay';
 
@@ -673,7 +674,7 @@ export class MockServerDialog {
      * @param {Object} endpoint - Endpoint object
      */
     async showResponseEditor(collection, endpoint) {
-        const t = (key, fallback) => window.i18n ? window.i18n.t(key) || fallback : fallback;
+        const t = (key, fallback) => app.i18n ? app.i18n.t(key) || fallback : fallback;
 
         // Get custom response or default
         const customResponse = await this.controller.getCustomResponse(collection.id, endpoint.id);

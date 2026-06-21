@@ -3,6 +3,7 @@
  * @module services/CollectionImportExportService
  */
 
+import { app } from '../appContext.js';
 import { toast } from '../ui/Toast.js';
 
 /**
@@ -67,7 +68,7 @@ export class CollectionImportExportService {
     async handleGenerateDocumentation(collection) {
         try {
             if (!this.docGeneratorService.hasHttpEndpoints(collection)) {
-                toast.error(window.i18n?.t('docs.no_http_endpoints') || 'This collection has no HTTP requests to document');
+                toast.error(app.i18n?.t('docs.no_http_endpoints') || 'This collection has no HTTP requests to document');
                 return;
             }
 
@@ -102,9 +103,9 @@ export class CollectionImportExportService {
             const result = await this.backendAPI.docs.save(defaultFileName, content, mimeType);
 
             if (result && result.success) {
-                toast.success(window.i18n?.t('docs.success') || 'Documentation generated successfully');
+                toast.success(app.i18n?.t('docs.success') || 'Documentation generated successfully');
             } else if (result && !result.cancelled) {
-                toast.error(window.i18n?.t('docs.error') || 'Failed to generate documentation');
+                toast.error(app.i18n?.t('docs.error') || 'Failed to generate documentation');
             }
 
             this.statusDisplay.update('', null);
@@ -184,8 +185,8 @@ export class CollectionImportExportService {
                 return null;
             }
 
-            if (window.environmentController) {
-                await window.environmentController.handleImportEnvironment(environment);
+            if (app.environmentController) {
+                await app.environmentController.handleImportEnvironment(environment);
             }
             return environment;
         } catch (error) {

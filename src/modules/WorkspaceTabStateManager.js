@@ -4,6 +4,7 @@
  * Manages capturing and restoring tab state from/to UI elements.
  * Bridges workspace tabs with the existing UI.
  */
+import { app } from './appContext.js';
 import { parseKeyValuePairs, populateKeyValueList, clearKeyValueList, addKeyValueRow, updateUrlFromQueryParams } from './keyValueManager.js';
 import { authManager } from './authManager.js';
 import { displayResponseWithLineNumbersForTab, clearResponseDisplayForTab, clearSchemaValidationBadge, clearGraphQLErrorsBadge } from './apiHandler.js';
@@ -31,8 +32,8 @@ export class WorkspaceTabStateManager {
         const { isGrpcMode, isWebSocketMode, isSseMode, isMqttMode, isGraphQLMode } = await import('./requestModeManager.js');
         
         if (isGrpcMode()) {
-            const grpcRequestJson = window.grpcBodyEditor
-                ? window.grpcBodyEditor.getContent()
+            const grpcRequestJson = app.grpcBodyEditor
+                ? app.grpcBodyEditor.getContent()
                 : (this.dom.grpcBodyInput?.value || '{}');
             
             // Capture metadata from UI
@@ -201,21 +202,21 @@ export class WorkspaceTabStateManager {
         const bodyModeSelect = document.getElementById('body-mode-select');
         const currentBodyMode = bodyModeSelect?.value || 'json';
         let bodyData;
-        if (currentBodyMode === 'formdata' && window.formBodyManager) {
+        if (currentBodyMode === 'formdata' && app.formBodyManager) {
             bodyData = {
                 mode: 'formdata',
-                fields: window.formBodyManager.getFormDataFields()
+                fields: app.formBodyManager.getFormDataFields()
             };
-        } else if (currentBodyMode === 'urlencoded' && window.formBodyManager) {
+        } else if (currentBodyMode === 'urlencoded' && app.formBodyManager) {
             bodyData = {
                 mode: 'urlencoded',
-                fields: window.formBodyManager.getUrlencodedFields()
+                fields: app.formBodyManager.getUrlencodedFields()
             };
         } else if (currentBodyMode === 'text') {
             bodyData = {
                 mode: 'text',
-                content: window.requestBodyTextEditor
-                    ? window.requestBodyTextEditor.getContent()
+                content: app.requestBodyTextEditor
+                    ? app.requestBodyTextEditor.getContent()
                     : ''
             };
         } else {
@@ -226,7 +227,7 @@ export class WorkspaceTabStateManager {
         }
 
         // Capture preview mode state from active container
-        const containerElements = window.responseContainerManager?.getActiveElements();
+        const containerElements = app.responseContainerManager?.getActiveElements();
         const previewMode = containerElements?.previewManager
             ? containerElements.previewManager.isPreviewMode(containerElements.tabId)
             : false;
@@ -327,8 +328,8 @@ export class WorkspaceTabStateManager {
             if (this.dom.grpcBodyInput) {
                 this.dom.grpcBodyInput.value = request.grpc?.requestJson || '{}';
             }
-            if (window.grpcBodyEditor) {
-                window.grpcBodyEditor.setContent(request.grpc?.requestJson || '{}');
+            if (app.grpcBodyEditor) {
+                app.grpcBodyEditor.setContent(request.grpc?.requestJson || '{}');
             }
             if (this.dom.grpcServiceSelect) {
                 this.dom.grpcServiceSelect.value = request.grpc?.service || '';
@@ -336,11 +337,11 @@ export class WorkspaceTabStateManager {
             if (this.dom.grpcMethodSelect) {
                 this.dom.grpcMethodSelect.value = request.grpc?.fullMethod || '';
             }
-            if (window.setGrpcMetadata) {
-                window.setGrpcMetadata(request.grpc?.metadata || {});
+            if (app.setGrpcMetadata) {
+                app.setGrpcMetadata(request.grpc?.metadata || {});
             }
-            if (window.setGrpcTls) {
-                window.setGrpcTls(request.grpc?.useTls || false);
+            if (app.setGrpcTls) {
+                app.setGrpcTls(request.grpc?.useTls || false);
             }
             
             // Set window.currentEndpoint for gRPC requests so Ctrl+S save works
@@ -566,16 +567,16 @@ export class WorkspaceTabStateManager {
         // Restore body based on mode
         if (request.body && typeof request.body === 'object' && request.body.mode) {
             const { mode } = request.body;
-            if (mode === 'formdata' && window.formBodyManager) {
+            if (mode === 'formdata' && app.formBodyManager) {
                 this.graphqlBodyManager?.switchMode('formdata');
-                window.formBodyManager.setFormDataFields(request.body.fields || {});
-            } else if (mode === 'urlencoded' && window.formBodyManager) {
+                app.formBodyManager.setFormDataFields(request.body.fields || {});
+            } else if (mode === 'urlencoded' && app.formBodyManager) {
                 this.graphqlBodyManager?.switchMode('urlencoded');
-                window.formBodyManager.setUrlencodedFields(request.body.fields || {});
+                app.formBodyManager.setUrlencodedFields(request.body.fields || {});
             } else if (mode === 'text') {
                 this.graphqlBodyManager?.switchMode('text');
-                if (window.requestBodyTextEditor) {
-                    window.requestBodyTextEditor.setContent(request.body.content || '');
+                if (app.requestBodyTextEditor) {
+                    app.requestBodyTextEditor.setContent(request.body.content || '');
                 }
             } else {
                 if (this.graphqlBodyManager) {
@@ -647,7 +648,7 @@ export class WorkspaceTabStateManager {
 
         // Restore preview mode if it was active
         if (tab.previewMode) {
-            const containerElements = window.responseContainerManager?.getOrCreateContainer(tab.id);
+            const containerElements = app.responseContainerManager?.getOrCreateContainer(tab.id);
             if (containerElements?.previewManager) {
                 // Only toggle if not already in preview mode
                 if (!containerElements.previewManager.isPreviewMode(tab.id)) {
@@ -667,13 +668,13 @@ export class WorkspaceTabStateManager {
             clearGraphQLErrorsBadge();
 
             // Load scripts for this endpoint
-            if (window.inlineScriptManager && endpoint.collectionId && endpoint.endpointId) {
-                await window.inlineScriptManager.loadScripts(endpoint.collectionId, endpoint.endpointId);
+            if (app.inlineScriptManager && endpoint.collectionId && endpoint.endpointId) {
+                await app.inlineScriptManager.loadScripts(endpoint.collectionId, endpoint.endpointId);
             }
 
             // Load schema for this endpoint
-            if (window.schemaController && endpoint.collectionId && endpoint.endpointId) {
-                await window.schemaController.loadSchema(endpoint.collectionId, endpoint.endpointId);
+            if (app.schemaController && endpoint.collectionId && endpoint.endpointId) {
+                await app.schemaController.loadSchema(endpoint.collectionId, endpoint.endpointId);
             }
         } else if (Object.prototype.hasOwnProperty.call(tab, 'endpoint')) {
             // Tab explicitly has no endpoint (e.g., manually created tab)
@@ -684,13 +685,13 @@ export class WorkspaceTabStateManager {
             clearGraphQLErrorsBadge();
 
             // Clear scripts when no endpoint
-            if (window.inlineScriptManager) {
-                window.inlineScriptManager.clear();
+            if (app.inlineScriptManager) {
+                app.inlineScriptManager.clear();
             }
 
             // Clear schema when no endpoint
-            if (window.schemaController) {
-                window.schemaController.clearContext();
+            if (app.schemaController) {
+                app.schemaController.clearContext();
             }
         }
         // If tab doesn't have endpoint property at all (old tab format),
@@ -728,7 +729,7 @@ export class WorkspaceTabStateManager {
             return;
         }
 
-        const containerElements = window.responseContainerManager?.getOrCreateContainer(tabId);
+        const containerElements = app.responseContainerManager?.getOrCreateContainer(tabId);
 
         // Restore response body with CodeMirror
         if (response.data) {
@@ -806,7 +807,7 @@ export class WorkspaceTabStateManager {
         updateResponseTime(null);
         updateResponseSize(null);
 
-        const containerElements = window.responseContainerManager?.getOrCreateContainer(tabId);
+        const containerElements = app.responseContainerManager?.getOrCreateContainer(tabId);
 
         // Clear response headers
         if (containerElements?.headersEditor) {

@@ -4,7 +4,7 @@
  * @module registry/FeatureRegistry
  *
  * Each feature supplies a descriptor with a `create(ctx)` factory. The registry
- * standardizes the boot mechanics — construction order, `window.*` exposure, the
+ * standardizes the boot mechanics — construction order, app-context exposure, the
  * cross-feature singleton bus, and initialization — while `create` captures each
  * feature's unique dependencies (which vary too much for a one-size-fits-all factory).
  *
@@ -20,8 +20,8 @@
  * @property {string} name - Unique feature name (registry/bus key).
  * @property {(ctx: FeatureContext) => Object} create - Builds and returns the feature's
  *   instances keyed by role, e.g. `{ repository, service, controller }`.
- * @property {Object<string, string>} [globals] - Map of `window` key → instance key to
- *   expose globally, e.g. `{ cookieController: 'controller' }`.
+ * @property {Object<string, string>} [globals] - Map of app-context key → instance key to
+ *   expose on the shared `app` locator, e.g. `{ cookieController: 'controller' }`.
  * @property {Object<string, string>} [provides] - Map of bus name → instance key to publish
  *   onto the shared bus so other features can `ctx.get(busName)` them, e.g.
  *   `{ environmentService: 'service' }`.
@@ -29,6 +29,8 @@
  *   Optional startup hook (e.g. cache warming, listener registration). Run fire-and-forget
  *   during boot to preserve existing non-blocking init timing.
  */
+
+import { app } from '../appContext.js';
 
 /**
  * Registers feature descriptors and boots them in registration order.
@@ -90,8 +92,8 @@ export class FeatureRegistry {
             this._instances.set(descriptor.name, instances);
 
             if (descriptor.globals) {
-                for (const [winKey, instanceKey] of Object.entries(descriptor.globals)) {
-                    window[winKey] = instances[instanceKey];
+                for (const [appKey, instanceKey] of Object.entries(descriptor.globals)) {
+                    app[appKey] = instances[instanceKey];
                 }
             }
 
