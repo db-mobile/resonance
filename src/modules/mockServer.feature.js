@@ -15,11 +15,8 @@ export const mockServerFeature = {
     create(ctx) {
         const repository = new MockServerRepository(ctx.backendAPI);
         const service = new MockServerService(repository, ctx.statusDisplay);
-        // collectionRepository is published onto the bus by renderer.js before boot.
         const controller = new MockServerController(service, ctx.get('collectionRepository'));
         const dialog = new MockServerDialog(controller);
         return { repository, service, controller, dialog };
     },
-    // No globals. controller.initialize() is deferred to an idle tier in renderer.js, so no
-    // init hook here.
 };

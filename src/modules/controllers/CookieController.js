@@ -14,7 +14,6 @@ export class CookieController {
     }
 
     initialize() {
-        // Nothing async to do at startup — jar is lazily loaded on first request
     }
 
     /**
@@ -54,7 +53,6 @@ export class CookieController {
             if (settings?.cookieJarEnabled === false) { return; }
             await this.service.processCookiesFromResponse(setCookieHeaders, requestUrl, this._activeEnvironmentId);
         } catch (_e) {
-            // Non-blocking
         }
     }
 

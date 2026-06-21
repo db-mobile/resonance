@@ -27,12 +27,10 @@ export function getRequestBodyContent() {
 export function setRequestBodyContent(content) {
     const bodyInput = document.getElementById('body-input');
 
-    // Update textarea (for backward compatibility)
     if (bodyInput) {
         bodyInput.value = content;
     }
 
-    // Update CodeMirror editor
     if (app.requestBodyEditor) {
         app.requestBodyEditor.setContent(content);
     }
@@ -54,7 +52,6 @@ export function formatRequestBodyJSON() {
         return app.requestBodyEditor.formatJSON();
     }
 
-    // Fallback: try to format textarea content
     const bodyInput = document.getElementById('body-input');
     if (!bodyInput) {
         return false;

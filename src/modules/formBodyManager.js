@@ -24,7 +24,6 @@ export class FormBodyManager {
             addKeyValueRow(this.urlencodedList);
         });
 
-        // Seed each list with one blank row
         addKeyValueRow(this.formdataList);
         addKeyValueRow(this.urlencodedList);
     }

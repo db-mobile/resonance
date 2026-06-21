@@ -6,7 +6,6 @@ export class DynamicVariableGenerator {
     constructor() {
         this.requestCache = new Map();
 
-        // Random name data for randomName generator
         this.firstNames = [
             'James', 'Mary', 'John', 'Patricia', 'Robert', 'Jennifer', 'Michael', 'Linda',
             'William', 'Elizabeth', 'David', 'Barbara', 'Richard', 'Susan', 'Joseph', 'Jessica',
@@ -23,12 +22,10 @@ export class DynamicVariableGenerator {
             'Young', 'Allen', 'King', 'Wright', 'Scott', 'Torres', 'Nguyen', 'Hill', 'Flores'
         ];
 
-        // Email domains for randomEmail generator
         this.emailDomains = [
             'example.com', 'test.com', 'mail.test', 'demo.org', 'sample.net'
         ];
 
-        // Generator functions for each dynamic variable type
         this.generators = {
             'timestamp': () => Math.floor(Date.now() / 1000),
             'timestampMs': () => Date.now(),
@@ -50,21 +47,17 @@ export class DynamicVariableGenerator {
     generate(name, params = null) {
         const cacheKey = params ? `${name}:${params}` : name;
 
-        // Return cached value if exists
         if (this.requestCache.has(cacheKey)) {
             return this.requestCache.get(cacheKey);
         }
 
-        // Check if generator exists
         const generator = this.generators[name];
         if (!generator) {
             return null;
         }
 
-        // Generate new value
         const value = generator(params);
 
-        // Cache the value
         this.requestCache.set(cacheKey, value);
 
         return value;
@@ -107,8 +100,6 @@ export class DynamicVariableGenerator {
         return Object.keys(this.generators);
     }
 
-    // Private generator methods
-
     /**
      * Generate a UUID v4
      * @returns {string}
@@ -147,7 +138,6 @@ export class DynamicVariableGenerator {
             }
         }
 
-        // Ensure min <= max
         if (min > max) {
             [min, max] = [max, min];
         }
@@ -166,7 +156,7 @@ export class DynamicVariableGenerator {
         if (params) {
             const parsedLength = parseInt(params, 10);
             if (!isNaN(parsedLength) && parsedLength > 0) {
-                length = Math.min(parsedLength, 1000); // Cap at 1000 chars
+                length = Math.min(parsedLength, 1000);
             }
         }
 

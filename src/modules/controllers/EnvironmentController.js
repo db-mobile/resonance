@@ -38,12 +38,10 @@ export class EnvironmentController {
      * @returns {Promise<void>}
      */
     async initialize() {
-        // Listen for environment changes from service
         this.service.addChangeListener((event) => {
             this.handleEnvironmentChange(event);
         });
 
-        // Load initial active environment
         await this.loadActiveEnvironment();
     }
 
@@ -123,7 +121,6 @@ export class EnvironmentController {
             if (activeEnvironment) {
                 this.selector.setActiveEnvironment(activeEnvironment);
             }
-            // Refresh selector dropdown
             await this.selector.refresh();
         } catch (error) {
             void error;
@@ -158,7 +155,6 @@ export class EnvironmentController {
         try {
             const result = await this.manager.show();
             if (result) {
-                // Refresh UI after changes
                 await this.onEnvironmentsChanged();
             }
         } catch (error) {
@@ -350,7 +346,6 @@ export class EnvironmentController {
      * @throws {Error} If import fails
      */
     async importEnvironments(merge = false) {
-        // Create file input
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.json';

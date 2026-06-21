@@ -19,8 +19,6 @@ export const environmentFeature = {
         const service = new EnvironmentService(repository, ctx.statusDisplay);
         const manager = new EnvironmentManager(service);
 
-        // The selector's callbacks reference the controller, which is constructed after it;
-        // a forward-declared binding lets the closures resolve once the controller exists.
         // eslint-disable-next-line prefer-const
         let controller;
         const selector = new EnvironmentSelector(
@@ -34,6 +32,4 @@ export const environmentFeature = {
     },
     globals: { environmentController: 'controller' },
     provides: { environmentService: 'service' },
-    // No init here: environmentController.initialize() is awaited in renderer.js's
-    // DOMContentLoaded Promise.all (timing-critical), and selector.initialize() needs the DOM.
 };

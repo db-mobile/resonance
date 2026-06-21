@@ -95,7 +95,8 @@ src/modules/
 1. Create the feature's modules in the appropriate `src/modules/` subdirectories (controller, service, repository, UI) and export them from the relevant index files.
 2. Add a co-located `src/modules/<name>.feature.js` descriptor that wires the stack in `create(ctx)` and declares any `globals`/`provides`/`init` (see the Feature Registry pattern above).
 3. Register it in `renderer.js` with a single `.register(<name>Feature)` call. Order matters only when one feature consumes another's `provides` (register the provider first). Avoid adding manual `new Controller(...)` wiring to `renderer.js`.
-4. For backend functionality: add Tauri commands in `src-tauri/src/commands/` and register in `main.rs`.
+4. For cross-module access, resolve app-wide singletons via the `app` locator (`src/modules/appContext.js`), not `window.*`. For shared mutable state, add an encapsulated module under `src/modules/state/` with `get`/`set` accessors (e.g. `state/currentEndpoint.js`) rather than a global — `window.backendAPI` (the Tauri IPC bridge) is the only sanctioned `window` global.
+5. For backend functionality: add Tauri commands in `src-tauri/src/commands/` and register in `main.rs`.
 
 ## ESLint Rules (Enforced)
 

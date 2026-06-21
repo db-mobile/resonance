@@ -23,7 +23,6 @@ function debouncedSaveRequestModifications(collectionId, endpointId) {
     }
     _saveDebounceTimer = setTimeout(() => {
         _saveDebounceTimer = null;
-        // Fire-and-forget: don't await, just catch errors silently
         saveAllRequestModifications(collectionId, endpointId).catch(() => {
             toast.error('Failed to save changes');
         });
@@ -398,12 +397,10 @@ export function displayResponseWithLineNumbersForTab(content, contentType = null
             if (containerElements.previewManager.isPreviewable(language)) {
                 containerElements.previewManager.refreshPreviewContent(containerElements.tabId, content, language);
             } else {
-                // Clear preview for non-previewable content
                 containerElements.previewManager.clearPreview(containerElements.tabId);
             }
         }
     } else {
-        // Fallback to global editor
         initResponseEditor();
         if (responseEditor) {
             responseEditor.setContent(content, contentType, languageHint);
@@ -416,7 +413,6 @@ export function clearResponseDisplay() {
 }
 
 export function clearResponseDisplayForTab(tabId = null) {
-    // Use per-tab editor if available, otherwise fall back to global editor
     const containerElements = tabId
         ? app.responseContainerManager?.getOrCreateContainer(tabId)
         : app.responseContainerManager?.getActiveElements();
@@ -424,7 +420,6 @@ export function clearResponseDisplayForTab(tabId = null) {
     if (containerElements && containerElements.editor) {
         containerElements.editor.clear();
     } else {
-        // Fallback to global editor
         initResponseEditor();
         if (responseEditor) {
             responseEditor.clear();
@@ -501,14 +496,12 @@ export async function handleCancelRequest() {
 }
 
 export async function handleSendRequest() {
-    // Check if we're in gRPC mode - delegate to gRPC handler
     if (isGrpcMode()) {
         return handleGrpcSend();
     }
 
     if (isWebSocketMode()) {
         if (getCurrentEndpoint()) {
-            // Fire-and-forget: don't block WebSocket connection on save
             debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
         }
 
@@ -621,9 +614,6 @@ export async function handleSendRequest() {
             return;
         }
 
-        // The MQTT connection persists after Send (pub/sub). Disconnecting is done
-        // via the dedicated Disconnect button in the MQTT panel, not the shared
-        // Send/Stop button — so restore the Send button once the connect returns.
         setRequestInProgress(true);
         try {
             await handleMqttSend(broker, {
@@ -654,7 +644,6 @@ export async function handleSendRequest() {
 
     const rawUrl = url;
 
-    // GraphQL is always an HTTP POST under the hood; the method dropdown is hidden.
     const method = isGraphQLMode() ? 'POST' : methodSelect.value;
     let body = undefined;
 
@@ -686,21 +675,17 @@ export async function handleSendRequest() {
         return;
     }
 
-    // Check if mock server should be used for this request
     if (getCurrentEndpoint()) {
         try {
             const mockServerService = getMockServerService();
             const { shouldUseMock, mockBaseUrl } = await mockServerService.shouldUseMockServer(getCurrentEndpoint().collectionId);
             
             if (shouldUseMock && mockBaseUrl) {
-                // Get the endpoint path from the collection
                 const collection = await getCollectionRepository().getById(getCurrentEndpoint().collectionId);
                 
                 if (collection) {
-                    // Find the endpoint in the collection
                     let endpoint = collection.endpoints?.find(e => e.id === getCurrentEndpoint().endpointId);
                     
-                    // Also check folders if not found at top level
                     if (!endpoint && collection.folders) {
                         for (const folder of collection.folders) {
                             endpoint = folder.endpoints?.find(e => e.id === getCurrentEndpoint().endpointId);
@@ -719,7 +704,6 @@ export async function handleSendRequest() {
                 }
             }
         } catch (error) {
-            // Continue with original URL if mock server check fails
         }
     }
 
@@ -760,7 +744,6 @@ export async function handleSendRequest() {
                     variables: parsedVariables
                 };
 
-                // Include operationName so servers can disambiguate multi-operation documents
                 const operationName = graphqlBodyManager.getSelectedOperationName?.();
                 if (operationName) {
                     body.operationName = operationName;
@@ -838,7 +821,6 @@ export async function handleSendRequest() {
         followRedirects
     };
 
-    // Apply a client certificate / custom CA configured for this request's host (mTLS).
     if (app.certificateController) {
         try {
             const clientCert = app.certificateController.getForHost(new URL(url).host);
@@ -885,7 +867,6 @@ export async function handleSendRequest() {
             const cookieHeader = await app.cookieController.getCookieHeader(url);
             if (cookieHeader) {
                 requestConfig.headers = requestConfig.headers || {};
-                // Don't overwrite a manually set Cookie header
                 if (!requestConfig.headers['Cookie'] && !requestConfig.headers['cookie']) {
                     requestConfig.headers['Cookie'] = cookieHeader;
                 }
@@ -917,7 +898,6 @@ export async function handleSendRequest() {
                 displaySchemaValidationResult(validationResult, requestTabId);
             }
 
-            // GraphQL servers return HTTP 200 even on failure; surface any top-level errors
             displayGraphQLErrorsBadge(result, requestTabId);
 
             displayResponsePanes(requestTabId, globalResponseElements(), {
@@ -948,7 +928,7 @@ export async function handleSendRequest() {
                         cookies: extractCookies(result.headers)
                     },
                     isModified: false
-                }).catch(() => { /* fire-and-forget */ });
+                }).catch(() => { });
                 if (app.workspaceTabController.tabBar?.updateTab) {
                     app.workspaceTabController.tabBar.updateTab(requestTabId, { isModified: false });
                 }
@@ -956,7 +936,7 @@ export async function handleSendRequest() {
 
             if (app.historyController) {
                 const _activeEnvName = await app.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
-                app.historyController.addHistoryEntry(requestConfig, result, getCurrentEndpoint(), _activeEnvName).catch(() => { /* fire-and-forget */ });
+                app.historyController.addHistoryEntry(requestConfig, result, getCurrentEndpoint(), _activeEnvName).catch(() => { });
             }
 
             if (getCurrentEndpoint() && app.scriptController) {
@@ -968,7 +948,6 @@ export async function handleSendRequest() {
                         result
                     );
                 } catch (error) {
-                    // Non-blocking
                 }
             }
         } else if (result.cancelled) {
@@ -1029,7 +1008,7 @@ export async function handleSendRequest() {
 
         if (app.historyController) {
             const _activeEnvName = await app.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
-            app.historyController.addHistoryEntry(requestConfig, error, getCurrentEndpoint(), _activeEnvName).catch(() => { /* fire-and-forget */ });
+            app.historyController.addHistoryEntry(requestConfig, error, getCurrentEndpoint(), _activeEnvName).catch(() => { });
         }
 
         if (getCurrentEndpoint() && app.scriptController) {
@@ -1041,7 +1020,6 @@ export async function handleSendRequest() {
                     error
                 );
             } catch (e) {
-                // Non-blocking
             }
         }
     } finally {

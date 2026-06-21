@@ -6,7 +6,6 @@ import {
     getActiveTabId
 } from './streaming/streamSession.js';
 
-// gRPC streaming does not persist its transcript onto the tab (no buildResponseMeta).
 const session = new StreamSession();
 
 function formatMessage(message) {
@@ -117,8 +116,6 @@ export async function startOrSend(opts) {
     const current = session.get(tabId);
     const sameMethod = current?.fullMethod === opts.fullMethod;
 
-    // If a stream that accepts client messages is already open on the same
-    // method, push another message instead of reopening.
     if (opts.canSend && current?.state === 'open' && sameMethod) {
         try {
             await window.backendAPI.grpc.streamSend(tabId, opts.requestJson);
@@ -130,7 +127,6 @@ export async function startOrSend(opts) {
         return;
     }
 
-    // Otherwise, start a fresh stream (this closes any previous stream for the tab)
     session.set(tabId, {
         fullMethod: opts.fullMethod,
         state: 'connecting',
@@ -178,7 +174,6 @@ export async function clearStreamState(tabId) {
         try {
             await window.backendAPI.grpc.streamCancel(tabId);
         } catch (_) {
-            // ignore
         }
     }
     session.remove(tabId);

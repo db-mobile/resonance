@@ -26,10 +26,8 @@ export class EnvironmentManager {
      * Create and display dialog
      */
     async createDialog() {
-        // Reset selection so active environment is selected
         this.currentEnvironmentId = null;
 
-        // Create overlay
         this.dialog = document.createElement('div');
         this.dialog.className = 'environment-manager-overlay modal-overlay';
 
@@ -50,10 +48,8 @@ export class EnvironmentManager {
         this.dialog.appendChild(dialogContent);
         document.body.appendChild(this.dialog);
 
-        // Setup event listeners
         this.setupEventListeners();
 
-        // Load environments
         await this.loadEnvironments();
     }
 
@@ -71,14 +67,12 @@ export class EnvironmentManager {
         importBtn.addEventListener('click', () => this.handleImport());
         exportAllBtn.addEventListener('click', () => this.handleExportAll());
 
-        // Close on overlay click
         this.dialog.addEventListener('click', (e) => {
             if (e.target === this.dialog) {
                 this.close(true);
             }
         });
 
-        // Close on Escape key
         this.escapeHandler = (e) => {
             if (e.key === 'Escape') {
                 this.close(true);
@@ -103,8 +97,6 @@ export class EnvironmentManager {
                 listContainer.appendChild(item);
             });
 
-            // Always select the active environment when loading (unless user already selected something)
-            // This ensures switching environments then opening dialog shows the new active environment
             const envToSelect = activeEnvId || environments[0]?.id;
             if (envToSelect) {
                 await this.selectEnvironment(envToSelect);
@@ -157,13 +149,11 @@ export class EnvironmentManager {
     async selectEnvironment(environmentId) {
         this.currentEnvironmentId = environmentId;
 
-        // Update selection UI
         this.dialog.querySelectorAll('.env-list-item').forEach(item => {
             const isSelected = item.dataset.envId === environmentId;
             item.classList.toggle('is-selected', isSelected);
         });
 
-        // Load environment details
         await this.loadEnvironmentDetails(environmentId);
     }
 
@@ -197,7 +187,6 @@ export class EnvironmentManager {
                 activeBadge.classList.toggle('is-hidden', !isActive);
             }
 
-            // Set environment name directly via .value property to preserve special characters like {{ }}
             const nameInput = detailsContainer.querySelector('#env-name-input');
             if (nameInput) {
                 nameInput.value = environment.name;
@@ -217,10 +206,8 @@ export class EnvironmentManager {
                 clearColorBtn.disabled = !environment.color;
             }
 
-            // Setup detail event listeners
             this.setupDetailEventListeners(environment);
 
-            // Load variables
             this.loadVariables(environment);
         } catch (error) {
             void error;
@@ -241,7 +228,6 @@ export class EnvironmentManager {
         const colorValue = this.dialog.querySelector('#env-color-value');
         const clearColorBtn = this.dialog.querySelector('#env-color-clear-btn');
 
-        // Name change
         if (nameInput) {
             nameInput.addEventListener('blur', async () => {
                 const newName = nameInput.value.trim();
@@ -321,7 +307,6 @@ export class EnvironmentManager {
             });
         }
 
-        // Set active
         if (setActiveBtn) {
             setActiveBtn.addEventListener('click', async () => {
                 try {
@@ -334,7 +319,6 @@ export class EnvironmentManager {
             });
         }
 
-        // Duplicate
         if (duplicateBtn) {
             duplicateBtn.addEventListener('click', async () => {
                 try {
@@ -347,7 +331,6 @@ export class EnvironmentManager {
             });
         }
 
-        // Export
         if (exportBtn) {
             exportBtn.addEventListener('click', async () => {
                 try {
@@ -364,7 +347,6 @@ export class EnvironmentManager {
             });
         }
 
-        // Delete
         if (deleteBtn) {
             deleteBtn.addEventListener('click', async () => {
                 const confirmed = await this.showConfirmDialog(`Are you sure you want to delete the environment "${environment.name}"?`);
@@ -380,7 +362,6 @@ export class EnvironmentManager {
             });
         }
 
-        // Add variable
         if (addVariableBtn) {
             addVariableBtn.addEventListener('click', () => {
                 this.addVariableRow({});
@@ -402,15 +383,12 @@ export class EnvironmentManager {
 
         for (const [name, value] of Object.entries(variables)) {
             const isSecret = secretKeys.includes(name);
-            // Secret values live in the SecretStore, not in the variables map; fetch the
-            // real value for in-editor display (rendered masked behind a reveal toggle).
             const resolvedValue = isSecret
                 ? await this.service.getSecretValue(environment.id, name)
                 : value;
             this.addVariableRow({ name, value: resolvedValue, isSecret }, container);
         }
 
-        // Add empty row for new variable
         this.addVariableRow({}, container);
     }
 
@@ -428,7 +406,6 @@ export class EnvironmentManager {
                 const row = fragment.firstElementChild;
                 container.appendChild(fragment);
 
-                // Set values directly via .value property to preserve special characters like {{ }}
                 const nameInput = row.querySelector('.var-name-input');
                 const valueInput = row.querySelector('.var-value-input');
                 if (nameInput) {nameInput.value = name;}
@@ -436,7 +413,6 @@ export class EnvironmentManager {
 
                 this.applySecretState(row, isSecret);
 
-                // Setup variable row event listeners
                 this.setupVariableRowListeners(row, name);
             })
             .catch((error) => {
@@ -462,7 +438,6 @@ export class EnvironmentManager {
         if (valueInput) {
             valueInput.type = isSecret ? 'password' : 'text';
         }
-        // Reset reveal toggle to hidden whenever secret state changes
         if (revealBtn) {
             const icon = revealBtn.querySelector('.icon');
             if (icon) {
@@ -491,14 +466,12 @@ export class EnvironmentManager {
 
             if (!name) {
                 if (originalName) {
-                    // Delete variable if name is cleared
                     await this.deleteVariable(originalName);
                 }
                 return;
             }
 
             if (name !== originalName && originalName) {
-                // Name changed - delete old and create new
                 await this.deleteVariable(originalName);
             }
 
@@ -516,7 +489,6 @@ export class EnvironmentManager {
             if (e.key === 'Enter') {saveVariable();}
         });
 
-        // Toggle the secret flag; persists immediately when the row has a name
         if (secretBtn) {
             secretBtn.addEventListener('click', async () => {
                 const next = !isSecret();
@@ -528,7 +500,6 @@ export class EnvironmentManager {
             });
         }
 
-        // Reveal/hide a secret value while editing
         if (revealBtn) {
             revealBtn.addEventListener('click', () => {
                 const showing = valueInput.type === 'text';
@@ -619,7 +590,6 @@ export class EnvironmentManager {
                     document.body.appendChild(overlay);
 
                     const input = dialog.querySelector('#input-dialog-input');
-                    // Set value directly via .value property to preserve special characters like {{ }}
                     if (input) {input.value = defaultValue;}
                     const okBtn = dialog.querySelector('#input-dialog-ok');
                     const cancelBtn = dialog.querySelector('#input-dialog-cancel');

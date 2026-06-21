@@ -113,7 +113,6 @@ export class HistoryRenderer {
             this.container.appendChild(el);
         });
 
-        // Attach event listeners to history items
         historyItems.forEach(entry => {
             const element = this.container.querySelector(`[data-history-id="${entry.id}"]`);
             if (element) {

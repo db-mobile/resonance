@@ -12,7 +12,6 @@ export const schemaFeature = {
     name: 'schema',
     create(ctx) {
         const controller = new SchemaController({
-            // collectionRepository is published onto the bus by renderer.js before boot.
             repository: ctx.get('collectionRepository'),
             statusDisplay: ctx.statusDisplay,
         });

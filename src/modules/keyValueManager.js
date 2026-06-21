@@ -2,7 +2,6 @@ import { getCurrentEndpoint } from './state/currentEndpoint.js';
 import { app } from './appContext.js';
 import { pathParamsList, addPathParamBtn, headersList, addHeaderBtn, queryParamsList, addQueryParamBtn, urlInput } from './domElements.js';
 
-// Flag to prevent circular updates between query params and URL
 let isUpdatingUrlFromQueryParams = false;
 
 /**
@@ -87,7 +86,6 @@ export function clearKeyValueList(listContainer) {
  * This allows users to see their variables in the URL preview without encoding
  */
 function encodeValuePreservingPlaceholders(value) {
-    // Find all {{...}} patterns and temporarily replace them with placeholders
     const placeholders = [];
     let index = 0;
 
@@ -98,10 +96,8 @@ function encodeValuePreservingPlaceholders(value) {
         return placeholder;
     });
 
-    // URL encode the value (this encodes special chars but not our placeholders)
     const encoded = encodeURIComponent(withPlaceholders);
 
-    // Restore the original {{...}} patterns
     let result = encoded;
     placeholders.forEach(({ placeholder, original }) => {
         result = result.replace(placeholder, original);
@@ -122,7 +118,6 @@ export function updateUrlFromQueryParams() {
         const questionMarkIndex = urlString.indexOf('?');
         const baseUrl = questionMarkIndex >= 0 ? urlString.substring(0, questionMarkIndex) : urlString;
 
-        // Build query string with encoding that preserves variable placeholders
         const queryPairs = [];
         Object.entries(queryParams).forEach(([key, value]) => {
             if (key) {
@@ -134,10 +129,8 @@ export function updateUrlFromQueryParams() {
 
         const queryString = queryPairs.join('&');
 
-        // Set flag to prevent circular update when URL input event fires
         isUpdatingUrlFromQueryParams = true;
         urlInput.value = queryString ? `${baseUrl}?${queryString}` : baseUrl;
-        // Clear flag after event loop to allow the input event to be skipped
         setTimeout(() => {
             isUpdatingUrlFromQueryParams = false;
         }, 0);
@@ -147,7 +140,6 @@ export function updateUrlFromQueryParams() {
 }
 
 export function updateQueryParamsFromUrl() {
-    // Skip if we're in the middle of updating URL from query params to prevent circular update
     if (isUpdatingUrlFromQueryParams) {
         return;
     }
@@ -177,13 +169,10 @@ export function updateQueryParamsFromUrl() {
             return;
         }
 
-        // Parse query string manually to preserve variable placeholders like {{variableName}}
-        // URLSearchParams doesn't handle unencoded braces correctly
         const pairs = queryString.split('&');
         let hasParams = false;
 
         for (const pair of pairs) {
-            // Skip empty pairs
             if (!pair.trim()) {
                 continue;
             }
@@ -194,14 +183,12 @@ export function updateQueryParamsFromUrl() {
                 const key = pair.substring(0, equalIndex);
                 const value = pair.substring(equalIndex + 1);
 
-                // Decode URL-encoded values but preserve {{...}} patterns
                 const decodedKey = decodeURIComponent(key);
                 const decodedValue = decodeURIComponent(value);
 
                 addKeyValueRow(queryParamsList, decodedKey, decodedValue);
                 hasParams = true;
             } else {
-                // Key without value
                 addKeyValueRow(queryParamsList, decodeURIComponent(pair), '');
                 hasParams = true;
             }

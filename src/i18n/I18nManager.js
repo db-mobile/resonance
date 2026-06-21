@@ -18,13 +18,10 @@ export class I18nManager {
     }
 
     async init() {
-        // Load saved language from storage or default to English
         this.currentLanguage = await this.getSavedLanguage() || 'en';
         
-        // Load the current language translations
         await this.loadLanguage(this.currentLanguage);
         
-        // Apply translations to the UI
         this.updateUI();
     }
 
@@ -61,7 +58,6 @@ export class I18nManager {
             this.currentLanguage = language;
         } catch (error) {
             if (language !== this.fallbackLanguage) {
-                // Fall back to default language
                 await this.loadLanguage(this.fallbackLanguage);
             }
         }
@@ -74,7 +70,6 @@ export class I18nManager {
         await this.saveLanguage(language);
         this.updateUI();
         
-        // Emit language change event
         document.dispatchEvent(new CustomEvent('languageChanged', { 
             detail: { language: this.currentLanguage } 
         }));
@@ -93,7 +88,6 @@ export class I18nManager {
             return key;
         }
         
-        // Replace parameters in the translation
         return this.interpolate(value, params);
     }
 
@@ -102,7 +96,6 @@ export class I18nManager {
     }
 
     updateUI(container = document) {
-        // Update all elements with data-i18n attribute
         const elements = container.querySelectorAll('[data-i18n]');
         elements.forEach(element => {
             const key = element.getAttribute('data-i18n');
@@ -115,7 +108,6 @@ export class I18nManager {
             }
         });
 
-        // Update elements with data-i18n-title attribute (for tooltips)
         const titleElements = container.querySelectorAll('[data-i18n-title]');
         titleElements.forEach(element => {
             const key = element.getAttribute('data-i18n-title');
@@ -124,7 +116,6 @@ export class I18nManager {
             element.title = shortcutHint ? `${title} (${shortcutHint})` : title;
         });
 
-        // Update aria-label attributes
         const ariaElements = container.querySelectorAll('[data-i18n-aria]');
         ariaElements.forEach(element => {
             const key = element.getAttribute('data-i18n-aria');
@@ -141,5 +132,4 @@ export class I18nManager {
     }
 }
 
-// Create global instance
 export const i18n = new I18nManager();

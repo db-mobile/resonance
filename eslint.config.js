@@ -34,6 +34,7 @@ export default [
             'no-console': ['warn', { allow: ['warn', 'error'] }],
             'no-debugger': 'warn',
             'no-duplicate-imports': 'error',
+            'no-empty': ['error', { allowEmptyCatch: true }],
             'no-template-curly-in-string': 'warn',
             'no-unreachable-loop': 'error',
 
@@ -42,7 +43,7 @@ export default [
             'default-case-last': 'error',
             'eqeqeq': ['error', 'always', { null: 'ignore' }],
             'no-else-return': 'warn',
-            'no-empty-function': 'warn',
+            'no-empty-function': ['warn', { allow: ['arrowFunctions', 'functions', 'methods', 'asyncFunctions', 'asyncMethods'] }],
             'no-eval': 'error',
             'no-implied-eval': 'error',
             'no-invalid-this': 'error',

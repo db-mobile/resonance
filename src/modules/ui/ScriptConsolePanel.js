@@ -30,19 +30,16 @@ export class ScriptConsolePanel {
      * @returns {HTMLElement|null} The active container
      */
     _getActiveContainer() {
-        // If container was provided in constructor, use it
         if (this.container) {
             return this.container;
         }
 
-        // Otherwise, get the active workspace tab's container
         const containerElements = app.responseContainerManager?.getActiveElements();
 
         if (containerElements && containerElements.scriptsDisplay) {
             return containerElements.scriptsDisplay;
         }
 
-        // Fallback: find first script console container
         return document.querySelector('.script-console-container');
     }
 
@@ -56,7 +53,6 @@ export class ScriptConsolePanel {
             return;
         }
 
-        // Check if already initialized (has the structure we need)
         if (container.querySelector('.script-console-header')) {
             return;
         }
@@ -70,13 +66,11 @@ export class ScriptConsolePanel {
         container.innerHTML = '';
         container.appendChild(fragment);
 
-        // Setup event listener for clear button
         const clearBtn = container.querySelector('.clear-console-btn');
         if (clearBtn) {
             clearBtn.addEventListener('click', () => this.clear());
         }
 
-        // Initially show empty state
         this._showEmptyStateInContainer(container);
     }
 
@@ -86,13 +80,11 @@ export class ScriptConsolePanel {
      * @param {Array} errors - Array of error messages
      */
     show(logs, errors) {
-        // Always get fresh container reference
         const container = this._getActiveContainer();
         if (!container) {
             return;
         }
 
-        // Ensure container is initialized
         this.initialize();
 
         const content = container.querySelector('.script-console-content');
@@ -102,21 +94,18 @@ export class ScriptConsolePanel {
 
         content.innerHTML = '';
 
-        // Show errors first
         if (errors && errors.length > 0) {
             errors.forEach(error => {
                 this.appendEntry(content, 'error', error, Date.now());
             });
         }
 
-        // Show logs
         if (logs && logs.length > 0) {
             logs.forEach(log => {
                 this.appendEntry(content, log.level, log.message, log.timestamp);
             });
         }
 
-        // If no logs or errors, show empty state
         if ((!logs || logs.length === 0) && (!errors || errors.length === 0)) {
             this.showEmptyState();
         }
@@ -127,13 +116,11 @@ export class ScriptConsolePanel {
      * @param {Object} result - Test execution result
      */
     showTestResults(result) {
-        // Always get fresh container reference (in case of tab switching)
         const container = this._getActiveContainer();
         if (!container) {
             return;
         }
 
-        // Ensure container is initialized
         this.initialize();
 
         const content = container.querySelector('.script-console-content');
@@ -143,12 +130,10 @@ export class ScriptConsolePanel {
 
         content.innerHTML = '';
 
-        // Calculate summary
         const passed = result.testResults.filter(t => t.passed).length;
         const failed = result.testResults.filter(t => !t.passed).length;
         const total = passed + failed;
 
-        // Show summary
         const summaryFragment = templateLoader.cloneSync(
             './src/templates/scripts/scriptConsolePanel.html',
             'tpl-script-console-summary'
@@ -185,7 +170,6 @@ export class ScriptConsolePanel {
 
         content.appendChild(summary);
 
-        // Show test results
         if (result.testResults && result.testResults.length > 0) {
             const testListFragment = templateLoader.cloneSync(
                 './src/templates/scripts/scriptConsolePanel.html',
@@ -216,7 +200,6 @@ export class ScriptConsolePanel {
             content.appendChild(testList);
         }
 
-        // Show console logs if any
         if (result.logs && result.logs.length > 0) {
             const sepFragment = templateLoader.cloneSync(
                 './src/templates/scripts/scriptConsolePanel.html',
@@ -232,7 +215,6 @@ export class ScriptConsolePanel {
             });
         }
 
-        // Show errors if any
         if (result.errors && result.errors.length > 0) {
             const sepFragment = templateLoader.cloneSync(
                 './src/templates/scripts/scriptConsolePanel.html',

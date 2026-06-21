@@ -155,7 +155,6 @@ export function setRequestMode(mode) {
     currentMode = mode;
     updateUIForMode(mode);
     
-    // Update response tabs for the current protocol
     setResponseTabsForProtocol(mode);
 }
 
@@ -172,19 +171,13 @@ function updateUIForMode(mode) {
     const bodyModeContainer = bodyModeSelect?.closest('.body-mode-selector-container');
     const bodyTitle = document.querySelector('#body h3');
     
-    // Get all request config tab buttons
     const tabButtons = document.querySelectorAll('.request-config .tab-nav .tab-button');
 
-    // Switching to any non-GraphQL mode tears down the GraphQL Workbench first. The
-    // teardown re-shows the method dropdown (correct for HTTP), so it must run before
-    // the per-mode layout below — otherwise gRPC/WS/SSE/MQTT hide the method dropdown
-    // and the teardown immediately un-hides it.
     if (mode !== RequestMode.GRAPHQL && app.graphqlBodyManager?.isGraphQLMode?.()) {
         app.graphqlBodyManager.setGraphQLModeEnabled(false);
     }
 
     if (mode === RequestMode.GRPC) {
-        // Hide HTTP-specific URL section elements
         if (methodSelectContainer) {
             methodSelectContainer.style.display = 'none';
         }
@@ -195,14 +188,12 @@ function updateUIForMode(mode) {
             curlBtn.style.display = 'none';
         }
 
-        // Show gRPC target input in URL section
         showGrpcUrlSection(true);
         showWebSocketUrlSection(false);
         showSseUrlSection(false);
         showMqttUrlSection(false);
         showGraphQLUrlSection(false);
 
-        // Update tab visibility - show gRPC tabs, hide HTTP-only tabs
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
             if (HTTP_ONLY_TABS.includes(tabId) || HTTP_AND_WEBSOCKET_TABS.includes(tabId) || HTTP_SHARED_TABS.includes(tabId) || MQTT_ONLY_TABS.includes(tabId)) {
@@ -222,7 +213,6 @@ function updateUIForMode(mode) {
             bodyTitle.textContent = 'Request Body';
         }
         
-        // Activate gRPC tab if current tab is HTTP-only
         const activeTab = document.querySelector('.request-config .tab-nav .tab-button.active');
         if (!activeTab
             || HTTP_ONLY_TABS.includes(activeTab.dataset.tab)
@@ -361,8 +351,6 @@ function updateUIForMode(mode) {
             activateTab('mqtt');
         }
     } else if (mode === RequestMode.GRAPHQL) {
-        // GraphQL is HTTP POST under the hood. The Workbench (activated below) owns the
-        // method dropdown and re-parents the Headers list into its drawer.
         if (methodSelectContainer) {
             methodSelectContainer.style.display = 'none';
         }
@@ -379,19 +367,14 @@ function updateUIForMode(mode) {
         showMqttUrlSection(false);
         showGraphQLUrlSection(true);
 
-        // Activate the Workbench: forces POST, hides method, moves Headers into the
-        // drawer, and shows the graphql body panel.
         if (app.graphqlBodyManager) {
             app.graphqlBodyManager.setGraphQLModeEnabled(true);
         }
 
-        // The body-mode selector is gone for GraphQL (it's a protocol, not a body type).
         if (bodyModeContainer) {
             bodyModeContainer.style.display = 'none';
         }
 
-        // Show Body (the Workbench), Headers, Authorization and Scripts as normal tabs;
-        // hide everything else. Only GraphQL Variables live in the Workbench drawer.
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
             btn.style.display = GRAPHQL_TABS.includes(tabId) ? '' : 'none';
@@ -403,16 +386,12 @@ function updateUIForMode(mode) {
 
         activateTab('body');
     } else {
-        // Show HTTP-specific URL section elements
         if (methodSelectContainer) {
             methodSelectContainer.style.display = '';
         }
         if (urlInputContainer) {
             urlInputContainer.style.display = '';
         }
-        // The URL autocomplete wrapper is created after the first mode switch, so if a
-        // non-HTTP mode hid #url-input directly (before the wrapper existed), showing the
-        // wrapper alone leaves a stale inline display:none on the input. Clear it too.
         if (urlInput && urlInput !== urlInputContainer && urlInput.style.display === 'none') {
             urlInput.style.display = '';
         }
@@ -420,14 +399,12 @@ function updateUIForMode(mode) {
             curlBtn.style.display = '';
         }
 
-        // Hide gRPC target input from URL section
         showGrpcUrlSection(false);
         showWebSocketUrlSection(false);
         showSseUrlSection(false);
         showMqttUrlSection(false);
         showGraphQLUrlSection(false);
 
-        // Update tab visibility - show HTTP tabs, hide gRPC-only tabs
         tabButtons.forEach(btn => {
             const tabId = btn.dataset.tab;
             if (GRPC_ONLY_TABS.includes(tabId) || MQTT_ONLY_TABS.includes(tabId)) {
@@ -450,7 +427,6 @@ function updateUIForMode(mode) {
             bodyTitle.textContent = 'Request Body';
         }
         
-        // Activate path-params tab if current tab is gRPC-only
         const activeTab = document.querySelector('.request-config .tab-nav .tab-button.active');
         if (!activeTab
             || GRPC_ONLY_TABS.includes(activeTab.dataset.tab)
@@ -480,7 +456,6 @@ function showGrpcUrlSection(show) {
     
     if (show) {
         if (!grpcUrlSection) {
-            // Create gRPC URL section if it doesn't exist
             grpcUrlSection = createGrpcUrlSection();
         }
         grpcUrlSection.style.display = 'flex';
@@ -519,22 +494,18 @@ function createGrpcUrlSection() {
         return null;
     }
     
-    // Create container for gRPC URL elements
     const grpcSection = document.createElement('div');
     grpcSection.id = 'grpc-url-section';
     grpcSection.className = 'grpc-url-section';
     grpcSection.style.display = 'none';
     
-    // gRPC badge
     const badge = document.createElement('span');
     badge.className = 'protocol-url-badge protocol-url-badge-grpc';
     badge.textContent = 'gRPC';
     
-    // Target input wrapper
     const targetWrapper = document.createElement('div');
     targetWrapper.className = 'grpc-target-wrapper';
     
-    // Target input (reuse existing or create reference)
     const existingTarget = document.getElementById('grpc-target-input');
     const targetInput = document.createElement('input');
     targetInput.type = 'text';
@@ -543,12 +514,10 @@ function createGrpcUrlSection() {
     targetInput.placeholder = 'localhost:50051';
     targetInput.setAttribute('aria-label', 'gRPC Target');
     
-    // Sync with existing target input
     if (existingTarget) {
         targetInput.value = existingTarget.value;
         targetInput.addEventListener('input', () => {
             existingTarget.value = targetInput.value;
-            // Mark tab as modified when gRPC target changes
             if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
                 app.workspaceTabController.markCurrentTabModified();
             }
@@ -563,7 +532,6 @@ function createGrpcUrlSection() {
     grpcSection.appendChild(badge);
     grpcSection.appendChild(targetWrapper);
     
-    // Insert after method select container
     const methodSelectContainer = document.querySelector('.method-select-container');
     if (methodSelectContainer) {
         methodSelectContainer.after(grpcSection);
@@ -608,7 +576,6 @@ function createWebSocketUrlSection() {
         urlInput.value = existingUrlInput.value;
         urlInput.addEventListener('input', () => {
             existingUrlInput.value = urlInput.value;
-            // Mark tab as modified when WebSocket URL changes
             if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
                 app.workspaceTabController.markCurrentTabModified();
             }
@@ -890,6 +857,5 @@ function activateHttpTab() {
  * Sets up initial state based on current UI
  */
 export function initRequestModeManager() {
-    // Default to HTTP mode
     setRequestMode(RequestMode.HTTP);
 }

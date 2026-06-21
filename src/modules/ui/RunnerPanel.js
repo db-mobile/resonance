@@ -27,7 +27,6 @@ export class RunnerPanel {
     constructor(container) {
         this.container = container;
 
-        // Collection source tree (left) and the selected-requests queue (right)
         this.palette = new CollectionPalette({
             onAddEndpoint: (collection, endpoint) => this.queue.addRequest(collection, endpoint)
         });
@@ -39,22 +38,17 @@ export class RunnerPanel {
                 this.onResolveEndpointDefaults?.(collectionId, endpointId)
         });
 
-        // Saved-runner dropdown — owns the active-runner id
         this.menu = new RunnerSelectorMenu({
             onLoadRunners: () => this.onLoadRunners?.(),
             onSelect: (runnerId) => this.onRunnerSelect?.(runnerId)
         });
 
-        // Results panel (list, detail view, resizer) — owns its own state
         this.resultsView = new RunnerResultsPanel(container);
 
-        // Per-request editor modal (params/headers/body/script) — owns its own DOM
         this.editorModal = new RequestEditorModal();
 
-        // Resolves an endpoint's saved config to seed per-request overrides
         this.onResolveEndpointDefaults = null;
 
-        // Event callbacks
         this.onRequestsChange = null;
         this.onScriptChange = null;
         this.onRunnerSave = null;
@@ -62,7 +56,6 @@ export class RunnerPanel {
         this.onRun = null;
         this.onStop = null;
 
-        // DOM references
         this.dom = {};
     }
 
@@ -133,27 +126,22 @@ export class RunnerPanel {
      * @private
      */
     _attachEventListeners() {
-        // New runner button
         this.container.querySelector('[data-action="new-runner"]')?.addEventListener('click', () => {
             this.startNewRunner();
         });
 
-        // Save runner button
         this.container.querySelector('[data-action="save-runner"]')?.addEventListener('click', () => {
             this._handleSave();
         });
 
-        // Delete runner button
         this.container.querySelector('[data-action="delete-runner"]')?.addEventListener('click', () => {
             this._handleDelete();
         });
 
-        // Clear all button
         this.container.querySelector('[data-action="clear-all"]')?.addEventListener('click', () => {
             this.queue.clearAll();
         });
 
-        // Run/Stop buttons
         this.dom.runButton?.addEventListener('click', () => {
             this._handleRun();
         });
@@ -236,7 +224,6 @@ export class RunnerPanel {
      */
     _handleDelete() {
         if (!this.currentRunnerId) {
-            // No saved runner to delete
             return;
         }
 
@@ -257,7 +244,6 @@ export class RunnerPanel {
 
         this._setRunningState(true);
 
-        // Show results panel at bottom
         this.showResultsPanel();
 
         if (this.onRun) {
@@ -326,7 +312,6 @@ export class RunnerPanel {
 
         this.queue.setRequests(runner.requests);
     }
-
 
     /**
      * Shows execution results and restores the idle (not-running) button state.

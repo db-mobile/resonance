@@ -39,11 +39,9 @@ export class PreviewRepository {
      */
     setPreviewMode(tabId, isPreviewMode) {
         try {
-            // Get existing modes and create a clean plain object
             const existingModes = this.backendAPI.store.get(this.storageKey);
             const modes = {};
 
-            // Copy existing modes (only plain values)
             if (existingModes && typeof existingModes === 'object') {
                 Object.keys(existingModes).forEach(key => {
                     if (typeof existingModes[key] === 'boolean') {
@@ -52,10 +50,8 @@ export class PreviewRepository {
                 });
             }
 
-            // Set new mode
             modes[tabId] = Boolean(isPreviewMode);
 
-            // Save clean object
             this.backendAPI.store.set(this.storageKey, modes);
         } catch (error) {
             void error;
@@ -71,7 +67,6 @@ export class PreviewRepository {
             const existingModes = this.backendAPI.store.get(this.storageKey);
             const modes = {};
 
-            // Copy existing modes except the one to remove
             if (existingModes && typeof existingModes === 'object') {
                 Object.keys(existingModes).forEach(key => {
                     if (key !== tabId && typeof existingModes[key] === 'boolean') {

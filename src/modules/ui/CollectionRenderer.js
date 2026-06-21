@@ -406,7 +406,6 @@ export class CollectionRenderer {
 
         const pathSpan = document.createElement('span');
         pathSpan.className = 'endpoint-path';
-        // Show the request name instead of the URL path
         const displayName = endpoint.name || endpoint.path.replace(/^\{\{baseUrl\}\}/, '').split('?')[0] || 'Unnamed Request';
         pathSpan.textContent = displayName;
 

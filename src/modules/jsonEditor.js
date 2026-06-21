@@ -78,7 +78,6 @@ export class JSONEditor {
             json(),
             placeholder('{"userId": 123, "limit": 10}'),
             EditorView.updateListener.of((update) => {
-                // Call change callback if content changed
                 if (update.docChanged && this.changeCallback) {
                     this.changeCallback(this.getContent());
                 }

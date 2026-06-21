@@ -45,21 +45,18 @@ function showCopyFeedback(button, success) {
  * @param {string} tabId - The workspace tab ID
  */
 export async function handleCopyResponse(button, tabId) {
-    // Get the response container manager from the window
     const { responseContainerManager } = window;
     if (!responseContainerManager) {
         showCopyFeedback(button, false);
         return;
     }
 
-    // Get the container elements for this tab
     const containerElements = responseContainerManager.getOrCreateContainer(tabId);
     if (!containerElements) {
         showCopyFeedback(button, false);
         return;
     }
 
-    // Get the response body content from the editor
     const { editor } = containerElements;
     let textToCopy = '';
     if (editor) {
@@ -138,6 +135,4 @@ export function attachHeadersCopyHandler(button, tabId) {
  * Initialize copy functionality (legacy support)
  */
 export function initializeCopyHandler() {
-    // This function is kept for backwards compatibility
-    // The new approach uses attachCopyHandler() for per-tab buttons
 }

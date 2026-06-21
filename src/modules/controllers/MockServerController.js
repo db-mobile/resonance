@@ -34,7 +34,6 @@ export class MockServerController {
      * @returns {Promise<void>}
      */
     async initialize() {
-        // Register service listeners for UI synchronization
         this.service.addChangeListener((event) => {
             this._handleServiceEvent(event);
         });
@@ -47,8 +46,6 @@ export class MockServerController {
      * @param {Object} event - Service event object
      */
     _handleServiceEvent(_event) {
-        // This can be extended to handle specific events
-        // For now, events are primarily for dialog updates
     }
 
     /**
@@ -59,7 +56,6 @@ export class MockServerController {
      */
     async handleStart() {
         try {
-            // Get all collections
             const collections = await this.collectionRepository.getAll();
 
             if (collections.length === 0) {
@@ -69,7 +65,6 @@ export class MockServerController {
                 };
             }
 
-            // Start server via service
             return await this.service.startServer(collections);
         } catch (error) {
             return {
@@ -212,7 +207,6 @@ export class MockServerController {
      */
     async handleSetCustomResponse(collectionId, endpointId, response) {
         try {
-            // Validate JSON if response is a string
             if (typeof response === 'string' && response.trim()) {
                 try {
                     response = JSON.parse(response);
@@ -335,7 +329,6 @@ export class MockServerController {
      */
     async handleSetCustomStatusCode(collectionId, endpointId, statusCode) {
         try {
-            // Validate status code if not null
             if (statusCode !== null) {
                 const errors = this.service.validateStatusCode(statusCode);
                 if (errors.length > 0) {

@@ -51,8 +51,8 @@ export class ResponseEditor {
             doc: '',
             extensions: [
                 lineNumbers(),
-                EditorView.editable.of(false), // Read-only
-                EditorView.contentAttributes.of({ tabindex: '0' }), // Make focusable for keyboard events
+                EditorView.editable.of(false),
+                EditorView.contentAttributes.of({ tabindex: '0' }),
                 EditorView.lineWrapping,
                 ...this.getThemeExtensions(),
                 ...this.getSearchExtensions()
@@ -76,14 +76,12 @@ export class ResponseEditor {
 
         const lowerContentType = contentType.toLowerCase();
 
-        // JSON types
         if (lowerContentType.includes('application/json') ||
             lowerContentType.includes('application/ld+json') ||
             lowerContentType.includes('application/vnd.api+json')) {
             return { extension: json(), type: 'json' };
         }
 
-        // XML types
         if (lowerContentType.includes('application/xml') ||
             lowerContentType.includes('text/xml') ||
             lowerContentType.includes('application/rss+xml') ||
@@ -91,13 +89,11 @@ export class ResponseEditor {
             return { extension: xml(), type: 'xml' };
         }
 
-        // HTML types
         if (lowerContentType.includes('text/html') ||
             lowerContentType.includes('application/xhtml+xml')) {
             return { extension: html(), type: 'html' };
         }
 
-        // Plain text
         if (lowerContentType.includes('text/plain')) {
             return { type: 'text' };
         }
@@ -113,19 +109,15 @@ export class ResponseEditor {
     detectLanguage(content) {
         const trimmed = content.trim();
 
-        // Try to detect JSON
         if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
             try {
                 JSON.parse(trimmed);
                 return { extension: json(), type: 'json' };
             } catch {
-                // Not valid JSON
             }
         }
 
-        // Detect XML
         if (trimmed.startsWith('<?xml') || trimmed.match(/^<[^>]+>/)) {
-            // Check if it's HTML
             if (trimmed.toLowerCase().includes('<!doctype html') ||
                 trimmed.toLowerCase().includes('<html')) {
                 return { extension: html(), type: 'html' };
@@ -133,7 +125,6 @@ export class ResponseEditor {
             return { extension: xml(), type: 'xml' };
         }
 
-        // Default to no highlighting
         return null;
     }
 
@@ -181,17 +172,15 @@ export class ResponseEditor {
      * @private
      */
     _updateEditorWithLanguage(content, languageType) {
-        // Build extensions array
         const extensions = [
             lineNumbers(),
             EditorView.editable.of(false),
-            EditorView.contentAttributes.of({ tabindex: '0' }), // Make focusable for keyboard events
+            EditorView.contentAttributes.of({ tabindex: '0' }),
             EditorView.lineWrapping,
             ...this.getThemeExtensions(),
             ...this.getSearchExtensions()
         ];
 
-        // Add language extension if specified
         if (languageType && languageType !== 'text') {
             const language = this.getLanguageExtension(languageType);
             if (language) {
@@ -201,13 +190,11 @@ export class ResponseEditor {
 
         this.currentLanguage = languageType;
 
-        // Update the editor state
         this.view.setState(EditorState.create({
             doc: content,
             extensions
         }));
 
-        // Notify callback if registered
         if (this.languageChangeCallback) {
             this.languageChangeCallback(languageType);
         }
@@ -224,27 +211,21 @@ export class ResponseEditor {
     setContent(content, contentType = null, languageHint = undefined) {
         this.currentContentType = contentType;
 
-        // If manual override is set, use it
         if (this.manualLanguageOverride !== null) {
             this._updateEditorWithLanguage(content, this.manualLanguageOverride);
             return;
         }
 
-        // A caller-supplied hint short-circuits detection. The response display
-        // path already knows the body is JSON (it just serialized it), so this
-        // skips the redundant JSON.parse that content-based detection would do.
         if (languageHint !== undefined && languageHint !== null) {
             this._updateEditorWithLanguage(content, languageHint);
             return;
         }
 
-        // Try to detect from content-type first
         let detectedLanguage = null;
         if (contentType) {
             detectedLanguage = this.detectLanguageFromContentType(contentType);
         }
 
-        // Fall back to content-based detection if no content-type or not recognized
         if (!detectedLanguage) {
             detectedLanguage = this.detectLanguage(content);
         }

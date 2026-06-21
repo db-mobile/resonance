@@ -199,19 +199,16 @@ export class RequestQueue {
             nameEl.textContent = request.name;
         }
 
-        // Edit script button
         el.querySelector('[data-action="edit-script"]')?.addEventListener('click', (e) => {
             e.stopPropagation();
             this._select(index);
         });
 
-        // Remove button
         el.querySelector('[data-action="remove"]')?.addEventListener('click', (e) => {
             e.stopPropagation();
             this._remove(index);
         });
 
-        // Click to select
         el.addEventListener('click', () => {
             this._select(index);
         });

@@ -70,10 +70,8 @@ export class ScriptService {
         }
 
         try {
-            // Get active environment variables
             const environmentVariables = await this.environmentService.getActiveEnvironmentVariables();
 
-            // Prepare script execution data
             const scriptData = {
                 script,
                 request: {
@@ -87,15 +85,12 @@ export class ScriptService {
                 environment: environmentVariables || {}
             };
 
-            // Execute script via IPC
             const result = await window.backendAPI.scripts.executePreRequest(scriptData);
 
-            // Apply environment changes if any
             if (result.modifiedEnvironment && Object.keys(result.modifiedEnvironment).length > 0) {
                 await this._applyEnvironmentChanges(result.modifiedEnvironment);
             }
 
-            // Return modified request and result
             return {
                 modifiedRequest: result.modifiedRequest || requestConfig,
                 result
@@ -132,7 +127,6 @@ export class ScriptService {
         }
 
         try {
-            // Get active environment variables
             const environmentVariables = await this.environmentService.getActiveEnvironmentVariables();
 
             const status = response?.status ?? response?.statusCode ?? response?.status_code ?? null;
@@ -142,7 +136,6 @@ export class ScriptService {
             const timings = response?.timings || {};
             const cookies = response?.cookies || [];
 
-            // Prepare script execution data
             const scriptData = {
                 script,
                 request: {
@@ -164,10 +157,8 @@ export class ScriptService {
                 environment: environmentVariables || {}
             };
 
-            // Execute script via IPC
             const result = await window.backendAPI.scripts.executeTest(scriptData);
 
-            // Apply environment changes if any
             if (result.modifiedEnvironment && Object.keys(result.modifiedEnvironment).length > 0) {
                 await this._applyEnvironmentChanges(result.modifiedEnvironment);
             }
@@ -197,19 +188,15 @@ export class ScriptService {
                 return;
             }
 
-            // Apply each change
             for (const [key, value] of Object.entries(changes)) {
                 if (value === null) {
-                    // Delete variable
                     await this.environmentService.deleteVariable(activeEnv.id, key);
                 } else {
-                    // Set variable
                     await this.environmentService.setVariable(activeEnv.id, key, value);
                 }
             }
 
         } catch (error) {
-            // Non-fatal - log and continue
         }
     }
 
@@ -224,8 +211,6 @@ export class ScriptService {
         }
 
         try {
-            // Basic syntax check using Function constructor
-            // This doesn't execute the script, just checks syntax
             new Function(script);
             return { valid: true, error: null };
         } catch (error) {

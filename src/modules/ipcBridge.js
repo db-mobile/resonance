@@ -6,15 +6,11 @@
  * Automatically detects the runtime environment and routes IPC calls accordingly.
  */
 
-// Detect runtime environment
-// In Tauri, __TAURI_INTERNALS__ is injected by the runtime
 const isTauri = '__TAURI_INTERNALS__' in window;
-
 
 let api;
 
 if (isTauri) {
-    // Tauri runtime - use the injected __TAURI_INTERNALS__.invoke
     
     const { invoke } = window.__TAURI_INTERNALS__;
     
@@ -69,14 +65,12 @@ if (isTauri) {
             set: (key, value) => invoke('store_set', { key, value })
         },
         secrets: {
-            // OS keychain (encryption at rest); account is an opaque `<scope>|<key>` string
             keychainAvailable: () => invoke('secret_keychain_available'),
             get: (account) => invoke('secret_get', { account }),
             set: (account, value) => invoke('secret_set', { account, value }),
             delete: (account) => invoke('secret_delete', { account })
         },
         collections: {
-            // File-based collection storage
             list: () => invoke('collections_list'),
             getAll: () => invoke('collections_get_all'),
             get: (collectionId) => invoke('collection_get', { collectionId }),
@@ -92,7 +86,6 @@ if (isTauri) {
             getPath: () => invoke('collections_get_path'),
             pickDirectory: () => invoke('collections_pick_directory'),
             pickImportFile: (importKind) => invoke('collections_pick_import_file', { importKind }),
-            // Import/Export
             importOpenApiFile: (filePath = null, storageParentPath = null) => invoke('import_openapi_file', { filePath, storageParentPath }),
             importPostmanCollection: (filePath = null, storageParentPath = null) => invoke('import_postman_collection', { filePath, storageParentPath }),
             importPostmanEnvironment: () => invoke('import_postman_environment'),
@@ -110,14 +103,12 @@ if (isTauri) {
             listMethods: (target, serviceName, useTls = false) => invoke('grpc_reflection_list_methods', { target, serviceName, useTls }),
             invokeUnary: (request) => invoke('grpc_invoke_unary', { request }),
             getInputSkeleton: (target, fullMethod, useTls = false) => invoke('grpc_get_input_skeleton', { target, fullMethod, useTls }),
-            // Proto file support
             selectProtoFile: () => invoke('grpc_select_proto_file'),
             parseProtoFile: (protoPath, includePaths = null) => invoke('grpc_parse_proto_file', { protoPath, includePaths }),
             protoGetInputSkeleton: (protoPath, fullMethod) => invoke('grpc_proto_get_input_skeleton', { protoPath, fullMethod }),
             protoInvokeUnary: (protoPath, request) => invoke('grpc_proto_invoke_unary', { protoPath, request }),
             listLoadedProtos: () => invoke('grpc_list_loaded_protos'),
             unloadProto: (protoPath) => invoke('grpc_unload_proto', { protoPath }),
-            // Streaming (server-streaming + bidirectional)
             streamStart: (request) => invoke('grpc_stream_start', { request }),
             streamSend: (tabId, messageJson) => invoke('grpc_stream_send', { tabId, messageJson }),
             streamCancel: (tabId) => invoke('grpc_stream_cancel', { tabId })
@@ -166,8 +157,6 @@ if (isTauri) {
     window.backendAPI = api;
 } else if (window.backendAPI) {
     api = window.backendAPI;
-} else {
-    // No API available - this shouldn't happen in normal operation
 }
 
 export default api;

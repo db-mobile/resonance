@@ -48,7 +48,6 @@ export class MockServerDialog {
      * @async
      */
     async createDialog() {
-        // Create overlay
         this.dialog = document.createElement('div');
         this.dialog.className = 'mock-server-overlay modal-overlay';
 
@@ -111,13 +110,10 @@ export class MockServerDialog {
         this.dialog.appendChild(dialogContent);
         document.body.appendChild(this.dialog);
 
-        // Setup event listeners
         this.setupEventListeners();
 
-        // Load initial state
         await this.loadInitialState();
 
-        // Start polling
         this.startStatusPolling();
         this.startLogsPolling();
     }
@@ -132,29 +128,23 @@ export class MockServerDialog {
         const closeBtn = this.dialog.querySelector('#mock-server-close-btn');
         const closeBtn2 = this.dialog.querySelector('#mock-server-close-btn-2');
 
-        // Toggle server
         toggleBtn.addEventListener('click', () => this.handleToggleServer());
 
-        // Port change
         portInput.addEventListener('change', async (e) => {
             await this.handlePortChange(e.target.value);
         });
 
-        // Clear logs
         clearLogsBtn.addEventListener('click', () => this.handleClearLogs());
 
-        // Close buttons
         closeBtn.addEventListener('click', () => this.close());
         closeBtn2.addEventListener('click', () => this.close());
 
-        // Close on overlay click
         this.dialog.addEventListener('click', (e) => {
             if (e.target === this.dialog) {
                 this.close();
             }
         });
 
-        // Close on Escape key
         this.escapeHandler = (e) => {
             if (e.key === 'Escape') {
                 this.close();
@@ -176,14 +166,11 @@ export class MockServerDialog {
                 this.controller.getStatus()
             ]);
 
-            // Update port input
             const portInput = this.dialog.querySelector('#mock-server-port-input');
             portInput.value = settings.port;
 
-            // Render collections
             await this.renderCollections(collections, settings);
 
-            // Update status
             await this.updateStatusDisplay(status);
         } catch (error) {
             void error;
@@ -239,7 +226,6 @@ export class MockServerDialog {
             const collectionDiv = document.createElement('div');
             collectionDiv.className = 'mock-server-collection';
 
-            // Collection header with toggle switch
             const headerDiv = document.createElement('div');
             headerDiv.className = 'mock-server-collection-header u-flex u-items-center u-gap-2';
             headerDiv.classList.toggle('has-endpoints', Boolean(isEnabled && httpEndpoints.length > 0));
@@ -269,12 +255,10 @@ export class MockServerDialog {
             headerDiv.appendChild(toggleLabel);
             collectionDiv.appendChild(headerDiv);
 
-            // Endpoints list (only show if enabled)
             if (isEnabled && httpEndpoints.length > 0) {
                 const endpointsDiv = document.createElement('div');
                 endpointsDiv.className = 'mock-server-endpoints';
 
-                // Determine how many endpoints to show (10 by default, or all if expanded)
                 const endpointsToShow = collection._showAllEndpoints ? httpEndpoints : httpEndpoints.slice(0, 10);
 
                 for (const endpoint of endpointsToShow) {
@@ -379,7 +363,6 @@ export class MockServerDialog {
                 this.showAlert(result.message);
             }
 
-            // Update status immediately
             await this.updateStatus();
 
             toggleBtn.disabled = false;
@@ -400,7 +383,6 @@ export class MockServerDialog {
             const result = await this.controller.handleUpdatePort(port);
             if (!result.success) {
                 this.showAlert(result.message);
-                // Revert to previous value
                 const settings = await this.controller.getSettings();
                 const portInput = this.dialog.querySelector('#mock-server-port-input');
                 portInput.value = settings.port;
@@ -421,7 +403,6 @@ export class MockServerDialog {
             const result = await this.controller.handleToggleCollection(collectionId);
 
             if (result.success) {
-                // Reload collections to show/hide endpoints
                 const [settings, collections] = await Promise.all([
                     this.controller.getSettings(),
                     this.controller.getCollections()
@@ -676,20 +657,16 @@ export class MockServerDialog {
     async showResponseEditor(collection, endpoint) {
         const t = (key, fallback) => app.i18n ? app.i18n.t(key) || fallback : fallback;
 
-        // Get custom response or default
         const customResponse = await this.controller.getCustomResponse(collection.id, endpoint.id);
         const hasCustomResponse = customResponse !== null;
 
-        // Get current delay
         const settings = await this.controller.getSettings();
         const delayKey = `${collection.id}_${endpoint.id}`;
         const currentDelay = settings.endpointDelays[delayKey] || 0;
 
-        // Get current status code
         const customStatusCode = await this.controller.getCustomStatusCode(collection.id, endpoint.id);
         const currentStatusCode = customStatusCode || this.getDefaultStatusCode(endpoint);
 
-        // Generate default response from schema via controller (supports $ref resolution)
         const defaultResponse =
             (await this.controller.getDefaultResponse(collection.id, endpoint.id)) ??
             this.generateDefaultResponse(endpoint);
@@ -785,7 +762,6 @@ export class MockServerDialog {
             document.body.removeChild(overlay);
         };
 
-        // Validate JSON on input
         textarea.addEventListener('input', () => {
             try {
                 JSON.parse(textarea.value);
@@ -797,33 +773,28 @@ export class MockServerDialog {
             }
         });
 
-        // Save custom response, delay, and status code
         saveBtn.addEventListener('click', async () => {
             try {
                 const response = JSON.parse(textarea.value);
                 const delay = parseInt(delayInput.value, 10);
                 const statusCode = parseInt(statusCodeInput.value, 10);
 
-                // Validate delay
                 if (delay < 0 || delay > 30000) {
                     errorDiv.textContent = 'Delay must be between 0 and 30000ms';
                     return;
                 }
 
-                // Validate status code
                 if (statusCode < 100 || statusCode > 599) {
                     errorDiv.textContent = 'Status code must be between 100 and 599';
                     return;
                 }
 
-                // Save all three settings sequentially to avoid race condition
                 const delayResult = await this.controller.handleSetDelay(collection.id, endpoint.id, delay);
                 const statusCodeResult = await this.controller.handleSetCustomStatusCode(collection.id, endpoint.id, statusCode);
                 const responseResult = await this.controller.handleSetCustomResponse(collection.id, endpoint.id, response);
 
                 if (responseResult.success && delayResult.success && statusCodeResult.success) {
                     cleanup();
-                    // Refresh the collections display
                     const [updatedSettings, collections] = await Promise.all([
                         this.controller.getSettings(),
                         this.controller.getCollections()
@@ -837,7 +808,6 @@ export class MockServerDialog {
             }
         });
 
-        // Reset to default (response, delay, and status code)
         resetBtn.addEventListener('click', async () => {
             const delayResult = await this.controller.handleSetDelay(collection.id, endpoint.id, 0);
             const statusCodeResult = await this.controller.handleSetCustomStatusCode(collection.id, endpoint.id, null);
@@ -852,7 +822,6 @@ export class MockServerDialog {
             }
         });
 
-        // Close handlers
         const closeHandler = () => cleanup();
         cancelBtn.addEventListener('click', closeHandler);
         _closeBtn.addEventListener('click', closeHandler);
@@ -862,7 +831,6 @@ export class MockServerDialog {
             }
         });
 
-        // Escape key
         const escapeHandler = (e) => {
             if (e.key === 'Escape') {
                 closeHandler();
@@ -918,19 +886,18 @@ export class MockServerDialog {
     getDefaultStatusCode(endpoint) {
         const method = endpoint.method.toUpperCase();
 
-        // Return appropriate default based on HTTP method
         switch (method) {
             case 'POST':
-                return 201; // Created
+                return 201;
             case 'DELETE':
-                return 204; // No Content
+                return 204;
             case 'GET':
             case 'PUT':
             case 'PATCH':
             case 'HEAD':
             case 'OPTIONS':
             default:
-                return 200; // OK
+                return 200;
         }
     }
 
@@ -938,7 +905,6 @@ export class MockServerDialog {
      * Closes the dialog
      */
     close() {
-        // Stop polling
         if (this.statusPoller) {
             clearInterval(this.statusPoller);
             this.statusPoller = null;
@@ -949,19 +915,16 @@ export class MockServerDialog {
             this.logsPoller = null;
         }
 
-        // Remove escape handler
         if (this.escapeHandler) {
             document.removeEventListener('keydown', this.escapeHandler);
             this.escapeHandler = null;
         }
 
-        // Remove dialog from DOM
         if (this.dialog) {
             document.body.removeChild(this.dialog);
             this.dialog = null;
         }
 
-        // Resolve promise
         if (this.resolve) {
             this.resolve(true);
             this.resolve = null;

@@ -46,8 +46,6 @@ export const workspaceTabFeature = {
         const service = new WorkspaceTabService(repository, ctx.statusDisplay);
         const tabBar = new WorkspaceTabBar('workspace-tab-bar-container');
 
-        // `statusDisplay` here is the response status DOM element (from domElements), distinct
-        // from ctx.statusDisplay (the status-display adapter used by the service above).
         const stateManager = new WorkspaceTabStateManager({
             urlInput,
             methodSelect,
@@ -80,6 +78,4 @@ export const workspaceTabFeature = {
         workspaceTabController: 'controller',
         responseContainerManager: 'responseContainerManager',
     },
-    // No init hook: controller.initialize() restores tab state and must run AFTER the lazy
-    // body editors are created, so it stays at that exact call site in renderer.js.
 };

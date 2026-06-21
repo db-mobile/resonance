@@ -76,14 +76,12 @@ export class EnvironmentSelector {
             this.toggleDropdown();
         });
 
-        // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
             if (this.isOpen && !this.container.contains(e.target)) {
                 this.closeDropdown();
             }
         });
 
-        // Close dropdown on escape
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.isOpen) {
                 this.closeDropdown();
@@ -112,7 +110,6 @@ export class EnvironmentSelector {
 
             this.dropdown.innerHTML = '';
 
-            // Add environments
             environments.forEach(env => {
                 const fragment = templateLoader.cloneSync(
                     './src/templates/environment/environmentSelector.html',
@@ -146,7 +143,6 @@ export class EnvironmentSelector {
                 this.dropdown.appendChild(item);
             });
 
-            // Add separator
             {
                 const separatorFragment = templateLoader.cloneSync(
                     './src/templates/environment/environmentSelector.html',
@@ -155,7 +151,6 @@ export class EnvironmentSelector {
                 this.dropdown.appendChild(separatorFragment);
             }
 
-            // Add manage button
             const manageFragment = templateLoader.cloneSync(
                 './src/templates/environment/environmentSelector.html',
                 'tpl-env-manage-item'
@@ -172,11 +167,9 @@ export class EnvironmentSelector {
 
             this.dropdown.appendChild(manageItem);
 
-            // Show dropdown
             this.dropdown.classList.remove('is-hidden');
             this.isOpen = true;
 
-            // Position dropdown
             this.positionDropdown();
         } catch (error) {
             void error;
@@ -239,7 +232,6 @@ export class EnvironmentSelector {
             await this.openDropdown();
         }
 
-        // Refresh active environment display
         try {
             const activeEnvironment = await this.service.getActiveEnvironment();
             if (activeEnvironment) {

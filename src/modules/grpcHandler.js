@@ -24,10 +24,8 @@ import { startOrSend as grpcStreamStartOrSend } from './grpcStreamHandler.js';
 
 let lastTarget = null;
 let methodsCache = new Map();
-// Maps fullMethod -> { clientStreaming, serverStreaming } for the currently displayed service
 const methodFlagsCache = new Map();
 
-// Proto file mode state
 let protoFileMode = false;
 let loadedProtoPath = null;
 let loadedProtoInfo = null;
@@ -218,13 +216,11 @@ async function onServiceChange() {
         return;
     }
 
-    // In proto file mode, use cached methods
     if (protoFileMode && methodsCache.has(serviceName)) {
         populateMethodOptions(methodsCache.get(serviceName));
         return;
     }
 
-    // In reflection mode, fetch methods from server
     const target = grpcTargetInput?.value?.trim();
     if (!target) {
         return;
@@ -286,7 +282,6 @@ export async function handleGrpcSend() {
 
         let result;
         if (protoFileMode && loadedProtoPath) {
-            // Use proto file mode
             result = await window.backendAPI.grpc.protoInvokeUnary(loadedProtoPath, {
                 target,
                 fullMethod,
@@ -296,7 +291,6 @@ export async function handleGrpcSend() {
                 tls: { useTls, skipVerify: false }
             });
         } else {
-            // Use reflection mode
             result = await window.backendAPI.grpc.invokeUnary({
                 target,
                 fullMethod,
@@ -310,15 +304,12 @@ export async function handleGrpcSend() {
         const formatted = typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2);
         displayResponseWithLineNumbersForTab(formatted, 'application/json', null);
 
-        // Populate metadata and trailers displays
         const containerElements = app.responseContainerManager?.getActiveElements();
         if (containerElements) {
-            // Display response metadata (headers)
             if (containerElements.metadataDisplay) {
                 const metadataStr = result.headers ? JSON.stringify(result.headers, null, 2) : '{}';
                 containerElements.metadataDisplay.textContent = metadataStr || 'No metadata.';
             }
-            // Display trailers
             if (containerElements.trailersDisplay) {
                 const trailersStr = result.trailers ? JSON.stringify(result.trailers, null, 2) : '{}';
                 containerElements.trailersDisplay.textContent = trailersStr || 'No trailers.';
@@ -358,16 +349,13 @@ export async function loadProtoFile(protoPath, includePaths = null) {
         protoFileMode = true;
         methodsCache = new Map();
 
-        // Populate service select
         clearSelect(grpcServiceSelect);
         protoInfo.services.forEach(svc => addOption(grpcServiceSelect, svc.fullName, svc.name));
 
         if (protoInfo.services.length > 0) {
-            // Populate methods for first service
             const firstService = protoInfo.services[0];
             populateMethodOptions(firstService.methods);
 
-            // Cache methods for all services
             protoInfo.services.forEach(svc => {
                 methodsCache.set(svc.fullName, svc.methods);
             });
@@ -389,7 +377,7 @@ export async function loadProtoFile(protoPath, includePaths = null) {
  */
 export function clearProtoFile() {
     if (loadedProtoPath) {
-        window.backendAPI.grpc.unloadProto(loadedProtoPath).catch(() => { /* ignore unload errors */ });
+        window.backendAPI.grpc.unloadProto(loadedProtoPath).catch(() => { });
     }
     protoFileMode = false;
     loadedProtoPath = null;
@@ -431,8 +419,6 @@ export function initGrpcUI() {
     grpcConnectBtn.addEventListener('click', onConnect);
     grpcServiceSelect.addEventListener('change', onServiceChange);
     
-    // Note: grpcSendBtn is deprecated - use main Send Request button instead
-    // Keep listener for backwards compatibility but it will be hidden
     if (grpcSendBtn) {
         grpcSendBtn.addEventListener('click', handleGrpcSend);
     }
@@ -445,7 +431,6 @@ export function initGrpcUI() {
         grpcGenerateSkeletonBtn.addEventListener('click', onGenerateSkeleton);
     }
 
-    // Proto file buttons
     if (grpcLoadProtoBtn) {
         grpcLoadProtoBtn.addEventListener('click', onLoadProtoFile);
     }
@@ -454,7 +439,6 @@ export function initGrpcUI() {
         grpcClearProtoBtn.addEventListener('click', onClearProtoFile);
     }
 
-    // Mark tab as modified when TLS checkbox is toggled
     if (grpcTlsCheckbox) {
         grpcTlsCheckbox.addEventListener('change', () => {
             if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
@@ -463,7 +447,6 @@ export function initGrpcUI() {
         });
     }
 
-    // Mark tab as modified when gRPC target input changes
     if (grpcTargetInput) {
         grpcTargetInput.addEventListener('input', () => {
             if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
@@ -475,7 +458,6 @@ export function initGrpcUI() {
         }
     }
 
-    // Mark tab as modified when service or method selection changes
     if (grpcServiceSelect) {
         grpcServiceSelect.addEventListener('change', () => {
             if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
@@ -493,7 +475,6 @@ export function initGrpcUI() {
         });
     }
 
-    // Mark tab as modified when metadata changes
     const grpcMetadataList = document.getElementById('grpc-metadata-list');
     if (grpcMetadataList) {
         grpcMetadataList.addEventListener('input', (event) => {
@@ -518,10 +499,8 @@ async function onGenerateSkeleton() {
         
         let skeleton;
         if (protoFileMode && loadedProtoPath) {
-            // Use proto file mode
             skeleton = await window.backendAPI.grpc.protoGetInputSkeleton(loadedProtoPath, fullMethod);
         } else {
-            // Use reflection mode
             const target = grpcTargetInput?.value?.trim();
             if (!target) {
                 updateStatusDisplay('Enter a target first', null);
@@ -549,16 +528,14 @@ async function onGenerateSkeleton() {
 
 async function onLoadProtoFile() {
     try {
-        // Use Tauri file dialog to select a proto file
         const protoPath = await window.backendAPI.grpc.selectProtoFile();
 
         if (!protoPath) {
-            return; // User cancelled
+            return;
         }
 
         await loadProtoFile(protoPath);
         
-        // Update UI to show loaded state
         updateProtoUI(true, protoPath);
     } catch (error) {
         updateStatusDisplay(`Failed to load proto: ${error.message || String(error)}`, null);

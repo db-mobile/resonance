@@ -48,11 +48,10 @@ export class RequestBodyEditor {
             lineNumbers(),
             history(),
             keymap.of([...defaultKeymap, ...historyKeymap]),
-            EditorView.editable.of(true), // Editable
+            EditorView.editable.of(true),
             EditorView.lineWrapping,
             ...this.getSearchExtensions(),
             EditorView.updateListener.of((update) => {
-                // Call change callback if content changed
                 if (update.docChanged && this.changeCallback) {
                     this.changeCallback(this.getContent());
                 }
@@ -125,14 +124,13 @@ export class RequestBodyEditor {
         try {
             const content = this.getContent().trim();
             if (!content) {
-                return true; // Empty content is valid
+                return true;
             }
             const parsed = JSON.parse(content);
             const formatted = JSON.stringify(parsed, null, 2);
             this.setContent(formatted);
             return true;
         } catch {
-            // Invalid JSON, don't format
             return false;
         }
     }

@@ -52,7 +52,6 @@ class KeyboardShortcutsManager {
             preventDefault
         });
 
-        // Track categories
         if (!this.categories.has(category)) {
             this.categories.set(category, []);
         }
@@ -80,7 +79,6 @@ class KeyboardShortcutsManager {
         if (shift) {parts.push(this.isMac ? '⇧' : 'Shift');}
         if (alt) {parts.push(this.isMac ? '⌥' : 'Alt');}
 
-        // Format key for display
         let displayKey = key;
         if (key.startsWith('Key')) {
             displayKey = key.substring(3);
@@ -108,8 +106,6 @@ class KeyboardShortcutsManager {
         const shift = event.shiftKey;
         const alt = event.altKey;
 
-        // Don't trigger shortcuts if user is typing in an input/textarea/contenteditable
-        // or CodeMirror editor, unless it's a specific input-safe shortcut
         const targetTag = event.target.tagName.toLowerCase();
         const { isContentEditable } = event.target;
         const isCodeMirror = event.target.closest('.cm-editor') || event.target.closest('.CodeMirror');
@@ -122,8 +118,6 @@ class KeyboardShortcutsManager {
         const shortcut = this.shortcuts.get(shortcutKey);
 
         if (shortcut) {
-            // Some shortcuts work in input fields (like Ctrl+Enter to send, Ctrl+S to save, Escape to cancel)
-            // Only allow shortcuts that use Ctrl/Cmd modifier or Enter/Escape keys when in input fields
             const isInputSafeShortcut = ctrl ||
                                        shortcutKey.includes('enter') ||
                                        shortcutKey.includes('escape');
@@ -169,7 +163,6 @@ class KeyboardShortcutsManager {
         document.body.appendChild(overlay);
         this.helpDialogVisible = true;
 
-        // Apply i18n if available
         if (app.i18n) {
             app.i18n.updateUI(overlay);
         }
@@ -187,7 +180,6 @@ class KeyboardShortcutsManager {
             if (e.target === overlay) {close();}
         });
 
-        // Close on Escape
         const escHandler = (e) => {
             if (e.key === 'Escape') {
                 close();

@@ -104,8 +104,6 @@ export class FeatureRegistry {
             }
 
             if (typeof descriptor.init === 'function') {
-                // Fire-and-forget: mirrors the pre-registry behavior where controller
-                // init was not awaited. Extension point for future deferred/idle-tier boot.
                 Promise.resolve()
                     .then(() => descriptor.init(instances, this.ctx))
                     .catch((err) => console.error(`Feature "${descriptor.name}" init failed:`, err));

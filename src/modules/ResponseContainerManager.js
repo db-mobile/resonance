@@ -13,7 +13,7 @@ import { PreviewManager } from './PreviewManager.js';
 export class ResponseContainerManager {
     constructor(previewRepository) {
         this.parentContainer = document.getElementById('workspace-response-container');
-        this.containers = new Map(); // Map of tabId -> container elements + ResponseEditor instances
+        this.containers = new Map();
         this.activeTabId = null;
         this.previewRepository = previewRepository;
         this.previewManager = new PreviewManager(previewRepository);
@@ -42,7 +42,6 @@ export class ResponseContainerManager {
     showContainer(tabId) {
         this.activeTabId = tabId;
 
-        // Ensure container exists
         this.getOrCreateContainer(tabId);
 
         this.containers.forEach((container, id) => {
@@ -72,7 +71,6 @@ export class ResponseContainerManager {
     removeContainer(tabId) {
         const container = this.containers.get(tabId);
         if (container) {
-            // Destroy CodeMirror editors to free memory
             if (container.editor && typeof container.editor.destroy === 'function') {
                 container.editor.destroy();
             }
@@ -80,14 +78,12 @@ export class ResponseContainerManager {
                 container.headersEditor.destroy();
             }
             
-            // Remove DOM element
             if (container.wrapper.parentNode) {
                 container.wrapper.parentNode.removeChild(container.wrapper);
             }
         }
         this.containers.delete(tabId);
 
-        // Clean up preview manager
         if (this.previewManager) {
             this.previewManager.removeContainer(tabId);
         }
@@ -105,7 +101,6 @@ export class ResponseContainerManager {
         const wrapper = fragment.firstElementChild;
         wrapper.dataset.tabId = tabId;
 
-        // Set tab-specific IDs and data-tab-id attributes
         const bodyPanel = wrapper.querySelector('[data-role="response-body"]');
         bodyPanel.id = `response-body-${tabId}`;
         wrapper.querySelector('[data-role="response-headers"]').id = `response-headers-${tabId}`;
@@ -115,7 +110,6 @@ export class ResponseContainerManager {
         wrapper.querySelector('[data-role="response-performance"]').id = `response-performance-${tabId}`;
         wrapper.querySelector('[data-role="response-scripts"]').id = `response-scripts-${tabId}`;
 
-        // Set data-tab-id on interactive elements
         wrapper.querySelector('.language-selector').dataset.tabId = tabId;
         wrapper.querySelector('.preview-mode-buttons').dataset.tabId = tabId;
         wrapper.querySelectorAll('.preview-mode-btn').forEach(btn => btn.dataset.tabId = tabId);
@@ -139,19 +133,14 @@ export class ResponseContainerManager {
         const codeBtn = wrapper.querySelector('.preview-mode-btn[data-mode="code"]');
         const previewBtn = wrapper.querySelector('.preview-mode-btn[data-mode="preview"]');
 
-        // Create ResponseEditor instance for this tab
         const editor = new ResponseEditor(bodyContainer);
 
-        // Create ResponseEditor instance for headers tab (JSON display)
         const headersContainer = wrapper.querySelector('.response-headers-display');
         const headersEditor = new ResponseEditor(headersContainer);
         headersEditor.setContent('', 'application/json');
 
-        // Fix: Prevent main-content-area from scrolling when editor gets focus
-        // CodeMirror focus causes the parent to scroll, hiding the workspace tabs
         const mainContentArea = document.getElementById('main-content-area');
         if (mainContentArea) {
-            // Prevent scroll on the main content area entirely
             mainContentArea.addEventListener('scroll', () => {
                 if (mainContentArea.scrollTop !== 0) {
                     mainContentArea.scrollTop = 0;
@@ -159,23 +148,19 @@ export class ResponseContainerManager {
             });
         }
 
-        // Initialize PreviewManager for this tab
         if (this.previewManager && previewContainer && codeBtn && previewBtn) {
             this.previewManager.initializeForTab(tabId, previewContainer, bodyContainer, editor, codeBtn, previewBtn);
         }
 
-        // Set up callback to update dropdown when language changes
         editor.onLanguageChange((lang) => {
             if (languageSelector) {
                 languageSelector.value = lang || 'text';
             }
-            // Update preview button state based on new language
             if (this.previewManager) {
                 this.previewManager.updateButtonState(tabId, lang);
             }
         });
 
-        // Set up language selector change handler
         if (languageSelector) {
             languageSelector.addEventListener('change', (e) => {
                 const selectedLang = e.target.value;
@@ -185,13 +170,11 @@ export class ResponseContainerManager {
             });
         }
 
-        // Get the copy button and attach handler
         const copyBtn = wrapper.querySelector('.copy-response-btn');
         if (copyBtn) {
             attachCopyHandler(copyBtn, tabId);
         }
 
-        // Get the headers copy button and attach handler
         const copyHeadersBtn = wrapper.querySelector('.copy-headers-btn');
         if (copyHeadersBtn) {
             attachHeadersCopyHandler(copyHeadersBtn, tabId);

@@ -9,7 +9,7 @@ import { PreviewRenderer } from './ui/PreviewRenderer.js';
 export class PreviewManager {
     constructor(previewRepository) {
         this.previewRepository = previewRepository;
-        this.containers = new Map(); // Map of tabId -> { previewContainer, codeContainer, editor, toggleBtn, renderer }
+        this.containers = new Map();
     }
 
     /**
@@ -33,11 +33,9 @@ export class PreviewManager {
             renderer
         });
 
-        // Default to showing code view. Preview will be rendered/shown on demand.
         codeContainer.classList.remove('is-hidden');
         previewContainer.classList.add('is-hidden');
 
-        // Set up button event listeners
         codeBtn.addEventListener('click', () => {
             this.showCode(tabId);
         });
@@ -46,11 +44,8 @@ export class PreviewManager {
             this.showPreview(tabId);
         });
 
-        // Restore preview state from repository
         const isPreviewMode = this.previewRepository.getPreviewMode(tabId);
         if (isPreviewMode) {
-            // Don't call showPreview here, just set visual state
-            // The actual preview will be rendered when response is displayed
             this._updateButtonState(tabId, true);
         }
     }
@@ -65,14 +60,11 @@ export class PreviewManager {
             return;
         }
 
-        // Switch to code view
         container.previewContainer.classList.add('is-hidden');
         container.codeContainer.classList.remove('is-hidden');
 
-        // Update button state
         this._updateButtonState(tabId, false);
 
-        // Persist state
         this.previewRepository.setPreviewMode(tabId, false);
     }
 
@@ -86,24 +78,19 @@ export class PreviewManager {
             return;
         }
 
-        // Check if content is previewable
         if (!this.isPreviewable(container.editor.currentLanguage)) {
-            return; // Don't switch to preview for non-previewable content
+            return;
         }
 
-        // Switch to preview view
         container.codeContainer.classList.add('is-hidden');
         container.previewContainer.classList.remove('is-hidden');
 
-        // Update preview content
         const content = container.editor.getContent();
         const language = container.editor.currentLanguage;
         container.renderer.render(content, language);
 
-        // Update button state
         this._updateButtonState(tabId, true);
 
-        // Persist state
         this.previewRepository.setPreviewMode(tabId, true);
     }
 
@@ -131,11 +118,9 @@ export class PreviewManager {
         }
 
         if (isPreviewMode) {
-            // Preview mode active
             container.codeBtn.classList.remove('active');
             container.previewBtn.classList.add('active');
         } else {
-            // Code mode active
             container.codeBtn.classList.add('active');
             container.previewBtn.classList.remove('active');
         }
@@ -162,7 +147,6 @@ export class PreviewManager {
             return;
         }
 
-        // Only update if in preview mode
         if (this.isPreviewMode(tabId)) {
             container.renderer.render(content, contentType);
         }
@@ -181,7 +165,6 @@ export class PreviewManager {
             return;
         }
 
-        // Always update preview content, even if not currently visible
         container.renderer.render(content, contentType);
     }
 
@@ -218,13 +201,10 @@ export class PreviewManager {
 
         const isPreviewable = this.isPreviewable(contentType);
 
-        // Disable preview button if content is not previewable
         container.previewBtn.disabled = !isPreviewable;
 
-        // Code button is always enabled
         container.codeBtn.disabled = false;
 
-        // If in preview mode and content is not previewable, switch back to code
         if (!isPreviewable && this.isPreviewMode(tabId)) {
             this.showCode(tabId);
         }
@@ -237,11 +217,9 @@ export class PreviewManager {
     removeContainer(tabId) {
         const container = this.containers.get(tabId);
         if (container) {
-            // Clear renderer content to free DOM nodes
             if (container.renderer) {
                 container.renderer.clear();
             }
-            // Remove event listeners by clearing references
             container.codeBtn = null;
             container.previewBtn = null;
             container.editor = null;

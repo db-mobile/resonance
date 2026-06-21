@@ -61,7 +61,6 @@ class Toast {
         toast.appendChild(closeBtn);
         container.appendChild(toast);
 
-        // Trigger enter animation on next frame
         requestAnimationFrame(() => toast.classList.add('toast--visible'));
 
         const dismiss = () => {

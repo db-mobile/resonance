@@ -22,7 +22,6 @@ export class ThemeManager {
     async loadSavedTheme() {
         try {
             let savedTheme = await window.backendAPI.store.get('theme');
-            // Migrate blueprint to black
             if (savedTheme === 'blueprint') {
                 savedTheme = 'black';
                 await this.saveTheme('black');
@@ -87,7 +86,6 @@ export class ThemeManager {
                 this.currentThemeLink = null;
             }
 
-            // If system theme is selected, resolve to actual theme (dark or light)
             let themeFile = theme;
             if (theme === 'system') {
                 themeFile = this.getSystemTheme();
@@ -237,25 +235,21 @@ export class SettingsModal {
             void e;
         }
 
-        // Set current theme selection
         const themeSelect = overlay.querySelector('select[name="theme"]');
         if (themeSelect) {
             themeSelect.value = this.themeManager.getCurrentTheme();
         }
 
-        // Set current HTTP version selection
         const httpVersionSelect = overlay.querySelector('select[name="httpVersion"]');
         if (httpVersionSelect) {
             httpVersionSelect.value = currentHttpVersion;
         }
 
-        // Set current timeout value
         const timeoutInput = overlay.querySelector('input[name="requestTimeout"]');
         if (timeoutInput) {
             timeoutInput.value = currentTimeout;
         }
 
-        // Set SSL verification, follow redirects, history limit
         const verifySslCheckbox = overlay.querySelector('input[name="verifySsl"]');
         if (verifySslCheckbox) {
             verifySslCheckbox.checked = currentVerifySsl;
@@ -271,13 +265,11 @@ export class SettingsModal {
             historyLimitInput.value = currentHistoryLimit;
         }
 
-        // Set check updates on launch
         const checkUpdatesOnLaunchCheckbox = overlay.querySelector('input[name="checkUpdatesOnLaunch"]');
         if (checkUpdatesOnLaunchCheckbox) {
             checkUpdatesOnLaunchCheckbox.checked = currentCheckUpdatesOnLaunch;
         }
 
-        // Set current version in Updates tab
         const currentVersionSpan = overlay.querySelector('#settings-current-version');
         if (currentVersionSpan && window.backendAPI?.app?.getVersion) {
             window.backendAPI.app.getVersion().then(version => {
@@ -287,7 +279,6 @@ export class SettingsModal {
             });
         }
 
-        // Add language section if i18nManager is available
         if (this.i18nManager) {
             const languagePlaceholder = overlay.querySelector('[data-role="language-section"]');
             if (languagePlaceholder) {
@@ -301,13 +292,11 @@ export class SettingsModal {
             }
         }
 
-        // Add accent buttons
         const accentGrid = overlay.querySelector('[data-role="accent-grid"]');
         if (accentGrid) {
             this.createAccentButtonsDOM(accentGrid);
         }
 
-        // Add proxy tab if proxyController is available
         if (this.proxyController) {
             const tabsContainer = overlay.querySelector('.settings-tabs');
             const proxyTabFragment = templateLoader.cloneSync(
@@ -327,7 +316,6 @@ export class SettingsModal {
             contentContainer.appendChild(proxyContent);
         }
 
-        // Add certificates tab if certificateController is available
         if (this.certificateController) {
             const tabsContainer = overlay.querySelector('.settings-tabs');
             const certsTabFragment = templateLoader.cloneSync(
@@ -347,7 +335,6 @@ export class SettingsModal {
             contentContainer.appendChild(certsContent);
         }
 
-        // Add Updates tab (always last)
         const tabsContainer = overlay.querySelector('.settings-tabs');
         const updatesTabFragment = templateLoader.cloneSync(
             './src/templates/settings/settingsModal.html',
@@ -423,37 +410,31 @@ export class SettingsModal {
 
         const settings = await this.proxyController.getSettings();
 
-        // Set enabled state
         const enabledCheckbox = section.querySelector('input[name="proxyEnabled"]');
         if (enabledCheckbox && settings.enabled) {
             enabledCheckbox.checked = true;
         }
 
-        // Toggle visibility of proxy settings content
         const proxyContent = section.querySelector('.proxy-settings-content');
         if (proxyContent && settings.enabled) {
             proxyContent.classList.remove('is-hidden');
         }
 
-        // Set use system proxy
         const useSystemCheckbox = section.querySelector('input[name="proxyUseSystem"]');
         if (useSystemCheckbox && settings.useSystemProxy) {
             useSystemCheckbox.checked = true;
         }
 
-        // Toggle visibility of manual settings
         const manualSettings = section.querySelector('.proxy-manual-settings');
         if (manualSettings && settings.useSystemProxy) {
             manualSettings.classList.add('is-hidden');
         }
 
-        // Set proxy type
         const typeSelect = section.querySelector('select[name="proxyType"]');
         if (typeSelect && settings.type) {
             typeSelect.value = settings.type;
         }
 
-        // Set host and port
         const hostInput = section.querySelector('input[name="proxyHost"]');
         if (hostInput) {
             hostInput.value = settings.host || '';
@@ -463,19 +444,16 @@ export class SettingsModal {
             portInput.value = settings.port || '';
         }
 
-        // Set auth enabled
         const authEnabledCheckbox = section.querySelector('input[name="proxyAuthEnabled"]');
         if (authEnabledCheckbox && settings.auth?.enabled) {
             authEnabledCheckbox.checked = true;
         }
 
-        // Toggle visibility of auth fields
         const authFields = section.querySelector('.proxy-auth-fields');
         if (authFields && settings.auth?.enabled) {
             authFields.classList.remove('is-hidden');
         }
 
-        // Set auth credentials
         const usernameInput = section.querySelector('input[name="proxyUsername"]');
         if (usernameInput) {
             usernameInput.value = settings.auth?.username || '';
@@ -485,7 +463,6 @@ export class SettingsModal {
             passwordInput.value = settings.auth?.password || '';
         }
 
-        // Set bypass list
         const bypassInput = section.querySelector('input[name="proxyBypass"]');
         if (bypassInput) {
             bypassInput.value = (settings.bypassList || []).join(', ');
@@ -600,8 +577,6 @@ export class SettingsModal {
             keyPath: row.querySelector('input[name="certKeyPath"]').value,
             caPath: row.querySelector('input[name="certCaPath"]').value
         });
-        // Surface only the cert/key pairing error inline; an empty host while
-        // adding a new row is self-evident and shouldn't flash an error.
         const pairing = errors.find(e => e.toLowerCase().includes('key file'));
         if (pairing) {
             errorEl.textContent = pairing;
@@ -651,7 +626,6 @@ export class SettingsModal {
         const httpVersionSelect = overlay.querySelector('select[name="httpVersion"]');
         const timeoutInput = overlay.querySelector('input[name="requestTimeout"]');
 
-        // Tab switching
         const tabButtons = overlay.querySelectorAll('.settings-tab');
         const tabContents = overlay.querySelectorAll('.settings-tab-content');
 
@@ -659,11 +633,9 @@ export class SettingsModal {
             button.addEventListener('click', () => {
                 const targetTab = button.dataset.tab;
 
-                // Remove active class from all tabs and contents
                 tabButtons.forEach(btn => btn.classList.remove('active'));
                 tabContents.forEach(content => content.classList.remove('active'));
 
-                // Add active class to clicked tab and corresponding content
                 button.classList.add('active');
                 const targetContent = overlay.querySelector(`[data-tab-content="${targetTab}"]`);
                 if (targetContent) {
@@ -680,7 +652,6 @@ export class SettingsModal {
             });
         }
 
-        // Accent color button listeners
         const accentButtons = overlay.querySelectorAll('.accent-btn');
         accentButtons.forEach(btn => {
             if (btn.dataset.btnColor) {
@@ -690,7 +661,6 @@ export class SettingsModal {
                 const { accent } = btn.dataset;
                 await this.themeManager.setAccent(accent);
 
-                // Update active state
                 accentButtons.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
             });
@@ -762,7 +732,6 @@ export class SettingsModal {
             });
         }
 
-        // Check updates on launch toggle
         const checkUpdatesOnLaunchCheckbox = overlay.querySelector('input[name="checkUpdatesOnLaunch"]');
         if (checkUpdatesOnLaunchCheckbox) {
             checkUpdatesOnLaunchCheckbox.addEventListener('change', async (e) => {
@@ -776,18 +745,15 @@ export class SettingsModal {
             });
         }
 
-        // Proxy settings event listeners
         if (this.proxyController) {
             this.attachProxyEventListeners(overlay);
         }
 
-        // Check for updates button
         const checkUpdatesBtn = overlay.querySelector('#check-for-updates-btn');
         const updateStatus = overlay.querySelector('#update-status');
         const autoUpdateSection = overlay.querySelector('[data-tab-content="updates"] .settings-section:first-child');
         const manualUpdateSection = overlay.querySelector('[data-tab-content="updates"] .settings-section:nth-child(2)');
         if (checkUpdatesBtn && updateStatus) {
-            // Check installation type on load
             (async () => {
                 try {
                     if (window.backendAPI?.updater?.getInstallInfo) {
@@ -795,22 +761,18 @@ export class SettingsModal {
                         if (installInfo.autoUpdateSupported) {
                             return;
                         }
-                        // Hide the auto-update and manual update sections entirely
                         if (autoUpdateSection) {
                             autoUpdateSection.style.display = 'none';
                         }
                         if (manualUpdateSection) {
                             manualUpdateSection.style.display = 'none';
                         }
-                        // Show message prominently in the version info section
                         const versionSection = overlay.querySelector('[data-tab-content="updates"] .settings-section:last-child');
                         if (!versionSection) {
                             return;
                         }
-                        // Make the managed message the main heading
                         const messageH3 = document.createElement('h3');
                         messageH3.textContent = installInfo.message || app.i18n?.t('settings.updates_managed_externally') || 'Updates are managed by your package manager';
-                        // Make version info smaller
                         const versionH3 = versionSection.querySelector('h3');
                         if (versionH3) {
                             versionH3.className = 'form-input-hint';
@@ -819,7 +781,6 @@ export class SettingsModal {
                         versionSection.insertBefore(messageH3, versionSection.firstChild);
                     }
                 } catch (e) {
-                    // Ignore errors
                 }
             })();
 
@@ -841,7 +802,6 @@ export class SettingsModal {
                         updateStatus.textContent = app.i18n?.t('settings.update_available', { version: update.version }) || `Update available: v${update.version}`;
                         updateStatus.className = 'update-status success';
                         
-                        // Ask user if they want to install
                         const installBtn = document.createElement('button');
                         installBtn.className = 'btn btn-primary btn-sm';
                         installBtn.style.marginLeft = '8px';
@@ -852,7 +812,6 @@ export class SettingsModal {
                             updateStatus.textContent = app.i18n?.t('settings.downloading_update') || 'Downloading...';
                             try {
                                 await window.backendAPI.updater.downloadAndInstall(update);
-                                // If we get here in simulation mode, show success
                                 updateStatus.textContent = app.i18n?.t('settings.update_installed') || 'Update installed! Restart to apply.';
                                 updateStatus.className = 'update-status success';
                             } catch (err) {
@@ -901,7 +860,6 @@ export class SettingsModal {
         const proxyTestBtn = overlay.querySelector('.proxy-test-btn');
         const proxyTestResult = overlay.querySelector('.proxy-test-result');
 
-        // Get all proxy input fields
         const proxyType = overlay.querySelector('select[name="proxyType"]');
         const proxyHost = overlay.querySelector('input[name="proxyHost"]');
         const proxyPort = overlay.querySelector('input[name="proxyPort"]');
@@ -909,7 +867,6 @@ export class SettingsModal {
         const proxyPassword = overlay.querySelector('input[name="proxyPassword"]');
         const proxyBypass = overlay.querySelector('input[name="proxyBypass"]');
 
-        // Toggle proxy settings visibility
         if (proxyEnabled && proxyContent) {
             proxyEnabled.addEventListener('change', async (e) => {
                 proxyContent.classList.toggle('is-hidden', !e.target.checked);
@@ -917,7 +874,6 @@ export class SettingsModal {
             });
         }
 
-        // Toggle system proxy vs manual settings
         if (proxyUseSystem && proxyManualSettings) {
             proxyUseSystem.addEventListener('change', async (e) => {
                 proxyManualSettings.classList.toggle('is-hidden', e.target.checked);
@@ -925,7 +881,6 @@ export class SettingsModal {
             });
         }
 
-        // Toggle auth fields visibility
         if (proxyAuthEnabled && proxyAuthFields) {
             proxyAuthEnabled.addEventListener('change', async (e) => {
                 proxyAuthFields.classList.toggle('is-hidden', !e.target.checked);
@@ -933,7 +888,6 @@ export class SettingsModal {
             });
         }
 
-        // Auto-save on change for all proxy fields
         const proxyFields = [proxyType, proxyHost, proxyPort, proxyUsername, proxyPassword, proxyBypass];
         proxyFields.forEach(field => {
             if (field) {
@@ -943,7 +897,6 @@ export class SettingsModal {
             }
         });
 
-        // Test connection button
         if (proxyTestBtn && proxyTestResult) {
             proxyTestBtn.addEventListener('click', async () => {
                 proxyTestBtn.disabled = true;
@@ -952,7 +905,6 @@ export class SettingsModal {
                 proxyTestResult.className = 'proxy-test-result';
 
                 try {
-                    // Save settings before testing
                     await this.saveProxySettings(overlay);
 
                     const result = await this.proxyController.testConnection();
@@ -989,7 +941,6 @@ export class SettingsModal {
             const password = overlay.querySelector('input[name="proxyPassword"]')?.value || '';
             const bypassText = overlay.querySelector('input[name="proxyBypass"]')?.value || '';
 
-            // Parse bypass list from comma-separated string
             const bypassList = bypassText
                 .split(',')
                 .map(item => item.trim())

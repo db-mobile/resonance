@@ -14,8 +14,6 @@ import { ScriptController } from './controllers/ScriptController.js';
 export const scriptFeature = {
     name: 'script',
     create(ctx) {
-        // environmentService is published onto the bus by the environment feature, which
-        // is registered before this one.
         const environmentService = ctx.get('environmentService');
 
         const repository = new ScriptRepository(ctx.backendAPI);
@@ -24,12 +22,10 @@ export const scriptFeature = {
         const inlineScriptManager = new InlineScriptManager();
         inlineScriptManager.initialize();
 
-        // ScriptConsolePanel is (re)initialized per workspace tab, so start with null.
         const consolePanel = new ScriptConsolePanel(null);
         const controller = new ScriptController(service, inlineScriptManager, consolePanel);
 
         return { repository, service, inlineScriptManager, consolePanel, controller };
     },
-    // inlineScriptManager is exposed for workspace tab restoration; scriptController for scripts.
     globals: { inlineScriptManager: 'inlineScriptManager', scriptController: 'controller' },
 };

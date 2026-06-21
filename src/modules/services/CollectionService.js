@@ -678,7 +678,6 @@ export class CollectionService {
             this.addKeyValueRow(formElements.queryParamsList);
         }
 
-        // Update URL with query params (with flag to prevent circular updates)
         this.updateUrlWithQueryParams(formElements);
     }
 
@@ -704,11 +703,9 @@ export class CollectionService {
             const questionMarkIndex = urlString.indexOf('?');
             const baseUrl = questionMarkIndex >= 0 ? urlString.substring(0, questionMarkIndex) : urlString;
 
-            // Build query string with encoding that preserves variable placeholders like {{variableName}}
             const queryPairs = [];
             queryParams.forEach(({ key, value }) => {
                 if (key) {
-                    // Use the same encoding function as keyValueManager to preserve {{...}} patterns
                     const encodedKey = this.encodeValuePreservingPlaceholders(key);
                     const encodedValue = this.encodeValuePreservingPlaceholders(value);
                     queryPairs.push(`${encodedKey}=${encodedValue}`);
@@ -717,15 +714,12 @@ export class CollectionService {
 
             const queryString = queryPairs.join('&');
 
-            // Import setUrlUpdating to prevent circular update
-            // Set flag before updating URL to prevent triggering updateQueryParamsFromUrl
             if (typeof window !== 'undefined' && app.setUrlUpdating) {
                 app.setUrlUpdating(true);
             }
 
             formElements.urlInput.value = queryString ? `${baseUrl}?${queryString}` : baseUrl;
 
-            // Clear flag after event loop
             if (typeof window !== 'undefined' && app.setUrlUpdating) {
                 setTimeout(() => {
                     app.setUrlUpdating(false);
@@ -749,7 +743,6 @@ export class CollectionService {
      * @returns {string} URL-encoded value with preserved placeholders
      */
     encodeValuePreservingPlaceholders(value) {
-        // Find all {{...}} patterns and temporarily replace them with placeholders
         const placeholders = [];
         let index = 0;
 
@@ -760,10 +753,8 @@ export class CollectionService {
             return placeholder;
         });
 
-        // URL encode the value (this encodes special chars but not our placeholders)
         const encoded = encodeURIComponent(withPlaceholders);
 
-        // Restore the original {{...}} patterns
         let result = encoded;
         placeholders.forEach(({ placeholder, original }) => {
             result = result.replace(placeholder, original);
@@ -783,7 +774,6 @@ export class CollectionService {
      * @returns {Promise<void>}
      */
     async populateRequestBody(collection, endpoint, _formElements) {
-        // Check if this endpoint has form body data (formdata / urlencoded)
         const formBodyData = await this.repository.getFormBodyData(collection.id, endpoint.id);
 
         if (formBodyData && (formBodyData.mode === 'formdata' || formBodyData.mode === 'urlencoded')) {
@@ -814,7 +804,6 @@ export class CollectionService {
             return;
         }
 
-        // Check if the endpoint's requestBody was imported from a form-data or urlencoded source
         const importedBodyType = endpoint.requestBody?.type;
         if (importedBodyType === 'formdata' || importedBodyType === 'urlencoded') {
             if (app.graphqlBodyManager) {
@@ -832,11 +821,9 @@ export class CollectionService {
             return;
         }
 
-        // Check if this endpoint has GraphQL data
         const graphqlData = await this.repository.getGraphQLData(collection.id, endpoint.id);
 
         if (graphqlData && graphqlData.mode === 'graphql') {
-            // Switch to GraphQL mode and populate GraphQL editors
             if (app.graphqlBodyManager) {
                 app.graphqlBodyManager.setGraphQLModeEnabled(true);
                 app.graphqlBodyManager.setGraphQLQuery(graphqlData.query || '');
@@ -846,7 +833,6 @@ export class CollectionService {
             const key = `${collection.id}_${endpoint.id}`;
             this.originalBodyValues.set(key, graphqlData.query || '');
         } else {
-            // Switch to JSON mode and populate JSON editor
             if (app.graphqlBodyManager) {
                 app.graphqlBodyManager.setGraphQLModeEnabled(false);
             }
@@ -864,7 +850,6 @@ export class CollectionService {
                 bodyContent = '';
             }
 
-            // Set the body content in both textarea and CodeMirror editor
             setRequestBodyContent(bodyContent);
 
             const key = `${collection.id}_${endpoint.id}`;

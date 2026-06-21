@@ -14,8 +14,6 @@ import { CookieController } from './controllers/CookieController.js';
 export const cookieFeature = {
     name: 'cookie',
     create(ctx) {
-        // environmentService is published onto the shared bus by renderer.js before boot,
-        // since the Environment feature is not yet registry-managed.
         const environmentService = ctx.get('environmentService');
 
         const repository = new CookieRepository(ctx.backendAPI);
@@ -23,7 +21,6 @@ export const cookieFeature = {
         const dialog = new CookieManagerDialog(service, environmentService);
         const controller = new CookieController(service, dialog);
 
-        // Sync the cookie jar's active environment when the user switches environments.
         environmentService.addChangeListener((event) => {
             if (event.type === 'environment-switched') {
                 controller.setActiveEnvironment(event.environmentId, event.environmentName);

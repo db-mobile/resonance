@@ -43,7 +43,6 @@ export class RunnerSelectorMenu {
             this.toggle();
         });
 
-        // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
             if (!this.dom.selector?.contains(e.target) && !this.dom.dropdown?.contains(e.target)) {
                 this.close();
@@ -102,7 +101,6 @@ export class RunnerSelectorMenu {
             `;
         }).join('');
 
-        // Add click handlers
         this.dom.list.querySelectorAll('.runner-dropdown-item').forEach(item => {
             item.addEventListener('click', () => {
                 const { runnerId } = item.dataset;

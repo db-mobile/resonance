@@ -76,10 +76,8 @@ export class SchemaController {
             return;
         }
 
-        // Update validation status
         this._updateValidationStatus();
 
-        // Debounced save
         if (this._saveDebounceTimer) {
             clearTimeout(this._saveDebounceTimer);
         }
@@ -147,7 +145,7 @@ export class SchemaController {
     async loadSchema(collectionId, endpointId) {
         this.currentCollectionId = collectionId;
         this.currentEndpointId = endpointId;
-        this.lastResponseBody = null; // Clear previous response when switching endpoints
+        this.lastResponseBody = null;
 
         if (!this.editor) {
             this.initialize();
@@ -200,7 +198,6 @@ export class SchemaController {
 
         let data = this.lastResponseBody;
         
-        // Parse if string
         if (typeof data === 'string') {
             try {
                 data = JSON.parse(data);
@@ -215,7 +212,6 @@ export class SchemaController {
         this._updateValidationStatus();
         this.statusDisplay.update('Schema inferred from response', null);
 
-        // Save immediately
         this._saveSchema();
     }
 
@@ -270,7 +266,6 @@ export class SchemaController {
         try {
             await this.repository.saveResponseSchema(collectionId, endpointId, schema);
             
-            // If this is the currently loaded endpoint, update the editor
             if (this.currentCollectionId === collectionId && 
                 this.currentEndpointId === endpointId && 
                 this.editor) {

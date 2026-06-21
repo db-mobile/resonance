@@ -40,12 +40,10 @@ export class VariableService {
      */
     async getVariables() {
         try {
-            // If environment repository is available, use active environment variables
             if (this.environmentRepository) {
                 return await this.environmentRepository.getActiveEnvironmentVariables();
             }
 
-            // No environment variables available
             return {};
         } catch (error) {
             return {};
@@ -67,14 +65,11 @@ export class VariableService {
         try {
             let variables = {};
 
-            // Start with collection variables as base
             const collectionVariables = await this.repository.getVariablesForCollection(collectionId);
             variables = { ...collectionVariables };
 
-            // If environment repository exists, merge environment variables (with precedence)
             if (this.environmentRepository) {
                 const environmentVariables = await this.environmentRepository.getActiveEnvironmentVariables();
-                // Environment variables override collection variables
                 variables = { ...variables, ...environmentVariables };
             }
 

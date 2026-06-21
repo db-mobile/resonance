@@ -52,21 +52,17 @@ export function initTabListeners() {
 
             const targetTabId = button.dataset.tab;
 
-            // Get the active workspace tab container
             const activeContainer = document.querySelector('.workspace-tab-response:not(.is-hidden)');
             if (activeContainer) {
-                // Deactivate all tab contents in this workspace tab
                 const allContents = activeContainer.querySelectorAll('.tab-content');
                 allContents.forEach(content => content.classList.remove('active'));
 
-                // Get the workspace tab ID and activate the correct content
                 const workspaceTabId = activeContainer.dataset.tabId;
                 const targetTabContent = document.getElementById(`${targetTabId}-${workspaceTabId}`);
                 if (targetTabContent) {
                     targetTabContent.classList.add('active');
                 }
             } else {
-                // Fallback for old structure
                 const responseTabContents = document.querySelectorAll('.response-display .tab-content');
                 responseTabContents.forEach(content => content.classList.remove('active'));
 
@@ -113,7 +109,6 @@ export function setResponseTabsForProtocol(protocol) {
         grpcTabs.forEach(tab => tab.classList.add('is-hidden'));
     }
 
-    // If the currently active tab is now hidden, switch to Body tab
     const activeTab = document.querySelector('.response-tabs .tab-button.active');
     if (activeTab && activeTab.classList.contains('is-hidden')) {
         activateTab('response', 'response-body');
@@ -129,7 +124,6 @@ export function activateTab(tabType, tabId) {
         contents = document.querySelectorAll('.request-config .tab-content');
     } else if (tabType === 'response') {
         buttons = document.querySelectorAll('.response-tabs .tab-button');
-        // Get response tab contents from the active workspace tab container
         const activeContainer = document.querySelector('.workspace-tab-response:not(.is-hidden)');
         if (activeContainer) {
             contents = activeContainer.querySelectorAll('.tab-content');
@@ -148,12 +142,10 @@ export function activateTab(tabType, tabId) {
 
     const targetButton = document.querySelector(`.${tabType === 'request' ? 'request-config' : 'response-tabs'} .tab-button[data-tab="${tabId}"]`);
 
-    // For response tabs, need to find the content within the active workspace tab
     let targetContent;
     if (tabType === 'response') {
         const activeContainer = document.querySelector('.workspace-tab-response:not(.is-hidden)');
         if (activeContainer) {
-            // Get the workspace tab ID from the container
             const workspaceTabId = activeContainer.dataset.tabId;
             targetContent = document.getElementById(`${tabId}-${workspaceTabId}`);
         } else {

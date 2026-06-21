@@ -58,7 +58,6 @@ function renderMqttStatus(entry, flash = false) {
 
     if (flash) {
         pill.classList.remove('is-receiving');
-        // Force reflow so the animation restarts on rapid successive messages.
         void pill.offsetWidth;
         pill.classList.add('is-receiving');
     }
@@ -107,8 +106,6 @@ async function handleBackendEvent(event) {
         return;
     }
 
-    // Ignore late events from a previous broker connection on the same tab
-    // (the 'connect' event establishes the new broker, so it is never dropped).
     if (current.broker && broker && current.broker !== broker && payload.eventType !== 'connect') {
         return;
     }
@@ -155,8 +152,6 @@ async function handleBackendEvent(event) {
     }
 
     if (payload.eventType === 'error') {
-        // Keep the current connection state — a terminal error is followed by a
-        // 'disconnect' event, while publish/subscribe errors leave us connected.
         session.set(tabId, {
             ...current,
             broker,

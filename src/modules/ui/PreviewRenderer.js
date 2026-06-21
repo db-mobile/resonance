@@ -71,21 +71,18 @@ export class PreviewRenderer {
             valueSpan.textContent = 'null';
             node.appendChild(valueSpan);
         } else if (Array.isArray(data)) {
-            // Check if array should be rendered inline
             if (this._shouldRenderInline(data)) {
                 this._buildInlineArray(node, data);
             } else {
                 this._buildArrayNode(node, data, level);
             }
         } else if (typeof data === 'object') {
-            // Check if object should be rendered inline
             if (this._shouldRenderInline(data)) {
                 this._buildInlineObject(node, data);
             } else {
                 this._buildObjectNode(node, data, level);
             }
         } else {
-            // Primitive value
             const valueSpan = document.createElement('span');
             valueSpan.className = `json-tree-${typeof data}`;
             valueSpan.textContent = JSON.stringify(data);
@@ -102,7 +99,6 @@ export class PreviewRenderer {
      * @returns {boolean}
      */
     _shouldRenderInline(data) {
-        // Empty objects/arrays should be inline
         if (Array.isArray(data) && data.length === 0) {
             return true;
         }
@@ -110,10 +106,8 @@ export class PreviewRenderer {
             return true;
         }
 
-        // Check size and complexity
         const entries = Array.isArray(data) ? data : Object.values(data);
 
-        // Inline if 3 or fewer items and all are primitives
         if (entries.length <= 3) {
             return entries.every(val =>
                 val === null ||
@@ -210,23 +204,19 @@ export class PreviewRenderer {
             return;
         }
 
-        // Create toggle arrow
         const toggle = document.createElement('span');
         toggle.className = 'json-tree-toggle';
         toggle.textContent = level < 2 ? '▼' : '▶';
         node.appendChild(toggle);
 
-        // Opening brace
         const openBrace = document.createElement('span');
         openBrace.textContent = '{';
         node.appendChild(openBrace);
 
-        // Create children container
         const children = document.createElement('div');
         children.className = 'json-tree-children';
         children.style.display = level < 2 ? 'block' : 'none';
 
-        // Add children
         entries.forEach(([key, value], index) => {
             const childLine = document.createElement('div');
             childLine.className = 'json-tree-line';
@@ -250,12 +240,10 @@ export class PreviewRenderer {
 
         node.appendChild(children);
 
-        // Closing brace
         const closeBrace = document.createElement('span');
         closeBrace.textContent = '}';
         node.appendChild(closeBrace);
 
-        // Toggle handler
         toggle.addEventListener('click', (e) => {
             e.stopPropagation();
             const isExpanded = children.style.display === 'block';
@@ -274,23 +262,19 @@ export class PreviewRenderer {
             return;
         }
 
-        // Create toggle arrow
         const toggle = document.createElement('span');
         toggle.className = 'json-tree-toggle';
         toggle.textContent = level < 2 ? '▼' : '▶';
         node.appendChild(toggle);
 
-        // Opening bracket
         const openBracket = document.createElement('span');
         openBracket.textContent = '[';
         node.appendChild(openBracket);
 
-        // Create children container
         const children = document.createElement('div');
         children.className = 'json-tree-children';
         children.style.display = level < 2 ? 'block' : 'none';
 
-        // Add children
         arr.forEach((value, index) => {
             const childLine = document.createElement('div');
             childLine.className = 'json-tree-line';
@@ -307,12 +291,10 @@ export class PreviewRenderer {
 
         node.appendChild(children);
 
-        // Closing bracket
         const closeBracket = document.createElement('span');
         closeBracket.textContent = ']';
         node.appendChild(closeBracket);
 
-        // Toggle handler
         toggle.addEventListener('click', (e) => {
             e.stopPropagation();
             const isExpanded = children.style.display === 'block';
@@ -330,7 +312,6 @@ export class PreviewRenderer {
         iframe.className = 'response-preview-iframe';
         iframe.setAttribute('sandbox', 'allow-same-origin');
 
-        // Inject CSP to block images and scripts
         const cspMeta = '<meta http-equiv="Content-Security-Policy" content="img-src \'none\'; script-src \'none\';">';
         const sanitizedContent = this._stripScripts(content);
         const modifiedContent = this._injectCSP(sanitizedContent, cspMeta);
@@ -349,9 +330,7 @@ export class PreviewRenderer {
      */
     _stripScripts(content) {
         return content
-            // Remove well-formed <script>...</script> blocks
             .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
-            // Remove any remaining/unclosed <script ...> opening tags
             .replace(/<script\b[^>]*>/gi, '');
     }
 
@@ -363,19 +342,16 @@ export class PreviewRenderer {
      * @returns {string} Modified HTML content with CSP
      */
     _injectCSP(content, cspMeta) {
-        // Try to inject CSP into <head> if it exists
         const headMatch = content.match(/<head[^>]*>/i);
         if (headMatch) {
             return content.replace(headMatch[0], `${headMatch[0]}\n${cspMeta}`);
         }
 
-        // If no <head>, try to inject after <html>
         const htmlMatch = content.match(/<html[^>]*>/i);
         if (htmlMatch) {
             return content.replace(htmlMatch[0], `${htmlMatch[0]}\n<head>${cspMeta}</head>`);
         }
 
-        // If no <html> or <head>, wrap content with html/head/body
         return `<!DOCTYPE html><html><head>${cspMeta}</head><body>${content}</body></html>`;
     }
 
@@ -388,14 +364,12 @@ export class PreviewRenderer {
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(content, 'text/xml');
 
-            // Check for parse errors
             const parseError = xmlDoc.querySelector('parsererror');
             if (parseError) {
                 this._renderError('Invalid XML');
                 return;
             }
 
-            // Build tree view
             const tree = this._buildXMLTree(xmlDoc.documentElement);
             tree.classList.add('xml-tree');
             this.container.appendChild(tree);
@@ -420,19 +394,16 @@ export class PreviewRenderer {
                        Array.from(node.childNodes).some(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
 
         if (hasChildren) {
-            // Element with children
             const toggle = document.createElement('span');
             toggle.className = 'xml-tree-toggle';
             toggle.textContent = level < 2 ? '▼' : '▶';
             treeNode.appendChild(toggle);
 
-            // Opening tag
             const openTag = document.createElement('span');
             openTag.className = 'xml-tree-tag';
             openTag.textContent = `<${node.tagName}`;
             treeNode.appendChild(openTag);
 
-            // Attributes
             if (node.attributes.length > 0) {
                 for (const attr of node.attributes) {
                     const attrSpan = document.createElement('span');
@@ -453,7 +424,6 @@ export class PreviewRenderer {
             const closingBracket = document.createTextNode('>');
             treeNode.appendChild(closingBracket);
 
-            // Children container
             const children = document.createElement('div');
             children.className = 'xml-tree-children';
             children.style.display = level < 2 ? 'block' : 'none';
@@ -465,13 +435,11 @@ export class PreviewRenderer {
 
             treeNode.appendChild(children);
 
-            // Closing tag
             const closeTag = document.createElement('span');
             closeTag.className = 'xml-tree-tag';
             closeTag.textContent = `</${node.tagName}>`;
             treeNode.appendChild(closeTag);
 
-            // Toggle handler
             toggle.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const isExpanded = children.style.display === 'block';
@@ -479,13 +447,11 @@ export class PreviewRenderer {
                 toggle.textContent = isExpanded ? '▶' : '▼';
             });
         } else if (hasText) {
-            // Element with text content only
             const tag = document.createElement('span');
             tag.className = 'xml-tree-tag';
             tag.textContent = `<${node.tagName}`;
             treeNode.appendChild(tag);
 
-            // Attributes
             if (node.attributes.length > 0) {
                 for (const attr of node.attributes) {
                     const attrSpan = document.createElement('span');
@@ -504,25 +470,21 @@ export class PreviewRenderer {
 
             treeNode.appendChild(document.createTextNode('>'));
 
-            // Text content
             const textContent = document.createElement('span');
             textContent.className = 'xml-tree-text';
             textContent.textContent = node.textContent;
             treeNode.appendChild(textContent);
 
-            // Closing tag
             const closeTag = document.createElement('span');
             closeTag.className = 'xml-tree-tag';
             closeTag.textContent = `</${node.tagName}>`;
             treeNode.appendChild(closeTag);
         } else {
-            // Empty element
             const tag = document.createElement('span');
             tag.className = 'xml-tree-tag';
             tag.textContent = `<${node.tagName}`;
             treeNode.appendChild(tag);
 
-            // Attributes
             if (node.attributes.length > 0) {
                 for (const attr of node.attributes) {
                     const attrSpan = document.createElement('span');

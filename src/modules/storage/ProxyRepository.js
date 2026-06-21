@@ -51,13 +51,11 @@ export class ProxyRepository {
                 return defaultData;
             }
 
-            // Validate structure and provide defaults for missing fields
             const validatedData = {
                 ...this._getDefaultProxySettings(),
                 ...data
             };
 
-            // Ensure auth object exists with proper structure
             if (!validatedData.auth || typeof validatedData.auth !== 'object') {
                 validatedData.auth = this._getDefaultProxySettings().auth;
             } else {
@@ -67,7 +65,6 @@ export class ProxyRepository {
                 };
             }
 
-            // Ensure bypassList is an array
             if (!Array.isArray(validatedData.bypassList)) {
                 validatedData.bypassList = [];
             }
@@ -94,7 +91,6 @@ export class ProxyRepository {
                 throw new Error('Invalid proxy settings format');
             }
 
-            // Validate and sanitize settings
             const validatedSettings = this._validateSettings(settings);
 
             await this.backendAPI.store.set(this.PROXY_KEY, validatedSettings);
@@ -123,7 +119,6 @@ export class ProxyRepository {
                 ...updates
             };
 
-            // If auth is being updated, merge with existing auth
             if (updates.auth) {
                 updatedSettings.auth = {
                     ...currentSettings.auth,
@@ -256,7 +251,7 @@ export class ProxyRepository {
      */
     _validateTimeout(timeout) {
         const timeoutNum = parseInt(timeout, 10);
-        return !isNaN(timeoutNum) && timeoutNum >= 0 && timeoutNum <= 300000; // Max 5 minutes
+        return !isNaN(timeoutNum) && timeoutNum >= 0 && timeoutNum <= 300000;
     }
 
     /**
@@ -270,7 +265,6 @@ export class ProxyRepository {
      */
     _sanitizeHost(host) {
         if (typeof host !== 'string') {return '';}
-        // Remove protocol if present
         return host.replace(/^(https?|socks[45]?):\/\//, '').trim();
     }
 

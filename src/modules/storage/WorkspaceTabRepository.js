@@ -28,7 +28,7 @@ export class WorkspaceTabRepository {
         this.STORE_KEY = 'workspace-tabs';
         this.ACTIVE_TAB_KEY = 'active-tab-id';
         this._tabsCache = null;
-        this._activeTabIdCache = undefined; // undefined = not yet loaded, null = loaded but empty
+        this._activeTabIdCache = undefined;
     }
 
     /**
@@ -45,19 +45,16 @@ export class WorkspaceTabRepository {
      * Responses larger than this will be truncated to save memory.
      * @private
      */
-    static MAX_RESPONSE_SIZE = 500000; // ~500KB
+    static MAX_RESPONSE_SIZE = 500000;
 
     async getTabs() {
         if (this._tabsCache !== null) {
-            // Return shallow copy of array with same tab references
-            // Callers should not mutate returned tabs directly
             return [...this._tabsCache];
         }
 
         try {
             const data = await this.backendAPI.store.get(this.STORE_KEY);
 
-            // Validate and initialize if needed
             if (!data || !Array.isArray(data)) {
                 const defaultTabs = [this._createDefaultTab()];
                 await this.saveTabs(defaultTabs);
@@ -120,8 +117,7 @@ export class WorkspaceTabRepository {
      */
     async setActiveTabId(tabId) {
         this._activeTabIdCache = tabId;
-        // Cache is authoritative — persist in background without blocking callers
-        this.backendAPI.store.set(this.ACTIVE_TAB_KEY, tabId).catch(() => { /* fire-and-forget */ });
+        this.backendAPI.store.set(this.ACTIVE_TAB_KEY, tabId).catch(() => { });
     }
 
     /**
@@ -136,7 +132,6 @@ export class WorkspaceTabRepository {
     async getTabById(tabId) {
         const tabs = await this.getTabs();
         const tab = tabs.find(tab => tab.id === tabId);
-        // Return tab reference directly - callers should not mutate
         return tab || null;
     }
 
@@ -164,9 +159,8 @@ export class WorkspaceTabRepository {
             lastModifiedAt: Date.now()
         };
         tabs.push(newTab);
-        // Update cache synchronously, persist in background
         this._tabsCache = tabs;
-        this.backendAPI.store.set(this.STORE_KEY, tabs).catch(() => { /* fire-and-forget */ });
+        this.backendAPI.store.set(this.STORE_KEY, tabs).catch(() => { });
         return newTab;
     }
 
@@ -195,19 +189,15 @@ export class WorkspaceTabRepository {
             return null;
         }
 
-        // Ensure existing tab has proper structure
         const existingTab = {
             ...this._createDefaultTab(),
             ...tabs[index]
         };
 
-        // Merge nested objects - use spread for shallow merge (sufficient for our data structures)
         const mergedRequest = updates.request ?
             { ...(existingTab.request || {}), ...updates.request } :
             existingTab.request;
 
-        // For response, completely replace instead of merge
-        // Truncate large responses to save memory
         let mergedResponse = updates.response !== undefined ?
             updates.response : existingTab.response;
         
@@ -228,7 +218,6 @@ export class WorkspaceTabRepository {
             { ...existingTab.endpoint, ...updates.endpoint } :
             (updates.endpoint || existingTab.endpoint);
 
-        // Create merged tab, excluding nested objects from updates
         const { request: _r, response: _res, endpoint: _e, ...restUpdates } = updates;
 
         const mergedTab = {
@@ -237,15 +226,14 @@ export class WorkspaceTabRepository {
             request: mergedRequest,
             response: mergedResponse,
             endpoint: mergedEndpoint,
-            id: tabId, // Ensure ID doesn't change
+            id: tabId,
             lastModifiedAt: Date.now()
         };
 
         tabs[index] = mergedTab;
 
-        // Update cache synchronously, then persist in background
         this._tabsCache = tabs;
-        this.backendAPI.store.set(this.STORE_KEY, tabs).catch(() => { /* fire-and-forget */ });
+        this.backendAPI.store.set(this.STORE_KEY, tabs).catch(() => { });
 
         return tabs[index];
     }
@@ -265,17 +253,15 @@ export class WorkspaceTabRepository {
         const filteredTabs = tabs.filter(tab => tab.id !== tabId);
 
         if (filteredTabs.length === tabs.length) {
-            return false; // Tab not found
+            return false;
         }
 
-        // Ensure at least one tab exists
         if (filteredTabs.length === 0) {
             filteredTabs.push(this._createDefaultTab());
         }
 
-        // Update cache synchronously, persist in background
         this._tabsCache = filteredTabs;
-        this.backendAPI.store.set(this.STORE_KEY, filteredTabs).catch(() => { /* fire-and-forget */ });
+        this.backendAPI.store.set(this.STORE_KEY, filteredTabs).catch(() => { });
         return true;
     }
 

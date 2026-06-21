@@ -149,7 +149,7 @@ export class CollectionController {
     async loadCollectionsWithExpansionState() {
         try {
             this.allCollections = await this.service.loadCollections();
-            await this.renderCollections(this.allCollections, true); // Preserve expansion state
+            await this.renderCollections(this.allCollections, true);
             return this.allCollections;
         } catch (error) {
             return [];
@@ -432,7 +432,7 @@ export class CollectionController {
             const newName = await this.renameDialog.show(collection.name);
             if (newName && newName !== collection.name) {
                 await this.service.renameCollection(collection.id, newName);
-                await this.loadCollections(); // Refresh display
+                await this.loadCollections();
             }
         } catch (error) {
             void error;
@@ -456,13 +456,6 @@ export class CollectionController {
 
             if (result !== null) {
                 await this.variableService.setMultipleVariables(collection.id, result.variables, result.secretKeys);
-
-                // Don't substitute variables in the form - they should stay as {{...}} placeholders
-                // Variable substitution happens at request time in apiHandler.js
-                // if (getCurrentEndpoint() && getCurrentEndpoint().collectionId === collection.id) {
-                //     const formElements = this.getFormElements();
-                //     await this.processFormVariablesExceptUrl(collection.id, formElements);
-                // }
             }
         } catch (error) {
             void error;
@@ -696,7 +689,6 @@ export class CollectionController {
             await this.service.renameRequest(collection.id, endpoint.id, newName);
             await this.loadCollectionsWithExpansionState();
 
-            // Update any open tabs that reference this endpoint
             if (!app.workspaceTabController) {
                 return;
             }

@@ -103,7 +103,6 @@ export function displayPerformanceMetrics(container, timings, size) {
         return;
     }
 
-    // Clear previous content
     container.innerHTML = '';
 
     if (!timings) {
@@ -111,7 +110,6 @@ export function displayPerformanceMetrics(container, timings, size) {
         return;
     }
 
-    // Create summary section
     const summary = document.createElement('div');
     summary.className = 'performance-summary';
 
@@ -139,7 +137,6 @@ export function displayPerformanceMetrics(container, timings, size) {
     summary.appendChild(metricsGrid);
     container.appendChild(summary);
 
-    // Create timing breakdown section
     const breakdown = document.createElement('div');
     breakdown.className = 'performance-breakdown';
 
@@ -150,16 +147,14 @@ export function displayPerformanceMetrics(container, timings, size) {
     const timingBars = document.createElement('div');
     timingBars.className = 'timing-bars';
 
-    // Define colors for each phase
     const colors = {
-        dns: '#4285f4',      // Blue
-        tcp: '#34a853',      // Green
-        tls: '#fbbc04',      // Yellow
-        ttfb: '#ea4335',     // Red
-        download: '#9c27b0'  // Purple
+        dns: '#4285f4',
+        tcp: '#34a853',
+        tls: '#fbbc04',
+        ttfb: '#ea4335',
+        download: '#9c27b0'
     };
 
-    // Add timing bars (only if time > 0)
     if (timings.dnsLookup > 0) {
         timingBars.appendChild(createTimingBar('DNS Lookup', timings.dnsLookup, timings.total, colors.dns));
     }
@@ -176,7 +171,6 @@ export function displayPerformanceMetrics(container, timings, size) {
         timingBars.appendChild(createTimingBar('Content Download', timings.download, timings.total, colors.download));
     }
 
-    // Create waterfall visualization
     const waterfall = document.createElement('div');
     waterfall.className = 'timing-waterfall';
     waterfall.setAttribute('aria-label', 'Request timing waterfall');
@@ -186,7 +180,6 @@ export function displayPerformanceMetrics(container, timings, size) {
 
     let accumulatedTime = 0;
 
-    // Add segments to waterfall
     if (timings.dnsLookup > 0) {
         const segment = document.createElement('div');
         segment.className = 'waterfall-segment';
@@ -217,7 +210,6 @@ export function displayPerformanceMetrics(container, timings, size) {
         accumulatedTime += timings.tlsHandshake;
     }
 
-    // Calculate waiting time (time until first byte minus connection overhead)
     const waitingTime = Math.max(0, timings.firstByte - accumulatedTime);
     if (waitingTime > 0) {
         const segment = document.createElement('div');
@@ -243,7 +235,6 @@ export function displayPerformanceMetrics(container, timings, size) {
     breakdown.appendChild(waterfall);
     container.appendChild(breakdown);
 
-    // Add legend
     const legend = document.createElement('div');
     legend.className = 'timing-legend';
 

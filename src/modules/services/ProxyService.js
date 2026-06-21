@@ -177,20 +177,16 @@ export class ProxyService {
             const {hostname} = urlObj;
 
             return bypassList.some(pattern => {
-                // Remove whitespace
                 const cleanPattern = pattern.trim();
                 if (!cleanPattern) {return false;}
 
-                // Exact match
                 if (cleanPattern === hostname) {return true;}
 
-                // Wildcard match (*.example.com)
                 if (cleanPattern.startsWith('*.')) {
                     const domain = cleanPattern.substring(2);
                     return hostname.endsWith(domain);
                 }
 
-                // Suffix match (.example.com matches subdomain.example.com)
                 if (cleanPattern.startsWith('.')) {
                     return hostname.endsWith(cleanPattern);
                 }
@@ -209,24 +205,20 @@ export class ProxyService {
         try {
             const settings = await this.repository.getProxySettings();
 
-            // If proxy is disabled, return null
             if (!settings.enabled) {
                 return null;
             }
 
-            // Check if URL should bypass proxy
             if (this.shouldBypassProxy(requestUrl, settings.bypassList)) {
                 return null;
             }
 
-            // Build proxy config
             const proxyConfig = {
                 protocol: settings.type,
                 host: settings.host,
                 port: settings.port
             };
 
-            // Add authentication if enabled
             if (settings.auth.enabled && settings.auth.username) {
                 proxyConfig.auth = {
                     username: settings.auth.username,
@@ -252,15 +244,10 @@ export class ProxyService {
             return errors;
         }
 
-        // Validate type
         if (settings.type && !this.isValidProxyType(settings.type)) {
             errors.push('Invalid proxy type. Must be: http, https, socks4, or socks5');
         }
 
-        // Validate host format when provided. Empty host is allowed even when
-        // proxy is enabled — settings autosave on every keystroke/toggle, so an
-        // in-progress form shouldn't error. The backend treats an unparseable
-        // proxy URL as disabled, so no request leaks through misconfiguration.
         if (settings.enabled && !settings.useSystemProxy && settings.host) {
             if (typeof settings.host !== 'string') {
                 errors.push('Invalid proxy host format');
@@ -269,24 +256,20 @@ export class ProxyService {
             }
         }
 
-        // Validate port
         if (settings.port !== undefined && !this.isValidPort(settings.port)) {
             errors.push('Invalid port number. Must be between 1 and 65535');
         }
 
-        // Validate auth
         if (settings.auth?.enabled) {
             if (!settings.auth.username || settings.auth.username.trim() === '') {
                 errors.push('Username is required when proxy authentication is enabled');
             }
         }
 
-        // Validate bypass list
         if (settings.bypassList && !Array.isArray(settings.bypassList)) {
             errors.push('Bypass list must be an array');
         }
 
-        // Validate timeout
         if (settings.timeout !== undefined && !this.isValidTimeout(settings.timeout)) {
             errors.push('Invalid timeout. Must be between 0 and 300000ms (5 minutes)');
         }
@@ -311,11 +294,8 @@ export class ProxyService {
         const trimmed = host.trim();
         if (trimmed.length === 0) {return false;}
 
-        // Remove protocol if present (shouldn't be there, but just in case)
         const cleanHost = trimmed.replace(/^(https?|socks[45]?):\/\//, '');
 
-        // Basic hostname validation
-        // Allow IP addresses (IPv4) and domain names
         const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
         const hostnamePattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 

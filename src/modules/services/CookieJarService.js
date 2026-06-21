@@ -19,37 +19,24 @@ export class CookieJarService {
 
     _notify(event) {
         for (const cb of this.listeners) {
-            try { cb(event); } catch (_e) { /* non-blocking */ }
+            try { cb(event); } catch (_e) { }
         }
     }
 
-    // -------------------------------------------------------------------------
-    // RFC 6265 §5.1.2 — canonicalize domain (lowercase, strip leading dot)
-    // -------------------------------------------------------------------------
     _canonicalizeDomain(domain) {
         if (!domain) { return ''; }
         return domain.toLowerCase().replace(/^\./, '');
     }
 
-    // -------------------------------------------------------------------------
-    // RFC 6265 §5.1.3 — domain match
-    // cookieDomain was stored without leading dot.
-    // If the Set-Cookie attribute had a Domain= value, subdomain matching applies.
-    // If not (hostOnly flag), only exact match is allowed.
-    // -------------------------------------------------------------------------
     _matchesDomain(cookieDomain, requestHost, hostOnly) {
         const host = requestHost.toLowerCase();
         const cd = cookieDomain.toLowerCase();
         if (hostOnly) {
             return host === cd;
         }
-        // Exact match or subdomain
         return host === cd || host.endsWith(`.${ cd}`);
     }
 
-    // -------------------------------------------------------------------------
-    // RFC 6265 §5.1.4 — path match
-    // -------------------------------------------------------------------------
     _matchesPath(cookiePath, requestPath) {
         if (cookiePath === '/') { return true; }
         if (requestPath === cookiePath) { return true; }
@@ -57,9 +44,6 @@ export class CookieJarService {
         return false;
     }
 
-    // -------------------------------------------------------------------------
-    // Parse a single Set-Cookie header string into a storable cookie object
-    // -------------------------------------------------------------------------
     _parseSetCookie(setCookieStr, requestUrl, environmentId) {
         const parts = setCookieStr.split(';').map(p => p.trim());
         const [nameValue, ...attrs] = parts;
@@ -95,7 +79,7 @@ export class CookieJarService {
                     try {
                         const ts = Date.parse(attrVal);
                         if (!isNaN(ts)) { expires = ts; }
-                    } catch (_e) { /* ignore */ }
+                    } catch (_e) { }
                     break;
                 case 'max-age':
                     maxAge = parseInt(attrVal, 10);
@@ -112,7 +96,6 @@ export class CookieJarService {
             }
         }
 
-        // Resolve domain from request URL if not provided
         let requestHost = '';
         try {
             requestHost = new URL(requestUrl).hostname.toLowerCase();
@@ -123,10 +106,9 @@ export class CookieJarService {
             domain = requestHost;
         }
 
-        // Max-Age takes precedence over Expires
         if (maxAge !== null) {
             if (maxAge <= 0) {
-                expires = 0; // Mark for immediate deletion
+                expires = 0;
             } else {
                 expires = Date.now() + maxAge * 1000;
             }
@@ -151,10 +133,6 @@ export class CookieJarService {
         };
     }
 
-    // -------------------------------------------------------------------------
-    // Public API
-    // -------------------------------------------------------------------------
-
     /**
      * Process Set-Cookie headers from a response and persist them to the jar.
      * @param {string[]} setCookieHeaders - Array of raw Set-Cookie header values
@@ -172,7 +150,6 @@ export class CookieJarService {
             if (!cookie) { continue; }
 
             if (cookie.expires !== null && cookie.expires <= Date.now()) {
-                // Max-Age=0 or expired Expires — delete if present
                 await this.repository.delete(cookie.id);
             } else {
                 await this.repository.upsert(cookie);

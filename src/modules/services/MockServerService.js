@@ -88,7 +88,6 @@ export class MockServerService {
         try {
             const settings = await this.repository.getSettings();
 
-            // Filter to only enabled collections
             const enabledCollections = collections.filter(collection =>
                 settings.enabledCollections.includes(collection.id)
             );
@@ -103,7 +102,6 @@ export class MockServerService {
                 throw error;
             }
 
-            // Call IPC to start server in main process
             const result = await window.backendAPI.mockServer.start(settings, enabledCollections);
 
             if (result.success) {
@@ -276,7 +274,6 @@ export class MockServerService {
      */
     async updateSettings(updates) {
         try {
-            // Check if server is running and port is being changed
             const status = await this.getStatus();
             const requiresRestart = status.running && updates.port !== undefined;
 
@@ -320,7 +317,6 @@ export class MockServerService {
 
             const result = await this.repository.setEndpointDelay(collectionId, endpointId, delayMs);
 
-            // Hot-reload settings if server is running
             await this._reloadServerSettings();
 
             return result;
@@ -344,7 +340,6 @@ export class MockServerService {
         try {
             const result = await this.repository.setCustomResponse(collectionId, endpointId, response);
 
-            // Hot-reload settings if server is running
             await this._reloadServerSettings();
 
             return result;
@@ -379,8 +374,6 @@ export class MockServerService {
      * @returns {Promise<Object|null>} Default schema-generated response or null
      */
     async getDefaultResponse(_collectionId, _endpointId) {
-        // This will be implemented to get the schema-generated response
-        // For now, return null - will be implemented when we have access to collections
         return null;
     }
 
@@ -398,7 +391,6 @@ export class MockServerService {
         try {
             const result = await this.repository.setCustomStatusCode(collectionId, endpointId, statusCode);
 
-            // Hot-reload settings if server is running
             await this._reloadServerSettings();
 
             return result;
@@ -531,7 +523,6 @@ export class MockServerService {
                 await window.backendAPI.mockServer.reloadSettings();
             }
         } catch (error) {
-            // Silently fail - settings will be picked up on next server start
         }
     }
 }

@@ -79,16 +79,13 @@ export class HistoryController {
      */
     async handleHistorySelect(historyEntry) {
         try {
-            // Load the historical request into the form
             const urlInput = document.getElementById('url-input');
             const methodSelect = document.getElementById('method-select');
             const headersList = document.getElementById('headers-list');
             const queryParamsList = document.getElementById('query-params-list');
             const pathParamsList = document.getElementById('path-params-list');
 
-            // Set basic request info
             if (urlInput) {
-                // Prefer rawUrl (preserves {{vars}}), strip any inline query params
                 const rawUrl = historyEntry.request.rawUrl || historyEntry.request.url;
                 urlInput.value = rawUrl.split('?')[0];
             }
@@ -97,26 +94,22 @@ export class HistoryController {
                 methodSelect.value = historyEntry.request.method;
             }
 
-            // Set body if present
             if (historyEntry.request.body) {
                 setRequestBodyContent(JSON.stringify(historyEntry.request.body, null, 2));
             } else {
                 setRequestBodyContent('');
             }
 
-            // Clear existing key-value lists
             this.clearKeyValueList(headersList);
             this.clearKeyValueList(queryParamsList);
             this.clearKeyValueList(pathParamsList);
 
-            // Populate headers
             if (historyEntry.request.headers && Object.keys(historyEntry.request.headers).length > 0) {
                 this.populateKeyValueList(headersList, historyEntry.request.headers);
             } else {
                 this.addKeyValueRow(headersList, 'Content-Type', 'application/json');
             }
 
-            // Extract and populate query params from URL
             const urlObj = new URL(historyEntry.request.url);
             const queryParams = {};
             urlObj.searchParams.forEach((value, key) => {
@@ -129,18 +122,14 @@ export class HistoryController {
                 this.addKeyValueRow(queryParamsList);
             }
 
-            // Add initial path params row if empty
             if (pathParamsList && pathParamsList.children.length === 0) {
                 this.addKeyValueRow(pathParamsList);
             }
 
-            // Update URL field to include query params
             updateUrlFromQueryParams();
 
-            // Switch to the request section if in history view
             this.showRequestSection();
 
-            // Clear current endpoint association since this is from history
             setCurrentEndpoint(null);
 
         } catch (error) {
@@ -196,7 +185,6 @@ export class HistoryController {
 
         listElement.appendChild(row);
 
-        // Add remove button handler
         const removeBtn = row.querySelector('.btn-danger');
         if (removeBtn) {
             removeBtn.addEventListener('click', () => {
@@ -207,11 +195,9 @@ export class HistoryController {
             });
         }
 
-        // Add input handlers for auto-adding new rows
         const keyInput = row.querySelector('.key-input');
         const valueInput = row.querySelector('.value-input');
 
-        // Set values directly via .value property (not via innerHTML) to preserve special characters like {{ }}
         if (keyInput) {keyInput.value = key;}
         if (valueInput) {valueInput.value = value;}
 
@@ -237,9 +223,6 @@ export class HistoryController {
      * @returns {void}
      */
     showRequestSection() {
-        // This is a placeholder for switching UI views
-        // Implementation depends on how the history panel is integrated
-        // Could involve tab switching or panel toggling
     }
 
     /**

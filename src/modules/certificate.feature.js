@@ -17,7 +17,6 @@ export const certificateFeature = {
         const controller = new CertificateController(service);
         return { repository, service, controller };
     },
-    // Exposed for the request path: apiHandler resolves a cert by host before sending.
     globals: { certificateController: 'controller' },
     async init({ controller }) {
         await controller.initialize();

@@ -21,7 +21,7 @@ export class HistoryRepository {
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.HISTORY_KEY = 'requestHistory';
-        this.MAX_HISTORY_ITEMS = 100; // Limit history to prevent excessive storage
+        this.MAX_HISTORY_ITEMS = 100;
     }
 
     /**
@@ -64,7 +64,6 @@ export class HistoryRepository {
     async getAll() {
         try {
             const history = await this._getArrayFromStore(this.HISTORY_KEY);
-            // Return sorted by timestamp descending (newest first)
             return history.sort((a, b) => b.timestamp - a.timestamp);
         } catch (error) {
             throw new Error(`Failed to load history: ${error.message}`);
@@ -94,10 +93,8 @@ export class HistoryRepository {
                 history = [];
             }
 
-            // Add new entry at the beginning
             history.unshift(historyEntry);
 
-            // Limit history size — respect user-configured limit if set
             let maxItems = this.MAX_HISTORY_ITEMS;
             try {
                 const settings = await this.backendAPI.settings.get();

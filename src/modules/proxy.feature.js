@@ -17,7 +17,4 @@ export const proxyFeature = {
         const controller = new ProxyController(service);
         return { repository, service, controller };
     },
-    // No `globals` and no `init`: faithfully preserves prior behavior — renderer.js never
-    // exposed proxyController globally nor called proxyController.initialize(), even though
-    // the method exists. Do not add an init hook here without verifying that intent.
 };

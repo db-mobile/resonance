@@ -14,5 +14,4 @@ export const historyFeature = {
         return { controller };
     },
     globals: { historyController: 'controller' },
-    // No init hook: controller.init() is deferred to an idle tier in renderer.js.
 };

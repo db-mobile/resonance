@@ -29,9 +29,8 @@ export class WorkspaceTabController {
         this.tabBar = tabBar;
         this.stateManager = stateManager;
         this.responseContainerManager = responseContainerManager;
-        this.isRestoringState = false; // Flag to prevent marking tabs as modified during restoration
+        this.isRestoringState = false;
 
-        // Runner controllers map (tabId -> RunnerController)
         this.runnerControllers = new Map();
         this.endpointLoader = new WorkspaceTabEndpointLoaderService({
             service: this.service,
@@ -42,7 +41,6 @@ export class WorkspaceTabController {
             restoreTabStateSafely: (tab) => this._restoreTabStateSafely(tab)
         });
 
-        // Bind tab bar event handlers
         this.tabBar.onTabSwitch = (tabId) => this.switchTab(tabId);
         this.tabBar.onTabClose = (tabId) => this.closeTab(tabId);
         this.tabBar.onTabCreate = (protocol) => this.createNewTab({ protocol });
@@ -52,7 +50,6 @@ export class WorkspaceTabController {
         this.tabBar.onRunnerTabCreate = () => this.createRunnerTab();
         this.tabBar.onTabReorder = (orderedTabIds) => this.reorderTabs(orderedTabIds);
 
-        // Listen to service changes
         this.service.addListener((event, data) => this._handleServiceEvent(event, data));
     }
 
@@ -69,21 +66,16 @@ export class WorkspaceTabController {
         try {
             const { tabs, activeTabId } = await this.service.initialize();
 
-            // Render tab bar
             this.tabBar.render(tabs, activeTabId);
 
-            // Restore active tab state to UI
             if (activeTabId) {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab) {
-                    // Update UI based on tab type (runner vs request)
                     this._updateUIForTabType(activeTab);
 
                     if (activeTab.type === 'runner') {
-                        // Initialize runner tab
                         await this._initializeRunnerTab(activeTabId);
                     } else {
-                        // Show response container for request tab
                         this.responseContainerManager.showContainer(activeTabId);
                         await this._restoreTabStateSafely(activeTab);
                     }
@@ -108,12 +100,10 @@ export class WorkspaceTabController {
      */
     async createNewTab(options = {}) {
         try {
-            // Save current tab state before creating new one
             await this._saveCurrentTabState();
 
             const { protocol = 'http', ...tabOptions } = options;
 
-            // Embed protocol-specific structure at creation time to avoid extra updateTab + getActiveTab round-trips
             if (protocol === 'websocket') {
                 tabOptions.name = tabOptions.name || 'New WebSocket';
                 tabOptions.request = {
@@ -187,20 +177,15 @@ export class WorkspaceTabController {
             const newTab = await this.service.createTab(tabOptions);
             await this.service.switchTab(newTab.id);
 
-            // Update UI based on tab type (switch from runner to request UI if needed)
             this._updateUIForTabType(newTab);
 
-            // Show response container for new tab
             this.responseContainerManager.showContainer(newTab.id);
 
-            // Re-render tab bar — active ID is already known
             const tabs = await this.service.getAllTabs();
             this.tabBar.render(tabs, newTab.id);
 
-            // Clear UI for new tab
             await this._restoreTabStateSafely(newTab);
 
-            // Clear scripts for new tab (no endpoint selected)
             if (app.scriptController) {
                 app.scriptController.clearScripts();
             }
@@ -223,7 +208,6 @@ export class WorkspaceTabController {
      */
     async createRunnerTab() {
         try {
-            // Save current tab state before creating new one
             await this._saveCurrentTabState();
 
             const newTab = await this.service.createTab({
@@ -232,15 +216,12 @@ export class WorkspaceTabController {
             });
             await this.service.switchTab(newTab.id);
 
-            // Re-render tab bar
             const tabs = await this.service.getAllTabs();
             const activeTabId = await this.service.getActiveTabId();
             this.tabBar.render(tabs, activeTabId);
 
-            // Hide other runner containers before initializing the new one
             this._updateUIForTabType(newTab);
 
-            // Initialize runner UI in the main content area
             await this._initializeRunnerTab(newTab.id);
 
             return newTab;
@@ -258,15 +239,12 @@ export class WorkspaceTabController {
      * @param {string} tabId - The runner tab ID
      */
     async _initializeRunnerTab(tabId) {
-        // Import RunnerController dynamically to avoid circular dependencies
         const { RunnerController } = await import('./RunnerController.js');
         const { getCollections } = await import('../collectionManager.js');
 
-        // Create a container for the runner panel
         const mainContentArea = document.getElementById('main-content-area');
         if (!mainContentArea) {return;}
 
-        // Hide the standard request builder UI
         const requestBuilder = mainContentArea.querySelector('.request-builder');
         const requestConfig = mainContentArea.querySelector('.request-config');
         const resizerHandle = mainContentArea.querySelector('.resizer-handle');
@@ -277,7 +255,6 @@ export class WorkspaceTabController {
         if (resizerHandle) {resizerHandle.classList.add('is-hidden');}
         if (responseArea) {responseArea.classList.add('is-hidden');}
 
-        // Create runner container
         let runnerContainer = document.getElementById(`runner-container-${tabId}`);
         if (!runnerContainer) {
             runnerContainer = document.createElement('div');
@@ -288,7 +265,6 @@ export class WorkspaceTabController {
             runnerContainer.style.flexDirection = 'column';
             runnerContainer.style.overflow = 'hidden';
 
-            // Insert after workspace tab bar
             const tabBarContainer = document.getElementById('workspace-tab-bar-container');
             if (tabBarContainer && tabBarContainer.nextSibling) {
                 mainContentArea.insertBefore(runnerContainer, tabBarContainer.nextSibling);
@@ -297,7 +273,6 @@ export class WorkspaceTabController {
             }
         }
 
-        // Initialize runner controller
         const runnerController = new RunnerController(
             window.backendAPI,
             () => getCollections()
@@ -314,13 +289,11 @@ export class WorkspaceTabController {
      * @param {string} tabId - The runner tab ID
      */
     _cleanupRunnerTab(tabId) {
-        // Remove runner container
         const runnerContainer = document.getElementById(`runner-container-${tabId}`);
         if (runnerContainer) {
             runnerContainer.remove();
         }
 
-        // Remove controller reference
         this.runnerControllers.delete(tabId);
     }
 
@@ -335,8 +308,6 @@ export class WorkspaceTabController {
         if (this.runnerControllers.has(tabId)) {
             this._cleanupRunnerTab(tabId);
         }
-        // Tear down any live streaming connection bound to this tab so it stops
-        // receiving (e.g. an MQTT subscription) once the tab is gone.
         if (window.backendAPI?.mqtt) {
             window.backendAPI.mqtt.close(tabId);
         }
@@ -358,12 +329,10 @@ export class WorkspaceTabController {
         const resizerHandle = mainContentArea.querySelector('.resizer-handle');
         const responseArea = mainContentArea.querySelector('.response-area');
 
-        // Hide all runner containers first
         const runnerContainers = mainContentArea.querySelectorAll('[id^="runner-container-"]');
         runnerContainers.forEach(c => c.classList.add('is-hidden'));
 
         if (tab.type === 'runner') {
-            // Show runner UI, hide request UI
             if (requestBuilder) {requestBuilder.classList.add('is-hidden');}
             if (requestConfig) {requestConfig.classList.add('is-hidden');}
             if (resizerHandle) {resizerHandle.classList.add('is-hidden');}
@@ -374,7 +343,6 @@ export class WorkspaceTabController {
                 runnerContainer.classList.remove('is-hidden');
             }
         } else {
-            // Show request UI, hide runner UI
             if (requestBuilder) {requestBuilder.classList.remove('is-hidden');}
             if (requestConfig) {requestConfig.classList.remove('is-hidden');}
             if (resizerHandle) {resizerHandle.classList.remove('is-hidden');}
@@ -397,42 +365,33 @@ export class WorkspaceTabController {
             const currentTabId = await this.service.getActiveTabId();
 
             if (currentTabId === tabId) {
-                return; // Already on this tab
+                return;
             }
 
-            // Save current tab state
             await this._saveCurrentTabState();
 
-            // Switch tab in service
             const tab = await this.service.switchTab(tabId);
             if (!tab) {
                 return;
             }
 
-            // Update UI based on tab type (runner vs request)
             this._updateUIForTabType(tab);
 
-            // Show response container for this workspace tab (only for request tabs)
             if (tab.type !== 'runner') {
                 this.responseContainerManager.showContainer(tabId);
             }
 
-            // Update UI
             this.tabBar.setActiveTab(tabId);
 
-            // Handle runner tabs differently
             if (tab.type === 'runner') {
-                // Initialize runner if not already done
                 if (!this.runnerControllers.has(tabId)) {
                     await this._initializeRunnerTab(tabId);
                 }
                 return;
             }
 
-            // Set flag to prevent marking tab as modified during restoration
             await this._restoreTabStateSafely(tab);
 
-            // Load scripts for this tab's endpoint, or clear if no endpoint
             if (app.scriptController) {
                 if (tab.endpoint && tab.endpoint.collectionId && tab.endpoint.endpointId) {
                     await app.scriptController.loadScriptsForEndpoint(
@@ -461,7 +420,6 @@ export class WorkspaceTabController {
      */
     async closeTab(tabId) {
         try {
-            // Check for unsaved changes before closing
             const allTabs = await this.service.getAllTabs();
             const tab = allTabs.find(t => t.id === tabId);
             if (tab?.isModified) {
@@ -481,12 +439,9 @@ export class WorkspaceTabController {
                 }
             }
 
-            // If this is the last tab, create a replacement first then close this one
             if (allTabs.length === 1) {
                 this._cleanupClosedTabUI(tabId);
                 await this.createNewTab();
-                // createNewTab already rendered the tab bar with [old, new] and activated new.
-                // Now remove the old tab from storage and re-render with just [new].
                 await this.service.closeTab(tabId);
                 const remainingTabs = await this.service.getAllTabs();
                 const activeTabId = await this.service.getActiveTabId();
@@ -498,14 +453,12 @@ export class WorkspaceTabController {
 
             const result = await this.service.closeTab(tabId);
             if (!result) {
-                return; // Could not close (last tab or not found)
+                return;
             }
 
-            // Re-render tab bar — tabs cache is updated by deleteTab, fetch reflects removal
             const remainingTabs = allTabs.filter(t => t.id !== tabId);
             this.tabBar.render(remainingTabs, result.newActiveTabId);
 
-            // If we switched to a different tab, activate it
             if (result.newActiveTabId !== tabId) {
                 const newActiveTab = remainingTabs.find(t => t.id === result.newActiveTabId);
                 if (newActiveTab) {
@@ -567,7 +520,6 @@ export class WorkspaceTabController {
         try {
             const newTab = await this.service.duplicateTab(tabId);
             if (newTab) {
-                // Re-render tab bar to show new tab
                 const tabs = await this.service.getAllTabs();
                 const activeTabId = await this.service.getActiveTabId();
                 this.tabBar.render(tabs, activeTabId);
@@ -589,7 +541,6 @@ export class WorkspaceTabController {
             const tabs = await this.service.getAllTabs();
             const tabsToClose = tabs.filter(t => t.id !== tabId);
 
-            // Warn if any tabs to close have unsaved changes
             const modifiedCount = tabsToClose.filter(t => t.isModified).length;
             if (modifiedCount > 0) {
                 const { ConfirmDialog } = await import('../ui/ConfirmDialog.js');
@@ -615,14 +566,11 @@ export class WorkspaceTabController {
                 await this.service.closeTab(tab.id);
             }
 
-            // Switch to the remaining tab if not already active
             await this.service.switchTab(tabId);
 
-            // Re-render tab bar
             const remainingTabs = await this.service.getAllTabs();
             this.tabBar.render(remainingTabs, tabId);
 
-            // Activate the remaining tab using the standard request/runner flow
             const activeTab = remainingTabs.find(t => t.id === tabId);
             if (activeTab) {
                 await this._activateTab(activeTab);
@@ -691,7 +639,6 @@ export class WorkspaceTabController {
             const activeTab = await this.service.getActiveTab();
             if (!activeTab) {return;}
 
-            // Don't auto-rename if user has customized the name
             if (activeTab.name !== 'New Request' && !activeTab.name.match(/^(GET|POST|PUT|DELETE|PATCH)/)) {
                 return;
             }
@@ -797,8 +744,6 @@ export class WorkspaceTabController {
      * @returns {void}
      */
     _handleServiceEvent(_event, _data) {
-        // Can be extended to handle various service events
-        // For now, most updates are handled directly in methods
     }
 
     /**

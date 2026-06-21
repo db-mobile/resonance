@@ -285,7 +285,6 @@ export class CollectionDialogs {
                         nameInput.value = `${requestData.method || 'GET'} ${endpoint}`;
                     }
                 } catch {
-                    // URL parsing failed, leave empty for user to fill.
                 }
             }
 

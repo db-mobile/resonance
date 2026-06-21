@@ -91,7 +91,6 @@ export class ScriptRepository {
     async _getObjectFromStore(key, defaultValue = {}) {
         const value = await this.backendAPI.store.get(key);
 
-        // Handle undefined (packaged apps) or invalid values
         if (value === undefined || value === null || typeof value !== 'object') {
             return defaultValue;
         }

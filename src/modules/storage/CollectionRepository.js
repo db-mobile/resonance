@@ -50,11 +50,9 @@ export class CollectionRepository {
      * @private
      */
     _addToCache(id, collection) {
-        // If already in cache, delete to update insertion order
         if (this._byIdCache.has(id)) {
             this._byIdCache.delete(id);
         }
-        // Evict oldest entry if at capacity
         if (this._byIdCache.size >= CollectionRepository.MAX_CACHE_SIZE) {
             const oldestKey = this._byIdCache.keys().next().value;
             this._byIdCache.delete(oldestKey);
@@ -110,18 +108,15 @@ export class CollectionRepository {
      */
     async save(collections) {
         try {
-            // Get existing collection IDs
             const existingIds = await this.backendAPI.collections.list();
             const newIds = collections.map(c => c.id);
 
-            // Delete collections that no longer exist
             for (const id of existingIds) {
                 if (!newIds.includes(id)) {
                     await this.backendAPI.collections.delete(id);
                 }
             }
 
-            // Save all collections
             for (const collection of collections) {
                 await this.backendAPI.collections.save(collection);
             }
@@ -139,7 +134,6 @@ export class CollectionRepository {
      */
     async getById(id) {
         if (this._byIdCache.has(id)) {
-            // Move to end of Map to mark as recently used
             const cached = this._byIdCache.get(id);
             this._byIdCache.delete(id);
             this._byIdCache.set(id, cached);
@@ -152,7 +146,6 @@ export class CollectionRepository {
             }
             return collection;
         } catch (error) {
-            // Collection not found
             return undefined;
         }
     }
@@ -475,8 +468,6 @@ export class CollectionRepository {
             if (!authConfig || !this.secretStore) {
                 return authConfig;
             }
-            // Literal credentials are stored out of band; merge them back so the UI,
-            // runner, and request builder all see the complete config.
             const secrets = await this.secretStore.getScope(authSecretScope(collectionId, endpointId));
             return mergeAuthSecrets(authConfig, secrets);
         } catch (error) {
@@ -498,15 +489,12 @@ export class CollectionRepository {
         try {
             let toPersist = authConfig;
             if (authConfig && this.secretStore) {
-                // Pull literal credentials out before they reach the on-disk file.
                 const { redacted, secrets } = splitAuthSecrets(authConfig);
                 const scope = authSecretScope(collectionId, endpointId);
                 const fields = Object.keys(secrets);
                 for (const field of fields) {
                     await this.secretStore.set(scope, field, secrets[field]);
                 }
-                // Drop any stored secret whose field is no longer a literal (cleared or
-                // replaced with a template reference) to avoid resurrecting stale values.
                 const stored = await this.secretStore.getScope(scope);
                 for (const field of Object.keys(stored)) {
                     if (!Object.prototype.hasOwnProperty.call(secrets, field)) {

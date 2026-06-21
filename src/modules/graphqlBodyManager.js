@@ -14,18 +14,15 @@ export class GraphQLBodyManager {
         this.dom = domElements;
         this.graphqlEditor = null;
         this.variablesEditor = null;
-        this.currentMode = 'json'; // 'json' or 'graphql'
+        this.currentMode = 'json';
         this.isGraphQLModeEnabled = false;
 
-        // Introspected schema state (in-memory only, keyed by resolved endpoint URL)
         this.schemaCache = new Map();
         this.currentSchema = null;
         this.isFetchingSchema = false;
 
-        // Operation picker state (for documents with multiple named operations)
         this.selectedOperationName = null;
 
-        // References to new DOM elements
         this.jsonPanel = document.getElementById('body-json-section');
         this.graphqlPanel = document.getElementById('body-graphql-section');
         this.graphqlEditorContainer = document.getElementById('graphql-query-editor');
@@ -37,13 +34,11 @@ export class GraphQLBodyManager {
         this.docsToggle = document.getElementById('graphql-docs-toggle');
         this.docsRail = document.getElementById('graphql-docs-rail');
 
-        // Workbench drawer (Variables only — Headers is a normal request tab)
         this.drawer = document.getElementById('graphql-drawer');
         this.drawerTabs = document.getElementById('graphql-drawer-tabs');
         this.graphqlResizerHandle = document.getElementById('graphql-resizer-handle');
         this.activeDrawer = 'variables';
 
-        // Method bar, hidden while the Workbench is active (GraphQL is always POST)
         this.methodSelectContainer = document.querySelector('.method-select-container');
 
         this.workbenchActive = false;
@@ -54,7 +49,6 @@ export class GraphQLBodyManager {
      * Initialize GraphQL body manager with event listeners
      */
     initialize() {
-        // Initialize mode selector dropdown
         const modeSelect = document.getElementById('body-mode-select');
         if (modeSelect) {
             modeSelect.addEventListener('change', (e) => {
@@ -66,7 +60,6 @@ export class GraphQLBodyManager {
             });
         }
 
-        // Format button
         if (this.formatBtn) {
             this.formatBtn.addEventListener('click', () => {
                 if (this.graphqlEditor) {
@@ -78,21 +71,18 @@ export class GraphQLBodyManager {
             });
         }
 
-        // Fetch schema button
         if (this.fetchSchemaBtn) {
             this.fetchSchemaBtn.addEventListener('click', () => {
                 this.fetchSchema();
             });
         }
 
-        // Operation picker (multi-operation documents)
         if (this.operationSelect) {
             this.operationSelect.addEventListener('change', (e) => {
                 this.selectedOperationName = e.target.value || null;
             });
         }
 
-        // Drawer tab strip (Variables | Headers) — also opens/collapses the drawer
         if (this.drawerTabs) {
             this.drawerTabs.addEventListener('click', (e) => {
                 const tab = e.target.closest('.graphql-drawer-tab');
@@ -102,14 +92,12 @@ export class GraphQLBodyManager {
             });
         }
 
-        // Run button — proxy to the main Send so all the request logic is reused
         if (this.runBtn) {
             this.runBtn.addEventListener('click', () => {
                 document.getElementById('send-request-btn')?.click();
             });
         }
 
-        // Docs toggle — show/hide the schema docs rail
         if (this.docsToggle) {
             this.docsToggle.addEventListener('click', () => this.toggleDocs());
         }
@@ -161,7 +149,6 @@ export class GraphQLBodyManager {
         if (!this.drawer) {
             return;
         }
-        // Drop any inline height set by the resizer so the CSS flex takes over.
         this.drawer.style.flex = '';
         this.drawer.classList.toggle('collapsed', collapsed);
         if (this.graphqlResizerHandle) {
@@ -231,7 +218,6 @@ export class GraphQLBodyManager {
         document.querySelector('.main-content-area')?.classList.toggle('workbench-active', on);
 
         if (on) {
-            // Force POST and hide the method dropdown (GraphQL is always POST)
             const methodSelect = document.getElementById('method-select');
             if (methodSelect) {
                 this.savedMethod = methodSelect.value;
@@ -240,7 +226,6 @@ export class GraphQLBodyManager {
             if (this.methodSelectContainer) {
                 this.methodSelectContainer.style.display = 'none';
             }
-            // Reset ephemeral drawer state: closed, Variables tab
             this.setDrawerPane('variables');
             this.setDrawerCollapsed(true);
             window.__verticalResizer?.setRequestBias(0.6);
@@ -260,7 +245,6 @@ export class GraphQLBodyManager {
             }
         }
 
-        // Let layout settle, then remeasure the editors
         requestAnimationFrame(() => requestAnimationFrame(() => {
             this.graphqlEditor?.view?.requestMeasure?.();
             this.variablesEditor?.view?.requestMeasure?.();
@@ -278,8 +262,6 @@ export class GraphQLBodyManager {
         }
 
         const operations = this.graphqlEditor ? this.graphqlEditor.getOperations() : [];
-        // operations === null means the document is currently unparseable — leave
-        // the picker as-is rather than flickering it away on every keystroke.
         if (operations === null) {
             return;
         }
@@ -289,7 +271,6 @@ export class GraphQLBodyManager {
         if (named.length <= 1) {
             this.operationSelect.style.display = 'none';
             this.operationSelect.innerHTML = '';
-            // A lone named operation is still sent by name via getSelectedOperationName()
             this.selectedOperationName = named.length === 1 ? named[0].name : null;
             return;
         }
@@ -382,13 +363,11 @@ export class GraphQLBodyManager {
     switchMode(mode) {
         this.currentMode = mode;
 
-        // Update dropdown selector
         const modeSelect = document.getElementById('body-mode-select');
         if (modeSelect && modeSelect.value !== mode) {
             modeSelect.value = mode;
         }
 
-        // Update panels
         document.querySelectorAll('.body-mode-panel').forEach(panel => {
             const panelMode = panel.getAttribute('data-mode');
             if (panelMode === mode) {
@@ -398,12 +377,10 @@ export class GraphQLBodyManager {
             }
         });
 
-        // Initialize GraphQL editor if switching to GraphQL mode
         if (mode === 'graphql' && !this.graphqlEditor) {
             this.initializeGraphQLEditor();
         }
 
-        // GraphQL gets the first-class Workbench layout; any other mode tears it down
         this.setWorkbenchActive(mode === 'graphql');
     }
 
@@ -420,22 +397,17 @@ export class GraphQLBodyManager {
         }
 
         try {
-            // Initialize query editor with GraphQL syntax highlighting
             this.graphqlEditor = new GraphQLEditor(this.graphqlEditorContainer);
 
-            // Set up auto-save on query change
             this.graphqlEditor.onChange((_content) => {
                 this.saveCurrentState();
                 this.updateOperationPicker();
             });
 
-            // Re-apply a previously fetched schema so it survives editor re-creation
             this.applySchemaToEditor();
 
-            // Initialize variables editor with JSON syntax highlighting
             this.variablesEditor = new JSONEditor(this.graphqlVariablesEditorContainer);
 
-            // Set up auto-save on variables change
             this.variablesEditor.onChange((_content) => {
                 this.saveCurrentState();
             });
@@ -524,8 +496,6 @@ export class GraphQLBodyManager {
      * Save current state (placeholder - will integrate with CollectionRepository)
      */
     async saveCurrentState() {
-        // This will be called by CollectionService to save modified state
-        // Implementation will integrate with existing save mechanisms
     }
 
     /**

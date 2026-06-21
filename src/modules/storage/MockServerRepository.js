@@ -47,28 +47,23 @@ export class MockServerRepository {
                 return defaultData;
             }
 
-            // Validate structure and provide defaults for missing fields
             const validatedData = {
                 ...this._getDefaultSettings(),
                 ...data
             };
 
-            // Ensure enabledCollections is an array
             if (!Array.isArray(validatedData.enabledCollections)) {
                 validatedData.enabledCollections = [];
             }
 
-            // Ensure endpointDelays is an object
             if (!validatedData.endpointDelays || typeof validatedData.endpointDelays !== 'object') {
                 validatedData.endpointDelays = {};
             }
 
-            // Ensure customResponses is an object
             if (!validatedData.customResponses || typeof validatedData.customResponses !== 'object') {
                 validatedData.customResponses = {};
             }
 
-            // Ensure customStatusCodes is an object
             if (!validatedData.customStatusCodes || typeof validatedData.customStatusCodes !== 'object') {
                 validatedData.customStatusCodes = {};
             }
@@ -95,7 +90,6 @@ export class MockServerRepository {
                 throw new Error('Invalid mock server settings format');
             }
 
-            // Validate and sanitize settings
             const validatedSettings = this._validateSettings(settings);
 
             await this.backendAPI.store.set(this.SETTINGS_KEY, validatedSettings);
@@ -124,7 +118,6 @@ export class MockServerRepository {
                 ...updates
             };
 
-            // If endpointDelays is being updated, merge with existing
             if (updates.endpointDelays) {
                 updatedSettings.endpointDelays = {
                     ...currentSettings.endpointDelays,
@@ -132,7 +125,6 @@ export class MockServerRepository {
                 };
             }
 
-            // If customResponses is being updated, merge with existing
             if (updates.customResponses) {
                 updatedSettings.customResponses = {
                     ...currentSettings.customResponses,
@@ -140,7 +132,6 @@ export class MockServerRepository {
                 };
             }
 
-            // If customStatusCodes is being updated, merge with existing
             if (updates.customStatusCodes) {
                 updatedSettings.customStatusCodes = {
                     ...currentSettings.customStatusCodes,
@@ -174,7 +165,6 @@ export class MockServerRepository {
             const key = `${collectionId}_${endpointId}`;
 
             if (delayMs === 0) {
-                // Remove delay entry if set to 0
                 delete settings.endpointDelays[key];
             } else {
                 settings.endpointDelays[key] = delayMs;
@@ -220,7 +210,6 @@ export class MockServerRepository {
             const key = `${collectionId}_${endpointId}`;
 
             if (response === null) {
-                // Remove custom response entry to use default
                 delete settings.customResponses[key];
             } else {
                 settings.customResponses[key] = response;
@@ -266,7 +255,6 @@ export class MockServerRepository {
             const key = `${collectionId}_${endpointId}`;
 
             if (statusCode === null) {
-                // Remove custom status code entry to use default
                 delete settings.customStatusCodes[key];
             } else {
                 settings.customStatusCodes[key] = statusCode;
@@ -310,10 +298,8 @@ export class MockServerRepository {
             const index = settings.enabledCollections.indexOf(collectionId);
 
             if (index === -1) {
-                // Enable collection
                 settings.enabledCollections.push(collectionId);
             } else {
-                // Disable collection
                 settings.enabledCollections.splice(index, 1);
             }
 

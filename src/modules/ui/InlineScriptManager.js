@@ -103,7 +103,7 @@ export class InlineScriptManager {
 
         this.saveTimeout = setTimeout(() => {
             this.saveScripts();
-        }, 1000); // Save after 1 second of no typing
+        }, 1000);
     }
 
     async flushPendingSave() {

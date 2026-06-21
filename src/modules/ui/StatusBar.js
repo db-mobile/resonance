@@ -35,7 +35,7 @@ export class StatusBar {
             if (version && this._versionEl) {
                 this._versionEl.textContent = `v${version}`;
             }
-        } catch (_e) { /* version stays as "Resonance" */ }
+        } catch (_e) { }
     }
 
     async _loadInitialEnv() {
@@ -43,7 +43,7 @@ export class StatusBar {
             const env = await this._environmentService.getActiveEnvironment();
             this._setEnvName(env?.name ?? null);
             this._setColor(env?.color ?? null);
-        } catch (_e) { /* stays "No Environment" */ }
+        } catch (_e) { }
     }
 
     _setEnvName(name) {

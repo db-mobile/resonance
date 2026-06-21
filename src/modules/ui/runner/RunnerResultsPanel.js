@@ -46,7 +46,6 @@ export class RunnerResultsPanel {
     open(selectedRequests) {
         this.selectedRequests = selectedRequests || [];
 
-        // If panel already exists, clear it for a new run
         if (this.panel) {
             this._clear();
             this._initializeResultsList();
@@ -61,7 +60,6 @@ export class RunnerResultsPanel {
         const runnerPanel = this.container.querySelector('.runner-panel');
         if (!runnerPanel) {return;}
 
-        // Append all children from fragment (resizer + container)
         this.resizer = fragment.querySelector('.runner-results-resizer');
         this.panel = fragment.querySelector('.runner-results-container');
 
@@ -132,7 +130,6 @@ export class RunnerResultsPanel {
         }
         this._updateResultItem(index, result);
 
-        // If this result is currently selected, refresh the detail view
         if (this.selectedIndex === index) {
             this._populateResultDetail(this.data[index]);
         }
@@ -144,21 +141,17 @@ export class RunnerResultsPanel {
      * @private
      */
     _clear() {
-        // Reset data
         this.data = [];
         this.selectedIndex = -1;
 
-        // Clear summary
         if (this.dom.passed) {this.dom.passed.textContent = '0';}
         if (this.dom.failed) {this.dom.failed.textContent = '0';}
         if (this.dom.totalTime) {this.dom.totalTime.textContent = '—';}
 
-        // Clear results list
         if (this.dom.resultsList) {
             this.dom.resultsList.innerHTML = '';
         }
 
-        // Clear detail panel
         if (this.dom.detailMethod) {this.dom.detailMethod.textContent = '';}
         if (this.dom.detailName) {this.dom.detailName.textContent = '';}
         if (this.dom.detailStatus) {
@@ -170,7 +163,6 @@ export class RunnerResultsPanel {
         if (this.dom.headersBody) {this.dom.headersBody.innerHTML = '';}
         if (this.dom.cookiesBody) {this.dom.cookiesBody.innerHTML = '';}
 
-        // Hide detail panel until a result is selected
         if (this.dom.detailPanel) {
             this.dom.detailPanel.classList.add('is-hidden');
         }
@@ -211,7 +203,6 @@ export class RunnerResultsPanel {
     _attachEventListeners() {
         if (!this.panel) {return;}
 
-        // Tab switching
         this.panel.querySelectorAll('.runner-results-tab').forEach(tab => {
             tab.addEventListener('click', () => {
                 this._switchTab(tab.dataset.tab);
@@ -250,7 +241,6 @@ export class RunnerResultsPanel {
             const newResultsHeight = this._resizeStartHeight + deltaY;
             const newMainHeight = this._resizeStartMainHeight - deltaY;
 
-            // Enforce min/max constraints
             const minResultsHeight = 150;
             const maxResultsHeight = window.innerHeight * 0.7;
             const minMainHeight = 200;
@@ -347,7 +337,6 @@ export class RunnerResultsPanel {
             timeEl.style.display = 'none';
         }
 
-        // Click to view details
         el.addEventListener('click', () => {
             this._selectResultItem(index);
         });
@@ -368,12 +357,10 @@ export class RunnerResultsPanel {
         const el = this.dom.resultsList.querySelector(`[data-index="${index}"]`);
         if (!el) {return;}
 
-        // Update stored data
         if (this.data[index]) {
             Object.assign(this.data[index], result);
         }
 
-        // Update status icon (and mirror status onto the item for the status rail)
         const statusIcon = el.querySelector('[data-role="status-icon"]');
         const statusClass =
             result.status === 'success' ? 'is-success' :
@@ -388,7 +375,6 @@ export class RunnerResultsPanel {
         el.classList.remove('is-pending', 'is-running', 'is-success', 'is-error');
         el.classList.add(statusClass);
 
-        // Update status code
         const statusCodeEl = el.querySelector('[data-role="status-code"]');
         if (statusCodeEl && result.statusCode != null) {
             statusCodeEl.textContent = result.statusCode;
@@ -396,7 +382,6 @@ export class RunnerResultsPanel {
             statusCodeEl.dataset.statusClass = getStatusCodeClass(result.statusCode);
         }
 
-        // Update time
         const timeEl = el.querySelector('[data-role="time"]');
         if (timeEl && result.time != null) {
             timeEl.textContent = `${result.time}ms`;
@@ -415,15 +400,12 @@ export class RunnerResultsPanel {
 
         this.selectedIndex = index;
 
-        // Update selection state
         this.dom.resultsList?.querySelectorAll('.runner-result-item').forEach((el, i) => {
             el.classList.toggle('is-selected', i === index);
         });
 
-        // Show detail panel
         this.dom.detailPanel?.classList.remove('is-hidden');
 
-        // Populate detail view
         this._populateResultDetail(this.data[index]);
     }
 
@@ -436,7 +418,6 @@ export class RunnerResultsPanel {
     _populateResultDetail(result) {
         if (!result) {return;}
 
-        // Update header info
         if (this.dom.detailMethod) {
             this.dom.detailMethod.textContent = result.method;
             this.dom.detailMethod.dataset.method = result.method;
@@ -461,7 +442,6 @@ export class RunnerResultsPanel {
             this.dom.detailTime.textContent = result.time != null ? `${result.time}ms` : '';
         }
 
-        // Populate body
         if (this.dom.bodyContent) {
             let bodyText = '';
             if (result.body != null) {
@@ -478,7 +458,6 @@ export class RunnerResultsPanel {
             this.dom.bodyContent.textContent = bodyText || '(No response body)';
         }
 
-        // Populate headers
         if (this.dom.headersBody) {
             this.dom.headersBody.innerHTML = '';
             const headers = result.headers || {};
@@ -497,7 +476,6 @@ export class RunnerResultsPanel {
             }
         }
 
-        // Populate cookies
         if (this.dom.cookiesBody && this.dom.noCookies) {
             this.dom.cookiesBody.innerHTML = '';
             const cookies = result.cookies || [];
@@ -529,12 +507,10 @@ export class RunnerResultsPanel {
     _switchTab(tabName) {
         if (!this.panel) {return;}
 
-        // Update tab buttons
         this.panel.querySelectorAll('.runner-results-tab').forEach(tab => {
             tab.classList.toggle('is-active', tab.dataset.tab === tabName);
         });
 
-        // Update tab content
         this.panel.querySelectorAll('.runner-results-tab-content').forEach(content => {
             content.classList.toggle('is-active', content.dataset.content === tabName);
         });
