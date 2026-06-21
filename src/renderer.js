@@ -8,6 +8,7 @@
  */
 
 // Import ipcBridge first to set up window.backendAPI before any other modules
+import { getCurrentEndpoint, setCurrentEndpoint } from './modules/state/currentEndpoint.js';
 import { app } from './modules/appContext.js';
 import './modules/ipcBridge.js';
 
@@ -188,11 +189,11 @@ function initKeyboardShortcuts() {
     keyboardShortcuts.register('KeyS', {
         ctrl: true,
         handler: async () => {
-            if (window.currentEndpoint) {
+            if (getCurrentEndpoint()) {
                 const { saveAllRequestModifications } = await import('./modules/collectionManager.js');
                 await saveAllRequestModifications(
-                    window.currentEndpoint.collectionId,
-                    window.currentEndpoint.endpointId
+                    getCurrentEndpoint().collectionId,
+                    getCurrentEndpoint().endpointId
                 );
                 if (app.workspaceTabController) {
                     await app.workspaceTabController.markCurrentTabUnmodified();
@@ -210,10 +211,10 @@ function initKeyboardShortcuts() {
                     const result = await saveRequestToCollection(requestData);
                     if (result) {
                         // Update current endpoint and tab
-                        window.currentEndpoint = {
+                        setCurrentEndpoint({
                             collectionId: result.collectionId,
                             endpointId: result.endpointId
-                        };
+                        });
                         await app.workspaceTabController.service.updateTab(activeTab.id, {
                             name: result.name,
                             endpoint: {

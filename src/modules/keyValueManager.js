@@ -1,3 +1,4 @@
+import { getCurrentEndpoint } from './state/currentEndpoint.js';
 import { app } from './appContext.js';
 import { pathParamsList, addPathParamBtn, headersList, addHeaderBtn, queryParamsList, addQueryParamBtn, urlInput } from './domElements.js';
 
@@ -285,39 +286,39 @@ function debounceAutoSave(callback) {
 }
 
 async function autoSavePathParams() {
-    if (window.currentEndpoint && app.collectionService) {
+    if (getCurrentEndpoint() && app.collectionService) {
         const formElements = {
             pathParamsList: pathParamsList
         };
         await app.collectionService.saveCurrentPathParams(
-            window.currentEndpoint.collectionId,
-            window.currentEndpoint.endpointId,
+            getCurrentEndpoint().collectionId,
+            getCurrentEndpoint().endpointId,
             formElements
         );
     }
 }
 
 async function autoSaveQueryParams() {
-    if (window.currentEndpoint && app.collectionService) {
+    if (getCurrentEndpoint() && app.collectionService) {
         const formElements = {
             queryParamsList: queryParamsList
         };
         await app.collectionService.saveCurrentQueryParams(
-            window.currentEndpoint.collectionId,
-            window.currentEndpoint.endpointId,
+            getCurrentEndpoint().collectionId,
+            getCurrentEndpoint().endpointId,
             formElements
         );
     }
 }
 
 async function autoSaveHeaders() {
-    if (window.currentEndpoint && app.collectionService) {
+    if (getCurrentEndpoint() && app.collectionService) {
         const formElements = {
             headersList: headersList
         };
         await app.collectionService.saveCurrentHeaders(
-            window.currentEndpoint.collectionId,
-            window.currentEndpoint.endpointId,
+            getCurrentEndpoint().collectionId,
+            getCurrentEndpoint().endpointId,
             formElements
         );
     }

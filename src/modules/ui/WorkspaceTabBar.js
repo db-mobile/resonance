@@ -3,6 +3,7 @@
  * @module ui/WorkspaceTabBar
  */
 
+import { setCurrentEndpoint } from '../state/currentEndpoint.js';
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 
@@ -624,10 +625,10 @@ export class WorkspaceTabBar {
                         const result = await saveRequestToCollection(requestData);
                         if (result) {
                             // Update current endpoint and tab
-                            window.currentEndpoint = {
+                            setCurrentEndpoint({
                                 collectionId: result.collectionId,
                                 endpointId: result.endpointId
-                            };
+                            });
                             await app.workspaceTabController.service.updateTab(tab.id, {
                                 name: result.name,
                                 endpoint: {

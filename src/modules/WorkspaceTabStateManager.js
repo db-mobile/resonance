@@ -4,6 +4,7 @@
  * Manages capturing and restoring tab state from/to UI elements.
  * Bridges workspace tabs with the existing UI.
  */
+import { getCurrentEndpoint, setCurrentEndpoint } from './state/currentEndpoint.js';
 import { app } from './appContext.js';
 import { parseKeyValuePairs, populateKeyValueList, clearKeyValueList, addKeyValueRow, updateUrlFromQueryParams } from './keyValueManager.js';
 import { authManager } from './authManager.js';
@@ -65,10 +66,10 @@ export class WorkspaceTabStateManager {
                         useTls
                     }
                 },
-                endpoint: window.currentEndpoint
+                endpoint: getCurrentEndpoint()
                     ? {
-                          collectionId: window.currentEndpoint.collectionId,
-                          endpointId: window.currentEndpoint.endpointId,
+                          collectionId: getCurrentEndpoint().collectionId,
+                          endpointId: getCurrentEndpoint().endpointId,
                           protocol: 'grpc'
                       }
                     : null
@@ -89,10 +90,10 @@ export class WorkspaceTabStateManager {
                     authType: 'none',
                     authConfig: {}
                 },
-                endpoint: window.currentEndpoint
+                endpoint: getCurrentEndpoint()
                     ? {
-                          collectionId: window.currentEndpoint.collectionId,
-                          endpointId: window.currentEndpoint.endpointId,
+                          collectionId: getCurrentEndpoint().collectionId,
+                          endpointId: getCurrentEndpoint().endpointId,
                           protocol: 'sse'
                       }
                     : null,
@@ -118,10 +119,10 @@ export class WorkspaceTabStateManager {
                     authType: 'none',
                     authConfig: {}
                 },
-                endpoint: window.currentEndpoint
+                endpoint: getCurrentEndpoint()
                     ? {
-                          collectionId: window.currentEndpoint.collectionId,
-                          endpointId: window.currentEndpoint.endpointId,
+                          collectionId: getCurrentEndpoint().collectionId,
+                          endpointId: getCurrentEndpoint().endpointId,
                           protocol: 'websocket'
                       }
                     : null,
@@ -150,10 +151,10 @@ export class WorkspaceTabStateManager {
                     authType: 'none',
                     authConfig: {}
                 },
-                endpoint: window.currentEndpoint
+                endpoint: getCurrentEndpoint()
                     ? {
-                          collectionId: window.currentEndpoint.collectionId,
-                          endpointId: window.currentEndpoint.endpointId,
+                          collectionId: getCurrentEndpoint().collectionId,
+                          endpointId: getCurrentEndpoint().endpointId,
                           protocol: 'mqtt'
                       }
                     : null,
@@ -177,10 +178,10 @@ export class WorkspaceTabStateManager {
                     authType: authConfig.type || 'none',
                     authConfig: authConfig.config || {}
                 },
-                endpoint: window.currentEndpoint
+                endpoint: getCurrentEndpoint()
                     ? {
-                          collectionId: window.currentEndpoint.collectionId,
-                          endpointId: window.currentEndpoint.endpointId,
+                          collectionId: getCurrentEndpoint().collectionId,
+                          endpointId: getCurrentEndpoint().endpointId,
                           protocol: 'graphql'
                       }
                     : null,
@@ -245,11 +246,11 @@ export class WorkspaceTabStateManager {
                 authConfig: authConfig.config || {}
             },
             // Capture current endpoint reference for variable substitution
-            endpoint: window.currentEndpoint ? {
-                collectionId: window.currentEndpoint.collectionId,
-                endpointId: window.currentEndpoint.endpointId,
-                path: window.currentEndpoint.path,
-                method: window.currentEndpoint.method
+            endpoint: getCurrentEndpoint() ? {
+                collectionId: getCurrentEndpoint().collectionId,
+                endpointId: getCurrentEndpoint().endpointId,
+                path: getCurrentEndpoint().path,
+                method: getCurrentEndpoint().method
             } : null,
             // Capture active response tab
             activeResponseTab: activeResponseTab,
@@ -344,9 +345,9 @@ export class WorkspaceTabStateManager {
                 app.setGrpcTls(request.grpc?.useTls || false);
             }
             
-            // Set window.currentEndpoint for gRPC requests so Ctrl+S save works
+            // Set getCurrentEndpoint() for gRPC requests so Ctrl+S save works
             if (endpoint) {
-                window.currentEndpoint = endpoint;
+                setCurrentEndpoint(endpoint);
             }
             return;
         }
@@ -391,7 +392,7 @@ export class WorkspaceTabStateManager {
             }
 
             if (endpoint) {
-                window.currentEndpoint = endpoint;
+                setCurrentEndpoint(endpoint);
             }
             return;
         }
@@ -441,7 +442,7 @@ export class WorkspaceTabStateManager {
             }
 
             if (endpoint) {
-                window.currentEndpoint = endpoint;
+                setCurrentEndpoint(endpoint);
             }
             return;
         }
@@ -499,7 +500,7 @@ export class WorkspaceTabStateManager {
             }
 
             if (endpoint) {
-                window.currentEndpoint = endpoint;
+                setCurrentEndpoint(endpoint);
             }
             return;
         }
@@ -547,7 +548,7 @@ export class WorkspaceTabStateManager {
             import('./mqttHandler.js').then(m => m.refreshMqttConnectionUi(tab.id));
 
             if (endpoint) {
-                window.currentEndpoint = endpoint;
+                setCurrentEndpoint(endpoint);
             }
             return;
         }
@@ -658,10 +659,10 @@ export class WorkspaceTabStateManager {
         }
 
         // Store endpoint reference globally for compatibility with existing code
-        // Always update window.currentEndpoint to match the tab's endpoint state
+        // Always update getCurrentEndpoint() to match the tab's endpoint state
         // This ensures variable substitution uses the correct collection context
         if (endpoint) {
-            window.currentEndpoint = endpoint;
+            setCurrentEndpoint(endpoint);
 
             // Clear schema validation badge when switching endpoints
             clearSchemaValidationBadge();
@@ -678,7 +679,7 @@ export class WorkspaceTabStateManager {
             }
         } else if (Object.prototype.hasOwnProperty.call(tab, 'endpoint')) {
             // Tab explicitly has no endpoint (e.g., manually created tab)
-            window.currentEndpoint = null;
+            setCurrentEndpoint(null);
 
             // Clear schema validation badge when no endpoint
             clearSchemaValidationBadge();
@@ -695,7 +696,7 @@ export class WorkspaceTabStateManager {
             }
         }
         // If tab doesn't have endpoint property at all (old tab format),
-        // leave window.currentEndpoint as-is for backwards compatibility
+        // leave getCurrentEndpoint() as-is for backwards compatibility
     }
 
     /**

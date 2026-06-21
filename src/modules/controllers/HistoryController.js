@@ -3,6 +3,7 @@
  * @module controllers/HistoryController
  */
 
+import { setCurrentEndpoint } from '../state/currentEndpoint.js';
 import { HistoryService } from '../services/HistoryService.js';
 import { HistoryRenderer } from '../ui/HistoryRenderer.js';
 import { updateUrlFromQueryParams } from '../keyValueManager.js';
@@ -140,7 +141,7 @@ export class HistoryController {
             this.showRequestSection();
 
             // Clear current endpoint association since this is from history
-            window.currentEndpoint = null;
+            setCurrentEndpoint(null);
 
         } catch (error) {
             void error;

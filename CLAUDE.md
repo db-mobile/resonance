@@ -68,6 +68,8 @@ src/modules/
 ├── variables/      # Variable processor ({{ varName }}) and dynamic variables ({{$uuid}})
 ├── schema/         # OpenAPI schema handling
 ├── registry/       # FeatureRegistry - boots feature descriptors
+├── state/          # Encapsulated app state (e.g. currentEndpoint get/set accessors)
+├── appContext.js   # `app` service-locator for app-wide singletons (not on window.*)
 └── *.feature.js    # Per-feature wiring descriptors (one per feature stack)
 ```
 

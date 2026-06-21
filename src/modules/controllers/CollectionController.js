@@ -3,6 +3,7 @@
  * @module controllers/CollectionController
  */
 
+import { getCurrentEndpoint, setCurrentEndpoint } from '../state/currentEndpoint.js';
 import { app } from '../appContext.js';
 import { CollectionRepository } from '../storage/CollectionRepository.js';
 import { VariableRepository } from '../storage/VariableRepository.js';
@@ -458,7 +459,7 @@ export class CollectionController {
 
                 // Don't substitute variables in the form - they should stay as {{...}} placeholders
                 // Variable substitution happens at request time in apiHandler.js
-                // if (window.currentEndpoint && window.currentEndpoint.collectionId === collection.id) {
+                // if (getCurrentEndpoint() && getCurrentEndpoint().collectionId === collection.id) {
                 //     const formElements = this.getFormElements();
                 //     await this.processFormVariablesExceptUrl(collection.id, formElements);
                 // }
@@ -753,9 +754,9 @@ export class CollectionController {
             try {
                 await this.service.deleteRequestFromCollection(collection.id, endpoint.id);
 
-                if (window.currentEndpoint &&
-                    window.currentEndpoint.collectionId === collection.id &&
-                    window.currentEndpoint.endpointId === endpoint.id) {
+                if (getCurrentEndpoint() &&
+                    getCurrentEndpoint().collectionId === collection.id &&
+                    getCurrentEndpoint().endpointId === endpoint.id) {
                     const formElements = this.getFormElements();
                     formElements.urlInput.value = '';
                     formElements.methodSelect.value = 'GET';
@@ -763,7 +764,7 @@ export class CollectionController {
                     this.service.clearKeyValueList(formElements.pathParamsList);
                     this.service.clearKeyValueList(formElements.headersList);
                     this.service.clearKeyValueList(formElements.queryParamsList);
-                    window.currentEndpoint = null;
+                    setCurrentEndpoint(null);
 
                     await this.repository.clearLastSelectedRequest();
 
@@ -867,10 +868,10 @@ export class CollectionController {
         const bodyInput = document.getElementById('body-input');
         if (bodyInput) {
             bodyInput.addEventListener('blur', async () => {
-                if (window.currentEndpoint) {
+                if (getCurrentEndpoint()) {
                     await this.saveRequestBodyModification(
-                        window.currentEndpoint.collectionId, 
-                        window.currentEndpoint.endpointId
+                        getCurrentEndpoint().collectionId, 
+                        getCurrentEndpoint().endpointId
                     );
                 }
             });
@@ -879,10 +880,10 @@ export class CollectionController {
             bodyInput.addEventListener('input', () => {
                 clearTimeout(saveTimeout);
                 saveTimeout = setTimeout(async () => {
-                    if (window.currentEndpoint) {
+                    if (getCurrentEndpoint()) {
                         await this.saveRequestBodyModification(
-                            window.currentEndpoint.collectionId, 
-                            window.currentEndpoint.endpointId
+                            getCurrentEndpoint().collectionId, 
+                            getCurrentEndpoint().endpointId
                         );
                     }
                 }, 2000);
@@ -952,8 +953,8 @@ export class CollectionController {
      * @returns {Promise<Object>} Variables object for current collection, or empty object if no endpoint loaded
      */
     async getCurrentCollectionVariables() {
-        if (window.currentEndpoint) {
-            return this.variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
+        if (getCurrentEndpoint()) {
+            return this.variableService.getVariablesForCollection(getCurrentEndpoint().collectionId);
         }
         return {};
     }
@@ -966,8 +967,8 @@ export class CollectionController {
      * @returns {Promise<Object>} Processed request with substituted variables
      */
     async processRequestForVariables(request) {
-        if (window.currentEndpoint) {
-            return this.variableService.processRequest(request, window.currentEndpoint.collectionId);
+        if (getCurrentEndpoint()) {
+            return this.variableService.processRequest(request, getCurrentEndpoint().collectionId);
         }
         return request;
     }

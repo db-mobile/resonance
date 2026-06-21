@@ -1,3 +1,4 @@
+import { getCurrentEndpoint } from './state/currentEndpoint.js';
 import { app } from './appContext.js';
 import { urlInput, methodSelect, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, responseCookiesDisplay, responsePerformanceDisplay, languageSelector } from './domElements.js';
 import { toast } from './ui/Toast.js';
@@ -138,7 +139,7 @@ export async function fetchGraphQLIntrospection() {
 
     let resolvedUrl = url;
     try {
-        const { variables, processor } = await builder.resolveVariables(window.currentEndpoint, headers);
+        const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
         ({ url: resolvedUrl } = builder.processRequestComponents({
             url, pathParams: {}, headers, queryParams, variables, processor
         }));
@@ -506,9 +507,9 @@ export async function handleSendRequest() {
     }
 
     if (isWebSocketMode()) {
-        if (window.currentEndpoint) {
+        if (getCurrentEndpoint()) {
             // Fire-and-forget: don't block WebSocket connection on save
-            debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+            debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
         }
 
         let websocketUrl = urlInput?.value?.trim() || '';
@@ -525,7 +526,7 @@ export async function handleSendRequest() {
 
         try {
             const { variables, processor } = await builder.resolveVariables(
-                window.currentEndpoint, headers
+                getCurrentEndpoint(), headers
             );
 
             const result = builder.processRequestComponents({
@@ -552,8 +553,8 @@ export async function handleSendRequest() {
     }
 
     if (isSseMode()) {
-        if (window.currentEndpoint) {
-            debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+        if (getCurrentEndpoint()) {
+            debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
         }
 
         const sseInput = document.getElementById('sse-url-input');
@@ -568,7 +569,7 @@ export async function handleSendRequest() {
 
         try {
             const { variables, processor } = await builder.resolveVariables(
-                window.currentEndpoint, headers
+                getCurrentEndpoint(), headers
             );
             const result = builder.processRequestComponents({
                 url: sseUrl,
@@ -594,8 +595,8 @@ export async function handleSendRequest() {
     }
 
     if (isMqttMode()) {
-        if (window.currentEndpoint) {
-            debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+        if (getCurrentEndpoint()) {
+            debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
         }
 
         const brokerInput = document.getElementById('mqtt-broker-input');
@@ -604,7 +605,7 @@ export async function handleSendRequest() {
         const builder = getRequestBuilderService();
         try {
             const { variables, processor } = await builder.resolveVariables(
-                window.currentEndpoint, {}
+                getCurrentEndpoint(), {}
             );
             const result = builder.processRequestComponents({
                 url: broker,
@@ -642,8 +643,8 @@ export async function handleSendRequest() {
 
     setRequestInProgress(true);
 
-    if (window.currentEndpoint) {
-        debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+    if (getCurrentEndpoint()) {
+        debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
     }
 
     let url = urlInput?.value?.trim() || '';
@@ -671,7 +672,7 @@ export async function handleSendRequest() {
     let queryString = '';
     try {
         ({ variables: _resolvedVariables, processor } = await builder.resolveVariables(
-            window.currentEndpoint, headers
+            getCurrentEndpoint(), headers
         ));
 
         ({ url, queryString } = builder.processRequestComponents({
@@ -686,23 +687,23 @@ export async function handleSendRequest() {
     }
 
     // Check if mock server should be used for this request
-    if (window.currentEndpoint) {
+    if (getCurrentEndpoint()) {
         try {
             const mockServerService = getMockServerService();
-            const { shouldUseMock, mockBaseUrl } = await mockServerService.shouldUseMockServer(window.currentEndpoint.collectionId);
+            const { shouldUseMock, mockBaseUrl } = await mockServerService.shouldUseMockServer(getCurrentEndpoint().collectionId);
             
             if (shouldUseMock && mockBaseUrl) {
                 // Get the endpoint path from the collection
-                const collection = await getCollectionRepository().getById(window.currentEndpoint.collectionId);
+                const collection = await getCollectionRepository().getById(getCurrentEndpoint().collectionId);
                 
                 if (collection) {
                     // Find the endpoint in the collection
-                    let endpoint = collection.endpoints?.find(e => e.id === window.currentEndpoint.endpointId);
+                    let endpoint = collection.endpoints?.find(e => e.id === getCurrentEndpoint().endpointId);
                     
                     // Also check folders if not found at top level
                     if (!endpoint && collection.folders) {
                         for (const folder of collection.folders) {
-                            endpoint = folder.endpoints?.find(e => e.id === window.currentEndpoint.endpointId);
+                            endpoint = folder.endpoints?.find(e => e.id === getCurrentEndpoint().endpointId);
                             if (endpoint) { break; }
                         }
                     }
@@ -728,8 +729,8 @@ export async function handleSendRequest() {
             let variables = _resolvedVariables;
             if (variables === null) {
                 const variableService = getVariableService();
-                if (window.currentEndpoint) {
-                    variables = await variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
+                if (getCurrentEndpoint()) {
+                    variables = await variableService.getVariablesForCollection(getCurrentEndpoint().collectionId);
                 } else {
                     variables = await variableService.getVariables();
                 }
@@ -868,11 +869,11 @@ export async function handleSendRequest() {
             requestConfig.awsAuth = authData.awsAuth;
         }
 
-        if (window.currentEndpoint && app.scriptController) {
+        if (getCurrentEndpoint() && app.scriptController) {
             try {
                 requestConfig = await app.scriptController.executePreRequest(
-                    window.currentEndpoint.collectionId,
-                    window.currentEndpoint.endpointId,
+                    getCurrentEndpoint().collectionId,
+                    getCurrentEndpoint().endpointId,
                     requestConfig
                 );
             } catch (error) {
@@ -955,14 +956,14 @@ export async function handleSendRequest() {
 
             if (app.historyController) {
                 const _activeEnvName = await app.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
-                app.historyController.addHistoryEntry(requestConfig, result, window.currentEndpoint, _activeEnvName).catch(() => { /* fire-and-forget */ });
+                app.historyController.addHistoryEntry(requestConfig, result, getCurrentEndpoint(), _activeEnvName).catch(() => { /* fire-and-forget */ });
             }
 
-            if (window.currentEndpoint && app.scriptController) {
+            if (getCurrentEndpoint() && app.scriptController) {
                 try {
                     await app.scriptController.executeTest(
-                        window.currentEndpoint.collectionId,
-                        window.currentEndpoint.endpointId,
+                        getCurrentEndpoint().collectionId,
+                        getCurrentEndpoint().endpointId,
                         requestConfig,
                         result
                     );
@@ -1028,14 +1029,14 @@ export async function handleSendRequest() {
 
         if (app.historyController) {
             const _activeEnvName = await app.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
-            app.historyController.addHistoryEntry(requestConfig, error, window.currentEndpoint, _activeEnvName).catch(() => { /* fire-and-forget */ });
+            app.historyController.addHistoryEntry(requestConfig, error, getCurrentEndpoint(), _activeEnvName).catch(() => { /* fire-and-forget */ });
         }
 
-        if (window.currentEndpoint && app.scriptController) {
+        if (getCurrentEndpoint() && app.scriptController) {
             try {
                 await app.scriptController.executeTest(
-                    window.currentEndpoint.collectionId,
-                    window.currentEndpoint.endpointId,
+                    getCurrentEndpoint().collectionId,
+                    getCurrentEndpoint().endpointId,
                     requestConfig,
                     error
                 );
@@ -1049,8 +1050,8 @@ export async function handleSendRequest() {
 }
 
 export async function handleGenerateCurl() {
-    if (window.currentEndpoint) {
-        debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+    if (getCurrentEndpoint()) {
+        debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
     }
 
     let url = urlInput.value.trim();
@@ -1071,7 +1072,7 @@ export async function handleGenerateCurl() {
     let resolvedVariables;
     try {
         ({ variables: resolvedVariables, processor } = await builder.resolveVariables(
-            window.currentEndpoint, headers
+            getCurrentEndpoint(), headers
         ));
 
         ({ url } = builder.processRequestComponents({
@@ -1091,8 +1092,8 @@ export async function handleGenerateCurl() {
             const variableService = getVariableService();
             let variables = {};
 
-            if (window.currentEndpoint) {
-                variables = await variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
+            if (getCurrentEndpoint()) {
+                variables = await variableService.getVariablesForCollection(getCurrentEndpoint().collectionId);
             } else {
                 variables = await variableService.getVariables();
             }

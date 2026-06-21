@@ -3,6 +3,7 @@
  * @module services/CollectionService
  */
 
+import { getCurrentEndpoint, setCurrentEndpoint } from '../state/currentEndpoint.js';
 import { app } from '../appContext.js';
 import { setRequestBodyContent, getRequestBodyContent } from '../requestBodyHelper.js';
 import { toast } from '../ui/Toast.js';
@@ -512,18 +513,18 @@ export class CollectionService {
         try {
             this.schemaProcessor.setOpenApiSpec(collection._openApiSpec);
 
-            if (window.currentEndpoint) {
+            if (getCurrentEndpoint()) {
                 await this.saveRequestBodyModification(
-                    window.currentEndpoint.collectionId,
-                    window.currentEndpoint.endpointId,
+                    getCurrentEndpoint().collectionId,
+                    getCurrentEndpoint().endpointId,
                     formElements.bodyInput
                 );
-                await this.saveCurrentPathParams(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId, formElements);
-                await this.saveCurrentQueryParams(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId, formElements);
-                await this.saveCurrentHeaders(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId, formElements);
-                await this.saveCurrentAuthConfig(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+                await this.saveCurrentPathParams(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId, formElements);
+                await this.saveCurrentQueryParams(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId, formElements);
+                await this.saveCurrentHeaders(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId, formElements);
+                await this.saveCurrentAuthConfig(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
             }
-            window.currentEndpoint = { collectionId: collection.id, endpointId: endpoint.id };
+            setCurrentEndpoint({ collectionId: collection.id, endpointId: endpoint.id });
 
             this.populateUrlAndMethod(collection, endpoint, formElements);
             await this.populatePathParams(endpoint, formElements);
@@ -580,7 +581,7 @@ export class CollectionService {
     async populatePathParams(endpoint, formElements) {
         this.clearKeyValueList(formElements.pathParamsList);
 
-        const persistedPathParams = await this.repository.getPersistedPathParams(window.currentEndpoint.collectionId, endpoint.id);
+        const persistedPathParams = await this.repository.getPersistedPathParams(getCurrentEndpoint().collectionId, endpoint.id);
 
         if (persistedPathParams.length > 0) {
             persistedPathParams.forEach(param => {
@@ -661,7 +662,7 @@ export class CollectionService {
     async populateQueryParams(endpoint, formElements) {
         this.clearKeyValueList(formElements.queryParamsList);
 
-        const persistedQueryParams = await this.repository.getPersistedQueryParams(window.currentEndpoint.collectionId, endpoint.id);
+        const persistedQueryParams = await this.repository.getPersistedQueryParams(getCurrentEndpoint().collectionId, endpoint.id);
 
         if (persistedQueryParams.length > 0) {
             persistedQueryParams.forEach(param => {
