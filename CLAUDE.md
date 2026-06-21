@@ -66,7 +66,9 @@ src/modules/
 ├── storage/        # Repository pattern for data persistence
 ├── ui/             # UI components and dialogs
 ├── variables/      # Variable processor ({{ varName }}) and dynamic variables ({{$uuid}})
-└── schema/         # OpenAPI schema handling
+├── schema/         # OpenAPI schema handling
+├── registry/       # FeatureRegistry - boots feature descriptors
+└── *.feature.js    # Per-feature wiring descriptors (one per feature stack)
 ```
 
 ### Key Patterns
@@ -77,16 +79,21 @@ src/modules/
 
 3. **Repository Pattern**: Repositories validate data, auto-initialize defaults, and use defensive programming
 
-4. **Variable System**:
+4. **Feature Registry**: Each feature stack (Repository → Service → Controller → UI) is declared in a co-located `src/modules/<name>.feature.js` descriptor and registered on the `FeatureRegistry` (`src/modules/registry/FeatureRegistry.js`), which `renderer.js` boots once. A descriptor exports `{ name, create(ctx), globals?, provides?, init? }`:
+   - `create(ctx)` builds and returns the feature's instances; `ctx` provides `backendAPI`, `statusDisplay`, `secretStore`, `toast`, plus `provide(name, val)`/`get(name)` (a shared bus for cross-feature singletons).
+   - `globals` maps a `window.*` key → instance key; `provides` maps a bus name → instance key.
+   - `init` runs fire-and-forget at boot. Timing-critical inits (awaited, idle-tier, or post-lazy-editor) are omitted from the descriptor and stay at their exact call site in `renderer.js`, referencing instances via `featureRegistry.get('<name>')`.
+
+5. **Variable System**:
    - Static: `{{ variableName }}` - resolved from environments
    - Dynamic: `{{$uuid}}`, `{{$timestamp}}`, etc. - generated at request time
 
 ### Adding New Features
 
-1. Create modules in appropriate `src/modules/` subdirectories
-2. Export from index files
-3. Import and initialize in `renderer.js`
-4. For backend functionality: add Tauri commands in `src-tauri/src/commands/` and register in `main.rs`
+1. Create the feature's modules in the appropriate `src/modules/` subdirectories (controller, service, repository, UI) and export them from the relevant index files.
+2. Add a co-located `src/modules/<name>.feature.js` descriptor that wires the stack in `create(ctx)` and declares any `globals`/`provides`/`init` (see the Feature Registry pattern above).
+3. Register it in `renderer.js` with a single `.register(<name>Feature)` call. Order matters only when one feature consumes another's `provides` (register the provider first). Avoid adding manual `new Controller(...)` wiring to `renderer.js`.
+4. For backend functionality: add Tauri commands in `src-tauri/src/commands/` and register in `main.rs`.
 
 ## ESLint Rules (Enforced)
 

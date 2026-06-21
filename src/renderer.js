@@ -10,7 +10,7 @@
 // Import ipcBridge first to set up window.backendAPI before any other modules
 import './modules/ipcBridge.js';
 
-import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, bodyEditorContainer, bodyTextEditorContainer, pathParamsList, queryParamsList, headersList, authTypeSelect, responseBodyContainer, statusDisplay, responseHeadersDisplay, responseCookiesDisplay, grpcTargetInput, grpcServiceSelect, grpcMethodSelect, grpcBodyInput, grpcBodyEditorContainer } from './modules/domElements.js';
+import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, bodyEditorContainer, bodyTextEditorContainer, grpcBodyInput, grpcBodyEditorContainer } from './modules/domElements.js';
 
 import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl, setUrlUpdating } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
@@ -33,48 +33,25 @@ import { initResizer } from './modules/resizer.js';
 import { i18n } from './i18n/I18nManager.js';
 import { authManager } from './modules/authManager.js';
 import { initializeCopyHandler } from './modules/copyHandler.js';
-import { HistoryController } from './modules/controllers/HistoryController.js';
-import { EnvironmentController } from './modules/controllers/EnvironmentController.js';
-import { EnvironmentRepository } from './modules/storage/EnvironmentRepository.js';
 import { SecretStore } from './modules/storage/SecretStore.js';
-import { EnvironmentService } from './modules/services/EnvironmentService.js';
-import { EnvironmentManager } from './modules/ui/EnvironmentManager.js';
-import { EnvironmentSelector } from './modules/ui/EnvironmentSelector.js';
 import { StatusBar } from './modules/ui/StatusBar.js';
 import { ContextMenu } from './modules/ui/ContextMenu.js';
-import { ProxyController } from './modules/controllers/ProxyController.js';
-import { ProxyRepository } from './modules/storage/ProxyRepository.js';
-import { ProxyService } from './modules/services/ProxyService.js';
-import { CertificateController } from './modules/controllers/CertificateController.js';
-import { CertificateRepository } from './modules/storage/CertificateRepository.js';
-import { CertificateService } from './modules/services/CertificateService.js';
+import { FeatureRegistry } from './modules/registry/FeatureRegistry.js';
+import { proxyFeature } from './modules/proxy.feature.js';
+import { certificateFeature } from './modules/certificate.feature.js';
+import { cookieFeature } from './modules/cookie.feature.js';
+import { environmentFeature } from './modules/environment.feature.js';
+import { scriptFeature } from './modules/script.feature.js';
+import { mockServerFeature } from './modules/mockServer.feature.js';
+import { schemaFeature } from './modules/schema.feature.js';
+import { historyFeature } from './modules/history.feature.js';
+import { workspaceTabFeature } from './modules/workspaceTab.feature.js';
 import { StatusDisplayAdapter } from './modules/interfaces/IStatusDisplay.js';
 import { keyboardShortcuts } from './modules/keyboardShortcuts.js';
-import { WorkspaceTabRepository } from './modules/storage/WorkspaceTabRepository.js';
-import { WorkspaceTabService } from './modules/services/WorkspaceTabService.js';
-import { WorkspaceTabBar } from './modules/ui/WorkspaceTabBar.js';
-import { WorkspaceTabController } from './modules/controllers/WorkspaceTabController.js';
-import { WorkspaceTabStateManager } from './modules/WorkspaceTabStateManager.js';
-import { ResponseContainerManager } from './modules/ResponseContainerManager.js';
-import { ScriptController } from './modules/controllers/ScriptController.js';
-import { ScriptService } from './modules/services/ScriptService.js';
-import { ScriptRepository } from './modules/storage/ScriptRepository.js';
-import { InlineScriptManager } from './modules/ui/InlineScriptManager.js';
-import { ScriptConsolePanel } from './modules/ui/ScriptConsolePanel.js';
-import { MockServerRepository } from './modules/storage/MockServerRepository.js';
-import { MockServerService } from './modules/services/MockServerService.js';
-import { MockServerController } from './modules/controllers/MockServerController.js';
-import { MockServerDialog } from './modules/ui/MockServerDialog.js';
 import { CollectionRepository } from './modules/storage/CollectionRepository.js';
 import { RequestBodyEditor } from './modules/requestBodyEditor.bundle.js';
-import { PreviewRepository } from './modules/storage/PreviewRepository.js';
 import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
 import { toast } from './modules/ui/Toast.js';
-import { CookieRepository } from './modules/storage/CookieRepository.js';
-import { CookieJarService } from './modules/services/CookieJarService.js';
-import { CookieController } from './modules/controllers/CookieController.js';
-import { CookieManagerDialog } from './modules/ui/CookieManagerDialog.js';
-import { SchemaController } from './modules/controllers/SchemaController.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
@@ -89,19 +66,6 @@ window.invalidateApiHandlerEnvironmentCache = invalidateEnvironmentCache;
 // Initialize shared status display adapter
 const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
 
-// Initialize proxy system
-const proxyRepository = new ProxyRepository(window.backendAPI);
-const proxyService = new ProxyService(proxyRepository, statusDisplayAdapter);
-const proxyController = new ProxyController(proxyService);
-
-// Initialize client certificate (mTLS) system
-const certificateRepository = new CertificateRepository(window.backendAPI);
-const certificateService = new CertificateService(certificateRepository);
-const certificateController = new CertificateController(certificateService);
-certificateController.initialize();
-// Expose for the request path (apiHandler resolves a cert by host before sending)
-window.certificateController = certificateController;
-
 // Shared secret backend: stores secret values in the OS keychain (encryption at rest),
 // keeping them out of the plaintext store, exports, and git-friendly collection files.
 // Exposed globally for the auth request path. Falls back to encrypted-at-rest-free local
@@ -113,65 +77,12 @@ const secretStore = new SecretStore(window.backendAPI, {
 });
 window.secretStore = secretStore;
 
-// Initialize environment system
-const environmentRepository = new EnvironmentRepository(window.backendAPI, secretStore);
-const environmentService = new EnvironmentService(environmentRepository, statusDisplayAdapter);
-const environmentManager = new EnvironmentManager(environmentService);
+// Shared singletons consumed by registry features but not themselves registry-managed:
+// the collection repository (mock-server + schema) and the GraphQL body manager (workspace
+// tab state). Both are published onto the registry bus below.
+const collectionRepository = new CollectionRepository(window.backendAPI, secretStore);
 
-// Create environment controller first
-// eslint-disable-next-line prefer-const
-let environmentController;
-
-// Create environment selector with callbacks that will use the controller
-const environmentSelector = new EnvironmentSelector(
-    environmentService,
-    (envId) => environmentController.switchEnvironment(envId),
-    () => environmentController.openEnvironmentManager()
-);
-
-// Now create the controller
-environmentController = new EnvironmentController(
-    environmentService,
-    environmentManager,
-    environmentSelector
-);
-
-// Initialize cookie jar system
-const cookieRepository = new CookieRepository(window.backendAPI);
-const cookieJarService = new CookieJarService(cookieRepository);
-const cookieManagerDialog = new CookieManagerDialog(cookieJarService, environmentService);
-const cookieController = new CookieController(cookieJarService, cookieManagerDialog);
-cookieController.initialize();
-window.cookieController = cookieController;
-
-// Sync cookie jar environment when active environment changes
-environmentService.addChangeListener((event) => {
-    if (event.type === 'environment-switched') {
-        cookieController.setActiveEnvironment(event.environmentId, event.environmentName);
-    }
-});
-
-// Initialize script system
-const scriptRepository = new ScriptRepository(window.backendAPI);
-const scriptService = new ScriptService(
-    scriptRepository,
-    environmentService,
-    statusDisplayAdapter
-);
-const inlineScriptManager = new InlineScriptManager();
-// Initialize script manager event listeners
-inlineScriptManager.initialize();
-// Expose globally for workspace tab restoration
-window.inlineScriptManager = inlineScriptManager;
-// ScriptConsolePanel will be initialized per workspace tab, so pass null for now
-const scriptConsolePanel = new ScriptConsolePanel(null);
-const scriptController = new ScriptController(
-    scriptService,
-    inlineScriptManager,
-    scriptConsolePanel
-);
-
-// Initialize GraphQL body manager
+// Initialize GraphQL body manager (also used by apiHandler and the workspace tab feature).
 const graphqlBodyManager = new GraphQLBodyManager({
     bodyInput,
     graphqlQueryEditor: document.getElementById('graphql-query-editor'),
@@ -179,12 +90,62 @@ const graphqlBodyManager = new GraphQLBodyManager({
     graphqlFormatBtn: document.getElementById('graphql-format-btn')
 });
 graphqlBodyManager.initialize();
-
-// Make available to apiHandler
 setGraphQLBodyManager(graphqlBodyManager);
-
-// Make available globally for workspace tab state manager
 window.graphqlBodyManager = graphqlBodyManager;
+
+// Registry-managed features: each declares its own wiring in a co-located *.feature.js
+// descriptor (Repository → Service → Controller → UI), so adding/removing one no longer
+// means hand-editing the orchestration order here. The registry applies `globals` (window.*
+// exposure), publishes `provides` onto the shared bus, and runs each feature's init hook on
+// boot. Registration order matters where one feature consumes another's provided singleton
+// (cookie/script consume environment's `environmentService`; mock/schema/workspace consume
+// the collection repository / GraphQL body manager provided below).
+const featureRegistry = new FeatureRegistry({
+    backendAPI: window.backendAPI,
+    statusDisplay: statusDisplayAdapter,
+    secretStore,
+    toast,
+    _shared: new Map(),
+    provide(name, value) {
+        this._shared.set(name, value);
+        return value;
+    },
+    get(name) {
+        return this._shared.get(name);
+    },
+});
+featureRegistry.provide('collectionRepository', collectionRepository);
+featureRegistry.provide('graphqlBodyManager', graphqlBodyManager);
+featureRegistry
+    .register(environmentFeature)
+    .register(proxyFeature)
+    .register(certificateFeature)
+    .register(cookieFeature)
+    .register(scriptFeature)
+    .register(mockServerFeature)
+    .register(schemaFeature)
+    .register(historyFeature)
+    .register(workspaceTabFeature)
+    .boot();
+
+// Capture instances still referenced directly below. Globals (window.*) and the shared bus
+// are wired by the registry; these locals cover the remaining by-name references in this file
+// (e.g. SettingsModal, the cookie-jar button, deferred init in idle tiers, beforeunload save).
+const environment = featureRegistry.get('environment');
+const environmentController = environment.controller;
+const environmentService = environment.service;
+const environmentSelector = environment.selector;
+const proxyController = featureRegistry.get('proxy').controller;
+const certificateController = featureRegistry.get('certificate').controller;
+const cookieController = featureRegistry.get('cookie').controller;
+const mockServer = featureRegistry.get('mockServer');
+const mockServerController = mockServer.controller;
+const mockServerDialog = mockServer.dialog;
+const historyController = featureRegistry.get('history').controller;
+const workspaceTab = featureRegistry.get('workspaceTab');
+const workspaceTabController = workspaceTab.controller;
+const workspaceTabService = workspaceTab.service;
+const workspaceTabStateManager = workspaceTab.stateManager;
 
 // Initialize form-data / URL-encoded body manager
 const formBodyManager = new FormBodyManager();
@@ -193,59 +154,6 @@ window.formBodyManager = formBodyManager;
 
 // Initialize settings modal with all managers
 const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager, proxyController, certificateController);
-
-// Initialize mock server system
-const collectionRepository = new CollectionRepository(window.backendAPI, secretStore);
-const mockServerRepository = new MockServerRepository(window.backendAPI);
-const mockServerService = new MockServerService(mockServerRepository, statusDisplayAdapter);
-const mockServerController = new MockServerController(mockServerService, collectionRepository);
-const mockServerDialog = new MockServerDialog(mockServerController);
-
-// Initialize schema validation system
-const schemaController = new SchemaController({
-    repository: collectionRepository,
-    statusDisplay: statusDisplayAdapter
-});
-window.schemaController = schemaController;
-
-// Initialize history controller
-const historyController = new HistoryController(window.backendAPI);
-
-// Initialize preview repository
-const previewRepository = new PreviewRepository(window.backendAPI);
-
-// Initialize response container manager for multiple workspace tabs
-const responseContainerManager = new ResponseContainerManager(previewRepository);
-window.responseContainerManager = responseContainerManager;
-
-// Initialize workspace tab system
-const workspaceTabRepository = new WorkspaceTabRepository(window.backendAPI);
-const workspaceTabService = new WorkspaceTabService(workspaceTabRepository, statusDisplayAdapter);
-const workspaceTabBar = new WorkspaceTabBar('workspace-tab-bar-container');
-const workspaceTabStateManager = new WorkspaceTabStateManager({
-    urlInput,
-    methodSelect,
-    bodyInput,
-    pathParamsList,
-    queryParamsList,
-    headersList,
-    authTypeSelect,
-    responseBodyContainer,
-    statusDisplay,
-    responseHeadersDisplay,
-    responseCookiesDisplay,
-    graphqlBodyManager,
-    grpcTargetInput,
-    grpcServiceSelect,
-    grpcMethodSelect,
-    grpcBodyInput
-});
-const workspaceTabController = new WorkspaceTabController(
-    workspaceTabService,
-    workspaceTabBar,
-    workspaceTabStateManager,
-    responseContainerManager
-);
 
 /**
  * Initializes application keyboard shortcuts
@@ -712,12 +620,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Expose global references
+    // Expose global references. Feature controllers (history, environment, script,
+    // workspace tab) are exposed by the registry's `globals` map at boot; only non-feature
+    // globals remain here.
     window.authManager = authManager;
-    window.historyController = historyController;
-    window.environmentController = environmentController;
-    window.workspaceTabController = workspaceTabController;
-    window.scriptController = scriptController;
     window.setUrlUpdating = setUrlUpdating;
     window.setGrpcMetadata = setGrpcMetadata;
     window.setGrpcTls = setGrpcTls;
