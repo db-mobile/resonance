@@ -3,6 +3,8 @@
  * @module services/CollectionEndpointLoaderService
  */
 
+import { app } from '../appContext.js';
+
 /**
  * Coordinates endpoint hydration for selection and restore flows.
  */
@@ -25,7 +27,7 @@ export class CollectionEndpointLoaderService {
 
     async handleEndpointClick(collection, endpoint) {
         try {
-            if (window.workspaceTabController) {
+            if (app.workspaceTabController) {
                 await this.loadEndpointIntoWorkspaceTab(collection, endpoint);
             } else {
                 const formElements = this.getFormElements();
@@ -109,7 +111,7 @@ export class CollectionEndpointLoaderService {
             grpcData: isGrpc ? persistedData.grpcData : null
         };
 
-        await window.workspaceTabController.loadEndpoint(endpointData, false);
+        await app.workspaceTabController.loadEndpoint(endpointData, false);
     }
 
     findEndpointInCollection(collection, endpointId) {

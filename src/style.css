@@ -563,7 +563,9 @@ code {
 }
 
 .modal-dialog--code-snippet {
-  min-width: 700px;
+  width: 760px;
+  height: 600px;
+  max-height: 80vh;
 }
 
 .modal-dialog--variable-manager {

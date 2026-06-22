@@ -3,28 +3,31 @@
  * @module graphqlBodyManager
  */
 
+import { app } from './appContext.js';
 import { GraphQLEditor } from './graphqlEditor.bundle.js';
 import { JSONEditor } from './jsonEditor.bundle.js';
 import { toast } from './ui/Toast.js';
-import { fetchGraphQLIntrospection } from './apiHandler.js';
+import { fetchGraphQLIntrospection, buildSchemaFromIntrospection } from './apiHandler.js';
+
+const SCHEMA_STORE_KEY = 'graphqlSchemaCache';
+const SCHEMA_STORE_LIMIT = 50;
 
 export class GraphQLBodyManager {
     constructor(domElements) {
         this.dom = domElements;
         this.graphqlEditor = null;
         this.variablesEditor = null;
-        this.currentMode = 'json'; // 'json' or 'graphql'
+        this.currentMode = 'json';
         this.isGraphQLModeEnabled = false;
 
-        // Introspected schema state (in-memory only, keyed by resolved endpoint URL)
         this.schemaCache = new Map();
         this.currentSchema = null;
         this.isFetchingSchema = false;
+        this._autoFetchedUrls = new Set();
+        this._urlDebounce = null;
 
-        // Operation picker state (for documents with multiple named operations)
         this.selectedOperationName = null;
 
-        // References to new DOM elements
         this.jsonPanel = document.getElementById('body-json-section');
         this.graphqlPanel = document.getElementById('body-graphql-section');
         this.graphqlEditorContainer = document.getElementById('graphql-query-editor');
@@ -36,13 +39,11 @@ export class GraphQLBodyManager {
         this.docsToggle = document.getElementById('graphql-docs-toggle');
         this.docsRail = document.getElementById('graphql-docs-rail');
 
-        // Workbench drawer (Variables only — Headers is a normal request tab)
         this.drawer = document.getElementById('graphql-drawer');
         this.drawerTabs = document.getElementById('graphql-drawer-tabs');
         this.graphqlResizerHandle = document.getElementById('graphql-resizer-handle');
         this.activeDrawer = 'variables';
 
-        // Method bar, hidden while the Workbench is active (GraphQL is always POST)
         this.methodSelectContainer = document.querySelector('.method-select-container');
 
         this.workbenchActive = false;
@@ -53,19 +54,17 @@ export class GraphQLBodyManager {
      * Initialize GraphQL body manager with event listeners
      */
     initialize() {
-        // Initialize mode selector dropdown
         const modeSelect = document.getElementById('body-mode-select');
         if (modeSelect) {
             modeSelect.addEventListener('change', (e) => {
                 const mode = e.target.value;
                 this.switchMode(mode);
-                if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                    window.workspaceTabController.markCurrentTabModified();
+                if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                    app.workspaceTabController.markCurrentTabModified();
                 }
             });
         }
 
-        // Format button
         if (this.formatBtn) {
             this.formatBtn.addEventListener('click', () => {
                 if (this.graphqlEditor) {
@@ -77,21 +76,18 @@ export class GraphQLBodyManager {
             });
         }
 
-        // Fetch schema button
         if (this.fetchSchemaBtn) {
             this.fetchSchemaBtn.addEventListener('click', () => {
                 this.fetchSchema();
             });
         }
 
-        // Operation picker (multi-operation documents)
         if (this.operationSelect) {
             this.operationSelect.addEventListener('change', (e) => {
                 this.selectedOperationName = e.target.value || null;
             });
         }
 
-        // Drawer tab strip (Variables | Headers) — also opens/collapses the drawer
         if (this.drawerTabs) {
             this.drawerTabs.addEventListener('click', (e) => {
                 const tab = e.target.closest('.graphql-drawer-tab');
@@ -101,17 +97,27 @@ export class GraphQLBodyManager {
             });
         }
 
-        // Run button — proxy to the main Send so all the request logic is reused
         if (this.runBtn) {
             this.runBtn.addEventListener('click', () => {
                 document.getElementById('send-request-btn')?.click();
             });
         }
 
-        // Docs toggle — show/hide the schema docs rail
         if (this.docsToggle) {
             this.docsToggle.addEventListener('click', () => this.toggleDocs());
         }
+
+        document.addEventListener('input', (e) => {
+            const id = e.target?.id;
+            if (id !== 'url-input' && id !== 'graphql-url-input') {
+                return;
+            }
+            if (!this.isGraphQLMode()) {
+                return;
+            }
+            clearTimeout(this._urlDebounce);
+            this._urlDebounce = setTimeout(() => this.autoApplySchemaForUrl(), 500);
+        });
     }
 
     /**
@@ -160,7 +166,6 @@ export class GraphQLBodyManager {
         if (!this.drawer) {
             return;
         }
-        // Drop any inline height set by the resizer so the CSS flex takes over.
         this.drawer.style.flex = '';
         this.drawer.classList.toggle('collapsed', collapsed);
         if (this.graphqlResizerHandle) {
@@ -230,7 +235,6 @@ export class GraphQLBodyManager {
         document.querySelector('.main-content-area')?.classList.toggle('workbench-active', on);
 
         if (on) {
-            // Force POST and hide the method dropdown (GraphQL is always POST)
             const methodSelect = document.getElementById('method-select');
             if (methodSelect) {
                 this.savedMethod = methodSelect.value;
@@ -239,7 +243,6 @@ export class GraphQLBodyManager {
             if (this.methodSelectContainer) {
                 this.methodSelectContainer.style.display = 'none';
             }
-            // Reset ephemeral drawer state: closed, Variables tab
             this.setDrawerPane('variables');
             this.setDrawerCollapsed(true);
             window.__verticalResizer?.setRequestBias(0.6);
@@ -259,7 +262,6 @@ export class GraphQLBodyManager {
             }
         }
 
-        // Let layout settle, then remeasure the editors
         requestAnimationFrame(() => requestAnimationFrame(() => {
             this.graphqlEditor?.view?.requestMeasure?.();
             this.variablesEditor?.view?.requestMeasure?.();
@@ -277,8 +279,6 @@ export class GraphQLBodyManager {
         }
 
         const operations = this.graphqlEditor ? this.graphqlEditor.getOperations() : [];
-        // operations === null means the document is currently unparseable — leave
-        // the picker as-is rather than flickering it away on every keystroke.
         if (operations === null) {
             return;
         }
@@ -288,7 +288,6 @@ export class GraphQLBodyManager {
         if (named.length <= 1) {
             this.operationSelect.style.display = 'none';
             this.operationSelect.innerHTML = '';
-            // A lone named operation is still sent by name via getSelectedOperationName()
             this.selectedOperationName = named.length === 1 ? named[0].name : null;
             return;
         }
@@ -341,14 +340,19 @@ export class GraphQLBodyManager {
         }
 
         try {
-            const { schema, url, error } = await fetchGraphQLIntrospection();
+            const cacheKey = this._getCurrentUrl();
+            const { schema, introspection, error } = await fetchGraphQLIntrospection();
             if (error) {
                 toast.error(error);
                 return;
             }
             this.currentSchema = schema;
-            if (url) {
-                this.schemaCache.set(url, schema);
+            if (cacheKey) {
+                this.schemaCache.set(cacheKey, schema);
+                this._autoFetchedUrls.add(cacheKey);
+                if (introspection) {
+                    this._saveSchemaToStore(cacheKey, introspection);
+                }
             }
             this.applySchemaToEditor();
             if (this.docsRail && this.docsRail.style.display !== 'none') {
@@ -375,19 +379,137 @@ export class GraphQLBodyManager {
     }
 
     /**
+     * Read the current endpoint URL. In GraphQL mode the shared `#url-input`
+     * remains the source of truth (the visible `#graphql-url-input` mirrors it).
+     * @returns {string} The trimmed URL, or '' when unavailable.
+     */
+    _getCurrentUrl() {
+        return document.getElementById('url-input')?.value?.trim() || '';
+    }
+
+    /**
+     * Load the persisted per-URL introspection cache from the backend store.
+     * @returns {Promise<Object>} A `{ [url]: introspectionJson }` map (possibly empty).
+     */
+    async _loadSchemaStore() {
+        try {
+            const store = await window.backendAPI?.store?.get(SCHEMA_STORE_KEY);
+            return store && typeof store === 'object' ? store : {};
+        } catch (_e) {
+            return {};
+        }
+    }
+
+    /**
+     * Persist a raw introspection result keyed by URL, capped to the most-recent
+     * {@link SCHEMA_STORE_LIMIT} endpoints (LRU by re-insertion order).
+     * @param {string} url
+     * @param {object} introspection - The serializable `data` of an introspection query.
+     */
+    async _saveSchemaToStore(url, introspection) {
+        if (!url || !introspection || !window.backendAPI?.store) {
+            return;
+        }
+        try {
+            const store = await this._loadSchemaStore();
+            delete store[url];
+            store[url] = introspection;
+            const keys = Object.keys(store);
+            let toSave = store;
+            if (keys.length > SCHEMA_STORE_LIMIT) {
+                toSave = {};
+                keys.slice(keys.length - SCHEMA_STORE_LIMIT).forEach((k) => {
+                    toSave[k] = store[k];
+                });
+            }
+            await window.backendAPI.store.set(SCHEMA_STORE_KEY, toSave);
+        } catch (_e) {
+            void _e;
+        }
+    }
+
+    /**
+     * Apply the best available schema for the given (or current) URL to the editor:
+     * in-memory cache → persisted store → silent background introspection.
+     * Keeps autocomplete current without forcing the user to click Schema.
+     * @param {string} [url] - Defaults to the current endpoint URL.
+     */
+    async autoApplySchemaForUrl(url) {
+        const targetUrl = (url || this._getCurrentUrl()).trim();
+        if (!targetUrl) {
+            return;
+        }
+
+        if (this.schemaCache.has(targetUrl)) {
+            this.currentSchema = this.schemaCache.get(targetUrl);
+            this.applySchemaToEditor();
+            return;
+        }
+
+        const store = await this._loadSchemaStore();
+        const introspection = store[targetUrl];
+        if (introspection) {
+            const schema = buildSchemaFromIntrospection(introspection);
+            if (schema) {
+                this.schemaCache.set(targetUrl, schema);
+                this.currentSchema = schema;
+                this.applySchemaToEditor();
+                return;
+            }
+        }
+
+        this.currentSchema = null;
+        this.graphqlEditor?.clearSchema?.();
+        this._backgroundIntrospect(targetUrl);
+    }
+
+    /**
+     * Fetch and cache the schema for a URL without surfacing toasts. Runs at most
+     * once per URL and only for absolute http(s) endpoints.
+     * @param {string} targetUrl
+     */
+    async _backgroundIntrospect(targetUrl) {
+        if (this.isFetchingSchema || this._autoFetchedUrls.has(targetUrl)) {
+            return;
+        }
+        if (!/^https?:\/\//i.test(targetUrl)) {
+            return;
+        }
+        this.isFetchingSchema = true;
+        try {
+            const { schema, introspection, error } = await fetchGraphQLIntrospection();
+            if (error || !schema) {
+                return;
+            }
+            if (this._getCurrentUrl() !== targetUrl) {
+                return;
+            }
+            this.schemaCache.set(targetUrl, schema);
+            this.currentSchema = schema;
+            if (introspection) {
+                this._saveSchemaToStore(targetUrl, introspection);
+            }
+            this.applySchemaToEditor();
+        } catch (_e) {
+            void _e;
+        } finally {
+            this.isFetchingSchema = false;
+            this._autoFetchedUrls.add(targetUrl);
+        }
+    }
+
+    /**
      * Switch between JSON and GraphQL modes
      * @param {string} mode - 'json' or 'graphql'
      */
     switchMode(mode) {
         this.currentMode = mode;
 
-        // Update dropdown selector
         const modeSelect = document.getElementById('body-mode-select');
         if (modeSelect && modeSelect.value !== mode) {
             modeSelect.value = mode;
         }
 
-        // Update panels
         document.querySelectorAll('.body-mode-panel').forEach(panel => {
             const panelMode = panel.getAttribute('data-mode');
             if (panelMode === mode) {
@@ -397,13 +519,15 @@ export class GraphQLBodyManager {
             }
         });
 
-        // Initialize GraphQL editor if switching to GraphQL mode
         if (mode === 'graphql' && !this.graphqlEditor) {
             this.initializeGraphQLEditor();
         }
 
-        // GraphQL gets the first-class Workbench layout; any other mode tears it down
         this.setWorkbenchActive(mode === 'graphql');
+
+        if (mode === 'graphql') {
+            this.autoApplySchemaForUrl();
+        }
     }
 
     /**
@@ -419,22 +543,17 @@ export class GraphQLBodyManager {
         }
 
         try {
-            // Initialize query editor with GraphQL syntax highlighting
             this.graphqlEditor = new GraphQLEditor(this.graphqlEditorContainer);
 
-            // Set up auto-save on query change
             this.graphqlEditor.onChange((_content) => {
                 this.saveCurrentState();
                 this.updateOperationPicker();
             });
 
-            // Re-apply a previously fetched schema so it survives editor re-creation
             this.applySchemaToEditor();
 
-            // Initialize variables editor with JSON syntax highlighting
             this.variablesEditor = new JSONEditor(this.graphqlVariablesEditorContainer);
 
-            // Set up auto-save on variables change
             this.variablesEditor.onChange((_content) => {
                 this.saveCurrentState();
             });
@@ -523,8 +642,6 @@ export class GraphQLBodyManager {
      * Save current state (placeholder - will integrate with CollectionRepository)
      */
     async saveCurrentState() {
-        // This will be called by CollectionService to save modified state
-        // Implementation will integrate with existing save mechanisms
     }
 
     /**

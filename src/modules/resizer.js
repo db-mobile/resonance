@@ -1,3 +1,5 @@
+import { app } from './appContext.js';
+
 export class Resizer {
     constructor() {
         this.isDragging = false;
@@ -322,7 +324,6 @@ export class HistoryResizer {
     drag(e) {
         if (!this.isDragging) {return;}
 
-        // History sidebar is on the right, so dragging left increases width
         const deltaX = e.clientX - this.startX;
         const newSidebarWidth = this.startSidebarWidth - deltaX;
 
@@ -397,7 +398,6 @@ export class GraphQLEditorResizer {
     drag(e) {
         if (!this.isDragging) {return;}
 
-        // Dragging up (negative delta) grows the variables pane
         const deltaY = e.clientY - this.startY;
         const newVariablesHeight = this.startVariablesHeight - deltaY;
 
@@ -421,9 +421,8 @@ export class GraphQLEditorResizer {
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
 
-        // CodeMirror needs to re-measure after its container changes height
-        window.graphqlBodyManager?.graphqlEditor?.view?.requestMeasure?.();
-        window.graphqlBodyManager?.variablesEditor?.view?.requestMeasure?.();
+        app.graphqlBodyManager?.graphqlEditor?.view?.requestMeasure?.();
+        app.graphqlBodyManager?.variablesEditor?.view?.requestMeasure?.();
     }
 }
 
@@ -432,8 +431,6 @@ export function initResizer() {
     const horizontalResizer = new HorizontalResizer();
     const historyResizer = new HistoryResizer();
     const graphqlEditorResizer = new GraphQLEditorResizer();
-    // Expose the vertical resizer so the GraphQL Workbench can bias the request/
-    // response split (and restore it) when entering/leaving GraphQL mode.
     window.__verticalResizer = verticalResizer;
     return { verticalResizer, horizontalResizer, historyResizer, graphqlEditorResizer };
 }

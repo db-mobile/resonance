@@ -3,6 +3,7 @@
  * @module ui/HistoryRenderer
  */
 
+import { app } from '../appContext.js';
 import { HistoryService } from '../services/HistoryService.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
 import { templateLoader } from '../templateLoader.js';
@@ -58,20 +59,20 @@ export class HistoryRenderer {
     }
 
     async handleClearAll() {
-        const confirmMessage = window.i18n ?
-            window.i18n.t('history.confirm_clear') || 'Are you sure you want to clear all request history?\n\nThis action cannot be undone.' :
+        const confirmMessage = app.i18n ?
+            app.i18n.t('history.confirm_clear') || 'Are you sure you want to clear all request history?\n\nThis action cannot be undone.' :
             'Are you sure you want to clear all request history?\n\nThis action cannot be undone.';
 
-        const title = window.i18n ?
-            window.i18n.t('history.clear_all_title') || 'Clear All History' :
+        const title = app.i18n ?
+            app.i18n.t('history.clear_all_title') || 'Clear All History' :
             'Clear All History';
 
-        const confirmText = window.i18n ?
-            window.i18n.t('common.delete') || 'Clear' :
+        const confirmText = app.i18n ?
+            app.i18n.t('common.delete') || 'Clear' :
             'Clear';
 
-        const cancelText = window.i18n ?
-            window.i18n.t('common.cancel') || 'Cancel' :
+        const cancelText = app.i18n ?
+            app.i18n.t('common.cancel') || 'Cancel' :
             'Cancel';
 
         const confirmed = await this.confirmDialog.show(confirmMessage, {
@@ -112,7 +113,6 @@ export class HistoryRenderer {
             this.container.appendChild(el);
         });
 
-        // Attach event listeners to history items
         historyItems.forEach(entry => {
             const element = this.container.querySelector(`[data-history-id="${entry.id}"]`);
             if (element) {

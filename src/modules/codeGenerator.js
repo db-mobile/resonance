@@ -1,6 +1,25 @@
-// Multi-language code generator for API requests
+/**
+ * @fileoverview Generates request code snippets for various languages and clients (cURL,
+ * Python, JavaScript, Node.js, Go, PHP, Ruby, Java) from a request configuration.
+ * @module codeGenerator
+ */
 
-// Helper function to escape shell arguments for cURL
+/**
+ * A request to generate code for.
+ *
+ * @typedef {Object} RequestConfig
+ * @property {string} [method] - HTTP method; defaults to `GET`.
+ * @property {string} url - Target request URL.
+ * @property {Object<string, string>} [headers] - Header name/value pairs.
+ * @property {string|Object} [body] - Request body; non-string values are JSON-stringified.
+ */
+
+/**
+ * Escapes a string for safe use as a single-quoted POSIX shell argument.
+ *
+ * @param {string} str - The raw value.
+ * @returns {string} The quoted, shell-safe argument.
+ */
 function escapeShellArg(str) {
     if (!str) {
         return "''";
@@ -8,7 +27,12 @@ function escapeShellArg(str) {
     return `'${str.replace(/'/g, "'\\''")}'`;
 }
 
-// Helper function to escape strings for Python
+/**
+ * Escapes a string for use inside a double-quoted Python/PHP/Ruby string literal.
+ *
+ * @param {string} str - The raw value.
+ * @returns {string} The escaped value.
+ */
 function escapePythonString(str) {
     if (!str) {
         return '';
@@ -16,7 +40,12 @@ function escapePythonString(str) {
     return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
 }
 
-// Helper function to escape strings for JavaScript
+/**
+ * Escapes a string for use inside a JavaScript template literal.
+ *
+ * @param {string} str - The raw value.
+ * @returns {string} The escaped value.
+ */
 function escapeJavaScriptString(str) {
     if (!str) {
         return '';
@@ -24,7 +53,12 @@ function escapeJavaScriptString(str) {
     return str.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
 }
 
-// Helper function to escape strings for Go
+/**
+ * Escapes a string for use inside a double-quoted Go/Java string literal.
+ *
+ * @param {string} str - The raw value.
+ * @returns {string} The escaped value.
+ */
 function escapeGoString(str) {
     if (!str) {
         return '';
@@ -32,7 +66,44 @@ function escapeGoString(str) {
     return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
 }
 
-// cURL Generator
+/**
+ * Whether the request carries a body, normalizing the method so a lowercase
+ * method (e.g. `"post"`) is treated the same as its uppercase form.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {boolean} True when a body should be emitted.
+ */
+function hasBody(config) {
+    return Boolean(config.body) && ['POST', 'PUT', 'PATCH'].includes((config.method || 'GET').toUpperCase());
+}
+
+/**
+ * Serializes a request body to a string. Objects are JSON-encoded.
+ *
+ * @param {string|Object} body - The request body.
+ * @param {boolean} [pretty=false] - Pretty-print JSON objects with 2-space indentation.
+ * @returns {string} The serialized body.
+ */
+function stringifyBody(body, pretty = false) {
+    return typeof body === 'string' ? body : JSON.stringify(body, null, pretty ? 2 : undefined);
+}
+
+/**
+ * Returns the non-empty header entries (both key and value truthy) of a config.
+ *
+ * @param {Object<string, string>} [headers] - Header name/value pairs.
+ * @returns {Array<[string, string]>} The retained header entries.
+ */
+function validHeaders(headers) {
+    return Object.entries(headers || {}).filter(([key, value]) => key && value);
+}
+
+/**
+ * Generates a cURL command for the given request.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {string} The generated cURL command.
+ */
 function generateCurl(config) {
     const { method, url, headers, body } = config;
     const curlParts = ['curl'];
@@ -41,17 +112,12 @@ function generateCurl(config) {
         curlParts.push(`-X ${method}`);
     }
 
-    if (headers && Object.keys(headers).length > 0) {
-        for (const [key, value] of Object.entries(headers)) {
-            if (key && value) {
-                curlParts.push(`-H ${escapeShellArg(`${key}: ${value}`)}`);
-            }
-        }
+    for (const [key, value] of validHeaders(headers)) {
+        curlParts.push(`-H ${escapeShellArg(`${key}: ${value}`)}`);
     }
 
-    if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
-        const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
-        curlParts.push(`-d ${escapeShellArg(bodyString)}`);
+    if (hasBody(config)) {
+        curlParts.push(`-d ${escapeShellArg(stringifyBody(body))}`);
     }
 
     curlParts.push(escapeShellArg(url));
@@ -59,45 +125,43 @@ function generateCurl(config) {
     return curlParts.join(' \\\n  ');
 }
 
-// Python (requests) Generator
+/**
+ * Generates Python code using the `requests` library.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {string} The generated Python code.
+ */
 function generatePythonRequests(config) {
     const { method, url, headers, body } = config;
+    const hdrs = validHeaders(headers);
     const lines = [];
 
     lines.push('import requests');
     lines.push('');
 
-    // URL
     lines.push(`url = "${escapePythonString(url)}"`);
     lines.push('');
 
-    // Headers
-    if (headers && Object.keys(headers).length > 0) {
+    if (hdrs.length > 0) {
         lines.push('headers = {');
-        const headerLines = Object.entries(headers)
-            .filter(([key, value]) => key && value)
-            .map(([key, value]) => `    "${escapePythonString(key)}": "${escapePythonString(value)}"`);
-        lines.push(headerLines.join(',\n'));
+        lines.push(hdrs.map(([key, value]) => `    "${escapePythonString(key)}": "${escapePythonString(value)}"`).join(',\n'));
         lines.push('}');
         lines.push('');
     }
 
-    // Body
-    if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
-        const bodyString = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
-        lines.push(`data = """${  bodyString  }"""`);
+    if (hasBody(config)) {
+        lines.push(`data = """${stringifyBody(body, true)}"""`);
         lines.push('');
     }
 
-    // Request
     const methodLower = (method || 'GET').toLowerCase();
     const requestParts = [`requests.${methodLower}(url`];
 
-    if (headers && Object.keys(headers).length > 0) {
+    if (hdrs.length > 0) {
         requestParts.push('headers=headers');
     }
 
-    if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
+    if (hasBody(config)) {
         requestParts.push('data=data');
     }
 
@@ -109,28 +173,28 @@ function generatePythonRequests(config) {
     return lines.join('\n');
 }
 
-// JavaScript (fetch) Generator
+/**
+ * Generates JavaScript code using the Fetch API.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {string} The generated JavaScript code.
+ */
 function generateJavaScriptFetch(config) {
     const { method, url, headers, body } = config;
+    const hdrs = validHeaders(headers);
     const lines = [];
 
     lines.push(`fetch(\`${escapeJavaScriptString(url)}\`, {`);
     lines.push(`  method: '${method || 'GET'}',`);
 
-    // Headers
-    if (headers && Object.keys(headers).length > 0) {
+    if (hdrs.length > 0) {
         lines.push('  headers: {');
-        const headerLines = Object.entries(headers)
-            .filter(([key, value]) => key && value)
-            .map(([key, value]) => `    '${escapeJavaScriptString(key)}': '${escapeJavaScriptString(value)}'`);
-        lines.push(headerLines.join(',\n'));
+        lines.push(hdrs.map(([key, value]) => `    '${escapeJavaScriptString(key)}': '${escapeJavaScriptString(value)}'`).join(',\n'));
         lines.push('  },');
     }
 
-    // Body
-    if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
-        const bodyString = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
-        lines.push(`  body: \`${escapeJavaScriptString(bodyString)}\``);
+    if (hasBody(config)) {
+        lines.push(`  body: \`${escapeJavaScriptString(stringifyBody(body, true))}\``);
     }
 
     lines.push('})');
@@ -141,9 +205,15 @@ function generateJavaScriptFetch(config) {
     return lines.join('\n');
 }
 
-// JavaScript (axios) Generator
+/**
+ * Generates JavaScript code using the Axios library.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {string} The generated JavaScript code.
+ */
 function generateJavaScriptAxios(config) {
     const { method, url, headers, body } = config;
+    const hdrs = validHeaders(headers);
     const lines = [];
 
     lines.push('const axios = require(\'axios\');');
@@ -153,20 +223,14 @@ function generateJavaScriptAxios(config) {
     lines.push(`  method: '${(method || 'GET').toLowerCase()}',`);
     lines.push(`  url: \`${escapeJavaScriptString(url)}\`,`);
 
-    // Headers
-    if (headers && Object.keys(headers).length > 0) {
+    if (hdrs.length > 0) {
         lines.push('  headers: {');
-        const headerLines = Object.entries(headers)
-            .filter(([key, value]) => key && value)
-            .map(([key, value]) => `    '${escapeJavaScriptString(key)}': '${escapeJavaScriptString(value)}'`);
-        lines.push(headerLines.join(',\n'));
+        lines.push(hdrs.map(([key, value]) => `    '${escapeJavaScriptString(key)}': '${escapeJavaScriptString(value)}'`).join(',\n'));
         lines.push('  },');
     }
 
-    // Body
-    if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
-        const bodyString = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
-        lines.push(`  data: \`${escapeJavaScriptString(bodyString)}\``);
+    if (hasBody(config)) {
+        lines.push(`  data: \`${escapeJavaScriptString(stringifyBody(body, true))}\``);
     }
 
     lines.push('};');
@@ -178,9 +242,16 @@ function generateJavaScriptAxios(config) {
     return lines.join('\n');
 }
 
-// Go (net/http) Generator
+/**
+ * Generates Go code using the `net/http` package.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {string} The generated Go code.
+ */
 function generateGo(config) {
     const { method, url, headers, body } = config;
+    const includeBody = hasBody(config);
+    const hdrs = validHeaders(headers);
     const lines = [];
 
     lines.push('package main');
@@ -189,22 +260,19 @@ function generateGo(config) {
     lines.push('    "fmt"');
     lines.push('    "io"');
     lines.push('    "net/http"');
-    if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
+    if (includeBody) {
         lines.push('    "strings"');
     }
     lines.push(')');
     lines.push('');
     lines.push('func main() {');
 
-    // Body
-    if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
-        const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
-        lines.push(`    payload := strings.NewReader(\`${escapeGoString(bodyString)}\`)`);
+    if (includeBody) {
+        lines.push(`    payload := strings.NewReader(\`${escapeGoString(stringifyBody(body))}\`)`);
         lines.push('');
     }
 
-    // Create request
-    const bodyArg = (body && ['POST', 'PUT', 'PATCH'].includes(method)) ? 'payload' : 'nil';
+    const bodyArg = includeBody ? 'payload' : 'nil';
     lines.push(`    req, err := http.NewRequest("${method || 'GET'}", "${escapeGoString(url)}", ${bodyArg})`);
     lines.push('    if err != nil {');
     lines.push('        fmt.Println(err)');
@@ -212,17 +280,13 @@ function generateGo(config) {
     lines.push('    }');
     lines.push('');
 
-    // Headers
-    if (headers && Object.keys(headers).length > 0) {
-        for (const [key, value] of Object.entries(headers)) {
-            if (key && value) {
-                lines.push(`    req.Header.Add("${escapeGoString(key)}", "${escapeGoString(value)}")`);
-            }
+    if (hdrs.length > 0) {
+        for (const [key, value] of hdrs) {
+            lines.push(`    req.Header.Add("${escapeGoString(key)}", "${escapeGoString(value)}")`);
         }
         lines.push('');
     }
 
-    // Execute request
     lines.push('    client := &http.Client{}');
     lines.push('    res, err := client.Do(req)');
     lines.push('    if err != nil {');
@@ -243,12 +307,17 @@ function generateGo(config) {
     return lines.join('\n');
 }
 
-// Node.js (https) Generator
+/**
+ * Generates Node.js code using the built-in `http`/`https` module.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {string} The generated Node.js code.
+ */
 function generateNodeJs(config) {
     const { method, url, headers, body } = config;
+    const hdrs = validHeaders(headers);
     const lines = [];
 
-    // Parse URL to determine if http or https
     const urlObj = new URL(url);
     const isHttps = urlObj.protocol === 'https:';
     const moduleName = isHttps ? 'https' : 'http';
@@ -264,13 +333,9 @@ function generateNodeJs(config) {
     lines.push(`  path: '${escapeJavaScriptString(urlObj.pathname + urlObj.search)}',`);
     lines.push(`  method: '${method || 'GET'}',`);
 
-    // Headers
-    if (headers && Object.keys(headers).length > 0) {
+    if (hdrs.length > 0) {
         lines.push('  headers: {');
-        const headerLines = Object.entries(headers)
-            .filter(([key, value]) => key && value)
-            .map(([key, value]) => `    '${escapeJavaScriptString(key)}': '${escapeJavaScriptString(value)}'`);
-        lines.push(headerLines.join(',\n'));
+        lines.push(hdrs.map(([key, value]) => `    '${escapeJavaScriptString(key)}': '${escapeJavaScriptString(value)}'`).join(',\n'));
         lines.push('  }');
     }
 
@@ -294,10 +359,8 @@ function generateNodeJs(config) {
     lines.push('});');
     lines.push('');
 
-    // Body
-    if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
-        const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
-        lines.push(`req.write(\`${escapeJavaScriptString(bodyString)}\`);`);
+    if (hasBody(config)) {
+        lines.push(`req.write(\`${escapeJavaScriptString(stringifyBody(body))}\`);`);
     }
 
     lines.push('req.end();');
@@ -305,9 +368,15 @@ function generateNodeJs(config) {
     return lines.join('\n');
 }
 
-// PHP (cURL) Generator
+/**
+ * Generates PHP code using the cURL extension.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {string} The generated PHP code.
+ */
 function generatePhp(config) {
     const { method, url, headers, body } = config;
+    const hdrs = validHeaders(headers);
     const lines = [];
 
     lines.push('<?php');
@@ -315,7 +384,6 @@ function generatePhp(config) {
     lines.push('$curl = curl_init();');
     lines.push('');
 
-    // cURL options
     lines.push('curl_setopt_array($curl, [');
     lines.push(`  CURLOPT_URL => "${escapePythonString(url)}",`);
     lines.push('  CURLOPT_RETURNTRANSFER => true,');
@@ -324,19 +392,13 @@ function generatePhp(config) {
     lines.push('  CURLOPT_TIMEOUT => 30,');
     lines.push(`  CURLOPT_CUSTOMREQUEST => "${method || 'GET'}",`);
 
-    // Body
-    if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
-        const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
-        lines.push(`  CURLOPT_POSTFIELDS => "${escapePythonString(bodyString)}",`);
+    if (hasBody(config)) {
+        lines.push(`  CURLOPT_POSTFIELDS => "${escapePythonString(stringifyBody(body))}",`);
     }
 
-    // Headers
-    if (headers && Object.keys(headers).length > 0) {
+    if (hdrs.length > 0) {
         lines.push('  CURLOPT_HTTPHEADER => [');
-        const headerLines = Object.entries(headers)
-            .filter(([key, value]) => key && value)
-            .map(([key, value]) => `    "${escapePythonString(key)}: ${escapePythonString(value)}"`);
-        lines.push(headerLines.join(',\n'));
+        lines.push(hdrs.map(([key, value]) => `    "${escapePythonString(key)}: ${escapePythonString(value)}"`).join(',\n'));
         lines.push('  ],');
     }
 
@@ -357,7 +419,12 @@ function generatePhp(config) {
     return lines.join('\n');
 }
 
-// Ruby (net/http) Generator
+/**
+ * Generates Ruby code using the `net/http` library.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {string} The generated Ruby code.
+ */
 function generateRuby(config) {
     const { method, url, headers, body } = config;
     const lines = [];
@@ -371,30 +438,21 @@ function generateRuby(config) {
 
     lines.push('http = Net::HTTP.new(url.host, url.port)');
 
-    // Check if HTTPS
     const urlObj = new URL(url);
     if (urlObj.protocol === 'https:') {
         lines.push('http.use_ssl = true');
     }
     lines.push('');
 
-    // Create request
     const methodCapitalized = (method || 'GET').charAt(0).toUpperCase() + (method || 'GET').slice(1).toLowerCase();
     lines.push(`request = Net::HTTP::${methodCapitalized}.new(url)`);
 
-    // Headers
-    if (headers && Object.keys(headers).length > 0) {
-        for (const [key, value] of Object.entries(headers)) {
-            if (key && value) {
-                lines.push(`request["${escapePythonString(key)}"] = "${escapePythonString(value)}"`);
-            }
-        }
+    for (const [key, value] of validHeaders(headers)) {
+        lines.push(`request["${escapePythonString(key)}"] = "${escapePythonString(value)}"`);
     }
 
-    // Body
-    if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
-        const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
-        lines.push(`request.body = "${escapePythonString(bodyString)}"`);
+    if (hasBody(config)) {
+        lines.push(`request.body = "${escapePythonString(stringifyBody(body))}"`);
     }
 
     lines.push('');
@@ -404,7 +462,12 @@ function generateRuby(config) {
     return lines.join('\n');
 }
 
-// Java (HttpClient) Generator
+/**
+ * Generates Java code using the `java.net.http.HttpClient` API.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {string} The generated Java code.
+ */
 function generateJava(config) {
     const { method, url, headers, body } = config;
     const lines = [];
@@ -419,24 +482,16 @@ function generateJava(config) {
     lines.push('        HttpClient client = HttpClient.newHttpClient();');
     lines.push('');
 
-    // Build request
     lines.push('        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()');
     lines.push(`            .uri(URI.create("${escapeGoString(url)}"))`);
 
-    // Headers
-    if (headers && Object.keys(headers).length > 0) {
-        for (const [key, value] of Object.entries(headers)) {
-            if (key && value) {
-                lines.push(`            .header("${escapeGoString(key)}", "${escapeGoString(value)}")`);
-            }
-        }
+    for (const [key, value] of validHeaders(headers)) {
+        lines.push(`            .header("${escapeGoString(key)}", "${escapeGoString(value)}")`);
     }
 
-    // Method and body
     const methodUpper = (method || 'GET').toUpperCase();
-    if (body && ['POST', 'PUT', 'PATCH'].includes(methodUpper)) {
-        const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
-        lines.push(`            .${methodUpper}(HttpRequest.BodyPublishers.ofString("${escapeGoString(bodyString)}"))`);
+    if (hasBody(config)) {
+        lines.push(`            .${methodUpper}(HttpRequest.BodyPublishers.ofString("${escapeGoString(stringifyBody(body))}"))`);
     } else {
         lines.push(`            .${methodUpper}(HttpRequest.BodyPublishers.noBody())`);
     }
@@ -454,42 +509,54 @@ function generateJava(config) {
     return lines.join('\n');
 }
 
-// Main export function
-export function generateCode(language, config) {
-    const generators = {
-        'curl': generateCurl,
-        'python': generatePythonRequests,
-        'javascript-fetch': generateJavaScriptFetch,
-        'javascript-axios': generateJavaScriptAxios,
-        'nodejs': generateNodeJs,
-        'go': generateGo,
-        'php': generatePhp,
-        'ruby': generateRuby,
-        'java': generateJava
-    };
-
-    const generator = generators[language];
-    if (!generator) {
-        throw new Error(`Unsupported language: ${language}`);
-    }
-
-    return generator(config);
-}
-
-// Language metadata for UI
-export const SUPPORTED_LANGUAGES = [
-    { id: 'curl', name: 'cURL', description: 'Command line' },
-    { id: 'python', name: 'Python', description: 'requests library' },
-    { id: 'javascript-fetch', name: 'JavaScript', description: 'Fetch API' },
-    { id: 'javascript-axios', name: 'JavaScript', description: 'Axios' },
-    { id: 'nodejs', name: 'Node.js', description: 'https module' },
-    { id: 'go', name: 'Go', description: 'net/http' },
-    { id: 'php', name: 'PHP', description: 'cURL' },
-    { id: 'ruby', name: 'Ruby', description: 'net/http' },
-    { id: 'java', name: 'Java', description: 'HttpClient' }
+/**
+ * Registered code generators — the single source of truth for both dispatch
+ * ({@link generateCode}) and the UI list ({@link SUPPORTED_LANGUAGES}). Add a language by
+ * appending one entry here; nothing else needs to change.
+ *
+ * @type {Array<{ id: string, name: string, description: string, generate: (config: RequestConfig) => string }>}
+ */
+const GENERATORS = [
+    { id: 'curl', name: 'cURL', description: 'Command line', generate: generateCurl },
+    { id: 'python', name: 'Python', description: 'requests library', generate: generatePythonRequests },
+    { id: 'javascript-fetch', name: 'JavaScript', description: 'Fetch API', generate: generateJavaScriptFetch },
+    { id: 'javascript-axios', name: 'JavaScript', description: 'Axios', generate: generateJavaScriptAxios },
+    { id: 'nodejs', name: 'Node.js', description: 'https module', generate: generateNodeJs },
+    { id: 'go', name: 'Go', description: 'net/http', generate: generateGo },
+    { id: 'php', name: 'PHP', description: 'cURL', generate: generatePhp },
+    { id: 'ruby', name: 'Ruby', description: 'net/http', generate: generateRuby },
+    { id: 'java', name: 'Java', description: 'HttpClient', generate: generateJava },
 ];
 
-// Legacy export for backward compatibility
+/**
+ * Generates request code for the given language.
+ *
+ * @param {string} language - One of the {@link SUPPORTED_LANGUAGES} ids.
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {string} The generated code snippet.
+ * @throws {Error} If the language is not supported.
+ */
+export function generateCode(language, config) {
+    const entry = GENERATORS.find((g) => g.id === language);
+    if (!entry) {
+        throw new Error(`Unsupported language: ${language}`);
+    }
+    return entry.generate(config);
+}
+
+/**
+ * Languages and clients supported by {@link generateCode}, for populating UI selectors.
+ *
+ * @type {Array<{ id: string, name: string, description: string }>}
+ */
+export const SUPPORTED_LANGUAGES = GENERATORS.map(({ id, name, description }) => ({ id, name, description }));
+
+/**
+ * Convenience wrapper that generates a cURL command.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {string} The generated cURL command.
+ */
 export function generateCurlCommand(config) {
     return generateCurl(config);
 }

@@ -111,7 +111,6 @@ export class VariableManager {
         const nameInput = row.querySelector('.variable-name');
         const valueInput = row.querySelector('.variable-value');
 
-        // Set values directly via .value property to preserve special characters like {{ }}
         if (nameInput) {nameInput.value = name;}
         if (valueInput) {valueInput.value = value;}
 
@@ -342,7 +341,6 @@ export class VariableManager {
             const value = row.querySelector('.variable-value').value.trim();
             const isSecret = row.dataset.secret === 'true';
             if (name) {
-                // Secret values are never written to exported files
                 variables[name] = isSecret ? '' : value;
             }
         });

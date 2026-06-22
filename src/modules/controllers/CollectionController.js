@@ -3,6 +3,8 @@
  * @module controllers/CollectionController
  */
 
+import { getCurrentEndpoint, setCurrentEndpoint } from '../state/currentEndpoint.js';
+import { app } from '../appContext.js';
 import { CollectionRepository } from '../storage/CollectionRepository.js';
 import { VariableRepository } from '../storage/VariableRepository.js';
 import { SchemaProcessor } from '../schema/SchemaProcessor.js';
@@ -43,8 +45,8 @@ export class CollectionController {
      */
     constructor(backendAPI, updateStatusDisplay) {
         this.backendAPI = backendAPI;
-        this.repository = new CollectionRepository(backendAPI, window.secretStore);
-        this.variableRepository = new VariableRepository(backendAPI, window.secretStore);
+        this.repository = new CollectionRepository(backendAPI, app.secretStore);
+        this.variableRepository = new VariableRepository(backendAPI, app.secretStore);
         this.schemaProcessor = new SchemaProcessor();
         this.variableProcessor = new VariableProcessor();
         this.statusDisplay = new StatusDisplayAdapter(updateStatusDisplay);
@@ -147,7 +149,7 @@ export class CollectionController {
     async loadCollectionsWithExpansionState() {
         try {
             this.allCollections = await this.service.loadCollections();
-            await this.renderCollections(this.allCollections, true); // Preserve expansion state
+            await this.renderCollections(this.allCollections, true);
             return this.allCollections;
         } catch (error) {
             return [];
@@ -430,7 +432,7 @@ export class CollectionController {
             const newName = await this.renameDialog.show(collection.name);
             if (newName && newName !== collection.name) {
                 await this.service.renameCollection(collection.id, newName);
-                await this.loadCollections(); // Refresh display
+                await this.loadCollections();
             }
         } catch (error) {
             void error;
@@ -454,13 +456,6 @@ export class CollectionController {
 
             if (result !== null) {
                 await this.variableService.setMultipleVariables(collection.id, result.variables, result.secretKeys);
-
-                // Don't substitute variables in the form - they should stay as {{...}} placeholders
-                // Variable substitution happens at request time in apiHandler.js
-                // if (window.currentEndpoint && window.currentEndpoint.collectionId === collection.id) {
-                //     const formElements = this.getFormElements();
-                //     await this.processFormVariablesExceptUrl(collection.id, formElements);
-                // }
             }
         } catch (error) {
             void error;
@@ -579,20 +574,20 @@ export class CollectionController {
      * @returns {Promise<void>}
      */
     async handleDelete(collection) {
-        const confirmMessage = window.i18n ?
-            window.i18n.t('collection.confirm_delete', { name: collection.name }) :
+        const confirmMessage = app.i18n ?
+            app.i18n.t('collection.confirm_delete', { name: collection.name }) :
             `Are you sure you want to delete the collection "${collection.name}"?\n\nThis action cannot be undone.`;
 
-        const title = window.i18n ?
-            window.i18n.t('collection.delete_title') || 'Delete Collection' :
+        const title = app.i18n ?
+            app.i18n.t('collection.delete_title') || 'Delete Collection' :
             'Delete Collection';
 
-        const confirmText = window.i18n ?
-            window.i18n.t('common.delete') || 'Delete' :
+        const confirmText = app.i18n ?
+            app.i18n.t('common.delete') || 'Delete' :
             'Delete';
 
-        const cancelText = window.i18n ?
-            window.i18n.t('common.cancel') || 'Cancel' :
+        const cancelText = app.i18n ?
+            app.i18n.t('common.cancel') || 'Cancel' :
             'Cancel';
 
         const confirmed = await this.confirmDialog.show(confirmMessage, {
@@ -669,16 +664,16 @@ export class CollectionController {
      */
     async handleRenameRequest(collection, endpoint) {
         try {
-            const title = window.i18n ?
-                window.i18n.t('endpoint.rename_title') || 'Rename Request' :
+            const title = app.i18n ?
+                app.i18n.t('endpoint.rename_title') || 'Rename Request' :
                 'Rename Request';
 
-            const label = window.i18n ?
-                window.i18n.t('endpoint.rename_label') || 'Request Name:' :
+            const label = app.i18n ?
+                app.i18n.t('endpoint.rename_label') || 'Request Name:' :
                 'Request Name:';
 
-            const confirmText = window.i18n ?
-                window.i18n.t('common.rename') || 'Rename' :
+            const confirmText = app.i18n ?
+                app.i18n.t('common.rename') || 'Rename' :
                 'Rename';
 
             const currentName = endpoint.name || endpoint.path;
@@ -694,19 +689,18 @@ export class CollectionController {
             await this.service.renameRequest(collection.id, endpoint.id, newName);
             await this.loadCollectionsWithExpansionState();
 
-            // Update any open tabs that reference this endpoint
-            if (!window.workspaceTabController) {
+            if (!app.workspaceTabController) {
                 return;
             }
-            const tabs = await window.workspaceTabController.service.getAllTabs();
+            const tabs = await app.workspaceTabController.service.getAllTabs();
             const matchingTabs = tabs.filter(tab => 
                 tab.endpoint && 
                 tab.endpoint.collectionId === collection.id && 
                 tab.endpoint.endpointId === endpoint.id
             );
             for (const tab of matchingTabs) {
-                await window.workspaceTabController.service.updateTab(tab.id, { name: newName });
-                window.workspaceTabController.tabBar.updateTab(tab.id, { name: newName });
+                await app.workspaceTabController.service.updateTab(tab.id, { name: newName });
+                app.workspaceTabController.tabBar.updateTab(tab.id, { name: newName });
             }
         } catch (error) {
             void error;
@@ -725,20 +719,20 @@ export class CollectionController {
      * @returns {Promise<void>}
      */
     async handleDeleteRequest(collection, endpoint) {
-        const confirmMessage = window.i18n ?
-            window.i18n.t('endpoint.confirm_delete', { name: endpoint.name || endpoint.path }) :
+        const confirmMessage = app.i18n ?
+            app.i18n.t('endpoint.confirm_delete', { name: endpoint.name || endpoint.path }) :
             `Are you sure you want to delete the request "${endpoint.name || endpoint.path}"?\n\nThis action cannot be undone.`;
 
-        const title = window.i18n ?
-            window.i18n.t('endpoint.delete_title') || 'Delete Request' :
+        const title = app.i18n ?
+            app.i18n.t('endpoint.delete_title') || 'Delete Request' :
             'Delete Request';
 
-        const confirmText = window.i18n ?
-            window.i18n.t('common.delete') || 'Delete' :
+        const confirmText = app.i18n ?
+            app.i18n.t('common.delete') || 'Delete' :
             'Delete';
 
-        const cancelText = window.i18n ?
-            window.i18n.t('common.cancel') || 'Cancel' :
+        const cancelText = app.i18n ?
+            app.i18n.t('common.cancel') || 'Cancel' :
             'Cancel';
 
         const confirmed = await this.confirmDialog.show(confirmMessage, {
@@ -752,9 +746,9 @@ export class CollectionController {
             try {
                 await this.service.deleteRequestFromCollection(collection.id, endpoint.id);
 
-                if (window.currentEndpoint &&
-                    window.currentEndpoint.collectionId === collection.id &&
-                    window.currentEndpoint.endpointId === endpoint.id) {
+                if (getCurrentEndpoint() &&
+                    getCurrentEndpoint().collectionId === collection.id &&
+                    getCurrentEndpoint().endpointId === endpoint.id) {
                     const formElements = this.getFormElements();
                     formElements.urlInput.value = '';
                     formElements.methodSelect.value = 'GET';
@@ -762,7 +756,7 @@ export class CollectionController {
                     this.service.clearKeyValueList(formElements.pathParamsList);
                     this.service.clearKeyValueList(formElements.headersList);
                     this.service.clearKeyValueList(formElements.queryParamsList);
-                    window.currentEndpoint = null;
+                    setCurrentEndpoint(null);
 
                     await this.repository.clearLastSelectedRequest();
 
@@ -866,10 +860,10 @@ export class CollectionController {
         const bodyInput = document.getElementById('body-input');
         if (bodyInput) {
             bodyInput.addEventListener('blur', async () => {
-                if (window.currentEndpoint) {
+                if (getCurrentEndpoint()) {
                     await this.saveRequestBodyModification(
-                        window.currentEndpoint.collectionId, 
-                        window.currentEndpoint.endpointId
+                        getCurrentEndpoint().collectionId, 
+                        getCurrentEndpoint().endpointId
                     );
                 }
             });
@@ -878,10 +872,10 @@ export class CollectionController {
             bodyInput.addEventListener('input', () => {
                 clearTimeout(saveTimeout);
                 saveTimeout = setTimeout(async () => {
-                    if (window.currentEndpoint) {
+                    if (getCurrentEndpoint()) {
                         await this.saveRequestBodyModification(
-                            window.currentEndpoint.collectionId, 
-                            window.currentEndpoint.endpointId
+                            getCurrentEndpoint().collectionId, 
+                            getCurrentEndpoint().endpointId
                         );
                     }
                 }, 2000);
@@ -951,8 +945,8 @@ export class CollectionController {
      * @returns {Promise<Object>} Variables object for current collection, or empty object if no endpoint loaded
      */
     async getCurrentCollectionVariables() {
-        if (window.currentEndpoint) {
-            return this.variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
+        if (getCurrentEndpoint()) {
+            return this.variableService.getVariablesForCollection(getCurrentEndpoint().collectionId);
         }
         return {};
     }
@@ -965,8 +959,8 @@ export class CollectionController {
      * @returns {Promise<Object>} Processed request with substituted variables
      */
     async processRequestForVariables(request) {
-        if (window.currentEndpoint) {
-            return this.variableService.processRequest(request, window.currentEndpoint.collectionId);
+        if (getCurrentEndpoint()) {
+            return this.variableService.processRequest(request, getCurrentEndpoint().collectionId);
         }
         return request;
     }

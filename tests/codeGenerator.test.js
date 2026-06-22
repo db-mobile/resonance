@@ -175,5 +175,13 @@ describe('Code Generator', () => {
             const code = generateCode('curl', config);
             expect(code).toContain('-d');
         });
+
+        test('should emit body for lowercase methods across all languages', () => {
+            const lowerConfig = { ...testConfig, method: 'post' };
+            for (const { id } of SUPPORTED_LANGUAGES) {
+                const code = generateCode(id, lowerConfig);
+                expect(code).toContain('John Doe');
+            }
+        });
     });
 });

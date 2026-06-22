@@ -66,7 +66,6 @@ export class RenameDialog extends BaseModal {
         if (labelEl) {labelEl.textContent = options.label || 'Collection Name:';}
         if (confirmEl) {confirmEl.textContent = options.confirmText || 'Rename';}
 
-        // Set value directly via .value property to preserve special characters like {{ }}
         const input = dialog.querySelector('#rename-input');
         if (input) {input.value = currentName;}
 

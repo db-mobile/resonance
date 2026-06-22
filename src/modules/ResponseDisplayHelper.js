@@ -3,6 +3,7 @@
  * @module ResponseDisplayHelper
  */
 
+import { app } from './appContext.js';
 import { extractCookies, renderCookies } from './cookieParser.js';
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
 
@@ -19,8 +20,8 @@ import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanc
  */
 export function getResponseElements(tabId, globalElements = {}) {
     const containerElements = tabId
-        ? window.responseContainerManager?.getOrCreateContainer(tabId)
-        : window.responseContainerManager?.getActiveElements();
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
 
     if (containerElements) {
         return {
@@ -36,7 +37,6 @@ export function getResponseElements(tabId, globalElements = {}) {
         headersEditor: null,
         cookiesDisplay: globalElements.cookiesDisplay || null,
         performanceDisplay: globalElements.performanceDisplay || null,
-        // headersDisplay is plain text (no CodeMirror), stored separately
         _headersDisplayFallback: globalElements.headersDisplay || null,
         isPerTab: false
     };
@@ -75,7 +75,6 @@ export function clearResponsePanes(tabId, globalElements = {}) {
 export function displayResponsePanes(tabId, globalElements, { headers, timings, size }) {
     const els = getResponseElements(tabId, globalElements);
 
-    // --- Headers ---
     const headersString = headers
         ? JSON.stringify(headers, null, 2)
         : '';
@@ -88,13 +87,11 @@ export function displayResponsePanes(tabId, globalElements, { headers, timings, 
         els._headersDisplayFallback.textContent = headersString || 'No response headers.';
     }
 
-    // --- Cookies ---
     const cookies = extractCookies(headers);
     if (els.cookiesDisplay) {
         renderCookies(els.cookiesDisplay, cookies);
     }
 
-    // --- Performance ---
     if (timings) {
         if (els.performanceDisplay) {
             displayPerformanceMetrics(els.performanceDisplay, timings, size);
@@ -117,7 +114,6 @@ export function displayResponsePanes(tabId, globalElements, { headers, timings, 
 export function displayErrorResponsePanes(tabId, globalElements, error) {
     const els = getResponseElements(tabId, globalElements);
 
-    // --- Headers ---
     if (error.headers && Object.keys(error.headers).length > 0) {
         try {
             const headersText = JSON.stringify(error.headers, null, 2);
@@ -135,7 +131,6 @@ export function displayErrorResponsePanes(tabId, globalElements, error) {
             }
         }
 
-        // Cookies from error response
         const cookies = extractCookies(error.headers);
         if (els.cookiesDisplay) {
             renderCookies(els.cookiesDisplay, cookies);
@@ -153,7 +148,6 @@ export function displayErrorResponsePanes(tabId, globalElements, error) {
         }
     }
 
-    // --- Performance ---
     if (error.timings) {
         if (els.performanceDisplay) {
             displayPerformanceMetrics(els.performanceDisplay, error.timings, error.size);

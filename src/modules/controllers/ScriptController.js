@@ -55,12 +55,10 @@ export class ScriptController {
      */
     async executePreRequest(collectionId, endpointId, requestConfig) {
         try {
-            // Flush pending debounce-save so latest edits are available
             if (this.scriptManager?.flushPendingSave) {
                 await this.scriptManager.flushPendingSave();
             }
 
-            // Prefer current editor scripts if they belong to this endpoint; otherwise fall back to persisted scripts
             let scripts;
             if (
                 this.scriptManager?.currentCollectionId === collectionId &&
@@ -76,18 +74,15 @@ export class ScriptController {
                 return requestConfig;
             }
 
-            // Execute script
             const { modifiedRequest, result } = await this.service.executePreRequestScript(
                 scripts.preRequestScript,
                 requestConfig
             );
 
-            // Show console output if any
             if (result.logs.length > 0 || result.errors.length > 0) {
                 this.consolePanel.show(result.logs, result.errors);
             }
 
-            // Show error if script failed
             if (!result.success) {
                 this._showScriptError('Pre-request script error', result.errors);
             }
@@ -110,12 +105,10 @@ export class ScriptController {
      */
     async executeTest(collectionId, endpointId, requestConfig, response) {
         try {
-            // Flush pending debounce-save so latest edits are available
             if (this.scriptManager?.flushPendingSave) {
                 await this.scriptManager.flushPendingSave();
             }
 
-            // Prefer current editor scripts if they belong to this endpoint; otherwise fall back to persisted scripts
             let scripts;
             if (
                 this.scriptManager?.currentCollectionId === collectionId &&
@@ -131,14 +124,12 @@ export class ScriptController {
                 return null;
             }
 
-            // Execute script
             const result = await this.service.executeTestScript(
                 scripts.testScript,
                 requestConfig,
                 response
             );
 
-            // Show test results and console output
             if (this.consolePanel) {
                 this.consolePanel.showTestResults(result);
             }

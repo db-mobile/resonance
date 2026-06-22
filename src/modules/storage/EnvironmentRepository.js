@@ -119,7 +119,6 @@ export class EnvironmentRepository {
                 return defaultData;
             }
 
-            // Validate structure
             if (!Array.isArray(data.items)) {
                 const defaultData = this._getDefaultEnvironments();
                 await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, defaultData);
@@ -175,15 +174,13 @@ export class EnvironmentRepository {
         try {
             const data = await this.getAllEnvironments();
 
-            // Verify environment exists
             const exists = data.items.some(env => env.id === environmentId);
             if (!exists) {
                 throw new Error(`Environment with ID ${environmentId} not found`);
             }
 
             data.activeEnvironmentId = environmentId;
-            // Cache is already mutated above; persist in background
-            this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data).catch(() => { /* fire-and-forget */ });
+            this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data).catch(() => { });
             return true;
         } catch (error) {
             throw new Error(`Failed to set active environment: ${error.message}`);
@@ -237,7 +234,6 @@ export class EnvironmentRepository {
         try {
             const data = await this.getAllEnvironments();
 
-            // Check for duplicate name
             const nameExists = data.items.some(env => env.name === name);
             if (nameExists) {
                 throw new Error(`Environment with name "${name}" already exists`);
@@ -281,7 +277,6 @@ export class EnvironmentRepository {
                 throw new Error(`Environment with ID ${environmentId} not found`);
             }
 
-            // Check for duplicate name if name is being updated
             if (updates.name && updates.name !== data.items[index].name) {
                 const nameExists = data.items.some(env => env.name === updates.name);
                 if (nameExists) {
@@ -289,11 +284,10 @@ export class EnvironmentRepository {
                 }
             }
 
-            // Update environment
             data.items[index] = this._normalizeEnvironment({
                 ...data.items[index],
                 ...updates,
-                id: environmentId // Preserve ID
+                id: environmentId
             });
 
             await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data);
@@ -318,7 +312,6 @@ export class EnvironmentRepository {
         try {
             const data = await this.getAllEnvironments();
 
-            // Prevent deleting the last environment
             if (data.items.length <= 1) {
                 throw new Error('Cannot delete the last environment');
             }
@@ -328,15 +321,12 @@ export class EnvironmentRepository {
                 throw new Error(`Environment with ID ${environmentId} not found`);
             }
 
-            // Remove environment
             data.items.splice(index, 1);
 
-            // If deleting active environment, set first environment as active
             if (data.activeEnvironmentId === environmentId) {
                 data.activeEnvironmentId = data.items[0].id;
             }
 
-            // Drop any secret values that belonged to this environment
             if (this.secretStore) {
                 await this.secretStore.deleteScope(this.secretScope(environmentId));
             }
@@ -372,7 +362,6 @@ export class EnvironmentRepository {
                 environment.color
             );
 
-            // Carry over secret flags and copy secret values into the new scope
             const secretKeys = Array.isArray(environment.secretKeys) ? environment.secretKeys : [];
             if (secretKeys.length === 0) {
                 return duplicate;
@@ -609,26 +598,23 @@ export class EnvironmentRepository {
             let data;
             if (merge) {
                 data = await this.getAllEnvironments();
-                // Add imported environments, handling duplicates
                 environmentsData.items.forEach(importedEnv => {
                     const exists = data.items.some(env => env.name === importedEnv.name);
                     if (!exists) {
                         data.items.push(this._normalizeEnvironment({
                             ...importedEnv,
-                            id: this._generateId() // Generate new ID
+                            id: this._generateId()
                         }));
                     }
                 });
             } else {
-                // Replace all environments
                 data = {
                     items: environmentsData.items.map(env => this._normalizeEnvironment({
                         ...env,
-                        id: this._generateId() // Generate new IDs
+                        id: this._generateId()
                     })),
                     activeEnvironmentId: null
                 };
-                // Set first environment as active
                 if (data.items.length > 0) {
                     data.activeEnvironmentId = data.items[0].id;
                 }

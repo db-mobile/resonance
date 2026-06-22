@@ -12,6 +12,7 @@
  * switching, import/export, and change notifications. Listens for service events
  * and synchronizes UI state accordingly.
  */
+import { app } from '../appContext.js';
 import { toast } from '../ui/Toast.js';
 
 export class EnvironmentController {
@@ -37,12 +38,10 @@ export class EnvironmentController {
      * @returns {Promise<void>}
      */
     async initialize() {
-        // Listen for environment changes from service
         this.service.addChangeListener((event) => {
             this.handleEnvironmentChange(event);
         });
 
-        // Load initial active environment
         await this.loadActiveEnvironment();
     }
 
@@ -96,7 +95,7 @@ export class EnvironmentController {
      */
     async onEnvironmentSwitched(_event) {
         try {
-            window.invalidateApiHandlerEnvironmentCache?.();
+            app.invalidateApiHandlerEnvironmentCache?.();
             const environment = await this.service.getActiveEnvironment();
             if (environment) {
                 this.selector.setActiveEnvironment(environment);
@@ -117,12 +116,11 @@ export class EnvironmentController {
      */
     async onEnvironmentsChanged() {
         try {
-            window.invalidateApiHandlerEnvironmentCache?.();
+            app.invalidateApiHandlerEnvironmentCache?.();
             const activeEnvironment = await this.service.getActiveEnvironment();
             if (activeEnvironment) {
                 this.selector.setActiveEnvironment(activeEnvironment);
             }
-            // Refresh selector dropdown
             await this.selector.refresh();
         } catch (error) {
             void error;
@@ -157,7 +155,6 @@ export class EnvironmentController {
         try {
             const result = await this.manager.show();
             if (result) {
-                // Refresh UI after changes
                 await this.onEnvironmentsChanged();
             }
         } catch (error) {
@@ -349,7 +346,6 @@ export class EnvironmentController {
      * @throws {Error} If import fails
      */
     async importEnvironments(merge = false) {
-        // Create file input
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.json';

@@ -3,6 +3,7 @@
  * @module ui/CookieManagerDialog
  */
 
+import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 
 export class CookieManagerDialog {
@@ -70,7 +71,6 @@ export class CookieManagerDialog {
             return;
         }
 
-        // Resolve initial selection: active env → env named "Default" → first env
         let selected = this._environments.find(env => env.id === this._environmentId);
         if (!selected) {
             selected = this._environments.find(env => env.name === 'Default') || this._environments[0];
@@ -205,7 +205,6 @@ export class CookieManagerDialog {
         }
         empty.style.display = 'none';
 
-        // Group by domain for visual clarity
         const sorted = [...cookies].sort((a, b) => a.domain.localeCompare(b.domain) || a.name.localeCompare(b.name));
 
         for (const cookie of sorted) {
@@ -281,8 +280,8 @@ export class CookieManagerDialog {
                     const settings = await window.backendAPI.settings.get();
                     settings.cookieJarEnabled = e.target.checked;
                     await window.backendAPI.settings.set(settings);
-                    window.invalidateApiHandlerSettingsCache?.();
-                } catch (_e) { /* non-blocking */ }
+                    app.invalidateApiHandlerSettingsCache?.();
+                } catch (_e) { }
             });
         }
 

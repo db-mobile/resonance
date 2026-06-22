@@ -12,7 +12,6 @@ import { escapeHtml } from './htmlUtils.js';
 function parseCookie(cookieString) {
     const parts = cookieString.split(';').map(part => part.trim());
 
-    // First part is the name=value pair
     const [nameValue, ...attributes] = parts;
     const [name, value] = nameValue.split('=').map(s => s.trim());
 
@@ -28,7 +27,6 @@ function parseCookie(cookieString) {
         sameSite: null
     };
 
-    // Parse attributes
     attributes.forEach(attr => {
         const [key, val] = attr.split('=').map(s => s ? s.trim() : '');
         const lowerKey = key.toLowerCase();
@@ -73,7 +71,6 @@ export function extractCookies(headers) {
 
     const cookies = [];
 
-    // Check for set-cookie header (case-insensitive)
     const setCookieKey = Object.keys(headers).find(
         key => key.toLowerCase() === 'set-cookie'
     );
@@ -84,7 +81,6 @@ export function extractCookies(headers) {
 
     const setCookieValue = headers[setCookieKey];
 
-    // set-cookie can be a string or an array
     if (Array.isArray(setCookieValue)) {
         setCookieValue.forEach(cookieString => {
             cookies.push(parseCookie(cookieString));
@@ -205,7 +201,6 @@ export function formatCookiesAsHtml(cookies) {
         html += `<td>${cookie.expires ? escapeHtml(cookie.expires) : '-'}</td>`;
         html += `<td>${cookie.maxAge ? escapeHtml(cookie.maxAge) : '-'}</td>`;
 
-        // Build flags column
         const flags = [];
         if (cookie.httpOnly) {flags.push('HttpOnly');}
         if (cookie.secure) {flags.push('Secure');}

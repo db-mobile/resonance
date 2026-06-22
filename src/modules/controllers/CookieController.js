@@ -3,6 +3,8 @@
  * @module controllers/CookieController
  */
 
+import { app } from '../appContext.js';
+
 export class CookieController {
     constructor(cookieJarService, cookieManagerDialog) {
         this.service = cookieJarService;
@@ -12,7 +14,6 @@ export class CookieController {
     }
 
     initialize() {
-        // Nothing async to do at startup — jar is lazily loaded on first request
     }
 
     /**
@@ -33,7 +34,7 @@ export class CookieController {
      */
     async getCookieHeader(requestUrl) {
         try {
-            const settings = window.getApiHandlerSettingsCache?.() ?? await window.backendAPI?.settings?.get();
+            const settings = app.getApiHandlerSettingsCache?.() ?? await window.backendAPI?.settings?.get();
             if (settings?.cookieJarEnabled === false) { return null; }
             return await this.service.getCookieHeaderForRequest(requestUrl, this._activeEnvironmentId);
         } catch (_e) {
@@ -48,11 +49,10 @@ export class CookieController {
      */
     async handleCookiesFromResponse(setCookieHeaders, requestUrl) {
         try {
-            const settings = window.getApiHandlerSettingsCache?.() ?? await window.backendAPI?.settings?.get();
+            const settings = app.getApiHandlerSettingsCache?.() ?? await window.backendAPI?.settings?.get();
             if (settings?.cookieJarEnabled === false) { return; }
             await this.service.processCookiesFromResponse(setCookieHeaders, requestUrl, this._activeEnvironmentId);
         } catch (_e) {
-            // Non-blocking
         }
     }
 

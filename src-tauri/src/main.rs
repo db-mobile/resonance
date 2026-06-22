@@ -13,6 +13,9 @@ use commands::{
         collections_get_path, collections_list, collections_migrate, collections_needs_migration,
         collections_pick_directory,
     },
+    graphql_subscription::{
+        graphql_subscription_close, graphql_subscription_send, GraphqlSubscriptionState,
+    },
     grpc_proto::{
         grpc_list_loaded_protos, grpc_parse_proto_file, grpc_proto_get_input_skeleton,
         grpc_proto_invoke_unary, grpc_select_proto_file, grpc_unload_proto, ProtoState,
@@ -67,6 +70,7 @@ fn main() {
         .manage(ProtoState::default())
         .manage(GrpcStreamingState::default())
         .manage(WebSocketState::default())
+        .manage(GraphqlSubscriptionState::default())
         .manage(SseState::default())
         .manage(MqttState::default())
         .manage(PendingUpdate::default())
@@ -133,6 +137,8 @@ fn main() {
             // WebSocket
             websocket_send,
             websocket_close,
+            graphql_subscription_send,
+            graphql_subscription_close,
             // SSE
             sse_connect,
             sse_close,

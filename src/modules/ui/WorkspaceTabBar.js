@@ -3,6 +3,8 @@
  * @module ui/WorkspaceTabBar
  */
 
+import { setCurrentEndpoint } from '../state/currentEndpoint.js';
+import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 
 /**
@@ -37,40 +39,32 @@ export class WorkspaceTabBar {
             return;
         }
 
-        // Store current tabs and activeTabId for dropdown
         this.tabs = tabs;
         this.activeTabId = activeTabId;
 
         this.container.innerHTML = '';
 
-        // Create left scroll button
         const leftScrollBtn = this._createScrollButton('left');
 
-        // Create wrapper with tab bar
         const tabBar = document.createElement('div');
         tabBar.className = 'workspace-tab-bar u-flex u-flex-1';
         this.tabBar = tabBar;
 
-        // Create tabs container
         const tabsContainer = document.createElement('div');
         tabsContainer.className = 'workspace-tabs-container u-flex';
 
-        // Render individual tabs
         tabs.forEach(tab => {
             const tabElement = this._createTabElement(tab, tab.id === activeTabId);
             tabsContainer.appendChild(tabElement);
         });
 
-        // Create new tab button
         const newTabBtn = this._createNewTabButton();
         tabsContainer.appendChild(newTabBtn);
 
         tabBar.appendChild(tabsContainer);
 
-        // Create right scroll button
         const rightScrollBtn = this._createScrollButton('right');
 
-        // Create tab list dropdown button
         const tabListButton = this._createTabListButton();
 
         this.container.appendChild(leftScrollBtn);
@@ -78,17 +72,13 @@ export class WorkspaceTabBar {
         this.container.appendChild(rightScrollBtn);
         this.container.appendChild(tabListButton);
 
-        // Store references for scroll management
         this.leftScrollBtn = leftScrollBtn;
         this.rightScrollBtn = rightScrollBtn;
 
-        // Update scroll button visibility
         this._updateScrollButtons();
 
-        // Listen for scroll events
         tabBar.addEventListener('scroll', () => this._updateScrollButtons());
 
-        // Listen for window resize
         if (!this.resizeObserver) {
             this.resizeObserver = new ResizeObserver(() => this._updateScrollButtons());
             this.resizeObserver.observe(tabBar);
@@ -104,13 +94,11 @@ export class WorkspaceTabBar {
         tabEl.className = `workspace-tab u-flex u-items-center${isActive ? ' active' : ''}${tab.isModified ? ' modified' : ''}`;
         tabEl.dataset.tabId = tab.id;
 
-        // Tab name
         const nameEl = document.createElement('span');
         nameEl.className = 'workspace-tab-name';
         nameEl.textContent = tab.name;
         nameEl.title = tab.name;
 
-        // Modified indicator (dot)
         if (tab.isModified) {
             const modifiedIndicator = document.createElement('span');
             modifiedIndicator.className = 'workspace-tab-modified-indicator';
@@ -120,7 +108,6 @@ export class WorkspaceTabBar {
 
         tabEl.appendChild(nameEl);
 
-        // Close button
         const closeBtn = document.createElement('button');
         closeBtn.className = 'workspace-tab-close';
         closeBtn.setAttribute('aria-label', 'Close tab');
@@ -140,16 +127,14 @@ export class WorkspaceTabBar {
 
         tabEl.appendChild(closeBtn);
 
-        // Tab click to switch
         tabEl.addEventListener('click', () => {
             if (this.onTabSwitch) {
                 this.onTabSwitch(tab.id);
             }
         });
 
-        // Middle mouse button to close tab
         tabEl.addEventListener('mousedown', (e) => {
-            if (e.button === 1) { // Middle mouse button
+            if (e.button === 1) {
                 e.preventDefault();
                 if (this.onTabClose) {
                     this.onTabClose(tab.id);
@@ -157,20 +142,16 @@ export class WorkspaceTabBar {
             }
         });
 
-        // Double-click to rename
         nameEl.addEventListener('dblclick', (e) => {
             e.stopPropagation();
             this._startRenaming(tabEl, tab);
         });
 
-        // Context menu
         tabEl.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             this._showContextMenu(e, tab);
         });
 
-
-        // Drag and drop for reordering
         tabEl.draggable = true;
 
         tabEl.addEventListener('dragstart', (e) => {
@@ -303,7 +284,6 @@ export class WorkspaceTabBar {
         const { scrollLeft, scrollWidth, clientWidth } = this.tabBar;
         const hasOverflow = scrollWidth > clientWidth;
 
-        // Show/hide buttons based on overflow
         if (hasOverflow) {
             this.leftScrollBtn.classList.add('visible');
             this.rightScrollBtn.classList.add('visible');
@@ -312,14 +292,12 @@ export class WorkspaceTabBar {
             this.rightScrollBtn.classList.remove('visible');
         }
 
-        // Disable left button at start
         if (scrollLeft <= 0) {
             this.leftScrollBtn.disabled = true;
         } else {
             this.leftScrollBtn.disabled = false;
         }
 
-        // Disable right button at end
         if (scrollLeft + clientWidth >= scrollWidth - 1) {
             this.rightScrollBtn.disabled = true;
         } else {
@@ -355,7 +333,6 @@ export class WorkspaceTabBar {
      * @private
      */
     _showNewTabMenu(button) {
-        // Remove any existing dropdown
         const existingDropdown = document.querySelector('.workspace-tab-new-menu');
         if (existingDropdown) {
             existingDropdown.remove();
@@ -439,41 +416,34 @@ export class WorkspaceTabBar {
      * @private
      */
     _toggleTabListDropdown(button) {
-        // Remove any existing dropdown
         const existingDropdown = document.querySelector('.workspace-tab-list-dropdown');
         if (existingDropdown) {
             existingDropdown.remove();
             return;
         }
 
-        // Create dropdown
         const dropdown = document.createElement('div');
         dropdown.className = 'workspace-tab-list-dropdown dropdown-panel visible';
 
-        // Position dropdown below button
         const rect = button.getBoundingClientRect();
         dropdown.style.top = `${rect.bottom + 4}px`;
         dropdown.style.right = '8px';
 
-        // Add tab items using current tabs
         this.tabs.forEach(tab => {
             const item = document.createElement('div');
             item.className = `workspace-tab-list-item dropdown-item${tab.id === this.activeTabId ? ' active is-active' : ''}`;
 
-            // Add modified indicator if needed
             if (tab.isModified) {
                 const indicator = document.createElement('span');
                 indicator.className = 'workspace-tab-list-item-indicator';
                 item.appendChild(indicator);
             }
 
-            // Add tab name
             const name = document.createElement('span');
             name.className = 'workspace-tab-list-item-name dropdown-item-label';
             name.textContent = tab.name;
             item.appendChild(name);
 
-            // Click handler
             item.addEventListener('click', () => {
                 if (this.onTabSwitch) {
                     this.onTabSwitch(tab.id);
@@ -486,7 +456,6 @@ export class WorkspaceTabBar {
 
         document.body.appendChild(dropdown);
 
-        // Close dropdown on outside click
         const closeDropdown = (e) => {
             if (!dropdown.contains(e.target) && !button.contains(e.target)) {
                 dropdown.remove();
@@ -501,7 +470,6 @@ export class WorkspaceTabBar {
      * @private
      */
     _startRenaming(tabElement, tab) {
-        // Close any open dropdown
         const existingDropdown = document.querySelector('.workspace-tab-list-dropdown');
         if (existingDropdown) {
             existingDropdown.remove();
@@ -546,7 +514,6 @@ export class WorkspaceTabBar {
      * @private
      */
     _showContextMenu(event, tab) {
-        // Remove any existing context menus
         const existingMenu = document.querySelector('.workspace-tab-context-menu');
         if (existingMenu) {
             existingMenu.remove();
@@ -609,25 +576,23 @@ export class WorkspaceTabBar {
                     if (tab.endpoint && tab.endpoint.collectionId && tab.endpoint.endpointId) {
                         const { saveAllRequestModifications } = await import('../collectionManager.js');
                         await saveAllRequestModifications(tab.endpoint.collectionId, tab.endpoint.endpointId);
-                        if (window.workspaceTabController) {
-                            await window.workspaceTabController.markCurrentTabUnmodified();
+                        if (app.workspaceTabController) {
+                            await app.workspaceTabController.markCurrentTabUnmodified();
                         }
-                    } else if (window.workspaceTabController && tab.type !== 'runner') {
-                        // No endpoint - show "Save to Collection" dialog
+                    } else if (app.workspaceTabController && tab.type !== 'runner') {
                         const { saveRequestToCollection } = await import('../collectionManager.js');
-                        const state = await window.workspaceTabController.stateManager.captureCurrentState();
+                        const state = await app.workspaceTabController.stateManager.captureCurrentState();
                         const requestData = {
                             name: tab.name,
                             ...state.request
                         };
                         const result = await saveRequestToCollection(requestData);
                         if (result) {
-                            // Update current endpoint and tab
-                            window.currentEndpoint = {
+                            setCurrentEndpoint({
                                 collectionId: result.collectionId,
                                 endpointId: result.endpointId
-                            };
-                            await window.workspaceTabController.service.updateTab(tab.id, {
+                            });
+                            await app.workspaceTabController.service.updateTab(tab.id, {
                                 name: result.name,
                                 endpoint: {
                                     collectionId: result.collectionId,
@@ -635,10 +600,9 @@ export class WorkspaceTabBar {
                                     protocol: state.request.protocol || 'http'
                                 }
                             });
-                            await window.workspaceTabController.markCurrentTabUnmodified();
-                            // Re-render tab bar to update the tab with new name
-                            const tabs = await window.workspaceTabController.service.getAllTabs();
-                            const activeTabId = await window.workspaceTabController.service.getActiveTabId();
+                            await app.workspaceTabController.markCurrentTabUnmodified();
+                            const tabs = await app.workspaceTabController.service.getAllTabs();
+                            const activeTabId = await app.workspaceTabController.service.getActiveTabId();
                             this.render(tabs, activeTabId);
                         }
                     }
@@ -683,7 +647,6 @@ export class WorkspaceTabBar {
 
         document.body.appendChild(menu);
 
-        // Close menu on outside click
         const closeMenu = (e) => {
             if (!menu.contains(e.target)) {
                 menu.remove();
@@ -702,7 +665,6 @@ export class WorkspaceTabBar {
         const tabEl = this.container?.querySelector(`[data-tab-id="${tabId}"]`);
         if (!tabEl) {return;}
 
-        // Update the stored tabs array
         if (this.tabs) {
             const tab = this.tabs.find(t => t.id === tabId);
             if (tab) {
@@ -749,21 +711,18 @@ export class WorkspaceTabBar {
     setActiveTab(tabId) {
         if (!this.container) {return;}
 
-        // Update stored active tab ID
         this.activeTabId = tabId;
 
         const tabs = this.container.querySelectorAll('.workspace-tab');
         tabs.forEach(tab => {
             if (tab.dataset.tabId === tabId) {
                 tab.classList.add('active');
-                // Scroll active tab into view
                 tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
             } else {
                 tab.classList.remove('active');
             }
         });
 
-        // Update scroll buttons after scrolling
         setTimeout(() => this._updateScrollButtons(), 300);
     }
 }

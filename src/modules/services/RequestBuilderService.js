@@ -28,10 +28,6 @@ export class RequestBuilderService {
         this._getCollectionRepository = getCollectionRepository;
     }
 
-    // -------------------------------------------------------------------------
-    //  Public API
-    // -------------------------------------------------------------------------
-
     /**
      * Resolves variables for the current context (collection + environment or
      * environment-only) and returns a fresh VariableProcessor.
@@ -53,7 +49,6 @@ export class RequestBuilderService {
             const collection = await this._getCollectionRepository()
                 .getById(currentEndpoint.collectionId);
 
-            // Inject collection-level default headers (user-set headers take precedence)
             if (collection && collection.defaultHeaders) {
                 const mergedHeaders = { ...collection.defaultHeaders, ...headers };
                 Object.assign(headers, mergedHeaders);
@@ -86,28 +81,22 @@ export class RequestBuilderService {
      * @returns {{ url: string, queryString: string }}
      */
     processRequestComponents({ url, pathParams, headers, queryParams, variables, processor }) {
-        // 1. Substitute variables in path param VALUES
         const processedPathParams = {};
         for (const [key, value] of Object.entries(pathParams)) {
             processedPathParams[key] = processor.processTemplate(value, variables);
         }
 
-        // 2. Substitute variables in URL (include processed path params)
         const combinedVariables = { ...variables, ...processedPathParams };
         let resolvedUrl = processor.processTemplate(url, combinedVariables);
 
-        // 3. Auto-prepend https:// if no protocol is specified
         if (resolvedUrl && !resolvedUrl.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {
             resolvedUrl = `https://${resolvedUrl}`;
         }
 
-        // 4. Substitute variables in headers (mutate in-place)
         this._processKeyValuePairs(headers, variables, processor);
 
-        // 5. Substitute variables in query params (mutate in-place)
         this._processKeyValuePairs(queryParams, variables, processor);
 
-        // 6. Build final URL with query string
         const queryString = this.buildQueryString(queryParams);
         const urlWithoutQuery = resolvedUrl.split('?')[0];
         resolvedUrl = queryString
@@ -152,17 +141,12 @@ export class RequestBuilderService {
             if (!key) {
                 continue;
             }
-            // Only encode if not already encoded (heuristic: contains %)
             const encodedKey = key.includes('%') ? key : encodeURIComponent(key);
             const encodedValue = value.includes('%') ? value : encodeURIComponent(value);
             queryPairs.push(`${encodedKey}=${encodedValue}`);
         }
         return queryPairs.join('&');
     }
-
-    // -------------------------------------------------------------------------
-    //  Private helpers
-    // -------------------------------------------------------------------------
 
     /**
      * Substitutes variables in a key-value map in-place (clears then re-populates).

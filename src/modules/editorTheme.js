@@ -155,7 +155,6 @@ export function createThemedHighlighting() {
         try {
             view.dispatch({ effects: compartment.reconfigure(getHighlighting()) });
         } catch (_) {
-            // View may have been destroyed already; safe to ignore.
         }
     };
     window.addEventListener(THEME_CHANGED_EVENT, onChange);

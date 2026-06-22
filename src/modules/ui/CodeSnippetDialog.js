@@ -23,7 +23,7 @@ export class CodeSnippetDialog extends BaseModal {
      */
     constructor() {
         super();
-        this.currentLanguage = 'curl'; // Default language
+        this.currentLanguage = 'curl';
         this.config = null;
     }
 
@@ -76,17 +76,14 @@ export class CodeSnippetDialog extends BaseModal {
         const languageSelector = dialog.querySelector('#language-selector');
         const commandDisplay = dialog.querySelector('#code-snippet-display');
 
-        // Close buttons
         closeBtn.addEventListener('click', () => this.destroy());
         closeBottomBtn.addEventListener('click', () => this.destroy());
 
-        // Language selector
         languageSelector.addEventListener('change', (e) => {
             this.currentLanguage = e.target.value;
             this.updateCodeDisplay(dialog);
         });
 
-        // Copy button
         copyBtn.addEventListener('click', async () => {
             try {
                 const code = commandDisplay.textContent;

@@ -3,6 +3,7 @@
  * @module controllers/RunnerController
  */
 
+import { app } from '../appContext.js';
 import { RunnerRepository } from '../storage/RunnerRepository.js';
 import { RunnerService } from '../services/RunnerService.js';
 import { RunnerPanel } from '../ui/RunnerPanel.js';
@@ -38,7 +39,6 @@ export class RunnerController {
         this.panel = null;
         this.currentRunnerId = null;
 
-        // Bind methods
         this._handleSave = this._handleSave.bind(this);
         this._handleLoadRunners = this._handleLoadRunners.bind(this);
         this._handleRunnerSelect = this._handleRunnerSelect.bind(this);
@@ -57,7 +57,6 @@ export class RunnerController {
     async initialize(container) {
         this.panel = new RunnerPanel(container);
 
-        // Set up callbacks
         this.panel.onRunnerSave = this._handleSave;
         this.panel.onLoadRunners = this._handleLoadRunners;
         this.panel.onRunnerSelect = this._handleRunnerSelect;
@@ -68,7 +67,6 @@ export class RunnerController {
         this.panel.onResolveEndpointDefaults = (collectionId, endpointId) =>
             this.service.getEndpointRequestConfig(collectionId, endpointId);
 
-        // Fetch collections and last-runner settings in parallel
         const [collections, settings] = await Promise.all([
             this.getCollections(),
             this.backendAPI.settings.get().catch(() => ({}))
@@ -76,12 +74,10 @@ export class RunnerController {
 
         this.panel.render(collections);
 
-        // Listen for service events
         this.service.addListener((event, data) => {
             this._handleServiceEvent(event, data);
         });
 
-        // Load last opened runner using already-fetched settings
         await this._loadLastRunner(settings);
     }
 
@@ -95,10 +91,8 @@ export class RunnerController {
     async _handleSave(runnerData) {
         try {
             if (this.currentRunnerId) {
-                // Update existing runner
                 await this.service.updateRunner(this.currentRunnerId, runnerData);
             } else {
-                // Create new runner
                 const runner = await this.service.createRunner(runnerData);
                 this.currentRunnerId = runner.id;
             }
@@ -186,7 +180,6 @@ export class RunnerController {
                 this.panel.currentRunnerId = null;
             }
             await this._saveLastRunnerId(null);
-            // Reset the panel
             this.panel?.startNewRunner();
             updateStatusDisplay('Runner deleted', null);
         } catch (error) {
@@ -212,7 +205,6 @@ export class RunnerController {
         const listContainer = overlay.querySelector('[data-role="saved-list"]');
         const closeButtons = overlay.querySelectorAll('[data-action="close"]');
 
-        // Close handlers
         const closeDialog = () => {
             overlay.remove();
         };
@@ -222,7 +214,6 @@ export class RunnerController {
             if (e.target === overlay) {closeDialog();}
         });
 
-        // Render runners
         if (runners.length === 0) {
             listContainer.innerHTML = `
                 <div class="empty-state-base runner-empty-state">
@@ -238,8 +229,8 @@ export class RunnerController {
             listContainer.appendChild(itemEl);
         });
 
-        if (window.i18n && window.i18n.updateUI) {
-            window.i18n.updateUI();
+        if (app.i18n && app.i18n.updateUI) {
+            app.i18n.updateUI();
         }
     }
 
@@ -271,19 +262,16 @@ export class RunnerController {
             metaEl.textContent = `${requestCount} requests • Last run: ${lastRun}`;
         }
 
-        // Load button
         el.querySelector('[data-action="load"]')?.addEventListener('click', async () => {
             await this._loadRunner(runner.id);
             closeDialog();
         });
 
-        // Delete button
         el.querySelector('[data-action="delete"]')?.addEventListener('click', async () => {
             if (confirm(`Delete runner "${runner.name}"?`)) {
                 await this.service.deleteRunner(runner.id);
                 el.remove();
 
-                // Check if list is now empty
                 const listContainer = el.parentElement;
                 if (listContainer && listContainer.children.length === 0) {
                     listContainer.innerHTML = `
@@ -327,7 +315,6 @@ export class RunnerController {
      */
     async _handleRun(runnerData) {
         try {
-            // Save runner first if it has a name
             let runnerId = this.currentRunnerId;
 
             if (!runnerId && runnerData.name && runnerData.name !== 'Untitled Runner') {
@@ -336,12 +323,10 @@ export class RunnerController {
                 this.currentRunnerId = runnerId;
             }
 
-            // If we have a saved runner, update it before running
             if (runnerId) {
                 await this.service.updateRunner(runnerId, runnerData);
             }
 
-            // Execute the runner - use executeRunnerData for unsaved runners
             const results = runnerId
                 ? await this.service.executeRunner(
                     runnerId,
@@ -445,7 +430,6 @@ export class RunnerController {
             settings.lastRunnerId = runnerId;
             await this.backendAPI.settings.set(settings);
         } catch (error) {
-            // Silently fail - not critical
         }
     }
 
@@ -469,7 +453,6 @@ export class RunnerController {
                 }
             }
         } catch (error) {
-            // Silently fail - not critical
         }
     }
 }

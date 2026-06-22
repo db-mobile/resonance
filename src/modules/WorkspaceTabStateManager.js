@@ -4,6 +4,8 @@
  * Manages capturing and restoring tab state from/to UI elements.
  * Bridges workspace tabs with the existing UI.
  */
+import { getCurrentEndpoint, setCurrentEndpoint } from './state/currentEndpoint.js';
+import { app } from './appContext.js';
 import { parseKeyValuePairs, populateKeyValueList, clearKeyValueList, addKeyValueRow, updateUrlFromQueryParams } from './keyValueManager.js';
 import { authManager } from './authManager.js';
 import { displayResponseWithLineNumbersForTab, clearResponseDisplayForTab, clearSchemaValidationBadge, clearGraphQLErrorsBadge } from './apiHandler.js';
@@ -31,11 +33,10 @@ export class WorkspaceTabStateManager {
         const { isGrpcMode, isWebSocketMode, isSseMode, isMqttMode, isGraphQLMode } = await import('./requestModeManager.js');
         
         if (isGrpcMode()) {
-            const grpcRequestJson = window.grpcBodyEditor
-                ? window.grpcBodyEditor.getContent()
+            const grpcRequestJson = app.grpcBodyEditor
+                ? app.grpcBodyEditor.getContent()
                 : (this.dom.grpcBodyInput?.value || '{}');
             
-            // Capture metadata from UI
             const metadata = {};
             const grpcMetadataList = document.getElementById('grpc-metadata-list');
             if (grpcMetadataList) {
@@ -48,7 +49,6 @@ export class WorkspaceTabStateManager {
                 });
             }
             
-            // Capture TLS setting
             const grpcTlsCheckbox = document.getElementById('grpc-tls-checkbox');
             const useTls = grpcTlsCheckbox?.checked || false;
             
@@ -64,10 +64,10 @@ export class WorkspaceTabStateManager {
                         useTls
                     }
                 },
-                endpoint: window.currentEndpoint
+                endpoint: getCurrentEndpoint()
                     ? {
-                          collectionId: window.currentEndpoint.collectionId,
-                          endpointId: window.currentEndpoint.endpointId,
+                          collectionId: getCurrentEndpoint().collectionId,
+                          endpointId: getCurrentEndpoint().endpointId,
                           protocol: 'grpc'
                       }
                     : null
@@ -88,10 +88,10 @@ export class WorkspaceTabStateManager {
                     authType: 'none',
                     authConfig: {}
                 },
-                endpoint: window.currentEndpoint
+                endpoint: getCurrentEndpoint()
                     ? {
-                          collectionId: window.currentEndpoint.collectionId,
-                          endpointId: window.currentEndpoint.endpointId,
+                          collectionId: getCurrentEndpoint().collectionId,
+                          endpointId: getCurrentEndpoint().endpointId,
                           protocol: 'sse'
                       }
                     : null,
@@ -117,10 +117,10 @@ export class WorkspaceTabStateManager {
                     authType: 'none',
                     authConfig: {}
                 },
-                endpoint: window.currentEndpoint
+                endpoint: getCurrentEndpoint()
                     ? {
-                          collectionId: window.currentEndpoint.collectionId,
-                          endpointId: window.currentEndpoint.endpointId,
+                          collectionId: getCurrentEndpoint().collectionId,
+                          endpointId: getCurrentEndpoint().endpointId,
                           protocol: 'websocket'
                       }
                     : null,
@@ -149,10 +149,10 @@ export class WorkspaceTabStateManager {
                     authType: 'none',
                     authConfig: {}
                 },
-                endpoint: window.currentEndpoint
+                endpoint: getCurrentEndpoint()
                     ? {
-                          collectionId: window.currentEndpoint.collectionId,
-                          endpointId: window.currentEndpoint.endpointId,
+                          collectionId: getCurrentEndpoint().collectionId,
+                          endpointId: getCurrentEndpoint().endpointId,
                           protocol: 'mqtt'
                       }
                     : null,
@@ -176,10 +176,10 @@ export class WorkspaceTabStateManager {
                     authType: authConfig.type || 'none',
                     authConfig: authConfig.config || {}
                 },
-                endpoint: window.currentEndpoint
+                endpoint: getCurrentEndpoint()
                     ? {
-                          collectionId: window.currentEndpoint.collectionId,
-                          endpointId: window.currentEndpoint.endpointId,
+                          collectionId: getCurrentEndpoint().collectionId,
+                          endpointId: getCurrentEndpoint().endpointId,
                           protocol: 'graphql'
                       }
                     : null,
@@ -192,30 +192,27 @@ export class WorkspaceTabStateManager {
         const headers = parseKeyValuePairs(this.dom.headersList);
 
         const authConfig = authManager.getAuthConfig();
-        // authConfig has structure: { type: 'bearer', config: {...} }
 
-        // Capture active response tab
         const activeResponseTab = this._getActiveResponseTab();
 
-        // Capture body based on active mode
         const bodyModeSelect = document.getElementById('body-mode-select');
         const currentBodyMode = bodyModeSelect?.value || 'json';
         let bodyData;
-        if (currentBodyMode === 'formdata' && window.formBodyManager) {
+        if (currentBodyMode === 'formdata' && app.formBodyManager) {
             bodyData = {
                 mode: 'formdata',
-                fields: window.formBodyManager.getFormDataFields()
+                fields: app.formBodyManager.getFormDataFields()
             };
-        } else if (currentBodyMode === 'urlencoded' && window.formBodyManager) {
+        } else if (currentBodyMode === 'urlencoded' && app.formBodyManager) {
             bodyData = {
                 mode: 'urlencoded',
-                fields: window.formBodyManager.getUrlencodedFields()
+                fields: app.formBodyManager.getUrlencodedFields()
             };
         } else if (currentBodyMode === 'text') {
             bodyData = {
                 mode: 'text',
-                content: window.requestBodyTextEditor
-                    ? window.requestBodyTextEditor.getContent()
+                content: app.requestBodyTextEditor
+                    ? app.requestBodyTextEditor.getContent()
                     : ''
             };
         } else {
@@ -225,8 +222,7 @@ export class WorkspaceTabStateManager {
             };
         }
 
-        // Capture preview mode state from active container
-        const containerElements = window.responseContainerManager?.getActiveElements();
+        const containerElements = app.responseContainerManager?.getActiveElements();
         const previewMode = containerElements?.previewManager
             ? containerElements.previewManager.isPreviewMode(containerElements.tabId)
             : false;
@@ -243,18 +239,14 @@ export class WorkspaceTabStateManager {
                 authType: authConfig.type || 'none',
                 authConfig: authConfig.config || {}
             },
-            // Capture current endpoint reference for variable substitution
-            endpoint: window.currentEndpoint ? {
-                collectionId: window.currentEndpoint.collectionId,
-                endpointId: window.currentEndpoint.endpointId,
-                path: window.currentEndpoint.path,
-                method: window.currentEndpoint.method
+            endpoint: getCurrentEndpoint() ? {
+                collectionId: getCurrentEndpoint().collectionId,
+                endpointId: getCurrentEndpoint().endpointId,
+                path: getCurrentEndpoint().path,
+                method: getCurrentEndpoint().method
             } : null,
-            // Capture active response tab
             activeResponseTab: activeResponseTab,
-            // Capture preview mode state
             previewMode: previewMode
-            // Response is captured when request completes (handled separately)
         };
     }
 
@@ -268,7 +260,7 @@ export class WorkspaceTabStateManager {
         if (activeResponseTab) {
             return activeResponseTab.dataset.tab;
         }
-        return 'response-body'; // Default to body tab
+        return 'response-body';
     }
 
     /**
@@ -281,9 +273,7 @@ export class WorkspaceTabStateManager {
             return;
         }
 
-        // Ensure request object exists
         if (!tab.request) {
-            // Initialize with empty request state
             tab.request = {
                 protocol: 'http',
                 url: '',
@@ -297,13 +287,11 @@ export class WorkspaceTabStateManager {
             };
         }
 
-        // Use tab.request directly to avoid stale destructured references
         const {request} = tab;
         const {response} = tab;
         const {endpoint} = tab;
 
         if (request.protocol === 'grpc') {
-            // Set UI to gRPC mode
             setRequestMode(RequestMode.GRPC);
             activateTab('request', 'grpc');
 
@@ -327,8 +315,8 @@ export class WorkspaceTabStateManager {
             if (this.dom.grpcBodyInput) {
                 this.dom.grpcBodyInput.value = request.grpc?.requestJson || '{}';
             }
-            if (window.grpcBodyEditor) {
-                window.grpcBodyEditor.setContent(request.grpc?.requestJson || '{}');
+            if (app.grpcBodyEditor) {
+                app.grpcBodyEditor.setContent(request.grpc?.requestJson || '{}');
             }
             if (this.dom.grpcServiceSelect) {
                 this.dom.grpcServiceSelect.value = request.grpc?.service || '';
@@ -336,16 +324,15 @@ export class WorkspaceTabStateManager {
             if (this.dom.grpcMethodSelect) {
                 this.dom.grpcMethodSelect.value = request.grpc?.fullMethod || '';
             }
-            if (window.setGrpcMetadata) {
-                window.setGrpcMetadata(request.grpc?.metadata || {});
+            if (app.setGrpcMetadata) {
+                app.setGrpcMetadata(request.grpc?.metadata || {});
             }
-            if (window.setGrpcTls) {
-                window.setGrpcTls(request.grpc?.useTls || false);
+            if (app.setGrpcTls) {
+                app.setGrpcTls(request.grpc?.useTls || false);
             }
             
-            // Set window.currentEndpoint for gRPC requests so Ctrl+S save works
             if (endpoint) {
-                window.currentEndpoint = endpoint;
+                setCurrentEndpoint(endpoint);
             }
             return;
         }
@@ -390,7 +377,7 @@ export class WorkspaceTabStateManager {
             }
 
             if (endpoint) {
-                window.currentEndpoint = endpoint;
+                setCurrentEndpoint(endpoint);
             }
             return;
         }
@@ -440,7 +427,7 @@ export class WorkspaceTabStateManager {
             }
 
             if (endpoint) {
-                window.currentEndpoint = endpoint;
+                setCurrentEndpoint(endpoint);
             }
             return;
         }
@@ -456,8 +443,6 @@ export class WorkspaceTabStateManager {
                 graphqlUrlInput.value = request.url || '';
             }
 
-            // GraphQL has no path/query params; clear the shared lists so values from a
-            // previously-viewed HTTP tab don't leak into the GraphQL request.
             if (this.dom.pathParamsList) {
                 clearKeyValueList(this.dom.pathParamsList);
             }
@@ -498,7 +483,7 @@ export class WorkspaceTabStateManager {
             }
 
             if (endpoint) {
-                window.currentEndpoint = endpoint;
+                setCurrentEndpoint(endpoint);
             }
             return;
         }
@@ -541,20 +526,16 @@ export class WorkspaceTabStateManager {
                 this._clearResponse(tab.id);
             }
 
-            // Sync the connection indicator (pill + Disconnect button) to this tab's
-            // live MQTT state, so switching tabs reflects the correct connection.
             import('./mqttHandler.js').then(m => m.refreshMqttConnectionUi(tab.id));
 
             if (endpoint) {
-                window.currentEndpoint = endpoint;
+                setCurrentEndpoint(endpoint);
             }
             return;
         }
 
-        // Set UI to HTTP mode
         setRequestMode(RequestMode.HTTP);
 
-        // Restore request fields
         if (this.dom.urlInput) {
             this.dom.urlInput.value = request.url || '';
         }
@@ -563,19 +544,18 @@ export class WorkspaceTabStateManager {
             this.dom.methodSelect.value = request.method || 'GET';
         }
 
-        // Restore body based on mode
         if (request.body && typeof request.body === 'object' && request.body.mode) {
             const { mode } = request.body;
-            if (mode === 'formdata' && window.formBodyManager) {
+            if (mode === 'formdata' && app.formBodyManager) {
                 this.graphqlBodyManager?.switchMode('formdata');
-                window.formBodyManager.setFormDataFields(request.body.fields || {});
-            } else if (mode === 'urlencoded' && window.formBodyManager) {
+                app.formBodyManager.setFormDataFields(request.body.fields || {});
+            } else if (mode === 'urlencoded' && app.formBodyManager) {
                 this.graphqlBodyManager?.switchMode('urlencoded');
-                window.formBodyManager.setUrlencodedFields(request.body.fields || {});
+                app.formBodyManager.setUrlencodedFields(request.body.fields || {});
             } else if (mode === 'text') {
                 this.graphqlBodyManager?.switchMode('text');
-                if (window.requestBodyTextEditor) {
-                    window.requestBodyTextEditor.setContent(request.body.content || '');
+                if (app.requestBodyTextEditor) {
+                    app.requestBodyTextEditor.setContent(request.body.content || '');
                 }
             } else {
                 if (this.graphqlBodyManager) {
@@ -584,14 +564,12 @@ export class WorkspaceTabStateManager {
                 setRequestBodyContent(request.body.content || '');
             }
         } else {
-            // Legacy format: body is a string
             if (this.graphqlBodyManager) {
                 this.graphqlBodyManager.setGraphQLModeEnabled(false);
             }
             setRequestBodyContent(typeof request.body === 'string' ? request.body : '');
         }
 
-        // Restore path params
         if (this.dom.pathParamsList) {
             clearKeyValueList(this.dom.pathParamsList);
             if (request.pathParams && Object.keys(request.pathParams).length > 0) {
@@ -601,20 +579,16 @@ export class WorkspaceTabStateManager {
             }
         }
 
-        // Restore query params
         if (this.dom.queryParamsList) {
             clearKeyValueList(this.dom.queryParamsList);
             if (request.queryParams && Object.keys(request.queryParams).length > 0) {
                 populateKeyValueList(this.dom.queryParamsList, request.queryParams);
-                // Update URL to include query params
                 updateUrlFromQueryParams();
             } else {
-                // Add empty row if no query params
                 addKeyValueRow(this.dom.queryParamsList);
             }
         }
 
-        // Restore headers
         if (this.dom.headersList) {
             clearKeyValueList(this.dom.headersList);
             if (request.headers && Object.keys(request.headers).length > 0) {
@@ -624,7 +598,6 @@ export class WorkspaceTabStateManager {
             }
         }
 
-        // Restore auth
         if (authManager) {
             const authType = request.authType || 'none';
             const authConfig = {
@@ -634,67 +607,51 @@ export class WorkspaceTabStateManager {
             authManager.loadAuthConfig(authConfig);
         }
 
-        // Restore active response tab FIRST, before restoring response data
         const activeResponseTab = tab.activeResponseTab || 'response-body';
         activateTab('response', activeResponseTab);
 
-        // Restore response if it exists
         if (response) {
             await this._restoreResponse(response, tab.id);
         } else {
             this._clearResponse(tab.id);
         }
 
-        // Restore preview mode if it was active
         if (tab.previewMode) {
-            const containerElements = window.responseContainerManager?.getOrCreateContainer(tab.id);
+            const containerElements = app.responseContainerManager?.getOrCreateContainer(tab.id);
             if (containerElements?.previewManager) {
-                // Only toggle if not already in preview mode
                 if (!containerElements.previewManager.isPreviewMode(tab.id)) {
                     containerElements.previewManager.togglePreview(tab.id);
                 }
             }
         }
 
-        // Store endpoint reference globally for compatibility with existing code
-        // Always update window.currentEndpoint to match the tab's endpoint state
-        // This ensures variable substitution uses the correct collection context
         if (endpoint) {
-            window.currentEndpoint = endpoint;
+            setCurrentEndpoint(endpoint);
 
-            // Clear schema validation badge when switching endpoints
             clearSchemaValidationBadge();
             clearGraphQLErrorsBadge();
 
-            // Load scripts for this endpoint
-            if (window.inlineScriptManager && endpoint.collectionId && endpoint.endpointId) {
-                await window.inlineScriptManager.loadScripts(endpoint.collectionId, endpoint.endpointId);
+            if (app.inlineScriptManager && endpoint.collectionId && endpoint.endpointId) {
+                await app.inlineScriptManager.loadScripts(endpoint.collectionId, endpoint.endpointId);
             }
 
-            // Load schema for this endpoint
-            if (window.schemaController && endpoint.collectionId && endpoint.endpointId) {
-                await window.schemaController.loadSchema(endpoint.collectionId, endpoint.endpointId);
+            if (app.schemaController && endpoint.collectionId && endpoint.endpointId) {
+                await app.schemaController.loadSchema(endpoint.collectionId, endpoint.endpointId);
             }
         } else if (Object.prototype.hasOwnProperty.call(tab, 'endpoint')) {
-            // Tab explicitly has no endpoint (e.g., manually created tab)
-            window.currentEndpoint = null;
+            setCurrentEndpoint(null);
 
-            // Clear schema validation badge when no endpoint
             clearSchemaValidationBadge();
             clearGraphQLErrorsBadge();
 
-            // Clear scripts when no endpoint
-            if (window.inlineScriptManager) {
-                window.inlineScriptManager.clear();
+            if (app.inlineScriptManager) {
+                app.inlineScriptManager.clear();
             }
 
-            // Clear schema when no endpoint
-            if (window.schemaController) {
-                window.schemaController.clearContext();
+            if (app.schemaController) {
+                app.schemaController.clearContext();
             }
         }
-        // If tab doesn't have endpoint property at all (old tab format),
-        // leave window.currentEndpoint as-is for backwards compatibility
     }
 
     /**
@@ -728,23 +685,20 @@ export class WorkspaceTabStateManager {
             return;
         }
 
-        const containerElements = window.responseContainerManager?.getOrCreateContainer(tabId);
+        const containerElements = app.responseContainerManager?.getOrCreateContainer(tabId);
 
-        // Restore response body with CodeMirror
         if (response.data) {
             const isStructured = typeof response.data !== 'string';
             const formattedResponse = isStructured
                 ? JSON.stringify(response.data, null, 2)
                 : response.data;
             const contentType = response.headers?.['content-type'] || null;
-            // Structured data is known JSON — hint it so the editor skips re-parsing.
             const languageHint = isStructured ? 'json' : undefined;
             displayResponseWithLineNumbersForTab(formattedResponse, contentType, tabId, languageHint);
         } else {
             clearResponseDisplayForTab(tabId);
         }
 
-        // Restore response headers
         if (containerElements?.headersEditor) {
             if (response.headers && Object.keys(response.headers).length > 0) {
                 containerElements.headersEditor.setContent(JSON.stringify(response.headers, null, 2), 'application/json');
@@ -753,7 +707,6 @@ export class WorkspaceTabStateManager {
             }
         }
 
-        // Restore cookies
         if (containerElements?.cookiesDisplay) {
             if (response.cookies && response.cookies.length > 0) {
                 containerElements.cookiesDisplay.innerHTML = formatCookiesAsHtml(response.cookies);
@@ -762,7 +715,6 @@ export class WorkspaceTabStateManager {
             }
         }
 
-        // Restore performance metrics
         if (containerElements?.performanceDisplay) {
             if (response.performanceHTML) {
                 containerElements.performanceDisplay.innerHTML = response.performanceHTML;
@@ -773,7 +725,6 @@ export class WorkspaceTabStateManager {
             }
         }
 
-        // Restore status display
         if (response.status) {
             updateStatusDisplay(`Status: ${response.status} ${response.statusText || ''}`, response.status);
         } else if (response.websocket?.state === 'open') {
@@ -784,10 +735,8 @@ export class WorkspaceTabStateManager {
             updateStatusDisplay('Ready', null);
         }
 
-        // Restore response time
         updateResponseTime(response.ttfb);
 
-        // Restore response size
         updateResponseSize(response.size);
     }
 
@@ -796,29 +745,23 @@ export class WorkspaceTabStateManager {
      * @private
      */
     _clearResponse(tabId) {
-        // Clear response body
         clearResponseDisplayForTab(tabId);
 
-        // Clear status display
         updateStatusDisplay('Ready', null);
 
-        // Clear response time and size
         updateResponseTime(null);
         updateResponseSize(null);
 
-        const containerElements = window.responseContainerManager?.getOrCreateContainer(tabId);
+        const containerElements = app.responseContainerManager?.getOrCreateContainer(tabId);
 
-        // Clear response headers
         if (containerElements?.headersEditor) {
             containerElements.headersEditor.setContent('', 'application/json');
         }
 
-        // Clear cookies
         if (containerElements?.cookiesDisplay) {
             containerElements.cookiesDisplay.innerHTML = '';
         }
 
-        // Clear performance metrics
         if (containerElements?.performanceDisplay) {
             clearPerformanceMetrics(containerElements.performanceDisplay);
         }

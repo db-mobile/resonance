@@ -30,7 +30,6 @@ export class ProxyController {
      * @returns {Promise<void>}
      */
     async initialize() {
-        // Listen for proxy configuration changes from service
         this.service.addChangeListener((event) => {
             this.handleProxyChange(event);
         });
@@ -51,7 +50,6 @@ export class ProxyController {
             case 'proxy-settings-updated':
             case 'proxy-toggled':
             case 'proxy-settings-reset':
-                // Can be used to update UI elements if needed
                 break;
         }
     }

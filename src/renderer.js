@@ -7,10 +7,11 @@
  * in the renderer process.
  */
 
-// Import ipcBridge first to set up window.backendAPI before any other modules
+import { getCurrentEndpoint, setCurrentEndpoint } from './modules/state/currentEndpoint.js';
+import { app } from './modules/appContext.js';
 import './modules/ipcBridge.js';
 
-import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, bodyEditorContainer, bodyTextEditorContainer, pathParamsList, queryParamsList, headersList, authTypeSelect, responseBodyContainer, statusDisplay, responseHeadersDisplay, responseCookiesDisplay, grpcTargetInput, grpcServiceSelect, grpcMethodSelect, grpcBodyInput, grpcBodyEditorContainer } from './modules/domElements.js';
+import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, bodyEditorContainer, bodyTextEditorContainer, grpcBodyInput, grpcBodyEditorContainer } from './modules/domElements.js';
 
 import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl, setUrlUpdating } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
@@ -22,6 +23,7 @@ import { FormBodyManager } from './modules/formBodyManager.js';
 import { initGrpcUI, setGrpcMetadata, setGrpcTls } from './modules/grpcHandler.js';
 import { initRequestModeManager } from './modules/requestModeManager.js';
 import { initWebSocketHandler } from './modules/websocketHandler.js';
+import { initGraphQLSubscriptionHandler } from './modules/graphqlSubscriptionHandler.js';
 import { initSseHandler } from './modules/sseHandler.js';
 import { initMqttHandler, handleMqttCancel } from './modules/mqttHandler.js';
 import { initGrpcStreamHandler } from './modules/grpcStreamHandler.js';
@@ -33,145 +35,45 @@ import { initResizer } from './modules/resizer.js';
 import { i18n } from './i18n/I18nManager.js';
 import { authManager } from './modules/authManager.js';
 import { initializeCopyHandler } from './modules/copyHandler.js';
-import { HistoryController } from './modules/controllers/HistoryController.js';
-import { EnvironmentController } from './modules/controllers/EnvironmentController.js';
-import { EnvironmentRepository } from './modules/storage/EnvironmentRepository.js';
 import { SecretStore } from './modules/storage/SecretStore.js';
-import { EnvironmentService } from './modules/services/EnvironmentService.js';
-import { EnvironmentManager } from './modules/ui/EnvironmentManager.js';
-import { EnvironmentSelector } from './modules/ui/EnvironmentSelector.js';
 import { StatusBar } from './modules/ui/StatusBar.js';
 import { ContextMenu } from './modules/ui/ContextMenu.js';
-import { ProxyController } from './modules/controllers/ProxyController.js';
-import { ProxyRepository } from './modules/storage/ProxyRepository.js';
-import { ProxyService } from './modules/services/ProxyService.js';
-import { CertificateController } from './modules/controllers/CertificateController.js';
-import { CertificateRepository } from './modules/storage/CertificateRepository.js';
-import { CertificateService } from './modules/services/CertificateService.js';
+import { FeatureRegistry } from './modules/registry/FeatureRegistry.js';
+import { proxyFeature } from './modules/proxy.feature.js';
+import { certificateFeature } from './modules/certificate.feature.js';
+import { cookieFeature } from './modules/cookie.feature.js';
+import { environmentFeature } from './modules/environment.feature.js';
+import { scriptFeature } from './modules/script.feature.js';
+import { mockServerFeature } from './modules/mockServer.feature.js';
+import { schemaFeature } from './modules/schema.feature.js';
+import { historyFeature } from './modules/history.feature.js';
+import { workspaceTabFeature } from './modules/workspaceTab.feature.js';
 import { StatusDisplayAdapter } from './modules/interfaces/IStatusDisplay.js';
 import { keyboardShortcuts } from './modules/keyboardShortcuts.js';
-import { WorkspaceTabRepository } from './modules/storage/WorkspaceTabRepository.js';
-import { WorkspaceTabService } from './modules/services/WorkspaceTabService.js';
-import { WorkspaceTabBar } from './modules/ui/WorkspaceTabBar.js';
-import { WorkspaceTabController } from './modules/controllers/WorkspaceTabController.js';
-import { WorkspaceTabStateManager } from './modules/WorkspaceTabStateManager.js';
-import { ResponseContainerManager } from './modules/ResponseContainerManager.js';
-import { ScriptController } from './modules/controllers/ScriptController.js';
-import { ScriptService } from './modules/services/ScriptService.js';
-import { ScriptRepository } from './modules/storage/ScriptRepository.js';
-import { InlineScriptManager } from './modules/ui/InlineScriptManager.js';
-import { ScriptConsolePanel } from './modules/ui/ScriptConsolePanel.js';
-import { MockServerRepository } from './modules/storage/MockServerRepository.js';
-import { MockServerService } from './modules/services/MockServerService.js';
-import { MockServerController } from './modules/controllers/MockServerController.js';
-import { MockServerDialog } from './modules/ui/MockServerDialog.js';
 import { CollectionRepository } from './modules/storage/CollectionRepository.js';
 import { RequestBodyEditor } from './modules/requestBodyEditor.bundle.js';
-import { PreviewRepository } from './modules/storage/PreviewRepository.js';
 import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
 import { toast } from './modules/ui/Toast.js';
-import { CookieRepository } from './modules/storage/CookieRepository.js';
-import { CookieJarService } from './modules/services/CookieJarService.js';
-import { CookieController } from './modules/controllers/CookieController.js';
-import { CookieManagerDialog } from './modules/ui/CookieManagerDialog.js';
-import { SchemaController } from './modules/controllers/SchemaController.js';
 
 const themeManager = new ThemeManager();
 const httpVersionManager = new HttpVersionManager();
 const timeoutManager = new TimeoutManager();
 
-// Expose settings cache invalidation so themeManager/httpVersionManager/timeoutManager
-// can bust it when the user saves new settings
-window.invalidateApiHandlerSettingsCache = invalidateSettingsCache;
-window.getApiHandlerSettingsCache = getSettingsCache;
-window.invalidateApiHandlerEnvironmentCache = invalidateEnvironmentCache;
+app.invalidateApiHandlerSettingsCache = invalidateSettingsCache;
+app.getApiHandlerSettingsCache = getSettingsCache;
+app.invalidateApiHandlerEnvironmentCache = invalidateEnvironmentCache;
 
-// Initialize shared status display adapter
 const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
 
-// Initialize proxy system
-const proxyRepository = new ProxyRepository(window.backendAPI);
-const proxyService = new ProxyService(proxyRepository, statusDisplayAdapter);
-const proxyController = new ProxyController(proxyService);
-
-// Initialize client certificate (mTLS) system
-const certificateRepository = new CertificateRepository(window.backendAPI);
-const certificateService = new CertificateService(certificateRepository);
-const certificateController = new CertificateController(certificateService);
-certificateController.initialize();
-// Expose for the request path (apiHandler resolves a cert by host before sending)
-window.certificateController = certificateController;
-
-// Shared secret backend: stores secret values in the OS keychain (encryption at rest),
-// keeping them out of the plaintext store, exports, and git-friendly collection files.
-// Exposed globally for the auth request path. Falls back to encrypted-at-rest-free local
-// storage only when no keychain is available, warning the user once.
 const secretStore = new SecretStore(window.backendAPI, {
     onFallback: () => toast.warning(
         'No OS keychain available — secrets are stored locally without encryption at rest.'
     )
 });
-window.secretStore = secretStore;
+app.secretStore = secretStore;
 
-// Initialize environment system
-const environmentRepository = new EnvironmentRepository(window.backendAPI, secretStore);
-const environmentService = new EnvironmentService(environmentRepository, statusDisplayAdapter);
-const environmentManager = new EnvironmentManager(environmentService);
+const collectionRepository = new CollectionRepository(window.backendAPI, secretStore);
 
-// Create environment controller first
-// eslint-disable-next-line prefer-const
-let environmentController;
-
-// Create environment selector with callbacks that will use the controller
-const environmentSelector = new EnvironmentSelector(
-    environmentService,
-    (envId) => environmentController.switchEnvironment(envId),
-    () => environmentController.openEnvironmentManager()
-);
-
-// Now create the controller
-environmentController = new EnvironmentController(
-    environmentService,
-    environmentManager,
-    environmentSelector
-);
-
-// Initialize cookie jar system
-const cookieRepository = new CookieRepository(window.backendAPI);
-const cookieJarService = new CookieJarService(cookieRepository);
-const cookieManagerDialog = new CookieManagerDialog(cookieJarService, environmentService);
-const cookieController = new CookieController(cookieJarService, cookieManagerDialog);
-cookieController.initialize();
-window.cookieController = cookieController;
-
-// Sync cookie jar environment when active environment changes
-environmentService.addChangeListener((event) => {
-    if (event.type === 'environment-switched') {
-        cookieController.setActiveEnvironment(event.environmentId, event.environmentName);
-    }
-});
-
-// Initialize script system
-const scriptRepository = new ScriptRepository(window.backendAPI);
-const scriptService = new ScriptService(
-    scriptRepository,
-    environmentService,
-    statusDisplayAdapter
-);
-const inlineScriptManager = new InlineScriptManager();
-// Initialize script manager event listeners
-inlineScriptManager.initialize();
-// Expose globally for workspace tab restoration
-window.inlineScriptManager = inlineScriptManager;
-// ScriptConsolePanel will be initialized per workspace tab, so pass null for now
-const scriptConsolePanel = new ScriptConsolePanel(null);
-const scriptController = new ScriptController(
-    scriptService,
-    inlineScriptManager,
-    scriptConsolePanel
-);
-
-// Initialize GraphQL body manager
 const graphqlBodyManager = new GraphQLBodyManager({
     bodyInput,
     graphqlQueryEditor: document.getElementById('graphql-query-editor'),
@@ -179,73 +81,58 @@ const graphqlBodyManager = new GraphQLBodyManager({
     graphqlFormatBtn: document.getElementById('graphql-format-btn')
 });
 graphqlBodyManager.initialize();
-
-// Make available to apiHandler
 setGraphQLBodyManager(graphqlBodyManager);
+app.graphqlBodyManager = graphqlBodyManager;
 
-// Make available globally for workspace tab state manager
-window.graphqlBodyManager = graphqlBodyManager;
+const featureRegistry = new FeatureRegistry({
+    backendAPI: window.backendAPI,
+    statusDisplay: statusDisplayAdapter,
+    secretStore,
+    toast,
+    _shared: new Map(),
+    provide(name, value) {
+        this._shared.set(name, value);
+        return value;
+    },
+    get(name) {
+        return this._shared.get(name);
+    },
+});
+featureRegistry.provide('collectionRepository', collectionRepository);
+featureRegistry.provide('graphqlBodyManager', graphqlBodyManager);
+featureRegistry
+    .register(environmentFeature)
+    .register(proxyFeature)
+    .register(certificateFeature)
+    .register(cookieFeature)
+    .register(scriptFeature)
+    .register(mockServerFeature)
+    .register(schemaFeature)
+    .register(historyFeature)
+    .register(workspaceTabFeature)
+    .boot();
 
-// Initialize form-data / URL-encoded body manager
+const environment = featureRegistry.get('environment');
+const environmentController = environment.controller;
+const environmentService = environment.service;
+const environmentSelector = environment.selector;
+const proxyController = featureRegistry.get('proxy').controller;
+const certificateController = featureRegistry.get('certificate').controller;
+const cookieController = featureRegistry.get('cookie').controller;
+const mockServer = featureRegistry.get('mockServer');
+const mockServerController = mockServer.controller;
+const mockServerDialog = mockServer.dialog;
+const historyController = featureRegistry.get('history').controller;
+const workspaceTab = featureRegistry.get('workspaceTab');
+const workspaceTabController = workspaceTab.controller;
+const workspaceTabService = workspaceTab.service;
+const workspaceTabStateManager = workspaceTab.stateManager;
+
 const formBodyManager = new FormBodyManager();
 formBodyManager.initialize();
-window.formBodyManager = formBodyManager;
+app.formBodyManager = formBodyManager;
 
-// Initialize settings modal with all managers
 const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager, proxyController, certificateController);
-
-// Initialize mock server system
-const collectionRepository = new CollectionRepository(window.backendAPI, secretStore);
-const mockServerRepository = new MockServerRepository(window.backendAPI);
-const mockServerService = new MockServerService(mockServerRepository, statusDisplayAdapter);
-const mockServerController = new MockServerController(mockServerService, collectionRepository);
-const mockServerDialog = new MockServerDialog(mockServerController);
-
-// Initialize schema validation system
-const schemaController = new SchemaController({
-    repository: collectionRepository,
-    statusDisplay: statusDisplayAdapter
-});
-window.schemaController = schemaController;
-
-// Initialize history controller
-const historyController = new HistoryController(window.backendAPI);
-
-// Initialize preview repository
-const previewRepository = new PreviewRepository(window.backendAPI);
-
-// Initialize response container manager for multiple workspace tabs
-const responseContainerManager = new ResponseContainerManager(previewRepository);
-window.responseContainerManager = responseContainerManager;
-
-// Initialize workspace tab system
-const workspaceTabRepository = new WorkspaceTabRepository(window.backendAPI);
-const workspaceTabService = new WorkspaceTabService(workspaceTabRepository, statusDisplayAdapter);
-const workspaceTabBar = new WorkspaceTabBar('workspace-tab-bar-container');
-const workspaceTabStateManager = new WorkspaceTabStateManager({
-    urlInput,
-    methodSelect,
-    bodyInput,
-    pathParamsList,
-    queryParamsList,
-    headersList,
-    authTypeSelect,
-    responseBodyContainer,
-    statusDisplay,
-    responseHeadersDisplay,
-    responseCookiesDisplay,
-    graphqlBodyManager,
-    grpcTargetInput,
-    grpcServiceSelect,
-    grpcMethodSelect,
-    grpcBodyInput
-});
-const workspaceTabController = new WorkspaceTabController(
-    workspaceTabService,
-    workspaceTabBar,
-    workspaceTabStateManager,
-    responseContainerManager
-);
 
 /**
  * Initializes application keyboard shortcuts
@@ -261,10 +148,8 @@ const workspaceTabController = new WorkspaceTabController(
  * @returns {void}
  */
 function initKeyboardShortcuts() {
-    // Initialize the shortcuts manager
     keyboardShortcuts.init();
 
-    // Request Actions
     keyboardShortcuts.register('Enter', {
         ctrl: true,
         handler: () => {
@@ -279,33 +164,31 @@ function initKeyboardShortcuts() {
     keyboardShortcuts.register('KeyS', {
         ctrl: true,
         handler: async () => {
-            if (window.currentEndpoint) {
+            if (getCurrentEndpoint()) {
                 const { saveAllRequestModifications } = await import('./modules/collectionManager.js');
                 await saveAllRequestModifications(
-                    window.currentEndpoint.collectionId,
-                    window.currentEndpoint.endpointId
+                    getCurrentEndpoint().collectionId,
+                    getCurrentEndpoint().endpointId
                 );
-                if (window.workspaceTabController) {
-                    await window.workspaceTabController.markCurrentTabUnmodified();
+                if (app.workspaceTabController) {
+                    await app.workspaceTabController.markCurrentTabUnmodified();
                 }
-            } else if (window.workspaceTabController) {
-                // No endpoint loaded - show "Save to Collection" dialog
+            } else if (app.workspaceTabController) {
                 const { saveRequestToCollection } = await import('./modules/collectionManager.js');
-                const activeTab = await window.workspaceTabController.service.getActiveTab();
+                const activeTab = await app.workspaceTabController.service.getActiveTab();
                 if (activeTab && activeTab.type !== 'runner') {
-                    const state = await window.workspaceTabController.stateManager.captureCurrentState();
+                    const state = await app.workspaceTabController.stateManager.captureCurrentState();
                     const requestData = {
                         name: activeTab.name,
                         ...state.request
                     };
                     const result = await saveRequestToCollection(requestData);
                     if (result) {
-                        // Update current endpoint and tab
-                        window.currentEndpoint = {
+                        setCurrentEndpoint({
                             collectionId: result.collectionId,
                             endpointId: result.endpointId
-                        };
-                        await window.workspaceTabController.service.updateTab(activeTab.id, {
+                        });
+                        await app.workspaceTabController.service.updateTab(activeTab.id, {
                             name: result.name,
                             endpoint: {
                                 collectionId: result.collectionId,
@@ -313,8 +196,8 @@ function initKeyboardShortcuts() {
                                 protocol: state.request.protocol || 'http'
                             }
                         });
-                        window.workspaceTabController.tabBar.updateTab(activeTab.id, { name: result.name });
-                        await window.workspaceTabController.markCurrentTabUnmodified();
+                        app.workspaceTabController.tabBar.updateTab(activeTab.id, { name: result.name });
+                        await app.workspaceTabController.markCurrentTabUnmodified();
                     }
                 }
             }
@@ -333,7 +216,6 @@ function initKeyboardShortcuts() {
         category: 'Request'
     });
 
-    // Navigation & UI
     keyboardShortcuts.register('KeyL', {
         ctrl: true,
         handler: (_e) => {
@@ -372,15 +254,14 @@ function initKeyboardShortcuts() {
     keyboardShortcuts.register('KeyJ', {
         ctrl: true,
         handler: () => {
-            if (window.cookieController) {
-                window.cookieController.openCookieManager();
+            if (app.cookieController) {
+                app.cookieController.openCookieManager();
             }
         },
         description: 'Open cookie jar',
         category: 'Navigation'
     });
 
-    // Actions
     keyboardShortcuts.register('KeyK', {
         ctrl: true,
         handler: () => {
@@ -414,7 +295,6 @@ function initKeyboardShortcuts() {
         category: 'Actions'
     });
 
-    // Settings & Help
     keyboardShortcuts.register('Comma', {
         ctrl: true,
         handler: () => {
@@ -435,7 +315,6 @@ function initKeyboardShortcuts() {
         category: 'Help'
     });
 
-    // Workspace Tab Switching (Ctrl/Cmd+1-9 to switch to specific workspace tabs)
     for (let i = 1; i <= 9; i++) {
         keyboardShortcuts.register(`Digit${i}`, {
             ctrl: true,
@@ -452,7 +331,6 @@ function initKeyboardShortcuts() {
         });
     }
 
-    // Request Tab Switching (Alt+1-6 for request sub-tabs)
     keyboardShortcuts.register('Digit1', {
         alt: true,
         handler: () => activateTab('request', 'path-params'),
@@ -495,7 +373,6 @@ function initKeyboardShortcuts() {
         category: 'Request Tabs'
     });
 
-    // Workspace Tab shortcuts
     keyboardShortcuts.register('KeyT', {
         ctrl: true,
         handler: () => {
@@ -575,7 +452,6 @@ function applyShortcutHints() {
         const display = keyboardShortcuts.lookupDisplayKey(key, ctrl);
         if (!display) { continue; }
         if (el.hasAttribute('data-i18n-title')) {
-            // Store on element so updateUI() re-applies after language changes
             el.setAttribute('data-shortcut-hint', display);
             el.title = `${el.title} (${display})`;
         } else {
@@ -600,9 +476,7 @@ function scheduleIdleTask(callback, timeout = 2000) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // === CRITICAL PATH: Must complete before first paint ===
     
-    // Set up core button event listeners immediately
     curlBtn.addEventListener('click', handleGenerateCurl);
     sendRequestBtn.addEventListener('click', handleSendRequest);
     cancelRequestBtn.addEventListener('click', handleCancelRequest);
@@ -612,11 +486,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         mqttDisconnectBtn.addEventListener('click', () => handleMqttCancel());
     }
 
-    // Initialize request mode UI (needed for tab visibility)
     initGrpcUI();
     initRequestModeManager();
 
-    // Import menu for OpenAPI, Postman, and cURL formats
     const importMenu = new ContextMenu();
     importCollectionBtn.addEventListener('click', (event) => {
         event.preventDefault();
@@ -655,7 +527,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Mock server button functionality
     const mockServerBtn = document.getElementById('mock-server-btn');
     if (mockServerBtn) {
         mockServerBtn.addEventListener('click', () => {
@@ -663,17 +534,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Collection Runner button functionality
     const runnerBtn = document.getElementById('runner-btn');
     if (runnerBtn) {
         runnerBtn.addEventListener('click', () => {
-            if (window.workspaceTabController) {
-                window.workspaceTabController.createRunnerTab();
+            if (app.workspaceTabController) {
+                app.workspaceTabController.createRunnerTab();
             }
         });
     }
 
-    // History toggle functionality
     const historyToggleBtn = document.getElementById('history-toggle-btn');
     const historySidebar = document.getElementById('history-sidebar');
     const historyResizerHandle = document.getElementById('history-resizer-handle');
@@ -704,7 +573,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Cookie jar button — opens the cookie manager dialog
     const cookieJarBtn = document.getElementById('cookie-jar-btn');
     if (cookieJarBtn) {
         cookieJarBtn.addEventListener('click', () => {
@@ -712,33 +580,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Expose global references
-    window.authManager = authManager;
-    window.historyController = historyController;
-    window.environmentController = environmentController;
-    window.workspaceTabController = workspaceTabController;
-    window.scriptController = scriptController;
-    window.setUrlUpdating = setUrlUpdating;
-    window.setGrpcMetadata = setGrpcMetadata;
-    window.setGrpcTls = setGrpcTls;
+    // globals remain here.
+    app.authManager = authManager;
+    app.setUrlUpdating = setUrlUpdating;
+    app.setGrpcMetadata = setGrpcMetadata;
+    app.setGrpcTls = setGrpcTls;
 
-    // Initialize environment selector (needed for environment switching)
     environmentSelector.initialize('environment-selector-container');
 
-    // Parallelize independent IPC calls: i18n, environment controller, and cookie jar sync
     await Promise.all([
-        i18n.init().then(() => { window.i18n = i18n; }),
+        i18n.init().then(() => { app.i18n = i18n; }),
         environmentController.initialize(),
         environmentService.getActiveEnvironment().then(activeEnv => {
             if (activeEnv) {
                 cookieController.setActiveEnvironment(activeEnv.id, activeEnv.name);
             }
-        }).catch(() => { /* non-blocking */ })
+        }).catch(() => { })
     ]);
 
-    // Initialize body editors lazily - CodeMirror is heavy and most editors
-    // aren't needed until the user interacts with a specific body mode.
-    // Each lazy editor defers construction until first real access (setContent/getContent/etc.)
     let isInitializingEditor = false;
     let isInitializingGrpcEditor = false;
 
@@ -768,68 +627,59 @@ document.addEventListener('DOMContentLoaded', async () => {
         return proxy;
     }
 
-    // JSON body editor (lazy)
     let requestBodyEditor = null;
     if (bodyEditorContainer) {
         requestBodyEditor = createLazyEditor(bodyEditorContainer, {}, (content) => {
             if (bodyInput) {
                 bodyInput.value = content;
             }
-            if (window.workspaceTabController &&
+            if (app.workspaceTabController &&
                 !isInitializingEditor &&
-                !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+                !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
-        window.requestBodyEditor = requestBodyEditor;
+        app.requestBodyEditor = requestBodyEditor;
     }
 
-    // Plain-text body editor (lazy)
     if (bodyTextEditorContainer) {
-        window.requestBodyTextEditor = createLazyEditor(
+        app.requestBodyTextEditor = createLazyEditor(
             bodyTextEditorContainer,
             { language: 'plain' },
             (_content) => {
-                if (window.workspaceTabController &&
-                    !window.workspaceTabController.isRestoringState) {
-                    window.workspaceTabController.markCurrentTabModified();
+                if (app.workspaceTabController &&
+                    !app.workspaceTabController.isRestoringState) {
+                    app.workspaceTabController.markCurrentTabModified();
                 }
             }
         );
     }
 
-    // gRPC body editor (lazy)
     let grpcBodyEditor = null;
     if (grpcBodyEditorContainer) {
         grpcBodyEditor = createLazyEditor(grpcBodyEditorContainer, {}, (content) => {
             if (grpcBodyInput) {
                 grpcBodyInput.value = content;
             }
-            if (window.workspaceTabController &&
+            if (app.workspaceTabController &&
                 !isInitializingGrpcEditor &&
-                !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+                !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
-        window.grpcBodyEditor = grpcBodyEditor;
+        app.grpcBodyEditor = grpcBodyEditor;
     }
 
-    // Initialize workspace tabs (restores user's last state - critical for UX)
-    // Must happen AFTER body editors are initialized so text/gRPC body content can be restored
     await workspaceTabController.initialize();
 
-    // Sync JSON body editor with textarea content (restored by workspace tab initialization)
-    // Use flag to prevent marking tab as modified during this sync
     if (requestBodyEditor && bodyInput && bodyInput.value) {
         isInitializingEditor = true;
         requestBodyEditor.setContent(bodyInput.value);
-        // Use setTimeout to ensure flag is cleared after any async updates
         setTimeout(() => {
             isInitializingEditor = false;
         }, 0);
     }
 
-    // Sync gRPC body editor with textarea content
     if (grpcBodyEditor && grpcBodyInput && grpcBodyInput.value) {
         isInitializingGrpcEditor = true;
         grpcBodyEditor.setContent(grpcBodyInput.value);
@@ -838,17 +688,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 0);
     }
 
-    // Initialize tab listeners AFTER workspace tabs are created
     initTabListeners();
 
-    // Initialize script sub-tabs
     initializeScriptSubTabs();
 
-    // Activate default response tab
     activateTab('response', 'response-body');
 
     document.addEventListener('languageChanged', (_event) => {
-        // Any dynamic content that needs special handling can be refreshed here
     });
 
     updateStatusDisplay('Ready', null);
@@ -860,27 +706,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     initKeyboardShortcuts();
     applyShortcutHints();
 
-    // Track changes to mark tabs as modified
     if (urlInput) {
         urlInput.addEventListener('input', () => {
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
     }
 
     if (bodyInput) {
         bodyInput.addEventListener('input', () => {
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
     }
 
     if (methodSelect) {
         methodSelect.addEventListener('change', () => {
-            if (window.workspaceTabController && !window.workspaceTabController.isRestoringState) {
-                window.workspaceTabController.markCurrentTabModified();
+            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
             }
         });
     }
@@ -896,50 +741,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     updateQueryParamsFromUrl();
 
-    // === FIRST PAINT COMPLETE ===
-    // The UI is now interactive. Defer non-critical initialization to idle time.
-
-    // Load collections (can show loading state in sidebar)
     loadCollections();
 
-    // === DEFERRED INITIALIZATION ===
-    // These tasks run during browser idle time to avoid blocking the main thread
-
-    // Tier 1: Initialize after first idle (needed for full functionality)
     scheduleIdleTask(async () => {
-        // Initialize status bar
         const statusBar = new StatusBar(environmentService);
         statusBar.initialize();
-        window.statusBar = statusBar;
+        app.statusBar = statusBar;
 
-        // Initialize history controller (needed for history sidebar)
         await historyController.init();
 
-        // Initialize URL autocomplete from history
         if (urlInput) {
             const urlAutocomplete = new UrlAutocomplete(urlInput, historyController);
             urlAutocomplete.init();
         }
     }, 1000);
 
-    // Tier 2: Lower priority initialization
     scheduleIdleTask(async () => {
-        // Initialize mock server controller
         await mockServerController.initialize();
 
-        // Initialize WebSocket handler
         await initWebSocketHandler();
 
-        // Initialize SSE handler
+        await initGraphQLSubscriptionHandler();
+
         await initSseHandler();
 
-        // Initialize MQTT handler
         await initMqttHandler();
 
-        // Initialize gRPC streaming handler
         await initGrpcStreamHandler();
 
-        // Check for and perform migration from old single-file store
         try {
             if (window.backendAPI?.collections?.needsMigration) {
                 const needsMigration = await window.backendAPI.collections.needsMigration();
@@ -956,13 +785,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 2000);
 
-    // Tier 3: Lowest priority (update check)
     scheduleIdleTask(() => {
         checkForUpdatesOnLaunch();
     }, 3000);
 });
 
-// Save current tab state before window closes
 window.addEventListener('beforeunload', async (_e) => {
     try {
         const activeTabId = await workspaceTabService.getActiveTabId();
@@ -980,31 +807,26 @@ window.addEventListener('beforeunload', async (_e) => {
  */
 async function checkForUpdatesOnLaunch() {
     try {
-        // Check if updater is available and setting is enabled
         if (!window.backendAPI?.updater?.check || !window.backendAPI?.updater?.getInstallInfo) {
             return;
         }
 
-        // Check if auto-update is supported for this installation type
         const installInfo = await window.backendAPI.updater.getInstallInfo();
         if (!installInfo.autoUpdateSupported) {
             return;
         }
 
-        // Check if the setting is enabled
         const settings = await window.backendAPI.settings.get();
         if (!settings.checkUpdatesOnLaunch) {
             return;
         }
 
-        // Check for updates
         const update = await window.backendAPI.updater.check();
         if (update?.available) {
-            const message = window.i18n?.t('settings.update_available', { version: update.version }) || `Update available: v${update.version}`;
+            const message = app.i18n?.t('settings.update_available', { version: update.version }) || `Update available: v${update.version}`;
             toast.info(message);
         }
     } catch (error) {
-        // Silently ignore errors during startup update check
         void error;
     }
 }

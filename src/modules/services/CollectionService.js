@@ -3,6 +3,8 @@
  * @module services/CollectionService
  */
 
+import { getCurrentEndpoint, setCurrentEndpoint } from '../state/currentEndpoint.js';
+import { app } from '../appContext.js';
 import { setRequestBodyContent, getRequestBodyContent } from '../requestBodyHelper.js';
 import { toast } from '../ui/Toast.js';
 
@@ -511,18 +513,18 @@ export class CollectionService {
         try {
             this.schemaProcessor.setOpenApiSpec(collection._openApiSpec);
 
-            if (window.currentEndpoint) {
+            if (getCurrentEndpoint()) {
                 await this.saveRequestBodyModification(
-                    window.currentEndpoint.collectionId,
-                    window.currentEndpoint.endpointId,
+                    getCurrentEndpoint().collectionId,
+                    getCurrentEndpoint().endpointId,
                     formElements.bodyInput
                 );
-                await this.saveCurrentPathParams(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId, formElements);
-                await this.saveCurrentQueryParams(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId, formElements);
-                await this.saveCurrentHeaders(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId, formElements);
-                await this.saveCurrentAuthConfig(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+                await this.saveCurrentPathParams(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId, formElements);
+                await this.saveCurrentQueryParams(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId, formElements);
+                await this.saveCurrentHeaders(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId, formElements);
+                await this.saveCurrentAuthConfig(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
             }
-            window.currentEndpoint = { collectionId: collection.id, endpointId: endpoint.id };
+            setCurrentEndpoint({ collectionId: collection.id, endpointId: endpoint.id });
 
             this.populateUrlAndMethod(collection, endpoint, formElements);
             await this.populatePathParams(endpoint, formElements);
@@ -579,7 +581,7 @@ export class CollectionService {
     async populatePathParams(endpoint, formElements) {
         this.clearKeyValueList(formElements.pathParamsList);
 
-        const persistedPathParams = await this.repository.getPersistedPathParams(window.currentEndpoint.collectionId, endpoint.id);
+        const persistedPathParams = await this.repository.getPersistedPathParams(getCurrentEndpoint().collectionId, endpoint.id);
 
         if (persistedPathParams.length > 0) {
             persistedPathParams.forEach(param => {
@@ -660,7 +662,7 @@ export class CollectionService {
     async populateQueryParams(endpoint, formElements) {
         this.clearKeyValueList(formElements.queryParamsList);
 
-        const persistedQueryParams = await this.repository.getPersistedQueryParams(window.currentEndpoint.collectionId, endpoint.id);
+        const persistedQueryParams = await this.repository.getPersistedQueryParams(getCurrentEndpoint().collectionId, endpoint.id);
 
         if (persistedQueryParams.length > 0) {
             persistedQueryParams.forEach(param => {
@@ -676,7 +678,6 @@ export class CollectionService {
             this.addKeyValueRow(formElements.queryParamsList);
         }
 
-        // Update URL with query params (with flag to prevent circular updates)
         this.updateUrlWithQueryParams(formElements);
     }
 
@@ -702,11 +703,9 @@ export class CollectionService {
             const questionMarkIndex = urlString.indexOf('?');
             const baseUrl = questionMarkIndex >= 0 ? urlString.substring(0, questionMarkIndex) : urlString;
 
-            // Build query string with encoding that preserves variable placeholders like {{variableName}}
             const queryPairs = [];
             queryParams.forEach(({ key, value }) => {
                 if (key) {
-                    // Use the same encoding function as keyValueManager to preserve {{...}} patterns
                     const encodedKey = this.encodeValuePreservingPlaceholders(key);
                     const encodedValue = this.encodeValuePreservingPlaceholders(value);
                     queryPairs.push(`${encodedKey}=${encodedValue}`);
@@ -715,23 +714,20 @@ export class CollectionService {
 
             const queryString = queryPairs.join('&');
 
-            // Import setUrlUpdating to prevent circular update
-            // Set flag before updating URL to prevent triggering updateQueryParamsFromUrl
-            if (typeof window !== 'undefined' && window.setUrlUpdating) {
-                window.setUrlUpdating(true);
+            if (typeof window !== 'undefined' && app.setUrlUpdating) {
+                app.setUrlUpdating(true);
             }
 
             formElements.urlInput.value = queryString ? `${baseUrl}?${queryString}` : baseUrl;
 
-            // Clear flag after event loop
-            if (typeof window !== 'undefined' && window.setUrlUpdating) {
+            if (typeof window !== 'undefined' && app.setUrlUpdating) {
                 setTimeout(() => {
-                    window.setUrlUpdating(false);
+                    app.setUrlUpdating(false);
                 }, 0);
             }
         } catch (error) {
-            if (typeof window !== 'undefined' && window.setUrlUpdating) {
-                window.setUrlUpdating(false);
+            if (typeof window !== 'undefined' && app.setUrlUpdating) {
+                app.setUrlUpdating(false);
             }
         }
     }
@@ -747,7 +743,6 @@ export class CollectionService {
      * @returns {string} URL-encoded value with preserved placeholders
      */
     encodeValuePreservingPlaceholders(value) {
-        // Find all {{...}} patterns and temporarily replace them with placeholders
         const placeholders = [];
         let index = 0;
 
@@ -758,10 +753,8 @@ export class CollectionService {
             return placeholder;
         });
 
-        // URL encode the value (this encodes special chars but not our placeholders)
         const encoded = encodeURIComponent(withPlaceholders);
 
-        // Restore the original {{...}} patterns
         let result = encoded;
         placeholders.forEach(({ placeholder, original }) => {
             result = result.replace(placeholder, original);
@@ -781,18 +774,17 @@ export class CollectionService {
      * @returns {Promise<void>}
      */
     async populateRequestBody(collection, endpoint, _formElements) {
-        // Check if this endpoint has form body data (formdata / urlencoded)
         const formBodyData = await this.repository.getFormBodyData(collection.id, endpoint.id);
 
         if (formBodyData && (formBodyData.mode === 'formdata' || formBodyData.mode === 'urlencoded')) {
-            if (window.graphqlBodyManager) {
-                window.graphqlBodyManager.switchMode(formBodyData.mode);
+            if (app.graphqlBodyManager) {
+                app.graphqlBodyManager.switchMode(formBodyData.mode);
             }
-            if (window.formBodyManager) {
+            if (app.formBodyManager) {
                 if (formBodyData.mode === 'formdata') {
-                    window.formBodyManager.setFormDataFields(formBodyData.fields || {});
+                    app.formBodyManager.setFormDataFields(formBodyData.fields || {});
                 } else {
-                    window.formBodyManager.setUrlencodedFields(formBodyData.fields || {});
+                    app.formBodyManager.setUrlencodedFields(formBodyData.fields || {});
                 }
             }
             const key = `${collection.id}_${endpoint.id}`;
@@ -801,28 +793,27 @@ export class CollectionService {
         }
 
         if (formBodyData && formBodyData.mode === 'text') {
-            if (window.graphqlBodyManager) {
-                window.graphqlBodyManager.switchMode('text');
+            if (app.graphqlBodyManager) {
+                app.graphqlBodyManager.switchMode('text');
             }
-            if (window.requestBodyTextEditor) {
-                window.requestBodyTextEditor.setContent(formBodyData.content || '');
+            if (app.requestBodyTextEditor) {
+                app.requestBodyTextEditor.setContent(formBodyData.content || '');
             }
             const key = `${collection.id}_${endpoint.id}`;
             this.originalBodyValues.set(key, formBodyData.content || '');
             return;
         }
 
-        // Check if the endpoint's requestBody was imported from a form-data or urlencoded source
         const importedBodyType = endpoint.requestBody?.type;
         if (importedBodyType === 'formdata' || importedBodyType === 'urlencoded') {
-            if (window.graphqlBodyManager) {
-                window.graphqlBodyManager.switchMode(importedBodyType);
+            if (app.graphqlBodyManager) {
+                app.graphqlBodyManager.switchMode(importedBodyType);
             }
-            if (window.formBodyManager) {
+            if (app.formBodyManager) {
                 if (importedBodyType === 'formdata') {
-                    window.formBodyManager.setFormDataFields(endpoint.requestBody.fields || {});
+                    app.formBodyManager.setFormDataFields(endpoint.requestBody.fields || {});
                 } else {
-                    window.formBodyManager.setUrlencodedFields(endpoint.requestBody.fields || {});
+                    app.formBodyManager.setUrlencodedFields(endpoint.requestBody.fields || {});
                 }
             }
             const key = `${collection.id}_${endpoint.id}`;
@@ -830,23 +821,20 @@ export class CollectionService {
             return;
         }
 
-        // Check if this endpoint has GraphQL data
         const graphqlData = await this.repository.getGraphQLData(collection.id, endpoint.id);
 
         if (graphqlData && graphqlData.mode === 'graphql') {
-            // Switch to GraphQL mode and populate GraphQL editors
-            if (window.graphqlBodyManager) {
-                window.graphqlBodyManager.setGraphQLModeEnabled(true);
-                window.graphqlBodyManager.setGraphQLQuery(graphqlData.query || '');
-                window.graphqlBodyManager.setGraphQLVariables(graphqlData.variables || '');
+            if (app.graphqlBodyManager) {
+                app.graphqlBodyManager.setGraphQLModeEnabled(true);
+                app.graphqlBodyManager.setGraphQLQuery(graphqlData.query || '');
+                app.graphqlBodyManager.setGraphQLVariables(graphqlData.variables || '');
             }
 
             const key = `${collection.id}_${endpoint.id}`;
             this.originalBodyValues.set(key, graphqlData.query || '');
         } else {
-            // Switch to JSON mode and populate JSON editor
-            if (window.graphqlBodyManager) {
-                window.graphqlBodyManager.setGraphQLModeEnabled(false);
+            if (app.graphqlBodyManager) {
+                app.graphqlBodyManager.setGraphQLModeEnabled(false);
             }
 
             const persistedBody = await this.repository.getModifiedRequestBody(collection.id, endpoint.id);
@@ -862,7 +850,6 @@ export class CollectionService {
                 bodyContent = '';
             }
 
-            // Set the body content in both textarea and CodeMirror editor
             setRequestBodyContent(bodyContent);
 
             const key = `${collection.id}_${endpoint.id}`;
@@ -922,28 +909,28 @@ export class CollectionService {
 
         const state = { modifiedBody: null, formBodyData: null, graphqlData: null };
 
-        if (bodyMode === 'formdata' && window.formBodyManager) {
+        if (bodyMode === 'formdata' && app.formBodyManager) {
             state.formBodyData = {
                 mode: 'formdata',
-                fields: window.formBodyManager.getFormDataFields()
+                fields: app.formBodyManager.getFormDataFields()
             };
-        } else if (bodyMode === 'urlencoded' && window.formBodyManager) {
+        } else if (bodyMode === 'urlencoded' && app.formBodyManager) {
             state.formBodyData = {
                 mode: 'urlencoded',
-                fields: window.formBodyManager.getUrlencodedFields()
+                fields: app.formBodyManager.getUrlencodedFields()
             };
         } else if (bodyMode === 'text') {
             state.formBodyData = {
                 mode: 'text',
-                content: window.requestBodyTextEditor
-                    ? window.requestBodyTextEditor.getContent()
+                content: app.requestBodyTextEditor
+                    ? app.requestBodyTextEditor.getContent()
                     : ''
             };
-        } else if (window.graphqlBodyManager && window.graphqlBodyManager.isGraphQLMode()) {
+        } else if (app.graphqlBodyManager && app.graphqlBodyManager.isGraphQLMode()) {
             state.graphqlData = {
                 mode: 'graphql',
-                query: window.graphqlBodyManager.getGraphQLQuery(),
-                variables: window.graphqlBodyManager.getGraphQLVariables()
+                query: app.graphqlBodyManager.getGraphQLQuery(),
+                variables: app.graphqlBodyManager.getGraphQLVariables()
             };
         } else {
             const currentBody = getRequestBodyContent().trim();
@@ -1068,8 +1055,8 @@ export class CollectionService {
      */
     async saveCurrentAuthConfig(collectionId, endpointId) {
         try {
-            if (window.authManager) {
-                const authConfig = window.authManager.getAuthConfig();
+            if (app.authManager) {
+                const authConfig = app.authManager.getAuthConfig();
                 await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
             }
         } catch (error) {
@@ -1088,18 +1075,18 @@ export class CollectionService {
      */
     async populateAuthConfig(collectionId, endpointId) {
         try {
-            if (window.authManager) {
+            if (app.authManager) {
                 const authConfig = await this.repository.getPersistedAuthConfig(collectionId, endpointId);
                 if (authConfig) {
-                    window.authManager.loadAuthConfig(authConfig);
+                    app.authManager.loadAuthConfig(authConfig);
                 } else {
                     const collection = await this.repository.getById(collectionId);
                     const endpoint = collection?.endpoints?.find(ep => ep.id === endpointId);
 
                     if (endpoint?.security) {
-                        window.authManager.loadAuthConfig(endpoint.security);
+                        app.authManager.loadAuthConfig(endpoint.security);
                     } else {
-                        window.authManager.resetAuthConfig();
+                        app.authManager.resetAuthConfig();
                     }
                 }
             }

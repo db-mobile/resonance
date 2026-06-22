@@ -157,7 +157,6 @@ export class KeychainBackend {
             }
         }
         await this._persistIndex();
-        // Clear the plaintext copies now that they live in the keychain.
         await this.backendAPI.store.set(legacyKey, {});
     }
 
@@ -323,7 +322,7 @@ export class SecretStore {
             this.usingKeychain = false;
             this._backend = new StoreBackend(this.backendAPI);
             if (this.onFallback) {
-                try { this.onFallback(); } catch (_e) { /* never let a warning hook break secrets */ }
+                try { this.onFallback(); } catch (_e) { }
             }
         }
         return this._backend;

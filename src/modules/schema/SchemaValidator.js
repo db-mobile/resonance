@@ -33,7 +33,6 @@ export class SchemaValidator {
      * @private
      */
     _validateNode(data, schema, path, errors) {
-        // Handle nullable
         if (data === null) {
             if (schema.nullable === true || (Array.isArray(schema.type) && schema.type.includes('null'))) {
                 return;
@@ -48,7 +47,6 @@ export class SchemaValidator {
             return;
         }
 
-        // Type validation
         if (schema.type) {
             const actualType = this._getType(data);
             const expectedTypes = Array.isArray(schema.type) ? schema.type : [schema.type];
@@ -63,27 +61,22 @@ export class SchemaValidator {
             }
         }
 
-        // Object validation
         if (typeof data === 'object' && !Array.isArray(data) && data !== null) {
             this._validateObject(data, schema, path, errors);
         }
 
-        // Array validation
         if (Array.isArray(data)) {
             this._validateArray(data, schema, path, errors);
         }
 
-        // String validation
         if (typeof data === 'string') {
             this._validateString(data, schema, path, errors);
         }
 
-        // Number validation
         if (typeof data === 'number') {
             this._validateNumber(data, schema, path, errors);
         }
 
-        // Enum validation
         if (schema.enum && !schema.enum.includes(data)) {
             errors.push({
                 path: path || '/',
@@ -98,7 +91,6 @@ export class SchemaValidator {
      * @private
      */
     _validateObject(data, schema, path, errors) {
-        // Required properties
         if (schema.required && Array.isArray(schema.required)) {
             for (const prop of schema.required) {
                 if (!(prop in data)) {
@@ -111,7 +103,6 @@ export class SchemaValidator {
             }
         }
 
-        // Property validation
         if (schema.properties) {
             for (const [key, propSchema] of Object.entries(schema.properties)) {
                 if (key in data) {
@@ -120,7 +111,6 @@ export class SchemaValidator {
             }
         }
 
-        // Additional properties
         if (schema.additionalProperties === false && schema.properties) {
             const allowedKeys = Object.keys(schema.properties);
             for (const key of Object.keys(data)) {
@@ -140,7 +130,6 @@ export class SchemaValidator {
      * @private
      */
     _validateArray(data, schema, path, errors) {
-        // Min/max items
         if (schema.minItems !== undefined && data.length < schema.minItems) {
             errors.push({
                 path: path || '/',
@@ -157,7 +146,6 @@ export class SchemaValidator {
             });
         }
 
-        // Items validation
         if (schema.items) {
             data.forEach((item, index) => {
                 this._validateNode(item, schema.items, `${path}/${index}`, errors);
@@ -197,11 +185,9 @@ export class SchemaValidator {
                     });
                 }
             } catch {
-                // Invalid regex pattern in schema
             }
         }
 
-        // Format validation (basic)
         if (schema.format) {
             const formatError = this._validateFormat(data, schema.format);
             if (formatError) {
@@ -376,8 +362,6 @@ export class SchemaValidator {
         };
 
         if (data.length > 0) {
-            // Infer items schema from first element
-            // Could be enhanced to merge schemas from all elements
             schema.items = this._inferNode(data[0]);
         }
 
@@ -391,7 +375,6 @@ export class SchemaValidator {
     _inferString(data) {
         const schema = { type: 'string' };
 
-        // Detect common formats
         if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data)) {
             schema.format = 'email';
         } else if (/^https?:\/\/.+/.test(data)) {

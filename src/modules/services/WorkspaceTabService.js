@@ -53,7 +53,6 @@ export class WorkspaceTabService {
             const tabs = await this.repository.getTabs();
             let activeTabId = await this.repository.getActiveTabId();
 
-            // Ensure active tab exists
             if (!activeTabId || !tabs.find(t => t.id === activeTabId)) {
                 activeTabId = tabs[0]?.id || null;
                 if (activeTabId) {
@@ -172,7 +171,6 @@ export class WorkspaceTabService {
                 return null;
             }
 
-            // Prevent closing the last tab
             if (tabs.length === 1) {
                 this.statusDisplay?.updateStatus('Cannot close the last tab', null);
                 return null;
@@ -181,10 +179,8 @@ export class WorkspaceTabService {
             const closedTab = tabs[tabIndex];
             const activeTabId = await this.repository.getActiveTabId();
 
-            // If closing the active tab, switch to another tab
             let newActiveTabId = activeTabId;
             if (tabId === activeTabId) {
-                // Switch to the next tab, or the previous one if this is the last tab
                 const newIndex = tabIndex < tabs.length - 1 ? tabIndex + 1 : tabIndex - 1;
                 newActiveTabId = tabs[newIndex].id;
                 await this.repository.setActiveTabId(newActiveTabId);
@@ -266,7 +262,7 @@ export class WorkspaceTabService {
 
             const duplicatedTab = {
                 ...tab,
-                id: undefined, // Let repository generate new ID
+                id: undefined,
                 name: `${tab.name} (Copy)`,
                 createdAt: undefined,
                 lastModifiedAt: undefined

@@ -97,7 +97,6 @@ export class GraphQLEditor {
             graphql(),
             placeholder(createPlaceholderElement('query {\n  user(id: 1) {\n    name\n    email\n  }\n}')),
             EditorView.updateListener.of((update) => {
-                // Call change callback if content changed
                 if (update.docChanged && this.changeCallback) {
                     this.changeCallback(this.getContent());
                 }

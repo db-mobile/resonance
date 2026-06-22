@@ -46,7 +46,6 @@ export class CollectionPalette {
         this.container.innerHTML = '';
 
         collections.forEach(collection => {
-            // Skip collections with no HTTP endpoints
             const endpoints = this._getAllEndpoints(collection);
             if (endpoints.length === 0) {return;}
 
@@ -76,13 +75,11 @@ export class CollectionPalette {
         const headerEl = el.querySelector('[data-role="collection-header"]');
         const endpointsContainer = el.querySelector('[data-role="endpoints-container"]');
 
-        // Toggle expansion
         headerEl?.addEventListener('click', () => {
             el.classList.toggle('is-expanded');
             endpointsContainer?.classList.toggle('is-hidden');
         });
 
-        // Render endpoints
         if (endpointsContainer) {
             const endpoints = this._getAllEndpoints(collection);
             endpoints.forEach(endpoint => {
@@ -150,14 +147,12 @@ export class CollectionPalette {
             nameEl.textContent = endpoint.name || endpoint.path;
         }
 
-        // Add button click
         const addBtn = el.querySelector('[data-action="add"]');
         addBtn?.addEventListener('click', (e) => {
             e.stopPropagation();
             this._onAddEndpoint?.(collection, endpoint);
         });
 
-        // Click on item also adds
         el.addEventListener('click', () => {
             this._onAddEndpoint?.(collection, endpoint);
         });

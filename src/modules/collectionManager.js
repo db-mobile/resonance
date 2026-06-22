@@ -3,6 +3,7 @@
  * @module modules/collectionManager
  */
 
+import { app } from './appContext.js';
 import { CollectionController } from './controllers/CollectionController.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 
@@ -27,7 +28,7 @@ function initializeController() {
             throw new Error('backendAPI is not available');
         }
         collectionController = new CollectionController(window.backendAPI, updateStatusDisplay);
-        window.collectionService = collectionController.service;
+        app.collectionService = collectionController.service;
     }
     return collectionController;
 }

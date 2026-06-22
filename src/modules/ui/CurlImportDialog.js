@@ -3,6 +3,7 @@
  * @module ui/CurlImportDialog
  */
 
+import { app } from '../appContext.js';
 import { CurlParser } from '../CurlParser.js';
 import { BaseModal } from './BaseModal.js';
 
@@ -56,8 +57,8 @@ export class CurlImportDialog extends BaseModal {
             templateId: 'tpl-curl-import-dialog'
         });
 
-        if (window.i18n && window.i18n.updateUI) {
-            window.i18n.updateUI();
+        if (app.i18n && app.i18n.updateUI) {
+            app.i18n.updateUI();
         }
 
         this.populateCollections(dialog, collections, options.targetCollectionId);
@@ -83,8 +84,8 @@ export class CurlImportDialog extends BaseModal {
 
         const newCollectionOption = document.createElement('option');
         newCollectionOption.value = '__new__';
-        newCollectionOption.textContent = window.i18n ?
-            window.i18n.t('curl_import.new_collection') :
+        newCollectionOption.textContent = app.i18n ?
+            app.i18n.t('curl_import.new_collection') :
             'Create New Collection';
         select.appendChild(newCollectionOption);
 

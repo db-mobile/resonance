@@ -208,7 +208,6 @@ export class AuthManager {
         this.authFieldsContainer.innerHTML = '';
         this.authFieldsContainer.appendChild(fragment);
 
-        // Initialize default config values
         if (!this.currentAuthConfig.config.grantType) {
             this.currentAuthConfig.config.grantType = 'client_credentials';
         }
@@ -219,7 +218,6 @@ export class AuthManager {
             this.currentAuthConfig.config.clientAuthMethod = 'body';
         }
 
-        // Get all elements
         const grantTypeSelect = document.getElementById('oauth2-grant-type');
         const tokenUrlInput = document.getElementById('oauth2-token-url');
         const authUrlInput = document.getElementById('oauth2-auth-url');
@@ -237,7 +235,6 @@ export class AuthManager {
         const tokenInput = document.getElementById('oauth2-token');
         const prefixInput = document.getElementById('oauth2-header-prefix');
 
-        // Group elements for visibility toggling
         const authUrlGroup = document.getElementById('oauth2-auth-url-group');
         const usernamePasswordPairGroup = document.getElementById('oauth2-username-password-pair');
         const redirectUriGroup = document.getElementById('oauth2-redirect-uri-group');
@@ -251,14 +248,11 @@ export class AuthManager {
         const errorGroup = document.getElementById('oauth2-error-group');
         const errorMessage = document.getElementById('oauth2-error-message');
 
-        // Update UI visibility based on grant type
         const updateGrantTypeUI = (grantType) => {
-            // Hide all optional groups first
             [authUrlGroup, usernamePasswordPairGroup, redirectUriGroup, pkceGroup].forEach(g => {
                 if (g) {g.classList.add('u-hidden');}
             });
 
-            // Show/hide based on grant type
             if (grantType === 'authorization_code') {
                 if (authUrlGroup) {authUrlGroup.classList.remove('u-hidden');}
                 if (redirectUriGroup) {redirectUriGroup.classList.remove('u-hidden');}
@@ -266,17 +260,14 @@ export class AuthManager {
             } else if (grantType === 'password') {
                 if (usernamePasswordPairGroup) {usernamePasswordPairGroup.classList.remove('u-hidden');}
             } else if (grantType === 'manual') {
-                // Hide most fields for manual token entry
                 [tokenUrlGroup, credentialsPairGroup, scopeGroup,
                  audienceGroup, clientAuthGroup, getTokenGroup].forEach(g => {
                     if (g) {g.classList.add('u-hidden');}
                 });
-                // Make token input editable
                 if (tokenInput) {tokenInput.removeAttribute('readonly');}
                 return;
             }
 
-            // For non-manual modes, show standard fields and make token readonly
             [tokenUrlGroup, credentialsPairGroup, scopeGroup,
              audienceGroup, clientAuthGroup, getTokenGroup].forEach(g => {
                 if (g) {g.classList.remove('u-hidden');}
@@ -284,7 +275,6 @@ export class AuthManager {
             if (tokenInput) {tokenInput.setAttribute('readonly', 'readonly');}
         };
 
-        // Grant type change handler
         if (grantTypeSelect) {
             grantTypeSelect.value = this.currentAuthConfig.config.grantType || 'client_credentials';
             updateGrantTypeUI(grantTypeSelect.value);
@@ -295,7 +285,6 @@ export class AuthManager {
             });
         }
 
-        // Input event handlers
         if (tokenUrlInput) {
             tokenUrlInput.value = this.currentAuthConfig.config.tokenUrl || '';
             tokenUrlInput.addEventListener('input', (e) => {
@@ -387,14 +376,12 @@ export class AuthManager {
             });
         }
 
-        // Get Token button handler
         if (getTokenBtn) {
             getTokenBtn.addEventListener('click', async () => {
                 await this._handleGetToken(errorGroup, errorMessage);
             });
         }
 
-        // Refresh Token button handler
         if (refreshBtn) {
             refreshBtn.addEventListener('click', async () => {
                 await this._handleRefreshToken(errorGroup, errorMessage);
@@ -415,10 +402,8 @@ export class AuthManager {
         const {config} = this.currentAuthConfig;
         const grantType = config.grantType || 'client_credentials';
 
-        // Hide any previous errors
         if (errorGroup) {errorGroup.classList.add('u-hidden');}
 
-        // Show loading state
         const getTokenText = document.getElementById('oauth2-get-token-text');
         const getTokenLoading = document.getElementById('oauth2-get-token-loading');
         if (getTokenText) {getTokenText.classList.add('u-hidden');}
@@ -428,7 +413,6 @@ export class AuthManager {
             if (grantType === 'authorization_code') {
                 await this._handleAuthorizationCodeFlow();
             } else {
-                // Client credentials or password grant
                 const tokenConfig = {
                     grantType: grantType,
                     tokenUrl: config.tokenUrl,
@@ -450,7 +434,6 @@ export class AuthManager {
         } catch (error) {
             this._showError(errorGroup, errorMessage, error.message || 'Failed to get token');
         } finally {
-            // Reset loading state
             if (getTokenText) {getTokenText.classList.remove('u-hidden');}
             if (getTokenLoading) {getTokenLoading.classList.add('u-hidden');}
         }
@@ -466,18 +449,14 @@ export class AuthManager {
     async _handleAuthorizationCodeFlow() {
         const {config} = this.currentAuthConfig;
 
-        // Generate state for CSRF protection
         const state = await api.oauth2.generateState();
 
-        // Generate PKCE if enabled
         let pkceParams = null;
         if (config.usePkce !== false) {
             pkceParams = await api.oauth2.generatePkce();
-            // Store the verifier for later use
             await api.oauth2.storePkceVerifier(state, pkceParams.codeVerifier);
         }
 
-        // Build authorization URL
         const authUrlParams = {
             authorizationUrl: config.authorizationUrl,
             clientId: config.clientId,
@@ -494,14 +473,11 @@ export class AuthManager {
 
         const authUrl = await api.oauth2.buildAuthorizationUrl(authUrlParams);
 
-        // Store state in config for callback handling
         this.currentAuthConfig.config._pendingState = state;
         this.currentAuthConfig.config._pendingPkce = pkceParams;
 
-        // Open authorization URL in browser
         window.open(authUrl, '_blank', 'width=600,height=700');
 
-        // Show instructions to user
         this._showAuthCodeInstructions();
     }
 
@@ -526,7 +502,6 @@ export class AuthManager {
                 <button type="button" id="oauth2-exchange-code-btn" class="btn btn-primary btn-sm u-mt-2">Exchange Code for Token</button>
             `;
 
-            // Add handler for code exchange
             const exchangeBtn = document.getElementById('oauth2-exchange-code-btn');
             if (exchangeBtn) {
                 exchangeBtn.addEventListener('click', async () => {
@@ -553,7 +528,6 @@ export class AuthManager {
         const errorMessage = document.getElementById('oauth2-error-message');
 
         try {
-            // Get stored PKCE verifier if used
             let codeVerifier = null;
             if (config._pendingState && config.usePkce !== false) {
                 codeVerifier = await api.oauth2.getPkceVerifier(config._pendingState);
@@ -573,7 +547,6 @@ export class AuthManager {
             const result = await api.oauth2.getToken(tokenConfig);
             this._handleTokenResponse(result, errorGroup, errorMessage);
 
-            // Clean up pending state
             delete config._pendingState;
             delete config._pendingPkce;
         } catch (error) {
@@ -626,21 +599,17 @@ export class AuthManager {
      */
     _handleTokenResponse(result, errorGroup, errorMessage) {
         if (result.success && result.accessToken) {
-            // Update config with new token
             this.currentAuthConfig.config.token = result.accessToken;
 
-            // Update UI
             const tokenInput = document.getElementById('oauth2-token');
             if (tokenInput) {tokenInput.value = result.accessToken;}
 
-            // Handle token type
             const tokenType = document.getElementById('oauth2-token-type');
             if (tokenType && result.tokenType) {
                 tokenType.textContent = result.tokenType;
                 tokenType.classList.remove('u-hidden');
             }
 
-            // Handle expiration
             const tokenExpires = document.getElementById('oauth2-token-expires');
             if (tokenExpires && result.expiresIn) {
                 const expiresAt = new Date(Date.now() + result.expiresIn * 1000);
@@ -649,7 +618,6 @@ export class AuthManager {
                 this.currentAuthConfig.config.expiresAt = expiresAt.getTime();
             }
 
-            // Handle refresh token
             if (result.refreshToken) {
                 this.currentAuthConfig.config.refreshToken = result.refreshToken;
                 const refreshTokenInput = document.getElementById('oauth2-refresh-token');
@@ -658,7 +626,6 @@ export class AuthManager {
                 if (refreshTokenGroup) {refreshTokenGroup.classList.remove('u-hidden');}
             }
 
-            // Hide error group
             if (errorGroup) {errorGroup.classList.add('u-hidden');}
         } else {
             const errorDesc = result.errorDescription || result.error || 'Unknown error';
@@ -963,7 +930,6 @@ export class AuthManager {
                     if (refreshGroup) {refreshGroup.classList.remove('u-hidden');}
                 }
 
-                // Trigger grant type UI update
                 if (oauth2GrantType && config.grantType) {
                     oauth2GrantType.dispatchEvent(new Event('change'));
                 }

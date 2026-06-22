@@ -167,7 +167,6 @@ export class CertificateService {
             errors.push('Host is required');
         }
 
-        // A client certificate requires both the cert and the key.
         const hasCert = typeof entry.certPath === 'string' && entry.certPath.trim() !== '';
         const hasKey = typeof entry.keyPath === 'string' && entry.keyPath.trim() !== '';
         if (hasCert !== hasKey) {

@@ -62,7 +62,7 @@ export class ConfirmDialog extends BaseModal {
         const title = options.title || 'Confirm Action';
         const confirmText = options.confirmText || 'Confirm';
         const cancelText = options.cancelText || 'Cancel';
-        const isDangerous = options.dangerous !== false; // Default to true for delete confirmations
+        const isDangerous = options.dangerous !== false;
 
         const titleEl = dialog.querySelector('[data-role="title"]');
         const messageEl = dialog.querySelector('[data-role="message"]');
@@ -101,7 +101,6 @@ export class ConfirmDialog extends BaseModal {
             if (e.key === 'Enter') {
                 this.confirm();
             } else if (e.key === 'Tab') {
-                // Cycle focus between the two buttons
                 e.preventDefault();
                 if (document.activeElement === cancelBtn) {
                     confirmBtn.focus();
@@ -170,7 +169,6 @@ export class ConfirmDialog extends BaseModal {
         }
         this.destroy();
 
-        // Restore focus to the collections list so focus returns to the app
         const collectionsList = document.getElementById('collections-list');
         if (collectionsList) {
             collectionsList.focus();

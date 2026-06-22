@@ -11,6 +11,7 @@
  * and manages expansion states, active selections, and user interactions. Supports
  * persistence of expansion state across sessions.
  */
+import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 
 export class CollectionRenderer {
@@ -93,8 +94,8 @@ export class CollectionRenderer {
             } else {
                 this.renderEmptyState(eventHandlers.onEmptyStateActions ?? {});
             }
-            if (window.i18n && window.i18n.updateUI) {
-                window.i18n.updateUI();
+            if (app.i18n && app.i18n.updateUI) {
+                app.i18n.updateUI();
             }
             if (eventHandlers.onEmptySpaceContextMenu) {
                 this.emptySpaceContextMenuHandler = (e) => {
@@ -153,8 +154,8 @@ export class CollectionRenderer {
             this.setActiveEndpoint(activeCollectionId, activeEndpointId);
         }
 
-        if (window.i18n && window.i18n.updateUI) {
-            window.i18n.updateUI();
+        if (app.i18n && app.i18n.updateUI) {
+            app.i18n.updateUI();
         }
     }
 
@@ -228,7 +229,7 @@ export class CollectionRenderer {
         toggle.textContent = '▶';
 
         const label = document.createElement('span');
-        label.textContent = (window.i18n && window.i18n.t('sidebar.pinned')) || 'Pinned';
+        label.textContent = (app.i18n && app.i18n.t('sidebar.pinned')) || 'Pinned';
 
         header.appendChild(toggle);
         header.appendChild(label);
@@ -405,7 +406,6 @@ export class CollectionRenderer {
 
         const pathSpan = document.createElement('span');
         pathSpan.className = 'endpoint-path';
-        // Show the request name instead of the URL path
         const displayName = endpoint.name || endpoint.path.replace(/^\{\{baseUrl\}\}/, '').split('?')[0] || 'Unnamed Request';
         pathSpan.textContent = displayName;
 

@@ -6,6 +6,7 @@
  * @module ui/runner/RequestEditorModal
  */
 
+import { app } from '../../appContext.js';
 import { templateLoader } from '../../templateLoader.js';
 import { ScriptEditor } from '../../scriptEditor.bundle.js';
 import { JSONEditor } from '../../jsonEditor.bundle.js';
@@ -39,7 +40,6 @@ export class RequestEditorModal {
         this._onSave = onSave || null;
         const overrides = this._ensureOverrides(request);
 
-        // Create modal from template
         const fragment = templateLoader.cloneSync(
             './src/templates/runner/runnerPanel.html',
             'tpl-runner-script-modal'
@@ -48,7 +48,6 @@ export class RequestEditorModal {
         this.modal = fragment.firstElementChild;
         document.body.appendChild(this.modal);
 
-        // Set request info
         const methodEl = this.modal.querySelector('[data-role="script-method"]');
         const pathEl = this.modal.querySelector('[data-role="script-path"]');
         if (methodEl) {
@@ -59,19 +58,16 @@ export class RequestEditorModal {
             pathEl.textContent = request.path;
         }
 
-        // Populate key-value lists from overrides
         this._renderKvList(this.modal.querySelector('[data-role="path-params-list"]'), overrides.pathParams);
         this._renderKvList(this.modal.querySelector('[data-role="query-params-list"]'), overrides.queryParams);
         this._renderKvList(this.modal.querySelector('[data-role="headers-list"]'), overrides.headers);
 
-        // Initialize body editor (CodeMirror JSON)
         const bodyContainer = this.modal.querySelector('[data-role="override-body-container"]');
         if (bodyContainer) {
             this.bodyEditor = new JSONEditor(bodyContainer);
             this.bodyEditor.setContent(overrides.body || '');
         }
 
-        // Initialize ScriptEditor (CodeMirror-based)
         const editorContainer = this.modal.querySelector('[data-role="script-editor-container"]');
         if (editorContainer) {
             this.scriptEditor = new ScriptEditor(editorContainer);
@@ -80,9 +76,8 @@ export class RequestEditorModal {
 
         this._attachEventListeners();
 
-        // Update i18n if available (sets tab labels and input placeholders)
-        if (window.i18n && window.i18n.updateUI) {
-            window.i18n.updateUI(this.modal);
+        if (app.i18n && app.i18n.updateUI) {
+            app.i18n.updateUI(this.modal);
         }
     }
 
@@ -109,7 +104,6 @@ export class RequestEditorModal {
             this._onSave?.();
         }
 
-        // Cleanup
         if (this._keyHandler) {
             document.removeEventListener('keydown', this._keyHandler);
             this._keyHandler = null;
@@ -187,11 +181,11 @@ export class RequestEditorModal {
         const valueInput = row.querySelector('[data-role="kv-value"]');
         if (keyInput) {
             keyInput.value = key;
-            keyInput.placeholder = window.i18n?.t('runner.key') || 'Key';
+            keyInput.placeholder = app.i18n?.t('runner.key') || 'Key';
         }
         if (valueInput) {
             valueInput.value = value;
-            valueInput.placeholder = window.i18n?.t('runner.value') || 'Value';
+            valueInput.placeholder = app.i18n?.t('runner.value') || 'Value';
         }
 
         row.querySelector('[data-action="remove-kv"]')?.addEventListener('click', () => {
@@ -246,29 +240,24 @@ export class RequestEditorModal {
     _attachEventListeners() {
         if (!this.modal) {return;}
 
-        // Close button
         this.modal.querySelector('[data-action="close"]')?.addEventListener('click', () => {
             this.close(false);
         });
 
-        // Cancel button
         this.modal.querySelector('[data-action="cancel"]')?.addEventListener('click', () => {
             this.close(false);
         });
 
-        // Save button
         this.modal.querySelector('[data-action="save"]')?.addEventListener('click', () => {
             this.close(true);
         });
 
-        // Tab switching
         this.modal.querySelectorAll('.runner-editor-tab').forEach(tab => {
             tab.addEventListener('click', () => {
                 this._switchTab(tab.dataset.editTab);
             });
         });
 
-        // Add-row buttons
         this.modal.querySelector('[data-action="add-path-param"]')?.addEventListener('click', () => {
             this._addKvRow(this.modal.querySelector('[data-role="path-params-list"]'));
         });
@@ -279,14 +268,12 @@ export class RequestEditorModal {
             this._addKvRow(this.modal.querySelector('[data-role="headers-list"]'));
         });
 
-        // Close on overlay click
         this.modal.querySelector('[data-role="script-modal-overlay"]')?.addEventListener('click', (e) => {
             if (e.target === e.currentTarget) {
                 this.close(false);
             }
         });
 
-        // Close on Escape key / save on Ctrl-S
         this._keyHandler = (e) => {
             if (e.key === 'Escape') {
                 this.close(false);

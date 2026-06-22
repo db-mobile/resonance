@@ -1,3 +1,5 @@
+import { app } from './appContext.js';
+
 export class HttpVersionManager {
     constructor() {
         this.currentVersion = 'auto';
@@ -24,7 +26,7 @@ export class HttpVersionManager {
             const settings = await window.backendAPI.settings.get();
             settings.httpVersion = version;
             await window.backendAPI.settings.set(settings);
-            window.invalidateApiHandlerSettingsCache?.();
+            app.invalidateApiHandlerSettingsCache?.();
         } catch (error) {
             void error;
         }

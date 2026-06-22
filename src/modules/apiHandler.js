@@ -1,3 +1,5 @@
+import { getCurrentEndpoint } from './state/currentEndpoint.js';
+import { app } from './appContext.js';
 import { urlInput, methodSelect, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, responseCookiesDisplay, responsePerformanceDisplay, languageSelector } from './domElements.js';
 import { toast } from './ui/Toast.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
@@ -21,7 +23,6 @@ function debouncedSaveRequestModifications(collectionId, endpointId) {
     }
     _saveDebounceTimer = setTimeout(() => {
         _saveDebounceTimer = null;
-        // Fire-and-forget: don't await, just catch errors silently
         saveAllRequestModifications(collectionId, endpointId).catch(() => {
             toast.error('Failed to save changes');
         });
@@ -45,6 +46,12 @@ import { handleGrpcSend } from './grpcHandler.js';
 import { handleWebSocketCancel, handleWebSocketSend } from './websocketHandler.js';
 import { handleSseCancel, handleSseConnect } from './sseHandler.js';
 import { handleMqttCancel, handleMqttSend } from './mqttHandler.js';
+import {
+    handleGraphQLSubscriptionStart,
+    handleGraphQLSubscriptionCancel,
+    isSubscriptionActive
+} from './graphqlSubscriptionHandler.js';
+import { selectActiveOperationType } from './graphqlTransportWs.js';
 import { cancelStream as cancelGrpcStream, hasActiveStream as hasActiveGrpcStream } from './grpcStreamHandler.js';
 import { RequestBuilderService } from './services/RequestBuilderService.js';
 import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes } from './ResponseDisplayHelper.js';
@@ -79,8 +86,8 @@ export function getSettingsCache() {
 
 function getVariableService() {
     if (!_variableService) {
-        const variableRepository = new VariableRepository(window.backendAPI, window.secretStore);
-        const environmentRepository = new EnvironmentRepository(window.backendAPI, window.secretStore);
+        const variableRepository = new VariableRepository(window.backendAPI, app.secretStore);
+        const environmentRepository = new EnvironmentRepository(window.backendAPI, app.secretStore);
         const variableProcessor = new VariableProcessor();
         const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
         _variableService = new VariableService(variableRepository, variableProcessor, statusDisplayAdapter, environmentRepository);
@@ -99,7 +106,7 @@ function getMockServerService() {
 
 function getCollectionRepository() {
     if (!_collectionRepository) {
-        _collectionRepository = new CollectionRepository(window.backendAPI, window.secretStore);
+        _collectionRepository = new CollectionRepository(window.backendAPI, app.secretStore);
     }
     return _collectionRepository;
 }
@@ -137,7 +144,7 @@ export async function fetchGraphQLIntrospection() {
 
     let resolvedUrl = url;
     try {
-        const { variables, processor } = await builder.resolveVariables(window.currentEndpoint, headers);
+        const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
         ({ url: resolvedUrl } = builder.processRequestComponents({
             url, pathParams: {}, headers, queryParams, variables, processor
         }));
@@ -178,9 +185,9 @@ export async function fetchGraphQLIntrospection() {
     if (authData.awsAuth) {
         requestConfig.awsAuth = authData.awsAuth;
     }
-    if (window.certificateController) {
+    if (app.certificateController) {
         try {
-            const clientCert = window.certificateController.getForHost(new URL(resolvedUrl).host);
+            const clientCert = app.certificateController.getForHost(new URL(resolvedUrl).host);
             if (clientCert) {
                 requestConfig.clientCert = clientCert;
             }
@@ -212,9 +219,27 @@ export async function fetchGraphQLIntrospection() {
     }
 
     try {
-        return { schema: buildClientSchema(introspection), url: resolvedUrl };
+        return { schema: buildClientSchema(introspection), introspection, url: resolvedUrl };
     } catch (error) {
         return { error: `Could not parse schema: ${error.message}` };
+    }
+}
+
+/**
+ * Rebuild a GraphQLSchema from a previously fetched (and persisted) raw
+ * introspection result. Used by the autocomplete cache load path.
+ *
+ * @param {object} introspection - The `data` payload of an introspection query.
+ * @returns {import('graphql').GraphQLSchema|null} The schema, or null if invalid.
+ */
+export function buildSchemaFromIntrospection(introspection) {
+    if (!introspection || !introspection.__schema) {
+        return null;
+    }
+    try {
+        return buildClientSchema(introspection);
+    } catch (_error) {
+        return null;
     }
 }
 
@@ -250,10 +275,10 @@ export function initResponseEditor() {
 }
 
 async function isTabCurrentlyActive(tabId) {
-    if (!tabId || !window.workspaceTabController) {
+    if (!tabId || !app.workspaceTabController) {
         return true;
     }
-    const activeTabId = await window.workspaceTabController.service.getActiveTabId();
+    const activeTabId = await app.workspaceTabController.service.getActiveTabId();
     return activeTabId === tabId;
 }
 
@@ -278,8 +303,8 @@ export function displayResponseWithLineNumbers(content, contentType = null) {
  */
 export function clearSchemaValidationBadge(tabId = null) {
     const containerElements = tabId
-        ? window.responseContainerManager?.getOrCreateContainer(tabId)
-        : window.responseContainerManager?.getActiveElements();
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
 
     const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
     if (!statusContainer) {
@@ -305,8 +330,8 @@ function displaySchemaValidationResult(validationResult, tabId = null) {
     }
 
     const containerElements = tabId
-        ? window.responseContainerManager?.getOrCreateContainer(tabId)
-        : window.responseContainerManager?.getActiveElements();
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
 
     const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
     if (!statusContainer) {
@@ -330,8 +355,8 @@ function displaySchemaValidationResult(validationResult, tabId = null) {
  */
 export function clearGraphQLErrorsBadge(tabId = null) {
     const containerElements = tabId
-        ? window.responseContainerManager?.getOrCreateContainer(tabId)
-        : window.responseContainerManager?.getActiveElements();
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
 
     const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
     const existingBadge = statusContainer?.querySelector('.graphql-errors-badge');
@@ -362,8 +387,8 @@ function displayGraphQLErrorsBadge(result, tabId = null) {
     }
 
     const containerElements = tabId
-        ? window.responseContainerManager?.getOrCreateContainer(tabId)
-        : window.responseContainerManager?.getActiveElements();
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
 
     const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
     if (!statusContainer) {
@@ -382,8 +407,8 @@ function displayGraphQLErrorsBadge(result, tabId = null) {
 
 export function displayResponseWithLineNumbersForTab(content, contentType = null, tabId = null, languageHint = undefined) {
     const containerElements = tabId
-        ? window.responseContainerManager?.getOrCreateContainer(tabId)
-        : window.responseContainerManager?.getActiveElements();
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
 
     if (containerElements && containerElements.editor) {
         containerElements.editor.setContent(content, contentType, languageHint);
@@ -396,12 +421,10 @@ export function displayResponseWithLineNumbersForTab(content, contentType = null
             if (containerElements.previewManager.isPreviewable(language)) {
                 containerElements.previewManager.refreshPreviewContent(containerElements.tabId, content, language);
             } else {
-                // Clear preview for non-previewable content
                 containerElements.previewManager.clearPreview(containerElements.tabId);
             }
         }
     } else {
-        // Fallback to global editor
         initResponseEditor();
         if (responseEditor) {
             responseEditor.setContent(content, contentType, languageHint);
@@ -414,15 +437,13 @@ export function clearResponseDisplay() {
 }
 
 export function clearResponseDisplayForTab(tabId = null) {
-    // Use per-tab editor if available, otherwise fall back to global editor
     const containerElements = tabId
-        ? window.responseContainerManager?.getOrCreateContainer(tabId)
-        : window.responseContainerManager?.getActiveElements();
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
 
     if (containerElements && containerElements.editor) {
         containerElements.editor.clear();
     } else {
-        // Fallback to global editor
         initResponseEditor();
         if (responseEditor) {
             responseEditor.clear();
@@ -440,7 +461,7 @@ export function setRequestInProgress(inProgress) {
         cancelRequestBtn.style.display = 'none';
         sendRequestBtn.disabled = false;
     }
-    window.statusBar?.setRequestRunning(inProgress);
+    app.statusBar?.setRequestRunning(inProgress);
 }
 
 export async function handleCancelRequest() {
@@ -463,8 +484,8 @@ export async function handleCancelRequest() {
     }
 
     if (isGrpcMode()) {
-        const tabId = window.workspaceTabController
-            ? await window.workspaceTabController.service.getActiveTabId()
+        const tabId = app.workspaceTabController
+            ? await app.workspaceTabController.service.getActiveTabId()
             : null;
         if (tabId && hasActiveGrpcStream(tabId)) {
             await cancelGrpcStream(tabId);
@@ -474,8 +495,8 @@ export async function handleCancelRequest() {
     }
 
     try {
-        const requestTabId = window.workspaceTabController
-            ? await window.workspaceTabController.service.getActiveTabId()
+        const requestTabId = app.workspaceTabController
+            ? await app.workspaceTabController.service.getActiveTabId()
             : null;
 
         const result = await window.backendAPI.cancelApiRequest();
@@ -498,16 +519,93 @@ export async function handleCancelRequest() {
     }
 }
 
+/**
+ * Determine the operation type the Run button should execute in GraphQL mode,
+ * based on the editor's parsed operations and the operation picker selection.
+ * @returns {string|null} 'query' | 'mutation' | 'subscription' | null
+ */
+function getActiveGraphQLOperationType() {
+    if (!graphqlBodyManager) {
+        return null;
+    }
+    const operations = graphqlBodyManager.graphqlEditor?.getOperations?.() || null;
+    const selected = graphqlBodyManager.getSelectedOperationName?.() || null;
+    return selectActiveOperationType(operations, selected);
+}
+
+/**
+ * Open (or toggle off) a GraphQL subscription over WebSocket. Resolves variables,
+ * headers, auth and the query exactly like the HTTP send path before connecting.
+ */
+async function handleGraphQLSubscriptionRequest() {
+    const tabId = app.workspaceTabController
+        ? await app.workspaceTabController.service.getActiveTabId()
+        : null;
+
+    if (tabId && isSubscriptionActive(tabId)) {
+        await handleGraphQLSubscriptionCancel();
+        return;
+    }
+
+    if (getCurrentEndpoint()) {
+        debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
+    }
+
+    let url = urlInput?.value?.trim() || urlInput?.getAttribute('value') || '';
+    const headers = parseKeyValuePairs(document.getElementById('headers-list'));
+    const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
+    const authData = authManager.generateAuthData();
+    const builder = getRequestBuilderService();
+    builder.mergeAuthData(headers, queryParams, authData);
+
+    let query = graphqlBodyManager.getGraphQLQuery().trim();
+    const variablesText = graphqlBodyManager.getGraphQLVariables().trim();
+    const operationName = graphqlBodyManager.getSelectedOperationName?.() || null;
+
+    try {
+        const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
+        ({ url } = builder.processRequestComponents({
+            url, pathParams: {}, headers, queryParams, variables, processor
+        }));
+        query = processor.processTemplate(query, variables);
+
+        let parsedVariables = {};
+        if (variablesText) {
+            const resolvedVarsText = processor.processTemplate(variablesText, variables);
+            try {
+                parsedVariables = JSON.parse(resolvedVarsText);
+            } catch (e) {
+                toast.error(`Invalid GraphQL Variables JSON: ${e.message}`);
+                return;
+            }
+        }
+
+        await handleGraphQLSubscriptionStart({
+            url, headers, query, variables: parsedVariables, operationName
+        });
+    } catch (error) {
+        updateStatusDisplay(`Variable processing error: ${error.message}`, null);
+    }
+}
+
 export async function handleSendRequest() {
-    // Check if we're in gRPC mode - delegate to gRPC handler
     if (isGrpcMode()) {
         return handleGrpcSend();
     }
 
+    if (isGraphQLMode()) {
+        const gqlTabId = app.workspaceTabController
+            ? await app.workspaceTabController.service.getActiveTabId()
+            : null;
+        if ((gqlTabId && isSubscriptionActive(gqlTabId))
+            || getActiveGraphQLOperationType() === 'subscription') {
+            return handleGraphQLSubscriptionRequest();
+        }
+    }
+
     if (isWebSocketMode()) {
-        if (window.currentEndpoint) {
-            // Fire-and-forget: don't block WebSocket connection on save
-            debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+        if (getCurrentEndpoint()) {
+            debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
         }
 
         let websocketUrl = urlInput?.value?.trim() || '';
@@ -524,7 +622,7 @@ export async function handleSendRequest() {
 
         try {
             const { variables, processor } = await builder.resolveVariables(
-                window.currentEndpoint, headers
+                getCurrentEndpoint(), headers
             );
 
             const result = builder.processRequestComponents({
@@ -551,8 +649,8 @@ export async function handleSendRequest() {
     }
 
     if (isSseMode()) {
-        if (window.currentEndpoint) {
-            debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+        if (getCurrentEndpoint()) {
+            debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
         }
 
         const sseInput = document.getElementById('sse-url-input');
@@ -567,7 +665,7 @@ export async function handleSendRequest() {
 
         try {
             const { variables, processor } = await builder.resolveVariables(
-                window.currentEndpoint, headers
+                getCurrentEndpoint(), headers
             );
             const result = builder.processRequestComponents({
                 url: sseUrl,
@@ -593,8 +691,8 @@ export async function handleSendRequest() {
     }
 
     if (isMqttMode()) {
-        if (window.currentEndpoint) {
-            debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+        if (getCurrentEndpoint()) {
+            debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
         }
 
         const brokerInput = document.getElementById('mqtt-broker-input');
@@ -603,7 +701,7 @@ export async function handleSendRequest() {
         const builder = getRequestBuilderService();
         try {
             const { variables, processor } = await builder.resolveVariables(
-                window.currentEndpoint, {}
+                getCurrentEndpoint(), {}
             );
             const result = builder.processRequestComponents({
                 url: broker,
@@ -619,9 +717,6 @@ export async function handleSendRequest() {
             return;
         }
 
-        // The MQTT connection persists after Send (pub/sub). Disconnecting is done
-        // via the dedicated Disconnect button in the MQTT panel, not the shared
-        // Send/Stop button — so restore the Send button once the connect returns.
         setRequestInProgress(true);
         try {
             await handleMqttSend(broker, {
@@ -641,8 +736,8 @@ export async function handleSendRequest() {
 
     setRequestInProgress(true);
 
-    if (window.currentEndpoint) {
-        debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+    if (getCurrentEndpoint()) {
+        debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
     }
 
     let url = urlInput?.value?.trim() || '';
@@ -652,7 +747,6 @@ export async function handleSendRequest() {
 
     const rawUrl = url;
 
-    // GraphQL is always an HTTP POST under the hood; the method dropdown is hidden.
     const method = isGraphQLMode() ? 'POST' : methodSelect.value;
     let body = undefined;
 
@@ -670,7 +764,7 @@ export async function handleSendRequest() {
     let queryString = '';
     try {
         ({ variables: _resolvedVariables, processor } = await builder.resolveVariables(
-            window.currentEndpoint, headers
+            getCurrentEndpoint(), headers
         ));
 
         ({ url, queryString } = builder.processRequestComponents({
@@ -684,24 +778,20 @@ export async function handleSendRequest() {
         return;
     }
 
-    // Check if mock server should be used for this request
-    if (window.currentEndpoint) {
+    if (getCurrentEndpoint()) {
         try {
             const mockServerService = getMockServerService();
-            const { shouldUseMock, mockBaseUrl } = await mockServerService.shouldUseMockServer(window.currentEndpoint.collectionId);
+            const { shouldUseMock, mockBaseUrl } = await mockServerService.shouldUseMockServer(getCurrentEndpoint().collectionId);
             
             if (shouldUseMock && mockBaseUrl) {
-                // Get the endpoint path from the collection
-                const collection = await getCollectionRepository().getById(window.currentEndpoint.collectionId);
+                const collection = await getCollectionRepository().getById(getCurrentEndpoint().collectionId);
                 
                 if (collection) {
-                    // Find the endpoint in the collection
-                    let endpoint = collection.endpoints?.find(e => e.id === window.currentEndpoint.endpointId);
+                    let endpoint = collection.endpoints?.find(e => e.id === getCurrentEndpoint().endpointId);
                     
-                    // Also check folders if not found at top level
                     if (!endpoint && collection.folders) {
                         for (const folder of collection.folders) {
-                            endpoint = folder.endpoints?.find(e => e.id === window.currentEndpoint.endpointId);
+                            endpoint = folder.endpoints?.find(e => e.id === getCurrentEndpoint().endpointId);
                             if (endpoint) { break; }
                         }
                     }
@@ -717,7 +807,6 @@ export async function handleSendRequest() {
                 }
             }
         } catch (error) {
-            // Continue with original URL if mock server check fails
         }
     }
 
@@ -727,8 +816,8 @@ export async function handleSendRequest() {
             let variables = _resolvedVariables;
             if (variables === null) {
                 const variableService = getVariableService();
-                if (window.currentEndpoint) {
-                    variables = await variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
+                if (getCurrentEndpoint()) {
+                    variables = await variableService.getVariablesForCollection(getCurrentEndpoint().collectionId);
                 } else {
                     variables = await variableService.getVariables();
                 }
@@ -758,15 +847,14 @@ export async function handleSendRequest() {
                     variables: parsedVariables
                 };
 
-                // Include operationName so servers can disambiguate multi-operation documents
                 const operationName = graphqlBodyManager.getSelectedOperationName?.();
                 if (operationName) {
                     body.operationName = operationName;
                 }
-            } else if ((bodyMode === 'formdata' || bodyMode === 'urlencoded') && window.formBodyManager) {
+            } else if ((bodyMode === 'formdata' || bodyMode === 'urlencoded') && app.formBodyManager) {
                 const rawFields = bodyMode === 'formdata'
-                    ? window.formBodyManager.getFormDataFields()
-                    : window.formBodyManager.getUrlencodedFields();
+                    ? app.formBodyManager.getFormDataFields()
+                    : app.formBodyManager.getUrlencodedFields();
                 const processed = {};
                 for (const [k, v] of Object.entries(rawFields)) {
                     processed[processor.processTemplate(k, variables)]
@@ -776,8 +864,8 @@ export async function handleSendRequest() {
                     body = processed;
                 }
             } else if (bodyMode === 'text') {
-                const rawText = window.requestBodyTextEditor
-                    ? window.requestBodyTextEditor.getContent()
+                const rawText = app.requestBodyTextEditor
+                    ? app.requestBodyTextEditor.getContent()
                     : '';
                 if (rawText) {
                     body = processor.processTemplate(rawText, variables);
@@ -836,10 +924,9 @@ export async function handleSendRequest() {
         followRedirects
     };
 
-    // Apply a client certificate / custom CA configured for this request's host (mTLS).
-    if (window.certificateController) {
+    if (app.certificateController) {
         try {
-            const clientCert = window.certificateController.getForHost(new URL(url).host);
+            const clientCert = app.certificateController.getForHost(new URL(url).host);
             if (clientCert) {
                 requestConfig.clientCert = clientCert;
             }
@@ -848,8 +935,8 @@ export async function handleSendRequest() {
         }
     }
 
-    const requestTabId = window.workspaceTabController
-        ? await window.workspaceTabController.service.getActiveTabId()
+    const requestTabId = app.workspaceTabController
+        ? await app.workspaceTabController.service.getActiveTabId()
         : null;
 
     try {
@@ -867,11 +954,11 @@ export async function handleSendRequest() {
             requestConfig.awsAuth = authData.awsAuth;
         }
 
-        if (window.currentEndpoint && window.scriptController) {
+        if (getCurrentEndpoint() && app.scriptController) {
             try {
-                requestConfig = await window.scriptController.executePreRequest(
-                    window.currentEndpoint.collectionId,
-                    window.currentEndpoint.endpointId,
+                requestConfig = await app.scriptController.executePreRequest(
+                    getCurrentEndpoint().collectionId,
+                    getCurrentEndpoint().endpointId,
                     requestConfig
                 );
             } catch (error) {
@@ -879,11 +966,10 @@ export async function handleSendRequest() {
             }
         }
 
-        if (window.cookieController) {
-            const cookieHeader = await window.cookieController.getCookieHeader(url);
+        if (app.cookieController) {
+            const cookieHeader = await app.cookieController.getCookieHeader(url);
             if (cookieHeader) {
                 requestConfig.headers = requestConfig.headers || {};
-                // Don't overwrite a manually set Cookie header
                 if (!requestConfig.headers['Cookie'] && !requestConfig.headers['cookie']) {
                     requestConfig.headers['Cookie'] = cookieHeader;
                 }
@@ -909,13 +995,12 @@ export async function handleSendRequest() {
 
             displayResponseWithLineNumbersForTab(formattedResponse, contentType, requestTabId, languageHint);
 
-            if (window.schemaController) {
-                window.schemaController.setLastResponseBody(result.data);
-                const validationResult = window.schemaController.validateResponse(result.data);
+            if (app.schemaController) {
+                app.schemaController.setLastResponseBody(result.data);
+                const validationResult = app.schemaController.validateResponse(result.data);
                 displaySchemaValidationResult(validationResult, requestTabId);
             }
 
-            // GraphQL servers return HTTP 200 even on failure; surface any top-level errors
             displayGraphQLErrorsBadge(result, requestTabId);
 
             displayResponsePanes(requestTabId, globalResponseElements(), {
@@ -924,8 +1009,8 @@ export async function handleSendRequest() {
                 size: result.size
             });
 
-            if (window.cookieController && result.setCookies && result.setCookies.length > 0) {
-                window.cookieController.handleCookiesFromResponse(result.setCookies, url);
+            if (app.cookieController && result.setCookies && result.setCookies.length > 0) {
+                app.cookieController.handleCookiesFromResponse(result.setCookies, url);
             }
 
             updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
@@ -933,8 +1018,8 @@ export async function handleSendRequest() {
             updateResponseSize(result.size);
             setRequestInProgress(false);
 
-            if (window.workspaceTabController && requestTabId) {
-                window.workspaceTabController.service.updateTab(requestTabId, {
+            if (app.workspaceTabController && requestTabId) {
+                app.workspaceTabController.service.updateTab(requestTabId, {
                     response: {
                         data: result.data,
                         headers: result.headers || {},
@@ -946,27 +1031,26 @@ export async function handleSendRequest() {
                         cookies: extractCookies(result.headers)
                     },
                     isModified: false
-                }).catch(() => { /* fire-and-forget */ });
-                if (window.workspaceTabController.tabBar?.updateTab) {
-                    window.workspaceTabController.tabBar.updateTab(requestTabId, { isModified: false });
+                }).catch(() => { });
+                if (app.workspaceTabController.tabBar?.updateTab) {
+                    app.workspaceTabController.tabBar.updateTab(requestTabId, { isModified: false });
                 }
             }
 
-            if (window.historyController) {
-                const _activeEnvName = await window.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
-                window.historyController.addHistoryEntry(requestConfig, result, window.currentEndpoint, _activeEnvName).catch(() => { /* fire-and-forget */ });
+            if (app.historyController) {
+                const _activeEnvName = await app.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
+                app.historyController.addHistoryEntry(requestConfig, result, getCurrentEndpoint(), _activeEnvName).catch(() => { });
             }
 
-            if (window.currentEndpoint && window.scriptController) {
+            if (getCurrentEndpoint() && app.scriptController) {
                 try {
-                    await window.scriptController.executeTest(
-                        window.currentEndpoint.collectionId,
-                        window.currentEndpoint.endpointId,
+                    await app.scriptController.executeTest(
+                        getCurrentEndpoint().collectionId,
+                        getCurrentEndpoint().endpointId,
                         requestConfig,
                         result
                     );
                 } catch (error) {
-                    // Non-blocking
                 }
             }
         } else if (result.cancelled) {
@@ -1025,21 +1109,20 @@ export async function handleSendRequest() {
             updateResponseSize(error.size);
         }
 
-        if (window.historyController) {
-            const _activeEnvName = await window.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
-            window.historyController.addHistoryEntry(requestConfig, error, window.currentEndpoint, _activeEnvName).catch(() => { /* fire-and-forget */ });
+        if (app.historyController) {
+            const _activeEnvName = await app.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
+            app.historyController.addHistoryEntry(requestConfig, error, getCurrentEndpoint(), _activeEnvName).catch(() => { });
         }
 
-        if (window.currentEndpoint && window.scriptController) {
+        if (getCurrentEndpoint() && app.scriptController) {
             try {
-                await window.scriptController.executeTest(
-                    window.currentEndpoint.collectionId,
-                    window.currentEndpoint.endpointId,
+                await app.scriptController.executeTest(
+                    getCurrentEndpoint().collectionId,
+                    getCurrentEndpoint().endpointId,
                     requestConfig,
                     error
                 );
             } catch (e) {
-                // Non-blocking
             }
         }
     } finally {
@@ -1048,8 +1131,8 @@ export async function handleSendRequest() {
 }
 
 export async function handleGenerateCurl() {
-    if (window.currentEndpoint) {
-        debouncedSaveRequestModifications(window.currentEndpoint.collectionId, window.currentEndpoint.endpointId);
+    if (getCurrentEndpoint()) {
+        debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
     }
 
     let url = urlInput.value.trim();
@@ -1070,7 +1153,7 @@ export async function handleGenerateCurl() {
     let resolvedVariables;
     try {
         ({ variables: resolvedVariables, processor } = await builder.resolveVariables(
-            window.currentEndpoint, headers
+            getCurrentEndpoint(), headers
         ));
 
         ({ url } = builder.processRequestComponents({
@@ -1090,8 +1173,8 @@ export async function handleGenerateCurl() {
             const variableService = getVariableService();
             let variables = {};
 
-            if (window.currentEndpoint) {
-                variables = await variableService.getVariablesForCollection(window.currentEndpoint.collectionId);
+            if (getCurrentEndpoint()) {
+                variables = await variableService.getVariablesForCollection(getCurrentEndpoint().collectionId);
             } else {
                 variables = await variableService.getVariables();
             }
