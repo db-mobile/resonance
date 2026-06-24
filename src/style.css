@@ -4105,6 +4105,7 @@ code {
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   overflow: hidden;
+  margin-bottom: 40px;
 }
 
 .response-headers-display .cm-editor {
