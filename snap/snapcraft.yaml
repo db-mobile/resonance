@@ -90,7 +90,7 @@ parts:
   db-mobile-resonance:
     plugin: dump
     build-snaps:
-      - node/20/stable
+      - node/22/stable
       - rustup/latest/stable
     build-packages:
       - curl
