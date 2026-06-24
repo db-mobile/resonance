@@ -138,7 +138,7 @@ export class CollectionRequestPersistenceService {
 
     async saveGraphQLRequest(collectionId, endpointId, parseKeyValuePairs, authManager) {
         const { urlInput, headersList } = this.getRequestFormElements();
-        const graphqlBodyManager = window.domElements?.graphqlBodyManager;
+        const { graphqlBodyManager } = app;
 
         if (urlInput && urlInput.value) {
             await this.repository.savePersistedUrl(collectionId, endpointId, urlInput.value);

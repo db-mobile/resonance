@@ -548,6 +548,7 @@ export class GraphQLBodyManager {
             this.graphqlEditor.onChange((_content) => {
                 this.saveCurrentState();
                 this.updateOperationPicker();
+                this._markTabModified();
             });
 
             this.applySchemaToEditor();
@@ -556,6 +557,7 @@ export class GraphQLBodyManager {
 
             this.variablesEditor.onChange((_content) => {
                 this.saveCurrentState();
+                this._markTabModified();
             });
         } catch (error) {
             void error;
@@ -642,6 +644,17 @@ export class GraphQLBodyManager {
      * Save current state (placeholder - will integrate with CollectionRepository)
      */
     async saveCurrentState() {
+    }
+
+    /**
+     * Flag the active workspace tab as having unsaved changes, unless the change
+     * originates from tab state restoration (where editor content is set programmatically).
+     * @private
+     */
+    _markTabModified() {
+        if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+            app.workspaceTabController.markCurrentTabModified();
+        }
     }
 
     /**
