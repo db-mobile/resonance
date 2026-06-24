@@ -622,6 +622,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             },
             formatJSON() { return this._ensureInstance()?.formatJSON() ?? true; },
             focus() { this._ensureInstance()?.focus(); },
+            ensure() { this._ensureInstance(); },
             destroy() { instance?.destroy(); instance = null; }
         };
         return proxy;
