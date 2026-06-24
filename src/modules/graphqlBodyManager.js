@@ -523,6 +523,12 @@ export class GraphQLBodyManager {
             this.initializeGraphQLEditor();
         }
 
+        // The plain-text editor is lazy; mount it when its panel becomes active
+        // so the Text body mode actually shows an input.
+        if (mode === 'text') {
+            app.requestBodyTextEditor?.ensure?.();
+        }
+
         this.setWorkbenchActive(mode === 'graphql');
 
         if (mode === 'graphql') {

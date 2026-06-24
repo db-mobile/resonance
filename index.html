@@ -9,13 +9,13 @@
 </head>
 <body>
     <!-- Main Layout -->
-    <div class="main-layout">
+    <div class="main-layout tk-shell">
 
         <!-- App Body -->
-        <div class="app-body">
+        <div class="app-body tk-body">
 
         <!-- Activity Bar -->
-        <div class="activity-bar" role="navigation" aria-label="Main Navigation">
+        <div class="activity-bar tk-rail" role="navigation" aria-label="Main Navigation">
             <div class="activity-bar-group">
                 <button id="keyboard-shortcuts-btn" class="activity-bar-btn" title="Keyboard Shortcuts (Ctrl+/)">
                     <span class="icon icon-18 icon-keyboard"></span>
@@ -51,15 +51,16 @@
         </div>
 
         <!-- Collections Sidebar -->
-        <aside class="collections-sidebar" role="complementary">
+        <aside class="collections-sidebar tk-panel" role="complementary">
 
             <!-- Environment Selector -->
-            <div class="environment-section">
+            <div class="environment-section tk-panel-section--env">
+                <span class="tk-eyebrow">Environment</span>
                 <div id="environment-selector-container"></div>
             </div>
 
-            <div class="sidebar-header collections-sidebar-header u-flex u-flex-col">
-                <h2 class="sidebar-title" data-i18n="sidebar.collections">Collections</h2>
+            <div class="sidebar-header tk-panel-head">
+                <span class="tk-eyebrow" data-i18n="sidebar.collections">Collections</span>
                 <div class="collections-search">
                     <div class="search-input-wrap">
                         <span class="search-input-icon icon icon-16 icon-search" aria-hidden="true"></span>
@@ -73,7 +74,7 @@
                 </div>
             </div>
             
-            <div class="collections-container u-flex u-flex-col">
+            <div class="collections-container tk-panel-scroll u-flex u-flex-col">
                 <div id="collections-list" class="collections-list u-flex u-flex-col">
                     <div class="empty-state-base collections-empty u-flex u-flex-col u-items-center">
                         <span class="collections-empty-icon icon icon-64 icon-spark"></span>
@@ -85,7 +86,7 @@
         </aside>
 
         <!-- Horizontal Resizer Handle -->
-        <div class="horizontal-resizer-handle" id="horizontal-resizer-handle">
+        <div class="horizontal-resizer-handle tk-gutter" id="horizontal-resizer-handle">
             <div class="horizontal-resizer-grip u-flex u-items-center u-justify-center">
                 <div class="horizontal-resizer-line"></div>
                 <div class="horizontal-resizer-line"></div>
@@ -94,12 +95,13 @@
         </div>
 
         <!-- Main Content Area -->
-        <main class="main-content-area" role="main" id="main-content-area">
+        <main class="main-content-area tk-main" role="main" id="main-content-area">
             <!-- Workspace Tab Bar -->
             <div id="workspace-tab-bar-container" class="workspace-tab-bar-container u-flex u-overflow-hidden"></div>
 
             <!-- Request Builder -->
-            <section class="request-builder">
+            <section class="request-builder tk-console">
+                <div class="tk-console-inner">
                 <div class="request-url-section">
                     <div class="method-select-container">
                         <select id="method-select" class="select-base method-select" aria-label="HTTP Method">
@@ -138,6 +140,10 @@
                             title="Generate Code Snippet (cURL, Python, JavaScript, etc.)">
                         <span class="icon icon-16 icon-curl"></span>
                     </button>
+                </div>
+                </div>
+                <div class="tk-console-rail" aria-hidden="true">
+                    <span class="tk-signal-trace" data-role="signal-trace"></span>
                 </div>
             </section>
 
@@ -691,7 +697,7 @@
             </section>
 
             <!-- Resizer Handle -->
-            <div class="resizer-handle" id="resizer-handle">
+            <div class="resizer-handle tk-split" id="resizer-handle">
                 <div class="resizer-grip u-flex u-items-center u-justify-center">
                     <div class="resizer-line"></div>
                     <div class="resizer-line"></div>
@@ -700,7 +706,8 @@
             </div>
 
             <!-- Response Area -->
-            <section class="response-area u-flex u-flex-col">
+            <section class="response-area tk-readout u-flex u-flex-col">
+                <div class="tk-readout-head">
                 <header class="response-header u-flex u-items-center u-justify-between">
                     <h3 class="response-title">Response</h3>
                     <div class="status-info-container u-flex u-items-center">
@@ -709,7 +716,9 @@
                         <p id="response-size-display" class="response-size-display" aria-live="polite"></p>
                     </div>
                 </header>
+                </div>
 
+                <div class="tk-readout-body">
                 <div class="response-content u-flex u-flex-col">
                     <nav class="response-tabs tab-nav u-flex" role="tablist" aria-label="Response Content">
                         <button class="tab-button active"
@@ -773,11 +782,12 @@
                         <!-- Response containers for each workspace tab will be created dynamically here -->
                     </div>
                 </div>
+                </div>
             </section>
         </main>
 
         <!-- History Sidebar Resizer Handle -->
-        <div class="horizontal-resizer-handle" id="history-resizer-handle">
+        <div class="horizontal-resizer-handle tk-gutter" id="history-resizer-handle">
             <div class="horizontal-resizer-grip u-flex u-items-center u-justify-center">
                 <div class="horizontal-resizer-line"></div>
                 <div class="horizontal-resizer-line"></div>
@@ -786,9 +796,9 @@
         </div>
 
         <!-- History Sidebar -->
-        <aside class="history-sidebar" role="complementary" id="history-sidebar">
-            <div class="sidebar-header u-flex u-items-center u-justify-between">
-                <h2 class="sidebar-title" data-i18n="sidebar.history">History</h2>
+        <aside class="history-sidebar tk-panel" role="complementary" id="history-sidebar">
+            <div class="sidebar-header tk-panel-head tk-panel-head--row">
+                <span class="tk-eyebrow" data-i18n="sidebar.history">History</span>
                 <div class="u-flex u-items-center u-gap-2">
                     <button id="clear-all-history-btn" class="btn btn-icon-bordered" data-i18n-title="history.clear_all" data-i18n-aria="history.clear_all">
                         <span class="icon icon-16 icon-trash"></span>
@@ -811,7 +821,7 @@
                 </div>
             </div>
 
-            <div class="history-container">
+            <div class="history-container tk-panel-scroll">
                 <div id="history-list" class="history-list">
                     <div class="history-empty">
                         <span class="history-empty-icon icon icon-64 icon-history"></span>
@@ -825,7 +835,7 @@
         </div><!-- /.app-body -->
 
         <!-- Status Bar -->
-        <div class="status-bar" id="status-bar-container">
+        <div class="status-bar tk-footer" id="status-bar-container">
             <div class="status-bar-left">
                 <span class="status-bar-item" id="status-bar-env">
                     <span id="status-bar-env-dot" class="status-bar-env-dot"></span>
