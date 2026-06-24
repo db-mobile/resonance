@@ -16,6 +16,29 @@ import { app } from '../appContext.js';
 import { WorkspaceTabEndpointLoaderService } from '../services/WorkspaceTabEndpointLoaderService.js';
 import { handleGraphQLSubscriptionCancel, isSubscriptionActive } from '../graphqlSubscriptionHandler.js';
 
+/**
+ * Default endpoint and query seeded into a freshly created GraphQL tab so users
+ * have a runnable example. Points at the public Countries API (no auth, CORS-friendly).
+ */
+const DEFAULT_GRAPHQL_URL = 'https://countries.trevorblades.com/';
+const DEFAULT_GRAPHQL_QUERY = `query GetCountry($code: ID!) {
+  country(code: $code) {
+    name
+    native
+    capital
+    currency
+    emoji
+    languages {
+      code
+      name
+    }
+  }
+}
+`;
+const DEFAULT_GRAPHQL_VARIABLES = `{
+  "code": "DE"
+}`;
+
 export class WorkspaceTabController {
     /**
      * Creates a WorkspaceTabController instance
@@ -148,10 +171,10 @@ export class WorkspaceTabController {
                 tabOptions.name = tabOptions.name || 'New GraphQL';
                 tabOptions.request = {
                     protocol: 'graphql',
-                    url: '',
+                    url: DEFAULT_GRAPHQL_URL,
                     method: 'POST',
-                    query: '',
-                    variables: '',
+                    query: DEFAULT_GRAPHQL_QUERY,
+                    variables: DEFAULT_GRAPHQL_VARIABLES,
                     operationName: null,
                     headers: {},
                     authType: 'none',
