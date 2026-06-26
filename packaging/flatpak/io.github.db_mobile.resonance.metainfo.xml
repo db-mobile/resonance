@@ -99,6 +99,14 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.12.1" date="2026-06-26">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Improve cURL import: URL parsing, body type, and open in new tab</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.12.0" date="2026-06-24">
       <description>
         <p>Changes</p>
