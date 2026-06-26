@@ -262,9 +262,40 @@ export class CollectionImportExportService {
 
             await this.refreshCollections(false);
             toast.success(`Imported cURL as "${result.endpoint.name}"`);
+
+            await this.openImportedEndpoint(targetCollection.id, newEndpoint.id);
         } catch (error) {
             toast.error(`cURL import failed: ${error.message}`);
         }
+    }
+
+    async openImportedEndpoint(collectionId, endpointId) {
+        if (!app.collectionController) {
+            return;
+        }
+
+        const collection = await this.repository.getById(collectionId);
+        if (!collection) {
+            return;
+        }
+
+        const endpoint = app.collectionController.endpointLoaderService.findEndpointInCollection(
+            collection,
+            endpointId
+        );
+        if (!endpoint) {
+            return;
+        }
+
+        if (app.workspaceTabController) {
+            try {
+                await app.workspaceTabController.createNewTab();
+            } catch (error) {
+                void error;
+            }
+        }
+
+        await app.collectionController.handleEndpointClick(collection, endpoint);
     }
 
     async saveResponseSchemasFromImport(collection) {
