@@ -181,7 +181,11 @@ export class CurlParser {
 
             if (token.startsWith('-')) {
                 i++;
-                if (i < tokens.length && !tokens[i].startsWith('-')) {
+                if (
+                    i < tokens.length &&
+                    !tokens[i].startsWith('-') &&
+                    !(!result.url && this.isUrl(tokens[i]))
+                ) {
                     i++;
                 }
                 continue;

@@ -287,7 +287,41 @@ export class WorkspaceTabEndpointLoaderService {
             content = '';
         }
 
-        return { mode: 'json', content };
+        const contentType = this.resolveBodyContentType(endpoint);
+        const mode = contentType && !contentType.toLowerCase().includes('json') ? 'text' : 'json';
+
+        return { mode, content };
+    }
+
+    resolveBodyContentType(endpoint) {
+        if (endpoint.persistedHeaders && endpoint.persistedHeaders.length > 0) {
+            const match = endpoint.persistedHeaders.find(
+                entry => entry.key && entry.key.toLowerCase() === 'content-type'
+            );
+            if (match) {
+                return match.value || '';
+            }
+        }
+
+        if (endpoint.collectionDefaultHeaders) {
+            const key = Object.keys(endpoint.collectionDefaultHeaders).find(
+                name => name.toLowerCase() === 'content-type'
+            );
+            if (key) {
+                return endpoint.collectionDefaultHeaders[key] || '';
+            }
+        }
+
+        if (endpoint.parameters?.header) {
+            const key = Object.keys(endpoint.parameters.header).find(
+                name => name.toLowerCase() === 'content-type'
+            );
+            if (key) {
+                return endpoint.parameters.header[key]?.example || '';
+            }
+        }
+
+        return endpoint.requestBody?.contentType || '';
     }
 
     buildHttpAuth(endpoint) {

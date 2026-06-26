@@ -29,6 +29,7 @@ function initializeController() {
         }
         collectionController = new CollectionController(window.backendAPI, updateStatusDisplay);
         app.collectionService = collectionController.service;
+        app.collectionController = collectionController;
     }
     return collectionController;
 }
