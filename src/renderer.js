@@ -51,7 +51,7 @@ import { workspaceTabFeature } from './modules/workspaceTab.feature.js';
 import { StatusDisplayAdapter } from './modules/interfaces/IStatusDisplay.js';
 import { keyboardShortcuts } from './modules/keyboardShortcuts.js';
 import { CollectionRepository } from './modules/storage/CollectionRepository.js';
-import { RequestBodyEditor } from './modules/requestBodyEditor.bundle.js';
+import { loadEditor, warmEditors } from './modules/editorLoader.js';
 import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
 import { toast } from './modules/ui/Toast.js';
 
@@ -603,29 +603,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function createLazyEditor(container, options, changeCallback) {
         let instance = null;
-        const proxy = {
-            _ensureInstance() {
-                if (!instance && container) {
-                    instance = new RequestBodyEditor(container, options);
-                    if (changeCallback) {
-                        instance.onChange(changeCallback);
-                    }
+        let loadStarted = false;
+        let destroyed = false;
+        let pendingContent = null;
+
+        function ensure() {
+            if (instance || destroyed || !container || loadStarted) { return; }
+            loadStarted = true;
+            loadEditor('requestBody').then((RequestBodyEditor) => {
+                if (destroyed) { return; }
+                instance = new RequestBodyEditor(container, options);
+                if (pendingContent !== null) {
+                    instance.setContent(pendingContent);
+                    pendingContent = null;
                 }
-                return instance;
+                if (changeCallback) {
+                    instance.onChange(changeCallback);
+                }
+            });
+        }
+
+        return {
+            setContent(content) {
+                if (instance) { instance.setContent(content); }
+                else { pendingContent = content; ensure(); }
             },
-            setContent(content) { this._ensureInstance()?.setContent(content); },
-            getContent() { return this._ensureInstance()?.getContent() ?? ''; },
-            clear() { this._ensureInstance()?.clear(); },
+            getContent() { return instance ? instance.getContent() : (pendingContent ?? ''); },
+            clear() {
+                if (instance) { instance.clear(); }
+                else { pendingContent = ''; }
+            },
             onChange(cb) {
                 changeCallback = cb;
                 if (instance) { instance.onChange(cb); }
             },
-            formatJSON() { return this._ensureInstance()?.formatJSON() ?? true; },
-            focus() { this._ensureInstance()?.focus(); },
-            ensure() { this._ensureInstance(); },
-            destroy() { instance?.destroy(); instance = null; }
+            formatJSON() { return instance ? instance.formatJSON() : true; },
+            focus() {
+                if (instance) { instance.focus(); }
+                else { ensure(); }
+            },
+            ensure() { ensure(); },
+            destroy() { instance?.destroy(); instance = null; destroyed = true; pendingContent = null; }
         };
-        return proxy;
     }
 
     let requestBodyEditor = null;
@@ -743,6 +762,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateQueryParamsFromUrl();
 
     loadCollections();
+
+    scheduleIdleTask(() => {
+        warmEditors();
+    }, 500);
 
     scheduleIdleTask(async () => {
         const statusBar = new StatusBar(environmentService);

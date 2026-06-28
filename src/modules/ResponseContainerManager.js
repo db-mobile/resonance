@@ -5,7 +5,7 @@
  * Each workspace tab gets its own complete response display (Body, Headers, Cookies, Performance).
  */
 
-import { ResponseEditor } from './responseEditor.bundle.js';
+import { createLazyEditorProxy } from './editorLoader.js';
 import { templateLoader } from './templateLoader.js';
 import { attachCopyHandler, attachHeadersCopyHandler } from './copyHandler.js';
 import { PreviewManager } from './PreviewManager.js';
@@ -133,10 +133,10 @@ export class ResponseContainerManager {
         const codeBtn = wrapper.querySelector('.preview-mode-btn[data-mode="code"]');
         const previewBtn = wrapper.querySelector('.preview-mode-btn[data-mode="preview"]');
 
-        const editor = new ResponseEditor(bodyContainer);
+        const editor = createLazyEditorProxy('response', bodyContainer);
 
         const headersContainer = wrapper.querySelector('.response-headers-display');
-        const headersEditor = new ResponseEditor(headersContainer);
+        const headersEditor = createLazyEditorProxy('response', headersContainer);
         headersEditor.setContent('', 'application/json');
 
         const mainContentArea = document.getElementById('main-content-area');
