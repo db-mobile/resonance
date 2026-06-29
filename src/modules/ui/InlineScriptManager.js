@@ -3,7 +3,7 @@
  * @module ui/InlineScriptManager
  */
 
-import { ScriptEditor } from '../scriptEditor.bundle.js';
+import { createLazyEditorProxy } from '../editorLoader.js';
 
 /**
  * Manages inline script editing with auto-save functionality
@@ -35,14 +35,14 @@ export class InlineScriptManager {
         }
 
         if (this.preRequestContainer && !this.preRequestEditor) {
-            this.preRequestEditor = new ScriptEditor(this.preRequestContainer);
+            this.preRequestEditor = createLazyEditorProxy('script', this.preRequestContainer);
             this.preRequestEditor.onChange(() => {
                 this.scheduleAutoSave();
             });
         }
 
         if (this.testScriptContainer && !this.testScriptEditor) {
-            this.testScriptEditor = new ScriptEditor(this.testScriptContainer);
+            this.testScriptEditor = createLazyEditorProxy('script', this.testScriptContainer);
             this.testScriptEditor.onChange(() => {
                 this.scheduleAutoSave();
             });

@@ -36,7 +36,7 @@ import { VariableService } from './services/VariableService.js';
 import { StatusDisplayAdapter } from './interfaces/IStatusDisplay.js';
 import { authManager } from './authManager.js';
 import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
-import { ResponseEditor } from './responseEditor.bundle.js';
+import { createLazyEditorProxy } from './editorLoader.js';
 import { extractCookies } from './cookieParser.js';
 import { getRequestBodyContent } from './requestBodyHelper.js';
 import { MockServerRepository } from './storage/MockServerRepository.js';
@@ -257,7 +257,7 @@ function globalResponseElements() {
 
 export function initResponseEditor() {
     if (!responseEditor && responseBodyContainer) {
-        responseEditor = new ResponseEditor(responseBodyContainer);
+        responseEditor = createLazyEditorProxy('response', responseBodyContainer);
 
         responseEditor.onLanguageChange((languageType) => {
             if (languageSelector) {

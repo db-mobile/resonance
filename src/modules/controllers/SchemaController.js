@@ -3,7 +3,7 @@
  * @module controllers/SchemaController
  */
 
-import { SchemaEditor } from '../schemaEditor.bundle.js';
+import { createLazyEditorProxy } from '../editorLoader.js';
 import { SchemaValidator } from '../schema/SchemaValidator.js';
 
 /**
@@ -42,9 +42,9 @@ export class SchemaController {
             return;
         }
 
-        this.editor = new SchemaEditor(container, {
+        this.editor = createLazyEditorProxy('schema', container, [{
             onChange: (value) => this._handleSchemaChange(value)
-        });
+        }]);
 
         this._setupEventListeners();
         this._initialized = true;

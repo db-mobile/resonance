@@ -4,8 +4,7 @@
  */
 
 import { app } from './appContext.js';
-import { GraphQLEditor } from './graphqlEditor.bundle.js';
-import { JSONEditor } from './jsonEditor.bundle.js';
+import { loadEditor } from './editorLoader.js';
 import { toast } from './ui/Toast.js';
 import { fetchGraphQLIntrospection, buildSchemaFromIntrospection } from './apiHandler.js';
 
@@ -17,6 +16,9 @@ export class GraphQLBodyManager {
         this.dom = domElements;
         this.graphqlEditor = null;
         this.variablesEditor = null;
+        this._initializingGql = null;
+        this._pendingQuery = null;
+        this._pendingVariables = null;
         this.currentMode = 'json';
         this.isGraphQLModeEnabled = false;
 
@@ -537,37 +539,59 @@ export class GraphQLBodyManager {
     }
 
     /**
-     * Initialize the GraphQL editors (lazy loading)
+     * Initialize the GraphQL editors (lazy loading). The editor bundles are
+     * dynamically imported, so this is async; concurrent callers share one
+     * in-flight initialization. Any content buffered via {@link setGraphQLQuery}
+     * or {@link setGraphQLVariables} before the editors exist is applied *before*
+     * change listeners attach, so restoring a tab never marks it modified.
+     * @returns {Promise<void>}
      */
     initializeGraphQLEditor() {
-        if (!this.graphqlEditorContainer) {
-            return;
+        if (this.graphqlEditor && this.variablesEditor) {
+            return Promise.resolve();
+        }
+        if (this._initializingGql) {
+            return this._initializingGql;
+        }
+        if (!this.graphqlEditorContainer || !this.graphqlVariablesEditorContainer) {
+            return Promise.resolve();
         }
 
-        if (!this.graphqlVariablesEditorContainer) {
-            return;
-        }
+        this._initializingGql = (async () => {
+            try {
+                const [GraphQLEditor, JSONEditor] = await Promise.all([
+                    loadEditor('graphql'),
+                    loadEditor('json')
+                ]);
 
-        try {
-            this.graphqlEditor = new GraphQLEditor(this.graphqlEditorContainer);
+                this.graphqlEditor = new GraphQLEditor(this.graphqlEditorContainer);
+                if (this._pendingQuery !== null) {
+                    this.graphqlEditor.setContent(this._pendingQuery);
+                    this._pendingQuery = null;
+                }
+                this.graphqlEditor.onChange((_content) => {
+                    this.saveCurrentState();
+                    this.updateOperationPicker();
+                    this._markTabModified();
+                });
 
-            this.graphqlEditor.onChange((_content) => {
-                this.saveCurrentState();
-                this.updateOperationPicker();
-                this._markTabModified();
-            });
+                this.applySchemaToEditor();
 
-            this.applySchemaToEditor();
+                this.variablesEditor = new JSONEditor(this.graphqlVariablesEditorContainer);
+                if (this._pendingVariables !== null) {
+                    this.variablesEditor.setContent(this._pendingVariables);
+                    this._pendingVariables = null;
+                }
+                this.variablesEditor.onChange((_content) => {
+                    this.saveCurrentState();
+                    this._markTabModified();
+                });
+            } catch (error) {
+                void error;
+            }
+        })();
 
-            this.variablesEditor = new JSONEditor(this.graphqlVariablesEditorContainer);
-
-            this.variablesEditor.onChange((_content) => {
-                this.saveCurrentState();
-                this._markTabModified();
-            });
-        } catch (error) {
-            void error;
-        }
+        return this._initializingGql;
     }
 
     /**
@@ -575,11 +599,11 @@ export class GraphQLBodyManager {
      * @param {string} query - GraphQL query string
      */
     setGraphQLQuery(query) {
-        if (!this.graphqlEditor) {
-            this.initializeGraphQLEditor();
-        }
         if (this.graphqlEditor) {
             this.graphqlEditor.setContent(query || '');
+        } else {
+            this._pendingQuery = query || '';
+            this.initializeGraphQLEditor();
         }
     }
 
@@ -588,16 +612,15 @@ export class GraphQLBodyManager {
      * @param {string|object} variables - Variables as JSON string or object
      */
     setGraphQLVariables(variables) {
-        if (!this.variablesEditor) {
-            this.initializeGraphQLEditor();
-        }
+        const content = typeof variables === 'object'
+            ? JSON.stringify(variables, null, 2)
+            : (variables || '');
 
         if (this.variablesEditor) {
-            const content = typeof variables === 'object'
-                ? JSON.stringify(variables, null, 2)
-                : (variables || '');
-
             this.variablesEditor.setContent(content);
+        } else {
+            this._pendingVariables = content;
+            this.initializeGraphQLEditor();
         }
     }
 
@@ -606,7 +629,10 @@ export class GraphQLBodyManager {
      * @returns {string}
      */
     getGraphQLQuery() {
-        return this.graphqlEditor ? this.graphqlEditor.getContent() : '';
+        if (this.graphqlEditor) {
+            return this.graphqlEditor.getContent();
+        }
+        return this._pendingQuery || '';
     }
 
     /**
@@ -614,7 +640,10 @@ export class GraphQLBodyManager {
      * @returns {string}
      */
     getGraphQLVariables() {
-        return this.variablesEditor ? this.variablesEditor.getContent() : '';
+        if (this.variablesEditor) {
+            return this.variablesEditor.getContent();
+        }
+        return this._pendingVariables || '';
     }
 
     /**
@@ -667,6 +696,8 @@ export class GraphQLBodyManager {
      * Clear all content
      */
     clear() {
+        this._pendingQuery = null;
+        this._pendingVariables = null;
         if (this.graphqlEditor) {
             this.graphqlEditor.clear();
         }
@@ -679,6 +710,9 @@ export class GraphQLBodyManager {
      * Destroy GraphQL editor instances
      */
     destroy() {
+        this._pendingQuery = null;
+        this._pendingVariables = null;
+        this._initializingGql = null;
         if (this.graphqlEditor) {
             this.graphqlEditor.clear();
             this.graphqlEditor = null;
