@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "2.12.1"
+version = "2.12.2"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -58,9 +58,7 @@ webpki-roots = "0.26"
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"
-anyhow = "1"
 tracing = "0.1"
-tracing-subscriber = "0.3"
 regex = "1"
 url = "2"
 
