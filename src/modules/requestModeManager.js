@@ -500,7 +500,8 @@ function createGrpcUrlSection() {
     grpcSection.style.display = 'none';
     
     const badge = document.createElement('span');
-    badge.className = 'protocol-url-badge protocol-url-badge-grpc';
+    badge.className = 'method-pill';
+    badge.dataset.method = 'GRPC';
     badge.textContent = 'gRPC';
     
     const targetWrapper = document.createElement('div');
@@ -558,7 +559,8 @@ function createWebSocketUrlSection() {
     websocketSection.style.display = 'none';
 
     const badge = document.createElement('span');
-    badge.className = 'protocol-url-badge protocol-url-badge-ws';
+    badge.className = 'method-pill';
+    badge.dataset.method = 'WS';
     badge.textContent = 'WS';
 
     const targetWrapper = document.createElement('div');
@@ -627,7 +629,8 @@ function createSseUrlSection() {
     sseSection.style.display = 'none';
 
     const badge = document.createElement('span');
-    badge.className = 'protocol-url-badge protocol-url-badge-sse';
+    badge.className = 'method-pill';
+    badge.dataset.method = 'SSE';
     badge.textContent = 'SSE';
 
     const targetWrapper = document.createElement('div');
@@ -705,7 +708,8 @@ function createGraphQLUrlSection() {
     graphqlSection.style.display = 'none';
 
     const badge = document.createElement('span');
-    badge.className = 'protocol-url-badge protocol-url-badge-graphql';
+    badge.className = 'method-pill';
+    badge.dataset.method = 'GRAPHQL';
     badge.textContent = 'GraphQL';
 
     const targetWrapper = document.createElement('div');
@@ -783,7 +787,8 @@ function createMqttUrlSection() {
     mqttSection.style.display = 'none';
 
     const badge = document.createElement('span');
-    badge.className = 'protocol-url-badge protocol-url-badge-mqtt';
+    badge.className = 'method-pill';
+    badge.dataset.method = 'MQTT';
     badge.textContent = 'MQTT';
 
     const targetWrapper = document.createElement('div');

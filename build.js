@@ -86,6 +86,37 @@ await esbuild.build({
     process.exit(1);
 });
 
+// Minify CSS in production (overwrites the verbatim copies in dist).
+// bundle:false leaves url("../assets/ui/...") references and the runtime
+// theme paths (src/themes/<name>.css) untouched.
+if (isProduction) {
+    const cssFiles = [];
+    (function collectCss(dir) {
+        for (const file of fs.readdirSync(dir)) {
+            const full = path.join(dir, file);
+            if (fs.statSync(full).isDirectory()) {
+                collectCss(full);
+            } else if (full.endsWith('.css')) {
+                cssFiles.push(full);
+            }
+        }
+    })('src');
+
+    await esbuild.build({
+        entryPoints: cssFiles,
+        outdir: 'dist/src',
+        outbase: 'src',
+        bundle: false,
+        minify: true,
+        loader: { '.css': 'css' },
+    }).then(() => {
+        console.log(`✓ Minified ${cssFiles.length} CSS file(s)`);
+    }).catch((error) => {
+        console.error('CSS build failed:', error);
+        process.exit(1);
+    });
+}
+
 // Update index.html in dist to reference the bundled renderer
 const indexHtml = fs.readFileSync('dist/index.html', 'utf8');
 const updatedHtml = indexHtml.replace(
