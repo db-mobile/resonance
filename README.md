@@ -129,7 +129,7 @@ The built application will be in `src-tauri/target/release/bundle/`.
 
 - **Multi-Language Export**: Generate request code in 9 languages:
   - cURL, Python (requests), JavaScript (Fetch), JavaScript (Axios)
-  - Node.js (axios), Go (net/http), PHP (cURL), Ruby (net/http), Java (HttpClient)
+  - Node.js (https module), Go (net/http), PHP (cURL), Ruby (net/http), Java (HttpClient)
 
 ### GraphQL Support
 
@@ -139,6 +139,7 @@ The built application will be in `src-tauri/target/release/bundle/`.
   - Variables editor with JSON syntax highlighting and validation
   - Query formatting with format button
   - Auto-save functionality for queries and variables
+  - **GraphQL Subscriptions**: Live subscriptions over WebSocket using the `graphql-transport-ws` protocol, with transcript-style display of streamed events
 
 ### gRPC Support
 
@@ -148,7 +149,7 @@ The built application will be in `src-tauri/target/release/bundle/`.
   - Request metadata (headers) configuration
   - Response metadata and trailers display
   - JSON-based message editing with schema-generated skeletons
-  - Unary RPC support
+  - All four RPC kinds: unary, server-streaming, client-streaming, and bidirectional streaming
 
 ### WebSocket Support
 
@@ -744,7 +745,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Variable templating system with environment support
 - [x] Dynamic variables (UUID, timestamps, random values)
 - [x] Multi-theme support (4 themes with 9 accent colors)
-- [x] Internationalization (5 languages)
+- [x] Internationalization (6 languages)
 - [x] Authentication support (Bearer, Basic, API Key, OAuth2, Digest)
 - [x] Client certificates / mTLS with per-host configuration and custom CA trust
 - [x] Request history with search and replay
@@ -756,8 +757,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Automated testing framework with rich assertion API
 - [x] Request chaining with environment variable integration
 - [x] GraphQL support with dedicated query and variables editors
+- [x] GraphQL subscriptions over WebSocket (graphql-transport-ws)
 - [x] Tauri v2 migration for smaller bundle and better performance
-- [x] gRPC support with server reflection and unary RPC
+- [x] gRPC support with server reflection and all four RPC kinds (unary, server/client/bidirectional streaming)
 - [x] WebSocket support with native backend transport and handshake headers
 - [x] Server-Sent Events (SSE) support with automatic reconnection and Last-Event-ID resumption
 - [x] MQTT support with topic subscribe/publish, QoS levels, retain, and TLS brokers
