@@ -1,3 +1,5 @@
+import { app } from './appContext.js';
+
 /**
  * Copy text to clipboard and show visual feedback
  * @param {string} text - The text to copy
@@ -45,7 +47,7 @@ function showCopyFeedback(button, success) {
  * @param {string} tabId - The workspace tab ID
  */
 export async function handleCopyResponse(button, tabId) {
-    const { responseContainerManager } = window;
+    const { responseContainerManager } = app;
     if (!responseContainerManager) {
         showCopyFeedback(button, false);
         return;
@@ -78,7 +80,7 @@ export async function handleCopyResponse(button, tabId) {
  * @param {string} tabId - The workspace tab ID
  */
 export async function handleCopyHeaders(button, tabId) {
-    const { responseContainerManager } = window;
+    const { responseContainerManager } = app;
     if (!responseContainerManager) {
         showCopyFeedback(button, false);
         return;
