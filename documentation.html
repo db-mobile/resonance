@@ -38,6 +38,10 @@
         <div class="doc-sidebar-label">Documentation</div>
         <ul class="doc-nav-list">
           <li><a href="documentation.html" class="active">Getting Started</a></li>
+          <li><a href="grpc.html">gRPC</a></li>
+          <li><a href="websocket.html">WebSocket</a></li>
+          <li><a href="mqtt.html">MQTT</a></li>
+          <li><a href="sse.html">Server-Sent Events</a></li>
           <li><a href="cookie-jar.html">Cookie Jar</a></li>
           <li><a href="mock-server.html">Mock Server</a></li>
           <li><a href="scripts.html">Using Scripts</a></li>
@@ -125,6 +129,15 @@
         <h3>Mock Server</h3>
         <p>Click the <strong>Mock Server</strong> toolbar action to spin up a local HTTP server backed by your OpenAPI collections. See <a href="mock-server.html">Mock Server</a> for setup details.</p>
 
+        <h3>Real-Time Protocols</h3>
+        <p>Beyond REST and GraphQL, Resonance speaks several streaming and messaging protocols natively &mdash; each from its own request tab:</p>
+        <ul class="doc-list">
+          <li><a href="grpc.html">gRPC</a> &mdash; server reflection with unary and streaming calls</li>
+          <li><a href="websocket.html">WebSocket</a> &mdash; persistent <code>ws://</code> / <code>wss://</code> connections</li>
+          <li><a href="mqtt.html">MQTT</a> &mdash; publish/subscribe with QoS, retain, and wildcards</li>
+          <li><a href="sse.html">Server-Sent Events</a> &mdash; <code>text/event-stream</code> with auto-reconnect</li>
+        </ul>
+
         <h3>Keyboard Shortcuts</h3>
         <ul class="doc-list">
           <li>Press <code>?</code> anywhere to open the shortcuts reference</li>
@@ -147,6 +160,7 @@
           <li><a href="collection-runner.html">Collection Runner</a> — run sequences of requests and chain variables between steps</li>
           <li><a href="scripts.html">Using Scripts</a> — full pre-request and test script API reference</li>
           <li><a href="mock-server.html">Mock Server</a> — serve OpenAPI-backed responses locally</li>
+          <li><a href="grpc.html">gRPC</a> — reflection, streaming, metadata, and trailers</li>
           <li><a href="https://github.com/db-mobile/resonance/issues" target="_blank" rel="noopener">Issue tracker</a> — report bugs or request features</li>
         </ul>
       </div>

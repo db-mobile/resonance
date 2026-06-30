@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Use Server-Sent Events in Resonance — stream text/event-stream with automatic reconnection and Last-Event-ID resumption.">
+
+  <title>Server-Sent Events — Resonance</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+</head>
+<body>
+
+  <div class="grain" aria-hidden="true"></div>
+
+  <header id="header">
+    <nav class="container nav-inner">
+      <a href="index.html" class="logo">
+        <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+        <span class="logo-text">Resonance</span>
+      </a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="index.html#screenshots">Screenshots</a></li>
+        <li><a href="index.html#download">Download</a></li>
+        <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="documentation.html" class="nav-cta">Docs</a></li>
+      </ul>
+      <button class="burger" id="burger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <div class="doc-page">
+      <aside class="doc-sidebar">
+        <div class="doc-sidebar-label">Documentation</div>
+        <ul class="doc-nav-list">
+          <li><a href="documentation.html">Getting Started</a></li>
+          <li><a href="grpc.html">gRPC</a></li>
+          <li><a href="websocket.html">WebSocket</a></li>
+          <li><a href="mqtt.html">MQTT</a></li>
+          <li><a href="sse.html" class="active">Server-Sent Events</a></li>
+          <li><a href="cookie-jar.html">Cookie Jar</a></li>
+          <li><a href="mock-server.html">Mock Server</a></li>
+          <li><a href="scripts.html">Using Scripts</a></li>
+          <li><a href="collection-runner.html">Collection Runner</a></li>
+        </ul>
+      </aside>
+
+      <div class="doc-content-wrap">
+        <div class="doc-page-label">// server-sent events</div>
+        <h2>Server-Sent Events</h2>
+        <p class="doc-lead">Resonance streams <code>text/event-stream</code> responses over a persistent connection, parsing each event and keeping the stream alive with automatic reconnection.</p>
+
+        <h3>What It Does</h3>
+        <ul class="doc-list">
+          <li>Streams <code>text/event-stream</code> responses over a persistent connection</li>
+          <li>Sends custom headers on the initial handshake</li>
+          <li>Displays each event with its <code>event</code>, <code>id</code>, <code>retry</code>, and <code>data</code> fields</li>
+          <li>Reconnects automatically, honoring the server&rsquo;s <code>retry</code> interval</li>
+          <li>Resumes with <code>Last-Event-ID</code> after a reconnect so you don&rsquo;t miss events</li>
+          <li>Shows the connection lifecycle: connecting, connected, reconnecting, closed, error</li>
+          <li>Persists the transcript per tab</li>
+        </ul>
+
+        <h3>Connecting</h3>
+        <ol class="doc-list">
+          <li>Create a request with an SSE endpoint URL &mdash; Resonance switches to SSE mode</li>
+          <li>Add any headers required for the handshake, such as an auth token</li>
+          <li>Click <strong>Connect</strong> &mdash; events stream into the transcript as the server emits them</li>
+        </ol>
+
+        <h3>Reading Events</h3>
+        <p>Each event is shown with its individual fields parsed out, so you can read the <code>event</code> name, <code>id</code>, suggested <code>retry</code> interval, and <code>data</code> payload separately rather than as one raw blob.</p>
+
+        <h3>Reconnection &amp; Resumption</h3>
+        <ul class="doc-list">
+          <li>If the connection drops, Resonance waits the server&rsquo;s <code>retry</code> interval and reconnects</li>
+          <li>It sends the <code>Last-Event-ID</code> header so the server can resume from where you left off</li>
+          <li>The lifecycle status reflects connecting, reconnecting, and closed states throughout</li>
+        </ul>
+
+        <h3>Troubleshooting</h3>
+        <h4>No events appear</h4>
+        <ul class="doc-list">
+          <li>Confirm the server responds with <code>Content-Type: text/event-stream</code></li>
+          <li>Make sure the server flushes events rather than buffering the whole response</li>
+        </ul>
+        <h4>Constant reconnecting</h4>
+        <ul class="doc-list">
+          <li>Check the server&rsquo;s <code>retry</code> value and the stability of the connection</li>
+          <li>For <code>401</code> / <code>403</code>, add the required handshake headers or auth token</li>
+        </ul>
+
+        <h3>Next Steps</h3>
+        <ul class="doc-list">
+          <li><a href="websocket.html">WebSocket</a> &mdash; two-way streaming when you also need to send</li>
+          <li><a href="documentation.html">Getting Started</a> &mdash; environments and variables for handshake headers</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="index.html" class="logo">
+          <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+          <span class="logo-text">Resonance</span>
+        </a>
+        <p class="footer-tagline">A Tauri desktop app. Open source under the MIT license.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <span class="footer-col-label">Project</span>
+          <ul>
+            <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub Repository</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/issues" target="_blank" rel="noopener">Report Issues</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <span class="footer-col-label">Resources</span>
+          <ul>
+            <li><a href="documentation.html">Documentation</a></li>
+            <li><a href="scripts.html">Using Scripts</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/blob/main/LICENSE" target="_blank" rel="noopener">License (MIT)</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <span>&copy; 2026 Resonance &mdash; MIT License</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

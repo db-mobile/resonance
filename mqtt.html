@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Use MQTT in Resonance — subscribe and publish over mqtt:// and mqtts:// brokers with QoS levels, retain, and wildcards.">
+
+  <title>MQTT — Resonance</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+</head>
+<body>
+
+  <div class="grain" aria-hidden="true"></div>
+
+  <header id="header">
+    <nav class="container nav-inner">
+      <a href="index.html" class="logo">
+        <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+        <span class="logo-text">Resonance</span>
+      </a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="index.html#screenshots">Screenshots</a></li>
+        <li><a href="index.html#download">Download</a></li>
+        <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="documentation.html" class="nav-cta">Docs</a></li>
+      </ul>
+      <button class="burger" id="burger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <div class="doc-page">
+      <aside class="doc-sidebar">
+        <div class="doc-sidebar-label">Documentation</div>
+        <ul class="doc-nav-list">
+          <li><a href="documentation.html">Getting Started</a></li>
+          <li><a href="grpc.html">gRPC</a></li>
+          <li><a href="websocket.html">WebSocket</a></li>
+          <li><a href="mqtt.html" class="active">MQTT</a></li>
+          <li><a href="sse.html">Server-Sent Events</a></li>
+          <li><a href="cookie-jar.html">Cookie Jar</a></li>
+          <li><a href="mock-server.html">Mock Server</a></li>
+          <li><a href="scripts.html">Using Scripts</a></li>
+          <li><a href="collection-runner.html">Collection Runner</a></li>
+        </ul>
+      </aside>
+
+      <div class="doc-content-wrap">
+        <div class="doc-page-label">// mqtt</div>
+        <h2>MQTT</h2>
+        <p class="doc-lead">Connect to an MQTT broker over a persistent backend connection, subscribe to topics, and publish messages &mdash; all from a request tab, with a live transcript of the traffic.</p>
+
+        <h3>What It Does</h3>
+        <ul class="doc-list">
+          <li>Connects to plaintext (<code>mqtt://</code>, default port 1883), TLS (<code>mqtts://</code>, default port 8883), or bare <code>host:port</code> brokers</li>
+          <li>Subscribes to topics, including wildcards like <code>sensors/#</code></li>
+          <li>Publishes messages with a chosen QoS level and an optional retain flag</li>
+          <li>Supports QoS 0, 1, and 2 for both subscriptions and published messages</li>
+          <li>Optional client ID (auto-generated when blank), username, and password</li>
+          <li>Configurable keep-alive interval</li>
+          <li>Live status indicator with a received-message count and an incoming-message flash</li>
+          <li>Transcript of published and received messages with topics and timestamps</li>
+        </ul>
+
+        <h3>Connecting</h3>
+        <ol class="doc-list">
+          <li>Enter the broker URL &mdash; <code>mqtt://broker.example.com</code>, <code>mqtts://&hellip;</code> for TLS, or <code>host:port</code></li>
+          <li>Optionally set a client ID, username, and password</li>
+          <li>Adjust the keep-alive interval if your broker needs it</li>
+          <li>Click <strong>Connect</strong> &mdash; the status indicator goes live once connected</li>
+        </ol>
+
+        <h3>Subscribing</h3>
+        <ol class="doc-list">
+          <li>Enter a topic filter, e.g. <code>sensors/temperature</code> or <code>sensors/#</code> for a wildcard</li>
+          <li>Choose the QoS level for the subscription</li>
+          <li>Subscribe &mdash; matching messages stream into the transcript as they arrive</li>
+        </ol>
+
+        <h3>Publishing</h3>
+        <ol class="doc-list">
+          <li>Enter the target topic</li>
+          <li>Choose the QoS level and whether to set the <strong>retain</strong> flag</li>
+          <li>Enter the payload and click <strong>Publish</strong></li>
+        </ol>
+
+        <h3>Troubleshooting</h3>
+        <h4>Cannot connect</h4>
+        <ul class="doc-list">
+          <li>Check the scheme and port &mdash; 1883 for <code>mqtt://</code>, 8883 for <code>mqtts://</code></li>
+          <li>Verify credentials, and that the broker accepts your client ID</li>
+        </ul>
+        <h4>No messages received</h4>
+        <ul class="doc-list">
+          <li>Confirm the topic filter actually matches the published topics</li>
+          <li>Check that the subscription QoS is acceptable to the broker</li>
+        </ul>
+
+        <h3>Next Steps</h3>
+        <ul class="doc-list">
+          <li><a href="websocket.html">WebSocket</a> &mdash; bidirectional messaging over a single connection</li>
+          <li><a href="sse.html">Server-Sent Events</a> &mdash; server-push streaming over HTTP</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="index.html" class="logo">
+          <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+          <span class="logo-text">Resonance</span>
+        </a>
+        <p class="footer-tagline">A Tauri desktop app. Open source under the MIT license.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <span class="footer-col-label">Project</span>
+          <ul>
+            <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub Repository</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/issues" target="_blank" rel="noopener">Report Issues</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <span class="footer-col-label">Resources</span>
+          <ul>
+            <li><a href="documentation.html">Documentation</a></li>
+            <li><a href="scripts.html">Using Scripts</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/blob/main/LICENSE" target="_blank" rel="noopener">License (MIT)</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <span>&copy; 2026 Resonance &mdash; MIT License</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

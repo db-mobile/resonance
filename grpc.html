@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Use gRPC in Resonance — server reflection, unary and streaming calls, TLS, metadata, and trailers.">
+
+  <title>gRPC — Resonance</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+</head>
+<body>
+
+  <div class="grain" aria-hidden="true"></div>
+
+  <header id="header">
+    <nav class="container nav-inner">
+      <a href="index.html" class="logo">
+        <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+        <span class="logo-text">Resonance</span>
+      </a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="index.html#screenshots">Screenshots</a></li>
+        <li><a href="index.html#download">Download</a></li>
+        <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="documentation.html" class="nav-cta">Docs</a></li>
+      </ul>
+      <button class="burger" id="burger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <div class="doc-page">
+      <aside class="doc-sidebar">
+        <div class="doc-sidebar-label">Documentation</div>
+        <ul class="doc-nav-list">
+          <li><a href="documentation.html">Getting Started</a></li>
+          <li><a href="grpc.html" class="active">gRPC</a></li>
+          <li><a href="websocket.html">WebSocket</a></li>
+          <li><a href="mqtt.html">MQTT</a></li>
+          <li><a href="sse.html">Server-Sent Events</a></li>
+          <li><a href="cookie-jar.html">Cookie Jar</a></li>
+          <li><a href="mock-server.html">Mock Server</a></li>
+          <li><a href="scripts.html">Using Scripts</a></li>
+          <li><a href="collection-runner.html">Collection Runner</a></li>
+        </ul>
+      </aside>
+
+      <div class="doc-content-wrap">
+        <div class="doc-page-label">// grpc</div>
+        <h2>gRPC</h2>
+        <p class="doc-lead">Resonance speaks gRPC natively, with server reflection so you can explore a service without hunting down its <code>.proto</code> files. Everything runs locally through the Rust backend.</p>
+
+        <h3>What It Does</h3>
+        <ul class="doc-list">
+          <li>Discovers services and methods automatically via gRPC server reflection</li>
+          <li>Supports all four RPC kinds: unary, server-streaming, client-streaming, and bidirectional streaming</li>
+          <li>Connects over plaintext or TLS</li>
+          <li>Sends request metadata (headers) and shows response metadata and trailers</li>
+          <li>Edits messages as JSON, with skeletons generated from the method&rsquo;s schema</li>
+        </ul>
+
+        <h3>Connecting to a Server</h3>
+        <ol class="doc-list">
+          <li>Create a gRPC request &mdash; the panel switches to gRPC mode</li>
+          <li>Enter the server address as <code>host:port</code>, e.g. <code>localhost:50051</code></li>
+          <li>Enable <strong>TLS</strong> for secure servers</li>
+          <li>Fetch the service list via reflection, or load a <code>.proto</code> file directly</li>
+          <li>Pick a service and method &mdash; the message editor populates with a JSON skeleton</li>
+        </ol>
+
+        <h3>RPC Kinds</h3>
+        <p>The method kind is shown as a badge next to the selected method. Each kind behaves differently once you send:</p>
+        <ul class="doc-list">
+          <li><strong>Unary</strong> &mdash; one request, one response. Click <strong>Send</strong>.</li>
+          <li><strong>Server-streaming</strong> &mdash; one request, a stream of responses appended to the transcript as they arrive</li>
+          <li><strong>Client-streaming</strong> &mdash; send several messages, then close the stream to receive the single response</li>
+          <li><strong>Bidirectional</strong> &mdash; send and receive concurrently; the transcript shows both directions</li>
+        </ul>
+
+        <h3>Metadata, Messages &amp; Trailers</h3>
+        <ul class="doc-list">
+          <li>Add key-value <strong>metadata</strong> (the gRPC equivalent of headers) to the outgoing call</li>
+          <li>Edit the request message as JSON &mdash; the skeleton mirrors the message&rsquo;s fields</li>
+          <li>Response <strong>metadata</strong> and <strong>trailers</strong> appear in their own response tabs</li>
+        </ul>
+
+        <h3>Troubleshooting</h3>
+        <h4>Method discovery is empty</h4>
+        <ul class="doc-list">
+          <li>The server must have the gRPC reflection service enabled</li>
+          <li>If reflection is unavailable, load the service&rsquo;s <code>.proto</code> file instead</li>
+        </ul>
+        <h4>TLS handshake fails</h4>
+        <ul class="doc-list">
+          <li>Confirm the TLS toggle matches the server (plaintext vs. secure)</li>
+          <li>For private or self-signed CAs, configure custom CA trust in the certificate settings</li>
+        </ul>
+
+        <h3>Next Steps</h3>
+        <ul class="doc-list">
+          <li><a href="documentation.html">Getting Started</a> &mdash; environments and variables you can reuse in metadata</li>
+          <li><a href="websocket.html">WebSocket</a> &mdash; another persistent, streaming transport</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="index.html" class="logo">
+          <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+          <span class="logo-text">Resonance</span>
+        </a>
+        <p class="footer-tagline">A Tauri desktop app. Open source under the MIT license.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <span class="footer-col-label">Project</span>
+          <ul>
+            <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub Repository</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/issues" target="_blank" rel="noopener">Report Issues</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <span class="footer-col-label">Resources</span>
+          <ul>
+            <li><a href="documentation.html">Documentation</a></li>
+            <li><a href="scripts.html">Using Scripts</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/blob/main/LICENSE" target="_blank" rel="noopener">License (MIT)</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <span>&copy; 2026 Resonance &mdash; MIT License</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

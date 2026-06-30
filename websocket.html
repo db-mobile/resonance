@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Use WebSocket in Resonance — persistent ws:// and wss:// connections, handshake headers, and a live message transcript.">
+
+  <title>WebSocket — Resonance</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+</head>
+<body>
+
+  <div class="grain" aria-hidden="true"></div>
+
+  <header id="header">
+    <nav class="container nav-inner">
+      <a href="index.html" class="logo">
+        <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+        <span class="logo-text">Resonance</span>
+      </a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="index.html#screenshots">Screenshots</a></li>
+        <li><a href="index.html#download">Download</a></li>
+        <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="documentation.html" class="nav-cta">Docs</a></li>
+      </ul>
+      <button class="burger" id="burger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <div class="doc-page">
+      <aside class="doc-sidebar">
+        <div class="doc-sidebar-label">Documentation</div>
+        <ul class="doc-nav-list">
+          <li><a href="documentation.html">Getting Started</a></li>
+          <li><a href="grpc.html">gRPC</a></li>
+          <li><a href="websocket.html" class="active">WebSocket</a></li>
+          <li><a href="mqtt.html">MQTT</a></li>
+          <li><a href="sse.html">Server-Sent Events</a></li>
+          <li><a href="cookie-jar.html">Cookie Jar</a></li>
+          <li><a href="mock-server.html">Mock Server</a></li>
+          <li><a href="scripts.html">Using Scripts</a></li>
+          <li><a href="collection-runner.html">Collection Runner</a></li>
+        </ul>
+      </aside>
+
+      <div class="doc-content-wrap">
+        <div class="doc-page-label">// websocket</div>
+        <h2>WebSocket</h2>
+        <p class="doc-lead">Resonance keeps a real WebSocket connection open in the background so you can send and receive messages interactively, with a full transcript of the exchange.</p>
+
+        <h3>What It Does</h3>
+        <ul class="doc-list">
+          <li>Connects to <code>ws://</code> and <code>wss://</code> endpoints</li>
+          <li>Keeps one reusable connection open per request tab</li>
+          <li>Sends custom handshake headers (auth tokens, subprotocols, and more)</li>
+          <li>Shows a transcript of everything sent and received, with timestamps</li>
+          <li>Saves WebSocket requests alongside HTTP and gRPC requests</li>
+        </ul>
+
+        <h3>Connecting</h3>
+        <ol class="doc-list">
+          <li>Create a request with a <code>ws://</code> or <code>wss://</code> URL &mdash; Resonance switches to WebSocket mode</li>
+          <li>Add any handshake headers the server requires</li>
+          <li>Click <strong>Connect</strong> &mdash; the status indicator shows the live connection state</li>
+          <li>The connection stays open until you disconnect or close the tab</li>
+        </ol>
+
+        <h3>Sending &amp; Receiving</h3>
+        <ul class="doc-list">
+          <li>Type a message and send it &mdash; it appears in the transcript</li>
+          <li>Incoming messages append to the transcript as they arrive</li>
+          <li>The connection is reusable, so send as many messages as you need</li>
+        </ul>
+
+        <h3>Closing the Connection</h3>
+        <p>Click <strong>Disconnect</strong> to close the socket, or simply close the tab. Connection state is tracked per tab, so other tabs are unaffected.</p>
+
+        <h3>Troubleshooting</h3>
+        <h4>Connection refused</h4>
+        <ul class="doc-list">
+          <li>Check the scheme &mdash; <code>ws://</code> for plaintext, <code>wss://</code> for TLS</li>
+          <li>Confirm the server is reachable and listening on that port</li>
+        </ul>
+        <h4>Handshake rejected (401 / 403)</h4>
+        <ul class="doc-list">
+          <li>Add the required handshake headers or auth token</li>
+          <li>For <code>wss://</code> with a private CA, configure custom CA trust in the certificate settings</li>
+        </ul>
+
+        <h3>Next Steps</h3>
+        <ul class="doc-list">
+          <li><a href="sse.html">Server-Sent Events</a> &mdash; one-way server streaming over plain HTTP</li>
+          <li><a href="mqtt.html">MQTT</a> &mdash; publish/subscribe messaging over a persistent connection</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="index.html" class="logo">
+          <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+          <span class="logo-text">Resonance</span>
+        </a>
+        <p class="footer-tagline">A Tauri desktop app. Open source under the MIT license.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <span class="footer-col-label">Project</span>
+          <ul>
+            <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub Repository</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/issues" target="_blank" rel="noopener">Report Issues</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <span class="footer-col-label">Resources</span>
+          <ul>
+            <li><a href="documentation.html">Documentation</a></li>
+            <li><a href="scripts.html">Using Scripts</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/blob/main/LICENSE" target="_blank" rel="noopener">License (MIT)</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <span>&copy; 2026 Resonance &mdash; MIT License</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
