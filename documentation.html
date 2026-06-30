@@ -57,9 +57,10 @@
         <h3>Installation</h3>
         <h4>Linux</h4>
         <ul class="doc-list">
-          <li>Download the <strong>AppImage</strong> or <strong>.deb</strong> from the <a href="index.html#download">Download</a> section, or install from <strong>Flathub</strong> or the <strong>AUR</strong> (<code>yay -S resonance-bin</code>)</li>
+          <li>Download the <strong>AppImage</strong> or <strong>.deb</strong> from the <a href="index.html#download">Download</a> section, or install from <strong>Flathub</strong> (<code>flatpak install flathub io.github.db_mobile.resonance</code>), <strong>Snap</strong> (<code>snap install db-mobile-resonance</code>), or the <strong>AUR</strong> (<code>yay -S resonance-bin</code>)</li>
           <li>AppImage: make it executable (<code>chmod +x Resonance*.AppImage</code>) and run it</li>
           <li>.deb: install with <code>sudo dpkg -i resonance*.deb</code></li>
+          <li>Snap: after installing, run <code>snap connect db-mobile-resonance:password-manager-service</code> so secrets are stored in the OS keychain — without this connection the strict snap falls back to unencrypted local storage</li>
         </ul>
         <h4>macOS</h4>
         <ul class="doc-list">
