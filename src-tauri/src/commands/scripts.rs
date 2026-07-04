@@ -232,6 +232,15 @@ fn execute_script(script: &str, ctx: Rc<RefCell<ScriptContext>>) -> Result<(), S
                     ctx.borrow_mut().test_results.extend(results);
                 }
             }
+
+            let request_global = context.global_object();
+            if let Ok(request_val) = request_global.get(js_string!("request"), &mut context) {
+                if request_val.is_object() {
+                    if let Ok(request_json) = request_val.to_json(&mut context) {
+                        ctx.borrow_mut().request = request_json;
+                    }
+                }
+            }
             Ok(())
         }
         Err(e) => Err(format!("Script error: {}", e)),
@@ -750,7 +759,7 @@ pub async fn script_execute_pre_request(
             logs: ctx_ref.logs.clone(),
             errors: Vec::new(),
             test_results: ctx_ref.test_results.clone(),
-            modified_request: Some(script_data.request),
+            modified_request: Some(ctx_ref.request.clone()),
             modified_environment: ctx_ref.environment_changes.clone(),
         }),
         Err(e) => Ok(ScriptResult {
@@ -758,7 +767,7 @@ pub async fn script_execute_pre_request(
             logs: ctx_ref.logs.clone(),
             errors: vec![e],
             test_results: ctx_ref.test_results.clone(),
-            modified_request: Some(script_data.request),
+            modified_request: Some(ctx_ref.request.clone()),
             modified_environment: ctx_ref.environment_changes.clone(),
         }),
     }
@@ -806,5 +815,56 @@ pub async fn script_execute_test(script_data: ScriptExecutionData) -> Result<Scr
             modified_request: None,
             modified_environment: ctx_ref.environment_changes.clone(),
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn run_script(script: &str) -> Value {
+        let ctx = Rc::new(RefCell::new(ScriptContext {
+            logs: Vec::new(),
+            test_results: Vec::new(),
+            environment_changes: HashMap::new(),
+            request: json!({
+                "url": "https://example.com",
+                "method": "GET",
+                "headers": {},
+                "body": null,
+                "queryParams": {},
+                "pathParams": {}
+            }),
+            response: None,
+            environment: HashMap::new(),
+        }));
+        execute_script(script, ctx.clone()).expect("script should execute");
+        let request = ctx.borrow().request.clone();
+        request
+    }
+
+    #[test]
+    fn pre_request_mutations_via_request_global_are_read_back() {
+        let request = run_script(
+            r#"
+            request.headers["Authorization"] = "Bearer test123";
+            request.url = "https://changed.example.com";
+        "#,
+        );
+        assert_eq!(request["headers"]["Authorization"], json!("Bearer test123"));
+        assert_eq!(request["url"], json!("https://changed.example.com"));
+    }
+
+    #[test]
+    fn pre_request_mutations_via_pm_request_are_read_back() {
+        let request = run_script(r#"pm.request.headers["X-Test"] = "1";"#);
+        assert_eq!(request["headers"]["X-Test"], json!("1"));
+    }
+
+    #[test]
+    fn setting_request_to_undefined_does_not_panic_and_keeps_original() {
+        let request = run_script("request = undefined;");
+        assert_eq!(request["url"], json!("https://example.com"));
     }
 }
