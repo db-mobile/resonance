@@ -99,6 +99,17 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.12.4" date="2026-07-04">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Apply pre-request script changes to the request to the outgoing HTTP request</li>
+          <li>Report script errors instead of silently discarding request changes</li>
+          <li>Attach and store cookies for the script-modified URL</li>
+          <li>Keep auth, client certificates, and timeout settings when a pre-request script runs</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.12.3" date="2026-07-01">
       <description>
         <p>Feature stabilization release</p>
