@@ -967,7 +967,7 @@ export async function handleSendRequest() {
         }
 
         if (app.cookieController) {
-            const cookieHeader = await app.cookieController.getCookieHeader(url);
+            const cookieHeader = await app.cookieController.getCookieHeader(requestConfig.url);
             if (cookieHeader) {
                 requestConfig.headers = requestConfig.headers || {};
                 if (!requestConfig.headers['Cookie'] && !requestConfig.headers['cookie']) {
@@ -1010,7 +1010,7 @@ export async function handleSendRequest() {
             });
 
             if (app.cookieController && result.setCookies && result.setCookies.length > 0) {
-                app.cookieController.handleCookiesFromResponse(result.setCookies, url);
+                app.cookieController.handleCookiesFromResponse(result.setCookies, requestConfig.url);
             }
 
             updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
