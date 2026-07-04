@@ -92,7 +92,7 @@ export class ScriptService {
             }
 
             return {
-                modifiedRequest: result.modifiedRequest || requestConfig,
+                modifiedRequest: this._mergeModifiedRequest(requestConfig, result.modifiedRequest),
                 result
             };
 
@@ -173,6 +173,23 @@ export class ScriptService {
                 testResults: []
             };
         }
+    }
+
+    /**
+     * Merge script mutations over the full request config so config-only
+     * fields (auth, client certificates, timeouts, body type, ...) that are
+     * not exposed to scripts survive the pre-request script round-trip.
+     * Non-object shapes are discarded in favor of the original config.
+     * @private
+     * @param {Object} requestConfig - Original request configuration
+     * @param {Object|undefined} modifiedRequest - Request returned by the script runtime
+     * @returns {Object} Request configuration to send
+     */
+    _mergeModifiedRequest(requestConfig, modifiedRequest) {
+        if (!modifiedRequest || typeof modifiedRequest !== 'object' || Array.isArray(modifiedRequest)) {
+            return requestConfig;
+        }
+        return { ...requestConfig, ...modifiedRequest };
     }
 
     /**

@@ -200,8 +200,14 @@ struct ScriptContext {
     environment: HashMap<String, String>,
 }
 
-/// Execute a JavaScript script in a sandboxed environment
-fn execute_script(script: &str, ctx: Rc<RefCell<ScriptContext>>) -> Result<(), String> {
+/// Execute a JavaScript script in a sandboxed environment.
+/// When `capture_request` is set, mutations to the `request` global are read
+/// back into the shared context after the script runs (even if it threw).
+fn execute_script(
+    script: &str,
+    ctx: Rc<RefCell<ScriptContext>>,
+    capture_request: bool,
+) -> Result<(), String> {
     let mut context = Context::default();
 
     // Setup console object
@@ -216,25 +222,103 @@ fn execute_script(script: &str, ctx: Rc<RefCell<ScriptContext>>) -> Result<(), S
     let pm_ctx = ctx.clone();
     setup_pm(&mut context, pm_ctx)?;
 
+    let baseline = if capture_request {
+        stringify_request_global(&mut context).ok().flatten()
+    } else {
+        None
+    };
+
     // Execute the script
     let source = Source::from_bytes(script.as_bytes());
     match context.eval(source) {
         Ok(_) => {
-            // Collect Jest test results
-            let collect_source = Source::from_bytes(b"__collectResults__()");
-            if let Ok(results_val) = context.eval(collect_source) {
-                let results_str = results_val.display().to_string();
-                // Remove surrounding quotes if present
-                let results_str = results_str.trim_matches('"');
-                // Unescape the JSON string
-                let results_str = results_str.replace("\\\"", "\"");
-                if let Ok(results) = serde_json::from_str::<Vec<TestResult>>(&results_str) {
-                    ctx.borrow_mut().test_results.extend(results);
-                }
+            collect_test_results(&mut context, &ctx);
+            if capture_request {
+                capture_request_mutations(&mut context, &ctx, baseline.as_deref())?;
             }
             Ok(())
         }
-        Err(e) => Err(format!("Script error: {}", e)),
+        Err(e) => {
+            if capture_request {
+                let _ = capture_request_mutations(&mut context, &ctx, baseline.as_deref());
+            }
+            Err(format!("Script error: {}", e))
+        }
+    }
+}
+
+/// Collect Jest test results accumulated by the in-context test framework.
+fn collect_test_results(context: &mut Context, ctx: &Rc<RefCell<ScriptContext>>) {
+    let collect_source = Source::from_bytes(b"__collectResults__()");
+    if let Ok(results_val) = context.eval(collect_source) {
+        if let Some(results_str) = results_val.as_string() {
+            if let Ok(results) =
+                serde_json::from_str::<Vec<TestResult>>(&results_str.to_std_string_escaped())
+            {
+                ctx.borrow_mut().test_results.extend(results);
+            }
+        }
+    }
+}
+
+/// Serialize the `request` global with the spec-compliant `JSON.stringify`:
+/// it omits `undefined`/function-valued properties, throws a catchable
+/// TypeError on cyclic objects and BigInt, and honors `toJSON`. Returns
+/// `Ok(None)` when `request` itself is not stringifiable (e.g. `undefined`).
+fn stringify_request_global(context: &mut Context) -> Result<Option<String>, String> {
+    let source = Source::from_bytes(b"JSON.stringify(request)");
+    match context.eval(source) {
+        Ok(val) => Ok(val.as_string().map(|s| s.to_std_string_escaped())),
+        Err(e) => Err(format!("{}", e)),
+    }
+}
+
+fn push_warn_log(ctx: &Rc<RefCell<ScriptContext>>, message: String) {
+    ctx.borrow_mut().logs.push(LogEntry {
+        level: "warn".to_string(),
+        message,
+        timestamp: chrono::Utc::now().timestamp_millis(),
+    });
+}
+
+/// Read the (possibly mutated) `request` global back into the shared context.
+/// When the snapshot matches the pre-script baseline the original request is
+/// kept verbatim so untouched requests never round-trip through the JS engine
+/// (which would coerce large integers to f64).
+fn capture_request_mutations(
+    context: &mut Context,
+    ctx: &Rc<RefCell<ScriptContext>>,
+    baseline: Option<&str>,
+) -> Result<(), String> {
+    let snapshot = stringify_request_global(context)
+        .map_err(|e| format!("Failed to serialize the modified request: {}", e))?;
+
+    let Some(snapshot) = snapshot else {
+        push_warn_log(
+            ctx,
+            "request is no longer an object; request changes were ignored".to_string(),
+        );
+        return Ok(());
+    };
+
+    if baseline == Some(snapshot.as_str()) {
+        return Ok(());
+    }
+
+    match serde_json::from_str::<Value>(&snapshot) {
+        Ok(value) if value.is_object() => {
+            ctx.borrow_mut().request = value;
+            Ok(())
+        }
+        Ok(_) => {
+            push_warn_log(
+                ctx,
+                "request was reassigned to a non-object value; request changes were ignored"
+                    .to_string(),
+            );
+            Ok(())
+        }
+        Err(e) => Err(format!("Failed to parse the modified request: {}", e)),
     }
 }
 
@@ -736,12 +820,12 @@ pub async fn script_execute_pre_request(
         logs: Vec::new(),
         test_results: Vec::new(),
         environment_changes: HashMap::new(),
-        request: script_data.request.clone(),
+        request: script_data.request,
         response: script_data.response,
         environment: script_data.environment,
     }));
 
-    let result = execute_script(&script_data.script, ctx.clone());
+    let result = execute_script(&script_data.script, ctx.clone(), true);
     let ctx_ref = ctx.borrow();
 
     match result {
@@ -750,7 +834,7 @@ pub async fn script_execute_pre_request(
             logs: ctx_ref.logs.clone(),
             errors: Vec::new(),
             test_results: ctx_ref.test_results.clone(),
-            modified_request: Some(script_data.request),
+            modified_request: Some(ctx_ref.request.clone()),
             modified_environment: ctx_ref.environment_changes.clone(),
         }),
         Err(e) => Ok(ScriptResult {
@@ -758,7 +842,7 @@ pub async fn script_execute_pre_request(
             logs: ctx_ref.logs.clone(),
             errors: vec![e],
             test_results: ctx_ref.test_results.clone(),
-            modified_request: Some(script_data.request),
+            modified_request: Some(ctx_ref.request.clone()),
             modified_environment: ctx_ref.environment_changes.clone(),
         }),
     }
@@ -786,7 +870,7 @@ pub async fn script_execute_test(script_data: ScriptExecutionData) -> Result<Scr
         environment: script_data.environment,
     }));
 
-    let result = execute_script(&script_data.script, ctx.clone());
+    let result = execute_script(&script_data.script, ctx.clone(), false);
     let ctx_ref = ctx.borrow();
 
     match result {
@@ -806,5 +890,143 @@ pub async fn script_execute_test(script_data: ScriptExecutionData) -> Result<Scr
             modified_request: None,
             modified_environment: ctx_ref.environment_changes.clone(),
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn default_request() -> Value {
+        json!({
+            "url": "https://example.com",
+            "method": "GET",
+            "headers": {},
+            "body": null,
+            "queryParams": {},
+            "pathParams": {}
+        })
+    }
+
+    fn run_script_on(script: &str, request: Value) -> (Result<(), String>, Value) {
+        let ctx = Rc::new(RefCell::new(ScriptContext {
+            request,
+            ..Default::default()
+        }));
+        let result = execute_script(script, ctx.clone(), true);
+        let request = ctx.borrow().request.clone();
+        (result, request)
+    }
+
+    fn run_script(script: &str) -> Value {
+        let (result, request) = run_script_on(script, default_request());
+        result.expect("script should execute");
+        request
+    }
+
+    #[test]
+    fn pre_request_mutations_via_request_global_are_read_back() {
+        let request = run_script(
+            r#"
+            request.headers["Authorization"] = "Bearer test123";
+            request.url = "https://changed.example.com";
+        "#,
+        );
+        assert_eq!(request["headers"]["Authorization"], json!("Bearer test123"));
+        assert_eq!(request["url"], json!("https://changed.example.com"));
+    }
+
+    #[test]
+    fn pre_request_mutations_via_pm_request_are_read_back() {
+        let request = run_script(r#"pm.request.headers["X-Test"] = "1";"#);
+        assert_eq!(request["headers"]["X-Test"], json!("1"));
+    }
+
+    #[test]
+    fn setting_request_to_undefined_does_not_panic_and_keeps_original() {
+        let request = run_script("request = undefined;");
+        assert_eq!(request["url"], json!("https://example.com"));
+    }
+
+    #[test]
+    fn setting_request_to_non_object_keeps_original() {
+        let request = run_script("request = [1, 2, 3];");
+        assert_eq!(request["url"], json!("https://example.com"));
+    }
+
+    #[test]
+    fn undefined_property_value_does_not_panic_and_other_mutations_apply() {
+        let request = run_script(
+            r#"
+            request.headers["X-Test"] = "1";
+            request.body = undefined;
+        "#,
+        );
+        assert_eq!(request["headers"]["X-Test"], json!("1"));
+        assert!(request.get("body").is_none());
+    }
+
+    #[test]
+    fn cyclic_request_fails_with_error_instead_of_crashing() {
+        let (result, request) = run_script_on("request.self = request;", default_request());
+        assert!(result.is_err());
+        assert_eq!(request["url"], json!("https://example.com"));
+    }
+
+    #[test]
+    fn unserializable_value_fails_with_error_instead_of_silent_discard() {
+        let (result, request) = run_script_on(
+            r#"
+            request.headers["Authorization"] = "Bearer test123";
+            request.retries = 5n;
+        "#,
+            default_request(),
+        );
+        assert!(result.is_err());
+        assert_eq!(request["url"], json!("https://example.com"));
+    }
+
+    #[test]
+    fn mutations_before_a_thrown_error_are_preserved() {
+        let (result, request) = run_script_on(
+            r#"
+            request.headers["Authorization"] = "Bearer test123";
+            throw new Error("boom");
+        "#,
+            default_request(),
+        );
+        assert!(result.is_err());
+        assert_eq!(request["headers"]["Authorization"], json!("Bearer test123"));
+    }
+
+    #[test]
+    fn untouched_request_is_passed_through_verbatim() {
+        let original = json!({
+            "url": "https://example.com",
+            "method": "POST",
+            "headers": {},
+            "body": { "id": 9007199254740993u64 },
+            "queryParams": {},
+            "pathParams": {}
+        });
+        let (result, request) = run_script_on(r#"console.log("hello");"#, original.clone());
+        assert!(result.is_ok());
+        assert_eq!(request, original);
+    }
+
+    #[test]
+    fn request_is_not_captured_for_test_scripts() {
+        let ctx = Rc::new(RefCell::new(ScriptContext {
+            request: default_request(),
+            ..Default::default()
+        }));
+        execute_script(
+            r#"request.url = "https://changed.example.com";"#,
+            ctx.clone(),
+            false,
+        )
+        .expect("script should execute");
+        assert_eq!(ctx.borrow().request["url"], json!("https://example.com"));
     }
 }
