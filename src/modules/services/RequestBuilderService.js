@@ -78,7 +78,9 @@ export class RequestBuilderService {
      * @param {Object}           opts.queryParams - Query parameter key-value pairs (mutated in-place)
      * @param {Object}           opts.variables   - Resolved variable map
      * @param {VariableProcessor} opts.processor  - VariableProcessor instance
-     * @returns {{ url: string, queryString: string }}
+     * @returns {{ url: string, queryString: string, pathParams: Object }} The
+     *          resolved URL, the encoded query string, and the
+     *          variable-resolved path parameter map
      */
     processRequestComponents({ url, pathParams, headers, queryParams, variables, processor }) {
         const processedPathParams = {};
@@ -103,7 +105,78 @@ export class RequestBuilderService {
             ? `${urlWithoutQuery}?${queryString}`
             : urlWithoutQuery;
 
-        return { url: resolvedUrl, queryString };
+        return { url: resolvedUrl, queryString, pathParams: processedPathParams };
+    }
+
+    /**
+     * Applies query/path parameter mutations made by a pre-request script to
+     * the request URL and returns the final URL to send.
+     *
+     * Rules:
+     * - When `queryParams` changed, the query string is rebuilt from the
+     *   mutated map onto the current URL base — an explicit `request.url`
+     *   edit supplies scheme/host/path, the map supplies the query.
+     * - When `pathParams` changed and the script did not edit `request.url`,
+     *   the URL base is re-baked from the raw URL template (or from the
+     *   mock-server rewrite when one is active) using the same processor and
+     *   variables as the original bake, so dynamic variables keep their
+     *   per-request values.
+     * - An explicit `request.url` edit wins over `pathParams` changes.
+     *
+     * Also normalizes `requestConfig.queryParams`/`pathParams` in place to
+     * flat string maps, since scripts may leave arbitrary JSON there.
+     *
+     * @param {Object} opts
+     * @param {Object} opts.requestConfig - Post-script request config (param maps are normalized in place)
+     * @param {Object} opts.snapshot      - Pre-script { url, queryParams, pathParams }
+     * @param {string} opts.rawUrl        - Unresolved URL template (may contain {{vars}} and {params})
+     * @param {Object} opts.variables     - Resolved variable map from the original bake
+     * @param {VariableProcessor} opts.processor - Processor instance from the original bake
+     * @param {{baseUrl: string, pathTemplate: string}|null} opts.mockRewrite - Active mock-server rewrite, if any
+     * @returns {string} The final request URL
+     */
+    applyScriptParamMutations({ requestConfig, snapshot, rawUrl, variables, processor, mockRewrite }) {
+        const queryParams = this._normalizeParamMap(requestConfig.queryParams);
+        const pathParams = this._normalizeParamMap(requestConfig.pathParams);
+        requestConfig.queryParams = queryParams;
+        requestConfig.pathParams = pathParams;
+
+        const urlEdited = requestConfig.url !== snapshot.url;
+        const queryChanged = !this._paramMapsEqual(queryParams, snapshot.queryParams);
+        const pathChanged = !this._paramMapsEqual(pathParams, snapshot.pathParams);
+
+        if (!queryChanged && !pathChanged) {
+            return requestConfig.url;
+        }
+
+        let base;
+        if (pathChanged && !urlEdited) {
+            if (mockRewrite) {
+                let mockPath = mockRewrite.pathTemplate;
+                for (const [key, value] of Object.entries(pathParams)) {
+                    mockPath = mockPath.replace(`{${key}}`, value);
+                }
+                base = `${mockRewrite.baseUrl}${mockPath}`;
+            } else {
+                base = processor.processTemplate(rawUrl, { ...variables, ...pathParams });
+                if (base && !base.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {
+                    base = `https://${base}`;
+                }
+            }
+        } else {
+            base = requestConfig.url;
+        }
+        base = base.split('?')[0];
+
+        let queryString;
+        if (queryChanged) {
+            queryString = this.buildQueryString(queryParams);
+        } else {
+            const queryIndex = requestConfig.url.indexOf('?');
+            queryString = queryIndex >= 0 ? requestConfig.url.slice(queryIndex + 1) : '';
+        }
+
+        return queryString ? `${base}?${queryString}` : base;
     }
 
     /**
@@ -141,11 +214,55 @@ export class RequestBuilderService {
             if (!key) {
                 continue;
             }
+            const stringValue = value === null || value === undefined ? '' : String(value);
             const encodedKey = key.includes('%') ? key : encodeURIComponent(key);
-            const encodedValue = value.includes('%') ? value : encodeURIComponent(value);
+            const encodedValue = stringValue.includes('%') ? stringValue : encodeURIComponent(stringValue);
             queryPairs.push(`${encodedKey}=${encodedValue}`);
         }
         return queryPairs.join('&');
+    }
+
+    /**
+     * Coerces an arbitrary script-supplied parameter map into a flat map of
+     * string keys to string values. Non-object shapes (null, arrays,
+     * primitives) become an empty map; null/undefined entries are dropped
+     * (a script deletes a parameter by setting it to null); object values
+     * are JSON-stringified, all other values stringified.
+     *
+     * @private
+     * @param {*} map - Value a script left in queryParams/pathParams
+     * @returns {Object} Flat string-to-string map
+     */
+    _normalizeParamMap(map) {
+        if (!map || typeof map !== 'object' || Array.isArray(map)) {
+            return {};
+        }
+        const normalized = {};
+        for (const [key, value] of Object.entries(map)) {
+            if (value === null || value === undefined) {
+                continue;
+            }
+            normalized[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        }
+        return normalized;
+    }
+
+    /**
+     * Shallow equality check for two flat string maps.
+     *
+     * @private
+     * @param {Object} a - First map
+     * @param {Object} b - Second map
+     * @returns {boolean} True when both maps hold the same key/value pairs
+     */
+    _paramMapsEqual(a, b) {
+        const aKeys = Object.keys(a);
+        if (aKeys.length !== Object.keys(b).length) {
+            return false;
+        }
+        return aKeys.every(
+            key => Object.prototype.hasOwnProperty.call(b, key) && a[key] === b[key]
+        );
     }
 
     /**

@@ -762,12 +762,13 @@ export async function handleSendRequest() {
     let processor;
     let _resolvedVariables = null;
     let queryString = '';
+    let processedPathParams = {};
     try {
         ({ variables: _resolvedVariables, processor } = await builder.resolveVariables(
             getCurrentEndpoint(), headers
         ));
 
-        ({ url, queryString } = builder.processRequestComponents({
+        ({ url, queryString, pathParams: processedPathParams } = builder.processRequestComponents({
             url, pathParams, headers, queryParams,
             variables: _resolvedVariables,
             processor
@@ -778,6 +779,7 @@ export async function handleSendRequest() {
         return;
     }
 
+    let mockRewrite = null;
     if (getCurrentEndpoint()) {
         try {
             const mockServerService = getMockServerService();
@@ -798,10 +800,11 @@ export async function handleSendRequest() {
                     
                     if (endpoint && endpoint.path) {
                         let mockPath = endpoint.path;
-                        for (const [key, value] of Object.entries(pathParams)) {
+                        for (const [key, value] of Object.entries(processedPathParams)) {
                             mockPath = mockPath.replace(`{${key}}`, value);
                         }
 
+                        mockRewrite = { baseUrl: mockBaseUrl, pathTemplate: endpoint.path };
                         url = queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`;
                     }
                 }
@@ -916,6 +919,8 @@ export async function handleSendRequest() {
         url,
         rawUrl,
         headers,
+        queryParams,
+        pathParams: processedPathParams,
         body,
         bodyType: (bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'text') ? bodyMode : undefined,
         httpVersion,
@@ -944,6 +949,11 @@ export async function handleSendRequest() {
         }
 
         if (getCurrentEndpoint() && app.scriptController) {
+            const preScriptSnapshot = {
+                url: requestConfig.url,
+                queryParams: { ...requestConfig.queryParams },
+                pathParams: { ...requestConfig.pathParams }
+            };
             try {
                 requestConfig = await app.scriptController.executePreRequest(
                     getCurrentEndpoint().collectionId,
@@ -953,6 +963,14 @@ export async function handleSendRequest() {
             } catch (error) {
                 updateStatusDisplay(`Pre-request script error: ${error.message}`, null);
             }
+            requestConfig.url = builder.applyScriptParamMutations({
+                requestConfig,
+                snapshot: preScriptSnapshot,
+                rawUrl,
+                variables: _resolvedVariables,
+                processor,
+                mockRewrite
+            });
         }
 
         if (app.certificateController) {
