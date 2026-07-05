@@ -438,6 +438,19 @@ request.headers["X-Timestamp"] = timestamp.toString();
 request.headers["X-Signature"] = btoa(`${request.method}:${timestamp}`);
 ```
 
+Read and modify query and path parameters:
+
+```javascript
+request.queryParams["token"] = environment.get("API_TOKEN");
+delete request.queryParams["debug"];
+request.pathParams["id"] = "42";
+```
+
+Parameter values are variable-resolved before the script runs. Setting a
+parameter to `null` removes it. If a script sets `request.url` directly, the
+explicit URL wins for scheme/host/path, while a mutated `request.queryParams`
+map always supplies the final query string.
+
 **Test Script Examples**
 
 Validate response and extract data:

@@ -99,6 +99,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.12.5" date="2026-07-05">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Let pre-request scripts read and modify query and path parameters</li>
+          <li>Select the client certificate after pre-request scripts run, so script URL changes get the right certificate</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.12.4" date="2026-07-04">
       <description>
         <p>Feature stabilization release</p>
