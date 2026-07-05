@@ -114,11 +114,12 @@ export class CookieJarService {
             }
         }
 
-        const id = `${domain}|${path}|${name}`;
+        const envId = environmentId || 'default';
+        const id = `${envId}|${domain}|${path}|${name}`;
 
         return {
             id,
-            environmentId: environmentId || 'default',
+            environmentId: envId,
             name,
             value,
             domain,

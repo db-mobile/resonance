@@ -16,10 +16,42 @@ export class CookieRepository {
                 data = [];
                 await this.backendAPI.store.set(this.COOKIE_JAR_KEY, data);
             }
-            return data;
+            return await this._migrateLegacyIds(data);
         } catch (_e) {
             return [];
         }
+    }
+
+    /**
+     * Rewrites cookie ids from the legacy `domain|path|name` format to the
+     * environment-scoped `environmentId|domain|path|name` format, deduplicating
+     * by keeping the most recently updated entry, and persists the result if
+     * anything changed.
+     */
+    async _migrateLegacyIds(cookies) {
+        let changed = false;
+        const byId = new Map();
+        for (const cookie of cookies) {
+            const envId = cookie.environmentId || 'default';
+            const id = `${envId}|${cookie.domain}|${cookie.path}|${cookie.name}`;
+            const migrated = id === cookie.id ? cookie : { ...cookie, id, environmentId: envId };
+            if (migrated !== cookie) {
+                changed = true;
+            }
+            const existing = byId.get(id);
+            if (!existing || (migrated.updatedAt || 0) > (existing.updatedAt || 0)) {
+                byId.set(id, migrated);
+            }
+        }
+        if (byId.size !== cookies.length) {
+            changed = true;
+        }
+        if (!changed) {
+            return cookies;
+        }
+        const result = [...byId.values()];
+        await this._save(result);
+        return result;
     }
 
     async _save(cookies) {
