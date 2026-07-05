@@ -45,26 +45,26 @@
   <icon type="stock">io.github.db_mobile.resonance</icon>
 
   <branding>
-    <color type="primary" scheme_preference="light">#f9f06b</color>
-    <color type="primary" scheme_preference="dark">#473C00</color>
+    <color type="primary" scheme_preference="light">#9fd6d2</color>
+    <color type="primary" scheme_preference="dark">#1f5751</color>
   </branding>
 
   <screenshots>
     <screenshot type="default" xml:lang="en">
       <caption>Main interface showing API request configuration</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.7.5/assets/screenshots/main_window.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.12.6/assets/screenshots/main_window.png</image>
     </screenshot>
     <screenshot xml:lang="en">
       <caption>Environment management</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.7.5/assets/screenshots/environment.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.12.6/assets/screenshots/environment.png</image>
     </screenshot>
     <screenshot xml:lang="en">
       <caption>Mock server</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.7.5/assets/screenshots/mock_server.png</image>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.12.6/assets/screenshots/mock_server.png</image>
     </screenshot>
     <screenshot xml:lang="en">
-      <caption>Settings modal in dark theme</caption>
-      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.7.5/assets/screenshots/settings.png</image>
+      <caption>Settings modal</caption>
+      <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.12.6/assets/screenshots/settings.png</image>
     </screenshot>
   </screenshots>
 
@@ -99,6 +99,14 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.12.6" date="2026-07-05">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Fix cookies from one environment overwriting the same-named cookie in another environment</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.12.5" date="2026-07-05">
       <description>
         <p>Feature stabilization release</p>

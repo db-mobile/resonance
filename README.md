@@ -6,7 +6,7 @@ A local-first, zero-account API client with excellent user experience built with
 ![Tauri](https://img.shields.io/badge/Tauri-v2.0.0-brightgreen.svg)
 ![Rust](https://img.shields.io/badge/Rust-Latest-orange.svg)
 
-![Alt text](/assets/screenshots/main_window.png?raw=true "Main interface showing API request configuration")
+![Main interface showing API request configuration](/assets/screenshots/main_window_hdpi.png?raw=true "Main interface showing API request configuration")
 
 ## Installation
 
