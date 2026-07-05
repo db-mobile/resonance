@@ -50,20 +50,40 @@
   </branding>
 
   <screenshots>
-    <screenshot type="default" xml:lang="en">
+    <screenshot type="default">
       <caption>Main interface showing API request configuration</caption>
+      <caption xml:lang="de">Hauptansicht mit der Konfiguration einer API-Anfrage</caption>
+      <caption xml:lang="es">Interfaz principal mostrando la configuración de una solicitud de API</caption>
+      <caption xml:lang="fr">Interface principale montrant la configuration d'une requête API</caption>
+      <caption xml:lang="it">Interfaccia principale con la configurazione di una richiesta API</caption>
+      <caption xml:lang="pt-BR">Interface principal mostrando a configuração de uma requisição de API</caption>
       <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.12.6/assets/screenshots/main_window.png</image>
     </screenshot>
-    <screenshot xml:lang="en">
+    <screenshot>
       <caption>Environment management</caption>
+      <caption xml:lang="de">Umgebungsverwaltung</caption>
+      <caption xml:lang="es">Gestión de entornos</caption>
+      <caption xml:lang="fr">Gestion des environnements</caption>
+      <caption xml:lang="it">Gestione degli ambienti</caption>
+      <caption xml:lang="pt-BR">Gerenciamento de ambientes</caption>
       <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.12.6/assets/screenshots/environment.png</image>
     </screenshot>
-    <screenshot xml:lang="en">
+    <screenshot>
       <caption>Mock server</caption>
+      <caption xml:lang="de">Mock-Server</caption>
+      <caption xml:lang="es">Servidor simulado</caption>
+      <caption xml:lang="fr">Serveur simulé</caption>
+      <caption xml:lang="it">Server simulato</caption>
+      <caption xml:lang="pt-BR">Servidor mock</caption>
       <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.12.6/assets/screenshots/mock_server.png</image>
     </screenshot>
-    <screenshot xml:lang="en">
+    <screenshot>
       <caption>Settings modal</caption>
+      <caption xml:lang="de">Einstellungsdialog</caption>
+      <caption xml:lang="es">Ventana de configuración</caption>
+      <caption xml:lang="fr">Fenêtre des paramètres</caption>
+      <caption xml:lang="it">Finestra delle impostazioni</caption>
+      <caption xml:lang="pt-BR">Janela de configurações</caption>
       <image>https://raw.githubusercontent.com/db-mobile/resonance/refs/tags/v2.12.6/assets/screenshots/settings.png</image>
     </screenshot>
   </screenshots>
