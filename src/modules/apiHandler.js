@@ -924,17 +924,6 @@ export async function handleSendRequest() {
         followRedirects
     };
 
-    if (app.certificateController) {
-        try {
-            const clientCert = app.certificateController.getForHost(new URL(url).host);
-            if (clientCert) {
-                requestConfig.clientCert = clientCert;
-            }
-        } catch (e) {
-            void e;
-        }
-    }
-
     const requestTabId = app.workspaceTabController
         ? await app.workspaceTabController.service.getActiveTabId()
         : null;
@@ -963,6 +952,17 @@ export async function handleSendRequest() {
                 );
             } catch (error) {
                 updateStatusDisplay(`Pre-request script error: ${error.message}`, null);
+            }
+        }
+
+        if (app.certificateController) {
+            try {
+                const clientCert = app.certificateController.getForHost(new URL(requestConfig.url).host);
+                if (clientCert) {
+                    requestConfig.clientCert = clientCert;
+                }
+            } catch (e) {
+                void e;
             }
         }
 
