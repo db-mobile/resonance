@@ -1,0 +1,39 @@
+<template id="tpl-dynamic-variables-reference">
+    <div class="u-flex u-flex-col u-gap-4 u-overflow-hidden">
+        <div class="dialog-header u-items-center u-justify-between">
+            <h3 class="dialog-title">Dynamic variables</h3>
+        </div>
+
+        <p class="var-reference-intro">
+            Generated at request time — no definition needed. The same variable resolves
+            to the same value everywhere within a single request.
+        </p>
+
+        <div class="var-reference-grid">
+            <span class="var-reference-group">Time &amp; dates</span>
+            <code>{{$timestamp}}</code><span>Unix timestamp, seconds</span>
+            <code>{{$timestampMs}}</code><span>Unix timestamp, milliseconds</span>
+            <code>{{$isoTimestamp}}</code><span>ISO 8601 date and time</span>
+            <code>{{$randomDate:30}}</code><span>Date within ±N days (default 365)</span>
+            <code>{{$randomDatePast:30}}</code><span>Date in the past N days</span>
+            <code>{{$randomDateFuture:30}}</code><span>Date in the next N days</span>
+            <span class="var-reference-group">Numbers &amp; IDs</span>
+            <code>{{$uuid}}</code><span>UUID v4</span>
+            <code>{{$randomInt:1:100}}</code><span>Integer in range (default 0–1000)</span>
+            <code>{{$randomPrice:1:100}}</code><span>Price with 2 decimals (default 1–1000)</span>
+            <code>{{$randomBoolean}}</code><span>true or false</span>
+            <span class="var-reference-group">Sample data</span>
+            <code>{{$randomString:16}}</code><span>Alphanumeric string (default 8 chars)</span>
+            <code>{{$randomLoremWords:5}}</code><span>Lorem ipsum words</span>
+            <code>{{$randomEmail}}</code><span>Email address</span>
+            <code>{{$randomName}}</code><span>Full name</span>
+            <code>{{$randomPhoneNumber}}</code><span>Phone number</span>
+            <code>{{$randomIPv4}}</code><span>IPv4 address</span>
+            <code>{{$randomUrl}}</code><span>https URL</span>
+        </div>
+
+        <div class="dialog-footer">
+            <button id="var-reference-close-btn" class="btn btn-primary">Close</button>
+        </div>
+    </div>
+</template>

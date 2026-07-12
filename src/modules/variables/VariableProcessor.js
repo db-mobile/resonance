@@ -2,8 +2,9 @@ import { DynamicVariableGenerator } from './DynamicVariableGenerator.js';
 
 export class VariableProcessor {
     constructor() {
-        this.VARIABLE_PATTERN = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
+        this.VARIABLE_PATTERN = /\{\{\s*([A-Za-z0-9_][A-Za-z0-9_.-]*)\s*\}\}/g;
         this.DYNAMIC_VARIABLE_PATTERN = /\{\{\s*\$([a-zA-Z_][a-zA-Z0-9_]*)(?::([^}]*))?\s*\}\}/g;
+        this.MAX_RESOLUTION_PASSES = 10;
         this.dynamicGenerator = new DynamicVariableGenerator();
     }
 
@@ -12,7 +13,27 @@ export class VariableProcessor {
             return template;
         }
 
-        let result = template.replace(this.DYNAMIC_VARIABLE_PATTERN, (match, variableName, params) => {
+        let result = template;
+        for (let pass = 0; pass < this.MAX_RESOLUTION_PASSES; pass++) {
+            const next = this._resolvePass(result, variables);
+            if (next === result) {
+                return result;
+            }
+            result = next;
+        }
+
+        return result;
+    }
+
+    /**
+     * Run one substitution pass over the input: dynamic variables first, then static.
+     * Unknown variables are left verbatim so callers can detect and preserve them.
+     * @param {string} input - String to substitute into
+     * @param {Object} variables - Static variable name/value map
+     * @returns {string} Input with one round of substitutions applied
+     */
+    _resolvePass(input, variables) {
+        const withDynamic = input.replace(this.DYNAMIC_VARIABLE_PATTERN, (match, variableName, params) => {
             if (this.dynamicGenerator.isDynamicVariable(variableName)) {
                 const value = this.dynamicGenerator.generate(variableName, params || null);
                 return String(value);
@@ -20,15 +41,13 @@ export class VariableProcessor {
             return match;
         });
 
-        result = result.replace(this.VARIABLE_PATTERN, (match, variableName) => {
+        return withDynamic.replace(this.VARIABLE_PATTERN, (match, variableName) => {
             const value = variables[variableName];
             if (value !== undefined && value !== null) {
                 return String(value);
             }
             return match;
         });
-
-        return result;
     }
 
     processObject(obj, variables = {}) {
@@ -99,7 +118,7 @@ export class VariableProcessor {
             return false;
         }
 
-        return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name);
+        return /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(name);
     }
 
     /**
@@ -135,32 +154,52 @@ export class VariableProcessor {
     }
 
     getPreview(template, variables = {}) {
-        const variableNames = this.extractVariableNames(template);
-        const dynamicVars = this.extractDynamicVariableNames(template);
-        const missingVariables = variableNames.filter(name => !(name in variables));
+        const staticNames = new Set();
+        const dynamicNames = new Set();
 
         let preview = template;
+        for (let pass = 0; pass < this.MAX_RESOLUTION_PASSES; pass++) {
+            this.extractVariableNames(preview).forEach(name => staticNames.add(name));
+            this.extractDynamicVariableNames(preview).forEach(v => dynamicNames.add(v.name));
 
-        preview = preview.replace(this.DYNAMIC_VARIABLE_PATTERN, (match, variableName, params) => {
+            const next = this._previewPass(preview, variables);
+            if (next === preview) {
+                break;
+            }
+            preview = next;
+        }
+
+        const variableNames = Array.from(staticNames);
+
+        return {
+            preview,
+            missingVariables: variableNames.filter(name => !(name in variables)),
+            foundVariables: variableNames.filter(name => name in variables),
+            dynamicVariables: Array.from(dynamicNames)
+        };
+    }
+
+    /**
+     * Run one preview substitution pass: dynamic variables become placeholders,
+     * static variables become their values, unknown variables stay verbatim.
+     * @param {string} input - String to substitute into
+     * @param {Object} variables - Static variable name/value map
+     * @returns {string} Input with one round of preview substitutions applied
+     */
+    _previewPass(input, variables) {
+        const withDynamic = input.replace(this.DYNAMIC_VARIABLE_PATTERN, (match, variableName, params) => {
             if (this.dynamicGenerator.isDynamicVariable(variableName)) {
                 return this.dynamicGenerator.getPlaceholder(variableName, params || null);
             }
             return match;
         });
 
-        preview = preview.replace(this.VARIABLE_PATTERN, (match, variableName) => {
+        return withDynamic.replace(this.VARIABLE_PATTERN, (match, variableName) => {
             const value = variables[variableName];
             if (value !== undefined && value !== null) {
                 return String(value);
             }
             return match;
         });
-
-        return {
-            preview,
-            missingVariables,
-            foundVariables: variableNames.filter(name => name in variables),
-            dynamicVariables: dynamicVars.map(v => v.name)
-        };
     }
 }

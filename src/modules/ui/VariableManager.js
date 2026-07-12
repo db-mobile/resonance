@@ -13,6 +13,7 @@
  */
 import { templateLoader } from '../templateLoader.js';
 import { toast } from './Toast.js';
+import { DynamicVariablesReferenceDialog } from './DynamicVariablesReferenceDialog.js';
 
 export class VariableManager {
     /**
@@ -193,6 +194,7 @@ export class VariableManager {
         const saveBtn = dialogContent.querySelector('#variables-save-btn');
         const importBtn = dialogContent.querySelector('#import-variables-btn');
         const exportBtn = dialogContent.querySelector('#export-variables-btn');
+        const referenceBtn = dialogContent.querySelector('#dynamic-vars-reference-btn');
         const container = dialogContent.querySelector('#variables-container');
 
         addBtn.addEventListener('click', () => {
@@ -204,6 +206,10 @@ export class VariableManager {
 
         importBtn.addEventListener('click', () => this.showImportDialog());
         exportBtn.addEventListener('click', () => this.exportVariables());
+
+        if (referenceBtn) {
+            referenceBtn.addEventListener('click', () => new DynamicVariablesReferenceDialog().show());
+        }
 
         this.dialog.addEventListener('click', (e) => {
             if (e.target === this.dialog) {
@@ -241,8 +247,8 @@ export class VariableManager {
                     return;
                 }
 
-                if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
-                    errors.push(`Row ${index + 1}: Invalid variable name "${name}". Use letters, numbers, and underscores only. Must start with letter or underscore.`);
+                if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(name)) {
+                    errors.push(`Row ${index + 1}: Invalid variable name "${name}". Must start with a letter, digit, or underscore, followed by letters, digits, underscores, hyphens, or dots.`);
                     return;
                 }
 

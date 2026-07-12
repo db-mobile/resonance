@@ -316,6 +316,15 @@ Dynamic variables use the `{{$variableName}}` syntax and generate values automat
 | `{{$randomString:N}}`    | Random N-character string     | `{{$randomString:16}}` → `xK9mPq2RaB3nLp8Y` |
 | `{{$randomEmail}}`       | Random email address          | `abc12345@example.com`                      |
 | `{{$randomName}}`        | Random full name              | `John Smith`                                |
+| `{{$randomBoolean}}`     | Random boolean                | `true`                                      |
+| `{{$randomIPv4}}`        | Random IPv4 address           | `192.83.4.211`                              |
+| `{{$randomDate}}`        | Random date within ±N days (default 365) | `{{$randomDate:30}}` → `2026-07-28`  |
+| `{{$randomDatePast}}`    | Random date 1..N days in the past (default 365) | `2026-03-14`                  |
+| `{{$randomDateFuture}}`  | Random date 1..N days in the future (default 365) | `2026-11-02`                |
+| `{{$randomUrl}}`         | Random https URL              | `https://xk9mpq2r.io/ab3nlp`                |
+| `{{$randomLoremWords:N}}`| N lorem ipsum words (default 5) | `lorem dolor amet sed tempor`             |
+| `{{$randomPrice:min:max}}`| Random price with 2 decimals (default 1:1000) | `{{$randomPrice:10:50}}` → `24.99` |
+| `{{$randomPhoneNumber}}` | Random US-style phone number  | `+1-555-283-4091`                           |
 
 **Per-Request Consistency**: The same dynamic variable used multiple times within a single request will resolve to the same value. For example, using `{{$uuid}}` in both the URL and a header will produce identical UUIDs.
 

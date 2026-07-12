@@ -3,6 +3,7 @@
  * Allows creating, editing, deleting, and duplicating environments
  */
 import { templateLoader } from '../templateLoader.js';
+import { DynamicVariablesReferenceDialog } from './DynamicVariablesReferenceDialog.js';
 
 export class EnvironmentManager {
     constructor(environmentService) {
@@ -224,9 +225,14 @@ export class EnvironmentManager {
         const exportBtn = this.dialog.querySelector('#env-export-btn');
         const deleteBtn = this.dialog.querySelector('#env-delete-btn');
         const addVariableBtn = this.dialog.querySelector('#env-add-variable-btn');
+        const dynamicVarsBtn = this.dialog.querySelector('#env-dynamic-vars-btn');
         const colorInput = this.dialog.querySelector('#env-color-input');
         const colorValue = this.dialog.querySelector('#env-color-value');
         const clearColorBtn = this.dialog.querySelector('#env-color-clear-btn');
+
+        if (dynamicVarsBtn) {
+            dynamicVarsBtn.addEventListener('click', () => new DynamicVariablesReferenceDialog().show());
+        }
 
         if (nameInput) {
             nameInput.addEventListener('blur', async () => {
