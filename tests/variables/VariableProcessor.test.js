@@ -244,6 +244,46 @@ describe('VariableProcessor', () => {
         });
     });
 
+    describe('extractUnresolvedVariableNames', () => {
+        test('should report static names missing from the variables map', () => {
+            const result = processor.extractUnresolvedVariableNames('{{host}}/{{path}}', { host: 'h' });
+            expect(result).toEqual(['path']);
+        });
+
+        test('should report all static names when no variables are given', () => {
+            const result = processor.extractUnresolvedVariableNames('{{api-key}} {{base.url}}');
+            expect(result.sort()).toEqual(['api-key', 'base.url']);
+        });
+
+        test('should report unknown dynamic variables with $ prefix', () => {
+            const result = processor.extractUnresolvedVariableNames('{{$unknownVar}} and {{$uuid}}');
+            expect(result).toEqual(['$unknownVar']);
+        });
+
+        test('should walk objects, arrays, and keys', () => {
+            const config = {
+                url: 'https://{{host}}/api',
+                headers: { 'X-{{headerName}}': 'Bearer {{token}}' },
+                body: { items: ['{{item1}}', { nested: '{{item2}}' }] }
+            };
+            const result = processor.extractUnresolvedVariableNames(config, { token: 't' });
+            expect(result.sort()).toEqual(['headerName', 'host', 'item1', 'item2']);
+        });
+
+        test('should deduplicate repeated names', () => {
+            const result = processor.extractUnresolvedVariableNames('{{a}} {{a}} {{a}}');
+            expect(result).toEqual(['a']);
+        });
+
+        test('should return empty array for fully resolved or non-string input', () => {
+            expect(processor.extractUnresolvedVariableNames('plain text')).toEqual([]);
+            expect(processor.extractUnresolvedVariableNames(null)).toEqual([]);
+            expect(processor.extractUnresolvedVariableNames(undefined)).toEqual([]);
+            expect(processor.extractUnresolvedVariableNames(42)).toEqual([]);
+            expect(processor.extractUnresolvedVariableNames({ a: 1, b: true })).toEqual([]);
+        });
+    });
+
     describe('isValidVariableName', () => {
         test('should validate correct variable names', () => {
             expect(processor.isValidVariableName('name')).toBe(true);

@@ -113,6 +113,45 @@ export class VariableProcessor {
         return Array.from(variableNames);
     }
 
+    /**
+     * Collect variable references that remain unresolved in a value.
+     * Walks strings, arrays, and plain objects (keys and values). Static
+     * references are unresolved when their name is missing from the given
+     * variables map; dynamic references are unresolved when the generator is
+     * unknown, and are reported with a `$` prefix.
+     * @param {*} value - String, array, or object to scan
+     * @param {Object} [variables={}] - Static variable name/value map
+     * @returns {string[]} Unique unresolved variable names
+     */
+    extractUnresolvedVariableNames(value, variables = {}) {
+        const unresolved = new Set();
+
+        const visit = (input) => {
+            if (typeof input === 'string') {
+                this.extractVariableNames(input).forEach(name => {
+                    if (!(name in variables)) {
+                        unresolved.add(name);
+                    }
+                });
+                this.extractDynamicVariableNames(input).forEach(v => {
+                    if (!this.dynamicGenerator.isDynamicVariable(v.name)) {
+                        unresolved.add(`$${v.name}`);
+                    }
+                });
+            } else if (Array.isArray(input)) {
+                input.forEach(visit);
+            } else if (input && typeof input === 'object') {
+                Object.entries(input).forEach(([key, val]) => {
+                    visit(key);
+                    visit(val);
+                });
+            }
+        };
+
+        visit(value);
+        return Array.from(unresolved);
+    }
+
     isValidVariableName(name) {
         if (!name || typeof name !== 'string') {
             return false;
