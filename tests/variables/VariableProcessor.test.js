@@ -47,6 +47,88 @@ describe('VariableProcessor', () => {
             const result = processor.processTemplate(template, variables);
             expect(result).toBe('Alice and Bob');
         });
+
+        test('should resolve names with hyphens, dots, and leading digits', () => {
+            const template = '{{api-key}} {{base.url}} {{2fa_code}}';
+            const variables = { 'api-key': 'k1', 'base.url': 'https://api.test', '2fa_code': '123456' };
+            const result = processor.processTemplate(template, variables);
+            expect(result).toBe('k1 https://api.test 123456');
+        });
+
+        test('should resolve hyphen/dot names with surrounding spaces', () => {
+            const template = '{{ api-key }} and {{  base.url  }}';
+            const variables = { 'api-key': 'k1', 'base.url': 'u1' };
+            const result = processor.processTemplate(template, variables);
+            expect(result).toBe('k1 and u1');
+        });
+
+        test('should leave unresolved hyphen/dot names unchanged', () => {
+            const template = 'x {{api-key}} y {{base.url}} z';
+            const result = processor.processTemplate(template, {});
+            expect(result).toBe('x {{api-key}} y {{base.url}} z');
+        });
+    });
+
+    describe('nested resolution', () => {
+        test('should resolve a variable whose value contains another variable', () => {
+            const template = '{{url}}';
+            const variables = { url: '{{host}}/api', host: 'https://example.com' };
+            const result = processor.processTemplate(template, variables);
+            expect(result).toBe('https://example.com/api');
+        });
+
+        test('should resolve two levels of nesting', () => {
+            const template = '{{a}}';
+            const variables = { a: 'a-{{b}}', b: 'b-{{c}}', c: 'c' };
+            const result = processor.processTemplate(template, variables);
+            expect(result).toBe('a-b-c');
+        });
+
+        test('should resolve a dynamic variable inside a static variable value', () => {
+            const template = '{{token}}';
+            const variables = { token: '{{$uuid}}' };
+            const result = processor.processTemplate(template, variables);
+            expect(result).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+        });
+
+        test('should leave self-referencing variables verbatim', () => {
+            const template = '{{a}}';
+            const variables = { a: '{{a}}' };
+            const result = processor.processTemplate(template, variables);
+            expect(result).toBe('{{a}}');
+        });
+
+        test('should terminate on mutually recursive variables', () => {
+            const template = '{{a}}';
+            const variables = { a: '{{b}}', b: '{{a}}' };
+            const result = processor.processTemplate(template, variables);
+            expect(result).toMatch(/^\{\{[ab]\}\}$/);
+        });
+
+        test('should leave unresolved inner variables verbatim', () => {
+            const template = '{{a}}';
+            const variables = { a: 'x-{{missing}}' };
+            const result = processor.processTemplate(template, variables);
+            expect(result).toBe('x-{{missing}}');
+        });
+
+        test('should stop at the resolution pass cap for deep chains', () => {
+            const variables = { a12: 'end' };
+            for (let i = 1; i < 12; i++) {
+                variables[`a${i}`] = `{{a${i + 1}}}`;
+            }
+            const result = processor.processTemplate('{{a1}}', variables);
+            expect(result).toBe('{{a11}}');
+        });
+
+        test('should use the same cached dynamic value for nested and top-level use', () => {
+            const template = '{{a}} {{$uuid}}';
+            const variables = { a: '{{$uuid}}' };
+            const result = processor.processTemplate(template, variables);
+            const [left, right] = result.split(' ');
+            expect(left).toBe(right);
+            expect(left).toMatch(/^[0-9a-f]{8}-/);
+        });
     });
 
     describe('processObject', () => {
@@ -125,6 +207,18 @@ describe('VariableProcessor', () => {
             const result = processor.extractVariableNames(template);
             expect(result).toEqual(['api_key', 'version_2', '_private']);
         });
+
+        test('should handle variables with hyphens, dots, and leading digits', () => {
+            const template = '{{ api-key }} and {{ base.url }} and {{ 2fa_code }}';
+            const result = processor.extractVariableNames(template);
+            expect(result).toEqual(['api-key', 'base.url', '2fa_code']);
+        });
+
+        test('should not extract dynamic variables as static names', () => {
+            const template = '{{$uuid}} and {{ $unknownVar }}';
+            const result = processor.extractVariableNames(template);
+            expect(result).toEqual([]);
+        });
     });
 
     describe('extractVariableNamesFromObject', () => {
@@ -150,6 +244,46 @@ describe('VariableProcessor', () => {
         });
     });
 
+    describe('extractUnresolvedVariableNames', () => {
+        test('should report static names missing from the variables map', () => {
+            const result = processor.extractUnresolvedVariableNames('{{host}}/{{path}}', { host: 'h' });
+            expect(result).toEqual(['path']);
+        });
+
+        test('should report all static names when no variables are given', () => {
+            const result = processor.extractUnresolvedVariableNames('{{api-key}} {{base.url}}');
+            expect(result.sort()).toEqual(['api-key', 'base.url']);
+        });
+
+        test('should report unknown dynamic variables with $ prefix', () => {
+            const result = processor.extractUnresolvedVariableNames('{{$unknownVar}} and {{$uuid}}');
+            expect(result).toEqual(['$unknownVar']);
+        });
+
+        test('should walk objects, arrays, and keys', () => {
+            const config = {
+                url: 'https://{{host}}/api',
+                headers: { 'X-{{headerName}}': 'Bearer {{token}}' },
+                body: { items: ['{{item1}}', { nested: '{{item2}}' }] }
+            };
+            const result = processor.extractUnresolvedVariableNames(config, { token: 't' });
+            expect(result.sort()).toEqual(['headerName', 'host', 'item1', 'item2']);
+        });
+
+        test('should deduplicate repeated names', () => {
+            const result = processor.extractUnresolvedVariableNames('{{a}} {{a}} {{a}}');
+            expect(result).toEqual(['a']);
+        });
+
+        test('should return empty array for fully resolved or non-string input', () => {
+            expect(processor.extractUnresolvedVariableNames('plain text')).toEqual([]);
+            expect(processor.extractUnresolvedVariableNames(null)).toEqual([]);
+            expect(processor.extractUnresolvedVariableNames(undefined)).toEqual([]);
+            expect(processor.extractUnresolvedVariableNames(42)).toEqual([]);
+            expect(processor.extractUnresolvedVariableNames({ a: 1, b: true })).toEqual([]);
+        });
+    });
+
     describe('isValidVariableName', () => {
         test('should validate correct variable names', () => {
             expect(processor.isValidVariableName('name')).toBe(true);
@@ -157,12 +291,16 @@ describe('VariableProcessor', () => {
             expect(processor.isValidVariableName('_private')).toBe(true);
             expect(processor.isValidVariableName('version2')).toBe(true);
             expect(processor.isValidVariableName('camelCase')).toBe(true);
+            expect(processor.isValidVariableName('2name')).toBe(true);
+            expect(processor.isValidVariableName('api-key')).toBe(true);
+            expect(processor.isValidVariableName('base.url')).toBe(true);
         });
 
         test('should reject invalid variable names', () => {
-            expect(processor.isValidVariableName('2name')).toBe(false);
-            expect(processor.isValidVariableName('api-key')).toBe(false);
             expect(processor.isValidVariableName('api key')).toBe(false);
+            expect(processor.isValidVariableName('$uuid')).toBe(false);
+            expect(processor.isValidVariableName('-leading')).toBe(false);
+            expect(processor.isValidVariableName('.leading')).toBe(false);
             expect(processor.isValidVariableName('')).toBe(false);
             expect(processor.isValidVariableName(null)).toBe(false);
             expect(processor.isValidVariableName(undefined)).toBe(false);
@@ -224,6 +362,32 @@ describe('VariableProcessor', () => {
             expect(result.preview).toBe('User Alice has ID [uuid]');
             expect(result.foundVariables).toEqual(['name']);
             expect(result.dynamicVariables).toEqual(['uuid']);
+        });
+
+        test('should report variables introduced by nested expansion', () => {
+            const template = '{{a}}';
+            const variables = { a: '{{missing}}' };
+            const result = processor.getPreview(template, variables);
+
+            expect(result.preview).toBe('{{missing}}');
+            expect(result.foundVariables).toEqual(['a']);
+            expect(result.missingVariables).toEqual(['missing']);
+        });
+
+        test('should report dynamic variables introduced by nested expansion', () => {
+            const template = '{{token}}';
+            const variables = { token: 'Bearer {{$uuid}}' };
+            const result = processor.getPreview(template, variables);
+
+            expect(result.preview).toBe('Bearer [uuid]');
+            expect(result.dynamicVariables).toEqual(['uuid']);
+        });
+
+        test('should report missing hyphen/dot names', () => {
+            const template = '{{api-key}} {{base.url}}';
+            const result = processor.getPreview(template, {});
+
+            expect(result.missingVariables.sort()).toEqual(['api-key', 'base.url']);
         });
     });
 
@@ -329,6 +493,13 @@ describe('VariableProcessor', () => {
             const result = processor.processTemplate(template, {});
 
             expect(result).toBe('Unknown: {{$unknownVar}}');
+        });
+
+        test('should leave unknown dynamic variables with spaces unchanged', () => {
+            const template = 'Unknown: {{ $unknownVar }}';
+            const result = processor.processTemplate(template, {});
+
+            expect(result).toBe('Unknown: {{ $unknownVar }}');
         });
 
         test('should handle mixed regular and dynamic variables', () => {

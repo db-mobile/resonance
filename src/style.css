@@ -1766,23 +1766,49 @@ code {
   color: var(--text-primary);
 }
 
-.variable-manager-dynamic-details {
-  margin-top: 8px;
+.modal-dialog--var-reference {
+  width: 520px;
+  max-width: 90vw;
 }
 
-.variable-manager-dynamic-summary {
-  cursor: pointer;
+.var-reference-intro {
+  margin: 0;
   font-size: 13px;
   color: var(--text-secondary);
-  user-select: none;
 }
 
-.variable-manager-dynamic-content {
-  margin-top: 8px;
-  font-size: 12px;
-  font-family: var(--font-family-mono);
+.var-reference-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 16px;
+  row-gap: 4px;
+  align-items: baseline;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+  font-size: var(--font-size-xs);
   color: var(--text-secondary);
-  line-height: 1.6;
+  line-height: 1.5;
+}
+
+.var-reference-grid code {
+  font-size: var(--font-size-2xs);
+  white-space: nowrap;
+  justify-self: start;
+}
+
+.var-reference-group {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.var-reference-group:first-child {
+  margin-top: 0;
 }
 
 
