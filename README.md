@@ -439,12 +439,15 @@ request.headers["Authorization"] = `Bearer ${apiKey}`;
 console.log("Added auth header");
 ```
 
-Generate timestamps and signatures:
+Fetch a token from an auth endpoint before the request:
 
 ```javascript
-const timestamp = Date.now();
-request.headers["X-Timestamp"] = timestamp.toString();
-request.headers["X-Signature"] = btoa(`${request.method}:${timestamp}`);
+const res = sendRequest({
+  url: environment.get("authUrl"),
+  method: "POST",
+  body: { clientId: environment.get("clientId") }
+});
+request.headers["Authorization"] = `Bearer ${res.json().access_token}`;
 ```
 
 Read and modify query and path parameters:
@@ -495,6 +498,7 @@ Scripts have access to powerful APIs:
 - `environment` - Get/set/delete environment variables
 - `console` - Log messages (log, info, warn, error)
 - `expect()` - Rich assertion library (toBe, toEqual, toContain, toHaveProperty, toMatch, etc.)
+- `sendRequest(options)` - Make an HTTP request from a script (token fetching, request chaining)
 
 **Common Use Cases**
 

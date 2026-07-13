@@ -1,11 +1,12 @@
 use boa_engine::object::ObjectInitializer;
 use boa_engine::property::Attribute;
-use boa_engine::{js_string, Context, JsValue, NativeFunction, Source};
+use boa_engine::{js_string, Context, JsNativeError, JsResult, JsValue, NativeFunction, Source};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::time::Duration;
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 
@@ -221,6 +222,9 @@ fn execute_script(
     // Setup pm (Postman-like) object for backward compatibility
     let pm_ctx = ctx.clone();
     setup_pm(&mut context, pm_ctx)?;
+
+    // Setup sendRequest (must come after pm so the glue can attach pm.sendRequest)
+    setup_send_request(&mut context)?;
 
     let baseline = if capture_request {
         stringify_request_global(&mut context).ok().flatten()
@@ -801,6 +805,247 @@ fn setup_pm(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<()
     Ok(())
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SendRequestOptions {
+    url: String,
+    #[serde(default)]
+    method: Option<String>,
+    #[serde(default)]
+    headers: Option<HashMap<String, String>>,
+    #[serde(default)]
+    body: Option<String>,
+    #[serde(default)]
+    timeout: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SendRequestResponse {
+    status: u16,
+    status_text: String,
+    headers: HashMap<String, String>,
+    body: String,
+}
+
+/// Perform the HTTP request described by `options`, blocking until complete.
+/// Must run on a thread that may block (spawn_blocking or a plain test
+/// thread): the future is driven with `Handle::block_on`, which panics on
+/// async worker threads. Outside any tokio runtime (unit tests) a one-off
+/// current-thread runtime is created instead.
+fn perform_send_request(options: SendRequestOptions) -> Result<SendRequestResponse, String> {
+    let timeout_ms = options.timeout.unwrap_or(10_000).min(60_000);
+    let method_str = options
+        .method
+        .clone()
+        .unwrap_or_else(|| "GET".to_string())
+        .to_uppercase();
+    let method = reqwest::Method::from_bytes(method_str.as_bytes())
+        .map_err(|_| format!("sendRequest: invalid HTTP method: {}", method_str))?;
+
+    let fut = async move {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_millis(timeout_ms))
+            .build()
+            .map_err(|e| format!("sendRequest: {}", e))?;
+
+        let mut request = client.request(method, &options.url);
+        if let Some(headers) = &options.headers {
+            for (key, value) in headers {
+                request = request.header(key, value);
+            }
+        }
+        if let Some(body) = options.body.clone() {
+            request = request.body(body);
+        }
+
+        let response = request
+            .send()
+            .await
+            .map_err(|e| format!("sendRequest: {}", e))?;
+
+        let status = response.status().as_u16();
+        let status_text = response
+            .status()
+            .canonical_reason()
+            .unwrap_or("")
+            .to_string();
+
+        let mut headers: HashMap<String, String> = HashMap::new();
+        for (name, value) in response.headers() {
+            let value = String::from_utf8_lossy(value.as_bytes()).to_string();
+            if let Some(existing) = headers.get_mut(name.as_str()) {
+                existing.push_str(", ");
+                existing.push_str(&value);
+            } else {
+                headers.insert(name.as_str().to_string(), value);
+            }
+        }
+
+        let body = response
+            .text()
+            .await
+            .map_err(|e| format!("sendRequest: {}", e))?;
+
+        Ok(SendRequestResponse {
+            status,
+            status_text,
+            headers,
+            body,
+        })
+    };
+
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) => handle.block_on(fut),
+        Err(_) => tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| format!("sendRequest: failed to create runtime: {}", e))?
+            .block_on(fut),
+    }
+}
+
+/// Native backend for the JS `sendRequest` global. Takes an options JSON
+/// string and returns a response JSON string; failures become catchable JS
+/// errors so scripts can try/catch them.
+fn send_request_raw_native(
+    _this: &JsValue,
+    args: &[JsValue],
+    _context: &mut Context,
+) -> JsResult<JsValue> {
+    let options_json = args
+        .first()
+        .and_then(|v| v.as_string())
+        .map(|s| s.to_std_string_escaped())
+        .ok_or_else(|| {
+            JsNativeError::typ().with_message("sendRequest: expected an options JSON string")
+        })?;
+
+    let options: SendRequestOptions = serde_json::from_str(&options_json).map_err(|e| {
+        JsNativeError::typ().with_message(format!("sendRequest: invalid options: {}", e))
+    })?;
+
+    let response =
+        perform_send_request(options).map_err(|e| JsNativeError::error().with_message(e))?;
+
+    let json = serde_json::to_string(&response).map_err(|e| {
+        JsNativeError::error()
+            .with_message(format!("sendRequest: failed to serialize response: {}", e))
+    })?;
+
+    Ok(JsValue::from(js_string!(json)))
+}
+
+/// Register the native HTTP bridge plus the `sendRequest` / `pm.sendRequest`
+/// JS wrapper. Accepts a URL string or an options object; a Postman-style
+/// callback is supported and invoked synchronously.
+fn setup_send_request(context: &mut Context) -> Result<(), String> {
+    context
+        .register_global_callable(
+            js_string!("__sendRequestRaw__"),
+            1,
+            NativeFunction::from_fn_ptr(send_request_raw_native),
+        )
+        .map_err(|e| e.to_string())?;
+
+    let glue_code = r#"
+        (function() {
+            function normalizeOptions(urlOrOptions) {
+                var opts = typeof urlOrOptions === 'string' ? { url: urlOrOptions } : urlOrOptions;
+                if (!opts || typeof opts.url !== 'string' || opts.url === '') {
+                    throw new TypeError('sendRequest requires a URL string or an options object with a url property');
+                }
+                var headers = {};
+                var hasContentType = false;
+                if (opts.headers) {
+                    for (var key in opts.headers) {
+                        headers[key] = String(opts.headers[key]);
+                        if (key.toLowerCase() === 'content-type') { hasContentType = true; }
+                    }
+                }
+                var normalized = {
+                    url: opts.url,
+                    method: opts.method ? String(opts.method) : 'GET',
+                    headers: headers
+                };
+                if (opts.body !== undefined && opts.body !== null) {
+                    if (typeof opts.body === 'string') {
+                        normalized.body = opts.body;
+                    } else {
+                        normalized.body = JSON.stringify(opts.body);
+                        if (!hasContentType) { headers['Content-Type'] = 'application/json'; }
+                    }
+                }
+                if (opts.timeout !== undefined) {
+                    var t = Number(opts.timeout);
+                    if (!isFinite(t) || t <= 0) {
+                        throw new TypeError('sendRequest timeout must be a positive number of milliseconds');
+                    }
+                    normalized.timeout = Math.floor(t);
+                }
+                return normalized;
+            }
+            function sendRequest(urlOrOptions, callback) {
+                var hasCallback = typeof callback === 'function';
+                try {
+                    var raw = __sendRequestRaw__(JSON.stringify(normalizeOptions(urlOrOptions)));
+                    var response = JSON.parse(raw);
+                    response.json = function() { return JSON.parse(response.body); };
+                    response.text = function() { return response.body; };
+                    if (hasCallback) { callback(null, response); }
+                    return response;
+                } catch (err) {
+                    if (hasCallback) { callback(err, undefined); return undefined; }
+                    throw err;
+                }
+            }
+            if (typeof pm === 'object' && pm !== null) { pm.sendRequest = sendRequest; }
+            return sendRequest;
+        })()
+    "#;
+
+    let source = Source::from_bytes(glue_code.as_bytes());
+    let send_request_fn = context.eval(source).map_err(|e| e.to_string())?;
+    context
+        .register_global_property(js_string!("sendRequest"), send_request_fn, Attribute::all())
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Build the script context, execute the script, and assemble the result.
+/// Runs synchronously; callers must invoke it from a blocking thread because
+/// `sendRequest` drives its HTTP future with `Handle::block_on`, which panics
+/// on async worker threads.
+fn run_script_sync(script_data: ScriptExecutionData, capture_request: bool) -> ScriptResult {
+    let ctx = Rc::new(RefCell::new(ScriptContext {
+        logs: Vec::new(),
+        test_results: Vec::new(),
+        environment_changes: HashMap::new(),
+        request: script_data.request,
+        response: script_data.response,
+        environment: script_data.environment,
+    }));
+
+    let result = execute_script(&script_data.script, ctx.clone(), capture_request);
+    let ctx_ref = ctx.borrow();
+    let modified_request = capture_request.then(|| ctx_ref.request.clone());
+
+    let (success, errors) = match result {
+        Ok(_) => (true, Vec::new()),
+        Err(e) => (false, vec![e]),
+    };
+
+    ScriptResult {
+        success,
+        logs: ctx_ref.logs.clone(),
+        errors,
+        test_results: ctx_ref.test_results.clone(),
+        modified_request,
+        modified_environment: ctx_ref.environment_changes.clone(),
+    }
+}
+
 #[tauri::command]
 pub async fn script_execute_pre_request(
     script_data: ScriptExecutionData,
@@ -816,36 +1061,9 @@ pub async fn script_execute_pre_request(
         });
     }
 
-    let ctx = Rc::new(RefCell::new(ScriptContext {
-        logs: Vec::new(),
-        test_results: Vec::new(),
-        environment_changes: HashMap::new(),
-        request: script_data.request,
-        response: script_data.response,
-        environment: script_data.environment,
-    }));
-
-    let result = execute_script(&script_data.script, ctx.clone(), true);
-    let ctx_ref = ctx.borrow();
-
-    match result {
-        Ok(_) => Ok(ScriptResult {
-            success: true,
-            logs: ctx_ref.logs.clone(),
-            errors: Vec::new(),
-            test_results: ctx_ref.test_results.clone(),
-            modified_request: Some(ctx_ref.request.clone()),
-            modified_environment: ctx_ref.environment_changes.clone(),
-        }),
-        Err(e) => Ok(ScriptResult {
-            success: false,
-            logs: ctx_ref.logs.clone(),
-            errors: vec![e],
-            test_results: ctx_ref.test_results.clone(),
-            modified_request: Some(ctx_ref.request.clone()),
-            modified_environment: ctx_ref.environment_changes.clone(),
-        }),
-    }
+    tokio::task::spawn_blocking(move || run_script_sync(script_data, true))
+        .await
+        .map_err(|e| format!("Script execution failed: {}", e))
 }
 
 #[tauri::command]
@@ -861,36 +1079,9 @@ pub async fn script_execute_test(script_data: ScriptExecutionData) -> Result<Scr
         });
     }
 
-    let ctx = Rc::new(RefCell::new(ScriptContext {
-        logs: Vec::new(),
-        test_results: Vec::new(),
-        environment_changes: HashMap::new(),
-        request: script_data.request,
-        response: script_data.response,
-        environment: script_data.environment,
-    }));
-
-    let result = execute_script(&script_data.script, ctx.clone(), false);
-    let ctx_ref = ctx.borrow();
-
-    match result {
-        Ok(_) => Ok(ScriptResult {
-            success: true,
-            logs: ctx_ref.logs.clone(),
-            errors: Vec::new(),
-            test_results: ctx_ref.test_results.clone(),
-            modified_request: None,
-            modified_environment: ctx_ref.environment_changes.clone(),
-        }),
-        Err(e) => Ok(ScriptResult {
-            success: false,
-            logs: ctx_ref.logs.clone(),
-            errors: vec![e],
-            test_results: ctx_ref.test_results.clone(),
-            modified_request: None,
-            modified_environment: ctx_ref.environment_changes.clone(),
-        }),
-    }
+    tokio::task::spawn_blocking(move || run_script_sync(script_data, false))
+        .await
+        .map_err(|e| format!("Script execution failed: {}", e))
 }
 
 #[cfg(test)]
@@ -1028,5 +1219,286 @@ mod tests {
         )
         .expect("script should execute");
         assert_eq!(ctx.borrow().request["url"], json!("https://example.com"));
+    }
+
+    /// Run a script and return the result plus the environment changes it made.
+    fn run_script_env(script: &str) -> (Result<(), String>, HashMap<String, Option<String>>) {
+        let ctx = Rc::new(RefCell::new(ScriptContext {
+            request: default_request(),
+            ..Default::default()
+        }));
+        let result = execute_script(script, ctx.clone(), false);
+        let env = ctx.borrow().environment_changes.clone();
+        (result, env)
+    }
+
+    fn env_value(env: &HashMap<String, Option<String>>, key: &str) -> String {
+        env.get(key)
+            .unwrap_or_else(|| panic!("missing env key: {}", key))
+            .clone()
+            .unwrap_or_else(|| panic!("env key {} was unset", key))
+    }
+
+    /// Minimal one-shot HTTP server on loopback. Accepts a single connection,
+    /// reads the full request (headers plus Content-Length body), writes the
+    /// canned response, and returns the captured request bytes on join.
+    fn spawn_test_server(response: &'static [u8]) -> (String, std::thread::JoinHandle<Vec<u8>>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind test server");
+        let addr = listener.local_addr().expect("local addr");
+        let handle = std::thread::spawn(move || {
+            use std::io::{Read, Write};
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut captured = Vec::new();
+            let mut buf = [0u8; 1024];
+            loop {
+                let n = stream.read(&mut buf).expect("read request");
+                if n == 0 {
+                    break;
+                }
+                captured.extend_from_slice(&buf[..n]);
+                if let Some(headers_end) = captured.windows(4).position(|w| w == b"\r\n\r\n") {
+                    let headers = String::from_utf8_lossy(&captured[..headers_end]).to_lowercase();
+                    let content_length = headers
+                        .lines()
+                        .find_map(|l| l.strip_prefix("content-length:"))
+                        .and_then(|v| v.trim().parse::<usize>().ok())
+                        .unwrap_or(0);
+                    if captured.len() >= headers_end + 4 + content_length {
+                        break;
+                    }
+                }
+            }
+            stream.write_all(response).expect("write response");
+            let _ = stream.flush();
+            captured
+        });
+        (format!("http://{}", addr), handle)
+    }
+
+    /// Bind then immediately drop a listener to get a port that refuses connections.
+    fn refused_url() -> String {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().expect("local addr");
+        drop(listener);
+        format!("http://{}", addr)
+    }
+
+    #[test]
+    fn send_request_get_returns_status_status_text_and_body() {
+        let (url, _handle) = spawn_test_server(
+            b"HTTP/1.1 201 Created\r\ncontent-length: 5\r\nconnection: close\r\n\r\nhello",
+        );
+        let script = format!(
+            r#"
+            var res = sendRequest("{url}");
+            environment.set('status', String(res.status));
+            environment.set('statusText', res.statusText);
+            environment.set('body', res.body);
+        "#
+        );
+        let (result, env) = run_script_env(&script);
+        result.expect("script should execute");
+        assert_eq!(env_value(&env, "status"), "201");
+        assert_eq!(env_value(&env, "statusText"), "Created");
+        assert_eq!(env_value(&env, "body"), "hello");
+    }
+
+    #[test]
+    fn send_request_json_helper_parses_body() {
+        let (url, _handle) = spawn_test_server(
+            b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: 15\r\nconnection: close\r\n\r\n{\"token\":\"abc\"}",
+        );
+        let script = format!(
+            r#"
+            var res = sendRequest("{url}");
+            environment.set('token', res.json().token);
+        "#
+        );
+        let (result, env) = run_script_env(&script);
+        result.expect("script should execute");
+        assert_eq!(env_value(&env, "token"), "abc");
+    }
+
+    #[test]
+    fn send_request_post_forwards_method_headers_and_string_body() {
+        let (url, handle) = spawn_test_server(
+            b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok",
+        );
+        let script = format!(
+            r#"
+            sendRequest({{ url: "{url}", method: "post", headers: {{ "X-Custom": "yes" }}, body: "payload" }});
+        "#
+        );
+        let (result, _) = run_script_env(&script);
+        result.expect("script should execute");
+        let captured = String::from_utf8_lossy(&handle.join().expect("server thread")).to_string();
+        assert!(captured.starts_with("POST / HTTP/1.1"), "got: {}", captured);
+        assert!(captured.to_lowercase().contains("x-custom: yes"));
+        assert!(captured.ends_with("payload"));
+    }
+
+    #[test]
+    fn send_request_object_body_is_stringified_with_json_content_type() {
+        let (url, handle) = spawn_test_server(
+            b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok",
+        );
+        let script = format!(
+            r#"
+            sendRequest({{ url: "{url}", method: "POST", body: {{ id: 7 }} }});
+        "#
+        );
+        let (result, _) = run_script_env(&script);
+        result.expect("script should execute");
+        let captured = String::from_utf8_lossy(&handle.join().expect("server thread")).to_string();
+        assert!(captured
+            .to_lowercase()
+            .contains("content-type: application/json"));
+        assert!(captured.contains(r#"{"id":7}"#));
+    }
+
+    #[test]
+    fn send_request_connection_refused_is_catchable() {
+        let url = refused_url();
+        let script = format!(
+            r#"
+            try {{
+                sendRequest("{url}");
+                environment.set('outcome', 'no error');
+            }} catch (e) {{
+                environment.set('outcome', 'caught');
+            }}
+        "#
+        );
+        let (result, env) = run_script_env(&script);
+        result.expect("script should execute despite network error");
+        assert_eq!(env_value(&env, "outcome"), "caught");
+    }
+
+    #[test]
+    fn send_request_callback_style_receives_response_and_error() {
+        let (url, _handle) = spawn_test_server(
+            b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok",
+        );
+        let refused = refused_url();
+        let script = format!(
+            r#"
+            sendRequest("{url}", function(err, res) {{
+                environment.set('ok', err === null ? res.body : 'unexpected error');
+            }});
+            sendRequest("{refused}", function(err, res) {{
+                environment.set('fail', err !== null && res === undefined ? 'error received' : 'unexpected');
+            }});
+            environment.set('afterwards', 'no throw');
+        "#
+        );
+        let (result, env) = run_script_env(&script);
+        result.expect("script should execute");
+        assert_eq!(env_value(&env, "ok"), "ok");
+        assert_eq!(env_value(&env, "fail"), "error received");
+        assert_eq!(env_value(&env, "afterwards"), "no throw");
+    }
+
+    #[test]
+    fn send_request_invalid_options_throw_type_error() {
+        let script = r#"
+            try {
+                sendRequest({});
+            } catch (e) {
+                environment.set('noUrl', e instanceof TypeError ? 'TypeError' : 'other');
+            }
+            try {
+                sendRequest(123);
+            } catch (e) {
+                environment.set('nonString', 'caught');
+            }
+        "#;
+        let (result, env) = run_script_env(script);
+        result.expect("script should execute");
+        assert_eq!(env_value(&env, "noUrl"), "TypeError");
+        assert_eq!(env_value(&env, "nonString"), "caught");
+    }
+
+    #[test]
+    fn send_request_timeout_option_aborts_request() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().expect("local addr");
+        std::thread::spawn(move || {
+            let (stream, _) = listener.accept().expect("accept");
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            drop(stream);
+        });
+        let script = format!(
+            r#"
+            try {{
+                sendRequest({{ url: "http://{addr}", timeout: 250 }});
+                environment.set('outcome', 'no error');
+            }} catch (e) {{
+                environment.set('outcome', 'timed out');
+            }}
+        "#
+        );
+        let start = std::time::Instant::now();
+        let (result, env) = run_script_env(&script);
+        result.expect("script should execute");
+        assert_eq!(env_value(&env, "outcome"), "timed out");
+        assert!(start.elapsed() < std::time::Duration::from_secs(5));
+    }
+
+    #[test]
+    fn send_request_pm_alias_works() {
+        let (url, _handle) = spawn_test_server(
+            b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok",
+        );
+        let script = format!(
+            r#"
+            var res = pm.sendRequest("{url}");
+            environment.set('body', res.body);
+        "#
+        );
+        let (result, env) = run_script_env(&script);
+        result.expect("script should execute");
+        assert_eq!(env_value(&env, "body"), "ok");
+    }
+
+    #[test]
+    fn send_request_multi_value_headers_are_joined() {
+        let (url, _handle) = spawn_test_server(
+            b"HTTP/1.1 200 OK\r\nx-multi: a\r\nx-multi: b\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok",
+        );
+        let script = format!(
+            r#"
+            var res = sendRequest("{url}");
+            environment.set('multi', res.headers['x-multi']);
+        "#
+        );
+        let (result, env) = run_script_env(&script);
+        result.expect("script should execute");
+        assert_eq!(env_value(&env, "multi"), "a, b");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn send_request_works_through_command_path() {
+        let (url, _handle) = spawn_test_server(
+            b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok",
+        );
+        let script = format!(
+            r#"
+            var res = sendRequest("{url}");
+            environment.set('status', String(res.status));
+        "#
+        );
+        let result = script_execute_test(ScriptExecutionData {
+            script,
+            request: default_request(),
+            response: None,
+            environment: HashMap::new(),
+        })
+        .await
+        .expect("command should succeed");
+        assert!(result.success, "errors: {:?}", result.errors);
+        assert_eq!(
+            result.modified_environment.get("status"),
+            Some(&Some("200".to_string()))
+        );
     }
 }

@@ -13,14 +13,14 @@
         <div class="script-tab-content is-active u-flex-1 u-min-h-0 u-overflow-hidden" data-tab="pre-request">
             <textarea id="pre-request-script-editor" class="textarea-base script-editor-textarea"></textarea>
             <div class="script-editor-hint">
-                <strong>Available APIs:</strong> request, environment, console, Date, Math, JSON
+                <strong>Available APIs:</strong> request, environment, console, sendRequest(), Date, Math, JSON
             </div>
         </div>
 
         <div class="script-tab-content u-flex-1 u-min-h-0 u-overflow-hidden" data-tab="test">
             <textarea id="test-script-editor" class="textarea-base script-editor-textarea"></textarea>
             <div class="script-editor-hint">
-                <strong>Available APIs:</strong> request, response, environment, console, expect(), Date, Math, JSON
+                <strong>Available APIs:</strong> request, response, environment, console, expect(), sendRequest(), Date, Math, JSON
             </div>
         </div>
 
@@ -31,6 +31,7 @@
                 <code>request.headers['key'] = 'value';</code><br>
                 <code>environment.set('name', 'value');</code><br>
                 <code>console.log('message');</code><br>
+                <code>const res = sendRequest({ url: '...', method: 'POST', body: { id: 1 } });</code><br>
 
                 <h4 class="script-editor-docs-heading script-editor-docs-heading--spaced">Test Script:</h4>
                 <code>expect(response.status).toBe(200);</code><br>
