@@ -51,12 +51,12 @@ cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings  # Lint Rust
 - **Key crates**:
   - `reqwest` v0.12 — async HTTP client (HTTP/2, SOCKS proxy)
   - `Axum` v0.7 — powers the built-in mock server
-  - `Boa Engine` v0.19 — JS engine for pre-request/test scripts (sandboxed, 10s timeout)
+  - `Boa Engine` v0.19 — JS engine for pre-request/test scripts (sandboxed; no overall script timeout — `sendRequest` calls default to a 10s per-request timeout)
   - `tauri-plugin-store` — persistent config storage
   - `serde_yaml` — OpenAPI YAML parsing
 
 ### Scripts Subsystem
-Pre-request and test scripts execute in Boa with access to: `request` (mutable URL/method/headers/body/params), `response` (test scripts only — status/headers/body/cookies/timings), `environment` (get/set/delete env vars), `console`, and `expect()` assertions. See `SCRIPTS.md` for the full API.
+Pre-request and test scripts execute in Boa with access to: `request` (mutable URL/method/headers/body/params), `response` (test scripts only — status/headers/body/cookies/timings), `environment` (get/set/unset env vars), `console`, `expect()` assertions, and `sendRequest()` for HTTP calls from scripts. See `SCRIPTS.md` for the full API.
 
 ### Module Organization
 ```

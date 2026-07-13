@@ -95,7 +95,7 @@ export class VariableService {
     async setVariable(collectionId, name, value) {
         try {
             if (!this.processor.isValidVariableName(name)) {
-                throw new Error(`Invalid variable name: ${name}. Variable names must start with a letter or underscore, followed by letters, numbers, or underscores.`);
+                throw new Error(`Invalid variable name: ${name}. Variable names must start with a letter, digit, or underscore, followed by letters, digits, underscores, hyphens, or dots.`);
             }
 
             await this.repository.setVariable(collectionId, name, value);

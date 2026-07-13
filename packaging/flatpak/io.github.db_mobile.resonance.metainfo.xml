@@ -119,6 +119,16 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.12.7" date="2026-07-13">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Extend variable templating: nested resolution, relax naming rules, new dynamic variables</li>
+          <li>Warn when a request is sent with unresolved variables</li>
+          <li>Add sendRequest to scripts and document the scripting API</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.12.6" date="2026-07-05">
       <description>
         <p>Feature stabilization release</p>

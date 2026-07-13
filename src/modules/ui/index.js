@@ -10,6 +10,7 @@ export { VariableManager } from './VariableManager.js';
 export { CurlDialog } from './CurlDialog.js';
 export { CodeSnippetDialog } from './CodeSnippetDialog.js';
 export { ConfirmDialog } from './ConfirmDialog.js';
+export { DynamicVariablesReferenceDialog } from './DynamicVariablesReferenceDialog.js';
 export { EnvironmentManager } from './EnvironmentManager.js';
 export { EnvironmentSelector } from './EnvironmentSelector.js';
 export { HistoryRenderer } from './HistoryRenderer.js';

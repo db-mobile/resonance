@@ -120,6 +120,36 @@ function getRequestBuilderService() {
 }
 
 /**
+ * Warns (non-blocking) when the outgoing request still contains unresolved
+ * variable references after variable processing and pre-request scripts.
+ * Scans the final URL, headers, query/path params, and body; never throws.
+ * @param {Object} processor - VariableProcessor used for this request
+ * @param {Object} requestConfig - Fully built request configuration
+ * @returns {void}
+ */
+function warnUnresolvedVariables(processor, requestConfig) {
+    try {
+        const unresolved = processor.extractUnresolvedVariableNames({
+            url: requestConfig.url,
+            headers: requestConfig.headers,
+            queryParams: requestConfig.queryParams,
+            pathParams: requestConfig.pathParams,
+            body: requestConfig.body
+        });
+
+        if (unresolved.length === 0) {
+            return;
+        }
+
+        const shown = unresolved.slice(0, 5).map(name => `{{${name}}}`).join(', ');
+        const more = unresolved.length > 5 ? ` and ${unresolved.length - 5} more` : '';
+        toast.warning(`Request sent with unresolved variables: ${shown}${more}`);
+    } catch (e) {
+        void e;
+    }
+}
+
+/**
  * Fetches the GraphQL schema for the current endpoint by POSTing the standard
  * introspection query. Reuses the same URL/header/auth/variable resolution as the
  * main send path so it honours the user's configured auth, headers and variables.
@@ -993,6 +1023,8 @@ export async function handleSendRequest() {
                 }
             }
         }
+
+        warnUnresolvedVariables(processor, requestConfig);
 
         const result = await window.backendAPI.sendApiRequest(requestConfig);
 

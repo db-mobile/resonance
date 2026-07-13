@@ -180,6 +180,181 @@ describe('DynamicVariableGenerator', () => {
         });
     });
 
+    describe('randomBoolean', () => {
+        test('should generate a boolean', () => {
+            const result = generator.generate('randomBoolean');
+
+            expect(typeof result).toBe('boolean');
+        });
+    });
+
+    describe('randomIPv4', () => {
+        test('should generate a valid IPv4 address', () => {
+            const result = generator.generate('randomIPv4');
+
+            expect(result).toMatch(/^\d{1,3}(\.\d{1,3}){3}$/);
+        });
+
+        test('should keep octets in valid ranges', () => {
+            for (let i = 0; i < 20; i++) {
+                generator.clearCache();
+                const octets = generator.generate('randomIPv4').split('.').map(Number);
+                expect(octets[0]).toBeGreaterThanOrEqual(1);
+                expect(octets[0]).toBeLessThanOrEqual(254);
+                octets.slice(1).forEach(octet => {
+                    expect(octet).toBeGreaterThanOrEqual(0);
+                    expect(octet).toBeLessThanOrEqual(255);
+                });
+            }
+        });
+    });
+
+    describe('randomDate', () => {
+        test('should generate an ISO date string', () => {
+            const result = generator.generate('randomDate');
+
+            expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+            expect(isNaN(new Date(result).getTime())).toBe(false);
+        });
+
+        test('should stay within the given day span', () => {
+            const dayMs = 86400000;
+            for (let i = 0; i < 20; i++) {
+                generator.clearCache();
+                const result = generator.generate('randomDate', '7');
+                const diff = Math.abs(new Date(result).getTime() - Date.now());
+                expect(diff).toBeLessThanOrEqual(8 * dayMs);
+            }
+        });
+
+        test('should fall back to default span for invalid params', () => {
+            const result = generator.generate('randomDate', 'abc');
+
+            expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        });
+    });
+
+    describe('randomDatePast', () => {
+        test('should generate a date strictly in the past', () => {
+            for (let i = 0; i < 20; i++) {
+                generator.clearCache();
+                const result = generator.generate('randomDatePast', '30');
+                expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+                expect(new Date(result).getTime()).toBeLessThan(Date.now());
+            }
+        });
+    });
+
+    describe('randomDateFuture', () => {
+        test('should generate a date strictly in the future', () => {
+            for (let i = 0; i < 20; i++) {
+                generator.clearCache();
+                const result = generator.generate('randomDateFuture', '30');
+                expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+                expect(new Date(result).getTime()).toBeGreaterThan(Date.now());
+            }
+        });
+    });
+
+    describe('randomUrl', () => {
+        test('should generate a valid https URL', () => {
+            const result = generator.generate('randomUrl');
+
+            expect(result).toMatch(/^https:\/\/[a-z0-9]{8}\.(com|org|net|io|dev)\/[a-z0-9]{6}$/);
+        });
+    });
+
+    describe('randomLoremWords', () => {
+        test('should generate 5 words by default', () => {
+            const result = generator.generate('randomLoremWords');
+
+            expect(result.split(' ').length).toBe(5);
+            expect(result).toMatch(/^[a-z]+( [a-z]+)*$/);
+        });
+
+        test('should generate the requested word count', () => {
+            const result = generator.generate('randomLoremWords', '12');
+
+            expect(result.split(' ').length).toBe(12);
+        });
+
+        test('should cap word count at 100', () => {
+            const result = generator.generate('randomLoremWords', '5000');
+
+            expect(result.split(' ').length).toBe(100);
+        });
+
+        test('should fall back to default for invalid params', () => {
+            const result = generator.generate('randomLoremWords', 'abc');
+
+            expect(result.split(' ').length).toBe(5);
+        });
+    });
+
+    describe('randomPrice', () => {
+        test('should generate a price with two decimals in the default range', () => {
+            const result = generator.generate('randomPrice');
+
+            expect(result).toMatch(/^\d+\.\d{2}$/);
+            const price = parseFloat(result);
+            expect(price).toBeGreaterThanOrEqual(1);
+            expect(price).toBeLessThanOrEqual(1000);
+        });
+
+        test('should respect a custom min:max range', () => {
+            for (let i = 0; i < 20; i++) {
+                generator.clearCache();
+                const price = parseFloat(generator.generate('randomPrice', '10:50'));
+                expect(price).toBeGreaterThanOrEqual(10);
+                expect(price).toBeLessThanOrEqual(50);
+            }
+        });
+
+        test('should treat a single param as max', () => {
+            for (let i = 0; i < 20; i++) {
+                generator.clearCache();
+                const price = parseFloat(generator.generate('randomPrice', '5'));
+                expect(price).toBeGreaterThanOrEqual(1);
+                expect(price).toBeLessThanOrEqual(5);
+            }
+        });
+
+        test('should swap reversed min and max', () => {
+            for (let i = 0; i < 20; i++) {
+                generator.clearCache();
+                const price = parseFloat(generator.generate('randomPrice', '100:1'));
+                expect(price).toBeGreaterThanOrEqual(1);
+                expect(price).toBeLessThanOrEqual(100);
+            }
+        });
+
+        test('should fall back to defaults for invalid params', () => {
+            const price = parseFloat(generator.generate('randomPrice', 'xyz'));
+
+            expect(price).toBeGreaterThanOrEqual(1);
+            expect(price).toBeLessThanOrEqual(1000);
+        });
+    });
+
+    describe('randomPhoneNumber', () => {
+        test('should generate a US-style phone number', () => {
+            const result = generator.generate('randomPhoneNumber');
+
+            expect(result).toMatch(/^\+1-\d{3}-\d{3}-\d{4}$/);
+        });
+
+        test('should keep area code and exchange in 200-999', () => {
+            for (let i = 0; i < 20; i++) {
+                generator.clearCache();
+                const parts = generator.generate('randomPhoneNumber').split('-');
+                expect(parseInt(parts[1], 10)).toBeGreaterThanOrEqual(200);
+                expect(parseInt(parts[1], 10)).toBeLessThanOrEqual(999);
+                expect(parseInt(parts[2], 10)).toBeGreaterThanOrEqual(200);
+                expect(parseInt(parts[2], 10)).toBeLessThanOrEqual(999);
+            }
+        });
+    });
+
     describe('caching', () => {
         test('should return same value within request (before cache clear)', () => {
             const uuid1 = generator.generate('uuid');
@@ -253,7 +428,16 @@ describe('DynamicVariableGenerator', () => {
             expect(supported).toContain('randomString');
             expect(supported).toContain('randomEmail');
             expect(supported).toContain('randomName');
-            expect(supported.length).toBe(8);
+            expect(supported).toContain('randomBoolean');
+            expect(supported).toContain('randomIPv4');
+            expect(supported).toContain('randomDate');
+            expect(supported).toContain('randomDatePast');
+            expect(supported).toContain('randomDateFuture');
+            expect(supported).toContain('randomUrl');
+            expect(supported).toContain('randomLoremWords');
+            expect(supported).toContain('randomPrice');
+            expect(supported).toContain('randomPhoneNumber');
+            expect(supported.length).toBe(17);
         });
     });
 

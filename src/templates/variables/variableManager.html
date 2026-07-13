@@ -13,24 +13,9 @@
             <p class="variable-manager-usage-text">
                 <strong>Usage:</strong> Define variables here and use them in your requests with <code>{{ variableName }}</code> syntax.
                 Variables can be used in URLs, headers, query parameters, and request bodies.
+                Values can reference other variables, including dynamic ones like <code>{{$uuid}}</code>.
             </p>
-            <details class="variable-manager-dynamic-details">
-                <summary class="variable-manager-dynamic-summary">
-                    <strong>Dynamic Variables</strong> - Auto-generated values (click to expand)
-                </summary>
-                <div class="variable-manager-dynamic-content">
-                    <code>{{$uuid}}</code> - Random UUID<br>
-                    <code>{{$timestamp}}</code> - Unix timestamp (seconds)<br>
-                    <code>{{$timestampMs}}</code> - Unix timestamp (ms)<br>
-                    <code>{{$isoTimestamp}}</code> - ISO 8601 date<br>
-                    <code>{{$randomInt}}</code> - Random 0-1000<br>
-                    <code>{{$randomInt:1:100}}</code> - Random in range<br>
-                    <code>{{$randomString}}</code> - Random 8-char string<br>
-                    <code>{{$randomString:16}}</code> - Random N-char string<br>
-                    <code>{{$randomEmail}}</code> - Random email<br>
-                    <code>{{$randomName}}</code> - Random name
-                </div>
-            </details>
+            <button type="button" id="dynamic-vars-reference-btn" class="btn btn-xs btn-outline">Dynamic variables…</button>
         </div>
 
         <div id="variables-container" class="manager-content"></div>
