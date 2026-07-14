@@ -34,7 +34,15 @@ pub struct Collection {
     pub endpoints: Vec<Endpoint>,
     #[serde(default)]
     pub folders: Vec<Folder>,
-    pub variables: Option<HashMap<String, String>>,
+    pub variables: Option<Vec<VariableEntry>>,
+}
+
+/// A single collection variable; kept as an ordered list (matching the
+/// `variables.json` array shape) so Postman variable order survives round trips.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VariableEntry {
+    pub key: String,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,9 +65,17 @@ pub struct Endpoint {
     pub parameters: Option<Value>,
     pub request_body: Option<Value>,
     pub responses: Option<HashMap<String, Value>>,
-    /// Authentication configuration: { type: "bearer"|"basic"|"api-key"|"digest", config: {...} }
+    /// Authentication configuration: { type: "bearer"|"basic"|"api-key"|"digest"|"oauth2", config: {...} }
     #[serde(skip_serializing_if = "Option::is_none")]
     pub security: Option<Value>,
+    /// Transient per-request scripts ({ preRequestScript, testScript }); persisted
+    /// to the endpoint's data file, never serialized into collection.json.
+    #[serde(skip_serializing, default)]
+    pub scripts: Option<Value>,
+    /// Transient GraphQL body ({ mode: "graphql", query, variables }); persisted
+    /// to the endpoint's data file, never serialized into collection.json.
+    #[serde(skip_serializing, default)]
+    pub graphql_data: Option<Value>,
 }
 
 #[tauri::command]

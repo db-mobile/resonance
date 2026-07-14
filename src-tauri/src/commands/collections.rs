@@ -280,7 +280,7 @@ fn find_available_dir(parent: &Path, base_name: &str, current_dir: Option<&Path>
     }
 }
 
-fn desired_endpoint_file_name(endpoint_name: &str, endpoint_id: &str) -> String {
+pub(crate) fn desired_endpoint_file_name(endpoint_name: &str, endpoint_id: &str) -> String {
     format!(
         "{}--{}.json",
         slugify(endpoint_name),
@@ -288,7 +288,7 @@ fn desired_endpoint_file_name(endpoint_name: &str, endpoint_id: &str) -> String 
     )
 }
 
-fn find_endpoint_data_file(
+pub(crate) fn find_endpoint_data_file(
     requests_dir: &Path,
     endpoint_id: &str,
 ) -> Result<Option<PathBuf>, String> {
