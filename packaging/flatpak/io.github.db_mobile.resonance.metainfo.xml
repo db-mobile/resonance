@@ -119,6 +119,16 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.0.0" date="2026-07-16">
+      <description>
+        <p>New major release</p>
+        <ul>
+          <li>Full UI rewrite</li>
+          <li>gRPC TLS options: skip-verify, custom CA, mTLS, reflection v1</li>
+          <li>Preserve scripts, variables, and folder structure in Postman import/export</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.12.7" date="2026-07-13">
       <description>
         <p>Feature stabilization release</p>
