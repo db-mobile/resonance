@@ -1,0 +1,106 @@
+/**
+ * Authorization tab fields (rendered from auth/authFields.html by
+ * authManager) including OAuth 2.0 advanced sections.
+ */
+
+.auth-fields-container {
+  gap: var(--space-4);
+  max-width: 560px;
+}
+
+.auth-field-group {
+  gap: var(--space-1);
+}
+
+.auth-field-group > label,
+.auth-field-group .form-label {
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  opacity: var(--dim-opacity);
+}
+
+.oauth2-field-pair {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.oauth2-field-pair > .auth-field-group {
+  flex: 1;
+}
+
+.oauth2-advanced-details {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-medium);
+  padding: var(--space-2) var(--space-3);
+}
+
+.oauth2-advanced-summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--font-size-small);
+}
+
+.oauth2-token-info {
+  padding: var(--space-3);
+  border-radius: var(--radius-medium);
+  background-color: var(--card-bg-color);
+  box-shadow: var(--shadow-card);
+  font-size: var(--font-size-small);
+}
+
+.alert {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-small);
+  font-size: var(--font-size-small);
+}
+
+.alert-error {
+  background-color: color-mix(in srgb, var(--error-color) 12%, transparent);
+  color: var(--error-color);
+}
+
+.badge-info {
+  background-color: color-mix(in srgb, var(--accent-color) 12%, transparent);
+  color: var(--accent-color);
+}
+
+.badge-warning {
+  background-color: color-mix(in srgb, var(--warning-color) 12%, transparent);
+  color: var(--warning-color);
+}
+
+.form-select {
+  appearance: none;
+  min-height: var(--control-height);
+  padding: 0 calc(var(--space-4) + var(--icon-size)) 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-small);
+  background-color: var(--shade-color);
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-bg-color);
+}
+
+.form-hint {
+  font-size: var(--font-size-caption);
+  opacity: var(--dim-opacity);
+}
+
+.select-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.select-wrapper .select-arrow {
+  position: absolute;
+  right: var(--space-2);
+  pointer-events: none;
+  opacity: var(--dim-opacity);
+}

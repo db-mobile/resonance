@@ -1,0 +1,41 @@
+/**
+ * Native selects styled as GtkDropDown.
+ */
+
+select.select,
+select.select-base {
+  appearance: none;
+  min-height: var(--control-height);
+  padding: 0 calc(var(--space-4) + var(--icon-size)) 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-small);
+  background-color: var(--shade-color);
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+select.select:hover,
+select.select-base:hover {
+  background-color: color-mix(in srgb, currentColor 15%, var(--shade-color));
+}
+
+.select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.select-wrap > .select-arrow {
+  position: absolute;
+  right: var(--space-2);
+  pointer-events: none;
+  opacity: var(--dim-opacity);
+}
+
+select.select.compact,
+select.select-base.compact {
+  min-height: var(--control-height-small);
+  font-size: var(--font-size-small);
+}

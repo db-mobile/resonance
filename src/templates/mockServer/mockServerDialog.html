@@ -2,7 +2,7 @@
     <div class="u-flex u-flex-col u-flex-1 u-min-h-0 u-overflow-hidden">
         <div class="dialog-header">
             <h3 class="dialog-title" data-role="title"></h3>
-            <button id="mock-server-close-btn" class="dialog-close-btn" aria-label="Close">&times;</button>
+            <button id="mock-server-close-btn" class="dialog-close-btn" aria-label="Close"><span class="icon icon-16 icon-x"></span></button>
         </div>
 
         <div class="mock-server-status-section">
@@ -33,10 +33,6 @@
                 </div>
                 <div id="mock-server-logs" class="mock-server-logs u-flex-1 u-overflow-y-auto"></div>
             </div>
-        </div>
-
-        <div class="dialog-footer dialog-footer--divided">
-            <button id="mock-server-close-btn-2" class="btn btn-outline" data-role="close"></button>
         </div>
     </div>
 </template>
@@ -79,15 +75,16 @@
 </template>
 
 <template id="tpl-mock-server-response-editor">
-    <div class="u-flex u-flex-col u-flex-1 u-min-h-0 u-overflow-hidden">
+    <div class="mock-server-response-editor u-flex u-flex-col u-flex-1 u-min-h-0 u-overflow-hidden">
         <div class="dialog-header">
             <div>
                 <h3 class="dialog-title" data-role="title"></h3>
                 <p class="dialog-subtitle" data-role="subtitle"></p>
             </div>
-            <button id="response-editor-close" class="dialog-close-btn" aria-label="Close">&times;</button>
+            <button id="response-editor-close" class="dialog-close-btn" aria-label="Close"><span class="icon icon-16 icon-x"></span></button>
         </div>
 
+        <div class="mock-server-response-editor-body">
         <div class="mock-server-notice is-hidden" data-role="custom-notice"></div>
 
         <div class="u-flex u-gap-6">
@@ -123,6 +120,7 @@
                 spellcheck="false"
             ></textarea>
             <div id="response-editor-error" class="field-error"></div>
+        </div>
         </div>
 
         <div class="mock-server-response-editor-footer dialog-footer dialog-footer--divided u-items-center u-justify-between u-gap-2">

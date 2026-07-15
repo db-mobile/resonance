@@ -1,0 +1,52 @@
+/**
+ * Resonance stylesheet entry point.
+ * Ordered imports: tokens → reset → base → typography → icons →
+ * widgets → layout → features. The active theme palette is injected
+ * as a separate link by themeManager (src/themes/{light,dark}.css).
+ */
+
+@import url("tokens.css");
+@import url("reset.css");
+@import url("base.css");
+@import url("typography.css");
+@import url("icons.css");
+
+@import url("widgets/button.css");
+@import url("widgets/entry.css");
+@import url("widgets/checkbox-radio.css");
+@import url("widgets/switch.css");
+@import url("widgets/select.css");
+@import url("widgets/boxed-list.css");
+@import url("widgets/view-switcher.css");
+@import url("widgets/tabbar.css");
+@import url("widgets/toolbar.css");
+@import url("widgets/popover.css");
+@import url("widgets/dialog.css");
+@import url("widgets/toast.css");
+@import url("widgets/badge.css");
+@import url("widgets/spinner.css");
+@import url("widgets/progress.css");
+@import url("widgets/statuspage.css");
+
+@import url("layout/shell.css");
+@import url("layout/sidebar.css");
+@import url("layout/panes.css");
+
+@import url("features/collections.css");
+@import url("features/history.css");
+@import url("features/environments.css");
+@import url("features/workspace-tabs.css");
+@import url("features/request.css");
+@import url("features/response.css");
+@import url("features/url-autocomplete.css");
+@import url("features/keyvalue.css");
+@import url("features/editors.css");
+@import url("features/response-container.css");
+@import url("features/settings.css");
+@import url("features/dialogs.css");
+@import url("features/managers.css");
+@import url("features/auth.css");
+@import url("features/scripts.css");
+@import url("features/preview.css");
+@import url("features/protocols.css");
+@import url("features/runner.css");

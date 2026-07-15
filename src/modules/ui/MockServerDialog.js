@@ -126,7 +126,6 @@ export class MockServerDialog {
         const portInput = this.dialog.querySelector('#mock-server-port-input');
         const clearLogsBtn = this.dialog.querySelector('#mock-server-clear-logs-btn');
         const closeBtn = this.dialog.querySelector('#mock-server-close-btn');
-        const closeBtn2 = this.dialog.querySelector('#mock-server-close-btn-2');
 
         toggleBtn.addEventListener('click', () => this.handleToggleServer());
 
@@ -137,7 +136,6 @@ export class MockServerDialog {
         clearLogsBtn.addEventListener('click', () => this.handleClearLogs());
 
         closeBtn.addEventListener('click', () => this.close());
-        closeBtn2.addEventListener('click', () => this.close());
 
         this.dialog.addEventListener('click', (e) => {
             if (e.target === this.dialog) {

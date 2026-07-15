@@ -1,66 +1,66 @@
 /**
- * Light Theme
+ * Adwaita light palette.
+ * Overrides the named-color defaults from src/styles/tokens.css.
+ * Contract documented in src/themes/README.md.
  */
+
 :root {
-  /* Text Colors */
-  --text-primary: #111827;
-  --text-secondary: #374151;
-  --text-tertiary: #6b7280;
-  --text-disabled: #d4d4d8;
-  --text-inverse: #fafafa;
+  color-scheme: light;
 
-  /* Background Colors - Light */
-  --bg-primary: #f8f9fc;
-  --bg-secondary: #f0f1f5;
-  --bg-tertiary: #e4e6ed;
-  --bg-overlay: rgba(255, 255, 255, 0.95);
-  --bg-glass: rgba(255, 255, 255, 0.8);
-  --bg-glass-strong: rgba(255, 255, 255, 0.9);
+  --window-bg-color: #fafafb;
+  --window-fg-color: rgb(0 0 6 / 80%);
+  --view-bg-color: #ffffff;
+  --view-fg-color: rgb(0 0 6 / 80%);
+  --headerbar-bg-color: #ffffff;
+  --headerbar-fg-color: rgb(0 0 6 / 80%);
+  --headerbar-shade-color: rgb(0 0 6 / 12%);
+  --sidebar-bg-color: #ebebed;
+  --sidebar-fg-color: rgb(0 0 6 / 80%);
+  --sidebar-backdrop-color: #f2f2f4;
+  --sidebar-shade-color: rgb(0 0 6 / 7%);
+  --card-bg-color: #ffffff;
+  --card-fg-color: rgb(0 0 6 / 80%);
+  --card-shade-color: rgb(0 0 6 / 7%);
+  --dialog-bg-color: #fafafb;
+  --dialog-fg-color: rgb(0 0 6 / 80%);
+  --popover-bg-color: #ffffff;
+  --popover-fg-color: rgb(0 0 6 / 80%);
+  --popover-shade-color: rgb(0 0 6 / 7%);
+  --shade-color: rgb(0 0 6 / 7%);
+  --scrim-color: rgb(0 0 6 / 25%);
+  --border-color: rgb(0 0 6 / 15%);
 
-  /* Border Colors - Subtle */
-  --border-light: #d1d5e0;
-  --border-medium: #c4c8d4;
-  --border-strong: #a1a1aa;
-  --border-focus: var(--accent, #10b981);
-  --border-glass: rgba(228, 228, 231, 0.5);
+  --destructive-bg-color: #e01b24;
+  --destructive-fg-color: #ffffff;
+  --destructive-color: #c30000;
+  --success-bg-color: #2ec27e;
+  --success-fg-color: #ffffff;
+  --success-color: #007c3d;
+  --warning-bg-color: #e5a50a;
+  --warning-fg-color: rgb(0 0 6 / 80%);
+  --warning-color: #905400;
+  --error-bg-color: #e01b24;
+  --error-fg-color: #ffffff;
+  --error-color: #c30000;
 
-  /* Shadows - Minimal */
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-  --shadow-base: 0 2px 4px -1px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 8px 16px -4px rgba(0, 0, 0, 0.08);
-  --shadow-xl: 0 16px 32px -8px rgba(0, 0, 0, 0.1);
+  --method-get-color: #15772e;
+  --method-post-color: #0461be;
+  --method-put-color: #b62200;
+  --method-delete-color: #c00023;
+  --method-patch-color: #8939a4;
 
-  /* Status Colors - Light mode variants */
-  --color-success: #047857;
-  --color-success-light: #dcfce7;
-  --color-warning-light: #fef3c7;
-  --color-error-light: #fee2e2;
-  --color-primary-light: #dbeafe;
+  --accent-color: #0461be;
 
-  /* HTTP Method Colors */
-  --method-get-bg: #dcfce7;
-  --method-get-text: #16a34a;
-  --method-post-bg: #dbeafe;
-  --method-post-text: #2563eb;
-  --method-put-bg: #ffedd5;
-  --method-put-text: #ea580c;
-  --method-delete-bg: #fee2e2;
-  --method-delete-text: #dc2626;
-  --method-patch-bg: #f3e8ff;
-  --method-patch-text: #9333ea;
-
-  /* Theme-specific overrides */
-  --input-bg: var(--bg-primary);
-  --content-bg: var(--bg-primary);
-  --sidebar-bg: var(--bg-secondary);
-  --nav-bg: var(--bg-tertiary);
-  --response-bg: var(--bg-secondary);
-  --resizer-bg: var(--bg-secondary);
-  --scrollbar-track-bg: var(--bg-secondary);
-  --focus-shadow-opacity: 0.1;
-  --status-redirect-text: #b45309;
-  --activity-bar-bg: #e8eaf0;
-  --bg-white: #ffffff;
+  --switcher-active-bg: #ffffff;
+  --switcher-active-shadow: 0 1px 2px rgb(0 0 6 / 10%);
 }
+
+:root[data-accent="blue"] { --accent-color: #0461be; }
+:root[data-accent="teal"] { --accent-color: #007184; }
+:root[data-accent="green"] { --accent-color: #15772e; }
+:root[data-accent="yellow"] { --accent-color: #905400; }
+:root[data-accent="orange"] { --accent-color: #b62200; }
+:root[data-accent="red"] { --accent-color: #c00023; }
+:root[data-accent="pink"] { --accent-color: #a2326c; }
+:root[data-accent="purple"] { --accent-color: #8939a4; }
+:root[data-accent="indigo"] { --accent-color: #3a41a8; }

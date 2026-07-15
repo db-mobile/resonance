@@ -1,0 +1,89 @@
+/**
+ * Text entries and text areas, GtkEntry style.
+ */
+
+.entry,
+.input-base,
+input[type="text"].form-input,
+input[type="url"].form-input,
+input[type="number"].form-input,
+input[type="password"].form-input,
+textarea.form-input {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  background-color: var(--view-bg-color);
+  color: var(--view-fg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-small);
+  transition: border-color var(--transition-fast), outline-color var(--transition-fast);
+}
+
+textarea.entry,
+textarea.form-input {
+  min-height: 72px;
+  padding: var(--space-2) var(--space-3);
+  resize: vertical;
+}
+
+.entry:focus,
+.entry:focus-within,
+.input-base:focus,
+.form-input:focus {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: -2px;
+  border-color: transparent;
+}
+
+.entry::placeholder,
+.input-base::placeholder,
+.form-input::placeholder {
+  color: currentColor;
+  opacity: 0.4;
+}
+
+.entry.error {
+  border-color: var(--error-color);
+}
+
+.entry.error:focus {
+  outline-color: color-mix(in srgb, var(--error-color) 50%, transparent);
+}
+
+.entry.warning {
+  border-color: var(--warning-color);
+}
+
+.entry.compact,
+.input-base.compact {
+  min-height: var(--control-height-small);
+  font-size: var(--font-size-small);
+}
+
+.search-entry,
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.search-entry > .icon,
+.search-input-wrap > .icon,
+.search-input-wrap .search-input-icon {
+  position: absolute;
+  left: var(--space-3);
+  opacity: var(--dim-opacity);
+  pointer-events: none;
+}
+
+.search-entry > input,
+.search-input-wrap > input,
+.search-entry > input[type="text"],
+.search-input-wrap > input[type="text"] {
+  width: 100%;
+  padding-left: calc(var(--space-3) + var(--icon-size) + var(--space-2));
+  border-radius: var(--radius-pill);
+}

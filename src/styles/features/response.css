@@ -1,0 +1,82 @@
+/**
+ * Response area: header with status readouts, response tabs, and
+ * the per-workspace-tab response containers.
+ */
+
+.response-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid transparent;
+}
+
+.response-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  flex-shrink: 0;
+}
+
+.status-info-container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
+}
+
+.status-display {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  background-color: var(--shade-color);
+}
+
+.status-display.status-success {
+  background-color: color-mix(in srgb, var(--success-color) 12%, transparent);
+  color: var(--success-color);
+}
+
+.status-display.status-redirect {
+  background-color: color-mix(in srgb, var(--warning-color) 12%, transparent);
+  color: var(--warning-color);
+}
+
+.status-display.status-client-error,
+.status-display.status-server-error {
+  background-color: color-mix(in srgb, var(--error-color) 12%, transparent);
+  color: var(--error-color);
+}
+
+.status-display.status-info {
+  background-color: color-mix(in srgb, var(--accent-color) 12%, transparent);
+  color: var(--accent-color);
+}
+
+.response-content {
+  flex: 1;
+  min-height: 0;
+}
+
+.response-tabs {
+  margin-bottom: var(--space-3);
+  flex-shrink: 0;
+}
+
+.response-display {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-tab-response {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}

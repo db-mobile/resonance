@@ -28,7 +28,8 @@ import { initSseHandler } from './modules/sseHandler.js';
 import { initMqttHandler, handleMqttCancel } from './modules/mqttHandler.js';
 import { initGrpcStreamHandler } from './modules/grpcStreamHandler.js';
 import { loadCollections, importOpenApiFile, importPostmanCollection, importPostmanEnvironment, importCurl, initializeBodyTracking } from './modules/collectionManager.js';
-import { ThemeManager, SettingsModal } from './modules/themeManager.js';
+import { ThemeManager } from './modules/themeManager.js';
+import { SettingsModal } from './modules/ui/SettingsModal.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
 import { TimeoutManager } from './modules/timeoutManager.js';
 import { initResizer } from './modules/resizer.js';
@@ -519,6 +520,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         ]);
     });
+
+    const primaryMenu = document.getElementById('primary-menu');
+    if (primaryMenu) {
+        document.addEventListener('click', (event) => {
+            if (primaryMenu.open && !primaryMenu.contains(event.target)) {
+                primaryMenu.open = false;
+            }
+        });
+        primaryMenu.addEventListener('click', (event) => {
+            if (event.target.closest('.menu-item')) {
+                primaryMenu.open = false;
+            }
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && primaryMenu.open) {
+                primaryMenu.open = false;
+            }
+        });
+    }
 
     const settingsBtn = document.getElementById('settings-btn');
     if (settingsBtn) {

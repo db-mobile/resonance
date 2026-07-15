@@ -1,0 +1,149 @@
+/**
+ * Base document styles: body defaults, focus ring, selection,
+ * scrollbars, and the state/utility classes toggled by JS.
+ */
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: 1.4;
+  color: var(--window-fg-color);
+  background-color: var(--window-bg-color);
+  overflow: hidden;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: -2px;
+  border-radius: var(--radius-small);
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--accent-bg-color) 30%, transparent);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, currentColor 40%, transparent);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+:disabled,
+.disabled {
+  opacity: var(--disabled-opacity);
+  pointer-events: none;
+}
+
+.is-hidden,
+.u-hidden,
+[hidden] {
+  display: none !important;
+}
+
+.u-flex {
+  display: flex;
+}
+
+.u-flex-col {
+  flex-direction: column;
+}
+
+.u-items-center {
+  align-items: center;
+}
+
+.u-justify-center {
+  justify-content: center;
+}
+
+.u-flex-1 {
+  flex: 1;
+}
+
+.u-min-w-0 {
+  min-width: 0;
+}
+
+.u-min-h-0 {
+  min-height: 0;
+}
+
+.u-justify-between {
+  justify-content: space-between;
+}
+
+.u-overflow-y-auto {
+  overflow-y: auto;
+}
+
+.u-overflow-hidden {
+  overflow: hidden;
+}
+
+.u-gap-1 {
+  gap: var(--space-1);
+}
+
+.u-gap-2 {
+  gap: var(--space-2);
+}
+
+.u-gap-3 {
+  gap: var(--space-3);
+}
+
+.u-gap-4 {
+  gap: var(--space-4);
+}
+
+.u-gap-6 {
+  gap: var(--space-6);
+}
+
+.u-gap-8 {
+  gap: var(--space-7);
+}
+
+.u-mb-4 {
+  margin-bottom: var(--space-4);
+}
+
+.u-items-start {
+  align-items: flex-start;
+}
+
+.u-justify-end {
+  justify-content: flex-end;
+}
+
+.u-flex-wrap {
+  flex-wrap: wrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

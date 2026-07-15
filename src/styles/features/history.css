@@ -1,0 +1,104 @@
+/**
+ * History list rows (rendered by HistoryRenderer from templates).
+ */
+
+.history-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.history-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  margin: 1px 0;
+  border-radius: var(--radius-small);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.history-item:hover {
+  background-color: var(--shade-color);
+}
+
+.history-item-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.history-item-method {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--history-method-color, inherit);
+}
+
+.history-item-status {
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  color: var(--history-status-color, var(--success-color));
+}
+
+.history-item-status.history-item-error {
+  color: var(--error-color);
+}
+
+.history-item-time {
+  margin-left: auto;
+  font-size: var(--font-size-caption);
+  opacity: var(--dim-opacity);
+  font-variant-numeric: tabular-nums;
+}
+
+.history-item-url {
+  font-size: var(--font-size-small);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.history-item-env {
+  font-size: var(--font-size-caption);
+  opacity: var(--dim-opacity);
+}
+
+.history-item-env--active {
+  color: var(--accent-color);
+  opacity: 1;
+}
+
+.history-item-delete {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-small);
+  opacity: 0;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast);
+}
+
+.history-item:hover .history-item-delete {
+  opacity: var(--dim-opacity);
+}
+
+.history-item-delete:hover {
+  background-color: color-mix(in srgb, var(--destructive-color) 15%, transparent);
+  color: var(--destructive-color);
+  opacity: 1;
+}

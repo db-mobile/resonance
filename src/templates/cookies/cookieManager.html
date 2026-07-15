@@ -1,17 +1,8 @@
 <template id="tpl-cookie-manager">
     <div class="dialog-header">
         <h2 class="dialog-title">Cookie Jar</h2>
-        <div class="cookie-manager-env-selector environment-selector">
-            <button type="button" class="env-selector-button cookie-manager-env-button" id="cookie-manager-env-btn" aria-label="Select environment" aria-haspopup="true">
-                <span class="env-active-indicator is-hidden" data-role="active-indicator"></span>
-                <span class="env-icon icon icon-16 icon-globe" aria-hidden="true"></span>
-                <span class="env-name" id="cookie-manager-env-name">Environment</span>
-                <span class="env-arrow icon icon-12 icon-chevron-down" aria-hidden="true"></span>
-            </button>
-            <div class="env-dropdown dropdown-panel is-hidden" id="cookie-manager-env-dropdown"></div>
-        </div>
         <button class="dialog-close-btn" id="cookie-manager-close-btn" aria-label="Close Cookie Manager">
-            <span class="icon icon-20 icon-x"></span>
+            <span class="icon icon-16 icon-x"></span>
         </button>
     </div>
 
@@ -21,6 +12,15 @@
             <span class="toggle-track"></span>
             <span>Automatically store and send cookies</span>
         </label>
+        <div class="cookie-manager-env-selector environment-selector">
+            <button type="button" class="env-selector-button cookie-manager-env-button" id="cookie-manager-env-btn" aria-label="Select environment" aria-haspopup="true">
+                <span class="env-active-indicator is-hidden" data-role="active-indicator"></span>
+                <span class="env-icon icon icon-16 icon-globe" aria-hidden="true"></span>
+                <span class="env-name" id="cookie-manager-env-name">Environment</span>
+                <span class="env-arrow icon icon-12 icon-chevron-down" aria-hidden="true"></span>
+            </button>
+            <div class="env-dropdown dropdown-panel is-hidden" id="cookie-manager-env-dropdown"></div>
+        </div>
     </div>
 
     <div class="cookie-manager-search-row">

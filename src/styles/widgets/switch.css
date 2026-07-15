@@ -1,0 +1,85 @@
+/**
+ * GtkSwitch replica on input[type=checkbox].switch.
+ */
+
+input[type="checkbox"].switch {
+  appearance: none;
+  position: relative;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background-color: color-mix(in srgb, currentColor 15%, var(--shade-color));
+  cursor: pointer;
+  transition: background-color var(--transition-base);
+}
+
+input[type="checkbox"].switch::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgb(0 0 6 / 25%);
+  transition: transform var(--transition-base);
+}
+
+input[type="checkbox"].switch:checked {
+  background-color: var(--accent-bg-color);
+}
+
+input[type="checkbox"].switch:checked::before {
+  transform: translateX(18px);
+}
+
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+}
+
+.toggle-switch > input[type="checkbox"]:not(.switch) {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggle-switch .toggle-track {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background-color: color-mix(in srgb, currentColor 15%, var(--shade-color));
+  transition: background-color var(--transition-base);
+}
+
+.toggle-switch .toggle-track::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgb(0 0 6 / 25%);
+  transition: transform var(--transition-base);
+}
+
+.toggle-switch input:checked + .toggle-track {
+  background-color: var(--accent-bg-color);
+}
+
+.toggle-switch input:checked + .toggle-track::before {
+  transform: translateX(18px);
+}
+
+.toggle-switch input:focus-visible + .toggle-track {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
+}

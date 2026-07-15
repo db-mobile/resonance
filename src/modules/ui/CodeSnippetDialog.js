@@ -71,13 +71,11 @@ export class CodeSnippetDialog extends BaseModal {
 
     setupEventListeners(dialog) {
         const closeBtn = dialog.querySelector('#code-snippet-close-btn');
-        const closeBottomBtn = dialog.querySelector('#code-snippet-close-bottom-btn');
         const copyBtn = dialog.querySelector('#code-snippet-copy-btn');
         const languageSelector = dialog.querySelector('#language-selector');
         const commandDisplay = dialog.querySelector('#code-snippet-display');
 
         closeBtn.addEventListener('click', () => this.destroy());
-        closeBottomBtn.addEventListener('click', () => this.destroy());
 
         languageSelector.addEventListener('change', (e) => {
             this.currentLanguage = e.target.value;

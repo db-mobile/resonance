@@ -1,0 +1,539 @@
+/**
+ * Manager dialogs: environment manager, variable manager, cookie
+ * manager, mock server. Shared manager chrome plus per-dialog rows.
+ */
+
+.manager-header-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.manager-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--space-4);
+  overflow: hidden;
+}
+
+.manager-section-title,
+.section-eyebrow {
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: var(--dim-opacity);
+}
+
+.empty-state-base {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  text-align: center;
+  opacity: var(--dim-opacity);
+}
+
+.env-manager-sidebar {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 220px;
+  min-height: 0;
+  border-right: 1px solid var(--border-color);
+  padding-right: var(--space-4);
+}
+
+.env-manager-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.env-manager-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.env-manager-sidebar-footer {
+  display: flex;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--border-color);
+}
+
+.env-manager-sidebar-footer > .btn {
+  flex: 1;
+}
+
+.manager-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.manager-toolbar .manager-header-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.env-manager-active-badge {
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  color: var(--accent-color);
+}
+
+.env-list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-small);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.env-list-item:hover {
+  background-color: var(--shade-color);
+}
+
+.env-list-item.is-selected {
+  background-color: color-mix(in srgb, var(--accent-bg-color) 15%, transparent);
+}
+
+.env-list-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.env-list-item-active-badge {
+  color: var(--accent-color);
+  flex-shrink: 0;
+}
+
+.env-manager-color-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.env-manager-color-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.env-manager-color-input {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-small);
+  background: none;
+  cursor: pointer;
+}
+
+.env-manager-color-value {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  opacity: var(--dim-opacity);
+}
+
+.env-manager-details-actions {
+  gap: var(--space-2);
+}
+
+.env-manager-variables-header {
+  margin-top: var(--space-4);
+}
+
+.env-variable-row,
+.variable-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.env-variable-row input,
+.variable-row input {
+  min-width: 0;
+}
+
+.variable-name,
+.var-name-input {
+  flex: 0 0 34%;
+}
+
+.variable-value,
+.var-value-input {
+  flex: 1;
+}
+
+.var-value-wrap {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+}
+
+.var-value-wrap input {
+  width: 100%;
+}
+
+.var-value-wrap .btn-icon,
+.var-value-wrap .btn {
+  position: absolute;
+  right: var(--space-1);
+}
+
+.btn-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height-small);
+  min-height: var(--control-height-small);
+  flex-shrink: 0;
+  border-radius: var(--radius-small);
+  opacity: var(--dim-opacity);
+  transition: background-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.btn-delete:hover {
+  background-color: color-mix(in srgb, var(--destructive-color) 15%, transparent);
+  color: var(--destructive-color);
+  opacity: 1;
+}
+
+.btn-outline-primary {
+  background-color: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-color) 50%, transparent);
+  color: var(--accent-color);
+}
+
+.btn-outline-primary:hover {
+  background-color: color-mix(in srgb, var(--accent-color) 10%, transparent);
+}
+
+.btn-outline-danger {
+  background-color: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--destructive-color) 50%, transparent);
+  color: var(--destructive-color);
+}
+
+.btn-outline-danger:hover {
+  background-color: color-mix(in srgb, var(--destructive-color) 10%, transparent);
+}
+
+.variable-manager-usage {
+  padding: var(--space-3);
+  border-radius: var(--radius-medium);
+  background-color: var(--card-bg-color);
+  box-shadow: var(--shadow-card);
+}
+
+.variable-manager-usage-text,
+.var-reference-intro {
+  font-size: var(--font-size-small);
+  opacity: 0.8;
+}
+
+.var-reference-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+
+.var-reference-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cookie-manager-search-row,
+.cookie-manager-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cookie-manager-env-selector {
+  flex-shrink: 0;
+}
+
+.cookies-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-small);
+}
+
+.cookies-table th {
+  text-align: left;
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  opacity: var(--dim-opacity);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.cookies-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--card-shade-color);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  white-space: nowrap;
+}
+
+.mock-server-status-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-3) 0 var(--space-4);
+  margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.mock-server-controls {
+  gap: var(--space-3);
+}
+
+.mock-server-port-input {
+  width: 90px;
+}
+
+.mock-server-main {
+  margin-top: var(--space-2);
+}
+
+.mock-server-section-title,
+.mock-server-log-header {
+  margin-bottom: var(--space-3);
+  flex-shrink: 0;
+}
+
+.mock-server-status-indicator {
+  font-size: var(--font-size-small);
+  line-height: 1;
+  opacity: var(--dim-opacity);
+}
+
+.mock-server-status-indicator.is-running {
+  color: var(--success-color);
+  opacity: 1;
+}
+
+.mock-server-status-text {
+  font-weight: 600;
+}
+
+.mock-server-url {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  color: var(--accent-color);
+}
+
+.mock-server-notice,
+.mock-server-alert-message {
+  font-size: var(--font-size-small);
+  color: var(--warning-color);
+}
+
+.dialog-subtitle {
+  font-size: var(--font-size-small);
+  font-family: var(--font-mono);
+  opacity: var(--dim-opacity);
+}
+
+.mock-server-response-editor-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mock-server-response-editor .field-help,
+.mock-server-input-hint {
+  font-size: var(--font-size-caption);
+  opacity: var(--dim-opacity);
+}
+
+.mock-server-response-editor .field-error,
+.field-error {
+  font-size: var(--font-size-caption);
+  color: var(--error-color);
+}
+
+.field-error:empty {
+  display: none;
+}
+
+.mock-server-number-input {
+  width: 100%;
+}
+
+.mock-server-response-editor-textarea {
+  flex: 1;
+  min-height: 200px;
+  width: 100%;
+  padding: var(--space-3);
+  background-color: var(--view-bg-color);
+  color: var(--view-fg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-small);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  line-height: 1.5;
+  resize: none;
+}
+
+.mock-server-response-editor-textarea:focus {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: -2px;
+  border-color: transparent;
+}
+
+.mock-server-logs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-caption);
+}
+
+.mock-server-logs-th {
+  text-align: left;
+  font-weight: 700;
+  opacity: var(--dim-opacity);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.mock-server-logs-th--right {
+  text-align: right;
+}
+
+.mock-server-logs-td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--card-shade-color);
+  font-family: var(--font-mono);
+}
+
+.mock-server-logs-td--muted {
+  opacity: var(--dim-opacity);
+}
+
+.mock-server-logs-td--right {
+  text-align: right;
+}
+
+.mock-server-logs-path {
+  word-break: break-all;
+}
+
+.mock-server-collection {
+  border-radius: var(--radius-medium);
+  background-color: var(--card-bg-color);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.mock-server-collection-header {
+  min-height: 32px;
+}
+
+.mock-server-collection-label {
+  font-weight: 700;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mock-server-endpoints {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-1);
+  padding-left: var(--space-2);
+}
+
+.mock-server-endpoint {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 30px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-small);
+  font-size: var(--font-size-small);
+}
+
+.mock-server-endpoint:hover {
+  background-color: var(--shade-color);
+}
+
+.mock-server-endpoint > .method-pill {
+  min-width: 0;
+  text-align: left;
+}
+
+.mock-server-endpoint-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+.mock-server-edit-response-btn {
+  color: var(--accent-color);
+  font-size: var(--font-size-caption);
+  opacity: 0.75;
+}
+
+.mock-server-endpoint:hover .mock-server-edit-response-btn {
+  opacity: 1;
+}
+
+.mock-server-endpoints-toggle,
+.mock-server-edit-response-btn {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-small);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-caption);
+  opacity: 0.8;
+}
+
+.mock-server-endpoints-toggle:hover,
+.mock-server-edit-response-btn:hover {
+  background-color: var(--shade-color);
+  opacity: 1;
+}
+
+.cookie-name,
+.cookie-value {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+}

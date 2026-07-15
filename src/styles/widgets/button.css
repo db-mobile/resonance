@@ -1,0 +1,164 @@
+/**
+ * GTK-style buttons. Class names follow libadwaita
+ * (.suggested-action, .destructive-action, .flat, .pill, .circular,
+ * .linked); .btn/.btn-primary/.btn-danger/.btn-secondary/.btn-sm are
+ * legacy aliases kept because JS adds them at runtime.
+ */
+
+.button,
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-small);
+  background-color: var(--shade-color);
+  color: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color var(--transition-fast);
+}
+
+.button:hover,
+.btn:hover {
+  background-color: color-mix(in srgb, currentColor 15%, var(--shade-color));
+}
+
+.button:active,
+.btn:active {
+  background-color: color-mix(in srgb, currentColor 25%, var(--shade-color));
+}
+
+.button.suggested-action,
+.btn-primary {
+  background-color: var(--accent-bg-color);
+  color: var(--accent-fg-color);
+}
+
+.button.suggested-action:hover,
+.btn-primary:hover {
+  background-color: color-mix(in srgb, var(--accent-bg-color) 90%, var(--accent-fg-color));
+}
+
+.button.suggested-action:active,
+.btn-primary:active {
+  background-color: color-mix(in srgb, var(--accent-bg-color) 80%, var(--accent-fg-color));
+}
+
+.button.destructive-action,
+.btn-danger {
+  background-color: var(--destructive-bg-color);
+  color: var(--destructive-fg-color);
+}
+
+.button.destructive-action:hover,
+.btn-danger:hover {
+  background-color: color-mix(in srgb, var(--destructive-bg-color) 90%, var(--destructive-fg-color));
+}
+
+.button.destructive-action:active,
+.btn-danger:active {
+  background-color: color-mix(in srgb, var(--destructive-bg-color) 80%, var(--destructive-fg-color));
+}
+
+.btn-secondary {
+  background-color: var(--shade-color);
+}
+
+.button.flat {
+  background-color: transparent;
+}
+
+.button.flat:hover {
+  background-color: var(--shade-color);
+}
+
+.button.flat:active,
+.button.flat.active {
+  background-color: color-mix(in srgb, currentColor 15%, var(--shade-color));
+}
+
+.button.pill,
+.btn-pill {
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-5);
+}
+
+.button.circular {
+  width: var(--control-height);
+  min-width: var(--control-height);
+  padding: 0;
+  border-radius: var(--radius-pill);
+}
+
+.button.circular.small {
+  width: var(--control-height-small);
+  min-width: var(--control-height-small);
+  min-height: var(--control-height-small);
+}
+
+.button.small,
+.btn-sm {
+  min-height: var(--control-height-small);
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-small);
+}
+
+.button.image-button {
+  padding: 0 var(--space-2);
+  min-width: var(--control-height);
+}
+
+.btn-icon,
+.btn-icon-bordered {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height-small);
+  min-height: var(--control-height-small);
+  padding: 0;
+  border-radius: var(--radius-small);
+  background-color: transparent;
+  color: inherit;
+  opacity: var(--dim-opacity);
+  transition: background-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.btn-icon:hover,
+.btn-icon-bordered:hover {
+  background-color: var(--shade-color);
+  opacity: 1;
+}
+
+.btn-xs {
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  font-size: var(--font-size-caption);
+}
+
+.linked {
+  display: inline-flex;
+}
+
+.linked > .button,
+.linked > .btn,
+.linked > input,
+.linked > select {
+  border-radius: 0;
+}
+
+.linked > :first-child {
+  border-top-left-radius: var(--radius-small);
+  border-bottom-left-radius: var(--radius-small);
+}
+
+.linked > :last-child {
+  border-top-right-radius: var(--radius-small);
+  border-bottom-right-radius: var(--radius-small);
+}
+
+.linked > * + * {
+  margin-left: -1px;
+}

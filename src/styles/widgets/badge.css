@@ -1,0 +1,81 @@
+/**
+ * Status pills, HTTP method badges, and count badges.
+ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge.neutral {
+  background-color: var(--shade-color);
+}
+
+.badge.success {
+  background-color: color-mix(in srgb, var(--success-color) 12%, transparent);
+  color: var(--success-color);
+}
+
+.badge.warning {
+  background-color: color-mix(in srgb, var(--warning-color) 12%, transparent);
+  color: var(--warning-color);
+}
+
+.badge.error {
+  background-color: color-mix(in srgb, var(--error-color) 12%, transparent);
+  color: var(--error-color);
+}
+
+.badge.accent {
+  background-color: color-mix(in srgb, var(--accent-color) 12%, transparent);
+  color: var(--accent-color);
+}
+
+.method-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-small);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.method-badge.method-get,
+.method-get {
+  background-color: var(--method-get-bg);
+  color: var(--method-get-color);
+}
+
+.method-badge.method-post,
+.method-post {
+  background-color: var(--method-post-bg);
+  color: var(--method-post-color);
+}
+
+.method-badge.method-put,
+.method-put {
+  background-color: var(--method-put-bg);
+  color: var(--method-put-color);
+}
+
+.method-badge.method-delete,
+.method-delete {
+  background-color: var(--method-delete-bg);
+  color: var(--method-delete-color);
+}
+
+.method-badge.method-patch,
+.method-patch {
+  background-color: var(--method-patch-bg);
+  color: var(--method-patch-color);
+}

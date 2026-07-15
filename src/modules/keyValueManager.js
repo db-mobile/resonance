@@ -28,8 +28,13 @@ export function createKeyValueRow(key = '', value = '') {
     valueInput.value = value;
 
     const removeButton = document.createElement('button');
-    removeButton.classList.add('btn', 'btn-danger', 'btn-xs', 'remove-row-btn');
-    removeButton.textContent = 'Remove';
+    removeButton.classList.add('remove-row-btn');
+    removeButton.setAttribute('aria-label', 'Remove row');
+    removeButton.title = 'Remove row';
+
+    const removeIcon = document.createElement('span');
+    removeIcon.classList.add('icon', 'icon-14', 'icon-x');
+    removeButton.appendChild(removeIcon);
 
     row.appendChild(keyInput);
     row.appendChild(valueInput);

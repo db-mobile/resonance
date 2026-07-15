@@ -1,16 +1,7 @@
 <template id="tpl-environment-manager-dialog-content">
-    <div class="manager-header dialog-header u-items-center u-justify-between">
+    <div class="dialog-header">
         <h3 class="dialog-title">Manage Environments</h3>
-        <div class="manager-header-actions u-flex">
-            <button id="env-import-btn" class="btn btn-xs btn-outline" title="Import Environments">
-                <span class="icon icon-14 icon-import"></span>
-                <span>Import</span>
-            </button>
-            <button id="env-export-all-btn" class="btn btn-xs btn-outline" title="Export All Environments">
-                <span class="icon icon-14 icon-export"></span>
-                <span>Export All</span>
-            </button>
-        </div>
+        <button id="env-close-btn" class="dialog-close-btn" aria-label="Close"><span class="icon icon-16 icon-x"></span></button>
     </div>
 
     <div class="u-flex u-flex-1 u-gap-4 u-overflow-hidden">
@@ -20,6 +11,16 @@
                 <button id="env-create-btn" class="btn btn-sm btn-outline-primary" title="Create New Environment">+</button>
             </div>
             <div id="env-list" class="env-manager-list"></div>
+            <div class="env-manager-sidebar-footer">
+                <button id="env-import-btn" class="btn btn-sm btn-outline" title="Import Environments">
+                    <span class="icon icon-14 icon-import"></span>
+                    <span>Import</span>
+                </button>
+                <button id="env-export-all-btn" class="btn btn-sm btn-outline" title="Export All Environments">
+                    <span class="icon icon-14 icon-export"></span>
+                    <span>Export All</span>
+                </button>
+            </div>
         </div>
 
         <div class="u-flex u-flex-1 u-flex-col u-overflow-hidden">
@@ -31,9 +32,6 @@
         </div>
     </div>
 
-    <div class="dialog-footer dialog-footer--divided">
-        <button id="env-close-btn" class="btn btn-outline">Close</button>
-    </div>
 </template>
 
 <template id="tpl-environment-manager-details">

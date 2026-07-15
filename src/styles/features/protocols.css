@@ -1,0 +1,297 @@
+/**
+ * Protocol panels: gRPC connection cards and selectors, MQTT cards,
+ * GraphQL workbench (query editor, variables drawer, docs rail),
+ * and the shared connection status pill.
+ */
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: var(--dim-opacity);
+}
+
+.status-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background-color: currentColor;
+}
+
+.status-pill:empty {
+  display: none;
+}
+
+.status-pill[data-state="connecting"] {
+  color: var(--warning-color);
+  background-color: color-mix(in srgb, var(--warning-color) 12%, transparent);
+  opacity: 1;
+}
+
+.status-pill[data-state="connecting"]::before {
+  animation: status-pulse 1.2s ease-in-out infinite;
+}
+
+.status-pill[data-state="connected"],
+.status-pill[data-state="loaded"] {
+  color: var(--success-color);
+  background-color: color-mix(in srgb, var(--success-color) 12%, transparent);
+  opacity: 1;
+}
+
+.status-pill[data-state="connected"]::before {
+  animation: status-pulse 1.6s ease-in-out infinite;
+}
+
+.status-pill[data-state="error"] {
+  color: var(--error-color);
+  background-color: color-mix(in srgb, var(--error-color) 12%, transparent);
+  opacity: 1;
+}
+
+.status-pill.is-receiving {
+  animation: status-pill-flash 0.4s ease-out;
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes status-pill-flash {
+  0% {
+    background-color: color-mix(in srgb, var(--accent-bg-color) 35%, transparent);
+  }
+
+  100% {
+    background-color: color-mix(in srgb, var(--success-color) 12%, transparent);
+  }
+}
+
+.grpc-source-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.grpc-source-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+
+.grpc-source-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.grpc-source-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.grpc-source-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.grpc-source-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.grpc-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.grpc-field-input {
+  width: 100%;
+}
+
+.proto-filename {
+  font-family: var(--font-mono);
+}
+
+.proto-filename:empty::before {
+  content: "No file loaded";
+  font-family: var(--font-sans);
+  opacity: var(--dim-opacity);
+}
+
+.grpc-hint {
+  max-width: 60ch;
+}
+
+.grpc-hint code {
+  font-family: var(--font-mono);
+}
+
+.grpc-selectors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 560px;
+}
+
+.grpc-selector-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.grpc-selector-label {
+  flex: 0 0 60px;
+}
+
+.grpc-selector-control {
+  flex: 1;
+}
+
+.grpc-selector-control select {
+  width: 100%;
+}
+
+.grpc-method-kind-badge:empty {
+  display: none;
+}
+
+.mqtt-panel-header {
+  flex-shrink: 0;
+}
+
+.mqtt-cards {
+  gap: var(--space-3);
+}
+
+.mqtt-field-row {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.mqtt-field-row .grpc-field {
+  flex: 1;
+}
+
+.mqtt-field-qos {
+  flex: 0 0 200px;
+}
+
+.graphql-body-container {
+  gap: var(--space-2);
+}
+
+.graphql-toolbar {
+  flex-shrink: 0;
+}
+
+.graphql-workbench-body {
+  flex: 1;
+  min-height: 0;
+  gap: var(--space-3);
+}
+
+.graphql-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.graphql-query-section {
+  flex: 1;
+  min-height: 80px;
+}
+
+.graphql-query-section .editor-shell,
+.graphql-drawer-pane .editor-shell {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.graphql-drawer {
+  flex-shrink: 0;
+}
+
+.graphql-drawer-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 30px;
+}
+
+.graphql-drawer-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-small);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  color: inherit;
+  opacity: var(--dim-opacity);
+}
+
+.graphql-drawer-tab.active {
+  background-color: var(--shade-color);
+  opacity: 1;
+}
+
+.graphql-drawer-chevron {
+  transition: transform var(--transition-fast);
+}
+
+.graphql-drawer.collapsed .graphql-drawer-chevron {
+  transform: rotate(-90deg);
+}
+
+.graphql-drawer-panes {
+  min-height: 100px;
+}
+
+.graphql-drawer.collapsed .graphql-drawer-panes {
+  display: none;
+}
+
+.graphql-drawer-pane {
+  display: none;
+  flex: 1;
+  min-height: 0;
+}
+
+.graphql-drawer-pane.active {
+  display: flex;
+  flex-direction: column;
+}
+
+.graphql-docs-rail {
+  flex: 0 0 280px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-medium);
+  background-color: var(--view-bg-color);
+  font-size: var(--font-size-small);
+}

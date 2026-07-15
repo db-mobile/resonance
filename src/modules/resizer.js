@@ -55,8 +55,10 @@ export class Resizer {
         const requestBuilder = document.querySelector('.request-builder');
         const requestBuilderHeight = requestBuilder ? requestBuilder.offsetHeight : 0;
         const resizerHeight = this.resizerHandle.offsetHeight;
+        const tabBar = document.getElementById('workspace-tab-bar-container');
+        const tabBarHeight = tabBar ? tabBar.offsetHeight : 0;
 
-        const availableHeight = mainContentHeight - requestBuilderHeight - resizerHeight;
+        const availableHeight = mainContentHeight - tabBarHeight - requestBuilderHeight - resizerHeight;
 
         if (availableHeight < this.minHeight * 2) {
             return;
@@ -88,7 +90,9 @@ export class Resizer {
             const requestBuilder = document.querySelector('.request-builder');
             const requestBuilderHeight = requestBuilder ? requestBuilder.offsetHeight : 0;
             const resizerHeight = this.resizerHandle.offsetHeight;
-            const availableHeight = mainContentHeight - requestBuilderHeight - resizerHeight;
+            const tabBar = document.getElementById('workspace-tab-bar-container');
+            const tabBarHeight = tabBar ? tabBar.offsetHeight : 0;
+            const availableHeight = mainContentHeight - tabBarHeight - requestBuilderHeight - resizerHeight;
 
             const totalCurrentHeight = currentRequestHeight + currentResponseHeight;
             const requestProportion = currentRequestHeight / totalCurrentHeight;
@@ -258,102 +262,6 @@ export class HorizontalResizer {
     }
 }
 
-export class HistoryResizer {
-    constructor() {
-        this.isDragging = false;
-        this.startX = 0;
-        this.startSidebarWidth = 0;
-        this.minWidth = 200;
-        this.maxWidth = 600;
-        this._saveTimer = null;
-
-        this.init();
-    }
-
-    init() {
-        this.resizerHandle = document.getElementById('history-resizer-handle');
-        this.sidebar = document.querySelector('.history-sidebar');
-
-        if (!this.resizerHandle || !this.sidebar) {
-            return;
-        }
-
-        this.setupEventListeners();
-        this._restoreWidth();
-    }
-
-    async _restoreWidth() {
-        try {
-            const saved = await window.backendAPI.store.get('historySidebarWidth');
-            if (saved && saved >= this.minWidth && saved <= this.maxWidth) {
-                this.sidebar.style.width = `${saved}px`;
-                this.sidebar.style.flex = `0 0 ${saved}px`;
-            }
-        } catch (error) {
-            void error;
-        }
-    }
-
-    _saveWidth(width) {
-        clearTimeout(this._saveTimer);
-        this._saveTimer = setTimeout(() => {
-            window.backendAPI.store.set('historySidebarWidth', width).catch((error) => void error);
-        }, 300);
-    }
-
-    setupEventListeners() {
-        this.resizerHandle.addEventListener('mousedown', this.startDrag.bind(this));
-        document.addEventListener('mousemove', this.drag.bind(this));
-        document.addEventListener('mouseup', this.endDrag.bind(this));
-
-        this.resizerHandle.addEventListener('selectstart', (e) => e.preventDefault());
-    }
-
-    startDrag(e) {
-        this.isDragging = true;
-        this.startX = e.clientX;
-        this.startSidebarWidth = this.sidebar.offsetWidth;
-
-        this.resizerHandle.classList.add('dragging');
-        document.body.style.userSelect = 'none';
-        document.body.style.cursor = 'col-resize';
-
-        e.preventDefault();
-    }
-
-    drag(e) {
-        if (!this.isDragging) {return;}
-
-        const deltaX = e.clientX - this.startX;
-        const newSidebarWidth = this.startSidebarWidth - deltaX;
-
-        if (newSidebarWidth < this.minWidth || newSidebarWidth > this.maxWidth) {
-            return;
-        }
-
-        this.sidebar.style.width = `${newSidebarWidth}px`;
-        this.sidebar.style.flex = `0 0 ${newSidebarWidth}px`;
-
-        e.preventDefault();
-    }
-
-    endDrag() {
-        if (!this.isDragging) {return;}
-
-        this.isDragging = false;
-        this.resizerHandle.classList.remove('dragging');
-        document.body.style.userSelect = '';
-        document.body.style.cursor = '';
-
-        this._saveWidth(this.sidebar.offsetWidth);
-    }
-
-    reset() {
-        this.sidebar.style.width = '';
-        this.sidebar.style.flex = '';
-    }
-}
-
 /**
  * Resizes the GraphQL Query / Variables split. The query section grows to fill
  * remaining space (flex: 1 1 0); dragging adjusts the variables pane's height.
@@ -429,8 +337,7 @@ export class GraphQLEditorResizer {
 export function initResizer() {
     const verticalResizer = new Resizer();
     const horizontalResizer = new HorizontalResizer();
-    const historyResizer = new HistoryResizer();
     const graphqlEditorResizer = new GraphQLEditorResizer();
     window.__verticalResizer = verticalResizer;
-    return { verticalResizer, horizontalResizer, historyResizer, graphqlEditorResizer };
+    return { verticalResizer, horizontalResizer, graphqlEditorResizer };
 }

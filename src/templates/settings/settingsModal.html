@@ -1,10 +1,10 @@
 <template id="tpl-settings-modal">
     <div class="modal-overlay">
         <div class="modal-dialog modal-dialog--settings u-flex u-flex-col">
-            <div class="settings-header u-flex u-items-center u-justify-between">
+            <div class="dialog-header">
                 <h2 class="dialog-title" data-i18n="settings.title">Settings</h2>
                 <button class="dialog-close-btn" aria-label="Close Settings" data-i18n-aria="settings.close">
-                    <span class="icon icon-20 icon-x"></span>
+                    <span class="icon icon-16 icon-x"></span>
                 </button>
             </div>
 
@@ -14,100 +14,128 @@
 
             <div class="settings-content">
                 <div class="settings-tab-content active" data-tab-content="general">
-                    <div data-role="language-section"></div>
+                    <p class="list-group-title" data-i18n="settings.group_appearance">Appearance</p>
+                    <div class="boxed-list">
+                        <div data-role="language-section"></div>
 
-                    <div class="settings-section">
-                        <h3 data-i18n="settings.theme">Theme</h3>
-                        <div class="theme-select-container">
-                            <select class="select-base theme-select" name="theme">
-                                <option value="light" data-i18n="theme.light">Light</option>
-                                <option value="dark" data-i18n="theme.dark">Dark</option>
-                                <option value="system" data-i18n="theme.system">System</option>
-                                <option value="black" data-i18n="theme.black">Black (OLED)</option>
-                            </select>
-                            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                        <div class="row">
+                            <div class="row-content">
+                                <span class="title" data-i18n="settings.theme">Theme</span>
+                            </div>
+                            <div class="suffix">
+                                <div class="select-wrap theme-select-container">
+                                    <select class="select-base theme-select" name="theme">
+                                        <option value="light" data-i18n="theme.light">Light</option>
+                                        <option value="dark" data-i18n="theme.dark">Dark</option>
+                                        <option value="system" data-i18n="theme.system">System</option>
+                                    </select>
+                                    <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="row-content">
+                                <span class="title" data-i18n="settings.accent_color">Accent Color</span>
+                            </div>
+                            <div class="suffix accent-color-grid" data-role="accent-grid"></div>
                         </div>
                     </div>
 
-                    <div class="settings-section">
-                        <h3 data-i18n="settings.accent_color">Accent Color</h3>
-                        <div class="accent-color-grid" data-role="accent-grid"></div>
-                    </div>
+                    <p class="list-group-title" data-i18n="settings.group_requests">Requests</p>
+                    <div class="boxed-list">
+                        <div class="row">
+                            <div class="row-content">
+                                <span class="title" data-i18n="settings.http_version">HTTP Version</span>
+                            </div>
+                            <div class="suffix">
+                                <div class="select-wrap http-version-select-container">
+                                    <select class="select-base http-version-select" name="httpVersion">
+                                        <option value="auto" data-i18n="http_version.auto">Auto</option>
+                                        <option value="http1" data-i18n="http_version.http1">HTTP/1.x</option>
+                                        <option value="http2" data-i18n="http_version.http2">HTTP/2</option>
+                                    </select>
+                                    <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                                </div>
+                            </div>
+                        </div>
 
-                    <div class="settings-section">
-                        <h3 data-i18n="settings.http_version">HTTP Version</h3>
-                        <div class="http-version-select-container">
-                            <select class="select-base http-version-select" name="httpVersion">
-                                <option value="auto" data-i18n="http_version.auto">Auto</option>
-                                <option value="http1" data-i18n="http_version.http1">HTTP/1.x</option>
-                                <option value="http2" data-i18n="http_version.http2">HTTP/2</option>
-                            </select>
-                            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                        <div class="row">
+                            <div class="row-content">
+                                <span class="title" data-i18n="settings.request_timeout">Request Timeout</span>
+                                <span class="subtitle" data-i18n="settings.timeout_description">Set to 0 for no timeout</span>
+                            </div>
+                            <div class="suffix">
+                                <div class="form-input-container">
+                                    <input type="number" class="entry compact settings-number-input" name="requestTimeout" min="0" step="1000" placeholder="0">
+                                    <span class="form-input-unit">ms</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="row-content">
+                                <span class="title" data-i18n="settings.ssl_verification_label">Verify SSL certificates</span>
+                                <span class="subtitle" data-i18n="settings.ssl_verification_description">Disable for self-signed certificates in development environments.</span>
+                            </div>
+                            <div class="suffix">
+                                <input type="checkbox" class="switch" name="verifySsl" aria-label="Verify SSL certificates">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="row-content">
+                                <span class="title" data-i18n="settings.follow_redirects_label">Follow redirects</span>
+                                <span class="subtitle" data-i18n="settings.follow_redirects_description">Disable to inspect redirect responses without following them.</span>
+                            </div>
+                            <div class="suffix">
+                                <input type="checkbox" class="switch" name="followRedirects" aria-label="Follow redirects">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="row-content">
+                                <span class="title" data-i18n="settings.history_limit">History Limit</span>
+                                <span class="subtitle" data-i18n="settings.history_limit_description">Maximum number of requests stored in history</span>
+                            </div>
+                            <div class="suffix">
+                                <div class="form-input-container">
+                                    <input type="number" class="entry compact settings-number-input" name="historyLimit" min="10" max="10000" step="10" placeholder="100">
+                                    <span class="form-input-unit" data-i18n="settings.history_limit_unit">entries</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    <div class="settings-section">
-                        <h3 data-i18n="settings.request_timeout">Request Timeout</h3>
-                        <div class="form-input-container">
-                            <input type="number" class="input-base form-input" name="requestTimeout" min="0" step="1000" placeholder="0">
-                            <span class="form-input-unit">ms</span>
-                        </div>
-                        <p class="form-input-hint" data-i18n="settings.timeout_description">Set to 0 for no timeout</p>
-                    </div>
-
-                    <div class="settings-section">
-                        <h3 data-i18n="settings.ssl_verification">SSL Verification</h3>
-                        <label class="toggle-switch">
-                            <input type="checkbox" name="verifySsl">
-                            <span class="toggle-track"></span>
-                            <span data-i18n="settings.ssl_verification_label">Verify SSL certificates</span>
-                        </label>
-                        <p class="form-input-hint" data-i18n="settings.ssl_verification_description">Disable for self-signed certificates in development environments.</p>
-                    </div>
-
-                    <div class="settings-section">
-                        <h3 data-i18n="settings.follow_redirects">Follow Redirects</h3>
-                        <label class="toggle-switch">
-                            <input type="checkbox" name="followRedirects">
-                            <span class="toggle-track"></span>
-                            <span data-i18n="settings.follow_redirects_label">Automatically follow HTTP redirects</span>
-                        </label>
-                        <p class="form-input-hint" data-i18n="settings.follow_redirects_description">Disable to inspect redirect responses without following them.</p>
-                    </div>
-
-                    <div class="settings-section">
-                        <h3 data-i18n="settings.history_limit">History Limit</h3>
-                        <div class="form-input-container">
-                            <input type="number" class="input-base form-input" name="historyLimit" min="10" max="10000" step="10" placeholder="100">
-                            <span class="form-input-unit" data-i18n="settings.history_limit_unit">entries</span>
-                        </div>
-                        <p class="form-input-hint" data-i18n="settings.history_limit_description">Maximum number of requests stored in history</p>
-                    </div>
-
                 </div>
 
                 <div class="settings-tab-content" data-tab-content="updates">
-                    <div class="settings-section">
-                        <h3 data-i18n="settings.auto_update">Automatic Updates</h3>
-                        <label class="toggle-switch">
-                            <input type="checkbox" name="checkUpdatesOnLaunch">
-                            <span class="toggle-track"></span>
-                            <span data-i18n="settings.check_updates_on_launch">Check for updates on launch</span>
-                        </label>
-                        <p class="form-input-hint" data-i18n="settings.check_updates_on_launch_description">Automatically check for new versions when the application starts.</p>
-                    </div>
-
-                    <div class="settings-section">
-                        <h3 data-i18n="settings.manual_update">Manual Update</h3>
-                        <div class="settings-update-section">
-                            <button type="button" class="btn btn-secondary btn-sm" id="check-for-updates-btn" data-i18n="settings.check_for_updates">Check for Updates</button>
-                            <span id="update-status" class="update-status"></span>
+                    <div class="boxed-list">
+                        <div class="row">
+                            <div class="row-content">
+                                <span class="title" data-i18n="settings.check_updates_on_launch">Check for updates on launch</span>
+                                <span class="subtitle" data-i18n="settings.check_updates_on_launch_description">Automatically check for new versions when the application starts.</span>
+                            </div>
+                            <div class="suffix">
+                                <input type="checkbox" class="switch" name="checkUpdatesOnLaunch" aria-label="Check for updates on launch">
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="settings-section">
-                        <h3 data-i18n="settings.version_info">Version Information</h3>
-                        <p class="version-info-text"><span data-i18n="settings.current_version">Current version</span>: <span id="settings-current-version"></span></p>
+                        <div class="row">
+                            <div class="row-content">
+                                <span class="title" data-i18n="settings.manual_update">Manual Update</span>
+                                <span id="update-status" class="subtitle update-status"></span>
+                            </div>
+                            <div class="suffix">
+                                <button type="button" class="button" id="check-for-updates-btn" data-i18n="settings.check_for_updates">Check for Updates</button>
+                            </div>
+                        </div>
+
+                        <div class="row property">
+                            <div class="row-content">
+                                <span class="title" data-i18n="settings.version_info">Version</span>
+                                <span class="subtitle" id="settings-current-version"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -203,11 +231,15 @@
 </template>
 
 <template id="tpl-language-section">
-    <div class="settings-section">
-        <h3 data-i18n="settings.language">Language</h3>
-        <div class="language-select-container">
-            <select class="select-base language-select" name="language"></select>
-            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+    <div class="row">
+        <div class="row-content">
+            <span class="title" data-i18n="settings.language">Language</span>
+        </div>
+        <div class="suffix">
+            <div class="select-wrap language-select-container">
+                <select class="select-base language-select" name="language"></select>
+                <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+            </div>
         </div>
     </div>
 </template>
@@ -241,7 +273,7 @@
                     <div class="proxy-field proxy-field-with-arrow">
                         <label data-i18n="settings.proxy_type">Type</label>
                         <div class="select-wrapper">
-                            <select name="proxyType" class="proxy-type-select">
+                            <select name="proxyType" class="select-base proxy-type-select">
                                 <option value="http">HTTP</option>
                                 <option value="https">HTTPS</option>
                                 <option value="socks4">SOCKS4</option>
@@ -255,11 +287,11 @@
                 <div class="proxy-row u-flex">
                     <div class="proxy-field proxy-field-grow">
                         <label data-i18n="settings.proxy_host">Host</label>
-                        <input type="text" name="proxyHost" placeholder="proxy.example.com">
+                        <input type="text" name="proxyHost" class="entry" placeholder="proxy.example.com">
                     </div>
                     <div class="proxy-field proxy-field-port">
                         <label data-i18n="settings.proxy_port">Port</label>
-                        <input type="number" name="proxyPort" min="1" max="65535">
+                        <input type="number" name="proxyPort" class="entry" min="1" max="65535">
                     </div>
                 </div>
 
@@ -275,13 +307,13 @@
                     <div class="proxy-row u-flex">
                         <div class="proxy-field proxy-field-grow">
                             <label data-i18n="settings.proxy_username">Username</label>
-                            <input type="text" name="proxyUsername" autocomplete="off">
+                            <input type="text" name="proxyUsername" class="entry" autocomplete="off">
                         </div>
                     </div>
                     <div class="proxy-row u-flex">
                         <div class="proxy-field proxy-field-grow">
                             <label data-i18n="settings.proxy_password">Password</label>
-                            <input type="password" name="proxyPassword" autocomplete="off">
+                            <input type="password" name="proxyPassword" class="entry" autocomplete="off">
                         </div>
                     </div>
                 </div>
@@ -289,14 +321,14 @@
                 <div class="proxy-row u-flex">
                     <div class="proxy-field proxy-field-grow">
                         <label data-i18n="settings.proxy_bypass">Bypass List (comma-separated)</label>
-                        <input type="text" name="proxyBypass" placeholder="localhost, *.internal.com">
+                        <input type="text" name="proxyBypass" class="entry" placeholder="localhost, *.internal.com">
                         <p class="proxy-field-help">Domains to bypass proxy (supports wildcards: *.example.com)</p>
                     </div>
                 </div>
             </div>
 
             <div class="proxy-row proxy-actions u-flex u-items-center">
-                <button type="button" class="proxy-test-btn" data-i18n="settings.proxy_test">Test Connection</button>
+                <button type="button" class="button proxy-test-btn" data-i18n="settings.proxy_test">Test Connection</button>
                 <span class="proxy-test-result"></span>
             </div>
         </div>

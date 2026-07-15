@@ -1,0 +1,67 @@
+/**
+ * AdwInlineViewSwitcher-style tab strips. Buttons keep the
+ * data-tab attribute and .active state class from the JS contract.
+ */
+
+.view-switcher {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-small);
+  background-color: var(--shade-color);
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.view-switcher > .view-switcher-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: calc(var(--control-height-small) - 6px);
+  padding: var(--space-1) var(--space-3);
+  border-radius: calc(var(--radius-small) - 2px);
+  font-weight: 600;
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+  color: inherit;
+  opacity: 0.8;
+  transition: background-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.view-switcher > .view-switcher-btn:hover {
+  background-color: color-mix(in srgb, currentColor 8%, transparent);
+  opacity: 1;
+}
+
+.view-switcher > .view-switcher-btn.active {
+  background-color: var(--switcher-active-bg);
+  box-shadow: var(--switcher-active-shadow);
+  opacity: 1;
+}
+
+.view-switcher.flat {
+  background-color: transparent;
+  padding: 0;
+  gap: var(--space-2);
+}
+
+.view-switcher.flat > .view-switcher-btn {
+  opacity: var(--dim-opacity);
+  border-radius: var(--radius-small);
+}
+
+.view-switcher.flat > .view-switcher-btn.active {
+  background-color: var(--shade-color);
+  box-shadow: none;
+}
+
+.view-switcher-badge {
+  min-width: 16px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  background-color: color-mix(in srgb, currentColor 15%, transparent);
+  font-size: 11px;
+  text-align: center;
+}

@@ -1,0 +1,194 @@
+/**
+ * Collections tree in the sidebar (rendered by CollectionRenderer)
+ * plus its empty states. Class names come from the renderer and
+ * templates and are part of the JS contract.
+ */
+
+.collections-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.collections-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.collection-item,
+.folder-item,
+.pinned-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.collection-header,
+.folder-header,
+.pinned-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  margin: 1px 0;
+  border-radius: var(--radius-small);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--transition-fast);
+}
+
+.collection-header:hover,
+.folder-header:hover,
+.pinned-section-header:hover {
+  background-color: var(--shade-color);
+}
+
+.collection-toggle,
+.folder-toggle,
+.pinned-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: var(--dim-opacity);
+  transition: transform var(--transition-fast);
+}
+
+.collection-item.expanded > .collection-header .collection-toggle,
+.folder-item.expanded > .folder-header .folder-toggle,
+.pinned-section.expanded .pinned-section-toggle {
+  transform: rotate(90deg);
+}
+
+.collection-name,
+.folder-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.collection-endpoints,
+.folder-endpoints,
+.pinned-section-endpoints {
+  display: none;
+  flex-direction: column;
+  padding-left: var(--space-4);
+}
+
+.collection-item.expanded > .collection-endpoints,
+.folder-item.expanded > .folder-endpoints,
+.pinned-section.expanded .pinned-section-endpoints {
+  display: flex;
+}
+
+.endpoint-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 30px;
+  padding: 0 var(--space-2);
+  margin: 1px 0;
+  border-radius: var(--radius-small);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--transition-fast);
+}
+
+.endpoint-item:hover {
+  background-color: var(--shade-color);
+}
+
+.endpoint-item.active,
+.endpoint-item.is-selected {
+  background-color: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.endpoint-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-small);
+}
+
+.endpoint-pin-btn {
+  opacity: 0;
+  flex-shrink: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.endpoint-item:hover .endpoint-pin-btn {
+  opacity: var(--dim-opacity);
+}
+
+.endpoint-pin-btn.is-pinned {
+  opacity: 1;
+  color: var(--warning-color);
+}
+
+.method-pill {
+  flex-shrink: 0;
+  min-width: 38px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: right;
+}
+
+.method-pill[data-method="GET"] { color: var(--method-get-color); }
+.method-pill[data-method="POST"] { color: var(--method-post-color); }
+.method-pill[data-method="PUT"] { color: var(--method-put-color); }
+.method-pill[data-method="DELETE"] { color: var(--method-delete-color); }
+.method-pill[data-method="PATCH"] { color: var(--method-patch-color); }
+
+.collections-empty {
+  padding: var(--space-6) var(--space-4);
+}
+
+.collections-empty-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-3);
+}
+
+.collections-empty-action-btn {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: var(--space-3);
+  align-items: center;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-small);
+  background-color: var(--shade-color);
+  transition: background-color var(--transition-fast);
+}
+
+.collections-empty-action-btn:hover {
+  background-color: color-mix(in srgb, currentColor 12%, var(--shade-color));
+}
+
+.collections-empty-action-icon {
+  grid-row: 1 / span 2;
+  opacity: var(--dim-opacity);
+}
+
+.collections-empty-action-title {
+  font-weight: 600;
+  font-size: var(--font-size-small);
+}
+
+.collections-empty-action-sub {
+  font-size: var(--font-size-caption);
+  opacity: var(--dim-opacity);
+}
