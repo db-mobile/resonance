@@ -103,10 +103,10 @@ if (isTauri) {
             save: (defaultFileName, content, mimeType) => invoke('save_documentation', { defaultFileName, content, mimeType })
         },
         grpc: {
-            listServices: (target, useTls = false) => invoke('grpc_reflection_list_services', { target, useTls }),
-            listMethods: (target, serviceName, useTls = false) => invoke('grpc_reflection_list_methods', { target, serviceName, useTls }),
+            listServices: (target, tls = null) => invoke('grpc_reflection_list_services', { target, tls }),
+            listMethods: (target, serviceName, tls = null) => invoke('grpc_reflection_list_methods', { target, serviceName, tls }),
             invokeUnary: (request) => invoke('grpc_invoke_unary', { request }),
-            getInputSkeleton: (target, fullMethod, useTls = false) => invoke('grpc_get_input_skeleton', { target, fullMethod, useTls }),
+            getInputSkeleton: (target, fullMethod, tls = null) => invoke('grpc_get_input_skeleton', { target, fullMethod, tls }),
             selectProtoFile: () => invoke('grpc_select_proto_file'),
             parseProtoFile: (protoPath, includePaths = null) => invoke('grpc_parse_proto_file', { protoPath, includePaths }),
             protoGetInputSkeleton: (protoPath, fullMethod) => invoke('grpc_proto_get_input_skeleton', { protoPath, fullMethod }),

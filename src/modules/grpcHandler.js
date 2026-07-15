@@ -19,7 +19,7 @@ import {
 
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
-import { displayResponseWithLineNumbersForTab } from './apiHandler.js';
+import { displayResponseWithLineNumbersForTab, getSettingsCache } from './apiHandler.js';
 import { startOrSend as grpcStreamStartOrSend } from './grpcStreamHandler.js';
 
 let lastTarget = null;
@@ -158,21 +158,63 @@ export function setGrpcTls(useTls) {
     }
 }
 
-async function loadServices(target) {
+/**
+ * Extract the host[:port] a gRPC target resolves to, matching how the HTTP
+ * path keys the certificate store (`new URL(url).host`).
+ * "https://h:50051/x" and "h:50051" both yield "h:50051".
+ */
+export function grpcHostForCertLookup(target) {
+    return (target || '')
+        .trim()
+        .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+        .split('/')[0]
+        .toLowerCase();
+}
+
+/**
+ * Build the TLS options object for gRPC backend commands. Skip-verify follows
+ * the global "Verify SSL certificates" setting (same as HTTP requests), and
+ * the client certificate/CA resolve from the per-host certificate store.
+ */
+async function buildTlsOptions(target) {
     const useTls = getUseTls();
-    const services = await window.backendAPI.grpc.listServices(target, useTls);
+    let skipVerify = false;
+    try {
+        const settings = getSettingsCache() || await window.backendAPI.settings.get();
+        skipVerify = settings?.verifySsl === false;
+    } catch (_e) {
+        skipVerify = false;
+    }
+
+    const tls = { useTls, skipVerify };
+    if (useTls && app.certificateController) {
+        try {
+            const cert = app.certificateController.getForHost(grpcHostForCertLookup(target));
+            if (cert) {
+                tls.clientCert = cert;
+            }
+        } catch (_e) {
+            /* certificate lookup is best-effort */
+        }
+    }
+    return tls;
+}
+
+async function loadServices(target) {
+    const tls = await buildTlsOptions(target);
+    const services = await window.backendAPI.grpc.listServices(target, tls);
     clearSelect(grpcServiceSelect);
     services.forEach(svc => addOption(grpcServiceSelect, svc, svc));
     return services;
 }
 
 async function loadMethods(target, serviceName) {
-    const useTls = getUseTls();
-    const cacheKey = `${target}::${serviceName}::${useTls}`;
+    const tls = await buildTlsOptions(target);
+    const cacheKey = `${target}::${serviceName}::${tls.useTls}`;
     if (methodsCache.has(cacheKey)) {
         return methodsCache.get(cacheKey);
     }
-    const methods = await window.backendAPI.grpc.listMethods(target, serviceName, useTls);
+    const methods = await window.backendAPI.grpc.listMethods(target, serviceName, tls);
     methodsCache.set(cacheKey, methods);
     return methods;
 }
@@ -259,7 +301,7 @@ export async function handleGrpcSend() {
     }
 
     const metadata = getMetadata();
-    const useTls = getUseTls();
+    const tls = await buildTlsOptions(target);
     const flags = methodFlagsCache.get(fullMethod);
     const isStreaming = !!(flags && (flags.serverStreaming || flags.clientStreaming));
 
@@ -269,7 +311,7 @@ export async function handleGrpcSend() {
             fullMethod,
             requestJson,
             metadata,
-            tls: { useTls, skipVerify: false },
+            tls,
             protoPath: protoFileMode ? loadedProtoPath : null,
             canSend: !!flags.clientStreaming
         });
@@ -288,7 +330,7 @@ export async function handleGrpcSend() {
                 requestJson,
                 metadata,
                 deadlineMs: 30000,
-                tls: { useTls, skipVerify: false }
+                tls
             });
         } else {
             result = await window.backendAPI.grpc.invokeUnary({
@@ -297,7 +339,7 @@ export async function handleGrpcSend() {
                 requestJson,
                 metadata,
                 deadlineMs: 30000,
-                tls: { useTls, skipVerify: false }
+                tls
             });
         }
 
@@ -506,8 +548,8 @@ async function onGenerateSkeleton() {
                 updateStatusDisplay('Enter a target first', null);
                 return;
             }
-            const useTls = getUseTls();
-            skeleton = await window.backendAPI.grpc.getInputSkeleton(target, fullMethod, useTls);
+            const tls = await buildTlsOptions(target);
+            skeleton = await window.backendAPI.grpc.getInputSkeleton(target, fullMethod, tls);
         }
         
         const formatted = JSON.stringify(skeleton, null, 2);
