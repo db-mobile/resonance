@@ -1,0 +1,161 @@
+/**
+ * Design tokens — Adwaita/libadwaita derived.
+ * Theme-independent structure tokens plus light-palette defaults.
+ * The active theme file (src/themes/{light,dark}.css) overrides the
+ * named colors; accents are keyed off the data-accent root attribute.
+ */
+
+:root {
+  --font-sans: "Adwaita Sans", "Inter", "Cantarell", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Adwaita Mono", "JetBrains Mono", "Fira Code", "Source Code Pro", ui-monospace, monospace;
+
+  --font-size-base: 14px;
+  --font-size-caption: 12px;
+  --font-size-small: 13px;
+  --font-size-heading: 14px;
+  --font-size-title-4: 16px;
+  --font-size-title-3: 18px;
+  --font-size-title-2: 20px;
+  --font-size-title-1: 24px;
+
+  --space-1: 3px;
+  --space-2: 6px;
+  --space-3: 9px;
+  --space-4: 12px;
+  --space-5: 18px;
+  --space-6: 24px;
+  --space-7: 36px;
+
+  --radius-small: 6px;
+  --radius-medium: 12px;
+  --radius-large: 15px;
+  --radius-pill: 9999px;
+
+  --control-height: 34px;
+  --control-height-small: 28px;
+  --row-height: 48px;
+  --icon-size: 16px;
+
+  --z-dropdown: 100;
+  --z-popover: 500;
+  --z-dialog: 900;
+  --z-toast: 1000;
+
+  --transition-fast: 100ms ease-out;
+  --transition-base: 200ms ease-out;
+
+  --dim-opacity: 0.55;
+  --disabled-opacity: 0.5;
+
+  --window-bg-color: #fafafb;
+  --window-fg-color: rgb(0 0 6 / 80%);
+  --view-bg-color: #ffffff;
+  --view-fg-color: rgb(0 0 6 / 80%);
+  --headerbar-bg-color: #ffffff;
+  --headerbar-fg-color: rgb(0 0 6 / 80%);
+  --headerbar-shade-color: rgb(0 0 6 / 12%);
+  --sidebar-bg-color: #ebebed;
+  --sidebar-fg-color: rgb(0 0 6 / 80%);
+  --sidebar-backdrop-color: #f2f2f4;
+  --sidebar-shade-color: rgb(0 0 6 / 7%);
+  --card-bg-color: #ffffff;
+  --card-fg-color: rgb(0 0 6 / 80%);
+  --card-shade-color: rgb(0 0 6 / 7%);
+  --dialog-bg-color: #fafafb;
+  --dialog-fg-color: rgb(0 0 6 / 80%);
+  --popover-bg-color: #ffffff;
+  --popover-fg-color: rgb(0 0 6 / 80%);
+  --popover-shade-color: rgb(0 0 6 / 7%);
+  --shade-color: rgb(0 0 6 / 7%);
+  --scrim-color: rgb(0 0 6 / 25%);
+  --border-color: rgb(0 0 6 / 15%);
+
+  --accent-bg-color: #3584e4;
+  --accent-fg-color: #ffffff;
+  --accent-color: #0461be;
+
+  --destructive-bg-color: #e01b24;
+  --destructive-fg-color: #ffffff;
+  --destructive-color: #c30000;
+  --success-bg-color: #2ec27e;
+  --success-fg-color: #ffffff;
+  --success-color: #007c3d;
+  --warning-bg-color: #e5a50a;
+  --warning-fg-color: rgb(0 0 6 / 80%);
+  --warning-color: #905400;
+  --error-bg-color: #e01b24;
+  --error-fg-color: #ffffff;
+  --error-color: #c30000;
+
+  --method-get-color: #15772e;
+  --method-post-color: #0461be;
+  --method-put-color: #b62200;
+  --method-delete-color: #c00023;
+  --method-patch-color: #8939a4;
+
+  --method-get-bg: color-mix(in srgb, var(--method-get-color) 12%, transparent);
+  --method-post-bg: color-mix(in srgb, var(--method-post-color) 12%, transparent);
+  --method-put-bg: color-mix(in srgb, var(--method-put-color) 12%, transparent);
+  --method-delete-bg: color-mix(in srgb, var(--method-delete-color) 12%, transparent);
+  --method-patch-bg: color-mix(in srgb, var(--method-patch-color) 12%, transparent);
+
+  --status-success-color: var(--success-color);
+  --status-redirect-color: var(--warning-color);
+  --status-error-color: var(--error-color);
+
+  --shadow-card: 0 0 0 1px var(--card-shade-color);
+  --shadow-popover: 0 1px 5px 1px rgb(0 0 6 / 9%), 0 2px 14px 3px rgb(0 0 6 / 5%);
+  --shadow-dialog: 0 2px 8px 2px rgb(0 0 6 / 12%), 0 4px 24px 6px rgb(0 0 6 / 9%);
+
+  --focus-ring-color: color-mix(in srgb, var(--accent-color) 50%, transparent);
+
+  --switcher-active-bg: #ffffff;
+  --switcher-active-shadow: 0 1px 2px rgb(0 0 6 / 10%);
+
+  --accent: var(--accent-bg-color);
+}
+
+:root[data-accent="blue"] {
+  --accent-bg-color: #3584e4;
+  --accent-fg-color: #ffffff;
+}
+
+:root[data-accent="teal"] {
+  --accent-bg-color: #2190a4;
+  --accent-fg-color: #ffffff;
+}
+
+:root[data-accent="green"] {
+  --accent-bg-color: #3a944a;
+  --accent-fg-color: #ffffff;
+}
+
+:root[data-accent="yellow"] {
+  --accent-bg-color: #c88800;
+  --accent-fg-color: rgb(0 0 6 / 80%);
+}
+
+:root[data-accent="orange"] {
+  --accent-bg-color: #ed5b00;
+  --accent-fg-color: #ffffff;
+}
+
+:root[data-accent="red"] {
+  --accent-bg-color: #e62d42;
+  --accent-fg-color: #ffffff;
+}
+
+:root[data-accent="pink"] {
+  --accent-bg-color: #d56199;
+  --accent-fg-color: #ffffff;
+}
+
+:root[data-accent="purple"] {
+  --accent-bg-color: #9141ac;
+  --accent-fg-color: #ffffff;
+}
+
+:root[data-accent="indigo"] {
+  --accent-bg-color: #5261c9;
+  --accent-fg-color: #ffffff;
+}

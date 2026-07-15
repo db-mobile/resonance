@@ -1,12 +1,8 @@
 <template id="tpl-variable-manager-dialog">
     <div class="u-flex u-flex-col u-gap-4">
-        <div class="manager-header dialog-header u-items-center u-justify-between">
+        <div class="dialog-header">
             <h3 class="dialog-title" data-role="title"></h3>
-            <div class="manager-header-actions u-flex">
-                <button id="add-variable-btn" class="btn btn-xs btn-outline-primary">+ Add Variable</button>
-                <button id="import-variables-btn" class="btn btn-xs btn-outline">Import</button>
-                <button id="export-variables-btn" class="btn btn-xs btn-outline">Export</button>
-            </div>
+            <button id="variables-close-btn" class="dialog-close-btn" aria-label="Close"><span class="icon icon-16 icon-x"></span></button>
         </div>
 
         <div class="variable-manager-usage">
@@ -16,6 +12,15 @@
                 Values can reference other variables, including dynamic ones like <code>{{$uuid}}</code>.
             </p>
             <button type="button" id="dynamic-vars-reference-btn" class="btn btn-xs btn-outline">Dynamic variables…</button>
+        </div>
+
+        <div class="manager-toolbar">
+            <span class="manager-section-title">Variables</span>
+            <div class="manager-header-actions u-flex">
+                <button id="add-variable-btn" class="btn btn-sm btn-outline-primary">+ Add Variable</button>
+                <button id="import-variables-btn" class="btn btn-sm btn-outline">Import</button>
+                <button id="export-variables-btn" class="btn btn-sm btn-outline">Export</button>
+            </div>
         </div>
 
         <div id="variables-container" class="manager-content"></div>

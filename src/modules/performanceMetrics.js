@@ -148,11 +148,11 @@ export function displayPerformanceMetrics(container, timings, size) {
     timingBars.className = 'timing-bars';
 
     const colors = {
-        dns: '#4285f4',
-        tcp: '#34a853',
-        tls: '#fbbc04',
-        ttfb: '#ea4335',
-        download: '#9c27b0'
+        dns: '#3584e4',
+        tcp: '#33d17a',
+        tls: '#f6d32d',
+        ttfb: '#ed333b',
+        download: '#c061cb'
     };
 
     if (timings.dnsLookup > 0) {

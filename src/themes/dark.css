@@ -1,65 +1,66 @@
 /**
- * Dark Theme
+ * Adwaita dark palette.
+ * Overrides the named-color defaults from src/styles/tokens.css.
+ * Contract documented in src/themes/README.md.
  */
+
 :root {
-  /* Text Colors */
-  --text-primary: #f4f4f5;
-  --text-secondary: #c4c4cc;
-  --text-tertiary: #8e8e96;
-  --text-disabled: #5c5c5c;
-  --text-inverse: #1a1a1a;
+  color-scheme: dark;
 
-  /* Background Colors - Improved Dark */
-  --bg-primary: #0a0a0b;
-  --bg-secondary: #141416;
-  --bg-tertiary: #1c1c1f;
-  --bg-overlay: rgba(30, 30, 30, 0.95);
-  --bg-glass: rgba(30, 30, 30, 0.85);
-  --bg-glass-strong: rgba(30, 30, 30, 0.92);
+  --window-bg-color: #242424;
+  --window-fg-color: #ffffff;
+  --view-bg-color: #1e1e1e;
+  --view-fg-color: #ffffff;
+  --headerbar-bg-color: #303030;
+  --headerbar-fg-color: #ffffff;
+  --headerbar-shade-color: rgb(0 0 6 / 36%);
+  --sidebar-bg-color: #303030;
+  --sidebar-fg-color: #ffffff;
+  --sidebar-backdrop-color: #2a2a2a;
+  --sidebar-shade-color: rgb(0 0 6 / 25%);
+  --card-bg-color: rgb(255 255 255 / 8%);
+  --card-fg-color: #ffffff;
+  --card-shade-color: rgb(0 0 6 / 36%);
+  --dialog-bg-color: #383838;
+  --dialog-fg-color: #ffffff;
+  --popover-bg-color: #383838;
+  --popover-fg-color: #ffffff;
+  --popover-shade-color: rgb(0 0 6 / 25%);
+  --shade-color: rgb(0 0 6 / 25%);
+  --scrim-color: rgb(0 0 6 / 45%);
+  --border-color: rgb(255 255 255 / 15%);
 
-  /* Border Colors - More Visible */
-  --border-light: #2a2a2e;
-  --border-medium: #3a3a3e;
-  --border-strong: #606060;
-  --border-focus: var(--accent, #10b981);
-  --border-glass: rgba(58, 58, 58, 0.6);
+  --destructive-bg-color: #c01c28;
+  --destructive-fg-color: #ffffff;
+  --destructive-color: #ff938c;
+  --success-bg-color: #26a269;
+  --success-fg-color: #ffffff;
+  --success-color: #78e9ab;
+  --warning-bg-color: #cd9309;
+  --warning-fg-color: rgb(0 0 6 / 80%);
+  --warning-color: #ffc252;
+  --error-bg-color: #c01c28;
+  --error-fg-color: #ffffff;
+  --error-color: #ff938c;
 
-  /* Shadows - Minimal */
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
-  --shadow-base: 0 2px 4px -1px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 6px -2px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 16px -4px rgba(0, 0, 0, 0.5);
-  --shadow-xl: 0 16px 32px -8px rgba(0, 0, 0, 0.5);
+  --method-get-color: #78e9ab;
+  --method-post-color: #81d0ff;
+  --method-put-color: #ff9c5b;
+  --method-delete-color: #ff888c;
+  --method-patch-color: #dc8add;
 
-  /* Status Colors - Dark mode variants */
-  --color-success-light: rgba(16, 185, 129, 0.18);
-  --color-warning-light: rgba(234, 179, 8, 0.18);
-  --color-error-light: rgba(239, 68, 68, 0.18);
-  --color-primary-light: rgba(59, 130, 246, 0.18);
+  --accent-color: #81d0ff;
 
-  /* HTTP Method Colors */
-  --method-get-bg: rgba(34, 197, 94, 0.18);
-  --method-get-text: #5ee98d;
-  --method-post-bg: rgba(59, 130, 246, 0.18);
-  --method-post-text: #74b3ff;
-  --method-put-bg: rgba(249, 115, 22, 0.18);
-  --method-put-text: #ffa352;
-  --method-delete-bg: rgba(239, 68, 68, 0.18);
-  --method-delete-text: #ff8585;
-  --method-patch-bg: rgba(168, 85, 247, 0.18);
-  --method-patch-text: #d4a5ff;
-
-  /* Theme-specific overrides */
-  --input-bg: var(--bg-secondary);
-  --content-bg: var(--bg-secondary);
-  --sidebar-bg: var(--bg-secondary);
-  --nav-bg: var(--bg-primary);
-  --response-bg: var(--bg-primary);
-  --resizer-bg: var(--bg-primary);
-  --scrollbar-track-bg: var(--bg-secondary);
-  --focus-shadow-opacity: 0.2;
-  --status-redirect-text: #fbbf24;
-  --activity-bar-bg: #0f0f11;
-  --bg-white: #18181b;
+  --switcher-active-bg: rgb(255 255 255 / 12%);
+  --switcher-active-shadow: none;
 }
+
+:root[data-accent="blue"] { --accent-color: #81d0ff; }
+:root[data-accent="teal"] { --accent-color: #7bdff4; }
+:root[data-accent="green"] { --accent-color: #78e9ab; }
+:root[data-accent="yellow"] { --accent-color: #ffc252; }
+:root[data-accent="orange"] { --accent-color: #ff9c5b; }
+:root[data-accent="red"] { --accent-color: #ff888c; }
+:root[data-accent="pink"] { --accent-color: #ff9bb9; }
+:root[data-accent="purple"] { --accent-color: #dc8add; }
+:root[data-accent="indigo"] { --accent-color: #a8b0ff; }

@@ -1,7 +1,8 @@
 <template id="tpl-dynamic-variables-reference">
     <div class="u-flex u-flex-col u-gap-4 u-overflow-hidden">
-        <div class="dialog-header u-items-center u-justify-between">
+        <div class="dialog-header">
             <h3 class="dialog-title">Dynamic variables</h3>
+            <button id="var-reference-close-btn" class="dialog-close-btn" aria-label="Close"><span class="icon icon-16 icon-x"></span></button>
         </div>
 
         <p class="var-reference-intro">
@@ -30,10 +31,6 @@
             <code>{{$randomPhoneNumber}}</code><span>Phone number</span>
             <code>{{$randomIPv4}}</code><span>IPv4 address</span>
             <code>{{$randomUrl}}</code><span>https URL</span>
-        </div>
-
-        <div class="dialog-footer">
-            <button id="var-reference-close-btn" class="btn btn-primary">Close</button>
         </div>
     </div>
 </template>

@@ -1,0 +1,96 @@
+/**
+ * AdwTabBar replica for workspace tabs. Drag states use the
+ * existing dragging/is-dragging contract classes.
+ */
+
+.tab-bar {
+  display: flex;
+  align-items: stretch;
+  min-height: 38px;
+  background-color: var(--headerbar-bg-color);
+  color: var(--headerbar-fg-color);
+  box-shadow: inset 0 -1px var(--headerbar-shade-color);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 160px;
+  min-width: 100px;
+  max-width: 220px;
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-small);
+  cursor: default;
+  user-select: none;
+  transition: background-color var(--transition-fast);
+}
+
+.tab-box + .tab-box {
+  box-shadow: inset 1px 0 var(--headerbar-shade-color);
+}
+
+.tab-box:hover {
+  background-color: var(--shade-color);
+}
+
+.tab-box.active {
+  background-color: var(--window-bg-color);
+  box-shadow: inset 0 2px var(--accent-bg-color);
+}
+
+.tab-box.dragging,
+.tab-box.is-dragging {
+  opacity: 0.5;
+}
+
+.tab-box .tab-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-box .tab-modified-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background-color: currentColor;
+  opacity: var(--dim-opacity);
+  flex-shrink: 0;
+}
+
+.tab-box .tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  opacity: 0;
+  flex-shrink: 0;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast);
+}
+
+.tab-box:hover .tab-close,
+.tab-box.active .tab-close {
+  opacity: var(--dim-opacity);
+}
+
+.tab-box .tab-close:hover {
+  background-color: color-mix(in srgb, currentColor 15%, transparent);
+  opacity: 1;
+}
+
+.tab-bar .tab-new-btn {
+  align-self: center;
+  margin: 0 var(--space-2);
+}

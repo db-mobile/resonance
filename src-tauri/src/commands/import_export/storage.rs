@@ -2,7 +2,7 @@
 //!
 //! `is_http_method` also lives here as a shared predicate.
 
-use super::Collection;
+use super::{Collection, VariableEntry};
 use crate::commands::collections as storage_collections;
 use serde::Serialize;
 use std::fs;
@@ -111,15 +111,69 @@ pub(crate) fn save_collection_to_files(
             .ok_or_else(|| "Collection storage path missing".to_string())?,
     );
 
-    // Save baseUrl as a collection variable if present
-    if let Some(base_url) = &collection.base_url {
-        if !base_url.is_empty() {
-            let variables = serde_json::json!([
-                { "key": "baseUrl", "value": base_url }
-            ]);
-            let variables_file = collection_dir.join("variables.json");
-            write_json_file(&variables_file, &variables)?;
+    save_collection_variables(collection, &collection_dir)?;
+    save_endpoint_data_files(collection, &collection_dir)?;
+
+    Ok(())
+}
+
+/// Write the imported collection variables to variables.json. Falls back to a
+/// lone baseUrl entry (the pre-existing behavior) for importers that don't
+/// produce a variable list, e.g. OpenAPI.
+fn save_collection_variables(
+    collection: &Collection,
+    collection_dir: &std::path::Path,
+) -> Result<(), String> {
+    let mut variables = collection.variables.clone().unwrap_or_default();
+
+    if variables.is_empty() {
+        if let Some(base_url) = collection.base_url.as_ref().filter(|s| !s.is_empty()) {
+            variables.push(VariableEntry {
+                key: "baseUrl".to_string(),
+                value: base_url.clone(),
+            });
         }
+    }
+
+    if !variables.is_empty() {
+        let variables_file = collection_dir.join("variables.json");
+        write_json_file(&variables_file, &variables)?;
+    }
+
+    Ok(())
+}
+
+/// Persist imported per-endpoint payloads (scripts, GraphQL bodies) into the
+/// endpoint data files the app reads them from. Endpoints appear in both the
+/// flat list and their folder, so writes are deduped by id.
+fn save_endpoint_data_files(
+    collection: &Collection,
+    collection_dir: &std::path::Path,
+) -> Result<(), String> {
+    let requests_dir = collection_dir.join("requests");
+    let mut written: std::collections::HashSet<&str> = std::collections::HashSet::new();
+
+    for endpoint in &collection.endpoints {
+        if endpoint.scripts.is_none() && endpoint.graphql_data.is_none() {
+            continue;
+        }
+        if !written.insert(endpoint.id.as_str()) {
+            continue;
+        }
+
+        if !requests_dir.exists() {
+            fs::create_dir_all(&requests_dir)
+                .map_err(|e| format!("Failed to create requests dir: {}", e))?;
+        }
+
+        let data = storage_collections::EndpointData {
+            scripts: endpoint.scripts.clone(),
+            graphql_data: endpoint.graphql_data.clone(),
+            ..Default::default()
+        };
+        let file_name =
+            storage_collections::desired_endpoint_file_name(&endpoint.name, &endpoint.id);
+        write_json_file(&requests_dir.join(file_name), &data)?;
     }
 
     Ok(())

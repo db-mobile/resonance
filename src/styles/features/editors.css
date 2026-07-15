@@ -1,0 +1,87 @@
+/**
+ * CodeMirror chrome integration: the editors inherit Adwaita surfaces
+ * from the named-color tokens; syntax colors come from editorTheme.js.
+ */
+
+.cm-editor {
+  height: 100%;
+  background-color: var(--view-bg-color);
+  color: var(--view-fg-color);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+}
+
+.cm-editor .cm-scroller {
+  font-family: var(--font-mono);
+  line-height: 1.5;
+}
+
+.cm-editor .cm-gutters {
+  background-color: var(--view-bg-color);
+  color: color-mix(in srgb, currentColor 40%, transparent);
+  border-right: 1px solid var(--border-color);
+}
+
+.cm-editor .cm-activeLine {
+  background-color: var(--shade-color);
+}
+
+.cm-editor .cm-activeLineGutter {
+  background-color: var(--shade-color);
+  color: inherit;
+}
+
+.cm-editor .cm-selectionBackground,
+.cm-editor.cm-focused .cm-selectionBackground,
+.cm-editor .cm-content ::selection {
+  background-color: color-mix(in srgb, var(--accent-bg-color) 30%, transparent) !important;
+}
+
+.cm-editor .cm-cursor,
+.cm-editor .cm-cursor-primary {
+  border-left: 2px solid var(--view-fg-color) !important;
+}
+
+.cm-editor .cm-content {
+  caret-color: var(--view-fg-color) !important;
+}
+
+.cm-editor .cm-dropCursor {
+  border-left: 2px solid var(--accent-bg-color) !important;
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+.cm-editor .cm-matchingBracket {
+  background-color: color-mix(in srgb, var(--accent-bg-color) 20%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--accent-bg-color) 45%, transparent);
+}
+
+.cm-editor .cm-tooltip {
+  background-color: var(--popover-bg-color);
+  color: var(--popover-fg-color);
+  border: none;
+  border-radius: var(--radius-small);
+  box-shadow: var(--shadow-popover);
+}
+
+.cm-editor .cm-tooltip-autocomplete ul li[aria-selected] {
+  background-color: var(--accent-bg-color);
+  color: var(--accent-fg-color);
+}
+
+.cm-editor .cm-panels {
+  background-color: var(--window-bg-color);
+  color: var(--window-fg-color);
+  border-color: var(--border-color);
+}
+
+.cm-editor .cm-searchMatch {
+  background-color: color-mix(in srgb, var(--warning-color) 30%, transparent);
+}
+
+.cm-editor .cm-searchMatch-selected {
+  background-color: color-mix(in srgb, var(--warning-color) 55%, transparent);
+}

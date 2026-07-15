@@ -1,0 +1,71 @@
+/**
+ * Key-value editors (params, headers, form bodies, gRPC metadata).
+ * Row markup comes from keyValueManager and is part of the JS contract.
+ */
+
+.key-value-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.key-value-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.key-value-row .key-input {
+  flex: 0 0 32%;
+}
+
+.key-value-row .value-input {
+  flex: 1;
+}
+
+.key-value-row .key-input,
+.key-value-row .value-input {
+  min-width: 0;
+  min-height: var(--control-height-small);
+  padding: 0 var(--space-3);
+  background-color: var(--view-bg-color);
+  color: var(--view-fg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-small);
+  font-size: var(--font-size-small);
+  font-family: var(--font-mono);
+}
+
+.key-value-row .key-input:focus,
+.key-value-row .value-input:focus {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: -2px;
+  border-color: transparent;
+}
+
+.key-value-row .key-input::placeholder,
+.key-value-row .value-input::placeholder {
+  opacity: 0.4;
+}
+
+.key-value-row .remove-row-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height-small);
+  min-height: var(--control-height-small);
+  padding: 0;
+  border-radius: var(--radius-small);
+  background-color: transparent;
+  color: inherit;
+  opacity: var(--dim-opacity);
+  font-size: var(--font-size-title-4);
+  line-height: 1;
+}
+
+.key-value-row .remove-row-btn:hover {
+  background-color: color-mix(in srgb, var(--destructive-color) 15%, transparent);
+  color: var(--destructive-color);
+  opacity: 1;
+}

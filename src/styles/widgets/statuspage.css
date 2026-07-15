@@ -1,0 +1,44 @@
+/**
+ * AdwStatusPage-style empty states.
+ */
+
+.status-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-7) var(--space-6);
+  text-align: center;
+  height: 100%;
+}
+
+.status-page .status-page-icon {
+  width: 64px;
+  height: 64px;
+  opacity: 0.3;
+  margin-bottom: var(--space-2);
+}
+
+.status-page .status-page-title {
+  font-size: var(--font-size-title-3);
+  font-weight: 700;
+}
+
+.status-page .status-page-description {
+  max-width: 340px;
+  opacity: var(--dim-opacity);
+}
+
+.status-page.compact {
+  padding: var(--space-5);
+}
+
+.status-page.compact .status-page-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.status-page.compact .status-page-title {
+  font-size: var(--font-size-title-4);
+}

@@ -1,5 +1,6 @@
 /**
- * @fileoverview Shared CodeMirror theme utilities
+ * @fileoverview Shared CodeMirror theme utilities. Syntax palettes are
+ * drawn from the GNOME color palette so editors match the Adwaita UI.
  * @module editorTheme
  */
 
@@ -15,7 +16,7 @@ export const THEME_CHANGED_EVENT = 'resonance:theme-changed';
  */
 export function isDarkMode() {
     const theme = document.documentElement.getAttribute('data-theme');
-    if (theme === 'dark' || theme === 'black') {
+    if (theme === 'dark') {
         return true;
     }
     if (theme === 'system') {
@@ -25,112 +26,62 @@ export function isDarkMode() {
 }
 
 /**
- * Resolve the active theme name to one of: 'light', 'dark', 'black'.
- * @returns {'light' | 'dark' | 'black'}
- */
-function getActiveTheme() {
-    const theme = document.documentElement.getAttribute('data-theme');
-    if (theme === 'black') {
-        return 'black';
-    }
-    if (theme === 'dark') {
-        return 'dark';
-    }
-    if (theme === 'system') {
-        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-            ? 'dark'
-            : 'light';
-    }
-    return 'light';
-}
-
-/**
- * Light highlight style tuned for the light theme background (#f8f9fc).
- * All token colors meet WCAG AA contrast (>=4.5:1) against the background.
+ * Light highlight style on the Adwaita light view background (#ffffff).
+ * Colors are GNOME palette shades 4-5 for AA contrast on white.
  */
 export const lightHighlightStyle = HighlightStyle.define([
-    { tag: tags.keyword,        color: '#9333ea' },
-    { tag: tags.atom,           color: '#0369a1' },
-    { tag: tags.bool,           color: '#0369a1' },
-    { tag: tags.null,           color: '#0369a1' },
-    { tag: tags.number,         color: '#1d4ed8' },
-    { tag: tags.string,         color: '#15803d' },
-    { tag: tags.propertyName,   color: '#6d28d9' },
-    { tag: tags.comment,        color: '#475569', fontStyle: 'italic' },
-    { tag: tags.operator,       color: '#b91c1c' },
-    { tag: tags.punctuation,    color: '#1e293b' },
-    { tag: tags.bracket,        color: '#1e293b' },
-    { tag: tags.typeName,       color: '#7c3aed' },
-    { tag: tags.variableName,   color: '#b45309' },
-    { tag: tags.function(tags.variableName), color: '#1d4ed8' },
-    { tag: tags.tagName,        color: '#b91c1c' },
-    { tag: tags.attributeName,  color: '#6d28d9' },
-    { tag: tags.attributeValue, color: '#15803d' },
+    { tag: tags.keyword,        color: '#613583' },
+    { tag: tags.atom,           color: '#c64600' },
+    { tag: tags.bool,           color: '#c64600' },
+    { tag: tags.null,           color: '#c64600' },
+    { tag: tags.number,         color: '#c64600' },
+    { tag: tags.string,         color: '#15772e' },
+    { tag: tags.propertyName,   color: '#1a5fb4' },
+    { tag: tags.comment,        color: '#77767b', fontStyle: 'italic' },
+    { tag: tags.operator,       color: '#a51d2d' },
+    { tag: tags.punctuation,    color: '#3d3846' },
+    { tag: tags.bracket,        color: '#3d3846' },
+    { tag: tags.typeName,       color: '#613583' },
+    { tag: tags.variableName,   color: '#905400' },
+    { tag: tags.function(tags.variableName), color: '#1a5fb4' },
+    { tag: tags.tagName,        color: '#a51d2d' },
+    { tag: tags.attributeName,  color: '#613583' },
+    { tag: tags.attributeValue, color: '#15772e' },
 ]);
 
 /**
- * Dark highlight style tuned for the dark theme background (#0a0a0b).
- * Bright comment color (#8b949e) keeps comments legible on near-black.
+ * Dark highlight style on the Adwaita dark view background (#1e1e1e).
+ * Colors are GNOME palette shades 1-2 for legibility on dark gray.
  */
 export const darkHighlightStyle = HighlightStyle.define([
-    { tag: tags.keyword,        color: '#c678dd' },
-    { tag: tags.atom,           color: '#d19a66' },
-    { tag: tags.bool,           color: '#d19a66' },
-    { tag: tags.null,           color: '#d19a66' },
-    { tag: tags.number,         color: '#d19a66' },
-    { tag: tags.string,         color: '#98c379' },
-    { tag: tags.propertyName,   color: '#e06c75' },
-    { tag: tags.comment,        color: '#8b949e', fontStyle: 'italic' },
-    { tag: tags.operator,       color: '#56b6c2' },
-    { tag: tags.punctuation,    color: '#abb2bf' },
-    { tag: tags.bracket,        color: '#abb2bf' },
-    { tag: tags.typeName,       color: '#e5c07b' },
-    { tag: tags.variableName,   color: '#e5c07b' },
-    { tag: tags.function(tags.variableName), color: '#61afef' },
-    { tag: tags.tagName,        color: '#e06c75' },
-    { tag: tags.attributeName,  color: '#d19a66' },
-    { tag: tags.attributeValue, color: '#98c379' },
-]);
-
-/**
- * Black highlight style tuned for the OLED black background (#000000).
- * Slightly brightened versions of the dark palette so tokens don't get
- * muddy against pure black.
- */
-export const blackHighlightStyle = HighlightStyle.define([
-    { tag: tags.keyword,        color: '#d586eb' },
-    { tag: tags.atom,           color: '#e0a370' },
-    { tag: tags.bool,           color: '#e0a370' },
-    { tag: tags.null,           color: '#e0a370' },
-    { tag: tags.number,         color: '#e0a370' },
-    { tag: tags.string,         color: '#a3d089' },
-    { tag: tags.propertyName,   color: '#ec7780' },
-    { tag: tags.comment,        color: '#9ba3ad', fontStyle: 'italic' },
-    { tag: tags.operator,       color: '#5fc1cd' },
-    { tag: tags.punctuation,    color: '#c5cad4' },
-    { tag: tags.bracket,        color: '#c5cad4' },
-    { tag: tags.typeName,       color: '#edc886' },
-    { tag: tags.variableName,   color: '#edc886' },
-    { tag: tags.function(tags.variableName), color: '#6cbaf0' },
-    { tag: tags.tagName,        color: '#ec7780' },
-    { tag: tags.attributeName,  color: '#e0a370' },
-    { tag: tags.attributeValue, color: '#a3d089' },
+    { tag: tags.keyword,        color: '#dc8add' },
+    { tag: tags.atom,           color: '#ffbe6f' },
+    { tag: tags.bool,           color: '#ffbe6f' },
+    { tag: tags.null,           color: '#ffbe6f' },
+    { tag: tags.number,         color: '#ffbe6f' },
+    { tag: tags.string,         color: '#8ff0a4' },
+    { tag: tags.propertyName,   color: '#99c1f1' },
+    { tag: tags.comment,        color: '#9a9996', fontStyle: 'italic' },
+    { tag: tags.operator,       color: '#93ddc2' },
+    { tag: tags.punctuation,    color: '#deddda' },
+    { tag: tags.bracket,        color: '#deddda' },
+    { tag: tags.typeName,       color: '#f8e45c' },
+    { tag: tags.variableName,   color: '#f8e45c' },
+    { tag: tags.function(tags.variableName), color: '#99c1f1' },
+    { tag: tags.tagName,        color: '#f66151' },
+    { tag: tags.attributeName,  color: '#ffbe6f' },
+    { tag: tags.attributeValue, color: '#8ff0a4' },
 ]);
 
 export const lightHighlighting = syntaxHighlighting(lightHighlightStyle);
 export const darkHighlighting = syntaxHighlighting(darkHighlightStyle);
-export const blackHighlighting = syntaxHighlighting(blackHighlightStyle);
 
 /**
  * Pick the syntax-highlighting extension for the currently active theme.
  * @returns {import('@codemirror/state').Extension}
  */
 export function getHighlighting() {
-    switch (getActiveTheme()) {
-        case 'black': return blackHighlighting;
-        case 'dark':  return darkHighlighting;
-        default:      return lightHighlighting;
-    }
+    return isDarkMode() ? darkHighlighting : lightHighlighting;
 }
 
 /**

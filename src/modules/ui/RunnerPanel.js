@@ -149,6 +149,51 @@ export class RunnerPanel {
         this.dom.stopButton?.addEventListener('click', () => {
             this._handleStop();
         });
+
+        this._attachMainResizer();
+    }
+
+    /**
+     * Wires the draggable divider between the Available and Selected panels,
+     * adjusting the Selected panel width via a CSS custom property.
+     *
+     * @private
+     */
+    _attachMainResizer() {
+        const resizer = this.container.querySelector('[data-role="main-resizer"]');
+        const main = this.container.querySelector('.runner-main');
+        const selected = this.container.querySelector('.runner-requests-panel');
+        if (!resizer || !main || !selected) {return;}
+
+        const minWidth = 160;
+        const maxWidth = 820;
+
+        const onMouseDown = (e) => {
+            e.preventDefault();
+            resizer.classList.add('dragging');
+            document.body.style.userSelect = 'none';
+            document.body.style.cursor = 'col-resize';
+
+            const onMove = (moveEvent) => {
+                const mainRect = main.getBoundingClientRect();
+                const raw = mainRect.right - moveEvent.clientX;
+                const width = Math.min(maxWidth, Math.max(minWidth, raw));
+                main.style.setProperty('--runner-selected-width', `${width}px`);
+            };
+
+            const onUp = () => {
+                resizer.classList.remove('dragging');
+                document.body.style.userSelect = '';
+                document.body.style.cursor = '';
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            };
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        };
+
+        resizer.addEventListener('mousedown', onMouseDown);
     }
 
     /**

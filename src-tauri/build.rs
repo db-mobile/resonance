@@ -5,8 +5,11 @@ fn main() {
     tonic_build::configure()
         .build_server(false)
         .type_attribute(".", "#[allow(clippy::enum_variant_names)]")
-        .compile(
-            &["proto/grpc/reflection/v1alpha/reflection.proto"],
+        .compile_protos(
+            &[
+                "proto/grpc/reflection/v1/reflection.proto",
+                "proto/grpc/reflection/v1alpha/reflection.proto",
+            ],
             &["proto"],
         )
         .unwrap();

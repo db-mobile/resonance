@@ -1,0 +1,62 @@
+/**
+ * Application shell: window frame, sidebar/content split, status bar.
+ */
+
+.main-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.app-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.main-content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background-color: var(--window-bg-color);
+}
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 26px;
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-caption);
+  background-color: var(--window-bg-color);
+  border-top: 1px solid var(--border-color);
+}
+
+.status-bar-left,
+.status-bar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.status-bar-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  opacity: var(--dim-opacity);
+}
+
+.status-bar-env-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background-color: var(--env-indicator-color, var(--success-bg-color));
+}
+
+.status-bar-request-spinner {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+}

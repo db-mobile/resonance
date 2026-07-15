@@ -1,3 +1,4 @@
+use super::api_request::ClientCertConfig;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use bytes::Buf;
@@ -17,6 +18,15 @@ use tonic::{Request, Status};
 
 pub mod reflection {
     #![allow(dead_code)]
+    tonic::include_proto!("grpc.reflection.v1");
+}
+
+/// Kept only for the wire-compat test: v1 is a package rename of v1alpha with
+/// identical field numbers, which is what lets `ReflectionClient` reuse the v1
+/// types on the v1alpha method path.
+#[cfg(test)]
+pub mod reflection_v1alpha {
+    #![allow(dead_code)]
     tonic::include_proto!("grpc.reflection.v1alpha");
 }
 
@@ -27,6 +37,10 @@ pub struct GrpcTlsOptions {
     pub use_tls: bool,
     #[serde(default)]
     pub skip_verify: bool,
+    /// Client identity (mTLS) and custom CA trust, resolved by the frontend
+    /// from the per-host certificate store — same shape as the HTTP path.
+    #[serde(default)]
+    pub client_cert: Option<ClientCertConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,160 +144,260 @@ pub async fn grpc_reflection_list_methods(
     _app: AppHandle,
     target: String,
     service_name: String,
-    use_tls: Option<bool>,
+    tls: Option<GrpcTlsOptions>,
 ) -> Result<Value, String> {
-    let use_tls = use_tls.unwrap_or(false);
-    let tls = GrpcTlsOptions {
-        use_tls,
-        skip_verify: false,
-    };
-    let target = normalize_target_with_tls(&target, use_tls);
+    let tls = tls.unwrap_or_default();
+    let target = normalize_target_with_tls(&target, tls.use_tls);
 
     let channel = create_channel(&target, &tls).await?;
+    let mut client = ReflectionClient::new(channel);
 
-    let mut grpc = tonic::client::Grpc::new(channel);
-    grpc.ready()
-        .await
-        .map_err(|e| format!("Reflection client not ready: {}", e))?;
+    let files = client.file_containing_symbol(&service_name).await?;
 
-    let req = reflection::ServerReflectionRequest {
-        host: "".to_string(),
-        message_request: Some(
-            reflection::server_reflection_request::MessageRequest::FileContainingSymbol(
-                service_name.clone(),
-            ),
-        ),
-    };
+    let mut methods: Vec<Value> = Vec::new();
+    for file in files {
+        let pkg = file.package.unwrap_or_default();
+        for svc in file.service {
+            let svc_name = svc.name.unwrap_or_default();
+            let full_svc_name = if pkg.is_empty() {
+                svc_name.clone()
+            } else {
+                format!("{}.{}", pkg, svc_name)
+            };
 
-    let mut stream = reflection_info_stream(&mut grpc, req).await?;
-
-    while let Some(resp) = stream.message().await.map_err(|e| e.to_string())? {
-        match resp.message_response {
-            Some(
-                reflection::server_reflection_response::MessageResponse::FileDescriptorResponse(r),
-            ) => {
-                let mut methods: Vec<Value> = Vec::new();
-
-                for file_bytes in r.file_descriptor_proto {
-                    let file = prost_types::FileDescriptorProto::decode(file_bytes.as_slice())
-                        .map_err(|e| format!("Failed to decode FileDescriptorProto: {}", e))?;
-
-                    let pkg = file.package.unwrap_or_default();
-                    for svc in file.service {
-                        let svc_name = svc.name.unwrap_or_default();
-                        let full_svc_name = if pkg.is_empty() {
-                            svc_name.clone()
-                        } else {
-                            format!("{}.{}", pkg, svc_name)
-                        };
-
-                        if full_svc_name != service_name {
-                            continue;
-                        }
-
-                        for m in svc.method {
-                            methods.push(serde_json::json!({
-                                "name": m.name.clone().unwrap_or_default(),
-                                "fullMethod": format!("/{}/{}", full_svc_name, m.name.unwrap_or_default()),
-                                "inputType": m.input_type.unwrap_or_default(),
-                                "outputType": m.output_type.unwrap_or_default(),
-                                "clientStreaming": m.client_streaming.unwrap_or(false),
-                                "serverStreaming": m.server_streaming.unwrap_or(false)
-                            }));
-                        }
-                    }
-                }
-
-                return Ok(Value::Array(methods));
+            if full_svc_name != service_name {
+                continue;
             }
-            Some(reflection::server_reflection_response::MessageResponse::ErrorResponse(err)) => {
-                return Err(format!(
-                    "Reflection error {}: {}",
-                    err.error_code, err.error_message
-                ));
+
+            for m in svc.method {
+                methods.push(serde_json::json!({
+                    "name": m.name.clone().unwrap_or_default(),
+                    "fullMethod": format!("/{}/{}", full_svc_name, m.name.unwrap_or_default()),
+                    "inputType": m.input_type.unwrap_or_default(),
+                    "outputType": m.output_type.unwrap_or_default(),
+                    "clientStreaming": m.client_streaming.unwrap_or(false),
+                    "serverStreaming": m.server_streaming.unwrap_or(false)
+                }));
             }
-            _ => {}
         }
     }
 
-    Err("No reflection response received".to_string())
+    Ok(Value::Array(methods))
 }
 
-async fn reflection_info_stream(
-    grpc: &mut tonic::client::Grpc<Channel>,
-    req: reflection::ServerReflectionRequest,
-) -> Result<tonic::Streaming<reflection::ServerReflectionResponse>, String> {
-    grpc.ready()
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReflectionVersion {
+    V1,
+    V1Alpha,
+}
+
+impl ReflectionVersion {
+    fn path(&self) -> &'static str {
+        match self {
+            ReflectionVersion::V1 => "/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+            ReflectionVersion::V1Alpha => {
+                "/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo"
+            }
+        }
+    }
+}
+
+enum ReflectionCallError {
+    Status(Status),
+    Other(String),
+}
+
+impl ReflectionCallError {
+    fn into_message(self) -> String {
+        match self {
+            ReflectionCallError::Status(status) => status.to_string(),
+            ReflectionCallError::Other(message) => message,
+        }
+    }
+}
+
+/// Status codes that indicate the reflection service version is not exposed
+/// (rather than a genuine failure), so the older v1alpha path should be tried.
+fn should_fallback(status: &Status) -> bool {
+    matches!(
+        status.code(),
+        tonic::Code::Unimplemented | tonic::Code::NotFound
+    )
+}
+
+/// Reflection client that negotiates `grpc.reflection.v1` vs `v1alpha` on the
+/// first call and pins the working version for the rest of the session. The
+/// two protos are wire-identical (package rename only), so the v1 message
+/// types are used on both paths.
+pub(crate) struct ReflectionClient {
+    grpc: tonic::client::Grpc<Channel>,
+    version: Option<ReflectionVersion>,
+}
+
+impl ReflectionClient {
+    pub(crate) fn new(channel: Channel) -> Self {
+        Self {
+            grpc: tonic::client::Grpc::new(channel),
+            version: None,
+        }
+    }
+
+    async fn call(
+        &mut self,
+        request: reflection::server_reflection_request::MessageRequest,
+    ) -> Result<reflection::server_reflection_response::MessageResponse, String> {
+        match self.version {
+            Some(version) => self
+                .call_version(version, request)
+                .await
+                .map_err(ReflectionCallError::into_message),
+            None => match self
+                .call_version(ReflectionVersion::V1, request.clone())
+                .await
+            {
+                Ok(response) => {
+                    self.version = Some(ReflectionVersion::V1);
+                    Ok(response)
+                }
+                Err(ReflectionCallError::Status(status)) if should_fallback(&status) => {
+                    let response = self
+                        .call_version(ReflectionVersion::V1Alpha, request)
+                        .await
+                        .map_err(ReflectionCallError::into_message)?;
+                    self.version = Some(ReflectionVersion::V1Alpha);
+                    Ok(response)
+                }
+                Err(err) => Err(err.into_message()),
+            },
+        }
+    }
+
+    async fn call_version(
+        &mut self,
+        version: ReflectionVersion,
+        request: reflection::server_reflection_request::MessageRequest,
+    ) -> Result<reflection::server_reflection_response::MessageResponse, ReflectionCallError> {
+        self.grpc.ready().await.map_err(|e| {
+            ReflectionCallError::Other(format!("Reflection client not ready: {}", e))
+        })?;
+
+        let path: PathAndQuery = version
+            .path()
+            .parse()
+            .map_err(|e| ReflectionCallError::Other(format!("Invalid reflection path: {}", e)))?;
+        let codec = tonic::codec::ProstCodec::<
+            reflection::ServerReflectionRequest,
+            reflection::ServerReflectionResponse,
+        >::default();
+
+        let req = reflection::ServerReflectionRequest {
+            host: String::new(),
+            message_request: Some(request),
+        };
+        let request_stream = tokio_stream::iter(vec![req]);
+
+        let response = self
+            .grpc
+            .streaming(Request::new(request_stream), path, codec)
+            .await
+            .map_err(ReflectionCallError::Status)?;
+        let mut stream = response.into_inner();
+
+        while let Some(resp) = stream
+            .message()
+            .await
+            .map_err(ReflectionCallError::Status)?
+        {
+            if let Some(message_response) = resp.message_response {
+                if let reflection::server_reflection_response::MessageResponse::ErrorResponse(err) =
+                    message_response
+                {
+                    return Err(ReflectionCallError::Other(format!(
+                        "Reflection error {}: {}",
+                        err.error_code, err.error_message
+                    )));
+                }
+                return Ok(message_response);
+            }
+        }
+
+        Err(ReflectionCallError::Other(
+            "No reflection response received".to_string(),
+        ))
+    }
+
+    async fn file_descriptors(
+        &mut self,
+        request: reflection::server_reflection_request::MessageRequest,
+    ) -> Result<Vec<prost_types::FileDescriptorProto>, String> {
+        match self.call(request).await? {
+            reflection::server_reflection_response::MessageResponse::FileDescriptorResponse(r) => {
+                let mut out = Vec::new();
+                for file_bytes in r.file_descriptor_proto {
+                    out.push(
+                        prost_types::FileDescriptorProto::decode(file_bytes.as_slice())
+                            .map_err(|e| format!("Failed to decode FileDescriptorProto: {}", e))?,
+                    );
+                }
+                Ok(out)
+            }
+            _ => Err("Unexpected reflection response".to_string()),
+        }
+    }
+
+    pub(crate) async fn file_containing_symbol(
+        &mut self,
+        symbol: &str,
+    ) -> Result<Vec<prost_types::FileDescriptorProto>, String> {
+        self.file_descriptors(
+            reflection::server_reflection_request::MessageRequest::FileContainingSymbol(
+                symbol.to_string(),
+            ),
+        )
         .await
-        .map_err(|e| format!("Reflection client not ready: {}", e))?;
+    }
 
-    let path: PathAndQuery = "/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo"
-        .parse()
-        .map_err(|e| format!("Invalid reflection path: {}", e))?;
-    let codec = tonic::codec::ProstCodec::<
-        reflection::ServerReflectionRequest,
-        reflection::ServerReflectionResponse,
-    >::default();
-
-    let request_stream = tokio_stream::iter(vec![req]);
-    let request = Request::new(request_stream);
-
-    let resp = grpc
-        .streaming(request, path, codec)
+    pub(crate) async fn file_by_filename(
+        &mut self,
+        filename: &str,
+    ) -> Result<Vec<prost_types::FileDescriptorProto>, String> {
+        self.file_descriptors(
+            reflection::server_reflection_request::MessageRequest::FileByFilename(
+                filename.to_string(),
+            ),
+        )
         .await
-        .map_err(|e| e.to_string())?;
+    }
 
-    Ok(resp.into_inner())
+    pub(crate) async fn list_services(&mut self) -> Result<Vec<String>, String> {
+        match self
+            .call(
+                reflection::server_reflection_request::MessageRequest::ListServices(String::new()),
+            )
+            .await?
+        {
+            reflection::server_reflection_response::MessageResponse::ListServicesResponse(r) => {
+                Ok(r.service.into_iter().map(|s| s.name).collect())
+            }
+            _ => Err("Unexpected reflection response".to_string()),
+        }
+    }
 }
 
 #[tauri::command]
 pub async fn grpc_reflection_list_services(
     _app: AppHandle,
     target: String,
-    use_tls: Option<bool>,
+    tls: Option<GrpcTlsOptions>,
 ) -> Result<Value, String> {
-    let use_tls = use_tls.unwrap_or(false);
-    let tls = GrpcTlsOptions {
-        use_tls,
-        skip_verify: false,
-    };
-    let target = normalize_target_with_tls(&target, use_tls);
+    let tls = tls.unwrap_or_default();
+    let target = normalize_target_with_tls(&target, tls.use_tls);
 
     let channel = create_channel(&target, &tls).await?;
+    let mut client = ReflectionClient::new(channel);
 
-    let mut grpc = tonic::client::Grpc::new(channel);
-    grpc.ready()
-        .await
-        .map_err(|e| format!("Reflection client not ready: {}", e))?;
-
-    let req = reflection::ServerReflectionRequest {
-        host: "".to_string(),
-        message_request: Some(
-            reflection::server_reflection_request::MessageRequest::ListServices("".to_string()),
-        ),
-    };
-
-    let mut stream = reflection_info_stream(&mut grpc, req).await?;
-
-    while let Some(resp) = stream.message().await.map_err(|e| e.to_string())? {
-        match resp.message_response {
-            Some(
-                reflection::server_reflection_response::MessageResponse::ListServicesResponse(r),
-            ) => {
-                let services: Vec<String> = r.service.into_iter().map(|s| s.name).collect();
-                return Ok(serde_json::to_value(services).unwrap());
-            }
-            Some(reflection::server_reflection_response::MessageResponse::ErrorResponse(err)) => {
-                return Err(format!(
-                    "Reflection error {}: {}",
-                    err.error_code, err.error_message
-                ));
-            }
-            _ => {}
-        }
-    }
-
-    Err("No reflection response received".to_string())
+    let services = client.list_services().await?;
+    Ok(serde_json::to_value(services).unwrap())
 }
 
 #[allow(dead_code)]
@@ -308,18 +422,78 @@ pub(crate) fn normalize_target_with_tls(target: &str, use_tls: bool) -> String {
 }
 
 pub(crate) async fn create_channel(target: &str, tls: &GrpcTlsOptions) -> Result<Channel, String> {
-    let mut endpoint =
+    let endpoint =
         Endpoint::from_shared(target.to_string()).map_err(|e| format!("Invalid target: {}", e))?;
 
-    if tls.use_tls {
-        let tls_config = ClientTlsConfig::new();
-        endpoint = endpoint
-            .tls_config(tls_config)
-            .map_err(|e| format!("TLS config error: {}", e))?;
+    if !tls.use_tls {
+        return endpoint
+            .connect()
+            .await
+            .map_err(|e| format!("Connection failed: {}", e));
+    }
+
+    let (cert_path, key_path, ca_path) = match &tls.client_cert {
+        Some(cert) => (&cert.cert_path, &cert.key_path, &cert.ca_path),
+        None => (&None, &None, &None),
+    };
+    let identity_pems = crate::commands::tls::load_identity_pems(cert_path, key_path)?;
+
+    if tls.skip_verify {
+        return connect_skip_verify(endpoint, identity_pems).await;
+    }
+
+    let mut tls_config = ClientTlsConfig::new().with_native_roots();
+    if let Some(ca_pem) = crate::commands::tls::load_ca_pem(ca_path)? {
+        tls_config = tls_config.ca_certificate(tonic::transport::Certificate::from_pem(ca_pem));
+    }
+    if let Some((cert_pem, key_pem)) = identity_pems {
+        tls_config = tls_config.identity(tonic::transport::Identity::from_pem(cert_pem, key_pem));
     }
 
     endpoint
+        .tls_config(tls_config)
+        .map_err(|e| format!("TLS config error: {}", e))?
         .connect()
+        .await
+        .map_err(|e| format!("Connection failed: {}", e))
+}
+
+/// Connect with server-certificate verification disabled. tonic has no hook
+/// for a custom certificate verifier, so the TLS handshake happens in a custom
+/// connector and tonic receives an already-encrypted stream.
+async fn connect_skip_verify(
+    endpoint: Endpoint,
+    identity_pems: Option<crate::commands::tls::IdentityPems>,
+) -> Result<Channel, String> {
+    let config = crate::commands::tls::build_danger_grpc_tls_config(identity_pems)?;
+    let tls_connector = tokio_rustls::TlsConnector::from(std::sync::Arc::new(config));
+
+    let connector = tower::service_fn(move |uri: http::Uri| {
+        let tls_connector = tls_connector.clone();
+        async move {
+            let host = uri
+                .host()
+                .ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "target has no host")
+                })?
+                .to_string();
+            let port = uri.port_u16().unwrap_or(443);
+
+            let tcp = tokio::net::TcpStream::connect((host.as_str(), port)).await?;
+            let server_name =
+                rustls::pki_types::ServerName::try_from(host.clone()).map_err(|e| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!("invalid server name '{}': {}", host, e),
+                    )
+                })?;
+            let stream = tls_connector.connect(server_name, tcp).await?;
+            Ok::<_, std::io::Error>(hyper_util::rt::TokioIo::new(stream))
+        }
+    });
+
+    endpoint
+        .connect_with_connector(connector)
         .await
         .map_err(|e| format!("Connection failed: {}", e))
 }
@@ -402,14 +576,10 @@ pub async fn grpc_get_input_skeleton(
     _app: AppHandle,
     target: String,
     full_method: String,
-    use_tls: Option<bool>,
+    tls: Option<GrpcTlsOptions>,
 ) -> Result<Value, String> {
-    let use_tls = use_tls.unwrap_or(false);
-    let tls = GrpcTlsOptions {
-        use_tls,
-        skip_verify: false,
-    };
-    let target = normalize_target_with_tls(&target, use_tls);
+    let tls = tls.unwrap_or_default();
+    let target = normalize_target_with_tls(&target, tls.use_tls);
 
     let pool = build_descriptor_pool_for_method_with_tls(&target, &full_method, &tls).await?;
     let (input_type, _) = resolve_method_types(&pool, &full_method)?;
@@ -466,14 +636,6 @@ fn generate_field_skeleton(field: &prost_reflect::FieldDescriptor) -> Value {
     }
 }
 
-#[allow(dead_code)]
-async fn build_descriptor_pool_for_method(
-    target: &str,
-    full_method: &str,
-) -> Result<DescriptorPool, String> {
-    build_descriptor_pool_for_method_with_tls(target, full_method, &GrpcTlsOptions::default()).await
-}
-
 pub(crate) async fn build_descriptor_pool_for_method_with_tls(
     target: &str,
     full_method: &str,
@@ -490,16 +652,12 @@ pub(crate) async fn build_descriptor_pool_for_method_with_tls(
     let service_symbol = parts[0];
 
     let channel = create_channel(target, tls).await?;
-
-    let mut grpc = tonic::client::Grpc::new(channel);
-    grpc.ready()
-        .await
-        .map_err(|e| format!("Reflection client not ready: {}", e))?;
+    let mut client = ReflectionClient::new(channel);
 
     let mut collected: Vec<prost_types::FileDescriptorProto> = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
 
-    let initial = reflection_request_file_containing_symbol(&mut grpc, service_symbol).await?;
+    let initial = client.file_containing_symbol(service_symbol).await?;
     for fd in initial {
         queue_descriptor(&mut collected, &mut seen, fd);
     }
@@ -512,7 +670,7 @@ pub(crate) async fn build_descriptor_pool_for_method_with_tls(
             if seen.contains(&dep) {
                 continue;
             }
-            let dep_files = reflection_request_file_by_filename(&mut grpc, &dep).await?;
+            let dep_files = client.file_by_filename(&dep).await?;
             for fd in dep_files {
                 queue_descriptor(&mut collected, &mut seen, fd);
             }
@@ -604,86 +762,103 @@ fn queue_descriptor(
     }
 }
 
-async fn reflection_request_file_containing_symbol(
-    grpc: &mut tonic::client::Grpc<Channel>,
-    symbol: &str,
-) -> Result<Vec<prost_types::FileDescriptorProto>, String> {
-    let req = reflection::ServerReflectionRequest {
-        host: "".to_string(),
-        message_request: Some(
-            reflection::server_reflection_request::MessageRequest::FileContainingSymbol(
-                symbol.to_string(),
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn v1_and_v1alpha_reflection_messages_are_wire_compatible() {
+        let v1_request = reflection::ServerReflectionRequest {
+            host: "example.com".to_string(),
+            message_request: Some(
+                reflection::server_reflection_request::MessageRequest::FileContainingSymbol(
+                    "pkg.Service".to_string(),
+                ),
             ),
-        ),
-    };
-
-    let mut stream = reflection_info_stream(grpc, req).await?;
-
-    while let Some(resp) = stream.message().await.map_err(|e| e.to_string())? {
-        match resp.message_response {
+        };
+        let bytes = v1_request.encode_to_vec();
+        let decoded =
+            reflection_v1alpha::ServerReflectionRequest::decode(bytes.as_slice()).unwrap();
+        assert_eq!(decoded.host, "example.com");
+        assert!(matches!(
+            decoded.message_request,
             Some(
-                reflection::server_reflection_response::MessageResponse::FileDescriptorResponse(r),
-            ) => {
-                let mut out = Vec::new();
-                for file_bytes in r.file_descriptor_proto {
-                    out.push(
-                        prost_types::FileDescriptorProto::decode(file_bytes.as_slice())
-                            .map_err(|e| format!("Failed to decode FileDescriptorProto: {}", e))?,
-                    );
-                }
-                return Ok(out);
-            }
-            Some(reflection::server_reflection_response::MessageResponse::ErrorResponse(err)) => {
-                return Err(format!(
-                    "Reflection error {}: {}",
-                    err.error_code, err.error_message
-                ));
-            }
-            _ => {}
-        }
+                reflection_v1alpha::server_reflection_request::MessageRequest::FileContainingSymbol(
+                    ref s
+                )
+            ) if s == "pkg.Service"
+        ));
+
+        let v1alpha_response = reflection_v1alpha::ServerReflectionResponse {
+            valid_host: "example.com".to_string(),
+            original_request: None,
+            message_response: Some(
+                reflection_v1alpha::server_reflection_response::MessageResponse::ListServicesResponse(
+                    reflection_v1alpha::ListServiceResponse {
+                        service: vec![reflection_v1alpha::ServiceResponse {
+                            name: "pkg.Service".to_string(),
+                        }],
+                    },
+                ),
+            ),
+        };
+        let bytes = v1alpha_response.encode_to_vec();
+        let decoded = reflection::ServerReflectionResponse::decode(bytes.as_slice()).unwrap();
+        assert!(matches!(
+            decoded.message_response,
+            Some(reflection::server_reflection_response::MessageResponse::ListServicesResponse(
+                ref r
+            )) if r.service.len() == 1 && r.service[0].name == "pkg.Service"
+        ));
     }
 
-    Err("No reflection response received".to_string())
-}
-
-async fn reflection_request_file_by_filename(
-    grpc: &mut tonic::client::Grpc<Channel>,
-    filename: &str,
-) -> Result<Vec<prost_types::FileDescriptorProto>, String> {
-    let req = reflection::ServerReflectionRequest {
-        host: "".to_string(),
-        message_request: Some(
-            reflection::server_reflection_request::MessageRequest::FileByFilename(
-                filename.to_string(),
-            ),
-        ),
-    };
-
-    let mut stream = reflection_info_stream(grpc, req).await?;
-
-    while let Some(resp) = stream.message().await.map_err(|e| e.to_string())? {
-        match resp.message_response {
-            Some(
-                reflection::server_reflection_response::MessageResponse::FileDescriptorResponse(r),
-            ) => {
-                let mut out = Vec::new();
-                for file_bytes in r.file_descriptor_proto {
-                    out.push(
-                        prost_types::FileDescriptorProto::decode(file_bytes.as_slice())
-                            .map_err(|e| format!("Failed to decode FileDescriptorProto: {}", e))?,
-                    );
-                }
-                return Ok(out);
-            }
-            Some(reflection::server_reflection_response::MessageResponse::ErrorResponse(err)) => {
-                return Err(format!(
-                    "Reflection error {}: {}",
-                    err.error_code, err.error_message
-                ));
-            }
-            _ => {}
-        }
+    #[test]
+    fn fallback_triggers_only_on_missing_service_codes() {
+        assert!(should_fallback(&Status::unimplemented("no v1")));
+        assert!(should_fallback(&Status::not_found("no route")));
+        assert!(!should_fallback(&Status::unavailable("down")));
+        assert!(!should_fallback(&Status::deadline_exceeded("slow")));
+        assert!(!should_fallback(&Status::permission_denied("denied")));
     }
 
-    Err("No reflection response received".to_string())
+    #[test]
+    fn tls_options_deserialize_legacy_and_full_payloads() {
+        let legacy: GrpcTlsOptions =
+            serde_json::from_value(serde_json::json!({ "useTls": true, "skipVerify": true }))
+                .unwrap();
+        assert!(legacy.use_tls);
+        assert!(legacy.skip_verify);
+        assert!(legacy.client_cert.is_none());
+
+        let full: GrpcTlsOptions = serde_json::from_value(serde_json::json!({
+            "useTls": true,
+            "skipVerify": false,
+            "clientCert": {
+                "certPath": "/tmp/client.pem",
+                "keyPath": "/tmp/client.key",
+                "caPath": "/tmp/ca.pem"
+            }
+        }))
+        .unwrap();
+        let cert = full.client_cert.expect("client cert present");
+        assert_eq!(cert.cert_path.as_deref(), Some("/tmp/client.pem"));
+        assert_eq!(cert.key_path.as_deref(), Some("/tmp/client.key"));
+        assert_eq!(cert.ca_path.as_deref(), Some("/tmp/ca.pem"));
+    }
+
+    #[test]
+    fn normalize_target_prefixes_scheme_by_tls_mode() {
+        assert_eq!(
+            normalize_target_with_tls("localhost:50051", false),
+            "http://localhost:50051"
+        );
+        assert_eq!(
+            normalize_target_with_tls("localhost:50051", true),
+            "https://localhost:50051"
+        );
+        assert_eq!(
+            normalize_target_with_tls("https://api.example.com", false),
+            "https://api.example.com"
+        );
+    }
 }

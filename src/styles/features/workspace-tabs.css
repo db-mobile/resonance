@@ -1,0 +1,143 @@
+/**
+ * Workspace tab bar (rendered by WorkspaceTabBar) mapped onto the
+ * AdwTabBar look. Class names come from the component and are part
+ * of the JS contract.
+ */
+
+.workspace-tab-bar-container {
+  display: flex;
+  overflow: hidden;
+  flex-shrink: 0;
+  background-color: var(--headerbar-bg-color);
+  color: var(--headerbar-fg-color);
+  box-shadow: inset 0 -1px var(--headerbar-shade-color);
+}
+
+.workspace-tab-bar {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  min-width: 0;
+  min-height: 38px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.workspace-tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.workspace-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 160px;
+  min-width: 110px;
+  max-width: 220px;
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-small);
+  cursor: default;
+  user-select: none;
+  box-shadow: inset -1px 0 var(--headerbar-shade-color);
+  transition: background-color var(--transition-fast);
+}
+
+.workspace-tab:hover {
+  background-color: var(--shade-color);
+}
+
+.workspace-tab.active {
+  background-color: var(--window-bg-color);
+  box-shadow: inset -1px 0 var(--headerbar-shade-color), inset 0 2px var(--accent-bg-color);
+}
+
+.workspace-tab.is-dragging,
+.workspace-tab.dragging {
+  opacity: 0.5;
+}
+
+.workspace-tab-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-tab-modified-indicator {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background-color: currentColor;
+  opacity: var(--dim-opacity);
+}
+
+.workspace-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  opacity: 0;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast);
+}
+
+.workspace-tab:hover .workspace-tab-close,
+.workspace-tab.active .workspace-tab-close {
+  opacity: var(--dim-opacity);
+}
+
+.workspace-tab-close:hover {
+  background-color: color-mix(in srgb, currentColor 15%, transparent);
+  opacity: 1;
+}
+
+.workspace-tab-new,
+.workspace-tab-list-button,
+.workspace-tab-scroll-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 28px;
+  height: 28px;
+  margin: 0 var(--space-1);
+  flex-shrink: 0;
+  border-radius: var(--radius-small);
+  transition: background-color var(--transition-fast);
+}
+
+.workspace-tab-new:hover,
+.workspace-tab-list-button:hover,
+.workspace-tab-scroll-button:hover {
+  background-color: var(--shade-color);
+}
+
+.workspace-tab-drag-preview {
+  position: fixed;
+  z-index: var(--z-toast);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-small);
+  background-color: var(--popover-bg-color);
+  color: var(--popover-fg-color);
+  box-shadow: var(--shadow-popover);
+  pointer-events: none;
+  font-size: var(--font-size-small);
+}
+
+.workspace-tab-list-item-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background-color: var(--accent-bg-color);
+  opacity: 0;
+}
+
+.workspace-tab-list-item.active .workspace-tab-list-item-indicator,
+.workspace-tab-list-item.is-active .workspace-tab-list-item-indicator {
+  opacity: 1;
+}

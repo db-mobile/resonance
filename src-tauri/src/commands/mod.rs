@@ -15,5 +15,6 @@ pub mod scripts;
 pub mod secrets;
 pub mod sse;
 pub mod store;
+pub mod tls;
 pub mod updater;
 pub mod websocket;

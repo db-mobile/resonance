@@ -190,6 +190,7 @@ export class VariableManager {
 
     setupEventListeners(dialogContent) {
         const addBtn = dialogContent.querySelector('#add-variable-btn');
+        const closeBtn = dialogContent.querySelector('#variables-close-btn');
         const cancelBtn = dialogContent.querySelector('#variables-cancel-btn');
         const saveBtn = dialogContent.querySelector('#variables-save-btn');
         const importBtn = dialogContent.querySelector('#import-variables-btn');
@@ -201,6 +202,7 @@ export class VariableManager {
             this.addVariableRow(container);
         });
 
+        closeBtn.addEventListener('click', () => this.close());
         cancelBtn.addEventListener('click', () => this.close());
         saveBtn.addEventListener('click', () => this.save());
 

@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "2.12.7"
+version = "3.0.0"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -9,7 +9,7 @@ edition = "2021"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-tonic-build = "0.11"
+tonic-build = "0.13"
 protoc-bin-vendored = "3"
 
 [dependencies]
@@ -29,15 +29,17 @@ futures-util = "0.3"
 # MQTT client (async, rustls to match project TLS stack — no OpenSSL)
 rumqttc = { version = "0.25", default-features = false, features = ["use-rustls"] }
 
-# gRPC client
-tonic = { version = "0.11", default-features = false, features = ["codegen", "prost", "transport", "tls", "tls-roots"] }
-prost = "0.12"
-prost-types = "0.12"
+# gRPC client (rustls-only TLS via tls-ring; keep the tree OpenSSL-free)
+tonic = { version = "0.13", default-features = false, features = ["codegen", "prost", "channel", "tls-ring", "tls-native-roots"] }
+prost = "0.13"
+prost-types = "0.13"
 tokio-stream = { version = "0.1", features = ["sync"] }
-prost-reflect = { version = "0.12", features = ["serde"] }
+prost-reflect = { version = "0.15", features = ["serde"] }
 bytes = "1"
-http = "0.2"
+http = "1"
 base64 = "0.21"
+hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
+rustls-pemfile = "2"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -46,7 +48,7 @@ serde_yaml = "0.9"
 
 # Mock server
 axum = "0.7"
-tower = "0.4"
+tower = { version = "0.4", features = ["util"] }
 tower-http = { version = "0.5", features = ["cors"] }
 
 # TLS for connection timing measurement

@@ -1,0 +1,123 @@
+/**
+ * Sidebar: view switcher toolbar, primary menu, collections and
+ * history pages. The history page overlays the collections page
+ * when it carries the .visible contract class.
+ */
+
+.sidebar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  flex: 0 0 280px;
+  min-width: 200px;
+  background-color: var(--sidebar-bg-color);
+  color: var(--sidebar-fg-color);
+}
+
+.sidebar-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  min-height: 46px;
+}
+
+.sidebar-switcher {
+  flex: 1;
+}
+
+.sidebar-switcher > .view-switcher-btn {
+  flex: 1;
+  justify-content: center;
+}
+
+.sidebar-switcher .sidebar-switcher-collections {
+  background-color: var(--switcher-active-bg);
+  box-shadow: var(--switcher-active-shadow);
+  opacity: 1;
+}
+
+.sidebar-toolbar:has(.sidebar-switcher-history.active) .sidebar-switcher-collections {
+  background-color: transparent;
+  box-shadow: none;
+  opacity: 0.8;
+}
+
+.sidebar-switcher .sidebar-switcher-history.active {
+  background-color: var(--switcher-active-bg);
+  box-shadow: var(--switcher-active-shadow);
+  opacity: 1;
+}
+
+.primary-menu {
+  position: relative;
+}
+
+.primary-menu > summary {
+  list-style: none;
+}
+
+.primary-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.primary-menu[open] > summary {
+  background-color: var(--shade-color);
+}
+
+.primary-menu-popover {
+  top: calc(100% + var(--space-1));
+  right: 0;
+  min-width: 220px;
+}
+
+.sidebar-page-collections {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sidebar-search {
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+.sidebar-search .entry {
+  width: 100%;
+}
+
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--space-2) var(--space-2);
+}
+
+.environment-section {
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--sidebar-shade-color);
+}
+
+.sidebar-page-history {
+  position: absolute;
+  top: 46px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: none;
+  flex-direction: column;
+  background-color: var(--sidebar-bg-color);
+}
+
+.sidebar-page-history.visible {
+  display: flex;
+}
+
+.sidebar-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-1) var(--space-3) var(--space-2);
+}

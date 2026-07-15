@@ -1,0 +1,91 @@
+/**
+ * Environment selector (sidebar bottom row) and its dropdown.
+ * The manager dialog itself is styled with the dialog widget.
+ */
+
+.environment-selector {
+  position: relative;
+}
+
+.env-selector-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-small);
+  color: inherit;
+  transition: background-color var(--transition-fast);
+}
+
+.env-selector-button:hover {
+  background-color: var(--shade-color);
+}
+
+.env-active-indicator {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background-color: var(--env-indicator-color, var(--success-bg-color));
+}
+
+.env-icon {
+  opacity: var(--dim-opacity);
+}
+
+.env-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.env-arrow {
+  opacity: var(--dim-opacity);
+}
+
+.env-dropdown {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  right: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.environment-section .env-dropdown {
+  top: auto;
+  bottom: calc(100% + var(--space-1));
+}
+
+.cookie-manager-env-selector .env-dropdown {
+  left: auto;
+  right: 0;
+  min-width: 260px;
+}
+
+.env-color-indicator {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background-color: var(--env-indicator-color, var(--shade-color));
+}
+
+.env-check {
+  margin-left: auto;
+  color: var(--accent-color);
+}
+
+.env-manage-item {
+  opacity: var(--dim-opacity);
+}
+
+.env-manage-item:hover {
+  opacity: 1;
+}

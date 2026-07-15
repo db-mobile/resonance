@@ -5,105 +5,144 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' ipc: http://ipc.localhost; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https: http:;">
     <title>Resonance</title>
-    <link rel="stylesheet" href="src/style.css">
+    <link rel="stylesheet" href="src/styles/main.css">
 </head>
 <body>
-    <!-- Main Layout -->
-    <div class="main-layout tk-shell">
+    <div class="main-layout" id="app-shell">
 
-        <!-- App Body -->
-        <div class="app-body tk-body">
+        <div class="app-body">
 
-        <!-- Activity Bar -->
-        <div class="activity-bar tk-rail" role="navigation" aria-label="Main Navigation">
-            <div class="activity-bar-group">
-                <button id="keyboard-shortcuts-btn" class="activity-bar-btn" title="Keyboard Shortcuts (Ctrl+/)">
-                    <span class="icon icon-18 icon-keyboard"></span>
-                </button>
-                <button id="history-toggle-btn" class="activity-bar-btn"
-                        data-i18n-title="sidebar.history" data-i18n-aria="sidebar.history" title="History">
-                    <span class="icon icon-18 icon-clock"></span>
-                </button>
-                <button id="cookie-jar-btn" class="activity-bar-btn" title="Cookie Jar">
-                    <span class="icon icon-18 icon-cookie"></span>
-                </button>
-                <button id="mock-server-btn" class="activity-bar-btn"
-                        data-i18n-title="toolbar.mockServer" data-i18n-aria="toolbar.mockServer" title="Mock Server">
-                    <span class="icon icon-18 icon-mock-server"></span>
-                </button>
-                <button id="runner-btn" class="activity-bar-btn"
-                        data-i18n-title="runner.title" data-i18n-aria="runner.title" title="Collection Runner">
-                    <span class="icon icon-18 icon-play"></span>
-                </button>
-                <button id="import-collection-btn" class="activity-bar-btn"
-                        data-i18n-title="sidebar.import" data-i18n-aria="sidebar.import" title="Import Collection">
-                    <span class="icon icon-18 icon-import"></span>
-                </button>
+        <!-- Sidebar: Collections / History -->
+        <aside class="sidebar collections-sidebar" role="complementary">
+            <div class="sidebar-toolbar">
+                <div class="view-switcher sidebar-switcher" role="tablist" aria-label="Sidebar Pages">
+                    <button id="close-history-btn"
+                            class="view-switcher-btn sidebar-switcher-collections"
+                            role="tab"
+                            data-i18n="sidebar.collections">
+                        Collections
+                    </button>
+                    <button id="history-toggle-btn"
+                            class="view-switcher-btn sidebar-switcher-history"
+                            role="tab"
+                            data-i18n="sidebar.history"
+                            data-i18n-title="sidebar.history"
+                            data-i18n-aria="sidebar.history">
+                        History
+                    </button>
+                </div>
+                <details class="primary-menu" id="primary-menu">
+                    <summary class="button flat image-button" title="Main Menu" aria-label="Main Menu">
+                        <span class="icon icon-16 icon-menu"></span>
+                    </summary>
+                    <div class="popover menu primary-menu-popover">
+                        <button id="import-collection-btn" class="menu-item"
+                                data-i18n-title="sidebar.import" data-i18n-aria="sidebar.import">
+                            <span class="icon icon-16 icon-import"></span>
+                            <span data-i18n="sidebar.import">Import Collection</span>
+                        </button>
+                        <button id="mock-server-btn" class="menu-item"
+                                data-i18n-title="toolbar.mockServer" data-i18n-aria="toolbar.mockServer">
+                            <span class="icon icon-16 icon-mock-server"></span>
+                            <span data-i18n="toolbar.mockServer">Mock Server</span>
+                        </button>
+                        <button id="cookie-jar-btn" class="menu-item" title="Cookie Jar">
+                            <span class="icon icon-16 icon-cookie"></span>
+                            <span>Cookie Jar</span>
+                        </button>
+                        <div class="menu-separator"></div>
+                        <button id="keyboard-shortcuts-btn" class="menu-item" title="Keyboard Shortcuts (Ctrl+/)">
+                            <span class="icon icon-16 icon-keyboard"></span>
+                            <span>Keyboard Shortcuts</span>
+                            <span class="menu-item-accel">Ctrl+/</span>
+                        </button>
+                        <button id="settings-btn" class="menu-item"
+                                data-i18n-title="header.settings" data-i18n-aria="header.settings">
+                            <span class="icon icon-16 icon-gear"></span>
+                            <span data-i18n="header.settings">Settings</span>
+                        </button>
+                    </div>
+                </details>
             </div>
-            <div class="activity-bar-divider"></div>
-            <div class="activity-bar-spacer"></div>
-            <div class="activity-bar-group">
-                <button id="settings-btn" class="activity-bar-btn"
-                        data-i18n-title="header.settings" data-i18n-aria="header.settings" title="Settings">
-                    <span class="icon icon-18 icon-gear"></span>
-                </button>
-            </div>
-        </div>
 
-        <!-- Collections Sidebar -->
-        <aside class="collections-sidebar tk-panel" role="complementary">
-
-            <!-- Environment Selector -->
-            <div class="environment-section tk-panel-section--env">
-                <span class="tk-eyebrow">Environment</span>
-                <div id="environment-selector-container"></div>
-            </div>
-
-            <div class="sidebar-header tk-panel-head">
-                <span class="tk-eyebrow" data-i18n="sidebar.collections">Collections</span>
-                <div class="collections-search">
-                    <div class="search-input-wrap">
+            <div class="sidebar-page sidebar-page-collections">
+                <div class="sidebar-search">
+                    <div class="search-entry search-input-wrap">
                         <span class="search-input-icon icon icon-16 icon-search" aria-hidden="true"></span>
                         <input type="text"
                                id="collections-search-input"
-                               class="input-base form-input compact search-input"
+                               class="entry compact search-input"
                                placeholder="Search collections..."
                                data-i18n-placeholder="sidebar.collections_search_placeholder"
                                aria-label="Search collections">
                     </div>
                 </div>
-            </div>
-            
-            <div class="collections-container tk-panel-scroll u-flex u-flex-col">
-                <div id="collections-list" class="collections-list u-flex u-flex-col">
-                    <div class="empty-state-base collections-empty u-flex u-flex-col u-items-center">
-                        <span class="collections-empty-icon icon icon-64 icon-spark"></span>
-                        <p class="collections-empty-text">No collections imported yet</p>
-                        <p class="collections-empty-subtext">Import an OpenAPI collection to get started</p>
+
+                <div class="collections-container sidebar-scroll">
+                    <div id="collections-list" class="collections-list">
+                        <div class="status-page compact collections-empty">
+                            <span class="status-page-icon icon icon-64 icon-spark"></span>
+                            <p class="status-page-title collections-empty-text">No collections imported yet</p>
+                            <p class="status-page-description collections-empty-subtext">Import an OpenAPI collection to get started</p>
+                        </div>
                     </div>
                 </div>
+
+                <div class="environment-section">
+                    <div id="environment-selector-container"></div>
+                </div>
             </div>
+
+            <!-- History page (overlays the collections page when .visible) -->
+            <aside class="sidebar-page sidebar-page-history history-sidebar" role="complementary" id="history-sidebar">
+                <div class="sidebar-section-header">
+                    <span class="caption-heading dim-label" data-i18n="sidebar.history">History</span>
+                    <button id="clear-all-history-btn" class="button flat small image-button"
+                            data-i18n-title="history.clear_all" data-i18n-aria="history.clear_all">
+                        <span class="icon icon-16 icon-trash"></span>
+                    </button>
+                </div>
+
+                <div class="history-search sidebar-search">
+                    <div class="search-entry search-input-wrap">
+                        <span class="search-input-icon icon icon-16 icon-search" aria-hidden="true"></span>
+                        <input type="text"
+                               id="history-search-input"
+                               class="entry compact search-input"
+                               placeholder="Search history..."
+                               data-i18n-placeholder="history.search_placeholder"
+                               aria-label="Search history">
+                    </div>
+                </div>
+
+                <div class="history-container sidebar-scroll">
+                    <div id="history-list" class="history-list">
+                        <div class="status-page compact history-empty">
+                            <span class="status-page-icon icon icon-64 icon-history"></span>
+                            <p class="status-page-title history-empty-text" data-i18n="history.empty">No request history</p>
+                            <p class="status-page-description history-empty-subtext" data-i18n="history.empty_subtext">Send a request to see it here</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
         </aside>
 
-        <!-- Horizontal Resizer Handle -->
-        <div class="horizontal-resizer-handle tk-gutter" id="horizontal-resizer-handle">
-            <div class="horizontal-resizer-grip u-flex u-items-center u-justify-center">
-                <div class="horizontal-resizer-line"></div>
-                <div class="horizontal-resizer-line"></div>
-                <div class="horizontal-resizer-line"></div>
-            </div>
+        <!-- Sidebar / content separator (draggable) -->
+        <div class="pane-resizer pane-resizer-col" id="horizontal-resizer-handle" aria-hidden="true">
+            <div class="horizontal-resizer-grip"><div class="horizontal-resizer-line"></div></div>
         </div>
 
+        <!-- Legacy history resizer: kept for the JS contract, never shown -->
+        <div class="pane-resizer-retired" id="history-resizer-handle" aria-hidden="true"></div>
+
         <!-- Main Content Area -->
-        <main class="main-content-area tk-main" role="main" id="main-content-area">
-            <!-- Workspace Tab Bar -->
-            <div id="workspace-tab-bar-container" class="workspace-tab-bar-container u-flex u-overflow-hidden"></div>
+        <main class="main-content-area" role="main" id="main-content-area">
+            <div id="workspace-tab-bar-container" class="workspace-tab-bar-container"></div>
 
             <!-- Request Builder -->
-            <section class="request-builder tk-console">
-                <div class="tk-console-inner">
+            <section class="request-builder">
                 <div class="request-url-section">
-                    <div class="method-select-container">
+                    <div class="method-select-container select-wrap">
                         <select id="method-select" class="select-base method-select" aria-label="HTTP Method">
                             <option value="GET">GET</option>
                             <option value="POST">POST</option>
@@ -113,165 +152,116 @@
                         </select>
                         <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                     </div>
-                    
+
                     <input type="url"
                            id="url-input"
-                           class="input-base url-input"
+                           class="entry url-input monospace"
                            placeholder="Enter API URL"
                            value="https://jsonplaceholder.typicode.com/posts"
                            aria-label="API URL">
 
                     <button id="send-request-btn"
-                            class="btn btn-primary"
+                            class="button suggested-action"
                             aria-label="Send Request">
-                        Send Request
+                        Send
                     </button>
 
                     <button id="cancel-request-btn"
-                            class="btn btn-danger"
+                            class="button destructive-action"
                             aria-label="Cancel Request"
                             style="display: none;">
                         Cancel
                     </button>
 
                     <button id="curl-btn"
-                            class="btn btn-primary"
+                            class="button flat image-button"
                             aria-label="Generate Code Snippet"
                             title="Generate Code Snippet (cURL, Python, JavaScript, etc.)">
                         <span class="icon icon-16 icon-curl"></span>
                     </button>
-                </div>
-                </div>
-                <div class="tk-console-rail" aria-hidden="true">
-                    <span class="tk-signal-trace" data-role="signal-trace"></span>
+
+                    <button id="runner-btn"
+                            class="button flat image-button"
+                            data-i18n-title="runner.title" data-i18n-aria="runner.title" title="Collection Runner">
+                        <span class="icon icon-16 icon-play"></span>
+                    </button>
                 </div>
             </section>
 
             <!-- Request Configuration -->
             <section class="request-config">
-                <nav class="tab-nav" role="tablist" aria-label="Request Configuration">
-                    <button class="tab-button active"
-                            data-tab="path-params"
-                            role="tab"
-                            aria-selected="true"
-                            aria-controls="path-params"
-                            data-i18n="tabs.path_params">
+                <nav class="tab-nav view-switcher flat" role="tablist" aria-label="Request Configuration">
+                    <button class="tab-button view-switcher-btn active" data-tab="path-params" role="tab"
+                            aria-selected="true" aria-controls="path-params" data-i18n="tabs.path_params">
                         Path Params
                     </button>
-                    <button class="tab-button"
-                            data-tab="query-params"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="query-params"
-                            data-i18n="tabs.query_params">
+                    <button class="tab-button view-switcher-btn" data-tab="query-params" role="tab"
+                            aria-selected="false" aria-controls="query-params" data-i18n="tabs.query_params">
                         Query Params
                     </button>
-                    <button class="tab-button"
-                            data-tab="headers"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="headers"
-                            data-i18n="tabs.headers">
+                    <button class="tab-button view-switcher-btn" data-tab="headers" role="tab"
+                            aria-selected="false" aria-controls="headers" data-i18n="tabs.headers">
                         Headers
                     </button>
-                    <button class="tab-button"
-                            data-tab="body"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="body"
-                            data-i18n="tabs.body">
+                    <button class="tab-button view-switcher-btn" data-tab="body" role="tab"
+                            aria-selected="false" aria-controls="body" data-i18n="tabs.body">
                         Body
                     </button>
-                    <button class="tab-button"
-                            data-tab="grpc"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="grpc"
-                            data-i18n="tabs.grpc">
+                    <button class="tab-button view-switcher-btn" data-tab="grpc" role="tab"
+                            aria-selected="false" aria-controls="grpc" data-i18n="tabs.grpc">
                         gRPC
                     </button>
-                    <button class="tab-button"
-                            data-tab="grpc-message"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="grpc-message"
-                            data-i18n="tabs.grpc_message">
+                    <button class="tab-button view-switcher-btn" data-tab="grpc-message" role="tab"
+                            aria-selected="false" aria-controls="grpc-message" data-i18n="tabs.grpc_message">
                         Message
                     </button>
-                    <button class="tab-button"
-                            data-tab="grpc-metadata"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="grpc-metadata"
-                            data-i18n="tabs.grpc_metadata">
+                    <button class="tab-button view-switcher-btn" data-tab="grpc-metadata" role="tab"
+                            aria-selected="false" aria-controls="grpc-metadata" data-i18n="tabs.grpc_metadata">
                         Metadata
                     </button>
-                    <button class="tab-button"
-                            data-tab="mqtt"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="mqtt"
-                            data-i18n="tabs.mqtt">
+                    <button class="tab-button view-switcher-btn" data-tab="mqtt" role="tab"
+                            aria-selected="false" aria-controls="mqtt" data-i18n="tabs.mqtt">
                         MQTT
                     </button>
-                    <button class="tab-button"
-                            data-tab="scripts"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="scripts"
-                            data-i18n="tabs.scripts">
+                    <button class="tab-button view-switcher-btn" data-tab="scripts" role="tab"
+                            aria-selected="false" aria-controls="scripts" data-i18n="tabs.scripts">
                         Scripts
                     </button>
-                    <button class="tab-button"
-                            data-tab="authorization"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="authorization"
-                            data-i18n="tabs.authorization">
+                    <button class="tab-button view-switcher-btn" data-tab="authorization" role="tab"
+                            aria-selected="false" aria-controls="authorization" data-i18n="tabs.authorization">
                         Authorization
                     </button>
-                    <button class="tab-button"
-                            data-tab="schema"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="schema"
-                            data-i18n="tabs.schema">
+                    <button class="tab-button view-switcher-btn" data-tab="schema" role="tab"
+                            aria-selected="false" aria-controls="schema" data-i18n="tabs.schema">
                         Schema
                     </button>
                 </nav>
 
-                <div class="tab-content active" id="path-params" role="tabpanel" aria-labelledby="path-params-tab">
-                    <h3>Path Parameters</h3>
-                    <div id="path-params-list" class="key-value-list" role="group" aria-label="Path Parameters">
-                    </div>
-                    <button id="add-path-param-btn" class="btn-sm btn-secondary" aria-label="Add Path Parameter">
-                        + Add Path Param
+                <div class="tab-content active" id="path-params" role="tabpanel">
+                    <div id="path-params-list" class="key-value-list" role="group" aria-label="Path Parameters"></div>
+                    <button id="add-path-param-btn" class="button flat small add-row-btn" aria-label="Add Path Parameter">
+                        <span class="icon icon-12 icon-plus"></span> Add Path Param
                     </button>
                 </div>
 
-                <div class="tab-content" id="query-params" role="tabpanel" aria-labelledby="query-params-tab">
-                    <h3>Query Parameters</h3>
-                    <div id="query-params-list" class="key-value-list" role="group" aria-label="Query Parameters">
-                    </div>
-                    <button id="add-query-param-btn" class="btn-sm btn-secondary" aria-label="Add Query Parameter">
-                        + Add Query Param
+                <div class="tab-content" id="query-params" role="tabpanel">
+                    <div id="query-params-list" class="key-value-list" role="group" aria-label="Query Parameters"></div>
+                    <button id="add-query-param-btn" class="button flat small add-row-btn" aria-label="Add Query Parameter">
+                        <span class="icon icon-12 icon-plus"></span> Add Query Param
                     </button>
                 </div>
 
-                <div class="tab-content" id="headers" role="tabpanel" aria-labelledby="headers-tab">
-                    <h3>Headers</h3>
-                    <div id="headers-list" class="key-value-list" role="group" aria-label="Request Headers">
-                    </div>
-                    <button id="add-header-btn" class="btn-sm btn-secondary" aria-label="Add Header">
-                        + Add Header
+                <div class="tab-content" id="headers" role="tabpanel">
+                    <div id="headers-list" class="key-value-list" role="group" aria-label="Request Headers"></div>
+                    <button id="add-header-btn" class="button flat small add-row-btn" aria-label="Add Header">
+                        <span class="icon icon-12 icon-plus"></span> Add Header
                     </button>
                 </div>
 
-                <div class="tab-content" id="authorization" role="tabpanel" aria-labelledby="authorization-tab">
-                    <h3>Authorization</h3>
+                <div class="tab-content" id="authorization" role="tabpanel">
                     <div class="auth-type-section">
-                        <label for="auth-type-select">Type</label>
-                        <div class="select-wrapper">
+                        <label for="auth-type-select" class="heading">Type</label>
+                        <div class="select-wrapper select-wrap">
                             <select id="auth-type-select" class="select-base" aria-label="Authorization Type">
                                 <option value="none">No Auth</option>
                                 <option value="bearer">Bearer Token</option>
@@ -284,16 +274,14 @@
                             <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                         </div>
                     </div>
-                    <div id="auth-fields-container" class="auth-fields-container u-flex u-flex-col">
-                        <!-- Dynamic auth fields will be inserted here -->
-                    </div>
+                    <div id="auth-fields-container" class="auth-fields-container u-flex u-flex-col"></div>
                 </div>
 
-                <div class="tab-content" id="body" role="tabpanel" aria-labelledby="body-tab">
+                <div class="tab-content" id="body" role="tabpanel">
                     <div class="body-header u-flex u-items-center u-justify-between">
-                        <h3>Request Body</h3>
-                        <div class="body-mode-selector-container u-flex u-items-center">
-                            <select id="body-mode-select" class="body-mode-select" aria-label="Body Mode">
+                        <span class="heading" data-i18n="tabs.body">Body</span>
+                        <div class="body-mode-selector-container select-wrap">
+                            <select id="body-mode-select" class="select-base compact body-mode-select" aria-label="Body Mode">
                                 <option value="json">JSON</option>
                                 <option value="formdata">Form Data</option>
                                 <option value="urlencoded">URL Encoded</option>
@@ -303,74 +291,64 @@
                         </div>
                     </div>
 
-                    <!-- JSON Mode (existing) -->
                     <div class="body-mode-panel active" id="body-json-section" data-mode="json">
                         <textarea id="body-input"
-                                  class="textarea-base body-textarea"
+                                  class="entry body-textarea"
                                   placeholder='{"title": "foo", "body": "bar", "userId": 1}'
                                   aria-label="Request Body JSON"
                                   style="display: none;"></textarea>
-                        <div id="body-editor-container" class="body-editor-container u-flex u-flex-col"></div>
+                        <div id="body-editor-container" class="body-editor-container editor-frame u-flex u-flex-col"></div>
                     </div>
 
-                    <!-- Form Data Mode -->
                     <div class="body-mode-panel" id="body-formdata-section" data-mode="formdata">
                         <div id="formdata-list" class="key-value-list"></div>
-                        <button id="add-formdata-row-btn" class="btn btn-sm btn-secondary">Add Field</button>
+                        <button id="add-formdata-row-btn" class="button flat small add-row-btn">
+                            <span class="icon icon-12 icon-plus"></span> Add Field
+                        </button>
                     </div>
 
-                    <!-- URL Encoded Mode -->
                     <div class="body-mode-panel" id="body-urlencoded-section" data-mode="urlencoded">
                         <div id="urlencoded-list" class="key-value-list"></div>
-                        <button id="add-urlencoded-row-btn" class="btn btn-sm btn-secondary">Add Field</button>
+                        <button id="add-urlencoded-row-btn" class="button flat small add-row-btn">
+                            <span class="icon icon-12 icon-plus"></span> Add Field
+                        </button>
                     </div>
 
-                    <!-- Plain Text Mode -->
                     <div class="body-mode-panel" id="body-text-section" data-mode="text">
-                        <div id="body-text-editor-container" class="body-editor-container u-flex u-flex-col"></div>
+                        <div id="body-text-editor-container" class="body-editor-container editor-frame u-flex u-flex-col"></div>
                     </div>
 
-                    <!-- GraphQL Mode (new) -->
                     <div class="body-mode-panel graphql-body-container" id="body-graphql-section" data-mode="graphql">
-                        <!-- Workbench toolbar -->
                         <div class="graphql-toolbar u-flex u-items-center u-justify-between">
                             <div class="graphql-toolbar-left u-flex u-items-center">
-                                <select id="graphql-operation-select" class="body-mode-select" aria-label="Operation to run" title="Operation to run" style="display: none;"></select>
+                                <select id="graphql-operation-select" class="select-base compact" aria-label="Operation to run" title="Operation to run" style="display: none;"></select>
                             </div>
-                            <div class="graphql-toolbar-right u-flex u-items-center">
-                                <button id="graphql-fetch-schema-btn" class="btn-sm btn-secondary" title="Fetch schema via introspection">
+                            <div class="graphql-toolbar-right u-flex u-items-center u-gap-2">
+                                <button id="graphql-fetch-schema-btn" class="button flat small" title="Fetch schema via introspection">
                                     Schema
                                 </button>
-                                <button id="graphql-format-btn" class="btn-sm btn-secondary" title="Format Query">
+                                <button id="graphql-format-btn" class="button flat small" title="Format Query">
                                     Format
                                 </button>
-                                <button id="graphql-docs-toggle" class="btn-sm btn-secondary" title="Schema docs" aria-pressed="false">
+                                <button id="graphql-docs-toggle" class="button flat small" title="Schema docs" aria-pressed="false">
                                     Docs
                                 </button>
-                                <button id="graphql-run-btn" class="btn btn-sm btn-primary" title="Run (send request)">
+                                <button id="graphql-run-btn" class="button suggested-action small" title="Run (send request)">
                                     <span class="icon icon-12 icon-play"></span> Run
                                 </button>
                             </div>
                         </div>
 
-                        <!-- Workbench body: editor column + (optional) docs rail -->
                         <div class="graphql-workbench-body u-flex">
                             <div class="graphql-main u-flex u-flex-col">
-                                <!-- Query hero -->
                                 <div class="graphql-query-section u-flex u-flex-col">
-                                    <div id="graphql-query-editor" class="editor-shell"></div>
+                                    <div id="graphql-query-editor" class="editor-shell editor-frame"></div>
                                 </div>
 
-                                <!-- Resizer between Query and the drawer -->
-                                <div class="resizer-handle" id="graphql-resizer-handle">
-                                    <div class="resizer-grip u-flex u-items-center u-justify-center">
-                                        <div class="resizer-line"></div>
-                                        <div class="resizer-line"></div>
-                                        <div class="resizer-line"></div>
-                                    </div>
+                                <div class="pane-resizer pane-resizer-row" id="graphql-resizer-handle" aria-hidden="true">
+                                    <div class="resizer-grip"><div class="resizer-line"></div></div>
                                 </div>
 
-                                <!-- Bottom drawer: Variables (collapsed by default) -->
                                 <div class="graphql-variables-section graphql-drawer collapsed u-flex u-flex-col" id="graphql-drawer">
                                     <div class="graphql-drawer-tabs u-flex u-items-center" id="graphql-drawer-tabs" role="tablist">
                                         <button type="button" class="graphql-drawer-tab active" id="graphql-drawer-tab-variables" data-drawer="variables" role="tab" aria-selected="true">Variables</button>
@@ -378,139 +356,137 @@
                                     </div>
                                     <div class="graphql-drawer-panes u-flex u-flex-col">
                                         <div class="graphql-drawer-pane active" data-drawer-pane="variables">
-                                            <div id="graphql-variables-editor" class="editor-shell"></div>
+                                            <div id="graphql-variables-editor" class="editor-shell editor-frame"></div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Schema docs explorer (minimal overview for now) -->
                             <div class="graphql-docs-rail" id="graphql-docs-rail" style="display: none;"></div>
                         </div>
                     </div>
                 </div>
 
-                <div class="tab-content" id="grpc" role="tabpanel" aria-labelledby="grpc-tab">
-                    <!-- Deprecated send button (kept hidden for legacy listener) -->
-                    <button id="grpc-send-btn" class="btn btn-primary" style="display: none;" aria-hidden="true" tabindex="-1">Send gRPC</button>
+                <div class="tab-content" id="grpc" role="tabpanel">
+                    <button id="grpc-send-btn" class="button suggested-action" style="display: none;" aria-hidden="true" tabindex="-1">Send gRPC</button>
 
                     <section class="grpc-source-section">
                         <div class="grpc-source-cards">
-                            <article class="grpc-source-card" data-source="reflection">
+                            <article class="grpc-source-card boxed-list" data-source="reflection">
                                 <header class="grpc-source-card-header">
-                                    <h4 class="grpc-source-card-title">Server reflection</h4>
-                                    <span id="grpc-connection-status" class="status-pill" data-state="idle" role="status"></span>
+                                    <h4 class="grpc-source-card-title heading">Server reflection</h4>
+                                    <span id="grpc-connection-status" class="status-pill badge neutral" data-state="idle" role="status"></span>
                                 </header>
                                 <div class="grpc-source-card-body">
                                     <label class="grpc-field">
-                                        <span class="grpc-field-label">Target</span>
-                                        <input id="grpc-target-input" type="text" class="input-base grpc-field-input" placeholder="localhost:50051" aria-label="gRPC Target">
+                                        <span class="grpc-field-label caption dim-label">Target</span>
+                                        <input id="grpc-target-input" type="text" class="entry grpc-field-input monospace" placeholder="localhost:50051" aria-label="gRPC Target">
                                     </label>
                                     <div class="grpc-source-card-actions">
-                                        <label class="toggle-switch">
-                                            <input type="checkbox" id="grpc-tls-checkbox" aria-label="Use TLS">
-                                            <span class="toggle-track"></span>
+                                        <label class="check-label toggle-switch">
+                                            <input type="checkbox" id="grpc-tls-checkbox" class="switch" aria-label="Use TLS">
                                             <span>TLS</span>
                                         </label>
-                                        <button id="grpc-connect-btn" class="btn-sm btn-secondary" aria-label="Connect via Reflection">
+                                        <button id="grpc-connect-btn" class="button small" aria-label="Connect via Reflection">
                                             Connect
                                         </button>
                                     </div>
                                 </div>
                             </article>
 
-                            <article class="grpc-source-card" data-source="proto">
+                            <article class="grpc-source-card boxed-list" data-source="proto">
                                 <header class="grpc-source-card-header">
-                                    <h4 class="grpc-source-card-title">Proto file</h4>
-                                    <span id="grpc-proto-status" class="status-pill" data-state="idle" role="status"></span>
+                                    <h4 class="grpc-source-card-title heading">Proto file</h4>
+                                    <span id="grpc-proto-status" class="status-pill badge neutral" data-state="idle" role="status"></span>
                                 </header>
                                 <div class="grpc-source-card-body">
                                     <div class="grpc-proto-filename-row">
-                                        <span id="grpc-proto-filename" class="proto-filename" aria-live="polite"></span>
+                                        <span id="grpc-proto-filename" class="proto-filename caption" aria-live="polite"></span>
                                     </div>
                                     <div class="grpc-source-card-actions">
-                                        <button id="grpc-load-proto-btn" class="btn-sm btn-secondary" aria-label="Load Proto File">
+                                        <button id="grpc-load-proto-btn" class="button small" aria-label="Load Proto File">
                                             <span class="icon icon-14 icon-file"></span>
                                             Load .proto
                                         </button>
-                                        <button id="grpc-clear-proto-btn" class="btn-sm btn-secondary" aria-label="Clear Proto" style="display: none;">
+                                        <button id="grpc-clear-proto-btn" class="button flat small" aria-label="Clear Proto" style="display: none;">
                                             Clear
                                         </button>
                                     </div>
                                 </div>
                             </article>
                         </div>
-                        <p class="grpc-hint">Connect to a server with reflection enabled, or load a <code>.proto</code> file to use type definitions directly.</p>
+                        <p class="grpc-hint caption dim-label">Connect to a server with reflection enabled, or load a <code>.proto</code> file to use type definitions directly.</p>
                     </section>
 
                     <section class="grpc-selectors">
                         <div class="grpc-selector-row">
-                            <label class="grpc-selector-label" for="grpc-service-select">Service</label>
-                            <div class="select-wrapper grpc-selector-control">
+                            <label class="grpc-selector-label caption dim-label" for="grpc-service-select">Service</label>
+                            <div class="select-wrapper select-wrap grpc-selector-control">
                                 <select id="grpc-service-select" class="select-base" aria-label="gRPC Service"></select>
                                 <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                             </div>
                         </div>
                         <div class="grpc-selector-row">
-                            <label class="grpc-selector-label" for="grpc-method-select">Method</label>
-                            <div class="select-wrapper grpc-selector-control">
+                            <label class="grpc-selector-label caption dim-label" for="grpc-method-select">Method</label>
+                            <div class="select-wrapper select-wrap grpc-selector-control">
                                 <select id="grpc-method-select" class="select-base" aria-label="gRPC Method"></select>
                                 <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                             </div>
-                            <span id="grpc-method-kind-badge" class="grpc-method-kind-badge" data-kind="" aria-live="polite"></span>
+                            <span id="grpc-method-kind-badge" class="grpc-method-kind-badge badge accent" data-kind="" aria-live="polite"></span>
                         </div>
                     </section>
                 </div>
 
-                <div class="tab-content" id="grpc-message" role="tabpanel" aria-labelledby="grpc-message-tab">
-                    <h3 class="u-flex u-items-center u-justify-between">
-                        <span>Request JSON</span>
-                        <button type="button" id="grpc-generate-skeleton-btn" class="btn-sm btn-secondary">Generate</button>
-                    </h3>
-                    <textarea id="grpc-body-input" class="textarea-base body-textarea" aria-label="gRPC Request JSON" placeholder="{}" style="display: none;"></textarea>
-                    <div id="grpc-body-editor-container" class="body-editor-container u-flex u-flex-col"></div>
+                <div class="tab-content" id="grpc-message" role="tabpanel">
+                    <div class="panel-header u-flex u-items-center u-justify-between">
+                        <span class="heading">Request JSON</span>
+                        <button type="button" id="grpc-generate-skeleton-btn" class="button flat small">Generate</button>
+                    </div>
+                    <textarea id="grpc-body-input" class="entry body-textarea" aria-label="gRPC Request JSON" placeholder="{}" style="display: none;"></textarea>
+                    <div id="grpc-body-editor-container" class="body-editor-container editor-frame u-flex u-flex-col"></div>
                 </div>
 
-                <div class="tab-content" id="grpc-metadata" role="tabpanel" aria-labelledby="grpc-metadata-tab">
-                    <h3>Metadata</h3>
+                <div class="tab-content" id="grpc-metadata" role="tabpanel">
                     <ul id="grpc-metadata-list" class="key-value-list" aria-label="gRPC Metadata"></ul>
-                    <button type="button" id="grpc-add-metadata-btn" class="btn-sm btn-secondary">+ Add Metadata</button>
+                    <button type="button" id="grpc-add-metadata-btn" class="button flat small add-row-btn">
+                        <span class="icon icon-12 icon-plus"></span> Add Metadata
+                    </button>
                 </div>
 
-                <div class="tab-content" id="mqtt" role="tabpanel" aria-labelledby="mqtt-tab">
+                <div class="tab-content" id="mqtt" role="tabpanel">
                     <div class="mqtt-panel-header u-flex u-items-center u-justify-between">
-                        <div class="mqtt-title-group u-flex u-items-center">
-                            <h3 data-i18n="mqtt.title">MQTT</h3>
-                            <span id="mqtt-status-pill" class="status-pill" data-state="disconnected" role="status" aria-live="polite">
+                        <div class="mqtt-title-group u-flex u-items-center u-gap-2">
+                            <span class="heading" data-i18n="mqtt.title">MQTT</span>
+                            <span id="mqtt-status-pill" class="status-pill badge neutral" data-state="disconnected" role="status" aria-live="polite">
                                 <span id="mqtt-status-text" data-i18n="mqtt.status_disconnected">Disconnected</span>
                             </span>
                         </div>
-                        <button type="button" id="mqtt-disconnect-btn" class="btn-sm btn-danger"
+                        <button type="button" id="mqtt-disconnect-btn" class="button destructive-action small"
                                 data-i18n="mqtt.disconnect" aria-label="Disconnect from MQTT broker"
                                 style="display: none;">
                             Disconnect
                         </button>
                     </div>
                     <div class="mqtt-cards u-flex u-flex-col">
-                        <article class="grpc-source-card mqtt-card">
+                        <article class="grpc-source-card mqtt-card boxed-list">
                             <header class="grpc-source-card-header">
-                                <h4 class="grpc-source-card-title" data-i18n="mqtt.section_messaging">Messaging</h4>
+                                <h4 class="grpc-source-card-title heading" data-i18n="mqtt.section_messaging">Messaging</h4>
                             </header>
                             <div class="grpc-source-card-body">
                                 <label class="grpc-field">
-                                    <span class="grpc-field-label" data-i18n="mqtt.subscribe_topic">Subscribe Topic</span>
-                                    <input type="text" id="mqtt-subscribe-input" class="input-base grpc-field-input"
+                                    <span class="grpc-field-label caption dim-label" data-i18n="mqtt.subscribe_topic">Subscribe Topic</span>
+                                    <input type="text" id="mqtt-subscribe-input" class="entry grpc-field-input monospace"
                                            placeholder="sensors/#" aria-label="MQTT Subscribe Topic">
                                 </label>
                                 <div class="mqtt-field-row">
                                     <label class="grpc-field mqtt-field-grow">
-                                        <span class="grpc-field-label" data-i18n="mqtt.publish_topic">Publish Topic</span>
-                                        <input type="text" id="mqtt-topic-input" class="input-base grpc-field-input"
+                                        <span class="grpc-field-label caption dim-label" data-i18n="mqtt.publish_topic">Publish Topic</span>
+                                        <input type="text" id="mqtt-topic-input" class="entry grpc-field-input monospace"
                                                placeholder="sensors/temperature" aria-label="MQTT Publish Topic">
                                     </label>
                                     <label class="grpc-field mqtt-field-qos">
-                                        <span class="grpc-field-label" data-i18n="mqtt.qos">QoS</span>
-                                        <div class="select-wrapper">
+                                        <span class="grpc-field-label caption dim-label" data-i18n="mqtt.qos">QoS</span>
+                                        <div class="select-wrapper select-wrap">
                                             <select id="mqtt-qos-select" class="select-base" aria-label="MQTT QoS Level">
                                                 <option value="0">0 — At most once</option>
                                                 <option value="1">1 — At least once</option>
@@ -523,25 +499,25 @@
                             </div>
                         </article>
 
-                        <article class="grpc-source-card mqtt-card">
+                        <article class="grpc-source-card mqtt-card boxed-list">
                             <header class="grpc-source-card-header">
-                                <h4 class="grpc-source-card-title" data-i18n="mqtt.section_connection_auth">Connection &amp; Auth</h4>
+                                <h4 class="grpc-source-card-title heading" data-i18n="mqtt.section_connection_auth">Connection &amp; Auth</h4>
                             </header>
                             <div class="grpc-source-card-body">
                                 <label class="grpc-field">
-                                    <span class="grpc-field-label" data-i18n="mqtt.client_id">Client ID</span>
-                                    <input type="text" id="mqtt-client-id-input" class="input-base grpc-field-input"
+                                    <span class="grpc-field-label caption dim-label" data-i18n="mqtt.client_id">Client ID</span>
+                                    <input type="text" id="mqtt-client-id-input" class="entry grpc-field-input monospace"
                                            placeholder="auto-generated" aria-label="MQTT Client ID">
                                 </label>
                                 <div class="mqtt-field-row">
                                     <label class="grpc-field">
-                                        <span class="grpc-field-label" data-i18n="mqtt.username">Username</span>
-                                        <input type="text" id="mqtt-username-input" class="input-base grpc-field-input"
+                                        <span class="grpc-field-label caption dim-label" data-i18n="mqtt.username">Username</span>
+                                        <input type="text" id="mqtt-username-input" class="entry grpc-field-input"
                                                placeholder="(optional)" autocomplete="off" aria-label="MQTT Username">
                                     </label>
                                     <label class="grpc-field">
-                                        <span class="grpc-field-label" data-i18n="mqtt.password">Password</span>
-                                        <input type="password" id="mqtt-password-input" class="input-base grpc-field-input"
+                                        <span class="grpc-field-label caption dim-label" data-i18n="mqtt.password">Password</span>
+                                        <input type="password" id="mqtt-password-input" class="entry grpc-field-input"
                                                placeholder="(optional)" autocomplete="off" aria-label="MQTT Password">
                                     </label>
                                 </div>
@@ -550,132 +526,122 @@
                     </div>
                 </div>
 
-                <div class="tab-content" id="scripts" role="tabpanel" aria-labelledby="scripts-tab">
+                <div class="tab-content" id="scripts" role="tabpanel">
                     <div class="u-flex u-flex-col u-flex-1 u-min-h-0 u-overflow-hidden">
-                        <!-- Script Sub-tabs Navigation -->
-                        <nav class="script-sub-tabs" role="tablist" aria-label="Script Sections">
-                            <button class="script-sub-tab active"
-                                    data-script-tab="pre-request"
-                                    role="tab"
-                                    aria-selected="true"
-                                    aria-controls="script-pre-request">
+                        <nav class="script-sub-tabs view-switcher" role="tablist" aria-label="Script Sections">
+                            <button class="script-sub-tab view-switcher-btn active"
+                                    data-script-tab="pre-request" role="tab"
+                                    aria-selected="true" aria-controls="script-pre-request">
                                 Pre-request
                             </button>
-                            <button class="script-sub-tab"
-                                    data-script-tab="test"
-                                    role="tab"
-                                    aria-selected="false"
-                                    aria-controls="script-test">
+                            <button class="script-sub-tab view-switcher-btn"
+                                    data-script-tab="test" role="tab"
+                                    aria-selected="false" aria-controls="script-test">
                                 Test
                             </button>
-                            <button class="script-sub-tab"
-                                    data-script-tab="api-reference"
-                                    role="tab"
-                                    aria-selected="false"
-                                    aria-controls="script-api-reference">
+                            <button class="script-sub-tab view-switcher-btn"
+                                    data-script-tab="api-reference" role="tab"
+                                    aria-selected="false" aria-controls="script-api-reference">
                                 API Reference
                             </button>
                         </nav>
 
-                        <!-- Pre-request Script Tab -->
                         <div class="script-tab-panel active u-flex-1 u-min-h-0" id="script-pre-request" role="tabpanel">
-                            <div id="pre-request-script-container" class="script-editor-container" aria-label="Pre-request Script"></div>
+                            <div id="pre-request-script-container" class="script-editor-container editor-frame" aria-label="Pre-request Script"></div>
                         </div>
 
-                        <!-- Test Script Tab -->
                         <div class="script-tab-panel u-flex-1 u-min-h-0" id="script-test" role="tabpanel">
-                            <div id="test-script-container" class="script-editor-container" aria-label="Test Script"></div>
+                            <div id="test-script-container" class="script-editor-container editor-frame" aria-label="Test Script"></div>
                         </div>
 
-                        <!-- API Reference Tab -->
                         <div class="script-tab-panel u-flex-1 u-min-h-0 u-overflow-y-auto" id="script-api-reference" role="tabpanel">
                             <div class="api-reference-content u-flex u-flex-col">
                                 <div class="api-reference-section u-flex u-flex-col">
-                                    <h4>Pre-request Script APIs</h4>
-                                    <p class="api-section-description">Execute code before sending the request to modify headers, set variables, or perform setup.</p>
-                                    <div class="api-list u-flex u-flex-col">
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                    <h4 class="heading">Pre-request Script APIs</h4>
+                                    <p class="api-section-description caption dim-label">Execute code before sending the request to modify headers, set variables, or perform setup.</p>
+                                    <div class="api-list boxed-list u-flex u-flex-col">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>request.url</code>
-                                            <span>The request URL (string)</span>
+                                            <span class="caption dim-label">The request URL (string)</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>request.method</code>
-                                            <span>HTTP method (GET, POST, etc.)</span>
+                                            <span class="caption dim-label">HTTP method (GET, POST, etc.)</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>request.headers</code>
-                                            <span>Request headers object - can be modified</span>
+                                            <span class="caption dim-label">Request headers object - can be modified</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>request.body</code>
-                                            <span>Request body content</span>
+                                            <span class="caption dim-label">Request body content</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>environment.get(name)</code>
-                                            <span>Get an environment variable</span>
+                                            <span class="caption dim-label">Get an environment variable</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>environment.set(name, value)</code>
-                                            <span>Set an environment variable</span>
+                                            <span class="caption dim-label">Set an environment variable</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>console.log(...)</code>
-                                            <span>Log messages to the Scripts tab in response</span>
+                                            <span class="caption dim-label">Log messages to the Scripts tab in response</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>sendRequest(url | options)</code>
-                                            <span>Make an HTTP request (e.g. fetch a token); returns the response</span>
+                                            <span class="caption dim-label">Make an HTTP request (e.g. fetch a token); returns the response</span>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div class="api-reference-section u-flex u-flex-col">
-                                    <h4>Test Script APIs</h4>
-                                    <p class="api-section-description">Run tests and assertions after receiving the response to validate data and extract values.</p>
-                                    <div class="api-list u-flex u-flex-col">
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                    <h4 class="heading">Test Script APIs</h4>
+                                    <p class="api-section-description caption dim-label">Run tests and assertions after receiving the response to validate data and extract values.</p>
+                                    <div class="api-list boxed-list u-flex u-flex-col">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>response.status</code>
-                                            <span>HTTP status code (number)</span>
+                                            <span class="caption dim-label">HTTP status code (number)</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>response.statusText</code>
-                                            <span>HTTP status text (OK, Not Found, etc.)</span>
+                                            <span class="caption dim-label">HTTP status text (OK, Not Found, etc.)</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>response.headers</code>
-                                            <span>Response headers object</span>
+                                            <span class="caption dim-label">Response headers object</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>response.body</code>
-                                            <span>Parsed response body (JSON object)</span>
+                                            <span class="caption dim-label">Parsed response body (JSON object)</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>expect(value).toBe(expected)</code>
-                                            <span>Assert strict equality</span>
+                                            <span class="caption dim-label">Assert strict equality</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>expect(value).toEqual(expected)</code>
-                                            <span>Assert deep equality</span>
+                                            <span class="caption dim-label">Assert deep equality</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>expect(value).toBeDefined()</code>
-                                            <span>Assert value is not undefined</span>
+                                            <span class="caption dim-label">Assert value is not undefined</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>expect(value).toBeTruthy()</code>
-                                            <span>Assert value is truthy</span>
+                                            <span class="caption dim-label">Assert value is truthy</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>expect(value).toContain(item)</code>
-                                            <span>Assert array/string contains item</span>
+                                            <span class="caption dim-label">Assert array/string contains item</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>expect(value).toBeGreaterThan(n)</code>
-                                            <span>Assert value is greater than n</span>
+                                            <span class="caption dim-label">Assert value is greater than n</span>
                                         </div>
-                                        <div class="api-item u-flex u-items-center u-justify-between">
+                                        <div class="api-item row u-flex u-items-center u-justify-between">
                                             <code>sendRequest(url | options)</code>
-                                            <span>Make an HTTP request for chaining or validation</span>
+                                            <span class="caption dim-label">Make an HTTP request for chaining or validation</span>
                                         </div>
                                     </div>
                                 </div>
@@ -684,165 +650,82 @@
                     </div>
                 </div>
 
-                <div class="tab-content" id="schema" role="tabpanel" aria-labelledby="schema-tab">
+                <div class="tab-content" id="schema" role="tabpanel">
                     <div class="schema-tab-container u-flex u-flex-col u-flex-1 u-min-h-0">
-                        <div class="schema-header u-flex u-items-center u-justify-between">
-                            <h3 data-i18n="schema.title">Response Schema</h3>
-                            <div class="schema-actions u-flex u-items-center">
-                                <button id="schema-infer-btn" class="btn-sm btn-secondary" title="Generate schema from last response" data-i18n="schema.infer_btn">
+                        <div class="schema-header panel-header u-flex u-items-center u-justify-between">
+                            <span class="heading" data-i18n="schema.title">Response Schema</span>
+                            <div class="schema-actions u-flex u-items-center u-gap-2">
+                                <button id="schema-infer-btn" class="button flat small" title="Generate schema from last response" data-i18n="schema.infer_btn">
                                     Infer from Response
                                 </button>
-                                <button id="schema-clear-btn" class="btn-sm btn-secondary" title="Clear schema" data-i18n="schema.clear_btn">
+                                <button id="schema-clear-btn" class="button flat small" title="Clear schema" data-i18n="schema.clear_btn">
                                     Clear
                                 </button>
                             </div>
                         </div>
-                        <div id="schema-editor-container" class="schema-editor-container editor-shell u-flex u-flex-col u-flex-1"></div>
+                        <div id="schema-editor-container" class="schema-editor-container editor-shell editor-frame u-flex u-flex-col u-flex-1"></div>
                         <div id="schema-validation-status" class="schema-validation-status"></div>
                     </div>
                 </div>
             </section>
 
-            <!-- Resizer Handle -->
-            <div class="resizer-handle tk-split" id="resizer-handle">
-                <div class="resizer-grip u-flex u-items-center u-justify-center">
-                    <div class="resizer-line"></div>
-                    <div class="resizer-line"></div>
-                    <div class="resizer-line"></div>
-                </div>
+            <!-- Request / Response separator (draggable) -->
+            <div class="pane-resizer pane-resizer-row" id="resizer-handle" aria-hidden="true">
+                <div class="resizer-grip"><div class="resizer-line"></div></div>
             </div>
 
             <!-- Response Area -->
-            <section class="response-area tk-readout u-flex u-flex-col">
-                <div class="tk-readout-head">
-                <header class="response-header u-flex u-items-center u-justify-between">
-                    <h3 class="response-title">Response</h3>
-                    <div class="status-info-container u-flex u-items-center">
+            <section class="response-area u-flex u-flex-col">
+                <header class="response-header">
+                    <span class="response-title heading">Response</span>
+                    <div class="status-info-container">
                         <p id="status-display" class="status-display" aria-live="polite">Ready</p>
-                        <p id="response-time-display" class="response-time-display" aria-live="polite"></p>
-                        <p id="response-size-display" class="response-size-display" aria-live="polite"></p>
+                        <p id="response-time-display" class="response-time-display caption dim-label numeric" aria-live="polite"></p>
+                        <p id="response-size-display" class="response-size-display caption dim-label numeric" aria-live="polite"></p>
                     </div>
                 </header>
-                </div>
 
-                <div class="tk-readout-body">
                 <div class="response-content u-flex u-flex-col">
-                    <nav class="response-tabs tab-nav u-flex" role="tablist" aria-label="Response Content">
-                        <button class="tab-button active"
-                                data-tab="response-body"
-                                role="tab"
-                                aria-selected="true"
-                                aria-controls="response-body">
+                    <nav class="response-tabs tab-nav view-switcher flat" role="tablist" aria-label="Response Content">
+                        <button class="tab-button view-switcher-btn active" data-tab="response-body" role="tab"
+                                aria-selected="true" aria-controls="response-body">
                             Body
                         </button>
-                        <button class="tab-button response-tab-http"
-                                data-tab="response-headers"
-                                data-protocol="http"
-                                role="tab"
-                                aria-selected="false"
-                                aria-controls="response-headers">
+                        <button class="tab-button view-switcher-btn response-tab-http" data-tab="response-headers" data-protocol="http"
+                                role="tab" aria-selected="false" aria-controls="response-headers">
                             Headers
                         </button>
-                        <button class="tab-button response-tab-grpc"
-                                data-tab="response-metadata"
-                                data-protocol="grpc"
-                                role="tab"
-                                aria-selected="false"
-                                aria-controls="response-metadata">
+                        <button class="tab-button view-switcher-btn response-tab-grpc" data-tab="response-metadata" data-protocol="grpc"
+                                role="tab" aria-selected="false" aria-controls="response-metadata">
                             Metadata
                         </button>
-                        <button class="tab-button response-tab-http"
-                                data-tab="response-cookies"
-                                data-protocol="http"
-                                role="tab"
-                                aria-selected="false"
-                                aria-controls="response-cookies">
+                        <button class="tab-button view-switcher-btn response-tab-http" data-tab="response-cookies" data-protocol="http"
+                                role="tab" aria-selected="false" aria-controls="response-cookies">
                             Cookies
                         </button>
-                        <button class="tab-button response-tab-grpc"
-                                data-tab="response-trailers"
-                                data-protocol="grpc"
-                                role="tab"
-                                aria-selected="false"
-                                aria-controls="response-trailers">
+                        <button class="tab-button view-switcher-btn response-tab-grpc" data-tab="response-trailers" data-protocol="grpc"
+                                role="tab" aria-selected="false" aria-controls="response-trailers">
                             Trailers
                         </button>
-                        <button class="tab-button response-tab-http"
-                                data-tab="response-performance"
-                                data-protocol="http"
-                                role="tab"
-                                aria-selected="false"
-                                aria-controls="response-performance">
+                        <button class="tab-button view-switcher-btn response-tab-http" data-tab="response-performance" data-protocol="http"
+                                role="tab" aria-selected="false" aria-controls="response-performance">
                             Performance
                         </button>
-                        <button class="tab-button response-tab-http"
-                                data-tab="response-scripts"
-                                data-protocol="http"
-                                role="tab"
-                                aria-selected="false"
-                                aria-controls="response-scripts">
+                        <button class="tab-button view-switcher-btn response-tab-http" data-tab="response-scripts" data-protocol="http"
+                                role="tab" aria-selected="false" aria-controls="response-scripts">
                             Scripts
                         </button>
                     </nav>
 
-                    <div class="response-display u-flex u-flex-col" id="workspace-response-container">
-                        <!-- Response containers for each workspace tab will be created dynamically here -->
-                    </div>
-                </div>
+                    <div class="response-display u-flex u-flex-col" id="workspace-response-container"></div>
                 </div>
             </section>
         </main>
 
-        <!-- History Sidebar Resizer Handle -->
-        <div class="horizontal-resizer-handle tk-gutter" id="history-resizer-handle">
-            <div class="horizontal-resizer-grip u-flex u-items-center u-justify-center">
-                <div class="horizontal-resizer-line"></div>
-                <div class="horizontal-resizer-line"></div>
-                <div class="horizontal-resizer-line"></div>
-            </div>
-        </div>
-
-        <!-- History Sidebar -->
-        <aside class="history-sidebar tk-panel" role="complementary" id="history-sidebar">
-            <div class="sidebar-header tk-panel-head tk-panel-head--row">
-                <span class="tk-eyebrow" data-i18n="sidebar.history">History</span>
-                <div class="u-flex u-items-center u-gap-2">
-                    <button id="clear-all-history-btn" class="btn btn-icon-bordered" data-i18n-title="history.clear_all" data-i18n-aria="history.clear_all">
-                        <span class="icon icon-16 icon-trash"></span>
-                    </button>
-                    <button id="close-history-btn" class="btn btn-icon-bordered" data-i18n-title="common.close" data-i18n-aria="common.close" title="Close">
-                        <span class="icon icon-16 icon-x"></span>
-                    </button>
-                </div>
-            </div>
-
-            <div class="history-search">
-                <div class="search-input-wrap">
-                    <span class="search-input-icon icon icon-16 icon-search" aria-hidden="true"></span>
-                    <input type="text"
-                           id="history-search-input"
-                           class="input-base form-input compact search-input"
-                           placeholder="Search history..."
-                           data-i18n-placeholder="history.search_placeholder"
-                           aria-label="Search history">
-                </div>
-            </div>
-
-            <div class="history-container tk-panel-scroll">
-                <div id="history-list" class="history-list">
-                    <div class="history-empty">
-                        <span class="history-empty-icon icon icon-64 icon-history"></span>
-                        <p class="history-empty-text" data-i18n="history.empty">No request history</p>
-                        <p class="history-empty-subtext" data-i18n="history.empty_subtext">Send a request to see it here</p>
-                    </div>
-                </div>
-            </div>
-        </aside>
-
         </div><!-- /.app-body -->
 
         <!-- Status Bar -->
-        <div class="status-bar tk-footer" id="status-bar-container">
+        <footer class="statusbar status-bar" id="status-bar-container">
             <div class="status-bar-left">
                 <span class="status-bar-item" id="status-bar-env">
                     <span id="status-bar-env-dot" class="status-bar-env-dot"></span>
@@ -850,14 +733,14 @@
                     <span id="status-bar-env-name">No Environment</span>
                 </span>
                 <span class="status-bar-item status-bar-request" id="status-bar-request" hidden>
-                    <span class="status-bar-request-spinner"></span>
-                    <span id="status-bar-request-time">0.0s</span>
+                    <span class="status-bar-request-spinner spinner"></span>
+                    <span id="status-bar-request-time" class="numeric">0.0s</span>
                 </span>
             </div>
             <div class="status-bar-right">
-                <span class="status-bar-version" id="status-bar-version"></span>
+                <span class="status-bar-version caption dim-label" id="status-bar-version"></span>
             </div>
-        </div>
+        </footer>
     </div>
 
     <script type="module" src="./src/renderer.js"></script>

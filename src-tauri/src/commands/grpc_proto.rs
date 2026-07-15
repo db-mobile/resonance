@@ -8,8 +8,8 @@ use tauri::{AppHandle, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use tokio::sync::oneshot;
 
-pub use super::grpc_reflection::GrpcTlsOptions;
 pub use super::grpc_reflection::GrpcUnaryRequest;
+use super::grpc_reflection::{create_channel, normalize_target_with_tls};
 
 /// State to hold loaded proto file descriptors
 pub struct ProtoState {
@@ -356,40 +356,6 @@ mod protox_parse {
 
         Err("protoc not found. Please install Protocol Buffers compiler.".to_string())
     }
-}
-
-// Re-use helper functions from grpc_reflection module
-fn normalize_target_with_tls(target: &str, use_tls: bool) -> String {
-    let trimmed = target.trim();
-    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
-        trimmed.to_string()
-    } else if use_tls {
-        format!("https://{}", trimmed)
-    } else {
-        format!("http://{}", trimmed)
-    }
-}
-
-async fn create_channel(
-    target: &str,
-    tls: &GrpcTlsOptions,
-) -> Result<tonic::transport::Channel, String> {
-    use tonic::transport::{ClientTlsConfig, Endpoint};
-
-    let mut endpoint =
-        Endpoint::from_shared(target.to_string()).map_err(|e| format!("Invalid target: {}", e))?;
-
-    if tls.use_tls {
-        let tls_config = ClientTlsConfig::new();
-        endpoint = endpoint
-            .tls_config(tls_config)
-            .map_err(|e| format!("TLS config error: {}", e))?;
-    }
-
-    endpoint
-        .connect()
-        .await
-        .map_err(|e| format!("Connection failed: {}", e))
 }
 
 fn strip_leading_dot(name: &str) -> String {

@@ -45,7 +45,6 @@ export class CurlDialog extends BaseModal {
      */
     setupEventListeners(dialog, curlCommand) {
         dialog.querySelector('#curl-close-btn').addEventListener('click', () => this.destroy());
-        dialog.querySelector('#curl-close-bottom-btn').addEventListener('click', () => this.destroy());
 
         const copyBtn = dialog.querySelector('#curl-copy-btn');
         copyBtn.addEventListener('click', async () => {

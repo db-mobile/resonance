@@ -19,58 +19,7 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 /// Dangerous cert verifier used only when the request has `verify_ssl: false`.
 /// Kept in sync with reqwest's `danger_accept_invalid_certs(true)` behavior so
 /// the probe does not fail on self-signed certs where the real request succeeds.
-#[derive(Debug)]
-struct NoCertVerifier;
-
-impl rustls::client::danger::ServerCertVerifier for NoCertVerifier {
-    fn verify_server_cert(
-        &self,
-        _end_entity: &rustls::pki_types::CertificateDer<'_>,
-        _intermediates: &[rustls::pki_types::CertificateDer<'_>],
-        _server_name: &rustls::pki_types::ServerName<'_>,
-        _ocsp_response: &[u8],
-        _now: rustls::pki_types::UnixTime,
-    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
-        Ok(rustls::client::danger::ServerCertVerified::assertion())
-    }
-
-    fn verify_tls12_signature(
-        &self,
-        _message: &[u8],
-        _cert: &rustls::pki_types::CertificateDer<'_>,
-        _dss: &rustls::DigitallySignedStruct,
-    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
-        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
-    }
-
-    fn verify_tls13_signature(
-        &self,
-        _message: &[u8],
-        _cert: &rustls::pki_types::CertificateDer<'_>,
-        _dss: &rustls::DigitallySignedStruct,
-    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
-        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
-    }
-
-    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
-        use rustls::SignatureScheme::*;
-        vec![
-            RSA_PKCS1_SHA1,
-            ECDSA_SHA1_Legacy,
-            RSA_PKCS1_SHA256,
-            ECDSA_NISTP256_SHA256,
-            RSA_PKCS1_SHA384,
-            ECDSA_NISTP384_SHA384,
-            RSA_PKCS1_SHA512,
-            ECDSA_NISTP521_SHA512,
-            RSA_PSS_SHA256,
-            RSA_PSS_SHA384,
-            RSA_PSS_SHA512,
-            ED25519,
-            ED448,
-        ]
-    }
-}
+use super::tls::NoCertVerifier;
 
 fn build_probe_tls_config(verify_ssl: bool) -> rustls::ClientConfig {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
