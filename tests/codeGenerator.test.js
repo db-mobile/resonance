@@ -184,4 +184,121 @@ describe('Code Generator', () => {
             }
         });
     });
+
+    describe('Form-data bodies (row arrays)', () => {
+        const formConfig = {
+            method: 'POST',
+            url: 'https://api.example.com/upload',
+            headers: { 'Content-Type': 'multipart/form-data' },
+            bodyType: 'formdata',
+            body: [
+                { key: 'title', value: 'hello', type: 'text' },
+                { key: 'avatar', type: 'file', filePath: '/tmp/pic.png', contentType: 'image/png' }
+            ]
+        };
+
+        test('curl emits -F for text and file parts and drops Content-Type', () => {
+            const code = generateCode('curl', formConfig);
+            expect(code).toContain("-F 'title=hello'");
+            expect(code).toContain("-F 'avatar=@/tmp/pic.png;type=image/png'");
+            expect(code).not.toContain('Content-Type: multipart/form-data');
+            expect(code).not.toContain('-d ');
+        });
+
+        test('curl omits ;type= when part has no content type', () => {
+            const config = {
+                ...formConfig,
+                body: [{ key: 'file', type: 'file', filePath: '/tmp/a.bin' }]
+            };
+            const code = generateCode('curl', config);
+            expect(code).toContain("-F 'file=@/tmp/a.bin'");
+        });
+
+        test('curl supports legacy flat-object formdata bodies', () => {
+            const config = { ...formConfig, body: { title: 'hello' } };
+            const code = generateCode('curl', config);
+            expect(code).toContain("-F 'title=hello'");
+        });
+
+        test('python emits files= and data= dicts', () => {
+            const code = generateCode('python', formConfig);
+            expect(code).toContain('files = {');
+            expect(code).toContain('"avatar": ("pic.png", open("/tmp/pic.png", "rb"), "image/png")');
+            expect(code).toContain('data = {');
+            expect(code).toContain('"title": "hello"');
+            expect(code).toContain('files=files');
+            expect(code).toContain('data=data');
+        });
+
+        test('other generators emit a comment instead of a bogus body', () => {
+            const code = generateCode('javascript-fetch', formConfig);
+            expect(code).toContain('File upload bodies are only generated for cURL and Python snippets.');
+            expect(code).not.toContain('body: `');
+        });
+    });
+
+    describe('URL-encoded bodies (row arrays)', () => {
+        const urlencodedConfig = {
+            method: 'POST',
+            url: 'https://api.example.com/form',
+            headers: {},
+            bodyType: 'urlencoded',
+            body: [
+                { key: 'a', value: '1' },
+                { key: 'a', value: '2 &more' }
+            ]
+        };
+
+        test('curl emits --data-urlencode per row preserving duplicates', () => {
+            const code = generateCode('curl', urlencodedConfig);
+            expect(code).toContain("--data-urlencode 'a=1'");
+            expect(code).toContain("--data-urlencode 'a=2 &more'");
+        });
+
+        test('python emits a list of tuples', () => {
+            const code = generateCode('python', urlencodedConfig);
+            expect(code).toContain('data = [');
+            expect(code).toContain('("a", "1")');
+            expect(code).toContain('("a", "2 &more")');
+        });
+
+        test('string-body generators receive an encoded query string', () => {
+            const code = generateCode('javascript-fetch', urlencodedConfig);
+            expect(code).toContain('a=1&a=2%20%26more');
+        });
+    });
+
+    describe('Binary bodies', () => {
+        const binaryConfig = {
+            method: 'PUT',
+            url: 'https://api.example.com/blob',
+            headers: {},
+            bodyType: 'binary',
+            body: { filePath: '/tmp/payload.bin', contentType: 'application/pdf' }
+        };
+
+        test('curl emits --data-binary with @path and a Content-Type header', () => {
+            const code = generateCode('curl', binaryConfig);
+            expect(code).toContain("--data-binary '@/tmp/payload.bin'");
+            expect(code).toContain("-H 'Content-Type: application/pdf'");
+        });
+
+        test('curl keeps a user-supplied Content-Type header', () => {
+            const config = { ...binaryConfig, headers: { 'Content-Type': 'image/png' } };
+            const code = generateCode('curl', config);
+            expect(code).toContain("-H 'Content-Type: image/png'");
+            expect(code).not.toContain('application/pdf');
+        });
+
+        test('python opens the file for the request body', () => {
+            const code = generateCode('python', binaryConfig);
+            expect(code).toContain('data = open("/tmp/payload.bin", "rb")');
+            expect(code).toContain('data=data');
+        });
+
+        test('other generators emit a comment instead of a bogus body', () => {
+            const code = generateCode('go', binaryConfig);
+            expect(code).toContain('File upload bodies are only generated for cURL and Python snippets.');
+        });
+    });
 });

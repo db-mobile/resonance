@@ -11,7 +11,12 @@
  * @property {string} [method] - HTTP method; defaults to `GET`.
  * @property {string} url - Target request URL.
  * @property {Object<string, string>} [headers] - Header name/value pairs.
- * @property {string|Object} [body] - Request body; non-string values are JSON-stringified.
+ * @property {string|Object|Array} [body] - Request body. For `bodyType`
+ *   `formdata`/`urlencoded` this is an array of row objects
+ *   (`{ key, value, type, filePath, contentType }`); for `binary` it is
+ *   `{ filePath, contentType }`; otherwise a string or JSON object.
+ * @property {string} [bodyType] - `formdata` | `urlencoded` | `text` | `binary`;
+ *   absent for JSON bodies.
  */
 
 /**
@@ -68,13 +73,100 @@ function escapeGoString(str) {
 
 /**
  * Whether the request carries a body, normalizing the method so a lowercase
- * method (e.g. `"post"`) is treated the same as its uppercase form.
+ * method (e.g. `"post"`) is treated the same as its uppercase form. Form and
+ * binary bodies count regardless of method, matching how requests are sent.
  *
  * @param {RequestConfig} config - The request configuration.
  * @returns {boolean} True when a body should be emitted.
  */
 function hasBody(config) {
+    if (isFormDataBody(config) || isUrlencodedBody(config) || isBinaryBody(config)) {
+        return true;
+    }
     return Boolean(config.body) && ['POST', 'PUT', 'PATCH'].includes((config.method || 'GET').toUpperCase());
+}
+
+/**
+ * Whether the config carries a multipart form-data body.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {boolean}
+ */
+function isFormDataBody(config) {
+    return config.bodyType === 'formdata' && Boolean(config.body) && typeof config.body === 'object';
+}
+
+/**
+ * Whether the config carries a URL-encoded form body.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {boolean}
+ */
+function isUrlencodedBody(config) {
+    return config.bodyType === 'urlencoded' && Boolean(config.body) && typeof config.body === 'object';
+}
+
+/**
+ * Whether the config carries a binary file body.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @returns {boolean}
+ */
+function isBinaryBody(config) {
+    return config.bodyType === 'binary' && Boolean(config.body?.filePath);
+}
+
+/**
+ * Returns form body rows in the canonical array shape, converting the legacy
+ * flat `{key: value}` object shape to text rows.
+ *
+ * @param {string|Object|Array} body - The form body.
+ * @returns {Array<{key: string, value?: string, type?: string, filePath?: string, contentType?: string}>}
+ */
+function bodyRows(body) {
+    if (Array.isArray(body)) {
+        return body.filter((row) => row && row.key);
+    }
+    if (body && typeof body === 'object') {
+        return Object.entries(body).map(([key, value]) => ({ key, value: String(value), type: 'text' }));
+    }
+    return [];
+}
+
+/**
+ * Extracts the file name from a path for snippet display.
+ *
+ * @param {string} filePath - Absolute or relative file path.
+ * @returns {string}
+ */
+function baseName(filePath) {
+    const parts = String(filePath).split(/[\\/]/);
+    return parts[parts.length - 1] || 'file';
+}
+
+/**
+ * Resolves the body for generators that emit a single string payload.
+ * URL-encoded row arrays become an encoded string; form-data and binary
+ * bodies cannot be represented portably and yield a comment instead.
+ *
+ * @param {RequestConfig} config - The request configuration.
+ * @param {boolean} [pretty=false] - Pretty-print JSON object bodies.
+ * @returns {{text: (string|null), comment: (string|null)}}
+ */
+function resolveSnippetBody(config, pretty = false) {
+    if (isUrlencodedBody(config)) {
+        const encoded = bodyRows(config.body)
+            .map((row) => `${encodeURIComponent(row.key)}=${encodeURIComponent(row.value || '')}`)
+            .join('&');
+        return { text: encoded || null, comment: null };
+    }
+    if (isFormDataBody(config) || isBinaryBody(config)) {
+        return { text: null, comment: 'File upload bodies are only generated for cURL and Python snippets.' };
+    }
+    if (hasBody(config)) {
+        return { text: stringifyBody(config.body, pretty), comment: null };
+    }
+    return { text: null, comment: null };
 }
 
 /**
@@ -112,11 +204,32 @@ function generateCurl(config) {
         curlParts.push(`-X ${method}`);
     }
 
+    const skipContentType = isFormDataBody(config) || isUrlencodedBody(config);
     for (const [key, value] of validHeaders(headers)) {
+        if (skipContentType && key.toLowerCase() === 'content-type') {
+            continue;
+        }
         curlParts.push(`-H ${escapeShellArg(`${key}: ${value}`)}`);
     }
 
-    if (hasBody(config)) {
+    if (isFormDataBody(config)) {
+        for (const row of bodyRows(body)) {
+            const spec = row.type === 'file'
+                ? `${row.key}=@${row.filePath || ''}${row.contentType ? `;type=${row.contentType}` : ''}`
+                : `${row.key}=${row.value || ''}`;
+            curlParts.push(`-F ${escapeShellArg(spec)}`);
+        }
+    } else if (isUrlencodedBody(config)) {
+        for (const row of bodyRows(body)) {
+            curlParts.push(`--data-urlencode ${escapeShellArg(`${row.key}=${row.value || ''}`)}`);
+        }
+    } else if (isBinaryBody(config)) {
+        const hasContentTypeHeader = validHeaders(headers).some(([key]) => key.toLowerCase() === 'content-type');
+        if (!hasContentTypeHeader) {
+            curlParts.push(`-H ${escapeShellArg(`Content-Type: ${body.contentType || 'application/octet-stream'}`)}`);
+        }
+        curlParts.push(`--data-binary ${escapeShellArg(`@${body.filePath}`)}`);
+    } else if (hasBody(config)) {
         curlParts.push(`-d ${escapeShellArg(stringifyBody(body))}`);
     }
 
@@ -149,11 +262,6 @@ function generatePythonRequests(config) {
         lines.push('');
     }
 
-    if (hasBody(config)) {
-        lines.push(`data = """${stringifyBody(body, true)}"""`);
-        lines.push('');
-    }
-
     const methodLower = (method || 'GET').toLowerCase();
     const requestParts = [`requests.${methodLower}(url`];
 
@@ -161,7 +269,42 @@ function generatePythonRequests(config) {
         requestParts.push('headers=headers');
     }
 
-    if (hasBody(config)) {
+    if (isFormDataBody(config)) {
+        const rows = bodyRows(body);
+        const fileRows = rows.filter((row) => row.type === 'file');
+        const textRows = rows.filter((row) => row.type !== 'file');
+        if (fileRows.length > 0) {
+            lines.push('files = {');
+            lines.push(fileRows.map((row) => {
+                const mime = row.contentType
+                    ? `, "${escapePythonString(row.contentType)}"`
+                    : '';
+                return `    "${escapePythonString(row.key)}": ("${escapePythonString(baseName(row.filePath))}", open("${escapePythonString(row.filePath || '')}", "rb")${mime})`;
+            }).join(',\n'));
+            lines.push('}');
+            lines.push('');
+            requestParts.push('files=files');
+        }
+        if (textRows.length > 0) {
+            lines.push('data = {');
+            lines.push(textRows.map((row) => `    "${escapePythonString(row.key)}": "${escapePythonString(row.value || '')}"`).join(',\n'));
+            lines.push('}');
+            lines.push('');
+            requestParts.push('data=data');
+        }
+    } else if (isUrlencodedBody(config)) {
+        lines.push('data = [');
+        lines.push(bodyRows(body).map((row) => `    ("${escapePythonString(row.key)}", "${escapePythonString(row.value || '')}")`).join(',\n'));
+        lines.push(']');
+        lines.push('');
+        requestParts.push('data=data');
+    } else if (isBinaryBody(config)) {
+        lines.push(`data = open("${escapePythonString(body.filePath)}", "rb")`);
+        lines.push('');
+        requestParts.push('data=data');
+    } else if (hasBody(config)) {
+        lines.push(`data = """${stringifyBody(body, true)}"""`);
+        lines.push('');
         requestParts.push('data=data');
     }
 
@@ -180,7 +323,7 @@ function generatePythonRequests(config) {
  * @returns {string} The generated JavaScript code.
  */
 function generateJavaScriptFetch(config) {
-    const { method, url, headers, body } = config;
+    const { method, url, headers } = config;
     const hdrs = validHeaders(headers);
     const lines = [];
 
@@ -193,8 +336,11 @@ function generateJavaScriptFetch(config) {
         lines.push('  },');
     }
 
-    if (hasBody(config)) {
-        lines.push(`  body: \`${escapeJavaScriptString(stringifyBody(body, true))}\``);
+    const bodyInfo = resolveSnippetBody(config, true);
+    if (bodyInfo.text !== null) {
+        lines.push(`  body: \`${escapeJavaScriptString(bodyInfo.text)}\``);
+    } else if (bodyInfo.comment) {
+        lines.push(`  // ${bodyInfo.comment}`);
     }
 
     lines.push('})');
@@ -212,7 +358,7 @@ function generateJavaScriptFetch(config) {
  * @returns {string} The generated JavaScript code.
  */
 function generateJavaScriptAxios(config) {
-    const { method, url, headers, body } = config;
+    const { method, url, headers } = config;
     const hdrs = validHeaders(headers);
     const lines = [];
 
@@ -229,8 +375,11 @@ function generateJavaScriptAxios(config) {
         lines.push('  },');
     }
 
-    if (hasBody(config)) {
-        lines.push(`  data: \`${escapeJavaScriptString(stringifyBody(body, true))}\``);
+    const bodyInfo = resolveSnippetBody(config, true);
+    if (bodyInfo.text !== null) {
+        lines.push(`  data: \`${escapeJavaScriptString(bodyInfo.text)}\``);
+    } else if (bodyInfo.comment) {
+        lines.push(`  // ${bodyInfo.comment}`);
     }
 
     lines.push('};');
@@ -249,8 +398,9 @@ function generateJavaScriptAxios(config) {
  * @returns {string} The generated Go code.
  */
 function generateGo(config) {
-    const { method, url, headers, body } = config;
-    const includeBody = hasBody(config);
+    const { method, url, headers } = config;
+    const bodyInfo = resolveSnippetBody(config);
+    const includeBody = bodyInfo.text !== null;
     const hdrs = validHeaders(headers);
     const lines = [];
 
@@ -268,7 +418,10 @@ function generateGo(config) {
     lines.push('func main() {');
 
     if (includeBody) {
-        lines.push(`    payload := strings.NewReader(\`${escapeGoString(stringifyBody(body))}\`)`);
+        lines.push(`    payload := strings.NewReader(\`${escapeGoString(bodyInfo.text)}\`)`);
+        lines.push('');
+    } else if (bodyInfo.comment) {
+        lines.push(`    // ${bodyInfo.comment}`);
         lines.push('');
     }
 
@@ -314,7 +467,7 @@ function generateGo(config) {
  * @returns {string} The generated Node.js code.
  */
 function generateNodeJs(config) {
-    const { method, url, headers, body } = config;
+    const { method, url, headers } = config;
     const hdrs = validHeaders(headers);
     const lines = [];
 
@@ -359,8 +512,11 @@ function generateNodeJs(config) {
     lines.push('});');
     lines.push('');
 
-    if (hasBody(config)) {
-        lines.push(`req.write(\`${escapeJavaScriptString(stringifyBody(body))}\`);`);
+    const bodyInfo = resolveSnippetBody(config);
+    if (bodyInfo.text !== null) {
+        lines.push(`req.write(\`${escapeJavaScriptString(bodyInfo.text)}\`);`);
+    } else if (bodyInfo.comment) {
+        lines.push(`// ${bodyInfo.comment}`);
     }
 
     lines.push('req.end();');
@@ -375,7 +531,7 @@ function generateNodeJs(config) {
  * @returns {string} The generated PHP code.
  */
 function generatePhp(config) {
-    const { method, url, headers, body } = config;
+    const { method, url, headers } = config;
     const hdrs = validHeaders(headers);
     const lines = [];
 
@@ -392,8 +548,11 @@ function generatePhp(config) {
     lines.push('  CURLOPT_TIMEOUT => 30,');
     lines.push(`  CURLOPT_CUSTOMREQUEST => "${method || 'GET'}",`);
 
-    if (hasBody(config)) {
-        lines.push(`  CURLOPT_POSTFIELDS => "${escapePythonString(stringifyBody(body))}",`);
+    const bodyInfo = resolveSnippetBody(config);
+    if (bodyInfo.text !== null) {
+        lines.push(`  CURLOPT_POSTFIELDS => "${escapePythonString(bodyInfo.text)}",`);
+    } else if (bodyInfo.comment) {
+        lines.push(`  // ${bodyInfo.comment}`);
     }
 
     if (hdrs.length > 0) {
@@ -426,7 +585,7 @@ function generatePhp(config) {
  * @returns {string} The generated Ruby code.
  */
 function generateRuby(config) {
-    const { method, url, headers, body } = config;
+    const { method, url, headers } = config;
     const lines = [];
 
     lines.push('require "uri"');
@@ -451,8 +610,11 @@ function generateRuby(config) {
         lines.push(`request["${escapePythonString(key)}"] = "${escapePythonString(value)}"`);
     }
 
-    if (hasBody(config)) {
-        lines.push(`request.body = "${escapePythonString(stringifyBody(body))}"`);
+    const bodyInfo = resolveSnippetBody(config);
+    if (bodyInfo.text !== null) {
+        lines.push(`request.body = "${escapePythonString(bodyInfo.text)}"`);
+    } else if (bodyInfo.comment) {
+        lines.push(`# ${bodyInfo.comment}`);
     }
 
     lines.push('');
@@ -469,7 +631,7 @@ function generateRuby(config) {
  * @returns {string} The generated Java code.
  */
 function generateJava(config) {
-    const { method, url, headers, body } = config;
+    const { method, url, headers } = config;
     const lines = [];
 
     lines.push('import java.net.URI;');
@@ -490,9 +652,13 @@ function generateJava(config) {
     }
 
     const methodUpper = (method || 'GET').toUpperCase();
-    if (hasBody(config)) {
-        lines.push(`            .${methodUpper}(HttpRequest.BodyPublishers.ofString("${escapeGoString(stringifyBody(body))}"))`);
+    const bodyInfo = resolveSnippetBody(config);
+    if (bodyInfo.text !== null) {
+        lines.push(`            .${methodUpper}(HttpRequest.BodyPublishers.ofString("${escapeGoString(bodyInfo.text)}"))`);
     } else {
+        if (bodyInfo.comment) {
+            lines.push(`            // ${bodyInfo.comment}`);
+        }
         lines.push(`            .${methodUpper}(HttpRequest.BodyPublishers.noBody())`);
     }
 

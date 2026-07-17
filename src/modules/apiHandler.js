@@ -844,7 +844,7 @@ export async function handleSendRequest() {
     }
 
     const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
-    if (['POST', 'PUT', 'PATCH'].includes(method) || bodyMode === 'formdata' || bodyMode === 'urlencoded') {
+    if (['POST', 'PUT', 'PATCH'].includes(method) || bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'binary') {
         try {
             let variables = _resolvedVariables;
             if (variables === null) {
@@ -885,17 +885,37 @@ export async function handleSendRequest() {
                     body.operationName = operationName;
                 }
             } else if ((bodyMode === 'formdata' || bodyMode === 'urlencoded') && app.formBodyManager) {
-                const rawFields = bodyMode === 'formdata'
-                    ? app.formBodyManager.getFormDataFields()
-                    : app.formBodyManager.getUrlencodedFields();
-                const processed = {};
-                for (const [k, v] of Object.entries(rawFields)) {
-                    processed[processor.processTemplate(k, variables)]
-                        = processor.processTemplate(v, variables);
-                }
-                if (Object.keys(processed).length > 0) {
+                const rows = bodyMode === 'formdata'
+                    ? app.formBodyManager.getFormDataRows()
+                    : app.formBodyManager.getUrlencodedRows();
+                const processed = rows
+                    .filter((row) => row.enabled !== false)
+                    .map((row) => ({
+                        key: processor.processTemplate(row.key, variables),
+                        value: row.type === 'file'
+                            ? ''
+                            : processor.processTemplate(row.value || '', variables),
+                        type: row.type || 'text',
+                        filePath: row.filePath
+                            ? processor.processTemplate(row.filePath, variables)
+                            : undefined,
+                        contentType: row.contentType || undefined
+                    }));
+                if (processed.length > 0) {
                     body = processed;
                 }
+            } else if (bodyMode === 'binary' && app.formBodyManager) {
+                const binary = app.formBodyManager.getBinaryBody();
+                if (!binary.filePath) {
+                    toast.error('No file selected for binary body.');
+                    clearResponseDisplay();
+                    setRequestInProgress(false);
+                    return;
+                }
+                body = {
+                    filePath: processor.processTemplate(binary.filePath, variables),
+                    contentType: binary.contentType || undefined
+                };
             } else if (bodyMode === 'text') {
                 const rawText = app.requestBodyTextEditor
                     ? app.requestBodyTextEditor.getContent()
@@ -952,7 +972,7 @@ export async function handleSendRequest() {
         queryParams,
         pathParams: processedPathParams,
         body,
-        bodyType: (bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'text') ? bodyMode : undefined,
+        bodyType: (bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'text' || bodyMode === 'binary') ? bodyMode : undefined,
         httpVersion,
         timeout,
         verifySsl,

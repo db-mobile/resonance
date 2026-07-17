@@ -10,6 +10,7 @@ import { EnvironmentRepository } from '../storage/EnvironmentRepository.js';
 import { CollectionRepository } from '../storage/CollectionRepository.js';
 import { CertificateRepository } from '../storage/CertificateRepository.js';
 import { CertificateService } from './CertificateService.js';
+import { normalizeFormRows } from '../utils/formDataRows.js';
 
 /**
  * Service for managing collection runner operations and execution
@@ -606,16 +607,31 @@ export class RunnerService {
         let bodyType = undefined;
 
         if (!overrideBody && persistedFormBodyData && (persistedFormBodyData.mode === 'formdata' || persistedFormBodyData.mode === 'urlencoded')) {
-            const rawFields = persistedFormBodyData.fields || {};
-            const processed = {};
-            for (const [k, v] of Object.entries(rawFields)) {
-                processed[this.variableProcessor.processTemplate(k, effectiveVariables)]
-                    = this.variableProcessor.processTemplate(v, effectiveVariables);
-            }
-            if (Object.keys(processed).length > 0) {
+            const processed = normalizeFormRows(persistedFormBodyData.fields)
+                .filter((row) => row.enabled !== false)
+                .map((row) => ({
+                    key: this.variableProcessor.processTemplate(row.key, effectiveVariables),
+                    value: row.type === 'file'
+                        ? ''
+                        : this.variableProcessor.processTemplate(row.value || '', effectiveVariables),
+                    type: row.type || 'text',
+                    filePath: row.filePath
+                        ? this.variableProcessor.processTemplate(row.filePath, effectiveVariables)
+                        : undefined,
+                    contentType: row.contentType || undefined
+                }));
+            if (processed.length > 0) {
                 body = processed;
             }
             bodyType = persistedFormBodyData.mode;
+        } else if (!overrideBody && persistedFormBodyData && persistedFormBodyData.mode === 'binary') {
+            if (persistedFormBodyData.filePath) {
+                body = {
+                    filePath: this.variableProcessor.processTemplate(persistedFormBodyData.filePath, effectiveVariables),
+                    contentType: persistedFormBodyData.contentType || undefined
+                };
+                bodyType = 'binary';
+            }
         } else if (overrideBody || ['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
             let bodyContent = overrideBody || persistedBody;
             if (!bodyContent && endpoint.requestBody) {

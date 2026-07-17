@@ -435,7 +435,7 @@ pub struct RequestOptions {
     /// Whether to follow HTTP redirects (defaults to true)
     #[serde(default)]
     pub follow_redirects: Option<bool>,
-    /// Body encoding type: "json" (default) | "formdata" | "urlencoded" | "text"
+    /// Body encoding type: "json" (default) | "formdata" | "urlencoded" | "text" | "binary"
     #[serde(default)]
     pub body_type: Option<String>,
     /// AWS Signature V4 authentication configuration
@@ -444,6 +444,86 @@ pub struct RequestOptions {
     /// Client certificate (mTLS) and custom CA configuration, resolved by host
     #[serde(default)]
     pub client_cert: Option<ClientCertConfig>,
+}
+
+/// One row of a "formdata" or "urlencoded" body sent as a JSON array.
+///
+/// Text rows carry `value`; file rows (`type: "file"`, formdata only) carry
+/// `file_path` and an optional per-part `content_type`. Disabled rows are
+/// filtered out by the frontend and never reach the backend. The legacy flat
+/// `{key: value}` object shape is still accepted by the body-building code.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FormPart {
+    pub key: String,
+    #[serde(default)]
+    pub value: Option<String>,
+    #[serde(rename = "type", default)]
+    pub part_type: Option<String>,
+    #[serde(default)]
+    pub file_path: Option<String>,
+    #[serde(default)]
+    pub content_type: Option<String>,
+}
+
+/// Body payload for `body_type: "binary"`: a file sent verbatim as the request
+/// body. Only the path travels over IPC; bytes are read here at send time.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BinaryBody {
+    pub file_path: String,
+    #[serde(default)]
+    pub content_type: Option<String>,
+}
+
+/// Read a request-body file from disk with a user-facing error message.
+/// Called inside `build_request`, so the file is re-read (not replayed) if the
+/// request is rebuilt for the digest-auth retry.
+fn read_body_file(path: &str) -> Result<Vec<u8>, String> {
+    std::fs::read(path).map_err(|e| format!("Failed to read file '{}': {}", path, e))
+}
+
+/// Build a multipart form from an array of [`FormPart`] rows (text and file parts).
+fn build_multipart_form(rows: &[serde_json::Value]) -> Result<reqwest::multipart::Form, String> {
+    let mut form = reqwest::multipart::Form::new();
+    for row in rows {
+        let part: FormPart = serde_json::from_value(row.clone())
+            .map_err(|e| format!("Invalid form-data field: {}", e))?;
+        if part.part_type.as_deref() == Some("file") {
+            let path = part
+                .file_path
+                .as_deref()
+                .filter(|p| !p.is_empty())
+                .ok_or_else(|| format!("Form field '{}' has no file selected", part.key))?;
+            let bytes = read_body_file(path)?;
+            let file_name = std::path::Path::new(path)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| "file".to_string());
+            let mime = part
+                .content_type
+                .as_deref()
+                .filter(|c| !c.is_empty())
+                .unwrap_or("application/octet-stream");
+            let file_part = reqwest::multipart::Part::bytes(bytes)
+                .file_name(file_name)
+                .mime_str(mime)
+                .map_err(|e| format!("Invalid content type '{}': {}", mime, e))?;
+            form = form.part(part.key, file_part);
+        } else {
+            form = form.text(part.key, part.value.unwrap_or_default());
+        }
+    }
+    Ok(form)
+}
+
+/// Flatten an array of form rows into ordered key/value pairs (urlencoded),
+/// preserving duplicates and row order.
+fn form_rows_to_pairs(rows: &[serde_json::Value]) -> Vec<(String, String)> {
+    rows.iter()
+        .filter_map(|row| serde_json::from_value::<FormPart>(row.clone()).ok())
+        .map(|p| (p.key, p.value.unwrap_or_default()))
+        .collect()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -792,7 +872,16 @@ pub async fn send_api_request(
     // the method, URL, headers, and body hash.
     let aws_headers: Option<HashMap<String, String>> = if let Some(aws) = &request_options.aws_auth
     {
+        // For "binary" the signature must cover the actual file bytes. For
+        // "formdata" the multipart boundary is generated per send, so a correct
+        // signature is not possible here (pre-existing limitation); other body
+        // types keep the historical JSON serialization.
         let body_bytes = match &request_options.body {
+            Some(b) if request_options.body_type.as_deref() == Some("binary") => {
+                let binary: BinaryBody = serde_json::from_value(b.clone())
+                    .map_err(|e| format!("Invalid binary body: {}", e))?;
+                read_body_file(&binary.file_path)?
+            }
             Some(b) => serde_json::to_vec(b).unwrap_or_default(),
             None => Vec::new(),
         };
@@ -808,8 +897,10 @@ pub async fn send_api_request(
         None
     };
 
-    // Helper to build a request
-    let build_request = |auth_header: Option<String>| -> RequestBuilder {
+    // Helper to build a request. Returns Result so body-file read errors
+    // surface as clean command errors; called again for the digest-auth retry,
+    // which re-reads any file-backed body from disk.
+    let build_request = |auth_header: Option<String>| -> Result<RequestBuilder, String> {
         let mut rb = client.request(method.clone(), &request_options.url);
         if let Some(headers) = &request_options.headers {
             for (key, value) in headers {
@@ -831,7 +922,11 @@ pub async fn send_api_request(
         match body_type.as_str() {
             "urlencoded" => {
                 if let Some(body) = &request_options.body {
-                    if let Some(obj) = body.as_object() {
+                    if let Some(rows) = body.as_array() {
+                        let pairs = form_rows_to_pairs(rows);
+                        rb = rb.form(&pairs);
+                    } else if let Some(obj) = body.as_object() {
+                        // Legacy flat-object shape from older persisted data
                         let pairs: Vec<(String, String)> = obj
                             .iter()
                             .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
@@ -842,12 +937,33 @@ pub async fn send_api_request(
             }
             "formdata" => {
                 if let Some(body) = &request_options.body {
-                    if let Some(obj) = body.as_object() {
+                    if let Some(rows) = body.as_array() {
+                        rb = rb.multipart(build_multipart_form(rows)?);
+                    } else if let Some(obj) = body.as_object() {
+                        // Legacy flat-object shape from older persisted data
                         let mut form = reqwest::multipart::Form::new();
                         for (k, v) in obj {
                             form = form.text(k.clone(), v.as_str().unwrap_or("").to_string());
                         }
                         rb = rb.multipart(form);
+                    }
+                }
+            }
+            "binary" => {
+                if let Some(body) = &request_options.body {
+                    let binary: BinaryBody = serde_json::from_value(body.clone())
+                        .map_err(|e| format!("Invalid binary body: {}", e))?;
+                    let bytes = read_body_file(&binary.file_path)?;
+                    rb = rb.body(bytes);
+                    if !user_has_content_type {
+                        rb = rb.header(
+                            "Content-Type",
+                            binary
+                                .content_type
+                                .as_deref()
+                                .filter(|c| !c.is_empty())
+                                .unwrap_or("application/octet-stream"),
+                        );
                     }
                 }
             }
@@ -869,11 +985,11 @@ pub async fn send_api_request(
         if let Some(auth) = auth_header {
             rb = rb.header("Authorization", auth);
         }
-        rb
+        Ok(rb)
     };
 
     // Execute request with cancellation support
-    let request_future = build_request(None).send();
+    let request_future = build_request(None)?.send();
 
     tokio::select! {
         result = request_future => {
@@ -896,7 +1012,7 @@ pub async fn send_api_request(
                                         ) {
                                             Ok(auth_header) => {
                                                 // Retry with digest auth
-                                                let retry_result = build_request(Some(auth_header)).send().await;
+                                                let retry_result = build_request(Some(auth_header))?.send().await;
                                                 return process_response(retry_result, &mut timings, start_time, &state).await;
                                             }
                                             Err(e) => {
@@ -1047,6 +1163,27 @@ async fn process_response(
     }
 }
 
+/// Open a file dialog to select a file for a request body (multipart file part
+/// or raw binary body). Returns the chosen path, or `None` if cancelled.
+/// Mirrors [`grpc_select_proto_file`](super::grpc_proto::grpc_select_proto_file)
+/// but without an extension filter.
+#[tauri::command]
+pub async fn pick_upload_file(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::{DialogExt, FilePath};
+
+    let (tx, rx) = oneshot::channel();
+
+    app.dialog().file().pick_file(move |file_path| {
+        let result = file_path.map(|fp| match fp {
+            FilePath::Path(p) => p.to_string_lossy().to_string(),
+            FilePath::Url(u) => u.path().to_string(),
+        });
+        let _ = tx.send(result);
+    });
+
+    rx.await.map_err(|e| format!("Dialog error: {}", e))
+}
+
 #[tauri::command]
 pub async fn cancel_api_request(
     state: State<'_, RequestState>,
@@ -1099,6 +1236,101 @@ mod tests {
             ca_path: Some("/certs/ca.pem".into()),
         };
         assert!(ca_only.is_active());
+    }
+
+    #[test]
+    fn form_part_deserializes_camel_case_rows() {
+        let json = serde_json::json!({
+            "key": "avatar",
+            "type": "file",
+            "filePath": "/tmp/pic.png",
+            "contentType": "image/png"
+        });
+        let part: FormPart = serde_json::from_value(json).unwrap();
+        assert_eq!(part.key, "avatar");
+        assert_eq!(part.part_type.as_deref(), Some("file"));
+        assert_eq!(part.file_path.as_deref(), Some("/tmp/pic.png"));
+        assert_eq!(part.content_type.as_deref(), Some("image/png"));
+        assert!(part.value.is_none());
+    }
+
+    #[test]
+    fn form_part_defaults_optional_fields() {
+        let json = serde_json::json!({ "key": "title", "value": "hello" });
+        let part: FormPart = serde_json::from_value(json).unwrap();
+        assert_eq!(part.value.as_deref(), Some("hello"));
+        assert!(part.part_type.is_none());
+        assert!(part.file_path.is_none());
+        assert!(part.content_type.is_none());
+    }
+
+    #[test]
+    fn binary_body_deserializes_camel_case() {
+        let json = serde_json::json!({ "filePath": "/tmp/a.bin", "contentType": "application/pdf" });
+        let body: BinaryBody = serde_json::from_value(json).unwrap();
+        assert_eq!(body.file_path, "/tmp/a.bin");
+        assert_eq!(body.content_type.as_deref(), Some("application/pdf"));
+
+        let minimal: BinaryBody = serde_json::from_value(serde_json::json!({ "filePath": "/f" })).unwrap();
+        assert!(minimal.content_type.is_none());
+    }
+
+    #[test]
+    fn build_multipart_form_mixes_text_and_file_parts() {
+        let dir = std::env::temp_dir().join(format!("resonance-upload-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file_path = dir.join("payload.txt");
+        std::fs::write(&file_path, b"file-bytes").unwrap();
+
+        let rows = vec![
+            serde_json::json!({ "key": "title", "value": "hello", "type": "text" }),
+            serde_json::json!({
+                "key": "doc",
+                "type": "file",
+                "filePath": file_path.to_str().unwrap(),
+                "contentType": "text/plain"
+            }),
+        ];
+        let form = build_multipart_form(&rows).unwrap();
+        assert!(!form.boundary().is_empty());
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn build_multipart_form_reports_missing_file() {
+        let rows = vec![serde_json::json!({
+            "key": "doc",
+            "type": "file",
+            "filePath": "/nonexistent/upload.bin"
+        })];
+        let err = build_multipart_form(&rows).unwrap_err();
+        assert!(err.contains("Failed to read file '/nonexistent/upload.bin'"));
+    }
+
+    #[test]
+    fn build_multipart_form_requires_path_for_file_parts() {
+        let rows = vec![serde_json::json!({ "key": "doc", "type": "file" })];
+        let err = build_multipart_form(&rows).unwrap_err();
+        assert!(err.contains("has no file selected"));
+    }
+
+    #[test]
+    fn form_rows_to_pairs_preserves_order_and_duplicates() {
+        let rows = vec![
+            serde_json::json!({ "key": "a", "value": "1" }),
+            serde_json::json!({ "key": "a", "value": "2" }),
+            serde_json::json!({ "key": "b", "value": "3" }),
+        ];
+        let pairs = form_rows_to_pairs(&rows);
+        assert_eq!(
+            pairs,
+            vec![
+                ("a".to_string(), "1".to_string()),
+                ("a".to_string(), "2".to_string()),
+                ("b".to_string(), "3".to_string()),
+            ]
+        );
     }
 
     #[test]

@@ -76,6 +76,7 @@ export class CollectionController {
                 }
             }
         });
+        this.docGeneratorService = new DocGeneratorService(this.repository);
         this.importExportService = new CollectionImportExportService({
             backendAPI,
             repository: this.repository,
@@ -118,8 +119,6 @@ export class CollectionController {
         this.handleCollectionsSearch = this.handleCollectionsSearch.bind(this);
         this.handleGenerateDocumentation = this.handleGenerateDocumentation.bind(this);
         this.handleTogglePinned = this.handleTogglePinned.bind(this);
-
-        this.docGeneratorService = new DocGeneratorService(this.repository);
 
         this.initializeCollectionsSearch();
     }

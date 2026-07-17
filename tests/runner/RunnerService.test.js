@@ -603,4 +603,85 @@ describe('RunnerService', () => {
             expect(config.body).toEqual({ from: 'collection' });
         });
     });
+
+    describe('_buildRequestConfig with form and binary bodies', () => {
+        let endpoint;
+        let collection;
+
+        beforeEach(() => {
+            service.collectionRepository.getPersistedHeaders = jest.fn().mockResolvedValue([]);
+            service.collectionRepository.getModifiedRequestBody = jest.fn().mockResolvedValue(null);
+            service.collectionRepository.getPersistedQueryParams = jest.fn().mockResolvedValue([]);
+            service.collectionRepository.getPersistedPathParams = jest.fn().mockResolvedValue([]);
+            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
+
+            collection = { id: 'c1', baseUrl: '', defaultHeaders: {} };
+            endpoint = { id: 'e1', method: 'POST', path: 'https://api.test/upload' };
+        });
+
+        test('should assemble form-data rows, filter disabled rows, and substitute variables', async () => {
+            service.collectionRepository.getFormBodyData = jest.fn().mockResolvedValue({
+                mode: 'formdata',
+                fields: [
+                    { key: 'title', value: '{{val}}', type: 'text', enabled: true },
+                    { key: 'skipped', value: 'x', type: 'text', enabled: false },
+                    { key: 'avatar', type: 'file', filePath: '{{dir}}/pic.png', contentType: 'image/png' }
+                ]
+            });
+
+            const config = await service._buildRequestConfig(collection, endpoint, {
+                val: 'hello',
+                dir: '/tmp'
+            });
+
+            expect(config.bodyType).toBe('formdata');
+            expect(config.body).toEqual([
+                { key: 'title', value: 'hello', type: 'text' },
+                { key: 'avatar', value: '', type: 'file', filePath: '/tmp/pic.png', contentType: 'image/png' }
+            ]);
+        });
+
+        test('should convert legacy flat-object fields to rows', async () => {
+            service.collectionRepository.getFormBodyData = jest.fn().mockResolvedValue({
+                mode: 'urlencoded',
+                fields: { a: '1', b: '2' }
+            });
+
+            const config = await service._buildRequestConfig(collection, endpoint, {});
+
+            expect(config.bodyType).toBe('urlencoded');
+            expect(config.body).toEqual([
+                { key: 'a', value: '1', type: 'text' },
+                { key: 'b', value: '2', type: 'text' }
+            ]);
+        });
+
+        test('should assemble binary bodies with variable substitution', async () => {
+            service.collectionRepository.getFormBodyData = jest.fn().mockResolvedValue({
+                mode: 'binary',
+                filePath: '{{dir}}/payload.bin',
+                contentType: 'application/pdf'
+            });
+
+            const config = await service._buildRequestConfig(collection, endpoint, { dir: '/tmp' });
+
+            expect(config.bodyType).toBe('binary');
+            expect(config.body).toEqual({
+                filePath: '/tmp/payload.bin',
+                contentType: 'application/pdf'
+            });
+        });
+
+        test('should skip binary bodies with no file path', async () => {
+            service.collectionRepository.getFormBodyData = jest.fn().mockResolvedValue({
+                mode: 'binary',
+                filePath: ''
+            });
+
+            const config = await service._buildRequestConfig(collection, endpoint, {});
+
+            expect(config.bodyType).toBeUndefined();
+            expect(config.body).toBeUndefined();
+        });
+    });
 });
