@@ -1,9 +1,3 @@
-/**
- * Sidebar: view switcher toolbar, primary menu, collections and
- * history pages. The history page overlays the collections page
- * when it carries the .visible contract class.
- */
-
 .sidebar {
   position: relative;
   display: flex;

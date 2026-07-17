@@ -1,9 +1,3 @@
-/**
- * Symbolic icon system: monochrome SVGs from assets/ui applied as
- * masks and recolored via currentColor, matching the GNOME
- * symbolic-icon convention. Class names are part of the JS contract.
- */
-
 .icon {
   display: inline-block;
   flex-shrink: 0;

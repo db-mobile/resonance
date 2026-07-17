@@ -1,7 +1,3 @@
-/**
- * Status pills, HTTP method badges, and count badges.
- */
-
 .badge {
   display: inline-flex;
   align-items: center;

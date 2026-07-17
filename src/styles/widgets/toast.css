@@ -1,7 +1,3 @@
-/**
- * AdwToast-style floating pills, bottom-center of the content area.
- */
-
 .toast-container {
   position: fixed;
   bottom: var(--space-6);

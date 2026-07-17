@@ -1,8 +1,3 @@
-/**
- * AdwDialog-style floating sheets with dimmed scrim, plus the
- * AdwAlertDialog variant used by confirm dialogs.
- */
-
 .dialog-scrim {
   position: fixed;
   inset: 0;
