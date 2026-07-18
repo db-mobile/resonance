@@ -69,6 +69,7 @@ pub(crate) fn parse_postman_collection(postman: Value) -> Result<Collection, Str
             items,
             &[],
             &inherited,
+            None,
             &mut endpoints,
             &mut folders,
             &mut used_folder_ids,
@@ -88,6 +89,7 @@ pub(crate) fn parse_postman_collection(postman: Value) -> Result<Collection, Str
         endpoints,
         folders,
         variables,
+        auth_config: extract_postman_auth(postman.get("auth")),
     })
 }
 
@@ -99,6 +101,7 @@ fn collect_items(
     items: &[Value],
     name_chain: &[String],
     inherited: &InheritedScripts,
+    folder_auth: Option<&Value>,
     endpoints: &mut Vec<Endpoint>,
     folders: &mut Vec<Folder>,
     used_folder_ids: &mut HashSet<String>,
@@ -117,10 +120,17 @@ fn collect_items(
             let mut child_inherited = inherited.clone();
             child_inherited.push_labeled(item, &format!("folder-level ({})", folder_name));
 
+            // Nearest folder auth wins; nested folders without their own auth
+            // materialize the ancestor's (the flattened folder model cannot
+            // walk parent folders at request time).
+            let own_auth = extract_postman_auth(item.get("auth"));
+            let child_auth = own_auth.as_ref().or(folder_auth);
+
             collect_items(
                 nested_items,
                 &chain,
                 &child_inherited,
+                child_auth,
                 endpoints,
                 folders,
                 used_folder_ids,
@@ -139,6 +149,7 @@ fn collect_items(
                             id: unique_folder_id(&composite_name, used_folder_ids),
                             name: composite_name,
                             endpoints: vec![endpoint],
+                            auth_config: folder_auth.cloned(),
                         });
                     }
                 }
@@ -430,7 +441,7 @@ fn extract_postman_auth(auth: Option<&Value>) -> Option<Value> {
         "oauth2" => Some(extract_postman_oauth2(
             auth_obj.get("oauth2").and_then(|o| o.as_array()),
         )),
-        "noauth" | "none" => None,
+        "noauth" | "none" => Some(serde_json::json!({ "type": "none", "config": {} })),
         _ => None,
     }
 }

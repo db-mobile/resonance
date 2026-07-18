@@ -1266,12 +1266,14 @@ mod tests {
 
     #[test]
     fn binary_body_deserializes_camel_case() {
-        let json = serde_json::json!({ "filePath": "/tmp/a.bin", "contentType": "application/pdf" });
+        let json =
+            serde_json::json!({ "filePath": "/tmp/a.bin", "contentType": "application/pdf" });
         let body: BinaryBody = serde_json::from_value(json).unwrap();
         assert_eq!(body.file_path, "/tmp/a.bin");
         assert_eq!(body.content_type.as_deref(), Some("application/pdf"));
 
-        let minimal: BinaryBody = serde_json::from_value(serde_json::json!({ "filePath": "/f" })).unwrap();
+        let minimal: BinaryBody =
+            serde_json::from_value(serde_json::json!({ "filePath": "/f" })).unwrap();
         assert!(minimal.content_type.is_none());
     }
 

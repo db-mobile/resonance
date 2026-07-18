@@ -1106,7 +1106,7 @@ export class CollectionService {
                     if (endpoint?.security) {
                         app.authManager.loadAuthConfig(endpoint.security);
                     } else {
-                        app.authManager.resetAuthConfig();
+                        app.authManager.loadAuthConfig({ type: 'inherit', config: {} });
                     }
                 }
             }

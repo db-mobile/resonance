@@ -1,0 +1,31 @@
+<template id="tpl-collection-auth-dialog">
+    <div class="u-flex u-flex-col u-gap-4">
+        <div class="dialog-header">
+            <h3 class="dialog-title" data-role="title"></h3>
+            <button type="button" id="collection-auth-close-btn" class="dialog-close-btn" aria-label="Close"><span class="icon icon-16 icon-x"></span></button>
+        </div>
+        <div class="dialog-body u-flex u-flex-col u-gap-4">
+            <p class="form-input-hint" data-role="hint">Requests in this collection whose auth type is "Inherit from Parent" use this configuration, unless their folder overrides it.</p>
+            <div class="auth-type-section">
+                <label for="collection-auth-type-select" class="heading">Type</label>
+                <div class="select-wrapper select-wrap">
+                    <select id="collection-auth-type-select" class="select-base" aria-label="Collection Authorization Type">
+                        <option value="none">No Auth</option>
+                        <option value="bearer">Bearer Token</option>
+                        <option value="basic">Basic Auth</option>
+                        <option value="api-key">API Key</option>
+                        <option value="oauth2">OAuth 2.0</option>
+                        <option value="digest">Digest Auth</option>
+                        <option value="aws-v4">AWS Signature</option>
+                    </select>
+                    <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                </div>
+            </div>
+            <div id="collection-auth-fields" class="auth-fields-container u-flex u-flex-col"></div>
+        </div>
+        <div class="dialog-footer">
+            <button id="collection-auth-cancel-btn" class="btn btn-outline">Cancel</button>
+            <button id="collection-auth-save-btn" class="btn btn-primary">Save</button>
+        </div>
+    </div>
+</template>

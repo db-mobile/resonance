@@ -199,13 +199,13 @@ export class CollectionRequestPersistenceService {
             Object.assign(updates, bodyState);
         }
 
-        const authConfig = authManager.getAuthConfig();
-        if (authConfig) {
-            updates.authConfig = authConfig;
-        }
-
         if (Object.keys(updates).length > 0) {
             await this.repository.updateEndpointFields(collectionId, endpointId, updates);
+        }
+
+        const authConfig = authManager.getAuthConfig();
+        if (authConfig) {
+            await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
         }
 
         if (urlInput && urlInput.value) {

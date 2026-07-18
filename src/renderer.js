@@ -602,6 +602,46 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // globals remain here.
     app.authManager = authManager;
+    authManager.getInheritedAuthInfo = async () => {
+        const controller = app.collectionController;
+        const current = getCurrentEndpoint();
+        if (!controller || !current?.collectionId) {
+            return null;
+        }
+        const [collection, folder] = await Promise.all([
+            controller.repository.getById(current.collectionId),
+            controller.repository.findFolderForEndpoint(current.collectionId, current.endpointId)
+        ]);
+        const folderHasAuth = Boolean(folder?.authConfig?.type && folder.authConfig.type !== 'inherit');
+        const authConfig = folderHasAuth
+            ? await controller.repository.getFolderAuthConfig(current.collectionId, folder.id)
+            : await controller.repository.getCollectionAuthConfig(current.collectionId);
+        return {
+            collectionId: current.collectionId,
+            collectionName: collection?.name || '',
+            folderId: folderHasAuth ? folder.id : null,
+            folderName: folderHasAuth ? folder.name : '',
+            authType: authConfig?.type || 'none'
+        };
+    };
+    authManager.onOpenCollectionAuth = async (collectionId, folderId = null) => {
+        const controller = app.collectionController;
+        if (!controller) {
+            return;
+        }
+        const collection = await controller.repository.getById(collectionId);
+        if (!collection) {
+            return;
+        }
+        const folder = folderId
+            ? (collection.folders || []).find((f) => f.id === folderId)
+            : null;
+        if (folder) {
+            await controller.handleFolderAuth(collection, folder);
+        } else {
+            await controller.handleCollectionAuth(collection);
+        }
+    };
     app.setUrlUpdating = setUrlUpdating;
     app.setGrpcMetadata = setGrpcMetadata;
     app.setGrpcTls = setGrpcTls;

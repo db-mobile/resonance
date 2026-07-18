@@ -82,6 +82,7 @@
     "new_request": "Nova Requisição",
     "import_curl": "Importar cURL",
     "manage_variables": "Gerenciar Variáveis",
+    "edit_auth": "Editar autenticação",
     "export_openapi_json": "Exportar como OpenAPI (JSON)",
     "export_openapi_yaml": "Exportar como OpenAPI (YAML)",
     "export_postman": "Exportar como Postman",

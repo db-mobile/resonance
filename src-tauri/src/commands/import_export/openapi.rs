@@ -87,6 +87,7 @@ pub(crate) fn parse_openapi_spec(spec: Value) -> Result<Collection, String> {
             ),
             name: base_path,
             endpoints,
+            auth_config: None,
         })
         .collect();
 
@@ -104,6 +105,7 @@ pub(crate) fn parse_openapi_spec(spec: Value) -> Result<Collection, String> {
         endpoints: all_endpoints,
         folders,
         variables: None,
+        auth_config: extract_openapi_security(spec.get("security"), &spec),
     })
 }
 

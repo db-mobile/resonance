@@ -35,6 +35,7 @@ import { CollectionRepository } from './storage/CollectionRepository.js';
 import { VariableService } from './services/VariableService.js';
 import { StatusDisplayAdapter } from './interfaces/IStatusDisplay.js';
 import { authManager } from './authManager.js';
+import { resolveEffectiveAuthConfig } from './auth/authInheritance.js';
 import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
 import { createLazyEditorProxy } from './editorLoader.js';
 import { extractCookies } from './cookieParser.js';
@@ -127,6 +128,22 @@ function getRequestBuilderService() {
  * @param {Object} requestConfig - Fully built request configuration
  * @returns {void}
  */
+/**
+ * Generates auth data for the current request with 'inherit' resolved to the
+ * owning collection's auth config. Used by every interactive send path.
+ *
+ * @returns {Promise<Object>} Auth data ({headers, queryParams, authConfig, awsAuth?})
+ */
+async function generateEffectiveAuthData() {
+    const current = getCurrentEndpoint();
+    const resolved = await resolveEffectiveAuthConfig(authManager.getAuthConfig(), {
+        collectionId: current?.collectionId,
+        endpointId: current?.endpointId,
+        repository: getCollectionRepository()
+    });
+    return authManager.generateAuthData(resolved);
+}
+
 function warnUnresolvedVariables(processor, requestConfig) {
     try {
         const unresolved = processor.extractUnresolvedVariableNames({
@@ -168,7 +185,7 @@ export async function fetchGraphQLIntrospection() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    const authData = authManager.generateAuthData();
+    const authData = await generateEffectiveAuthData();
     const builder = getRequestBuilderService();
     builder.mergeAuthData(headers, queryParams, authData);
 
@@ -584,7 +601,7 @@ async function handleGraphQLSubscriptionRequest() {
     let url = urlInput?.value?.trim() || urlInput?.getAttribute('value') || '';
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
-    const authData = authManager.generateAuthData();
+    const authData = await generateEffectiveAuthData();
     const builder = getRequestBuilderService();
     builder.mergeAuthData(headers, queryParams, authData);
 
@@ -645,7 +662,7 @@ export async function handleSendRequest() {
 
         const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
         const headers = parseKeyValuePairs(document.getElementById('headers-list'));
-        const authData = authManager.generateAuthData();
+        const authData = await generateEffectiveAuthData();
 
         const builder = getRequestBuilderService();
         builder.mergeAuthData(headers, queryParams, authData);
@@ -688,7 +705,7 @@ export async function handleSendRequest() {
 
         const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
         const headers = parseKeyValuePairs(document.getElementById('headers-list'));
-        const authData = authManager.generateAuthData();
+        const authData = await generateEffectiveAuthData();
 
         const builder = getRequestBuilderService();
         builder.mergeAuthData(headers, queryParams, authData);
@@ -784,7 +801,7 @@ export async function handleSendRequest() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    const authData = authManager.generateAuthData();
+    const authData = await generateEffectiveAuthData();
 
     const builder = getRequestBuilderService();
     builder.mergeAuthData(headers, queryParams, authData);
@@ -1214,7 +1231,7 @@ export async function handleGenerateCurl() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    const authData = authManager.generateAuthData();
+    const authData = await generateEffectiveAuthData();
 
     const builder = getRequestBuilderService();
     builder.mergeAuthData(headers, queryParams, authData);

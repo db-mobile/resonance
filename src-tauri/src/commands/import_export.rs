@@ -35,6 +35,10 @@ pub struct Collection {
     #[serde(default)]
     pub folders: Vec<Folder>,
     pub variables: Option<Vec<VariableEntry>>,
+    /// Collection-level auth ({ type, config }) inherited by endpoints whose
+    /// auth type is "inherit"; same shape as `Endpoint::security`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_config: Option<Value>,
 }
 
 /// A single collection variable; kept as an ordered list (matching the
@@ -51,6 +55,10 @@ pub struct Folder {
     pub id: String,
     pub name: String,
     pub endpoints: Vec<Endpoint>,
+    /// Folder-level auth ({ type, config }); overrides the collection auth for
+    /// endpoints in this folder whose own auth type is "inherit".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_config: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

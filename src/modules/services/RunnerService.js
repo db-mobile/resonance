@@ -531,7 +531,10 @@ export class RunnerService {
         const effectiveHeaders = overrides?.headers?.length ? overrides.headers : persistedHeaders;
         const overrideBody = typeof overrides?.body === 'string' && overrides.body.trim() !== '' ? overrides.body : null;
 
-        const effectiveAuthConfig = persistedAuthConfig || endpoint.security || null;
+        let effectiveAuthConfig = persistedAuthConfig || endpoint.security || { type: 'inherit', config: {} };
+        if (effectiveAuthConfig?.type === 'inherit') {
+            effectiveAuthConfig = await this.collectionRepository.getInheritedAuthConfig(collection.id, endpoint.id) || null;
+        }
         
         let url = endpoint.path;
         
@@ -766,7 +769,7 @@ export class RunnerService {
             authConfig: null
         };
 
-        if (!authConfig || !authConfig.type || authConfig.type === 'none') {
+        if (!authConfig || !authConfig.type || authConfig.type === 'none' || authConfig.type === 'inherit') {
             return authData;
         }
 

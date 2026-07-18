@@ -684,4 +684,87 @@ describe('RunnerService', () => {
             expect(config.body).toBeUndefined();
         });
     });
+
+    describe('_buildRequestConfig with collection auth inheritance', () => {
+        let endpoint;
+        let collection;
+
+        beforeEach(() => {
+            service.collectionRepository.getPersistedHeaders = jest.fn().mockResolvedValue([]);
+            service.collectionRepository.getModifiedRequestBody = jest.fn().mockResolvedValue(null);
+            service.collectionRepository.getFormBodyData = jest.fn().mockResolvedValue(null);
+            service.collectionRepository.getPersistedQueryParams = jest.fn().mockResolvedValue([]);
+            service.collectionRepository.getPersistedPathParams = jest.fn().mockResolvedValue([]);
+            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
+            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue(null);
+
+            collection = { id: 'c1', baseUrl: '', defaultHeaders: {} };
+            endpoint = { id: 'e1', method: 'GET', path: 'https://api.test/users' };
+        });
+
+        test('endpoint without persisted auth inherits the collection auth', async () => {
+            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue({
+                type: 'bearer',
+                config: { token: 'shared-token' }
+            });
+
+            const config = await service._buildRequestConfig(collection, endpoint, {});
+
+            expect(service.collectionRepository.getInheritedAuthConfig).toHaveBeenCalledWith('c1', 'e1');
+            expect(config.headers['Authorization']).toBe('Bearer shared-token');
+        });
+
+        test('explicit persisted none opts out of collection auth', async () => {
+            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue({
+                type: 'none',
+                config: {}
+            });
+            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue({
+                type: 'bearer',
+                config: { token: 'shared-token' }
+            });
+
+            const config = await service._buildRequestConfig(collection, endpoint, {});
+
+            expect(config.headers['Authorization']).toBeUndefined();
+        });
+
+        test('persisted endpoint auth wins over collection auth', async () => {
+            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue({
+                type: 'bearer',
+                config: { token: 'endpoint-token' }
+            });
+            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue({
+                type: 'bearer',
+                config: { token: 'shared-token' }
+            });
+
+            const config = await service._buildRequestConfig(collection, endpoint, {});
+
+            expect(config.headers['Authorization']).toBe('Bearer endpoint-token');
+        });
+
+        test('persisted inherit resolves to collection auth with variable substitution', async () => {
+            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue({
+                type: 'inherit',
+                config: {}
+            });
+            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue({
+                type: 'bearer',
+                config: { token: '{{apiToken}}' }
+            });
+
+            const config = await service._buildRequestConfig(collection, endpoint, {
+                apiToken: 'resolved-secret'
+            });
+
+            expect(config.headers['Authorization']).toBe('Bearer resolved-secret');
+        });
+
+        test('inherit with no collection auth sends unauthenticated', async () => {
+            const config = await service._buildRequestConfig(collection, endpoint, {});
+
+            expect(config.headers['Authorization']).toBeUndefined();
+        });
+    });
 });

@@ -91,6 +91,7 @@ pub(crate) fn load_collection_for_export(
         endpoints,
         folders,
         variables,
+        auth_config: raw.get("authConfig").filter(|v| v.is_object()).cloned(),
     })
 }
 
@@ -269,7 +270,24 @@ fn endpoint_events_to_postman(endpoint: &Endpoint) -> Vec<Value> {
 }
 
 fn endpoint_auth_to_postman(endpoint: &Endpoint) -> Option<Value> {
-    let security = endpoint.security.as_ref()?;
+    auth_to_postman(endpoint.security.as_ref()?)
+}
+
+/// Maps a folder's auth config to Postman's folder `auth`. Unlike the
+/// collection root, an explicit folder "none" is meaningful (it opts the
+/// folder's requests out of collection auth) and round-trips as `noauth`.
+fn folder_auth_to_postman(auth_config: Option<&Value>) -> Option<Value> {
+    let cfg = auth_config?;
+    match cfg.get("type").and_then(|v| v.as_str()) {
+        None | Some("inherit") => None,
+        Some("none") => Some(serde_json::json!({ "type": "noauth" })),
+        _ => auth_to_postman(cfg),
+    }
+}
+
+/// Maps a stored auth config ({type, config}) to the Postman `auth` object
+/// shape. Used for both per-request auth and collection-level auth.
+fn auth_to_postman(security: &Value) -> Option<Value> {
     let auth_type = security.get("type").and_then(|v| v.as_str())?;
     let config = security.get("config");
     let get = |key: &str| {
@@ -381,7 +399,12 @@ fn oauth2_to_postman(config: Option<&Value>) -> Option<Value> {
 /// Place a folder's exported items into a nested Postman item tree derived
 /// from the composite folder name segments ("Parent / Child"). A user folder
 /// literally named "A / B" therefore exports as nested folders A > B.
-fn insert_into_item_tree(items: &mut Vec<Value>, segments: &[&str], folder_items: Vec<Value>) {
+fn insert_into_item_tree(
+    items: &mut Vec<Value>,
+    segments: &[&str],
+    folder_items: Vec<Value>,
+    folder_auth: Option<&Value>,
+) {
     let Some((name, rest)) = segments.split_first() else {
         items.extend(folder_items);
         return;
@@ -398,11 +421,17 @@ fn insert_into_item_tree(items: &mut Vec<Value>, segments: &[&str], folder_items
         }
     };
 
+    if rest.is_empty() {
+        if let Some(auth) = folder_auth {
+            node["auth"] = auth.clone();
+        }
+    }
+
     let children = node
         .get_mut("item")
         .and_then(|i| i.as_array_mut())
         .expect("folder node has an item array");
-    insert_into_item_tree(children, rest, folder_items);
+    insert_into_item_tree(children, rest, folder_items, folder_auth);
 }
 
 pub(crate) fn collection_to_postman(collection: &Collection) -> (Value, Vec<String>) {
@@ -423,7 +452,8 @@ pub(crate) fn collection_to_postman(collection: &Collection) -> (Value, Vec<Stri
 
         if !folder_items.is_empty() {
             let segments: Vec<&str> = folder.name.split(" / ").collect();
-            insert_into_item_tree(&mut items, &segments, folder_items);
+            let folder_auth = folder_auth_to_postman(folder.auth_config.as_ref());
+            insert_into_item_tree(&mut items, &segments, folder_items, folder_auth.as_ref());
         }
     }
 
@@ -470,17 +500,30 @@ pub(crate) fn collection_to_postman(collection: &Collection) -> (Value, Vec<Stri
         }
     }
 
-    (
-        serde_json::json!({
-            "info": {
-                "name": collection.name,
-                "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-            },
-            "item": items,
-            "variable": variables
-        }),
-        skipped,
-    )
+    let mut postman = serde_json::json!({
+        "info": {
+            "name": collection.name,
+            "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+        },
+        "item": items,
+        "variable": variables
+    });
+
+    if let Some(auth) = collection
+        .auth_config
+        .as_ref()
+        .filter(|cfg| {
+            !matches!(
+                cfg.get("type").and_then(|v| v.as_str()),
+                None | Some("none") | Some("inherit")
+            )
+        })
+        .and_then(auth_to_postman)
+    {
+        postman["auth"] = auth;
+    }
+
+    (postman, skipped)
 }
 
 #[cfg(test)]
@@ -535,15 +578,26 @@ mod tests {
                 id: "folder_Parent___Child".to_string(),
                 name: "Parent / Child".to_string(),
                 endpoints: vec![scripted],
+                auth_config: Some(serde_json::json!({
+                    "type": "basic",
+                    "config": { "username": "folder-user", "password": "" }
+                })),
             }],
             variables: Some(vec![VariableEntry {
                 key: "apiKey".to_string(),
                 value: "secret".to_string(),
             }]),
+            auth_config: Some(serde_json::json!({
+                "type": "bearer",
+                "config": { "token": "{{token}}" }
+            })),
         };
 
         let (postman, skipped) = collection_to_postman(&collection);
         assert!(skipped.is_empty());
+
+        assert_eq!(postman["auth"]["type"], "bearer");
+        assert_eq!(postman["auth"]["bearer"][0]["value"], "{{token}}");
 
         let items = postman["item"].as_array().unwrap();
         assert_eq!(items.len(), 3);
@@ -551,6 +605,8 @@ mod tests {
         let parent = items.iter().find(|i| i["name"] == "Parent").unwrap();
         let child = &parent["item"][0];
         assert_eq!(child["name"], "Child");
+        assert_eq!(child["auth"]["type"], "basic");
+        assert!(parent.get("auth").is_none());
         let exported_scripted = &child["item"][0];
         assert_eq!(exported_scripted["name"], "List Users");
         let events = exported_scripted["event"].as_array().unwrap();
@@ -590,6 +646,10 @@ mod tests {
     fn postman_import_export_round_trips() {
         let fixture = serde_json::json!({
             "info": { "name": "RoundTrip" },
+            "auth": {
+                "type": "bearer",
+                "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "variable": [
                 { "key": "baseUrl", "value": "https://api.example.com" },
                 { "key": "token", "value": "abc" }
@@ -597,6 +657,13 @@ mod tests {
             "item": [
                 {
                     "name": "Users",
+                    "auth": {
+                        "type": "basic",
+                        "basic": [
+                            { "key": "username", "value": "folder-user", "type": "string" },
+                            { "key": "password", "value": "{{folderPass}}", "type": "string" }
+                        ]
+                    },
                     "item": [
                         {
                             "name": "Admin",
@@ -638,12 +705,25 @@ mod tests {
         });
 
         let imported = parse_postman_collection(fixture).unwrap();
+        let imported_auth = imported.auth_config.as_ref().unwrap();
+        assert_eq!(imported_auth["type"], "bearer");
+        assert_eq!(imported_auth["config"]["token"], "{{token}}");
+
         let (exported, skipped) = collection_to_postman(&imported);
         assert!(skipped.is_empty());
+        assert_eq!(exported["auth"]["type"], "bearer");
         let reimported = parse_postman_collection(exported).unwrap();
+        assert_eq!(
+            reimported.auth_config.as_ref().unwrap()["config"]["token"],
+            "{{token}}"
+        );
 
         assert_eq!(reimported.folders.len(), 1);
         assert_eq!(reimported.folders[0].name, "Users / Admin");
+        let folder_auth = reimported.folders[0].auth_config.as_ref().unwrap();
+        assert_eq!(folder_auth["type"], "basic");
+        assert_eq!(folder_auth["config"]["username"], "folder-user");
+        assert_eq!(folder_auth["config"]["password"], "{{folderPass}}");
 
         let delete_user = reimported
             .endpoints
