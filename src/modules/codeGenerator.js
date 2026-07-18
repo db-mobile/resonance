@@ -716,13 +716,3 @@ export function generateCode(language, config) {
  * @type {Array<{ id: string, name: string, description: string }>}
  */
 export const SUPPORTED_LANGUAGES = GENERATORS.map(({ id, name, description }) => ({ id, name, description }));
-
-/**
- * Convenience wrapper that generates a cURL command.
- *
- * @param {RequestConfig} config - The request configuration.
- * @returns {string} The generated cURL command.
- */
-export function generateCurlCommand(config) {
-    return generateCurl(config);
-}

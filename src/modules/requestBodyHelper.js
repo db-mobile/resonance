@@ -35,38 +35,3 @@ export function setRequestBodyContent(content) {
         app.requestBodyEditor.setContent(content);
     }
 }
-
-/**
- * Clear the request body content
- */
-export function clearRequestBodyContent() {
-    setRequestBodyContent('');
-}
-
-/**
- * Format the JSON content in the request body
- * @returns {boolean} - True if formatting succeeded, false otherwise
- */
-export function formatRequestBodyJSON() {
-    if (app.requestBodyEditor) {
-        return app.requestBodyEditor.formatJSON();
-    }
-
-    const bodyInput = document.getElementById('body-input');
-    if (!bodyInput) {
-        return false;
-    }
-
-    try {
-        const content = bodyInput.value.trim();
-        if (!content) {
-            return true;
-        }
-        const parsed = JSON.parse(content);
-        const formatted = JSON.stringify(parsed, null, 2);
-        bodyInput.value = formatted;
-        return true;
-    } catch {
-        return false;
-    }
-}

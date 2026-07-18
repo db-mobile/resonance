@@ -1,6 +1,5 @@
 /**
- * @fileoverview Shared CodeMirror theme utilities. Syntax palettes are
- * drawn from the GNOME color palette so editors match the Adwaita UI.
+ * @fileoverview Shared CodeMirror theme utilities.
  * @module editorTheme
  */
 
@@ -26,8 +25,7 @@ export function isDarkMode() {
 }
 
 /**
- * Light highlight style on the Adwaita light view background (#ffffff).
- * Colors are GNOME palette shades 4-5 for AA contrast on white.
+ * Light highlight style on the light view background (#ffffff).
  */
 export const lightHighlightStyle = HighlightStyle.define([
     { tag: tags.keyword,        color: '#613583' },
@@ -50,8 +48,7 @@ export const lightHighlightStyle = HighlightStyle.define([
 ]);
 
 /**
- * Dark highlight style on the Adwaita dark view background (#1e1e1e).
- * Colors are GNOME palette shades 1-2 for legibility on dark gray.
+ * Dark highlight style on the dark view background (#1e1e1e).
  */
 export const darkHighlightStyle = HighlightStyle.define([
     { tag: tags.keyword,        color: '#dc8add' },

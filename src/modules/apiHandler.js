@@ -330,21 +330,6 @@ async function isTabCurrentlyActive(tabId) {
 }
 
 /**
- * Get the current response body content from the editor
- * @returns {string}
- */
-export function getResponseBodyContent() {
-    if (responseEditor) {
-        return responseEditor.getContent();
-    }
-    return '';
-}
-
-export function displayResponseWithLineNumbers(content, contentType = null) {
-    return displayResponseWithLineNumbersForTab(content, contentType, null);
-}
-
-/**
  * Clears the schema validation badge from the response area
  * @param {string|null} tabId - Workspace tab ID
  */

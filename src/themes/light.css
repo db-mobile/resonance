@@ -1,9 +1,3 @@
-/**
- * Adwaita light palette.
- * Overrides the named-color defaults from src/styles/tokens.css.
- * Contract documented in src/themes/README.md.
- */
-
 :root {
   color-scheme: light;
 

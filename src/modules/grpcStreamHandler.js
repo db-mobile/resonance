@@ -89,11 +89,6 @@ export function hasActiveStream(tabId) {
     return !!(entry && entry.state === 'open');
 }
 
-export function getStreamMethod(tabId) {
-    const entry = session.get(tabId);
-    return entry?.fullMethod || null;
-}
-
 /**
  * Start a new stream or push another message into an open client/bidi stream.
  * @param {object} opts - {target, fullMethod, requestJson, metadata, tls, protoPath, canSend}
