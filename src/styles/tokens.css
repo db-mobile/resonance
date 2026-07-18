@@ -1,13 +1,6 @@
-/**
- * Design tokens — Adwaita/libadwaita derived.
- * Theme-independent structure tokens plus light-palette defaults.
- * The active theme file (src/themes/{light,dark}.css) overrides the
- * named colors; accents are keyed off the data-accent root attribute.
- */
-
 :root {
-  --font-sans: "Adwaita Sans", "Inter", "Cantarell", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Adwaita Mono", "JetBrains Mono", "Fira Code", "Source Code Pro", ui-monospace, monospace;
+  --font-sans: "Inter", "Cantarell", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Source Code Pro", ui-monospace, monospace;
 
   --font-size-base: 14px;
   --font-size-caption: 12px;

@@ -28,6 +28,10 @@ pub struct Collection {
     pub folders: Vec<Value>,
     #[serde(default)]
     pub default_headers: Value,
+    /// Collection-level auth config ({type, config}) inherited by endpoints
+    /// whose auth type is "inherit". Secret fields are redacted before write.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_config: Option<Value>,
     #[serde(rename = "_openApiSpec")]
     #[serde(default)]
     pub open_api_spec: Option<Value>,
@@ -482,6 +486,14 @@ pub(crate) fn persist_collection(
     let mut persisted = collection.clone();
     persisted.storage_path = Some(target_dir.to_string_lossy().to_string());
     persisted.storage_parent_path = None;
+    if let Some(auth) = persisted.auth_config.as_mut() {
+        redact_auth_secrets(auth);
+    }
+    for folder in persisted.folders.iter_mut() {
+        if let Some(auth) = folder.get_mut("authConfig").filter(|v| v.is_object()) {
+            redact_auth_secrets(auth);
+        }
+    }
 
     let collection_file = target_dir.join("collection.json");
     write_json_file(&collection_file, &persisted)?;

@@ -34,7 +34,6 @@ function copyRecursive(src, dest) {
 
 fs.copyFileSync('index.html', 'dist/index.html');
 copyRecursive('assets/ui', 'dist/assets/ui');
-copyRecursive('assets/fonts', 'dist/assets/fonts');
 copyRecursive('src', 'dist/src');
 
 console.log('✓ Static files copied to dist/');

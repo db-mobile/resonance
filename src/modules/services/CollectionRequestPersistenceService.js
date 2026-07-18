@@ -199,13 +199,13 @@ export class CollectionRequestPersistenceService {
             Object.assign(updates, bodyState);
         }
 
-        const authConfig = authManager.getAuthConfig();
-        if (authConfig) {
-            updates.authConfig = authConfig;
-        }
-
         if (Object.keys(updates).length > 0) {
             await this.repository.updateEndpointFields(collectionId, endpointId, updates);
+        }
+
+        const authConfig = authManager.getAuthConfig();
+        if (authConfig) {
+            await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
         }
 
         if (urlInput && urlInput.value) {
@@ -300,10 +300,35 @@ export class CollectionRequestPersistenceService {
         }
 
         if (bodyInput) {
-            updatedRequest.body = {
-                mode: 'json',
-                content: getRequestBodyContent()
-            };
+            const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
+            if (bodyMode === 'formdata' && app.formBodyManager) {
+                updatedRequest.body = {
+                    mode: 'formdata',
+                    fields: app.formBodyManager.getFormDataRows()
+                };
+            } else if (bodyMode === 'urlencoded' && app.formBodyManager) {
+                updatedRequest.body = {
+                    mode: 'urlencoded',
+                    fields: app.formBodyManager.getUrlencodedRows()
+                };
+            } else if (bodyMode === 'binary' && app.formBodyManager) {
+                updatedRequest.body = {
+                    mode: 'binary',
+                    ...app.formBodyManager.getBinaryBody()
+                };
+            } else if (bodyMode === 'text') {
+                updatedRequest.body = {
+                    mode: 'text',
+                    content: app.requestBodyTextEditor
+                        ? app.requestBodyTextEditor.getContent()
+                        : ''
+                };
+            } else {
+                updatedRequest.body = {
+                    mode: 'json',
+                    content: getRequestBodyContent()
+                };
+            }
             hasChanges = true;
         }
 

@@ -130,14 +130,6 @@ export function isGraphQLMode() {
 }
 
 /**
- * Check if current mode is HTTP
- * @returns {boolean}
- */
-export function isHttpMode() {
-    return currentMode === RequestMode.HTTP;
-}
-
-/**
  * Set the request mode and update UI accordingly
  * @param {string} mode - The mode to set
  */

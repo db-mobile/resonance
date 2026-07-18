@@ -153,12 +153,6 @@ export const responseCookiesDisplay = document.getElementById('response-cookies-
 export const responsePerformanceDisplay = document.getElementById('response-performance-display');
 
 /**
- * Copy response button
- * @const {HTMLButtonElement}
- */
-export const copyResponseBtn = document.getElementById('copy-response-btn');
-
-/**
  * Language selector for syntax highlighting
  * @const {HTMLSelectElement}
  */
@@ -189,12 +183,6 @@ export const responseTabButtons = document.querySelectorAll('.response-tabs .tab
 export const importCollectionBtn = document.getElementById('import-collection-btn');
 
 /**
- * Collections list container
- * @const {HTMLElement}
- */
-export const collectionsListDiv = document.getElementById('collections-list');
-
-/**
  * Authentication type select dropdown
  * @const {HTMLSelectElement}
  */
@@ -222,10 +210,3 @@ export const grpcLoadProtoBtn = document.getElementById('grpc-load-proto-btn');
 export const grpcClearProtoBtn = document.getElementById('grpc-clear-proto-btn');
 export const grpcProtoFilename = document.getElementById('grpc-proto-filename');
 export const grpcProtoStatus = document.getElementById('grpc-proto-status');
-
-export const mqttSubscribeInput = document.getElementById('mqtt-subscribe-input');
-export const mqttTopicInput = document.getElementById('mqtt-topic-input');
-export const mqttQosSelect = document.getElementById('mqtt-qos-select');
-export const mqttClientIdInput = document.getElementById('mqtt-client-id-input');
-export const mqttUsernameInput = document.getElementById('mqtt-username-input');
-export const mqttPasswordInput = document.getElementById('mqtt-password-input');

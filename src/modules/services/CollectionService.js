@@ -782,13 +782,28 @@ export class CollectionService {
             }
             if (app.formBodyManager) {
                 if (formBodyData.mode === 'formdata') {
-                    app.formBodyManager.setFormDataFields(formBodyData.fields || {});
+                    app.formBodyManager.setFormDataRows(formBodyData.fields);
                 } else {
-                    app.formBodyManager.setUrlencodedFields(formBodyData.fields || {});
+                    app.formBodyManager.setUrlencodedRows(formBodyData.fields);
                 }
             }
             const key = `${collection.id}_${endpoint.id}`;
-            this.originalBodyValues.set(key, JSON.stringify(formBodyData.fields || {}));
+            this.originalBodyValues.set(key, JSON.stringify(formBodyData.fields || []));
+            return;
+        }
+
+        if (formBodyData && formBodyData.mode === 'binary') {
+            if (app.graphqlBodyManager) {
+                app.graphqlBodyManager.switchMode('binary');
+            }
+            if (app.formBodyManager) {
+                app.formBodyManager.setBinaryBody(formBodyData);
+            }
+            const key = `${collection.id}_${endpoint.id}`;
+            this.originalBodyValues.set(key, JSON.stringify({
+                filePath: formBodyData.filePath || '',
+                contentType: formBodyData.contentType || ''
+            }));
             return;
         }
 
@@ -811,13 +826,13 @@ export class CollectionService {
             }
             if (app.formBodyManager) {
                 if (importedBodyType === 'formdata') {
-                    app.formBodyManager.setFormDataFields(endpoint.requestBody.fields || {});
+                    app.formBodyManager.setFormDataRows(endpoint.requestBody.fields);
                 } else {
-                    app.formBodyManager.setUrlencodedFields(endpoint.requestBody.fields || {});
+                    app.formBodyManager.setUrlencodedRows(endpoint.requestBody.fields);
                 }
             }
             const key = `${collection.id}_${endpoint.id}`;
-            this.originalBodyValues.set(key, JSON.stringify(endpoint.requestBody.fields || {}));
+            this.originalBodyValues.set(key, JSON.stringify(endpoint.requestBody.fields || []));
             return;
         }
 
@@ -912,12 +927,17 @@ export class CollectionService {
         if (bodyMode === 'formdata' && app.formBodyManager) {
             state.formBodyData = {
                 mode: 'formdata',
-                fields: app.formBodyManager.getFormDataFields()
+                fields: app.formBodyManager.getFormDataRows()
             };
         } else if (bodyMode === 'urlencoded' && app.formBodyManager) {
             state.formBodyData = {
                 mode: 'urlencoded',
-                fields: app.formBodyManager.getUrlencodedFields()
+                fields: app.formBodyManager.getUrlencodedRows()
+            };
+        } else if (bodyMode === 'binary' && app.formBodyManager) {
+            state.formBodyData = {
+                mode: 'binary',
+                ...app.formBodyManager.getBinaryBody()
             };
         } else if (bodyMode === 'text') {
             state.formBodyData = {
@@ -1086,7 +1106,7 @@ export class CollectionService {
                     if (endpoint?.security) {
                         app.authManager.loadAuthConfig(endpoint.security);
                     } else {
-                        app.authManager.resetAuthConfig();
+                        app.authManager.loadAuthConfig({ type: 'inherit', config: {} });
                     }
                 }
             }

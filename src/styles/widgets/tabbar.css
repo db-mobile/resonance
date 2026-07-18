@@ -1,8 +1,3 @@
-/**
- * AdwTabBar replica for workspace tabs. Drag states use the
- * existing dragging/is-dragging contract classes.
- */
-
 .tab-bar {
   display: flex;
   align-items: stretch;

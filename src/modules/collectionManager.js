@@ -61,30 +61,6 @@ export async function getCollections() {
 }
 
 /**
- * Displays collections in the UI
- *
- * @param {Array<Object>} collections - Array of collection objects to display
- * @returns {void}
- */
-export function displayCollections(collections) {
-    const controller = initializeController();
-    controller.renderCollections(collections);
-}
-
-/**
- * Loads an endpoint from a collection into the request form
- *
- * @async
- * @param {Object} collection - The collection object
- * @param {Object} endpoint - The endpoint object
- * @returns {Promise<void>}
- */
-export async function loadEndpointIntoForm(collection, endpoint) {
-    const controller = initializeController();
-    await controller.handleEndpointClick(collection, endpoint);
-}
-
-/**
  * Opens file dialog and imports OpenAPI specification file
  *
  * @async
@@ -129,19 +105,6 @@ export function importCurl() {
 }
 
 /**
- * Saves modified request body for an endpoint
- *
- * @async
- * @param {string} collectionId - Collection ID
- * @param {string} endpointId - Endpoint ID
- * @returns {Promise<void>}
- */
-export async function saveRequestBodyModification(collectionId, endpointId) {
-    const controller = initializeController();
-    await controller.saveRequestBodyModification(collectionId, endpointId);
-}
-
-/**
  * Saves all request modifications for an endpoint (params, headers, body, auth)
  *
  * @async
@@ -165,40 +128,6 @@ export function initializeBodyTracking() {
 }
 
 /**
- * Gets variables for currently loaded collection
- *
- * @async
- * @returns {Promise<Object>} Variables object
- */
-export function getCurrentCollectionVariables() {
-    const controller = initializeController();
-    return controller.getCurrentCollectionVariables();
-}
-
-/**
- * Processes request with variable substitution
- *
- * @async
- * @param {Object} request - Request object to process
- * @returns {Promise<Object>} Processed request with variables substituted
- */
-export function processRequestForVariables(request) {
-    const controller = initializeController();
-    return controller.processRequestForVariables(request);
-}
-
-/**
- * Restores the last selected request from storage
- *
- * @async
- * @returns {Promise<void>}
- */
-export function restoreLastSelectedRequest() {
-    const controller = initializeController();
-    return controller.restoreLastSelectedRequest();
-}
-
-/**
  * Shows dialog to save current request to a collection
  *
  * @async
@@ -208,28 +137,6 @@ export function restoreLastSelectedRequest() {
 export async function saveRequestToCollection(requestData) {
     const controller = initializeController();
     return controller.showSaveToCollectionDialog(requestData);
-}
-
-/**
- * Generates placeholder request body from schema
- *
- * @deprecated Use SchemaProcessor class instead
- * @param {Object} _requestBody - Request body schema
- * @returns {null}
- */
-export function generatePlaceholderBody(_requestBody) {
-    return null;
-}
-
-/**
- * Generates example data from schema
- *
- * @deprecated Use SchemaProcessor class instead
- * @param {Object} _schema - Schema object
- * @returns {null}
- */
-export function generateExampleFromSchema(_schema) {
-    return null;
 }
 
 if (typeof window !== 'undefined' && window.backendAPI) {

@@ -1,7 +1,3 @@
-/**
- * Popovers and menus, GtkPopover/GtkPopoverMenu style.
- */
-
 .popover {
   position: absolute;
   z-index: var(--z-popover);

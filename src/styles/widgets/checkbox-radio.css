@@ -1,7 +1,3 @@
-/**
- * GTK-style check buttons and radio buttons.
- */
-
 input[type="checkbox"].check,
 input[type="radio"].radio {
   appearance: none;

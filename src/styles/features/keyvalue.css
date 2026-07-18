@@ -24,7 +24,9 @@
 }
 
 .key-value-row .key-input,
-.key-value-row .value-input {
+.key-value-row .value-input,
+.form-body-row .file-path-input,
+.form-body-row .part-content-type-input {
   min-width: 0;
   min-height: var(--control-height-small);
   padding: 0 var(--space-3);
@@ -37,15 +39,51 @@
 }
 
 .key-value-row .key-input:focus,
-.key-value-row .value-input:focus {
+.key-value-row .value-input:focus,
+.form-body-row .file-path-input:focus,
+.form-body-row .part-content-type-input:focus {
   outline: 2px solid var(--focus-ring-color);
   outline-offset: -2px;
   border-color: transparent;
 }
 
 .key-value-row .key-input::placeholder,
-.key-value-row .value-input::placeholder {
+.key-value-row .value-input::placeholder,
+.form-body-row .file-path-input::placeholder,
+.form-body-row .part-content-type-input::placeholder {
   opacity: 0.4;
+}
+
+.form-body-row .row-enabled-checkbox {
+  flex-shrink: 0;
+}
+
+.form-body-row .row-type-select {
+  flex: 0 0 auto;
+}
+
+.form-body-row .file-cell {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.form-body-row .file-cell[hidden] {
+  display: none;
+}
+
+.form-body-row .file-path-input {
+  flex: 1;
+}
+
+.form-body-row .part-content-type-input {
+  flex: 0 0 28%;
+}
+
+.form-body-row .browse-file-btn {
+  flex-shrink: 0;
 }
 
 .key-value-row .remove-row-btn {

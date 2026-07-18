@@ -3,7 +3,7 @@
  * @module storage/CollectionRepository
  */
 
-import { splitAuthSecrets, mergeAuthSecrets, authSecretScope } from '../auth/authSecrets.js';
+import { splitAuthSecrets, mergeAuthSecrets, authSecretScope, collectionAuthSecretScope, folderAuthSecretScope } from '../auth/authSecrets.js';
 
 /**
  * Repository for managing collection data persistence
@@ -506,6 +506,199 @@ export class CollectionRepository {
             await this._updateEndpointField(collectionId, endpointId, 'authConfig', toPersist);
         } catch (error) {
             throw new Error(`Failed to save persisted auth config: ${error.message || error}`);
+        }
+    }
+
+    /**
+     * Retrieves the collection-level auth config, with secret fields merged
+     * back from the SecretStore.
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @returns {Promise<Object|null>} The auth config ({type, config}) or null
+     */
+    async getCollectionAuthConfig(collectionId) {
+        try {
+            const collection = await this._getByIdFresh(collectionId);
+            const authConfig = collection?.authConfig || null;
+            if (!authConfig || !this.secretStore) {
+                return authConfig;
+            }
+            const secrets = await this.secretStore.getScope(collectionAuthSecretScope(collectionId));
+            return mergeAuthSecrets(authConfig, secrets);
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /**
+     * Saves the collection-level auth config. Literal secret values are moved
+     * into the SecretStore (scope auth:<collectionId>:__collection__) and the
+     * persisted collection.json keeps a redacted copy.
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {Object} authConfig - The authentication configuration ({type, config})
+     * @returns {Promise<void>}
+     * @throws {Error} If save operation fails
+     */
+    async saveCollectionAuthConfig(collectionId, authConfig) {
+        try {
+            let toPersist = authConfig;
+            if (authConfig && this.secretStore) {
+                const { redacted, secrets } = splitAuthSecrets(authConfig);
+                const scope = collectionAuthSecretScope(collectionId);
+                const fields = Object.keys(secrets);
+                for (const field of fields) {
+                    await this.secretStore.set(scope, field, secrets[field]);
+                }
+                const stored = await this.secretStore.getScope(scope);
+                for (const field of Object.keys(stored)) {
+                    if (!Object.prototype.hasOwnProperty.call(secrets, field)) {
+                        await this.secretStore.delete(scope, field);
+                    }
+                }
+                toPersist = redacted;
+            }
+            await this._getByIdFresh(collectionId);
+            await this.update(collectionId, { authConfig: toPersist });
+        } catch (error) {
+            throw new Error(`Failed to save collection auth config: ${error.message || error}`);
+        }
+    }
+
+    /**
+     * Reads a collection directly from the backend, bypassing (and refreshing)
+     * this instance's LRU cache. Several repository instances exist at runtime
+     * (controller, apiHandler, runner), each with its own cache; auth
+     * resolution must see edits saved through any of them, so it never trusts
+     * a cached copy.
+     *
+     * @private
+     * @async
+     * @param {string} id - The collection ID
+     * @returns {Promise<Object|undefined>} The collection or undefined
+     */
+    async _getByIdFresh(id) {
+        try {
+            const collection = await this.backendAPI.collections.get(id);
+            if (collection) {
+                this._addToCache(id, collection);
+            }
+            return collection;
+        } catch (error) {
+            return undefined;
+        }
+    }
+
+    /**
+     * Finds the folder that contains an endpoint, if any. Reads fresh so
+     * cross-instance auth edits are visible.
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<Object|null>} The folder object or null
+     */
+    async findFolderForEndpoint(collectionId, endpointId) {
+        try {
+            const collection = await this._getByIdFresh(collectionId);
+            return (collection?.folders || []).find(
+                (folder) => (folder.endpoints || []).some((ep) => ep.id === endpointId)
+            ) || null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /**
+     * Retrieves a folder's auth config, with secret fields merged back from
+     * the SecretStore.
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} folderId - The folder ID
+     * @returns {Promise<Object|null>} The auth config ({type, config}) or null
+     */
+    async getFolderAuthConfig(collectionId, folderId) {
+        try {
+            const collection = await this._getByIdFresh(collectionId);
+            const folder = (collection?.folders || []).find((f) => f.id === folderId);
+            const authConfig = folder?.authConfig || null;
+            if (!authConfig || !this.secretStore) {
+                return authConfig;
+            }
+            const secrets = await this.secretStore.getScope(folderAuthSecretScope(collectionId, folderId));
+            return mergeAuthSecrets(authConfig, secrets);
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /**
+     * Saves a folder's auth config. Literal secret values are moved into the
+     * SecretStore (scope auth:<collectionId>:__folder__:<folderId>) and the
+     * persisted collection.json keeps a redacted copy on the folder object.
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} folderId - The folder ID
+     * @param {Object} authConfig - The authentication configuration ({type, config})
+     * @returns {Promise<void>}
+     * @throws {Error} If save operation fails
+     */
+    async saveFolderAuthConfig(collectionId, folderId, authConfig) {
+        try {
+            let toPersist = authConfig;
+            if (authConfig && this.secretStore) {
+                const { redacted, secrets } = splitAuthSecrets(authConfig);
+                const scope = folderAuthSecretScope(collectionId, folderId);
+                const fields = Object.keys(secrets);
+                for (const field of fields) {
+                    await this.secretStore.set(scope, field, secrets[field]);
+                }
+                const stored = await this.secretStore.getScope(scope);
+                for (const field of Object.keys(stored)) {
+                    if (!Object.prototype.hasOwnProperty.call(secrets, field)) {
+                        await this.secretStore.delete(scope, field);
+                    }
+                }
+                toPersist = redacted;
+            }
+            const collection = await this._getByIdFresh(collectionId);
+            if (!collection) {
+                throw new Error(`Collection with id ${collectionId} not found`);
+            }
+            const folders = (collection.folders || []).map(
+                (folder) => folder.id === folderId ? { ...folder, authConfig: toPersist } : folder
+            );
+            await this.update(collectionId, { folders });
+        } catch (error) {
+            throw new Error(`Failed to save folder auth config: ${error.message || error}`);
+        }
+    }
+
+    /**
+     * Resolves the auth config an endpoint inherits: its folder's auth when
+     * the folder defines one (explicit "none" opts the folder out), otherwise
+     * the collection's auth. Secrets are merged in either case.
+     *
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} [endpointId] - The endpoint ID (for folder lookup)
+     * @returns {Promise<Object|null>} The inherited auth config or null
+     */
+    async getInheritedAuthConfig(collectionId, endpointId) {
+        try {
+            const folder = endpointId
+                ? await this.findFolderForEndpoint(collectionId, endpointId)
+                : null;
+            if (folder?.authConfig?.type && folder.authConfig.type !== 'inherit') {
+                return this.getFolderAuthConfig(collectionId, folder.id);
+            }
+            return this.getCollectionAuthConfig(collectionId);
+        } catch (error) {
+            return null;
         }
     }
 

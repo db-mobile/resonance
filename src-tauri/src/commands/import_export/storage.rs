@@ -99,6 +99,7 @@ pub(crate) fn save_collection_to_files(
             endpoints: endpoints.as_array().cloned().unwrap_or_default(),
             folders: folders.as_array().cloned().unwrap_or_default(),
             default_headers: serde_json::json!({}),
+            auth_config: collection.auth_config.clone(),
             open_api_spec: None,
             storage_path: None,
             storage_parent_path,

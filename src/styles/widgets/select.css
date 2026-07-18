@@ -1,7 +1,3 @@
-/**
- * Native selects styled as GtkDropDown.
- */
-
 select.select,
 select.select-base {
   appearance: none;

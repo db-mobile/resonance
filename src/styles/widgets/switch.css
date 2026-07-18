@@ -1,7 +1,3 @@
-/**
- * GtkSwitch replica on input[type=checkbox].switch.
- */
-
 input[type="checkbox"].switch {
   appearance: none;
   position: relative;

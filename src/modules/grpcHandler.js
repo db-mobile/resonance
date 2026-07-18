@@ -28,7 +28,6 @@ const methodFlagsCache = new Map();
 
 let protoFileMode = false;
 let loadedProtoPath = null;
-let loadedProtoInfo = null;
 
 function addMetadataRow(key = '', value = '') {
     if (!grpcMetadataList) {
@@ -385,9 +384,8 @@ export async function loadProtoFile(protoPath, includePaths = null) {
         updateStatusDisplay('Parsing proto file...', null);
 
         const protoInfo = await window.backendAPI.grpc.parseProtoFile(protoPath, includePaths);
-        
+
         loadedProtoPath = protoPath;
-        loadedProtoInfo = protoInfo;
         protoFileMode = true;
         methodsCache = new Map();
 
@@ -423,34 +421,12 @@ export function clearProtoFile() {
     }
     protoFileMode = false;
     loadedProtoPath = null;
-    loadedProtoInfo = null;
     methodsCache = new Map();
     methodFlagsCache.clear();
     clearSelect(grpcServiceSelect);
     clearSelect(grpcMethodSelect);
     updateMethodKindBadge(null);
     updateStatusDisplay('Proto file cleared', null);
-}
-
-/**
- * Check if currently in proto file mode
- */
-export function isProtoFileMode() {
-    return protoFileMode;
-}
-
-/**
- * Get the currently loaded proto info
- */
-export function getLoadedProtoInfo() {
-    return loadedProtoInfo;
-}
-
-/**
- * Get the currently loaded proto path
- */
-export function getLoadedProtoPath() {
-    return loadedProtoPath;
 }
 
 export function initGrpcUI() {

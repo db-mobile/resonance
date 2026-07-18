@@ -22,6 +22,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 import { VariableManager } from '../ui/VariableManager.js';
 import { CurlImportDialog } from '../ui/CurlImportDialog.js';
 import { CollectionDialogs } from '../ui/CollectionDialogs.js';
+import { CollectionAuthDialog } from '../ui/CollectionAuthDialog.js';
 import { toast } from '../ui/Toast.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { setRequestBodyContent } from '../requestBodyHelper.js';
@@ -59,6 +60,7 @@ export class CollectionController {
         this.renameDialog = new RenameDialog();
         this.confirmDialog = new ConfirmDialog();
         this.variableManager = new VariableManager();
+        this.collectionAuthDialog = new CollectionAuthDialog();
         this.curlImportDialog = new CurlImportDialog();
         this.collectionDialogs = new CollectionDialogs({
             backendAPI,
@@ -76,6 +78,7 @@ export class CollectionController {
                 }
             }
         });
+        this.docGeneratorService = new DocGeneratorService(this.repository);
         this.importExportService = new CollectionImportExportService({
             backendAPI,
             repository: this.repository,
@@ -103,6 +106,7 @@ export class CollectionController {
         
         this.handleEndpointClick = this.handleEndpointClick.bind(this);
         this.handleContextMenu = this.handleContextMenu.bind(this);
+        this.handleFolderContextMenu = this.handleFolderContextMenu.bind(this);
         this.handleEndpointContextMenu = this.handleEndpointContextMenu.bind(this);
         this.handleEmptySpaceContextMenu = this.handleEmptySpaceContextMenu.bind(this);
         this.handleRename = this.handleRename.bind(this);
@@ -118,8 +122,6 @@ export class CollectionController {
         this.handleCollectionsSearch = this.handleCollectionsSearch.bind(this);
         this.handleGenerateDocumentation = this.handleGenerateDocumentation.bind(this);
         this.handleTogglePinned = this.handleTogglePinned.bind(this);
-
-        this.docGeneratorService = new DocGeneratorService(this.repository);
 
         this.initializeCollectionsSearch();
     }
@@ -177,6 +179,7 @@ export class CollectionController {
             },
             onEndpointClick: this.handleEndpointClick,
             onContextMenu: this.handleContextMenu,
+            onFolderContextMenu: this.handleFolderContextMenu,
             onEndpointContextMenu: this.handleEndpointContextMenu,
             onEmptySpaceContextMenu: this.handleEmptySpaceContextMenu,
             onTogglePinned: this.handleTogglePinned
@@ -305,6 +308,12 @@ export class CollectionController {
                 translationKey: 'context_menu.manage_variables',
                 iconClass: ContextMenu.createVariableIcon(),
                 onClick: () => this.handleVariables(collection)
+            },
+            {
+                label: 'Edit Auth',
+                translationKey: 'context_menu.edit_auth',
+                iconClass: 'icon-lock',
+                onClick: () => this.handleCollectionAuth(collection)
             },
             {
                 label: 'Export as OpenAPI (JSON)',
@@ -459,6 +468,81 @@ export class CollectionController {
             }
         } catch (error) {
             void error;
+        }
+    }
+
+    /**
+     * Opens the collection auth dialog and persists the edited config.
+     * Endpoints whose auth type is "Inherit from Parent" pick the new
+     * value up at send time; the open Authorization tab hint is re-rendered.
+     *
+     * @async
+     * @param {Object} collection - The collection whose auth to edit
+     * @returns {Promise<void>}
+     */
+    async handleCollectionAuth(collection) {
+        try {
+            const result = await this.collectionAuthDialog.show(collection, this.repository);
+            if (result !== null) {
+                await this.repository.saveCollectionAuthConfig(collection.id, result);
+                this.refreshInheritHint();
+            }
+        } catch (error) {
+            void error;
+        }
+    }
+
+    /**
+     * Handles right-click context menu on a folder header.
+     *
+     * @param {Event} event - The contextmenu event
+     * @param {Object} collection - The parent collection
+     * @param {Object} folder - The folder that was right-clicked
+     * @returns {void}
+     */
+    handleFolderContextMenu(event, collection, folder) {
+        this.contextMenu.show(event, [
+            {
+                label: 'Edit Auth',
+                translationKey: 'context_menu.edit_auth',
+                iconClass: 'icon-lock',
+                onClick: () => this.handleFolderAuth(collection, folder)
+            }
+        ]);
+    }
+
+    /**
+     * Opens the folder auth dialog and persists the edited config. Folder
+     * auth overrides collection auth for the folder's inheriting endpoints;
+     * "Inherit from Collection" removes the override.
+     *
+     * @async
+     * @param {Object} collection - The parent collection
+     * @param {Object} folder - The folder whose auth to edit
+     * @returns {Promise<void>}
+     */
+    async handleFolderAuth(collection, folder) {
+        try {
+            const result = await this.collectionAuthDialog.show(collection, this.repository, { folder });
+            if (result !== null) {
+                await this.repository.saveFolderAuthConfig(collection.id, folder.id, result);
+                this.refreshInheritHint();
+            }
+        } catch (error) {
+            void error;
+        }
+    }
+
+    /**
+     * Re-renders the request tab's inherit hint after collection/folder auth
+     * changes so the displayed source stays accurate.
+     *
+     * @private
+     * @returns {void}
+     */
+    refreshInheritHint() {
+        if (app.authManager?.getAuthConfig()?.type === 'inherit') {
+            app.authManager.renderAuthFields('inherit');
         }
     }
 

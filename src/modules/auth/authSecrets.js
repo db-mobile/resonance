@@ -109,3 +109,36 @@ export function mergeAuthSecrets(authConfig, secrets) {
 export function authSecretScope(collectionId, endpointId) {
     return `auth:${collectionId}:${endpointId}`;
 }
+
+/**
+ * Pseudo endpoint ID for collection-level auth secrets. Endpoint IDs are
+ * UUIDs or slugs, so this sentinel cannot collide with a real endpoint scope.
+ *
+ * @type {string}
+ */
+export const COLLECTION_AUTH_SCOPE_ID = '__collection__';
+
+/**
+ * Builds the SecretStore scope string for a collection's own auth secrets.
+ * Lives under the same `auth:<collectionId>:` prefix as endpoint scopes so
+ * collection deletion prunes it automatically.
+ *
+ * @param {string} collectionId
+ * @returns {string}
+ */
+export function collectionAuthSecretScope(collectionId) {
+    return authSecretScope(collectionId, COLLECTION_AUTH_SCOPE_ID);
+}
+
+/**
+ * Builds the SecretStore scope string for a folder's auth secrets. Shares the
+ * `auth:<collectionId>:` prefix so collection deletion prunes it automatically;
+ * the `__folder__` segment cannot collide with endpoint IDs.
+ *
+ * @param {string} collectionId
+ * @param {string} folderId
+ * @returns {string}
+ */
+export function folderAuthSecretScope(collectionId, folderId) {
+    return authSecretScope(collectionId, `__folder__:${folderId}`);
+}

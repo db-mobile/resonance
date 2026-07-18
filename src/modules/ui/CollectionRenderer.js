@@ -358,6 +358,14 @@ export class CollectionRenderer {
         folderHeader.appendChild(folderToggle);
         folderHeader.appendChild(folderName);
 
+        if (eventHandlers.onFolderContextMenu) {
+            folderHeader.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                eventHandlers.onFolderContextMenu(e, collection, folder);
+            });
+        }
+
         const folderEndpoints = document.createElement('div');
         folderEndpoints.className = 'folder-endpoints';
 

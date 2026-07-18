@@ -201,12 +201,17 @@ export class WorkspaceTabStateManager {
         if (currentBodyMode === 'formdata' && app.formBodyManager) {
             bodyData = {
                 mode: 'formdata',
-                fields: app.formBodyManager.getFormDataFields()
+                fields: app.formBodyManager.getFormDataRows()
             };
         } else if (currentBodyMode === 'urlencoded' && app.formBodyManager) {
             bodyData = {
                 mode: 'urlencoded',
-                fields: app.formBodyManager.getUrlencodedFields()
+                fields: app.formBodyManager.getUrlencodedRows()
+            };
+        } else if (currentBodyMode === 'binary' && app.formBodyManager) {
+            bodyData = {
+                mode: 'binary',
+                ...app.formBodyManager.getBinaryBody()
             };
         } else if (currentBodyMode === 'text') {
             bodyData = {
@@ -548,10 +553,13 @@ export class WorkspaceTabStateManager {
             const { mode } = request.body;
             if (mode === 'formdata' && app.formBodyManager) {
                 this.graphqlBodyManager?.switchMode('formdata');
-                app.formBodyManager.setFormDataFields(request.body.fields || {});
+                app.formBodyManager.setFormDataRows(request.body.fields);
             } else if (mode === 'urlencoded' && app.formBodyManager) {
                 this.graphqlBodyManager?.switchMode('urlencoded');
-                app.formBodyManager.setUrlencodedFields(request.body.fields || {});
+                app.formBodyManager.setUrlencodedRows(request.body.fields);
+            } else if (mode === 'binary' && app.formBodyManager) {
+                this.graphqlBodyManager?.switchMode('binary');
+                app.formBodyManager.setBinaryBody(request.body);
             } else if (mode === 'text') {
                 this.graphqlBodyManager?.switchMode('text');
                 if (app.requestBodyTextEditor) {

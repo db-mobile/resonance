@@ -340,7 +340,7 @@ export class WorkspaceTabEndpointLoaderService {
         }
 
         return {
-            authType: 'none',
+            authType: 'inherit',
             authConfig: {}
         };
     }

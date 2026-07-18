@@ -35,6 +35,7 @@ import { CollectionRepository } from './storage/CollectionRepository.js';
 import { VariableService } from './services/VariableService.js';
 import { StatusDisplayAdapter } from './interfaces/IStatusDisplay.js';
 import { authManager } from './authManager.js';
+import { resolveEffectiveAuthConfig } from './auth/authInheritance.js';
 import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
 import { createLazyEditorProxy } from './editorLoader.js';
 import { extractCookies } from './cookieParser.js';
@@ -127,6 +128,22 @@ function getRequestBuilderService() {
  * @param {Object} requestConfig - Fully built request configuration
  * @returns {void}
  */
+/**
+ * Generates auth data for the current request with 'inherit' resolved to the
+ * owning collection's auth config. Used by every interactive send path.
+ *
+ * @returns {Promise<Object>} Auth data ({headers, queryParams, authConfig, awsAuth?})
+ */
+async function generateEffectiveAuthData() {
+    const current = getCurrentEndpoint();
+    const resolved = await resolveEffectiveAuthConfig(authManager.getAuthConfig(), {
+        collectionId: current?.collectionId,
+        endpointId: current?.endpointId,
+        repository: getCollectionRepository()
+    });
+    return authManager.generateAuthData(resolved);
+}
+
 function warnUnresolvedVariables(processor, requestConfig) {
     try {
         const unresolved = processor.extractUnresolvedVariableNames({
@@ -168,7 +185,7 @@ export async function fetchGraphQLIntrospection() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    const authData = authManager.generateAuthData();
+    const authData = await generateEffectiveAuthData();
     const builder = getRequestBuilderService();
     builder.mergeAuthData(headers, queryParams, authData);
 
@@ -310,21 +327,6 @@ async function isTabCurrentlyActive(tabId) {
     }
     const activeTabId = await app.workspaceTabController.service.getActiveTabId();
     return activeTabId === tabId;
-}
-
-/**
- * Get the current response body content from the editor
- * @returns {string}
- */
-export function getResponseBodyContent() {
-    if (responseEditor) {
-        return responseEditor.getContent();
-    }
-    return '';
-}
-
-export function displayResponseWithLineNumbers(content, contentType = null) {
-    return displayResponseWithLineNumbersForTab(content, contentType, null);
 }
 
 /**
@@ -584,7 +586,7 @@ async function handleGraphQLSubscriptionRequest() {
     let url = urlInput?.value?.trim() || urlInput?.getAttribute('value') || '';
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
-    const authData = authManager.generateAuthData();
+    const authData = await generateEffectiveAuthData();
     const builder = getRequestBuilderService();
     builder.mergeAuthData(headers, queryParams, authData);
 
@@ -645,7 +647,7 @@ export async function handleSendRequest() {
 
         const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
         const headers = parseKeyValuePairs(document.getElementById('headers-list'));
-        const authData = authManager.generateAuthData();
+        const authData = await generateEffectiveAuthData();
 
         const builder = getRequestBuilderService();
         builder.mergeAuthData(headers, queryParams, authData);
@@ -688,7 +690,7 @@ export async function handleSendRequest() {
 
         const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
         const headers = parseKeyValuePairs(document.getElementById('headers-list'));
-        const authData = authManager.generateAuthData();
+        const authData = await generateEffectiveAuthData();
 
         const builder = getRequestBuilderService();
         builder.mergeAuthData(headers, queryParams, authData);
@@ -784,7 +786,7 @@ export async function handleSendRequest() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    const authData = authManager.generateAuthData();
+    const authData = await generateEffectiveAuthData();
 
     const builder = getRequestBuilderService();
     builder.mergeAuthData(headers, queryParams, authData);
@@ -844,7 +846,7 @@ export async function handleSendRequest() {
     }
 
     const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
-    if (['POST', 'PUT', 'PATCH'].includes(method) || bodyMode === 'formdata' || bodyMode === 'urlencoded') {
+    if (['POST', 'PUT', 'PATCH'].includes(method) || bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'binary') {
         try {
             let variables = _resolvedVariables;
             if (variables === null) {
@@ -885,17 +887,37 @@ export async function handleSendRequest() {
                     body.operationName = operationName;
                 }
             } else if ((bodyMode === 'formdata' || bodyMode === 'urlencoded') && app.formBodyManager) {
-                const rawFields = bodyMode === 'formdata'
-                    ? app.formBodyManager.getFormDataFields()
-                    : app.formBodyManager.getUrlencodedFields();
-                const processed = {};
-                for (const [k, v] of Object.entries(rawFields)) {
-                    processed[processor.processTemplate(k, variables)]
-                        = processor.processTemplate(v, variables);
-                }
-                if (Object.keys(processed).length > 0) {
+                const rows = bodyMode === 'formdata'
+                    ? app.formBodyManager.getFormDataRows()
+                    : app.formBodyManager.getUrlencodedRows();
+                const processed = rows
+                    .filter((row) => row.enabled !== false)
+                    .map((row) => ({
+                        key: processor.processTemplate(row.key, variables),
+                        value: row.type === 'file'
+                            ? ''
+                            : processor.processTemplate(row.value || '', variables),
+                        type: row.type || 'text',
+                        filePath: row.filePath
+                            ? processor.processTemplate(row.filePath, variables)
+                            : undefined,
+                        contentType: row.contentType || undefined
+                    }));
+                if (processed.length > 0) {
                     body = processed;
                 }
+            } else if (bodyMode === 'binary' && app.formBodyManager) {
+                const binary = app.formBodyManager.getBinaryBody();
+                if (!binary.filePath) {
+                    toast.error('No file selected for binary body.');
+                    clearResponseDisplay();
+                    setRequestInProgress(false);
+                    return;
+                }
+                body = {
+                    filePath: processor.processTemplate(binary.filePath, variables),
+                    contentType: binary.contentType || undefined
+                };
             } else if (bodyMode === 'text') {
                 const rawText = app.requestBodyTextEditor
                     ? app.requestBodyTextEditor.getContent()
@@ -952,7 +974,7 @@ export async function handleSendRequest() {
         queryParams,
         pathParams: processedPathParams,
         body,
-        bodyType: (bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'text') ? bodyMode : undefined,
+        bodyType: (bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'text' || bodyMode === 'binary') ? bodyMode : undefined,
         httpVersion,
         timeout,
         verifySsl,
@@ -1194,7 +1216,7 @@ export async function handleGenerateCurl() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    const authData = authManager.generateAuthData();
+    const authData = await generateEffectiveAuthData();
 
     const builder = getRequestBuilderService();
     builder.mergeAuthData(headers, queryParams, authData);

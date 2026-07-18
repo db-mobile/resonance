@@ -1,7 +1,3 @@
-/**
- * Application shell: window frame, sidebar/content split, status bar.
- */
-
 .main-layout {
   display: flex;
   flex-direction: column;

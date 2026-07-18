@@ -1,7 +1,3 @@
-/**
- * AdwPreferencesGroup-style boxed lists and rows.
- */
-
 .boxed-list {
   background-color: var(--card-bg-color);
   color: var(--card-fg-color);

@@ -263,6 +263,7 @@
                         <label for="auth-type-select" class="heading">Type</label>
                         <div class="select-wrapper select-wrap">
                             <select id="auth-type-select" class="select-base" aria-label="Authorization Type">
+                                <option value="inherit">Inherit from Parent</option>
                                 <option value="none">No Auth</option>
                                 <option value="bearer">Bearer Token</option>
                                 <option value="basic">Basic Auth</option>
@@ -286,6 +287,7 @@
                                 <option value="formdata">Form Data</option>
                                 <option value="urlencoded">URL Encoded</option>
                                 <option value="text">Text</option>
+                                <option value="binary">Binary File</option>
                             </select>
                             <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                         </div>
@@ -316,6 +318,19 @@
 
                     <div class="body-mode-panel" id="body-text-section" data-mode="text">
                         <div id="body-text-editor-container" class="body-editor-container editor-frame u-flex u-flex-col"></div>
+                    </div>
+
+                    <div class="body-mode-panel" id="body-binary-section" data-mode="binary">
+                        <div class="binary-body-row u-flex u-items-center">
+                            <input type="text" id="binary-file-path" class="binary-file-path" placeholder="File path or {{variable}}" aria-label="Binary body file path">
+                            <button id="binary-browse-btn" class="button flat small">Browse</button>
+                            <button id="binary-clear-btn" class="button flat small" title="Clear file" aria-label="Clear file">
+                                <span class="icon icon-12 icon-x"></span>
+                            </button>
+                        </div>
+                        <div class="binary-body-row u-flex u-items-center">
+                            <input type="text" id="binary-content-type" class="binary-content-type" placeholder="Content-Type (optional, e.g. application/pdf)" aria-label="Binary body content type">
+                        </div>
                     </div>
 
                     <div class="body-mode-panel graphql-body-container" id="body-graphql-section" data-mode="graphql">

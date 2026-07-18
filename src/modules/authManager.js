@@ -16,17 +16,71 @@ import { api } from './ipcBridge.js';
 
 export class AuthManager {
     /**
-     * Creates an AuthManager instance
+     * Creates an AuthManager instance.
+     *
+     * Without options this binds to the request Authorization tab (the
+     * app-wide singleton). A second instance can be mounted elsewhere (e.g.
+     * the collection auth dialog) by passing its own elements plus an
+     * `idPrefix`, which scopes every field lookup and rewrites template IDs
+     * so both instances can live in the DOM at once.
+     *
+     * @param {Object} [options]
+     * @param {HTMLSelectElement} [options.typeSelect] - Auth type select element
+     * @param {HTMLElement} [options.fieldsContainer] - Container for auth fields
+     * @param {string} [options.idPrefix] - Prefix applied to all field element IDs
      */
-    constructor() {
-        this.authTypeSelect = document.getElementById('auth-type-select');
-        this.authFieldsContainer = document.getElementById('auth-fields-container');
+    constructor(options = {}) {
+        this.idPrefix = options.idPrefix || '';
+        this.authTypeSelect = options.typeSelect || document.getElementById('auth-type-select');
+        this.authFieldsContainer = options.fieldsContainer || document.getElementById('auth-fields-container');
+        this.inheritSummary = options.inheritSummary || null;
         this.currentAuthConfig = {
             type: 'none',
             config: {}
         };
 
         this.initializeEventListeners();
+    }
+
+    /**
+     * Looks up an auth field element. Unprefixed instances use the document
+     * (original singleton behavior); prefixed instances resolve within their
+     * own fields container against the rewritten IDs.
+     *
+     * @private
+     * @param {string} id - Unprefixed element ID
+     * @returns {HTMLElement|null}
+     */
+    _el(id) {
+        if (!this.idPrefix) {
+            return document.getElementById(id);
+        }
+        return this.authFieldsContainer?.querySelector(`#${CSS.escape(this.idPrefix + id)}`) || null;
+    }
+
+    /**
+     * Clones an auth field template, rewriting element IDs and label targets
+     * with this instance's prefix so the fragment can coexist with the
+     * singleton's unprefixed fields.
+     *
+     * @private
+     * @param {string} templateId - Template ID within authFields.html
+     * @returns {DocumentFragment}
+     */
+    _cloneAuthTemplate(templateId) {
+        const fragment = templateLoader.cloneSync(
+            './src/templates/auth/authFields.html',
+            templateId
+        );
+        if (this.idPrefix) {
+            fragment.querySelectorAll('[id]').forEach((el) => {
+                el.id = this.idPrefix + el.id;
+            });
+            fragment.querySelectorAll('label[for]').forEach((el) => {
+                el.setAttribute('for', this.idPrefix + el.getAttribute('for'));
+            });
+        }
+        return fragment;
     }
 
     /**
@@ -70,6 +124,10 @@ export class AuthManager {
             case 'none':
                 break;
 
+            case 'inherit':
+                this.renderInheritFields();
+                break;
+
             case 'bearer':
                 this.renderBearerTokenFields();
                 break;
@@ -100,6 +158,80 @@ export class AuthManager {
     }
 
     /**
+     * Renders the read-only "Inherit from Parent" panel: a summary of the
+     * folder or collection auth this request resolves to, plus a shortcut to
+     * edit it.
+     * The data accessors are injected at the composition root via
+     * {@link getInheritedAuthInfo} and {@link onOpenCollectionAuth}; without
+     * them (or outside a collection endpoint) generic text is shown.
+     *
+     * @private
+     * @returns {void}
+     */
+    renderInheritFields() {
+        const fragment = this._cloneAuthTemplate('tpl-auth-inherit');
+        this.authFieldsContainer.innerHTML = '';
+        this.authFieldsContainer.appendChild(fragment);
+
+        const summary = this._el('inherit-auth-summary');
+        const editButton = this._el('inherit-edit-collection-auth');
+
+        if (summary && this.inheritSummary) {
+            summary.textContent = this.inheritSummary;
+        }
+
+        if (typeof this.getInheritedAuthInfo === 'function') {
+            Promise.resolve(this.getInheritedAuthInfo()).then((info) => {
+                if (!summary || !summary.isConnected) {
+                    return;
+                }
+                if (info === null) {
+                    return;
+                }
+                const source = info.folderName
+                    ? `folder "${info.folderName}"`
+                    : (info.collectionName ? `collection "${info.collectionName}"` : 'the collection');
+                if (!info.authType || info.authType === 'none') {
+                    summary.textContent = info.folderName
+                        ? `Folder "${info.folderName}" opts out of collection auth — this request is sent unauthenticated.`
+                        : (info.collectionName
+                            ? `Collection "${info.collectionName}" has no auth configured — this request is sent unauthenticated.`
+                            : 'The collection has no auth configured — this request is sent unauthenticated.');
+                } else {
+                    summary.textContent = `Inheriting ${this.getAuthTypeLabel(info.authType)} from ${source}.`;
+                }
+                if (editButton && typeof this.onOpenCollectionAuth === 'function' && info.collectionId) {
+                    editButton.hidden = false;
+                    editButton.textContent = info.folderName ? 'Edit folder auth' : 'Edit collection auth';
+                    editButton.addEventListener('click', () => {
+                        this.onOpenCollectionAuth(info.collectionId, info.folderId || null);
+                    });
+                }
+            }).catch(() => {});
+        }
+    }
+
+    /**
+     * Human-readable label for an auth type value.
+     *
+     * @param {string} type
+     * @returns {string}
+     */
+    getAuthTypeLabel(type) {
+        const labels = {
+            none: 'No Auth',
+            inherit: 'Inherit from Parent',
+            bearer: 'Bearer Token',
+            basic: 'Basic Auth',
+            'api-key': 'API Key',
+            oauth2: 'OAuth 2.0',
+            digest: 'Digest Auth',
+            'aws-v4': 'AWS Signature'
+        };
+        return labels[type] || type;
+    }
+
+    /**
      * Renders Bearer token authentication fields
      *
      * @private
@@ -108,14 +240,11 @@ export class AuthManager {
     renderBearerTokenFields() {
         const defaultToken = this.currentAuthConfig.config.token || '{{bearerToken}}';
 
-        const fragment = templateLoader.cloneSync(
-            './src/templates/auth/authFields.html',
-            'tpl-auth-bearer'
-        );
+        const fragment = this._cloneAuthTemplate('tpl-auth-bearer');
         this.authFieldsContainer.innerHTML = '';
         this.authFieldsContainer.appendChild(fragment);
 
-        const tokenInput = document.getElementById('bearer-token');
+        const tokenInput = this._el('bearer-token');
         if (tokenInput) {
             tokenInput.value = defaultToken;
             this.currentAuthConfig.config.token = tokenInput.value;
@@ -133,15 +262,12 @@ export class AuthManager {
      * @returns {void}
      */
     renderBasicAuthFields() {
-        const fragment = templateLoader.cloneSync(
-            './src/templates/auth/authFields.html',
-            'tpl-auth-basic'
-        );
+        const fragment = this._cloneAuthTemplate('tpl-auth-basic');
         this.authFieldsContainer.innerHTML = '';
         this.authFieldsContainer.appendChild(fragment);
 
-        const usernameInput = document.getElementById('basic-username');
-        const passwordInput = document.getElementById('basic-password');
+        const usernameInput = this._el('basic-username');
+        const passwordInput = this._el('basic-password');
 
         if (usernameInput) {
             usernameInput.addEventListener('input', (e) => {
@@ -163,16 +289,13 @@ export class AuthManager {
      * @returns {void}
      */
     renderApiKeyFields() {
-        const fragment = templateLoader.cloneSync(
-            './src/templates/auth/authFields.html',
-            'tpl-auth-api-key'
-        );
+        const fragment = this._cloneAuthTemplate('tpl-auth-api-key');
         this.authFieldsContainer.innerHTML = '';
         this.authFieldsContainer.appendChild(fragment);
 
-        const keyNameInput = document.getElementById('api-key-name');
-        const keyValueInput = document.getElementById('api-key-value');
-        const keyLocationSelect = document.getElementById('api-key-location');
+        const keyNameInput = this._el('api-key-name');
+        const keyValueInput = this._el('api-key-value');
+        const keyLocationSelect = this._el('api-key-location');
 
         if (keyNameInput) {
             keyNameInput.addEventListener('input', (e) => {
@@ -201,10 +324,7 @@ export class AuthManager {
      * @returns {void}
      */
     renderOAuth2Fields() {
-        const fragment = templateLoader.cloneSync(
-            './src/templates/auth/authFields.html',
-            'tpl-auth-oauth2'
-        );
+        const fragment = this._cloneAuthTemplate('tpl-auth-oauth2');
         this.authFieldsContainer.innerHTML = '';
         this.authFieldsContainer.appendChild(fragment);
 
@@ -218,35 +338,35 @@ export class AuthManager {
             this.currentAuthConfig.config.clientAuthMethod = 'body';
         }
 
-        const grantTypeSelect = document.getElementById('oauth2-grant-type');
-        const tokenUrlInput = document.getElementById('oauth2-token-url');
-        const authUrlInput = document.getElementById('oauth2-auth-url');
-        const clientIdInput = document.getElementById('oauth2-client-id');
-        const clientSecretInput = document.getElementById('oauth2-client-secret');
-        const usernameInput = document.getElementById('oauth2-username');
-        const passwordInput = document.getElementById('oauth2-password');
-        const redirectUriInput = document.getElementById('oauth2-redirect-uri');
-        const scopeInput = document.getElementById('oauth2-scope');
-        const audienceInput = document.getElementById('oauth2-audience');
-        const usePkceCheckbox = document.getElementById('oauth2-use-pkce');
-        const clientAuthSelect = document.getElementById('oauth2-client-auth');
-        const getTokenBtn = document.getElementById('oauth2-get-token-btn');
-        const refreshBtn = document.getElementById('oauth2-refresh-btn');
-        const tokenInput = document.getElementById('oauth2-token');
-        const prefixInput = document.getElementById('oauth2-header-prefix');
+        const grantTypeSelect = this._el('oauth2-grant-type');
+        const tokenUrlInput = this._el('oauth2-token-url');
+        const authUrlInput = this._el('oauth2-auth-url');
+        const clientIdInput = this._el('oauth2-client-id');
+        const clientSecretInput = this._el('oauth2-client-secret');
+        const usernameInput = this._el('oauth2-username');
+        const passwordInput = this._el('oauth2-password');
+        const redirectUriInput = this._el('oauth2-redirect-uri');
+        const scopeInput = this._el('oauth2-scope');
+        const audienceInput = this._el('oauth2-audience');
+        const usePkceCheckbox = this._el('oauth2-use-pkce');
+        const clientAuthSelect = this._el('oauth2-client-auth');
+        const getTokenBtn = this._el('oauth2-get-token-btn');
+        const refreshBtn = this._el('oauth2-refresh-btn');
+        const tokenInput = this._el('oauth2-token');
+        const prefixInput = this._el('oauth2-header-prefix');
 
-        const authUrlGroup = document.getElementById('oauth2-auth-url-group');
-        const usernamePasswordPairGroup = document.getElementById('oauth2-username-password-pair');
-        const redirectUriGroup = document.getElementById('oauth2-redirect-uri-group');
-        const pkceGroup = document.getElementById('oauth2-pkce-group');
-        const tokenUrlGroup = document.getElementById('oauth2-token-url-group');
-        const credentialsPairGroup = document.getElementById('oauth2-credentials-pair');
-        const scopeGroup = document.getElementById('oauth2-scope-group');
-        const audienceGroup = document.getElementById('oauth2-audience-group');
-        const clientAuthGroup = document.getElementById('oauth2-client-auth-group');
-        const getTokenGroup = document.getElementById('oauth2-get-token-group');
-        const errorGroup = document.getElementById('oauth2-error-group');
-        const errorMessage = document.getElementById('oauth2-error-message');
+        const authUrlGroup = this._el('oauth2-auth-url-group');
+        const usernamePasswordPairGroup = this._el('oauth2-username-password-pair');
+        const redirectUriGroup = this._el('oauth2-redirect-uri-group');
+        const pkceGroup = this._el('oauth2-pkce-group');
+        const tokenUrlGroup = this._el('oauth2-token-url-group');
+        const credentialsPairGroup = this._el('oauth2-credentials-pair');
+        const scopeGroup = this._el('oauth2-scope-group');
+        const audienceGroup = this._el('oauth2-audience-group');
+        const clientAuthGroup = this._el('oauth2-client-auth-group');
+        const getTokenGroup = this._el('oauth2-get-token-group');
+        const errorGroup = this._el('oauth2-error-group');
+        const errorMessage = this._el('oauth2-error-message');
 
         const updateGrantTypeUI = (grantType) => {
             [authUrlGroup, usernamePasswordPairGroup, redirectUriGroup, pkceGroup].forEach(g => {
@@ -404,8 +524,8 @@ export class AuthManager {
 
         if (errorGroup) {errorGroup.classList.add('u-hidden');}
 
-        const getTokenText = document.getElementById('oauth2-get-token-text');
-        const getTokenLoading = document.getElementById('oauth2-get-token-loading');
+        const getTokenText = this._el('oauth2-get-token-text');
+        const getTokenLoading = this._el('oauth2-get-token-loading');
         if (getTokenText) {getTokenText.classList.add('u-hidden');}
         if (getTokenLoading) {getTokenLoading.classList.remove('u-hidden');}
 
@@ -488,8 +608,8 @@ export class AuthManager {
      * @returns {void}
      */
     _showAuthCodeInstructions() {
-        const errorGroup = document.getElementById('oauth2-error-group');
-        const errorMessage = document.getElementById('oauth2-error-message');
+        const errorGroup = this._el('oauth2-error-group');
+        const errorMessage = this._el('oauth2-error-message');
 
         if (errorGroup && errorMessage) {
             errorGroup.classList.remove('u-hidden');
@@ -502,10 +622,10 @@ export class AuthManager {
                 <button type="button" id="oauth2-exchange-code-btn" class="btn btn-primary btn-sm u-mt-2">Exchange Code for Token</button>
             `;
 
-            const exchangeBtn = document.getElementById('oauth2-exchange-code-btn');
+            const exchangeBtn = this._el('oauth2-exchange-code-btn');
             if (exchangeBtn) {
                 exchangeBtn.addEventListener('click', async () => {
-                    const codeInput = document.getElementById('oauth2-auth-code-input');
+                    const codeInput = this._el('oauth2-auth-code-input');
                     if (codeInput && codeInput.value) {
                         await this._exchangeAuthorizationCode(codeInput.value);
                     }
@@ -524,8 +644,8 @@ export class AuthManager {
      */
     async _exchangeAuthorizationCode(code) {
         const {config} = this.currentAuthConfig;
-        const errorGroup = document.getElementById('oauth2-error-group');
-        const errorMessage = document.getElementById('oauth2-error-message');
+        const errorGroup = this._el('oauth2-error-group');
+        const errorMessage = this._el('oauth2-error-message');
 
         try {
             let codeVerifier = null;
@@ -601,16 +721,16 @@ export class AuthManager {
         if (result.success && result.accessToken) {
             this.currentAuthConfig.config.token = result.accessToken;
 
-            const tokenInput = document.getElementById('oauth2-token');
+            const tokenInput = this._el('oauth2-token');
             if (tokenInput) {tokenInput.value = result.accessToken;}
 
-            const tokenType = document.getElementById('oauth2-token-type');
+            const tokenType = this._el('oauth2-token-type');
             if (tokenType && result.tokenType) {
                 tokenType.textContent = result.tokenType;
                 tokenType.classList.remove('u-hidden');
             }
 
-            const tokenExpires = document.getElementById('oauth2-token-expires');
+            const tokenExpires = this._el('oauth2-token-expires');
             if (tokenExpires && result.expiresIn) {
                 const expiresAt = new Date(Date.now() + result.expiresIn * 1000);
                 tokenExpires.textContent = `Expires: ${expiresAt.toLocaleTimeString()}`;
@@ -620,8 +740,8 @@ export class AuthManager {
 
             if (result.refreshToken) {
                 this.currentAuthConfig.config.refreshToken = result.refreshToken;
-                const refreshTokenInput = document.getElementById('oauth2-refresh-token');
-                const refreshTokenGroup = document.getElementById('oauth2-refresh-token-group');
+                const refreshTokenInput = this._el('oauth2-refresh-token');
+                const refreshTokenGroup = this._el('oauth2-refresh-token-group');
                 if (refreshTokenInput) {refreshTokenInput.value = result.refreshToken;}
                 if (refreshTokenGroup) {refreshTokenGroup.classList.remove('u-hidden');}
             }
@@ -657,15 +777,12 @@ export class AuthManager {
      * @returns {void}
      */
     renderDigestAuthFields() {
-        const fragment = templateLoader.cloneSync(
-            './src/templates/auth/authFields.html',
-            'tpl-auth-digest'
-        );
+        const fragment = this._cloneAuthTemplate('tpl-auth-digest');
         this.authFieldsContainer.innerHTML = '';
         this.authFieldsContainer.appendChild(fragment);
 
-        const usernameInput = document.getElementById('digest-username');
-        const passwordInput = document.getElementById('digest-password');
+        const usernameInput = this._el('digest-username');
+        const passwordInput = this._el('digest-password');
 
         if (usernameInput) {
             usernameInput.addEventListener('input', (e) => {
@@ -687,18 +804,15 @@ export class AuthManager {
      * @returns {void}
      */
     renderAwsV4Fields() {
-        const fragment = templateLoader.cloneSync(
-            './src/templates/auth/authFields.html',
-            'tpl-auth-aws-v4'
-        );
+        const fragment = this._cloneAuthTemplate('tpl-auth-aws-v4');
         this.authFieldsContainer.innerHTML = '';
         this.authFieldsContainer.appendChild(fragment);
 
-        const accessKeyInput = document.getElementById('aws-access-key-id');
-        const secretKeyInput = document.getElementById('aws-secret-access-key');
-        const regionInput = document.getElementById('aws-region');
-        const serviceInput = document.getElementById('aws-service');
-        const sessionTokenInput = document.getElementById('aws-session-token');
+        const accessKeyInput = this._el('aws-access-key-id');
+        const secretKeyInput = this._el('aws-secret-access-key');
+        const regionInput = this._el('aws-region');
+        const serviceInput = this._el('aws-service');
+        const sessionTokenInput = this._el('aws-session-token');
 
         if (accessKeyInput) {
             accessKeyInput.value = this.currentAuthConfig.config.accessKeyId || '';
@@ -739,22 +853,25 @@ export class AuthManager {
     /**
      * Generates authentication data for API requests
      *
-     * Converts current authentication configuration into headers, query parameters,
-     * and auth config that can be used in HTTP requests.
+     * Converts an authentication configuration into headers, query parameters,
+     * and auth config that can be used in HTTP requests. Callers that support
+     * inheritance pass a pre-resolved config (see auth/authInheritance.js);
+     * an unresolved 'inherit' type safely yields empty auth data.
      *
+     * @param {Object} [authConfig] - `{ type, config }`; defaults to the current config
      * @returns {Object} Authentication data
      * @returns {Object} return.headers - Headers to include in request
      * @returns {Object} return.queryParams - Query parameters to include in request
      * @returns {Object|null} return.authConfig - Auth configuration for digest auth
      */
-    generateAuthData() {
+    generateAuthData(authConfig = this.currentAuthConfig) {
         const authData = {
             headers: {},
             queryParams: {},
             authConfig: null
         };
 
-        const { type, config } = this.currentAuthConfig;
+        const { type, config = {} } = authConfig || {};
 
         switch (type) {
             case 'none':
@@ -858,7 +975,7 @@ export class AuthManager {
 
         switch (type) {
             case 'bearer': {
-                const bearerToken = document.getElementById('bearer-token');
+                const bearerToken = this._el('bearer-token');
                 if (bearerToken && config.token) {
                     bearerToken.value = config.token;
                 }
@@ -866,8 +983,8 @@ export class AuthManager {
             }
 
             case 'basic': {
-                const basicUsername = document.getElementById('basic-username');
-                const basicPassword = document.getElementById('basic-password');
+                const basicUsername = this._el('basic-username');
+                const basicPassword = this._el('basic-password');
                 if (basicUsername && config.username) {
                     basicUsername.value = config.username;
                 }
@@ -878,9 +995,9 @@ export class AuthManager {
             }
 
             case 'api-key': {
-                const keyName = document.getElementById('api-key-name');
-                const keyValue = document.getElementById('api-key-value');
-                const keyLocation = document.getElementById('api-key-location');
+                const keyName = this._el('api-key-name');
+                const keyValue = this._el('api-key-value');
+                const keyLocation = this._el('api-key-location');
                 if (keyName && config.keyName) {
                     keyName.value = config.keyName;
                 }
@@ -894,21 +1011,21 @@ export class AuthManager {
             }
 
             case 'oauth2': {
-                const oauth2Token = document.getElementById('oauth2-token');
-                const oauth2Prefix = document.getElementById('oauth2-header-prefix');
-                const oauth2GrantType = document.getElementById('oauth2-grant-type');
-                const oauth2TokenUrl = document.getElementById('oauth2-token-url');
-                const oauth2AuthUrl = document.getElementById('oauth2-auth-url');
-                const oauth2ClientId = document.getElementById('oauth2-client-id');
-                const oauth2ClientSecret = document.getElementById('oauth2-client-secret');
-                const oauth2Username = document.getElementById('oauth2-username');
-                const oauth2Password = document.getElementById('oauth2-password');
-                const oauth2RedirectUri = document.getElementById('oauth2-redirect-uri');
-                const oauth2Scope = document.getElementById('oauth2-scope');
-                const oauth2Audience = document.getElementById('oauth2-audience');
-                const oauth2UsePkce = document.getElementById('oauth2-use-pkce');
-                const oauth2ClientAuth = document.getElementById('oauth2-client-auth');
-                const oauth2RefreshToken = document.getElementById('oauth2-refresh-token');
+                const oauth2Token = this._el('oauth2-token');
+                const oauth2Prefix = this._el('oauth2-header-prefix');
+                const oauth2GrantType = this._el('oauth2-grant-type');
+                const oauth2TokenUrl = this._el('oauth2-token-url');
+                const oauth2AuthUrl = this._el('oauth2-auth-url');
+                const oauth2ClientId = this._el('oauth2-client-id');
+                const oauth2ClientSecret = this._el('oauth2-client-secret');
+                const oauth2Username = this._el('oauth2-username');
+                const oauth2Password = this._el('oauth2-password');
+                const oauth2RedirectUri = this._el('oauth2-redirect-uri');
+                const oauth2Scope = this._el('oauth2-scope');
+                const oauth2Audience = this._el('oauth2-audience');
+                const oauth2UsePkce = this._el('oauth2-use-pkce');
+                const oauth2ClientAuth = this._el('oauth2-client-auth');
+                const oauth2RefreshToken = this._el('oauth2-refresh-token');
 
                 if (oauth2Token && config.token) {oauth2Token.value = config.token;}
                 if (oauth2Prefix && config.headerPrefix) {oauth2Prefix.value = config.headerPrefix;}
@@ -926,7 +1043,7 @@ export class AuthManager {
                 if (oauth2ClientAuth && config.clientAuthMethod) {oauth2ClientAuth.value = config.clientAuthMethod;}
                 if (oauth2RefreshToken && config.refreshToken) {
                     oauth2RefreshToken.value = config.refreshToken;
-                    const refreshGroup = document.getElementById('oauth2-refresh-token-group');
+                    const refreshGroup = this._el('oauth2-refresh-token-group');
                     if (refreshGroup) {refreshGroup.classList.remove('u-hidden');}
                 }
 
@@ -937,8 +1054,8 @@ export class AuthManager {
             }
 
             case 'digest': {
-                const digestUsername = document.getElementById('digest-username');
-                const digestPassword = document.getElementById('digest-password');
+                const digestUsername = this._el('digest-username');
+                const digestPassword = this._el('digest-password');
                 if (digestUsername && config.username) {
                     digestUsername.value = config.username;
                 }
@@ -949,11 +1066,11 @@ export class AuthManager {
             }
 
             case 'aws-v4': {
-                const awsAccessKey = document.getElementById('aws-access-key-id');
-                const awsSecretKey = document.getElementById('aws-secret-access-key');
-                const awsRegion = document.getElementById('aws-region');
-                const awsService = document.getElementById('aws-service');
-                const awsSessionToken = document.getElementById('aws-session-token');
+                const awsAccessKey = this._el('aws-access-key-id');
+                const awsSecretKey = this._el('aws-secret-access-key');
+                const awsRegion = this._el('aws-region');
+                const awsService = this._el('aws-service');
+                const awsSessionToken = this._el('aws-session-token');
                 if (awsAccessKey && config.accessKeyId) {awsAccessKey.value = config.accessKeyId;}
                 if (awsSecretKey && config.secretAccessKey) {awsSecretKey.value = config.secretAccessKey;}
                 if (awsRegion && config.region) {awsRegion.value = config.region;}

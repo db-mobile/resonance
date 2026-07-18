@@ -1,9 +1,3 @@
-/**
- * Draggable pane separators: hairline with an invisible grab zone.
- * IDs and .dragging class are part of the JS contract; the retired
- * history resizer stays in the DOM but never renders.
- */
-
 .pane-resizer {
   position: relative;
   z-index: 5;

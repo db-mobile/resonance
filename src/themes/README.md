@@ -1,19 +1,19 @@
 # Theme System
 
-Themes are Adwaita-derived color palettes. `themeManager.js` injects one theme
+`themeManager.js` injects one theme
 file at a time as a `<link>` and sets `data-theme` on the root element; the
 `system` mode resolves to `light.css` or `dark.css` via `prefers-color-scheme`
 and re-resolves on OS changes.
 
 ## Available themes
 
-- **light.css** — Adwaita light palette
-- **dark.css** — Adwaita dark palette
+- **light.css** — Light palette
+- **dark.css** — Dark palette
 - `system` — virtual mode, loads one of the two files above
 
 ## Token contract
 
-Every theme file must define the libadwaita-style named colors that
+Every theme file must define the  named colors that
 `src/styles/tokens.css` declares light defaults for. Grouped:
 
 - **Surfaces**: `--window-bg-color`, `--window-fg-color`, `--view-bg-color`,

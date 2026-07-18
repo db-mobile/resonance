@@ -1,7 +1,3 @@
-/**
- * Flat toolbars, AdwHeaderBar/toolbar style.
- */
-
 .toolbar {
   display: flex;
   align-items: center;

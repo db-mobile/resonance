@@ -137,6 +137,7 @@ export class CollectionImportExportService {
 
             await this.refreshCollections(false);
             await this.saveResponseSchemasFromImport(collection);
+            await this.storeImportedCollectionAuth(collection);
             toast.success(`Imported "${collection.name}"`);
             return collection;
         } catch (error) {
@@ -167,12 +168,37 @@ export class CollectionImportExportService {
             }
 
             await this.refreshCollections(false);
+            await this.storeImportedCollectionAuth(collection);
             toast.success(`Imported "${collection.name}"`);
             return collection;
         } catch (error) {
             const errorMessage = typeof error === 'string' ? error : (error.message || 'Unknown error');
             toast.error(`Import failed: ${errorMessage}`);
             throw error;
+        }
+    }
+
+    /**
+     * Re-persists imported collection- and folder-level auth configs through
+     * the repository so literal credentials move into the SecretStore and
+     * collection.json keeps only redacted copies.
+     *
+     * @async
+     * @param {Object} collection - The imported collection as returned by the backend
+     * @returns {Promise<void>}
+     */
+    async storeImportedCollectionAuth(collection) {
+        try {
+            if (collection?.authConfig) {
+                await this.repository.saveCollectionAuthConfig(collection.id, collection.authConfig);
+            }
+            for (const folder of collection?.folders || []) {
+                if (folder?.authConfig && folder.id) {
+                    await this.repository.saveFolderAuthConfig(collection.id, folder.id, folder.authConfig);
+                }
+            }
+        } catch (error) {
+            void error;
         }
     }
 
