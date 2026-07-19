@@ -1,3 +1,4 @@
+use super::api_request::ClientCertConfig;
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS, Transport};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -25,6 +26,18 @@ impl Default for MqttState {
     }
 }
 
+/// TLS options for `mqtts://` connections. The client identity (mTLS) and
+/// custom CA trust are resolved by the frontend from the per-host certificate
+/// store — same shape and wire names as the HTTP and gRPC paths.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MqttTlsOptions {
+    #[serde(default)]
+    pub skip_verify: bool,
+    #[serde(default)]
+    pub client_cert: Option<ClientCertConfig>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MqttConnectRequest {
@@ -42,6 +55,8 @@ pub struct MqttConnectRequest {
     pub subscribe_topic: Option<String>,
     #[serde(default)]
     pub qos: Option<u8>,
+    #[serde(default)]
+    pub tls: MqttTlsOptions,
 }
 
 #[derive(Debug, Deserialize)]
@@ -128,9 +143,39 @@ fn parse_broker(broker: &str) -> Result<(String, u16, bool), String> {
     Ok((host, port, use_tls))
 }
 
+/// Build the rumqttc TLS transport from the request's TLS options. Always
+/// builds an explicit rustls config (webpki roots) rather than rumqttc's
+/// default, so skip-verify, custom CA, and mTLS all flow through the shared
+/// tls.rs builders. No ALPN is set (MQTT is not h2).
+fn build_tls_transport(tls: &MqttTlsOptions) -> Result<Transport, String> {
+    let (cert_path, key_path, ca_path) = match tls.client_cert.as_ref() {
+        Some(cert) => (&cert.cert_path, &cert.key_path, &cert.ca_path),
+        None => (&None, &None, &None),
+    };
+
+    let identity = crate::commands::tls::load_identity_pems(cert_path, key_path)?;
+
+    let config = if tls.skip_verify {
+        crate::commands::tls::build_danger_tls_config(identity)?
+    } else {
+        let ca_pem = crate::commands::tls::load_ca_pem(ca_path)?;
+        crate::commands::tls::build_verifying_tls_config(ca_pem, identity)?
+    };
+
+    Ok(Transport::tls_with_config(config.into()))
+}
+
 fn build_config_key(request: &MqttConnectRequest, host: &str, port: u16, use_tls: bool) -> String {
+    let (cert_path, key_path, ca_path) = match request.tls.client_cert.as_ref() {
+        Some(cert) => (
+            cert.cert_path.clone().unwrap_or_default(),
+            cert.key_path.clone().unwrap_or_default(),
+            cert.ca_path.clone().unwrap_or_default(),
+        ),
+        None => (String::new(), String::new(), String::new()),
+    };
     format!(
-        "{}|{}|{}|{}|{}|{}|{}|{}",
+        "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
         host,
         port,
         use_tls,
@@ -139,6 +184,10 @@ fn build_config_key(request: &MqttConnectRequest, host: &str, port: u16, use_tls
         request.password.clone().unwrap_or_default(),
         request.keep_alive.unwrap_or(60),
         request.subscribe_topic.clone().unwrap_or_default(),
+        request.tls.skip_verify,
+        cert_path,
+        key_path,
+        ca_path,
     )
 }
 
@@ -173,10 +222,17 @@ async fn establish_connection(
     }
 
     if use_tls {
-        mqtt_options.set_transport(Transport::tls_with_default_config());
+        mqtt_options.set_transport(build_tls_transport(&request.tls)?);
     }
 
     let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
+
+    // Hold the map lock across spawn + insert so the poll task's cleanup
+    // (remove_connection) cannot run before the entry exists. An instantly
+    // failing event loop parks on this lock and then removes the entry
+    // inserted below, instead of racing ahead of the insert and leaving a
+    // dead connection in the map.
+    let mut connections = state.lock().await;
 
     let poll_app = app.clone();
     let poll_state = state.clone();
@@ -250,17 +306,15 @@ async fn establish_connection(
         remove_connection(&poll_state, &poll_tab_id).await;
     });
 
-    {
-        let mut connections = state.lock().await;
-        connections.insert(
-            request.tab_id.clone(),
-            MqttConnection {
-                client: client.clone(),
-                poll_handle,
-                config_key,
-            },
-        );
-    }
+    connections.insert(
+        request.tab_id.clone(),
+        MqttConnection {
+            client: client.clone(),
+            poll_handle,
+            config_key,
+        },
+    );
+    drop(connections);
 
     Ok(client)
 }
@@ -300,7 +354,9 @@ pub async fn mqtt_connect(
         let connections = state.connections.lock().await;
         connections
             .get(&request.tab_id)
-            .filter(|connection| connection.config_key == config_key)
+            .filter(|connection| {
+                connection.config_key == config_key && !connection.poll_handle.is_finished()
+            })
             .map(|connection| connection.client.clone())
     };
 
@@ -482,5 +538,109 @@ mod tests {
         assert_eq!(qos_from_u8(1), QoS::AtLeastOnce);
         assert_eq!(qos_from_u8(2), QoS::ExactlyOnce);
         assert_eq!(qos_from_u8(9), QoS::AtMostOnce);
+    }
+
+    fn base_request() -> MqttConnectRequest {
+        MqttConnectRequest {
+            tab_id: "tab".to_string(),
+            broker: "mqtts://broker:8883".to_string(),
+            client_id: None,
+            username: None,
+            password: None,
+            keep_alive: None,
+            subscribe_topic: None,
+            qos: None,
+            tls: MqttTlsOptions::default(),
+        }
+    }
+
+    fn cert_config(cert: &str, key: &str, ca: &str) -> ClientCertConfig {
+        serde_json::from_value(serde_json::json!({
+            "certPath": cert,
+            "keyPath": key,
+            "caPath": ca,
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn config_key_changes_when_tls_options_change() {
+        let base = base_request();
+        let base_key = build_config_key(&base, "broker", 8883, true);
+        assert_eq!(
+            base_key,
+            build_config_key(&base_request(), "broker", 8883, true)
+        );
+
+        let mut skip = base_request();
+        skip.tls.skip_verify = true;
+        assert_ne!(base_key, build_config_key(&skip, "broker", 8883, true));
+
+        let mut with_cert = base_request();
+        with_cert.tls.client_cert = Some(cert_config("/c.pem", "/k.pem", ""));
+        let cert_key = build_config_key(&with_cert, "broker", 8883, true);
+        assert_ne!(base_key, cert_key);
+
+        let mut with_ca = base_request();
+        with_ca.tls.client_cert = Some(cert_config("/c.pem", "/k.pem", "/ca.pem"));
+        assert_ne!(cert_key, build_config_key(&with_ca, "broker", 8883, true));
+    }
+
+    #[test]
+    fn config_key_treats_empty_client_cert_as_absent() {
+        let mut empty_cert = base_request();
+        empty_cert.tls.client_cert = Some(cert_config("", "", ""));
+        assert_eq!(
+            build_config_key(&base_request(), "broker", 8883, true),
+            build_config_key(&empty_cert, "broker", 8883, true)
+        );
+    }
+
+    #[test]
+    fn connect_request_deserializes_without_tls() {
+        let request: MqttConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab",
+            "broker": "mqtt://localhost"
+        }))
+        .unwrap();
+        assert!(!request.tls.skip_verify);
+        assert!(request.tls.client_cert.is_none());
+    }
+
+    #[test]
+    fn connect_request_deserializes_camel_case_tls() {
+        let request: MqttConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab",
+            "broker": "mqtts://localhost",
+            "tls": {
+                "skipVerify": true,
+                "clientCert": { "certPath": "/c", "keyPath": "/k", "caPath": "/ca" }
+            }
+        }))
+        .unwrap();
+        assert!(request.tls.skip_verify);
+        let cert = request.tls.client_cert.unwrap();
+        assert_eq!(cert.cert_path.as_deref(), Some("/c"));
+        assert_eq!(cert.key_path.as_deref(), Some("/k"));
+        assert_eq!(cert.ca_path.as_deref(), Some("/ca"));
+    }
+
+    #[test]
+    fn tls_transport_reports_missing_files() {
+        let tls = MqttTlsOptions {
+            skip_verify: false,
+            client_cert: Some(cert_config("/nonexistent/c.pem", "/nonexistent/k.pem", "")),
+        };
+        let err = build_tls_transport(&tls).err().expect("expected an error");
+        assert!(err.contains("could not be read"));
+    }
+
+    #[test]
+    fn tls_transport_builds_for_skip_verify_without_cert() {
+        let tls = MqttTlsOptions {
+            skip_verify: true,
+            client_cert: None,
+        };
+        assert!(build_tls_transport(&tls).is_ok());
     }
 }

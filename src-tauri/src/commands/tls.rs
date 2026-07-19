@@ -1,6 +1,7 @@
-//! Shared TLS building blocks used by the HTTP timing probe and the gRPC
-//! channel builder: the danger accept-all certificate verifier and PEM
-//! loading/parsing helpers for client identities and CA bundles.
+//! Shared TLS building blocks used by the HTTP timing probe, the gRPC
+//! channel builder, and the MQTT transport: the danger accept-all
+//! certificate verifier, PEM loading/parsing helpers for client identities
+//! and CA bundles, and rustls client config builders.
 
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use std::sync::Arc;
@@ -129,8 +130,8 @@ pub(crate) fn parse_identity(
 /// Build a rustls client config that skips server-certificate verification,
 /// optionally presenting a client identity (mTLS still works with
 /// verification off, matching reqwest's `danger_accept_invalid_certs` +
-/// `identity` semantics). ALPN is pinned to h2 for gRPC.
-pub(crate) fn build_danger_grpc_tls_config(
+/// `identity` semantics). No ALPN is set; protocol-specific wrappers add it.
+pub(crate) fn build_danger_tls_config(
     identity: Option<IdentityPems>,
 ) -> Result<rustls::ClientConfig, String> {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
@@ -140,18 +141,69 @@ pub(crate) fn build_danger_grpc_tls_config(
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(NoCertVerifier));
 
-    let mut config = match identity {
+    match identity {
         Some((cert_pem, key_pem)) => {
             let (certs, key) = parse_identity(&cert_pem, &key_pem)?;
             builder
                 .with_client_auth_cert(certs, key)
-                .map_err(|e| format!("Client certificate could not be loaded: {}", e))?
+                .map_err(|e| format!("Client certificate could not be loaded: {}", e))
         }
-        None => builder.with_no_client_auth(),
-    };
+        None => Ok(builder.with_no_client_auth()),
+    }
+}
 
+/// Skip-verify config for gRPC channels: ALPN pinned to h2.
+pub(crate) fn build_danger_grpc_tls_config(
+    identity: Option<IdentityPems>,
+) -> Result<rustls::ClientConfig, String> {
+    let mut config = build_danger_tls_config(identity)?;
     config.alpn_protocols = vec![b"h2".to_vec()];
     Ok(config)
+}
+
+/// Build a verifying rustls client config: webpki roots plus an optional
+/// custom CA bundle appended, and an optional client identity (mTLS).
+/// No ALPN is set.
+pub(crate) fn build_verifying_tls_config(
+    ca_pem: Option<Vec<u8>>,
+    identity: Option<IdentityPems>,
+) -> Result<rustls::ClientConfig, String> {
+    let mut root_store = rustls::RootCertStore::empty();
+    root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+
+    if let Some(ca_pem) = ca_pem {
+        let certs: Vec<CertificateDer<'static>> =
+            rustls_pemfile::certs(&mut std::io::Cursor::new(&ca_pem))
+                .collect::<Result<_, _>>()
+                .map_err(|e| format!("CA certificate could not be parsed: {}", e))?;
+        if certs.is_empty() {
+            return Err("CA certificate contains no PEM certificates".to_string());
+        }
+        for cert in certs {
+            root_store.add(cert).map_err(|e| {
+                format!(
+                    "CA certificate could not be added to the trust store: {}",
+                    e
+                )
+            })?;
+        }
+    }
+
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let builder = rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|e| format!("TLS protocol configuration error: {}", e))?
+        .with_root_certificates(root_store);
+
+    match identity {
+        Some((cert_pem, key_pem)) => {
+            let (certs, key) = parse_identity(&cert_pem, &key_pem)?;
+            builder
+                .with_client_auth_cert(certs, key)
+                .map_err(|e| format!("Client certificate could not be loaded: {}", e))
+        }
+        None => Ok(builder.with_no_client_auth()),
+    }
 }
 
 #[cfg(test)]
@@ -195,5 +247,23 @@ mod tests {
     fn danger_config_builds_without_client_auth() {
         let config = build_danger_grpc_tls_config(None).unwrap();
         assert_eq!(config.alpn_protocols, vec![b"h2".to_vec()]);
+    }
+
+    #[test]
+    fn danger_config_has_no_alpn() {
+        let config = build_danger_tls_config(None).unwrap();
+        assert!(config.alpn_protocols.is_empty());
+    }
+
+    #[test]
+    fn verifying_config_builds_with_defaults() {
+        let config = build_verifying_tls_config(None, None).unwrap();
+        assert!(config.alpn_protocols.is_empty());
+    }
+
+    #[test]
+    fn verifying_config_rejects_garbage_ca() {
+        let err = build_verifying_tls_config(Some(b"not a pem".to_vec()), None).unwrap_err();
+        assert!(err.contains("contains no PEM certificates"));
     }
 }
