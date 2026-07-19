@@ -3,7 +3,7 @@
 A local-first, zero-account API client with excellent user experience built with Tauri. Resonance is designed to be resource-friendly — with a ~15MB bundle size and ~50MB memory footprint, it runs lean compared to Electron-based alternatives.
 
 ![Resonance API Client](https://img.shields.io/badge/License-MIT-blue.svg)
-![Tauri](https://img.shields.io/badge/Tauri-v2.0.0-brightgreen.svg)
+![Tauri](https://img.shields.io/badge/Tauri-v2-brightgreen.svg)
 ![Rust](https://img.shields.io/badge/Rust-Latest-orange.svg)
 
 ![Main interface showing API request configuration](/assets/screenshots/main_window_hdpi.png?raw=true "Main interface showing API request configuration")
@@ -130,11 +130,20 @@ The built application will be in `src-tauri/target/release/bundle/`.
 - **Multi-Language Export**: Generate request code in 9 languages:
   - cURL, Python (requests), JavaScript (Fetch), JavaScript (Axios)
   - Node.js (https module), Go (net/http), PHP (cURL), Ruby (net/http), Java (HttpClient)
+- **All Body Modes Covered**: Generated snippets include multipart form-data file parts, binary file bodies, and URL-encoded forms
+
+### Request Bodies & File Uploads
+
+- **Body Modes**: JSON, Form Data, URL-encoded, plain text, binary file, and GraphQL — switchable per request via the body mode selector
+- **Multipart File Uploads**: Attach files as form-data parts alongside text fields, with an optional explicit `Content-Type` per part
+- **Binary Bodies**: Send a file as the raw request body with a configurable content type
+- **Path-Only Storage**: Collections store only file paths — file contents are read from disk at request time, so collections stay small and git-friendly
+- **Runner Support**: File parts and binary bodies also work in the Collection Runner
 
 ### GraphQL Support
 
 - **GraphQL Integration**: Dedicated editors for GraphQL queries and testing
-  - Dropdown selector to switch between JSON and GraphQL body modes
+  - Body mode selector to switch the body editor into GraphQL mode
   - GraphQL query editor with syntax highlighting
   - Variables editor with JSON syntax highlighting and validation
   - Query formatting with format button
@@ -144,8 +153,8 @@ The built application will be in `src-tauri/target/release/bundle/`.
 ### gRPC Support
 
 - **gRPC Integration**: Native gRPC client with server reflection
-  - Automatic service and method discovery via gRPC reflection
-  - TLS support for secure connections
+  - Automatic service and method discovery via gRPC reflection (v1 and v1alpha)
+  - TLS options: system roots, custom CA bundle, client certificates (mTLS), and skip-verify for development
   - Request metadata (headers) configuration
   - Response metadata and trailers display
   - JSON-based message editing with schema-generated skeletons
@@ -252,6 +261,7 @@ The built application will be in `src-tauri/target/release/bundle/`.
 - **Secure Architecture**: Tauri's secure IPC, CSP policies, and native system integration
 - **Persistent Storage**: Auto-save for collections, variables, environments, settings, and history
 - **Git-Friendly Storage**: Collections are stored as human-readable JSON files in a directory structure, making them easy to version control, diff, and collaborate on with Git
+- **Auto-Update**: In-app update check with one-click install for AppImage and direct downloads; package-manager installs (Flatpak, Snap, Homebrew, Scoop, distro packages) are detected and defer to their own update mechanism
 - **Lightweight**: ~15MB bundle size, ~50MB memory usage (vs ~150MB/~200MB for Electron)
 
 ## Usage
@@ -518,7 +528,7 @@ Resonance supports GraphQL queries with dedicated editors for queries and variab
 **Using GraphQL Mode**
 
 1. Navigate to the **Body** tab in the request configuration area
-2. Use the dropdown selector at the top to switch from **JSON** to **GraphQL**
+2. Use the body mode selector at the top to switch from **JSON** to **GraphQL**
 3. Write your GraphQL query in the query editor
 4. Add variables in the variables editor (optional)
 5. Click the **Format** button to auto-format your query
@@ -633,23 +643,23 @@ Resonance includes comprehensive keyboard shortcuts to speed up your workflow. P
 
 ```
 src/
-├── renderer.js          # Renderer process coordinator
-├── style.css           # Global styles
-├── modules/            # Modular renderer components
-│   ├── controllers/    # MVC controllers (Collection, Environment, History, Script, Proxy, WorkspaceTab, MockServer)
-│   ├── services/       # Business logic services (Script, Environment, Collection, etc.)
-│   ├── storage/        # Data persistence repositories (Script, Environment, Collection, etc.)
-│   ├── ui/            # UI components (dialogs, renderers, selectors, script editors)
-│   ├── variables/     # Variable processing and templating
-│   ├── schema/        # OpenAPI schema handling
-│   ├── ipcBridge.js   # Tauri IPC compatibility layer
-│   ├── codeGenerator.js       # Multi-language code export
-│   ├── cookieParser.js        # Cookie parsing and display
-│   ├── performanceMetrics.js  # Performance timing visualization
-│   ├── scriptSubTabs.js       # Script editor sub-tabs management
-│   └── [26+ other modules]
-├── themes/            # Theme CSS files
-└── i18n/             # Internationalization (5 languages)
+├── renderer.js          # Renderer process coordinator (boots the FeatureRegistry)
+├── styles/             # Modular CSS (tokens, layout, widgets, per-feature styles)
+├── themes/             # Light/dark theme CSS
+├── i18n/               # Internationalization (6 languages)
+└── modules/            # Modular renderer components
+    ├── controllers/    # MVC controllers (Collection, Environment, History, Script, Proxy, WorkspaceTab, MockServer)
+    ├── services/       # Business logic services (Script, Environment, Collection, etc.)
+    ├── storage/        # Data persistence repositories (Script, Environment, Collection, etc.)
+    ├── ui/             # UI components (dialogs, renderers, selectors, script editors)
+    ├── variables/      # Variable processing and templating
+    ├── schema/         # OpenAPI schema handling
+    ├── registry/       # FeatureRegistry booting co-located *.feature.js descriptors
+    ├── state/          # Encapsulated app state modules
+    ├── ipcBridge.js    # Tauri IPC compatibility layer
+    ├── codeGenerator.js        # Multi-language code export
+    ├── *.feature.js            # Per-feature wiring descriptors
+    └── [60+ other modules]     # Protocol handlers (gRPC, WebSocket, MQTT, SSE), editors, managers
 
 src-tauri/
 ├── Cargo.toml         # Rust dependencies
@@ -657,13 +667,25 @@ src-tauri/
 └── src/
     ├── main.rs        # Application entry point
     └── commands/      # IPC command handlers
-        ├── api_request.rs    # HTTP request handling with reqwest (incl. mTLS / client certs)
-        ├── proxy.rs          # Proxy configuration
-        ├── certificates.rs   # Native file picker for client certificate (mTLS) files
-        ├── mock_server.rs    # Mock server with Axum
-        ├── scripts.rs        # JavaScript execution with Boa Engine
-        ├── store.rs          # Data persistence
-        └── import_export.rs  # OpenAPI/Postman parsing
+        ├── api_request.rs        # HTTP requests with reqwest (mTLS, multipart/binary bodies)
+        ├── grpc_reflection.rs    # gRPC server reflection (v1/v1alpha negotiation)
+        ├── grpc_streaming.rs     # gRPC unary and streaming calls
+        ├── grpc_proto.rs         # Proto descriptor handling
+        ├── websocket.rs          # WebSocket connections
+        ├── sse.rs                # Server-Sent Events streaming
+        ├── mqtt.rs               # MQTT broker connections
+        ├── graphql_subscription.rs  # GraphQL subscriptions (graphql-transport-ws)
+        ├── mock_server.rs        # Mock server with Axum
+        ├── scripts.rs            # JavaScript execution with Boa Engine
+        ├── import_export/        # OpenAPI/Postman import and export
+        ├── collections.rs        # Git-friendly collection file storage
+        ├── store.rs              # Settings/data persistence
+        ├── secrets.rs            # OS keychain secret storage
+        ├── oauth.rs              # OAuth 2.0 token fetching
+        ├── proxy.rs              # Proxy configuration
+        ├── certificates.rs       # Native file picker for client certificate (mTLS) files
+        ├── tls.rs                # Shared TLS helpers (PEM loading, skip-verify)
+        └── updater.rs            # Auto-update and install-type detection
 ```
 
 ### Key Technologies
@@ -676,7 +698,7 @@ src-tauri/
 - **CodeMirror** (v6.x): Advanced syntax highlighting and code editing
 - **tauri-plugin-store**: Persistent configuration storage
 - **serde_yaml**: YAML parsing for OpenAPI specs
-- **esbuild** (v0.25.x): Fast JavaScript bundler
+- **esbuild** (v0.28.x): Fast JavaScript bundler
 - **Jest** (v30.0.x): Testing framework
 
 ### Security Features
@@ -714,9 +736,9 @@ The application follows a modular MVC-like architecture:
 
 ### Adding New Features
 
-1. Create modules in appropriate `src/modules/` subdirectories
-2. Export functionality from index files
-3. Import and initialize in `renderer.js`
+1. Create the feature's modules in the appropriate `src/modules/` subdirectories (controller, service, repository, UI) and export them from index files
+2. Add a co-located `src/modules/<name>.feature.js` descriptor that wires the stack together
+3. Register the descriptor on the `FeatureRegistry` in `renderer.js` with a single `.register(...)` call — avoid manual wiring in `renderer.js`
 4. Add Tauri commands in `src-tauri/src/commands/` if backend functionality is needed
 5. Register commands in `src-tauri/src/main.rs`
 
@@ -741,9 +763,7 @@ We welcome contributions! Please follow these guidelines:
 - Use defensive programming in repository layer (validate data types, handle undefined)
 - **Code Quality Tools**:
   - ESLint for JavaScript linting and quality checks
-  - Prettier for consistent code formatting
   - Run `npm run lint` before committing
-  - Use `npm run format` to auto-format code
   - Run `cargo clippy` for Rust linting
 
 ## License
@@ -790,6 +810,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Server-Sent Events (SSE) support with automatic reconnection and Last-Event-ID resumption
 - [x] MQTT support with topic subscribe/publish, QoS levels, retain, and TLS brokers
 - [x] Collection runner for batch request execution with variable chaining
+- [x] File uploads: multipart form-data file parts and binary request bodies
 
 ### Planned
 

@@ -586,8 +586,6 @@ export class SettingsModal {
 
         const checkUpdatesBtn = overlay.querySelector('#check-for-updates-btn');
         const updateStatus = overlay.querySelector('#update-status');
-        const autoUpdateSection = overlay.querySelector('[data-tab-content="updates"] .settings-section:first-child');
-        const manualUpdateSection = overlay.querySelector('[data-tab-content="updates"] .settings-section:nth-child(2)');
         if (checkUpdatesBtn && updateStatus) {
             (async () => {
                 try {
@@ -596,24 +594,28 @@ export class SettingsModal {
                         if (installInfo.autoUpdateSupported) {
                             return;
                         }
-                        if (autoUpdateSection) {
-                            autoUpdateSection.style.display = 'none';
+                        const autoUpdateRow = checkUpdatesOnLaunchCheckbox?.closest('.row');
+                        if (autoUpdateRow) {
+                            autoUpdateRow.style.display = 'none';
                         }
-                        if (manualUpdateSection) {
-                            manualUpdateSection.style.display = 'none';
+                        const manualUpdateRow = checkUpdatesBtn.closest('.row');
+                        if (manualUpdateRow) {
+                            manualUpdateRow.style.display = 'none';
                         }
-                        const versionSection = overlay.querySelector('[data-tab-content="updates"] .settings-section:last-child');
-                        if (!versionSection) {
+                        const versionRow = overlay.querySelector('#settings-current-version')?.closest('.row');
+                        if (!versionRow) {
                             return;
                         }
-                        const messageH3 = document.createElement('h3');
-                        messageH3.textContent = installInfo.message || app.i18n?.t('settings.updates_managed_externally') || 'Updates are managed by your package manager';
-                        const versionH3 = versionSection.querySelector('h3');
-                        if (versionH3) {
-                            versionH3.className = 'form-input-hint';
-                            versionH3.style.marginTop = '16px';
-                        }
-                        versionSection.insertBefore(messageH3, versionSection.firstChild);
+                        const messageRow = document.createElement('div');
+                        messageRow.className = 'row property';
+                        const messageContent = document.createElement('div');
+                        messageContent.className = 'row-content';
+                        const messageTitle = document.createElement('span');
+                        messageTitle.className = 'title';
+                        messageTitle.textContent = installInfo.message || app.i18n?.t('settings.updates_managed_externally') || 'Updates are managed by your package manager';
+                        messageContent.appendChild(messageTitle);
+                        messageRow.appendChild(messageContent);
+                        versionRow.parentElement.insertBefore(messageRow, versionRow);
                     }
                 } catch (e) {
                 }
