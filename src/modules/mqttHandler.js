@@ -1,4 +1,5 @@
-import { clearResponseDisplayForTab } from './apiHandler.js';
+import { clearResponseDisplayForTab, getSettingsCache } from './apiHandler.js';
+import { app } from './appContext.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
 import { i18n } from '../i18n/index.js';
@@ -95,6 +96,66 @@ function normalizeMqttBroker(broker) {
     }
 
     return `mqtt://${broker}`;
+}
+
+/**
+ * Extract the host[:port] an MQTT broker URL resolves to, matching how the
+ * HTTP and gRPC paths key the certificate store. "mqtts://h:8883/path" and
+ * "h:8883" both yield "h:8883"; no default port is injected.
+ * @param {string} broker
+ * @returns {string}
+ */
+function mqttHostForCertLookup(broker) {
+    return (broker || '')
+        .trim()
+        .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+        .split(/[/?]/)[0]
+        .toLowerCase();
+}
+
+/**
+ * @param {string} broker - normalized broker URL (always carries a scheme)
+ * @returns {boolean}
+ */
+function isTlsBroker(broker) {
+    return /^(mqtts|ssl|tls):\/\//i.test(broker || '');
+}
+
+/**
+ * Build the TLS options for mqtt_connect, or null for plaintext brokers.
+ * Skip-verify follows the global "Verify SSL certificates" setting and the
+ * client certificate/CA resolve from the per-host certificate store, same
+ * as the HTTP and gRPC paths.
+ * @param {string} normalizedBroker
+ * @returns {Promise<Object|null>}
+ */
+async function buildMqttTlsOptions(normalizedBroker) {
+    if (!isTlsBroker(normalizedBroker)) {
+        return null;
+    }
+
+    let skipVerify = false;
+    try {
+        const settings = getSettingsCache() || (await window.backendAPI.settings.get());
+        skipVerify = settings?.verifySsl === false;
+    } catch (_e) {
+        skipVerify = false;
+    }
+
+    const tls = { skipVerify };
+    if (app.certificateController) {
+        try {
+            const cert = app.certificateController.getForHost(
+                mqttHostForCertLookup(normalizedBroker)
+            );
+            if (cert) {
+                tls.clientCert = cert;
+            }
+        } catch (_e) {
+            /* certificate lookup is best-effort */
+        }
+    }
+    return tls;
 }
 
 async function handleBackendEvent(event) {
@@ -230,16 +291,22 @@ export async function handleMqttSend(broker, options = {}) {
     await session.updateStatus(tabId, 'MQTT connecting...', null);
     await updateMqttUiIfActive(tabId);
 
+    const tls = await buildMqttTlsOptions(normalizedBroker);
+    const connectRequest = {
+        tabId,
+        broker: normalizedBroker,
+        clientId,
+        username,
+        password,
+        subscribeTopic,
+        qos: Number(qos) || 0
+    };
+    if (tls) {
+        connectRequest.tls = tls;
+    }
+
     try {
-        await window.backendAPI.mqtt.connect({
-            tabId,
-            broker: normalizedBroker,
-            clientId,
-            username,
-            password,
-            subscribeTopic,
-            qos: Number(qos) || 0
-        });
+        await window.backendAPI.mqtt.connect(connectRequest);
     } catch (error) {
         toast.error(`MQTT connection failed: ${error.message || error}`);
         session.set(tabId, { ...(session.get(tabId) || {}), state: 'closed' });
