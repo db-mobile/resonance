@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "3.1.1"
+version = "3.1.2"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -69,6 +69,9 @@ md5 = "0.7"
 sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
+
+# Cryptographic RNG for OAuth PKCE verifiers and CSRF state (OS entropy, OpenSSL-free)
+getrandom = "0.3"
 
 # Proto file parsing
 which = "6"

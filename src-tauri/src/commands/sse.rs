@@ -73,10 +73,9 @@ impl PartialEvent {
     }
 
     fn dispatch(&mut self, app: &AppHandle, tab_id: &str, url: &str) {
-        if self.data.is_empty() && self.event.is_none() && self.retry.is_none() {
+        if self.data.is_empty() && self.event.is_none() {
             // Comment-only or empty frame; keep id but emit nothing.
             self.event = None;
-            self.retry = None;
             return;
         }
 
@@ -95,7 +94,7 @@ impl PartialEvent {
                 event: self.event.take(),
                 data,
                 id: self.id.clone(),
-                retry: self.retry.take(),
+                retry: None,
                 status: None,
                 message: None,
             },
@@ -328,11 +327,11 @@ async fn run_stream(
                             if let Some(id) = &partial.id {
                                 last_event_id = Some(id.clone());
                             }
-                            if let Some(r) = partial.retry {
-                                retry_ms = r;
-                            }
                         } else {
                             parse_line(&line, &mut partial);
+                            if let Some(r) = partial.retry.take() {
+                                retry_ms = r;
+                            }
                         }
                     }
                 }

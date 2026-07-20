@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Resonance is a local-first, zero-account API client built with Tauri v2.0.0. It's a cross-platform desktop application (Linux, macOS, Windows) supporting REST, GraphQL, gRPC (with server reflection), WebSocket, and MQTT protocols, plus OpenAPI/Postman import, a built-in mock server, pre-request/test scripting, collection runner, client certificates (mTLS) with custom CA trust, and environment management.
 
-**Prerequisites**: Node.js v20+, Rust stable.
+**Prerequisites**: Node.js v22+, Rust stable.
 
 Collections, environments, history, and settings are persisted as human-readable JSON files (git-friendly) via the repository layer in `src/modules/storage/`.
 
