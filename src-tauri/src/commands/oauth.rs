@@ -414,26 +414,12 @@ pub async fn oauth2_get_token(config: OAuth2Config) -> Result<OAuth2TokenRespons
     }
 }
 
-/// Generate random bytes using a simple PRNG (for non-cryptographic use)
-/// In production, you might want to use a proper crypto RNG
+/// Generate cryptographically secure random bytes from the operating system's
+/// entropy source. Used for the PKCE `code_verifier` and the OAuth CSRF `state`,
+/// both of which must be unpredictable.
 fn rand_bytes<const N: usize>() -> [u8; N] {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
     let mut result = [0u8; N];
-    let seed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64;
-
-    // Simple xorshift64 PRNG
-    let mut state = seed ^ 0x5DEECE66D;
-    for byte in result.iter_mut() {
-        state ^= state << 13;
-        state ^= state >> 7;
-        state ^= state << 17;
-        *byte = state as u8;
-    }
-
+    getrandom::fill(&mut result).expect("OS random number generator unavailable");
     result
 }
 

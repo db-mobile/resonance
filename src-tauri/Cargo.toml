@@ -70,6 +70,9 @@ sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
 
+# Cryptographic RNG for OAuth PKCE verifiers and CSRF state (OS entropy, OpenSSL-free)
+getrandom = "0.3"
+
 # Proto file parsing
 which = "6"
 protoc-bin-vendored = "3"
