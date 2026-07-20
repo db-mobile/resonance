@@ -11,20 +11,20 @@ button { cursor: pointer; border: none; background: none; font: inherit; }
 
 /* ── Design Tokens ── */
 :root {
-  --bg:          #090910;
-  --bg-2:        #0d0d18;
-  --surface:     #111119;
-  --surface-2:   #15151f;
-  --border:      #1d1d2c;
-  --border-2:    #262636;
+  --bg:          #061224;
+  --bg-2:        #0a1d38;
+  --surface:     #0d2547;
+  --surface-2:   #11315c;
+  --border:      #1a3d68;
+  --border-2:    #264f82;
 
-  --text:        #e2e2f0;
-  --text-2:      #9090a8;
-  --text-3:      #50506a;
+  --text:        #e9f1fb;
+  --text-2:      #a3bfe0;
+  --text-3:      #5c7aa0;
 
-  --accent:      #f9f06b;
-  --accent-bg:   rgba(249, 240, 107, 0.08);
-  --accent-glow: rgba(249, 240, 107, 0.18);
+  --accent:      #99c1f1;
+  --accent-bg:   rgba(153, 193, 241, 0.10);
+  --accent-glow: rgba(153, 193, 241, 0.20);
 
   --red:    #ff5f57;
   --yellow: #febc2e;
@@ -226,12 +226,12 @@ code {
 
 .btn-primary {
   background: var(--accent);
-  color: #0a0a10;
+  color: #071a33;
   border: 1px solid var(--accent);
 }
 
 .btn-primary:hover {
-  background: #fdf5a0;
+  background: #bcd6f7;
   box-shadow: 0 0 24px var(--accent-glow);
   transform: translateY(-1px);
 }
@@ -306,7 +306,7 @@ code {
   right: -80px;
   width: 600px;
   height: 600px;
-  background: radial-gradient(circle, rgba(249,240,107,0.06) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(153,193,241,0.08) 0%, transparent 65%);
   pointer-events: none;
 }
 
