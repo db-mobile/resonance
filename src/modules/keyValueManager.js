@@ -249,11 +249,16 @@ export function initKeyValueListeners() {
     });
 
     document.addEventListener('click', (event) => {
-        if (event.target.classList.contains('remove-row-btn')) {
-            const isPathParam = event.target.closest('#path-params-list');
-            const isQueryParam = event.target.closest('#query-params-list');
-            const isHeader = event.target.closest('#headers-list');
-            event.target.closest('.key-value-row').remove();
+        const removeBtn = event.target.closest('.remove-row-btn');
+        if (removeBtn) {
+            const isPathParam = removeBtn.closest('#path-params-list');
+            const isQueryParam = removeBtn.closest('#query-params-list');
+            const isHeader = removeBtn.closest('#headers-list');
+            const row = removeBtn.closest('.key-value-row');
+            if (!row) {
+                return;
+            }
+            row.remove();
 
             if (isPathParam) {
                 debounceAutoSave(() => autoSavePathParams());
