@@ -45,8 +45,8 @@
   <icon type="stock">io.github.db_mobile.resonance</icon>
 
   <branding>
-    <color type="primary" scheme_preference="light">#9fd6d2</color>
-    <color type="primary" scheme_preference="dark">#1f5751</color>
+    <color type="primary" scheme_preference="light">#99c1f1</color>
+    <color type="primary" scheme_preference="dark">#09356d</color>
   </branding>
 
   <screenshots>
