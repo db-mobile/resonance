@@ -44,6 +44,7 @@ export class CollectionDialogs {
             const locationInput = dialog.querySelector('#collection-location');
             const locationBtn = dialog.querySelector('#collection-location-btn');
             const cancelBtn = dialog.querySelector('#cancel-btn');
+            const closeBtn = dialog.querySelector('#new-collection-close-btn');
             let selectedStoragePath = defaultStoragePath;
             let resolved = false;
 
@@ -65,6 +66,10 @@ export class CollectionDialogs {
             };
 
             cancelBtn.addEventListener('click', () => {
+                finish(null);
+            });
+
+            closeBtn.addEventListener('click', () => {
                 finish(null);
             });
 
@@ -126,6 +131,7 @@ export class CollectionDialogs {
             const grpcTargetInput = dialog.querySelector('#grpc-target');
             const pathLabel = dialog.querySelector('label[for="request-path"]');
             const cancelBtn = dialog.querySelector('#cancel-btn');
+            const closeBtn = dialog.querySelector('#new-request-close-btn');
             let resolved = false;
 
             nameInput.focus();
@@ -143,6 +149,10 @@ export class CollectionDialogs {
             };
 
             cancelBtn.addEventListener('click', () => {
+                finish(null);
+            });
+
+            closeBtn.addEventListener('click', () => {
                 finish(null);
             });
 
@@ -267,6 +277,7 @@ export class CollectionDialogs {
             const newCollectionLocationInput = dialog.querySelector('#new-collection-location-input');
             const newCollectionLocationBtn = dialog.querySelector('#new-collection-location-btn');
             const cancelBtn = dialog.querySelector('#cancel-btn');
+            const closeBtn = dialog.querySelector('#save-to-collection-close-btn');
             let newCollectionStoragePath = defaultStoragePath;
             let resolved = false;
 
@@ -333,6 +344,10 @@ export class CollectionDialogs {
             });
 
             cancelBtn.addEventListener('click', () => {
+                finish(null);
+            });
+
+            closeBtn.addEventListener('click', () => {
                 finish(null);
             });
 

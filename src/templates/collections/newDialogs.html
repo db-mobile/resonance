@@ -1,8 +1,11 @@
 <template id="tpl-new-collection-dialog">
     <div class="new-request-dialog-overlay modal-overlay">
-        <div class="new-request-dialog modal-dialog modal-dialog--sm">
+        <div class="new-request-dialog modal-dialog modal-dialog--md">
             <form id="new-collection-form" class="u-flex u-flex-col u-gap-4">
-                <h3 class="dialog-title" data-i18n="new_collection.title">Create New Collection</h3>
+                <div class="dialog-header">
+                    <h3 class="dialog-title" data-i18n="new_collection.title">Create New Collection</h3>
+                    <button type="button" id="new-collection-close-btn" class="dialog-close-btn" aria-label="Close"><span class="icon icon-16 icon-x"></span></button>
+                </div>
                 <div class="form-group">
                     <label for="collection-name" class="form-label" data-i18n="new_collection.name_label">Collection Name:</label>
                     <input type="text" id="collection-name" class="input-base form-input" data-i18n-placeholder="new_collection.name_placeholder" placeholder="My Collection" required>
@@ -10,7 +13,7 @@
                 <div class="form-group">
                     <label for="collection-location" class="form-label">Location:</label>
                     <div class="u-flex u-gap-8">
-                        <input type="text" id="collection-location" class="input-base form-input" readonly>
+                        <input type="text" id="collection-location" class="input-base form-input u-flex-1" readonly>
                         <button type="button" id="collection-location-btn" class="btn btn-outline">Choose Folder</button>
                     </div>
                 </div>
@@ -27,7 +30,10 @@
     <div class="new-request-dialog-overlay modal-overlay">
         <div class="new-request-dialog modal-dialog modal-dialog--sm">
             <form id="new-request-form" class="u-flex u-flex-col u-gap-4">
-                <h3 class="dialog-title" data-i18n="new_request.title">Create New Request</h3>
+                <div class="dialog-header">
+                    <h3 class="dialog-title" data-i18n="new_request.title">Create New Request</h3>
+                    <button type="button" id="new-request-close-btn" class="dialog-close-btn" aria-label="Close"><span class="icon icon-16 icon-x"></span></button>
+                </div>
                 <div class="form-group">
                     <label for="request-name" class="form-label" data-i18n="new_request.name_label">Request Name:</label>
                     <input type="text" id="request-name" class="input-base form-input" data-i18n-placeholder="new_request.name_placeholder" placeholder="My Request" required>
@@ -78,7 +84,10 @@
     <div class="new-request-dialog-overlay modal-overlay">
         <div class="new-request-dialog modal-dialog modal-dialog--sm">
             <form id="save-to-collection-form" class="u-flex u-flex-col u-gap-4">
-                <h3 class="dialog-title" data-i18n="save_to_collection.title">Save to Collection</h3>
+                <div class="dialog-header">
+                    <h3 class="dialog-title" data-i18n="save_to_collection.title">Save to Collection</h3>
+                    <button type="button" id="save-to-collection-close-btn" class="dialog-close-btn" aria-label="Close"><span class="icon icon-16 icon-x"></span></button>
+                </div>
                 <div class="form-group">
                     <label for="save-request-name" class="form-label" data-i18n="save_to_collection.name_label">Request Name:</label>
                     <input type="text" id="save-request-name" class="input-base form-input" data-i18n-placeholder="save_to_collection.name_placeholder" placeholder="My Request" required>
@@ -99,7 +108,7 @@
                 <div class="form-group is-hidden" id="new-collection-location-group">
                     <label for="new-collection-location-input" class="form-label">Location:</label>
                     <div class="u-flex u-gap-8">
-                        <input type="text" id="new-collection-location-input" class="input-base form-input" readonly>
+                        <input type="text" id="new-collection-location-input" class="input-base form-input u-flex-1" readonly>
                         <button type="button" id="new-collection-location-btn" class="btn btn-outline">Choose Folder</button>
                     </div>
                 </div>
@@ -115,7 +124,7 @@
 <template id="tpl-import-collection-dialog">
     <div class="new-request-dialog-overlay modal-overlay">
         <div class="new-request-dialog modal-dialog modal-dialog--md">
-            <form id="import-collection-form" class="u-flex u-flex-col u-gap-4">
+            <form id="import-collection-form" class="u-flex u-flex-col">
                 <div class="dialog-header">
                     <div>
                         <h3 class="dialog-title" id="import-collection-title" data-i18n="import_dialog.title">Import Collection</h3>
@@ -124,7 +133,7 @@
                     <button type="button" id="import-collection-close-btn" class="dialog-close-btn" aria-label="Close"><span class="icon icon-16 icon-x"></span></button>
                 </div>
 
-                <div class="u-flex u-flex-col u-gap-4">
+                <div class="u-flex u-flex-col import-collection-body">
                     <div class="import-selector-card" id="import-source-card">
                         <div class="import-selector-card__header">
                             <div>
