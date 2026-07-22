@@ -6,7 +6,9 @@
 import { app } from './appContext.js';
 import { loadEditor } from './editorLoader.js';
 import { toast } from './ui/Toast.js';
+import { debounce } from './utils/debounce.js';
 import { fetchGraphQLIntrospection, buildSchemaFromIntrospection } from './apiHandler.js';
+import { GraphQLExplorer } from './graphqlExplorer.js';
 
 const SCHEMA_STORE_KEY = 'graphqlSchemaCache';
 const SCHEMA_STORE_LIMIT = 50;
@@ -15,10 +17,9 @@ export class GraphQLBodyManager {
     constructor(domElements) {
         this.dom = domElements;
         this.graphqlEditor = null;
-        this.variablesEditor = null;
         this._initializingGql = null;
         this._pendingQuery = null;
-        this._pendingVariables = null;
+        this._variablesString = '';
         this.currentMode = 'json';
         this.isGraphQLModeEnabled = false;
 
@@ -26,27 +27,27 @@ export class GraphQLBodyManager {
         this.currentSchema = null;
         this.isFetchingSchema = false;
         this._autoFetchedUrls = new Set();
-        this._urlDebounce = null;
+        this._debouncedApplySchema = debounce(() => this.autoApplySchemaForUrl(), 500);
 
         this.selectedOperationName = null;
 
         this.jsonPanel = document.getElementById('body-json-section');
         this.graphqlPanel = document.getElementById('body-graphql-section');
         this.graphqlEditorContainer = document.getElementById('graphql-query-editor');
-        this.graphqlVariablesEditorContainer = document.getElementById('graphql-variables-editor');
         this.formatBtn = document.getElementById('graphql-format-btn');
         this.fetchSchemaBtn = document.getElementById('graphql-fetch-schema-btn');
         this.operationSelect = document.getElementById('graphql-operation-select');
-        this.runBtn = document.getElementById('graphql-run-btn');
         this.docsToggle = document.getElementById('graphql-docs-toggle');
         this.docsRail = document.getElementById('graphql-docs-rail');
-
-        this.drawer = document.getElementById('graphql-drawer');
-        this.drawerTabs = document.getElementById('graphql-drawer-tabs');
-        this.graphqlResizerHandle = document.getElementById('graphql-resizer-handle');
-        this.activeDrawer = 'variables';
+        this.explorerResizerHandle = document.getElementById('graphql-explorer-resizer-handle');
+        this.explorer = null;
+        this._debouncedRefreshExplorer = debounce(
+            (query) => this.explorer?.refreshState(query, this.getGraphQLVariables()),
+            200
+        );
 
         this.methodSelectContainer = document.querySelector('.method-select-container');
+        this.runnerBtn = document.getElementById('runner-btn');
 
         this.workbenchActive = false;
         this.savedMethod = null;
@@ -87,21 +88,9 @@ export class GraphQLBodyManager {
         if (this.operationSelect) {
             this.operationSelect.addEventListener('change', (e) => {
                 this.selectedOperationName = e.target.value || null;
-            });
-        }
-
-        if (this.drawerTabs) {
-            this.drawerTabs.addEventListener('click', (e) => {
-                const tab = e.target.closest('.graphql-drawer-tab');
-                if (tab) {
-                    this.onDrawerTab(tab.dataset.drawer);
+                if (this.isDocsRailOpen()) {
+                    this.renderDocsRail();
                 }
-            });
-        }
-
-        if (this.runBtn) {
-            this.runBtn.addEventListener('click', () => {
-                document.getElementById('send-request-btn')?.click();
             });
         }
 
@@ -117,70 +106,12 @@ export class GraphQLBodyManager {
             if (!this.isGraphQLMode()) {
                 return;
             }
-            clearTimeout(this._urlDebounce);
-            this._urlDebounce = setTimeout(() => this.autoApplySchemaForUrl(), 500);
+            this._debouncedApplySchema();
         });
     }
 
     /**
-     * Handle a click on a drawer tab. Opens the drawer on the requested pane,
-     * switches panes when already open, or collapses when the active pane is
-     * clicked again. (The drawer currently holds only the Variables pane.)
-     * @param {string} which - 'variables'
-     */
-    onDrawerTab(which) {
-        const collapsed = this.drawer.classList.contains('collapsed');
-        if (collapsed) {
-            this.setDrawerPane(which);
-            this.setDrawerCollapsed(false);
-        } else if (which === this.activeDrawer) {
-            this.setDrawerCollapsed(true);
-        } else {
-            this.setDrawerPane(which);
-        }
-    }
-
-    /**
-     * Activate a drawer pane (tab highlight + pane visibility).
-     * @param {string} which - 'variables'
-     */
-    setDrawerPane(which) {
-        this.activeDrawer = which;
-        this.drawerTabs?.querySelectorAll('.graphql-drawer-tab').forEach(tab => {
-            const on = tab.dataset.drawer === which;
-            tab.classList.toggle('active', on);
-            tab.setAttribute('aria-selected', String(on));
-        });
-        this.drawer?.querySelectorAll('.graphql-drawer-pane').forEach(pane => {
-            pane.classList.toggle('active', pane.dataset.drawerPane === which);
-        });
-        if (which === 'variables') {
-            this.variablesEditor?.view?.requestMeasure?.();
-        }
-    }
-
-    /**
-     * Collapse/expand the drawer. Collapsed = just the tab strip, hiding the
-     * resize handle so the Query editor keeps all the height.
-     * @param {boolean} collapsed
-     */
-    setDrawerCollapsed(collapsed) {
-        if (!this.drawer) {
-            return;
-        }
-        this.drawer.style.flex = '';
-        this.drawer.classList.toggle('collapsed', collapsed);
-        if (this.graphqlResizerHandle) {
-            this.graphqlResizerHandle.style.display = collapsed ? 'none' : '';
-        }
-        if (!collapsed) {
-            this.variablesEditor?.view?.requestMeasure?.();
-        }
-    }
-
-    /**
-     * Toggle the schema docs rail. Renders a lightweight summary of the loaded
-     * schema's root fields (the full explorer is a follow-up).
+     * Toggle the schema explorer rail (the click-build query tree).
      */
     toggleDocs() {
         if (!this.docsRail) {
@@ -188,6 +119,9 @@ export class GraphQLBodyManager {
         }
         const show = this.docsRail.style.display === 'none';
         this.docsRail.style.display = show ? '' : 'none';
+        if (this.explorerResizerHandle) {
+            this.explorerResizerHandle.style.display = show ? '' : 'none';
+        }
         this.docsToggle?.setAttribute('aria-pressed', String(show));
         if (show) {
             this.renderDocsRail();
@@ -195,31 +129,53 @@ export class GraphQLBodyManager {
     }
 
     /**
-     * Render a minimal schema overview into the docs rail.
+     * Render the interactive schema explorer into the rail, bound to the query
+     * editor: ticking a field rewrites the query, editing the query re-derives
+     * the checkbox state (see {@link GraphQLExplorer}).
      */
     renderDocsRail() {
         if (!this.docsRail) {
             return;
         }
-        if (!this.currentSchema) {
-            this.docsRail.innerHTML = '<div class="graphql-docs-empty">Load the schema (Schema button) to browse types.</div>';
-            return;
+        if (!this.explorer) {
+            this.explorer = new GraphQLExplorer(this.docsRail);
         }
-        const sections = [
-            ['Query', this.currentSchema.getQueryType?.()],
-            ['Mutation', this.currentSchema.getMutationType?.()],
-            ['Subscription', this.currentSchema.getSubscriptionType?.()]
-        ];
-        const html = sections
-            .filter(([, type]) => type)
-            .map(([label, type]) => {
-                const fields = Object.keys(type.getFields())
-                    .map(name => `<li>${name}</li>`)
-                    .join('');
-                return `<section class="graphql-docs-section"><h4>${label}</h4><ul>${fields}</ul></section>`;
-            })
-            .join('');
-        this.docsRail.innerHTML = html || '<div class="graphql-docs-empty">Schema has no root types.</div>';
+        this.explorer.render(
+            this.currentSchema,
+            this.getGraphQLQuery(),
+            this.getGraphQLVariables(),
+            this.getSelectedOperationName(),
+            {
+                onQueryChange: (text) => this._onExplorerQueryChange(text),
+                onVariablesChange: (json) => this._onExplorerVariablesChange(json)
+            }
+        );
+    }
+
+    /**
+     * Whether the explorer rail is currently visible.
+     * @returns {boolean}
+     */
+    isDocsRailOpen() {
+        return !!this.docsRail && this.docsRail.style.display !== 'none';
+    }
+
+    /**
+     * Push a query generated by the explorer into the editor and flag the tab
+     * as modified.
+     * @param {string} text
+     */
+    _onExplorerQueryChange(text) {
+        this.setGraphQLQuery(text);
+        this._markTabModified();
+    }
+
+    /**
+     * Store variable values the explorer produced (from inline arg inputs).
+     * @param {string} json
+     */
+    _onExplorerVariablesChange(json) {
+        this.setGraphQLVariables(json);
     }
 
     /**
@@ -245,9 +201,18 @@ export class GraphQLBodyManager {
             if (this.methodSelectContainer) {
                 this.methodSelectContainer.style.display = 'none';
             }
-            this.setDrawerPane('variables');
-            this.setDrawerCollapsed(true);
+            if (this.runnerBtn) {
+                this.runnerBtn.style.display = 'none';
+            }
             window.__verticalResizer?.setRequestBias(0.6);
+            if (this.docsRail) {
+                this.docsRail.style.display = '';
+                this.docsToggle?.setAttribute('aria-pressed', 'true');
+            }
+            if (this.explorerResizerHandle) {
+                this.explorerResizerHandle.style.display = '';
+            }
+            this.renderDocsRail();
         } else {
             const methodSelect = document.getElementById('method-select');
             if (methodSelect && this.savedMethod !== null) {
@@ -257,16 +222,21 @@ export class GraphQLBodyManager {
             if (this.methodSelectContainer) {
                 this.methodSelectContainer.style.display = '';
             }
+            if (this.runnerBtn) {
+                this.runnerBtn.style.display = '';
+            }
             window.__verticalResizer?.setRequestBias(0.4);
             if (this.docsRail) {
                 this.docsRail.style.display = 'none';
                 this.docsToggle?.setAttribute('aria-pressed', 'false');
             }
+            if (this.explorerResizerHandle) {
+                this.explorerResizerHandle.style.display = 'none';
+            }
         }
 
         requestAnimationFrame(() => requestAnimationFrame(() => {
             this.graphqlEditor?.view?.requestMeasure?.();
-            this.variablesEditor?.view?.requestMeasure?.();
         }));
     }
 
@@ -357,9 +327,6 @@ export class GraphQLBodyManager {
                 }
             }
             this.applySchemaToEditor();
-            if (this.docsRail && this.docsRail.style.display !== 'none') {
-                this.renderDocsRail();
-            }
             toast.success('Schema loaded');
         } catch (e) {
             toast.error(`Failed to fetch schema: ${e.message || e}`);
@@ -372,11 +339,22 @@ export class GraphQLBodyManager {
     }
 
     /**
-     * Apply the currently held schema to the query editor, if both exist.
+     * Apply the currently held schema to the query editor, if both exist, and
+     * refresh the explorer so it reflects the schema (or its absence).
      */
     applySchemaToEditor() {
         if (this.graphqlEditor && this.currentSchema) {
             this.graphqlEditor.setSchema(this.currentSchema);
+        }
+        this._refreshExplorerIfOpen();
+    }
+
+    /**
+     * Re-render the explorer rail when it is visible.
+     */
+    _refreshExplorerIfOpen() {
+        if (this.isDocsRailOpen()) {
+            this.renderDocsRail();
         }
     }
 
@@ -462,6 +440,7 @@ export class GraphQLBodyManager {
 
         this.currentSchema = null;
         this.graphqlEditor?.clearSchema?.();
+        this._refreshExplorerIfOpen();
         this._backgroundIntrospect(targetUrl);
     }
 
@@ -547,45 +526,35 @@ export class GraphQLBodyManager {
      * @returns {Promise<void>}
      */
     initializeGraphQLEditor() {
-        if (this.graphqlEditor && this.variablesEditor) {
+        if (this.graphqlEditor) {
             return Promise.resolve();
         }
         if (this._initializingGql) {
             return this._initializingGql;
         }
-        if (!this.graphqlEditorContainer || !this.graphqlVariablesEditorContainer) {
+        if (!this.graphqlEditorContainer) {
             return Promise.resolve();
         }
 
         this._initializingGql = (async () => {
             try {
-                const [GraphQLEditor, JSONEditor] = await Promise.all([
-                    loadEditor('graphql'),
-                    loadEditor('json')
-                ]);
+                const GraphQLEditor = await loadEditor('graphql');
 
                 this.graphqlEditor = new GraphQLEditor(this.graphqlEditorContainer);
                 if (this._pendingQuery !== null) {
                     this.graphqlEditor.setContent(this._pendingQuery);
                     this._pendingQuery = null;
                 }
-                this.graphqlEditor.onChange((_content) => {
+                this.graphqlEditor.onChange((content) => {
                     this.saveCurrentState();
                     this.updateOperationPicker();
                     this._markTabModified();
+                    if (this.isDocsRailOpen()) {
+                        this._debouncedRefreshExplorer(content);
+                    }
                 });
 
                 this.applySchemaToEditor();
-
-                this.variablesEditor = new JSONEditor(this.graphqlVariablesEditorContainer);
-                if (this._pendingVariables !== null) {
-                    this.variablesEditor.setContent(this._pendingVariables);
-                    this._pendingVariables = null;
-                }
-                this.variablesEditor.onChange((_content) => {
-                    this.saveCurrentState();
-                    this._markTabModified();
-                });
             } catch (error) {
                 void error;
             }
@@ -608,20 +577,20 @@ export class GraphQLBodyManager {
     }
 
     /**
-     * Set GraphQL variables content
+     * Set GraphQL variables content. Variables have no pane of their own — values
+     * are entered inline in the Explorer — so they are held as a plain JSON string
+     * that persistence and the request builder read via {@link getGraphQLVariables}.
      * @param {string|object} variables - Variables as JSON string or object
      */
     setGraphQLVariables(variables) {
         const content = typeof variables === 'object'
             ? JSON.stringify(variables, null, 2)
             : (variables || '');
-
-        if (this.variablesEditor) {
-            this.variablesEditor.setContent(content);
-        } else {
-            this._pendingVariables = content;
-            this.initializeGraphQLEditor();
+        if (content === this._variablesString) {
+            return;
         }
+        this._variablesString = content;
+        this._markTabModified();
     }
 
     /**
@@ -640,10 +609,7 @@ export class GraphQLBodyManager {
      * @returns {string}
      */
     getGraphQLVariables() {
-        if (this.variablesEditor) {
-            return this.variablesEditor.getContent();
-        }
-        return this._pendingVariables || '';
+        return this._variablesString || '';
     }
 
     /**
@@ -697,12 +663,9 @@ export class GraphQLBodyManager {
      */
     clear() {
         this._pendingQuery = null;
-        this._pendingVariables = null;
+        this._variablesString = '';
         if (this.graphqlEditor) {
             this.graphqlEditor.clear();
-        }
-        if (this.variablesEditor) {
-            this.variablesEditor.clear();
         }
     }
 
@@ -711,14 +674,11 @@ export class GraphQLBodyManager {
      */
     destroy() {
         this._pendingQuery = null;
-        this._pendingVariables = null;
+        this._variablesString = '';
         this._initializingGql = null;
         if (this.graphqlEditor) {
             this.graphqlEditor.clear();
             this.graphqlEditor = null;
-        }
-        if (this.variablesEditor) {
-            this.variablesEditor = null;
         }
     }
 }

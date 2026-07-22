@@ -224,69 +224,14 @@
   min-height: 80px;
 }
 
-.graphql-query-section .editor-shell,
-.graphql-drawer-pane .editor-shell {
+.graphql-query-section .editor-shell {
   flex: 1;
   min-height: 0;
   height: 100%;
 }
 
-.graphql-drawer {
-  flex-shrink: 0;
-}
-
-.graphql-drawer-tabs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 30px;
-}
-
-.graphql-drawer-tab {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-small);
-  font-size: var(--font-size-caption);
-  font-weight: 700;
-  color: inherit;
-  opacity: var(--dim-opacity);
-}
-
-.graphql-drawer-tab.active {
-  background-color: var(--shade-color);
-  opacity: 1;
-}
-
-.graphql-drawer-chevron {
-  transition: transform var(--transition-fast);
-}
-
-.graphql-drawer.collapsed .graphql-drawer-chevron {
-  transform: rotate(-90deg);
-}
-
-.graphql-drawer-panes {
-  min-height: 100px;
-}
-
-.graphql-drawer.collapsed .graphql-drawer-panes {
-  display: none;
-}
-
-.graphql-drawer-pane {
-  display: none;
-  flex: 1;
-  min-height: 0;
-}
-
-.graphql-drawer-pane.active {
-  display: flex;
-  flex-direction: column;
-}
-
 .graphql-docs-rail {
-  flex: 0 0 280px;
+  flex: 0 0 320px;
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-3);
@@ -294,4 +239,137 @@
   border-radius: var(--radius-medium);
   background-color: var(--view-bg-color);
   font-size: var(--font-size-small);
+}
+
+.graphql-explorer-search {
+  width: 100%;
+  margin-bottom: var(--space-2);
+}
+
+.graphql-explorer-empty {
+  opacity: var(--dim-opacity);
+}
+
+.graphql-explorer-notice {
+  margin-bottom: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-small);
+  border: 1px solid var(--warning-color);
+  color: var(--warning-color);
+  font-size: var(--font-size-caption);
+}
+
+.graphql-explorer-section {
+  margin-bottom: var(--space-3);
+}
+
+.graphql-explorer-section > h4 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: var(--dim-opacity);
+}
+
+.graphql-explorer-node {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  border-radius: var(--radius-small);
+}
+
+.graphql-explorer-node:hover {
+  background-color: var(--shade-color);
+}
+
+.graphql-explorer-toggle,
+.graphql-explorer-toggle-spacer {
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.graphql-explorer-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: var(--dim-opacity);
+  transform: rotate(-90deg);
+  transition: transform var(--transition-fast);
+}
+
+.graphql-explorer-item.expanded > .graphql-explorer-node .graphql-explorer-toggle {
+  transform: rotate(0deg);
+}
+
+.graphql-explorer-name {
+  font-weight: 600;
+}
+
+.graphql-explorer-type {
+  opacity: var(--dim-opacity);
+  font-size: var(--font-size-caption);
+  font-family: "Fira Code", "Courier New", monospace;
+}
+
+.graphql-explorer-arg-tag {
+  margin-left: auto;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-small);
+  background-color: var(--shade-color);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  opacity: var(--dim-opacity);
+}
+
+.graphql-explorer-children {
+  display: none;
+  padding-left: var(--space-4);
+}
+
+.graphql-explorer-item.expanded > .graphql-explorer-children {
+  display: block;
+}
+
+.graphql-explorer-args {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-left: var(--space-5);
+  margin: var(--space-1) 0;
+}
+
+.graphql-explorer-arg-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.graphql-explorer-arg-name {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+}
+
+.graphql-explorer-arg-type {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  opacity: var(--dim-opacity);
+}
+
+.graphql-explorer-arg-type.is-required::after {
+  content: "*";
+  color: var(--accent-color);
+  opacity: 1;
+}
+
+.graphql-explorer-arg-value {
+  flex: 1;
+  min-width: 0;
+}
+
+.graphql-explorer-arg-row input[type="checkbox"].graphql-explorer-arg-value {
+  flex: 0 0 auto;
 }

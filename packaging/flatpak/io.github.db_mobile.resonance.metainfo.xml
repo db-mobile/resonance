@@ -119,6 +119,16 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.1.3" date="2026-07-23">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Add click-build GraphQL query Explorer</li>
+          <li>Trim dependency tree and clean build output</li>
+          <li>Fix style misalignments</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.1.2" date="2026-07-20">
       <description>
         <p>Feature stabilization release</p>

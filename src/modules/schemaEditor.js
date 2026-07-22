@@ -8,6 +8,7 @@ import { EditorState } from '@codemirror/state';
 import { json } from '@codemirror/lang-json';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { createThemedHighlighting } from './editorTheme.js';
+import { debounce } from './utils/debounce.js';
 
 /**
  * SchemaEditor - CodeMirror editor for JSON Schema content
@@ -17,7 +18,11 @@ export class SchemaEditor {
         this.container = containerElement;
         this.view = null;
         this.changeCallback = options.onChange || null;
-        this._debounceTimer = null;
+        this._debouncedChange = debounce(() => {
+            if (this.changeCallback) {
+                this.changeCallback(this.getContent());
+            }
+        }, 500);
         this._themed = null;
         this.init();
     }
@@ -103,14 +108,7 @@ export class SchemaEditor {
      * @private
      */
     _handleChange() {
-        if (this._debounceTimer) {
-            clearTimeout(this._debounceTimer);
-        }
-        this._debounceTimer = setTimeout(() => {
-            if (this.changeCallback) {
-                this.changeCallback(this.getContent());
-            }
-        }, 500);
+        this._debouncedChange();
     }
 
     /**
@@ -223,9 +221,7 @@ export class SchemaEditor {
      * Destroy the editor instance
      */
     destroy() {
-        if (this._debounceTimer) {
-            clearTimeout(this._debounceTimer);
-        }
+        this._debouncedChange.cancel();
         this._themed?.dispose();
         this._themed = null;
         if (this.view) {

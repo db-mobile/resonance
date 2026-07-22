@@ -1,3 +1,5 @@
+import { debounce } from '../utils/debounce.js';
+
 export class UrlAutocomplete {
     constructor(urlInputElement, historyController) {
         this.urlInput = urlInputElement;
@@ -5,7 +7,7 @@ export class UrlAutocomplete {
         this.dropdown = null;
         this.suggestions = [];
         this.activeIndex = -1;
-        this._debounceTimer = null;
+        this._debouncedShow = debounce(() => this._showSuggestions(this.urlInput.value), 150);
     }
 
     init() {
@@ -38,10 +40,7 @@ export class UrlAutocomplete {
         });
 
         this.urlInput.addEventListener('input', () => {
-            clearTimeout(this._debounceTimer);
-            this._debounceTimer = setTimeout(async () => {
-                await this._showSuggestions(this.urlInput.value);
-            }, 150);
+            this._debouncedShow();
         });
 
         this.urlInput.addEventListener('keydown', (e) => {

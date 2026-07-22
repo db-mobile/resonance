@@ -5,29 +5,23 @@ import { toast } from './ui/Toast.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { saveAllRequestModifications } from './collectionManager.js';
+import { debounce } from './utils/debounce.js';
 
-let _saveDebounceTimer = null;
 const SAVE_DEBOUNCE_MS = 500;
 
 /**
  * Debounced, fire-and-forget save of request modifications.
  * Does not block the caller - saves happen asynchronously after a delay.
  * Multiple rapid calls will be coalesced into a single save.
- * 
+ *
  * @param {string} collectionId - Collection ID
  * @param {string} endpointId - Endpoint ID
  */
-function debouncedSaveRequestModifications(collectionId, endpointId) {
-    if (_saveDebounceTimer) {
-        clearTimeout(_saveDebounceTimer);
-    }
-    _saveDebounceTimer = setTimeout(() => {
-        _saveDebounceTimer = null;
-        saveAllRequestModifications(collectionId, endpointId).catch(() => {
-            toast.error('Failed to save changes');
-        });
-    }, SAVE_DEBOUNCE_MS);
-}
+const debouncedSaveRequestModifications = debounce((collectionId, endpointId) => {
+    saveAllRequestModifications(collectionId, endpointId).catch(() => {
+        toast.error('Failed to save changes');
+    });
+}, SAVE_DEBOUNCE_MS);
 import { VariableProcessor } from './variables/VariableProcessor.js';
 import { VariableRepository } from './storage/VariableRepository.js';
 import { EnvironmentRepository } from './storage/EnvironmentRepository.js';
@@ -1069,8 +1063,12 @@ export async function handleSendRequest() {
 
             if (app.schemaController) {
                 app.schemaController.setLastResponseBody(result.data);
-                const validationResult = app.schemaController.validateResponse(result.data);
-                displaySchemaValidationResult(validationResult, requestTabId);
+                if (isGraphQLMode()) {
+                    clearSchemaValidationBadge(requestTabId);
+                } else {
+                    const validationResult = app.schemaController.validateResponse(result.data);
+                    displaySchemaValidationResult(validationResult, requestTabId);
+                }
             }
 
             displayGraphQLErrorsBadge(result, requestTabId);

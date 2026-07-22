@@ -4,6 +4,7 @@
  */
 import { templateLoader } from '../templateLoader.js';
 import { DynamicVariablesReferenceDialog } from './DynamicVariablesReferenceDialog.js';
+import { ConfirmDialog } from './ConfirmDialog.js';
 
 export class EnvironmentManager {
     constructor(environmentService) {
@@ -355,7 +356,10 @@ export class EnvironmentManager {
 
         if (deleteBtn) {
             deleteBtn.addEventListener('click', async () => {
-                const confirmed = await this.showConfirmDialog(`Are you sure you want to delete the environment "${environment.name}"?`);
+                const confirmed = await new ConfirmDialog().show(
+                    `Are you sure you want to delete the environment "${environment.name}"?`,
+                    { title: 'Delete Environment', confirmText: 'Delete' }
+                );
                 if (confirmed) {
                     try {
                         await this.service.deleteEnvironment(environment.id);
@@ -673,61 +677,13 @@ export class EnvironmentManager {
     }
 
     /**
-     * Show confirm dialog (replaces confirm)
-     */
-    showConfirmDialog(message) {
-        return new Promise((resolve) => {
-            const overlay = document.createElement('div');
-            overlay.className = 'modal-overlay';
-
-            const dialog = document.createElement('div');
-            dialog.className = 'modal-dialog modal-dialog--sm';
-
-            templateLoader
-                .clone('./src/templates/environment/environmentManager.html', 'tpl-environment-manager-confirm-dialog')
-                .then((fragment) => {
-                    dialog.appendChild(fragment);
-
-                    const messageEl = dialog.querySelector('[data-role="message"]');
-                    if (messageEl) {messageEl.textContent = message;}
-
-                    overlay.appendChild(dialog);
-                    document.body.appendChild(overlay);
-
-                    const okBtn = dialog.querySelector('#confirm-dialog-ok');
-                    const cancelBtn = dialog.querySelector('#confirm-dialog-cancel');
-
-                    const cleanup = (value) => {
-                        document.body.removeChild(overlay);
-                        resolve(value);
-                    };
-
-                    okBtn.addEventListener('click', () => cleanup(true));
-                    cancelBtn.addEventListener('click', () => cleanup(false));
-
-                    overlay.addEventListener('click', (e) => {
-                        if (e.target === overlay) {cleanup(false);}
-                    });
-
-                    document.addEventListener('keydown', function escapeHandler(e) {
-                        if (e.key === 'Escape') {
-                            cleanup(false);
-                            document.removeEventListener('keydown', escapeHandler);
-                        }
-                    });
-                })
-                .catch((error) => {
-                    void error;
-                    resolve(false);
-                });
-        });
-    }
-
-    /**
      * Handle import environments
      */
     async handleImport() {
-        const merge = await this.showConfirmDialog('Merge with existing environments? (Cancel to replace all)');
+        const merge = await new ConfirmDialog().show(
+            'Merge with existing environments? (Cancel to replace all)',
+            { title: 'Import Environments', confirmText: 'Merge', cancelText: 'Replace All', dangerous: false }
+        );
 
         const input = document.createElement('input');
         input.type = 'file';

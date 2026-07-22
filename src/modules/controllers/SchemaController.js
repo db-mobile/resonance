@@ -4,6 +4,7 @@
  */
 
 import { createLazyEditorProxy } from '../editorLoader.js';
+import { debounce } from '../utils/debounce.js';
 import { SchemaValidator } from '../schema/SchemaValidator.js';
 
 /**
@@ -25,7 +26,7 @@ export class SchemaController {
         this.currentCollectionId = null;
         this.currentEndpointId = null;
         this.lastResponseBody = null;
-        this._saveDebounceTimer = null;
+        this._debouncedSave = debounce(() => this._saveSchema(), 1000);
         this._initialized = false;
     }
 
@@ -78,13 +79,7 @@ export class SchemaController {
 
         this._updateValidationStatus();
 
-        if (this._saveDebounceTimer) {
-            clearTimeout(this._saveDebounceTimer);
-        }
-
-        this._saveDebounceTimer = setTimeout(() => {
-            this._saveSchema();
-        }, 1000);
+        this._debouncedSave();
     }
 
     /**
@@ -292,9 +287,7 @@ export class SchemaController {
      * Destroys the controller and cleans up resources
      */
     destroy() {
-        if (this._saveDebounceTimer) {
-            clearTimeout(this._saveDebounceTimer);
-        }
+        this._debouncedSave.cancel();
         if (this.editor) {
             this.editor.destroy();
         }

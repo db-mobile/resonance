@@ -5,6 +5,9 @@ import path from 'path';
 // Check for production build flag
 const isProduction = process.argv.includes('--production') || process.env.NODE_ENV === 'production';
 
+// Wipe dist so stale hashed chunks and prior sourcemaps aren't packaged
+fs.rmSync('dist', { recursive: true, force: true });
+
 // Ensure dist directory exists
 if (!fs.existsSync('dist')) {
     fs.mkdirSync('dist', { recursive: true });

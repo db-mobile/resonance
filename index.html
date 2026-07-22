@@ -345,11 +345,8 @@
                                 <button id="graphql-format-btn" class="button flat small" title="Format Query">
                                     Format
                                 </button>
-                                <button id="graphql-docs-toggle" class="button flat small" title="Schema docs" aria-pressed="false">
-                                    Docs
-                                </button>
-                                <button id="graphql-run-btn" class="button suggested-action small" title="Run (send request)">
-                                    <span class="icon icon-12 icon-play"></span> Run
+                                <button id="graphql-docs-toggle" class="button flat small" title="Schema explorer (click-build query)" aria-pressed="false">
+                                    Explorer
                                 </button>
                             </div>
                         </div>
@@ -359,22 +356,10 @@
                                 <div class="graphql-query-section u-flex u-flex-col">
                                     <div id="graphql-query-editor" class="editor-shell editor-frame"></div>
                                 </div>
+                            </div>
 
-                                <div class="pane-resizer pane-resizer-row" id="graphql-resizer-handle" aria-hidden="true">
-                                    <div class="resizer-grip"><div class="resizer-line"></div></div>
-                                </div>
-
-                                <div class="graphql-variables-section graphql-drawer collapsed u-flex u-flex-col" id="graphql-drawer">
-                                    <div class="graphql-drawer-tabs u-flex u-items-center" id="graphql-drawer-tabs" role="tablist">
-                                        <button type="button" class="graphql-drawer-tab active" id="graphql-drawer-tab-variables" data-drawer="variables" role="tab" aria-selected="true">Variables</button>
-                                        <span class="graphql-drawer-chevron icon icon-12 icon-chevron-down" aria-hidden="true"></span>
-                                    </div>
-                                    <div class="graphql-drawer-panes u-flex u-flex-col">
-                                        <div class="graphql-drawer-pane active" data-drawer-pane="variables">
-                                            <div id="graphql-variables-editor" class="editor-shell editor-frame"></div>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div class="pane-resizer pane-resizer-col" id="graphql-explorer-resizer-handle" style="display: none;" aria-hidden="true">
+                                <div class="resizer-grip"><div class="resizer-line"></div></div>
                             </div>
 
                             <div class="graphql-docs-rail" id="graphql-docs-rail" style="display: none;"></div>

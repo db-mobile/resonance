@@ -4,6 +4,7 @@
  */
 
 import { HistoryRepository } from '../storage/HistoryRepository.js';
+import { statusCategory } from '../utils/statusCategory.js';
 
 /**
  * Service for managing request history business logic
@@ -207,12 +208,14 @@ export class HistoryService {
      * @returns {string} CSS color variable or hex color
      */
     getStatusColor(status) {
-        if (!status) {return 'var(--text-secondary)';}
-        if (status >= 200 && status < 300) {return 'var(--success-color, #10b981)';}
-        if (status >= 300 && status < 400) {return 'var(--warning-color, #f59e0b)';}
-        if (status >= 400 && status < 500) {return 'var(--error-color, #ef4444)';}
-        if (status >= 500) {return 'var(--error-color, #dc2626)';}
-        return 'var(--text-secondary)';
+        const colors = {
+            success: 'var(--success-color, #10b981)',
+            redirect: 'var(--warning-color, #f59e0b)',
+            'client-error': 'var(--error-color, #ef4444)',
+            'server-error': 'var(--error-color, #dc2626)',
+            info: 'var(--text-secondary)'
+        };
+        return colors[statusCategory(status)];
     }
 
     /**

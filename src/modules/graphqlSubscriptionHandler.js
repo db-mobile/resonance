@@ -92,11 +92,6 @@ async function refreshRunButton(tabId, active) {
     if ((await getActiveTabId()) !== tabId) {
         return;
     }
-    setButtonStop(
-        document.getElementById('graphql-run-btn'),
-        active,
-        '<span class="icon icon-12 icon-x"></span> Stop'
-    );
     setButtonStop(document.getElementById('send-request-btn'), active, 'Stop');
 }
 
