@@ -106,7 +106,7 @@ pub async fn import_openapi_file(
         .map_err(|e| format!("Failed to read file: {}", e))?;
 
     // Parse as YAML (also handles JSON)
-    let spec: Value = serde_yaml::from_str(&content)
+    let spec: Value = serde_yaml_ng::from_str(&content)
         .map_err(|e| format!("Failed to parse OpenAPI spec: {}", e))?;
 
     // Convert OpenAPI spec to Collection
@@ -256,7 +256,7 @@ pub async fn export_openapi(
     let (openapi_spec, skipped) = collection_to_openapi(&collection);
 
     let content = if format == "yaml" {
-        serde_yaml::to_string(&openapi_spec).map_err(|e| e.to_string())?
+        serde_yaml_ng::to_string(&openapi_spec).map_err(|e| e.to_string())?
     } else {
         serde_json::to_string_pretty(&openapi_spec).map_err(|e| e.to_string())?
     };

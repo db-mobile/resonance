@@ -54,6 +54,7 @@
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.38.6",
     "@lezer/highlight": "^1.2.3",
-    "cm6-graphql": "^0.2.1"
+    "cm6-graphql": "^0.2.1",
+    "graphql": "^17.0.2"
   }
 }

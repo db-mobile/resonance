@@ -1,4 +1,5 @@
 import { app } from './appContext.js';
+import { debounce } from './utils/debounce.js';
 
 export class Resizer {
     constructor() {
@@ -173,7 +174,9 @@ export class HorizontalResizer {
         this.startSidebarWidth = 0;
         this.minWidth = 200;
         this.maxWidth = 600;
-        this._saveTimer = null;
+        this._debouncedSave = debounce((width) => {
+            window.backendAPI.store.set('sidebarWidth', width).catch((error) => void error);
+        }, 300);
 
         this.init();
     }
@@ -203,10 +206,7 @@ export class HorizontalResizer {
     }
 
     _saveWidth(width) {
-        clearTimeout(this._saveTimer);
-        this._saveTimer = setTimeout(() => {
-            window.backendAPI.store.set('sidebarWidth', width).catch((error) => void error);
-        }, 300);
+        this._debouncedSave(width);
     }
 
     setupEventListeners() {

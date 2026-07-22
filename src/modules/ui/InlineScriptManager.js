@@ -4,6 +4,7 @@
  */
 
 import { createLazyEditorProxy } from '../editorLoader.js';
+import { debounce } from '../utils/debounce.js';
 
 /**
  * Manages inline script editing with auto-save functionality
@@ -22,7 +23,7 @@ export class InlineScriptManager {
         this.testScriptEditor = null;
         this.currentCollectionId = null;
         this.currentEndpointId = null;
-        this.saveTimeout = null;
+        this._scheduleSave = debounce(() => this.saveScripts(), 1000);
         this.initialized = false;
     }
 
@@ -97,21 +98,11 @@ export class InlineScriptManager {
      * @private
      */
     scheduleAutoSave() {
-        if (this.saveTimeout) {
-            clearTimeout(this.saveTimeout);
-        }
-
-        this.saveTimeout = setTimeout(() => {
-            this.saveScripts();
-        }, 1000);
+        this._scheduleSave();
     }
 
     async flushPendingSave() {
-        if (this.saveTimeout) {
-            clearTimeout(this.saveTimeout);
-            this.saveTimeout = null;
-            await this.saveScripts();
-        }
+        await this._scheduleSave.flush();
     }
 
     /**

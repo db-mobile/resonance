@@ -37,19 +37,19 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 prost-reflect = { version = "0.15", features = ["serde"] }
 bytes = "1"
 http = "1"
-base64 = "0.21"
+base64 = "0.22"
 hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
 rustls-pemfile = "2"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
-serde_yaml = "0.9"
+serde_yaml_ng = "0.10"
 
 # Mock server
 axum = "0.7"
-tower = { version = "0.4", features = ["util"] }
-tower-http = { version = "0.5", features = ["cors"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors"] }
 
 # TLS for connection timing measurement
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }

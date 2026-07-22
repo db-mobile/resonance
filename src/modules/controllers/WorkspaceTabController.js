@@ -14,7 +14,11 @@
  */
 import { app } from '../appContext.js';
 import { WorkspaceTabEndpointLoaderService } from '../services/WorkspaceTabEndpointLoaderService.js';
-import { handleGraphQLSubscriptionCancel, isSubscriptionActive } from '../graphqlSubscriptionHandler.js';
+import { handleGraphQLSubscriptionCancel, isSubscriptionActive, clearGraphQLSubscriptionState } from '../graphqlSubscriptionHandler.js';
+import { clearWebSocketState } from '../websocketHandler.js';
+import { clearSseState } from '../sseHandler.js';
+import { clearMqttState } from '../mqttHandler.js';
+import { clearStreamState } from '../grpcStreamHandler.js';
 
 /**
  * Default endpoint and query seeded into a freshly created GraphQL tab so users
@@ -332,13 +336,37 @@ export class WorkspaceTabController {
         if (this.runnerControllers.has(tabId)) {
             this._cleanupRunnerTab(tabId);
         }
-        if (window.backendAPI?.mqtt) {
-            window.backendAPI.mqtt.close(tabId);
-        }
-        if (window.backendAPI?.graphqlSubscription) {
-            window.backendAPI.graphqlSubscription.close(tabId);
-        }
+        this._teardownTabConnections(tabId);
         this.responseContainerManager.removeContainer(tabId);
+    }
+
+    /**
+     * Best-effort teardown of any streaming connection a closed tab may hold.
+     *
+     * Each protocol clearer closes its backend connection (a no-op for a tab
+     * that never used that protocol) and drops the tab's frontend session
+     * state, preventing both orphaned background streams and session-map growth.
+     * Every protocol is cleared because a tab may still hold a connection opened
+     * under a previously selected protocol.
+     *
+     * @private
+     * @param {string} tabId - The id of the closed tab.
+     * @returns {void}
+     */
+    _teardownTabConnections(tabId) {
+        if (!tabId) {
+            return;
+        }
+        const clearers = [
+            clearWebSocketState,
+            clearSseState,
+            clearMqttState,
+            clearStreamState,
+            clearGraphQLSubscriptionState
+        ];
+        for (const clear of clearers) {
+            Promise.resolve(clear(tabId)).catch(() => {});
+        }
     }
 
     /**

@@ -6,6 +6,7 @@
 import { app } from './appContext.js';
 import { loadEditor } from './editorLoader.js';
 import { toast } from './ui/Toast.js';
+import { debounce } from './utils/debounce.js';
 import { fetchGraphQLIntrospection, buildSchemaFromIntrospection } from './apiHandler.js';
 
 const SCHEMA_STORE_KEY = 'graphqlSchemaCache';
@@ -26,7 +27,7 @@ export class GraphQLBodyManager {
         this.currentSchema = null;
         this.isFetchingSchema = false;
         this._autoFetchedUrls = new Set();
-        this._urlDebounce = null;
+        this._debouncedApplySchema = debounce(() => this.autoApplySchemaForUrl(), 500);
 
         this.selectedOperationName = null;
 
@@ -117,8 +118,7 @@ export class GraphQLBodyManager {
             if (!this.isGraphQLMode()) {
                 return;
             }
-            clearTimeout(this._urlDebounce);
-            this._urlDebounce = setTimeout(() => this.autoApplySchemaForUrl(), 500);
+            this._debouncedApplySchema();
         });
     }
 

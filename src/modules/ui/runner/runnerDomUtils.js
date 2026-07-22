@@ -3,6 +3,8 @@
  * @module ui/runner/runnerDomUtils
  */
 
+import { statusCategory } from '../../utils/statusCategory.js';
+
 export { escapeHtml } from '../../htmlUtils.js';
 
 /**
@@ -12,11 +14,8 @@ export { escapeHtml } from '../../htmlUtils.js';
  * @returns {string} CSS class suffix
  */
 export function getStatusCodeClass(statusCode) {
-    if (statusCode >= 200 && statusCode < 300) {return 'success';}
-    if (statusCode >= 300 && statusCode < 400) {return 'redirect';}
-    if (statusCode >= 400 && statusCode < 500) {return 'client-error';}
-    if (statusCode >= 500) {return 'server-error';}
-    return 'unknown';
+    const category = statusCategory(statusCode);
+    return category === 'info' ? 'unknown' : category;
 }
 
 const STATUS_TEXTS = {

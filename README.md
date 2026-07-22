@@ -148,7 +148,7 @@ User documentation lives on the **[Resonance website](https://db-mobile.github.i
 ## Roadmap
 
 - [ ] Response comparison and diff view
-- [ ] Plugin system for extensions
+- [ ] Git integration for collections (versioning & sync)
 - [ ] Team collaboration features
 
 <details>

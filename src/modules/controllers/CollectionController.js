@@ -4,6 +4,7 @@
  */
 
 import { getCurrentEndpoint, setCurrentEndpoint } from '../state/currentEndpoint.js';
+import { debounce } from '../utils/debounce.js';
 import { app } from '../appContext.js';
 import { CollectionRepository } from '../storage/CollectionRepository.js';
 import { VariableRepository } from '../storage/VariableRepository.js';
@@ -952,18 +953,15 @@ export class CollectionController {
                 }
             });
 
-            let saveTimeout;
-            bodyInput.addEventListener('input', () => {
-                clearTimeout(saveTimeout);
-                saveTimeout = setTimeout(async () => {
-                    if (getCurrentEndpoint()) {
-                        await this.saveRequestBodyModification(
-                            getCurrentEndpoint().collectionId, 
-                            getCurrentEndpoint().endpointId
-                        );
-                    }
-                }, 2000);
-            });
+            const debouncedSaveBody = debounce(() => {
+                if (getCurrentEndpoint()) {
+                    this.saveRequestBodyModification(
+                        getCurrentEndpoint().collectionId,
+                        getCurrentEndpoint().endpointId
+                    );
+                }
+            }, 2000);
+            bodyInput.addEventListener('input', () => debouncedSaveBody());
         }
     }
 
