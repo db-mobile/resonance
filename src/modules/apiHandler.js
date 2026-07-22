@@ -1063,8 +1063,12 @@ export async function handleSendRequest() {
 
             if (app.schemaController) {
                 app.schemaController.setLastResponseBody(result.data);
-                const validationResult = app.schemaController.validateResponse(result.data);
-                displaySchemaValidationResult(validationResult, requestTabId);
+                if (isGraphQLMode()) {
+                    clearSchemaValidationBadge(requestTabId);
+                } else {
+                    const validationResult = app.schemaController.validateResponse(result.data);
+                    displaySchemaValidationResult(validationResult, requestTabId);
+                }
             }
 
             displayGraphQLErrorsBadge(result, requestTabId);

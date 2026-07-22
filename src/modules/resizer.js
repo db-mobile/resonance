@@ -334,10 +334,96 @@ export class GraphQLEditorResizer {
     }
 }
 
+/**
+ * Resizes the GraphQL explorer rail. The divider sits to the left of the rail
+ * (which is the right-hand column), so dragging left widens it. Width persists
+ * across sessions via the backend store.
+ */
+export class GraphQLExplorerResizer {
+    constructor() {
+        this.isDragging = false;
+        this.startX = 0;
+        this.startWidth = 0;
+        this.minWidth = 240;
+        this.maxWidth = 600;
+        this._debouncedSave = debounce((width) => {
+            window.backendAPI.store.set('graphqlExplorerWidth', width).catch((error) => void error);
+        }, 300);
+
+        this.init();
+    }
+
+    init() {
+        this.handle = document.getElementById('graphql-explorer-resizer-handle');
+        this.rail = document.getElementById('graphql-docs-rail');
+
+        if (!this.handle || !this.rail) {
+            return;
+        }
+
+        this.handle.addEventListener('mousedown', this.startDrag.bind(this));
+        document.addEventListener('mousemove', this.drag.bind(this));
+        document.addEventListener('mouseup', this.endDrag.bind(this));
+        this.handle.addEventListener('selectstart', (e) => e.preventDefault());
+        this._restoreWidth();
+    }
+
+    async _restoreWidth() {
+        try {
+            const saved = await window.backendAPI.store.get('graphqlExplorerWidth');
+            if (saved && saved >= this.minWidth && saved <= this.maxWidth) {
+                this.rail.style.flex = `0 0 ${saved}px`;
+            }
+        } catch (error) {
+            void error;
+        }
+    }
+
+    startDrag(e) {
+        this.isDragging = true;
+        this.startX = e.clientX;
+        this.startWidth = this.rail.offsetWidth;
+
+        this.handle.classList.add('dragging');
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'col-resize';
+
+        e.preventDefault();
+    }
+
+    drag(e) {
+        if (!this.isDragging) {return;}
+
+        const deltaX = e.clientX - this.startX;
+        const newWidth = this.startWidth - deltaX;
+
+        if (newWidth < this.minWidth || newWidth > this.maxWidth) {
+            return;
+        }
+
+        this.rail.style.flex = `0 0 ${newWidth}px`;
+
+        e.preventDefault();
+    }
+
+    endDrag() {
+        if (!this.isDragging) {return;}
+
+        this.isDragging = false;
+        this.handle.classList.remove('dragging');
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+
+        this._debouncedSave(this.rail.offsetWidth);
+        app.graphqlBodyManager?.graphqlEditor?.view?.requestMeasure?.();
+    }
+}
+
 export function initResizer() {
     const verticalResizer = new Resizer();
     const horizontalResizer = new HorizontalResizer();
     const graphqlEditorResizer = new GraphQLEditorResizer();
+    const graphqlExplorerResizer = new GraphQLExplorerResizer();
     window.__verticalResizer = verticalResizer;
-    return { verticalResizer, horizontalResizer, graphqlEditorResizer };
+    return { verticalResizer, horizontalResizer, graphqlEditorResizer, graphqlExplorerResizer };
 }
