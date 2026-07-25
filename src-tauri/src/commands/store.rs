@@ -1,8 +1,20 @@
 use serde_json::Value;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
 
+use super::fs_secure::restrict_file;
+
 const STORE_FILE: &str = "resonance-store.json";
+
+/// Best-effort restriction of the on-disk store file to owner-only access.
+/// The store plugin writes it with the process umask (typically world-readable),
+/// so it holds request history, the cookie jar, and any plaintext-fallback
+/// secrets — tighten it after every save.
+fn restrict_store_file(app: &AppHandle) {
+    if let Ok(dir) = app.path().app_data_dir() {
+        restrict_file(&dir.join(STORE_FILE));
+    }
+}
 
 fn get_default_for_key(key: &str) -> Value {
     match key {
@@ -64,6 +76,7 @@ pub async fn store_set(app: AppHandle, key: String, value: Value) -> Result<(), 
 
     store.set(key, value);
     store.save().map_err(|e| e.to_string())?;
+    restrict_store_file(&app);
 
     Ok(())
 }

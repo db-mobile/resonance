@@ -9,6 +9,8 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_store::StoreExt;
 use tokio::sync::oneshot;
 
+use super::fs_secure::{restrict_dir, restrict_file};
+
 const STORE_FILE: &str = "resonance-store.json";
 const COLLECTIONS_DIR: &str = "collections";
 const COLLECTION_INDEX_KEY: &str = "collectionIndex";
@@ -87,6 +89,7 @@ fn ensure_default_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
     if !dir.exists() {
         fs::create_dir_all(&dir).map_err(|e| format!("Failed to create collections dir: {}", e))?;
     }
+    restrict_dir(&dir);
     Ok(dir)
 }
 
@@ -157,6 +160,7 @@ fn write_json_file<T: Serialize>(path: &PathBuf, data: &T) -> Result<(), String>
     let json = serde_json::to_string_pretty(data)
         .map_err(|e| format!("Failed to serialize JSON: {}", e))?;
     fs::write(path, json).map_err(|e| format!("Failed to write file: {}", e))?;
+    restrict_file(path);
     Ok(())
 }
 
@@ -482,6 +486,7 @@ pub(crate) fn persist_collection(
         fs::create_dir_all(&target_dir)
             .map_err(|e| format!("Failed to create collection dir: {}", e))?;
     }
+    restrict_dir(&target_dir);
 
     let mut persisted = collection.clone();
     persisted.storage_path = Some(target_dir.to_string_lossy().to_string());
@@ -638,6 +643,7 @@ pub async fn collection_save_endpoint_data(
         fs::create_dir_all(&requests_dir)
             .map_err(|e| format!("Failed to create requests dir: {}", e))?;
     }
+    restrict_dir(&requests_dir);
 
     let endpoint_name = find_endpoint_name_in_collection(&collection, &endpoint_id)
         .unwrap_or_else(|| endpoint_id.clone());
@@ -836,6 +842,7 @@ fn migrate_endpoint_data(
     if !endpoint_ids.is_empty() && !requests_dir.exists() {
         fs::create_dir_all(&requests_dir)
             .map_err(|e| format!("Failed to create requests dir: {}", e))?;
+        restrict_dir(&requests_dir);
     }
 
     for endpoint_id in endpoint_ids {

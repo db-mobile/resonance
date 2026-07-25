@@ -75,6 +75,15 @@ fn main() {
         .manage(MqttState::default())
         .manage(PendingUpdate::default())
         .manage(OAuth2State::default())
+        .setup(|app| {
+            use tauri::Manager;
+            if let Ok(dir) = app.path().app_data_dir() {
+                let _ = std::fs::create_dir_all(&dir);
+                commands::fs_secure::restrict_dir(&dir);
+                commands::fs_secure::restrict_file(&dir.join("resonance-store.json"));
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // App
             app_get_version,
