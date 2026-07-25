@@ -4,6 +4,7 @@
 
 use super::{Collection, VariableEntry};
 use crate::commands::collections as storage_collections;
+use crate::commands::fs_secure::{restrict_dir, restrict_file};
 use serde::Serialize;
 use std::fs;
 use std::path::PathBuf;
@@ -66,6 +67,7 @@ fn ensure_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
     if !dir.exists() {
         fs::create_dir_all(&dir).map_err(|e| format!("Failed to create collections dir: {}", e))?;
     }
+    restrict_dir(&dir);
     Ok(dir)
 }
 
@@ -74,6 +76,7 @@ fn write_json_file<T: Serialize>(path: &PathBuf, data: &T) -> Result<(), String>
     let json = serde_json::to_string_pretty(data)
         .map_err(|e| format!("Failed to serialize JSON: {}", e))?;
     fs::write(path, json).map_err(|e| format!("Failed to write file: {}", e))?;
+    restrict_file(path);
     Ok(())
 }
 
@@ -165,6 +168,7 @@ fn save_endpoint_data_files(
         if !requests_dir.exists() {
             fs::create_dir_all(&requests_dir)
                 .map_err(|e| format!("Failed to create requests dir: {}", e))?;
+            restrict_dir(&requests_dir);
         }
 
         let data = storage_collections::EndpointData {
