@@ -298,4 +298,167 @@ describe('RequestBuilderService', () => {
             expect(url).toBe('https://api.example.com/users');
         });
     });
+
+    describe('stripCrossOriginAuth', () => {
+        const bearerAuthData = () => ({
+            headers: { Authorization: 'Bearer secret-token' },
+            queryParams: {}
+        });
+
+        it('returns false and keeps auth when the origin is unchanged', () => {
+            const requestConfig = {
+                url: 'https://api.example.com/v2/users',
+                headers: { Authorization: 'Bearer secret-token' },
+                auth: { username: 'u', password: 'p' },
+                awsAuth: { accessKeyId: 'AKIA' }
+            };
+
+            const stripped = service.stripCrossOriginAuth({
+                requestConfig,
+                originalUrl: 'https://api.example.com/users',
+                authData: bearerAuthData()
+            });
+
+            expect(stripped).toBe(false);
+            expect(requestConfig.headers.Authorization).toBe('Bearer secret-token');
+            expect(requestConfig.auth).toBeDefined();
+            expect(requestConfig.awsAuth).toBeDefined();
+        });
+
+        it('strips the app-injected auth header when the host changes', () => {
+            const requestConfig = {
+                url: 'https://attacker.example/collect',
+                headers: { Authorization: 'Bearer secret-token', Accept: 'application/json' }
+            };
+
+            const stripped = service.stripCrossOriginAuth({
+                requestConfig,
+                originalUrl: 'https://api.example.com/users',
+                authData: bearerAuthData()
+            });
+
+            expect(stripped).toBe(true);
+            expect(requestConfig.headers.Authorization).toBeUndefined();
+            expect(requestConfig.headers.Accept).toBe('application/json');
+        });
+
+        it('strips digest and AWS credentials when the host changes', () => {
+            const requestConfig = {
+                url: 'https://attacker.example/collect',
+                headers: {},
+                auth: { username: 'u', password: 'p' },
+                awsAuth: { accessKeyId: 'AKIA', secretAccessKey: 'x' }
+            };
+
+            const stripped = service.stripCrossOriginAuth({
+                requestConfig,
+                originalUrl: 'https://api.example.com/users',
+                authData: { headers: {}, queryParams: {} }
+            });
+
+            expect(stripped).toBe(true);
+            expect(requestConfig.auth).toBeUndefined();
+            expect(requestConfig.awsAuth).toBeUndefined();
+        });
+
+        it('strips an app-injected query api-key when the host changes', () => {
+            const requestConfig = {
+                url: 'https://attacker.example/collect',
+                headers: {},
+                queryParams: { api_key: 'k', page: '1' }
+            };
+
+            const stripped = service.stripCrossOriginAuth({
+                requestConfig,
+                originalUrl: 'https://api.example.com/users',
+                authData: { headers: {}, queryParams: { api_key: 'k' } }
+            });
+
+            expect(stripped).toBe(true);
+            expect(requestConfig.queryParams.api_key).toBeUndefined();
+            expect(requestConfig.queryParams.page).toBe('1');
+        });
+
+        it('leaves a header the script overrode with a different value', () => {
+            const requestConfig = {
+                url: 'https://attacker.example/collect',
+                headers: { Authorization: 'Bearer script-chosen' }
+            };
+
+            const stripped = service.stripCrossOriginAuth({
+                requestConfig,
+                originalUrl: 'https://api.example.com/users',
+                authData: bearerAuthData()
+            });
+
+            expect(stripped).toBe(false);
+            expect(requestConfig.headers.Authorization).toBe('Bearer script-chosen');
+        });
+
+        it('treats a port change as a different origin', () => {
+            const requestConfig = {
+                url: 'https://api.example.com:8443/users',
+                headers: { Authorization: 'Bearer secret-token' }
+            };
+
+            const stripped = service.stripCrossOriginAuth({
+                requestConfig,
+                originalUrl: 'https://api.example.com/users',
+                authData: bearerAuthData()
+            });
+
+            expect(stripped).toBe(true);
+            expect(requestConfig.headers.Authorization).toBeUndefined();
+        });
+
+        it('treats a scheme downgrade to the default http port as a different origin', () => {
+            const requestConfig = {
+                url: 'http://api.example.com/users',
+                headers: { Authorization: 'Bearer secret-token' }
+            };
+
+            const stripped = service.stripCrossOriginAuth({
+                requestConfig,
+                originalUrl: 'https://api.example.com/users',
+                authData: bearerAuthData()
+            });
+
+            expect(stripped).toBe(true);
+            expect(requestConfig.headers.Authorization).toBeUndefined();
+        });
+
+        it('treats explicit default ports as the same origin', () => {
+            const requestConfig = {
+                url: 'https://api.example.com:443/v2/users',
+                headers: { Authorization: 'Bearer secret-token' }
+            };
+
+            const stripped = service.stripCrossOriginAuth({
+                requestConfig,
+                originalUrl: 'https://api.example.com/users',
+                authData: bearerAuthData()
+            });
+
+            expect(stripped).toBe(false);
+            expect(requestConfig.headers.Authorization).toBe('Bearer secret-token');
+        });
+
+        it('strips credentials when the post-script URL is unparseable', () => {
+            const requestConfig = {
+                url: 'not a url',
+                headers: { Authorization: 'Bearer secret-token' },
+                auth: { username: 'u', password: 'p' }
+            };
+
+            const stripped = service.stripCrossOriginAuth({
+                requestConfig,
+                originalUrl: 'https://api.example.com/users',
+                authData: bearerAuthData()
+            });
+
+            expect(stripped).toBe(true);
+            expect(requestConfig.headers.Authorization).toBeUndefined();
+            expect(requestConfig.auth).toBeUndefined();
+        });
+    });
 });

@@ -1017,6 +1017,14 @@ export async function handleSendRequest() {
                 processor,
                 mockRewrite
             });
+            const authStripped = builder.stripCrossOriginAuth({
+                requestConfig,
+                originalUrl: preScriptSnapshot.url,
+                authData
+            });
+            if (authStripped) {
+                toast.warning('Authentication was not sent: the pre-request script changed the request host.');
+            }
         }
 
         if (app.certificateController) {
