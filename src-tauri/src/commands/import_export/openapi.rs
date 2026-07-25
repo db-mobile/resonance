@@ -2,7 +2,20 @@
 
 use super::{Collection, Endpoint, Folder};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+/// Hard cap on `$ref` resolution depth. Cycle detection stops self-referential
+/// schemas; this is a safety net for pathologically deep (but acyclic) specs.
+const MAX_REF_DEPTH: usize = 64;
+
+/// Hard cap on example-generation recursion depth.
+const MAX_EXAMPLE_DEPTH: usize = 128;
+
+/// Stub emitted in place of a `$ref` that is cyclic, unresolvable, or past the
+/// depth cap, so no unresolved `$ref` ever survives into example generation.
+fn empty_schema_stub() -> Value {
+    Value::Object(serde_json::Map::new())
+}
 
 pub(crate) fn parse_openapi_spec(spec: Value) -> Result<Collection, String> {
     let info = spec.get("info").ok_or("Missing 'info' in OpenAPI spec")?;
@@ -229,26 +242,44 @@ fn extract_openapi_responses(
 
 /// Resolve $ref in OpenAPI schema recursively
 fn resolve_schema_ref(schema: &Value, spec: &Value) -> Value {
-    resolve_schema_ref_recursive(schema, spec, 0)
+    let mut active = HashSet::new();
+    resolve_schema_ref_recursive(schema, spec, 0, &mut active)
 }
 
-/// Recursively resolve all $ref in OpenAPI schema with depth limit to prevent infinite loops
-fn resolve_schema_ref_recursive(schema: &Value, spec: &Value, depth: usize) -> Value {
-    // Prevent infinite recursion
-    if depth > 20 {
-        return schema.clone();
+/// Recursively resolve all `$ref` in an OpenAPI schema.
+///
+/// `active` holds the `$ref` paths currently being resolved on this branch. A
+/// `$ref` already in that set is a cycle (e.g. a self-referential `Node`
+/// schema) and resolves to an empty-object stub instead of recursing forever;
+/// the entry is removed on the way back up so the same schema reused in a
+/// sibling (non-cyclic) position still resolves normally. Unresolvable refs and
+/// anything past `MAX_REF_DEPTH` also stub out, so the returned value never
+/// contains an unresolved `$ref`.
+fn resolve_schema_ref_recursive(
+    schema: &Value,
+    spec: &Value,
+    depth: usize,
+    active: &mut HashSet<String>,
+) -> Value {
+    if depth > MAX_REF_DEPTH {
+        return empty_schema_stub();
     }
 
     // Handle direct $ref
     if let Some(ref_path) = schema.get("$ref").and_then(|r| r.as_str()) {
         if ref_path.starts_with("#/") {
+            if active.contains(ref_path) {
+                return empty_schema_stub();
+            }
             let json_pointer = format!("/{}", ref_path.trim_start_matches("#/"));
             if let Some(resolved) = spec.pointer(&json_pointer) {
-                // Recursively resolve the resolved schema
-                return resolve_schema_ref_recursive(resolved, spec, depth + 1);
+                active.insert(ref_path.to_string());
+                let out = resolve_schema_ref_recursive(resolved, spec, depth + 1, active);
+                active.remove(ref_path);
+                return out;
             }
         }
-        return schema.clone();
+        return empty_schema_stub();
     }
 
     // Handle object with properties
@@ -262,7 +293,7 @@ fn resolve_schema_ref_recursive(schema: &Value, spec: &Value, depth: usize) -> V
                     for (prop_key, prop_value) in props {
                         new_props.insert(
                             prop_key.clone(),
-                            resolve_schema_ref_recursive(prop_value, spec, depth + 1),
+                            resolve_schema_ref_recursive(prop_value, spec, depth + 1, active),
                         );
                     }
                     new_obj.insert(key.clone(), Value::Object(new_props));
@@ -273,14 +304,14 @@ fn resolve_schema_ref_recursive(schema: &Value, spec: &Value, depth: usize) -> V
                 // Handle array items
                 new_obj.insert(
                     key.clone(),
-                    resolve_schema_ref_recursive(value, spec, depth + 1),
+                    resolve_schema_ref_recursive(value, spec, depth + 1, active),
                 );
             } else if key == "allOf" || key == "oneOf" || key == "anyOf" {
                 // Handle composition keywords
                 if let Some(arr) = value.as_array() {
                     let resolved_arr: Vec<Value> = arr
                         .iter()
-                        .map(|item| resolve_schema_ref_recursive(item, spec, depth + 1))
+                        .map(|item| resolve_schema_ref_recursive(item, spec, depth + 1, active))
                         .collect();
                     new_obj.insert(key.clone(), Value::Array(resolved_arr));
                 } else {
@@ -299,10 +330,21 @@ fn resolve_schema_ref_recursive(schema: &Value, spec: &Value, depth: usize) -> V
 
 /// Generate example JSON from OpenAPI schema
 fn generate_example_from_schema(schema: &Value, spec: &Value) -> Value {
+    generate_example_with_depth(schema, spec, 0)
+}
+
+/// Depth-guarded backing for [`generate_example_from_schema`]. Bounds recursion
+/// so a deep (but finite) resolved schema cannot overflow the stack; refs are
+/// already cycle-safe by the time they reach here.
+fn generate_example_with_depth(schema: &Value, spec: &Value, depth: usize) -> Value {
+    if depth > MAX_EXAMPLE_DEPTH {
+        return Value::Null;
+    }
+
     // Handle $ref
     if schema.get("$ref").is_some() {
         let resolved = resolve_schema_ref(schema, spec);
-        return generate_example_from_schema(&resolved, spec);
+        return generate_example_with_depth(&resolved, spec, depth + 1);
     }
 
     let schema_type = schema
@@ -319,7 +361,10 @@ fn generate_example_from_schema(schema: &Value, spec: &Value) -> Value {
                     if let Some(example) = prop_schema.get("example") {
                         obj.insert(key.clone(), example.clone());
                     } else {
-                        obj.insert(key.clone(), generate_example_from_schema(prop_schema, spec));
+                        obj.insert(
+                            key.clone(),
+                            generate_example_with_depth(prop_schema, spec, depth + 1),
+                        );
                     }
                 }
             }
@@ -327,7 +372,7 @@ fn generate_example_from_schema(schema: &Value, spec: &Value) -> Value {
         }
         "array" => {
             if let Some(items) = schema.get("items") {
-                Value::Array(vec![generate_example_from_schema(items, spec)])
+                Value::Array(vec![generate_example_with_depth(items, spec, depth + 1)])
             } else {
                 Value::Array(vec![])
             }
@@ -546,5 +591,162 @@ fn extract_openapi_security(security: Option<&Value>, spec: &Value) -> Option<Va
             }))
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn self_referential_spec() -> Value {
+        json!({
+            "components": {
+                "schemas": {
+                    "Node": {
+                        "type": "object",
+                        "properties": {
+                            "value": { "type": "string" },
+                            "child": { "$ref": "#/components/schemas/Node" }
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    #[test]
+    fn resolve_self_referential_ref_terminates_with_stub() {
+        let spec = self_referential_spec();
+        let resolved = resolve_schema_ref(&json!({ "$ref": "#/components/schemas/Node" }), &spec);
+
+        let child = resolved.pointer("/properties/child").unwrap();
+        assert_eq!(child, &json!({}));
+        assert!(child.get("$ref").is_none());
+        assert_eq!(
+            resolved.pointer("/properties/value/type").unwrap(),
+            &json!("string")
+        );
+    }
+
+    #[test]
+    fn generate_example_for_self_referential_schema_terminates() {
+        let spec = self_referential_spec();
+        let resolved = resolve_schema_ref(&json!({ "$ref": "#/components/schemas/Node" }), &spec);
+        let example = generate_example_from_schema(&resolved, &spec);
+
+        assert_eq!(example, json!({ "value": "string", "child": {} }));
+    }
+
+    #[test]
+    fn extract_request_body_with_recursive_schema_does_not_crash() {
+        let spec = self_referential_spec();
+        let request_body = json!({
+            "content": {
+                "application/json": {
+                    "schema": { "$ref": "#/components/schemas/Node" }
+                }
+            }
+        });
+
+        let result = extract_openapi_request_body(Some(&request_body), &spec);
+        assert!(result.is_some());
+        let example_str = result
+            .unwrap()
+            .get("example")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert!(serde_json::from_str::<Value>(&example_str).is_ok());
+    }
+
+    #[test]
+    fn many_recursive_properties_do_not_explode() {
+        let spec = json!({
+            "components": {
+                "schemas": {
+                    "Node": {
+                        "type": "object",
+                        "properties": {
+                            "a": { "$ref": "#/components/schemas/Node" },
+                            "b": { "$ref": "#/components/schemas/Node" },
+                            "c": { "$ref": "#/components/schemas/Node" },
+                            "d": { "$ref": "#/components/schemas/Node" },
+                            "e": { "$ref": "#/components/schemas/Node" }
+                        }
+                    }
+                }
+            }
+        });
+
+        let resolved = resolve_schema_ref(&json!({ "$ref": "#/components/schemas/Node" }), &spec);
+        let props = resolved
+            .pointer("/properties")
+            .unwrap()
+            .as_object()
+            .unwrap();
+        assert_eq!(props.len(), 5);
+        for key in ["a", "b", "c", "d", "e"] {
+            assert_eq!(props.get(key).unwrap(), &json!({}));
+        }
+    }
+
+    #[test]
+    fn non_cyclic_reuse_of_a_schema_is_still_resolved() {
+        let spec = json!({
+            "components": {
+                "schemas": {
+                    "Address": {
+                        "type": "object",
+                        "properties": { "street": { "type": "string" } }
+                    },
+                    "Person": {
+                        "type": "object",
+                        "properties": {
+                            "home": { "$ref": "#/components/schemas/Address" },
+                            "work": { "$ref": "#/components/schemas/Address" }
+                        }
+                    }
+                }
+            }
+        });
+
+        let resolved = resolve_schema_ref(&json!({ "$ref": "#/components/schemas/Person" }), &spec);
+        for slot in ["home", "work"] {
+            let street_type = resolved
+                .pointer(&format!("/properties/{}/properties/street/type", slot))
+                .unwrap();
+            assert_eq!(street_type, &json!("string"));
+        }
+    }
+
+    #[test]
+    fn unresolvable_ref_becomes_empty_stub() {
+        let spec = json!({ "components": { "schemas": {} } });
+        let resolved =
+            resolve_schema_ref(&json!({ "$ref": "#/components/schemas/Missing" }), &spec);
+
+        assert_eq!(resolved, json!({}));
+        assert!(resolved.get("$ref").is_none());
+    }
+
+    #[test]
+    fn plain_schema_still_generates_expected_example() {
+        let spec = json!({});
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" },
+                "age": { "type": "integer" },
+                "tags": { "type": "array", "items": { "type": "string" } }
+            }
+        });
+
+        let example = generate_example_from_schema(&schema, &spec);
+        assert_eq!(
+            example,
+            json!({ "name": "string", "age": 0, "tags": ["string"] })
+        );
     }
 }
