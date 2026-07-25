@@ -203,6 +203,87 @@ export class RequestBuilderService {
     }
 
     /**
+     * Removes app-injected credentials when a pre-request script moved the
+     * request to a different origin than the one it was built for, so a script
+     * cannot redirect a bearer/Basic/API-key header, digest response, or AWS
+     * signature to an attacker-controlled host. Credentials the script set
+     * itself (values that no longer match `authData`) are left untouched.
+     *
+     * @param {Object} opts
+     * @param {Object} opts.requestConfig - Post-script config (mutated in place)
+     * @param {string} opts.originalUrl   - Request URL before the script ran
+     * @param {Object} opts.authData      - Result of authManager.generateAuthData()
+     * @returns {boolean} True when any credential was stripped
+     */
+    stripCrossOriginAuth({ requestConfig, originalUrl, authData }) {
+        if (this._sameOrigin(originalUrl, requestConfig.url)) {
+            return false;
+        }
+
+        let stripped = false;
+        const authHeaders = authData?.headers || {};
+        if (requestConfig.headers) {
+            for (const key of Object.keys(authHeaders)) {
+                if (requestConfig.headers[key] === authHeaders[key]) {
+                    delete requestConfig.headers[key];
+                    stripped = true;
+                }
+            }
+        }
+
+        const authQuery = authData?.queryParams || {};
+        if (requestConfig.queryParams) {
+            for (const key of Object.keys(authQuery)) {
+                if (requestConfig.queryParams[key] === authQuery[key]) {
+                    delete requestConfig.queryParams[key];
+                    stripped = true;
+                }
+            }
+        }
+
+        if (requestConfig.auth) {
+            delete requestConfig.auth;
+            stripped = true;
+        }
+        if (requestConfig.awsAuth) {
+            delete requestConfig.awsAuth;
+            stripped = true;
+        }
+
+        return stripped;
+    }
+
+    /**
+     * Compares two URLs by web origin (protocol + hostname + effective port).
+     * Unparseable input is treated as a different origin so callers fail safe.
+     *
+     * @private
+     * @param {string} a - First URL
+     * @param {string} b - Second URL
+     * @returns {boolean} True when both URLs share the same origin
+     */
+    _sameOrigin(a, b) {
+        try {
+            return this._originKey(a) === this._originKey(b);
+        } catch (e) {
+            void e;
+            return false;
+        }
+    }
+
+    /**
+     * @private
+     * @param {string} url - URL to derive an origin key from
+     * @returns {string} `protocol//hostname:port` with the scheme default port applied
+     */
+    _originKey(url) {
+        const parsed = new URL(url);
+        const defaultPort = parsed.protocol === 'https:' ? '443' : parsed.protocol === 'http:' ? '80' : '';
+        const port = parsed.port || defaultPort;
+        return `${parsed.protocol}//${parsed.hostname}:${port}`;
+    }
+
+    /**
      * Builds a query string from a key-value map, preserving already-encoded values.
      *
      * @param {Object} queryParams - Processed query parameter key-value pairs
