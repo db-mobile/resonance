@@ -782,6 +782,11 @@ export async function handleSendRequest() {
 
     const authData = await generateEffectiveAuthData();
 
+    const historySensitive = {
+        headerNames: Object.keys(authData.headers || {}),
+        queryNames: Object.keys(authData.queryParams || {})
+    };
+
     const builder = getRequestBuilderService();
     builder.mergeAuthData(headers, queryParams, authData);
 
@@ -1109,7 +1114,7 @@ export async function handleSendRequest() {
 
             if (app.historyController) {
                 const _activeEnvName = await app.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
-                app.historyController.addHistoryEntry(requestConfig, result, getCurrentEndpoint(), _activeEnvName).catch(() => { });
+                app.historyController.addHistoryEntry(requestConfig, result, getCurrentEndpoint(), _activeEnvName, historySensitive).catch(() => { });
             }
 
             if (getCurrentEndpoint() && app.scriptController) {
@@ -1181,7 +1186,7 @@ export async function handleSendRequest() {
 
         if (app.historyController) {
             const _activeEnvName = await app.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
-            app.historyController.addHistoryEntry(requestConfig, error, getCurrentEndpoint(), _activeEnvName).catch(() => { });
+            app.historyController.addHistoryEntry(requestConfig, error, getCurrentEndpoint(), _activeEnvName, historySensitive).catch(() => { });
         }
 
         if (getCurrentEndpoint() && app.scriptController) {
