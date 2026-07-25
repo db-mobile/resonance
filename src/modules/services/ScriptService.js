@@ -4,6 +4,20 @@
  */
 
 /**
+ * Request fields a pre-request script may mutate: the exact set seeded into the
+ * script's `request` object and the only keys copied back from the result.
+ * @type {ReadonlyArray<string>}
+ */
+export const SCRIPT_MUTABLE_REQUEST_FIELDS = Object.freeze([
+    'url',
+    'method',
+    'headers',
+    'body',
+    'queryParams',
+    'pathParams'
+]);
+
+/**
  * Service for managing script operations and execution
  * Coordinates between storage, execution, and environment management
  *
@@ -176,9 +190,10 @@ export class ScriptService {
     }
 
     /**
-     * Merge script mutations over the full request config so config-only
-     * fields (auth, client certificates, timeouts, body type, ...) that are
-     * not exposed to scripts survive the pre-request script round-trip.
+     * Merge script mutations over the full request config, copying only the
+     * allowlisted {@link SCRIPT_MUTABLE_REQUEST_FIELDS}. Config-only fields
+     * (auth, client cert, timeouts, body type, TLS verification) are never
+     * taken from the script result, so a script cannot inject them.
      * Non-object shapes are discarded in favor of the original config.
      * @private
      * @param {Object} requestConfig - Original request configuration
@@ -189,7 +204,13 @@ export class ScriptService {
         if (!modifiedRequest || typeof modifiedRequest !== 'object' || Array.isArray(modifiedRequest)) {
             return requestConfig;
         }
-        return { ...requestConfig, ...modifiedRequest };
+        const merged = { ...requestConfig };
+        for (const field of SCRIPT_MUTABLE_REQUEST_FIELDS) {
+            if (Object.prototype.hasOwnProperty.call(modifiedRequest, field)) {
+                merged[field] = modifiedRequest[field];
+            }
+        }
+        return merged;
     }
 
     /**
