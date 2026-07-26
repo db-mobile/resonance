@@ -68,7 +68,67 @@ function escapeGoString(str) {
     if (!str) {
         return '';
     }
-    return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+    return str
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+}
+
+/**
+ * Escapes a string for use inside a single-quoted JavaScript string literal.
+ *
+ * @param {string} str - The raw value.
+ * @returns {string} The escaped value.
+ */
+function escapeJsSingleQuoted(str) {
+    if (!str) {
+        return '';
+    }
+    return str
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
+}
+
+/**
+ * Escapes a string for use inside a double-quoted PHP string literal, including
+ * the `$` variable and `{$...}` interpolation sigils.
+ *
+ * @param {string} str - The raw value.
+ * @returns {string} The escaped value.
+ */
+function escapePhpDoubleQuoted(str) {
+    if (!str) {
+        return '';
+    }
+    return str
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\$/g, '\\$')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
+}
+
+/**
+ * Escapes a string for use inside a double-quoted Ruby string literal,
+ * neutralizing `#{...}`, `#@...`, and `#$...` interpolation.
+ *
+ * @param {string} str - The raw value.
+ * @returns {string} The escaped value.
+ */
+function escapeRubyDoubleQuoted(str) {
+    if (!str) {
+        return '';
+    }
+    return str
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/#([{@$])/g, '\\#$1')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
 }
 
 /**
@@ -303,7 +363,7 @@ function generatePythonRequests(config) {
         lines.push('');
         requestParts.push('data=data');
     } else if (hasBody(config)) {
-        lines.push(`data = """${stringifyBody(body, true)}"""`);
+        lines.push(`data = "${escapePythonString(stringifyBody(body))}"`);
         lines.push('');
         requestParts.push('data=data');
     }
@@ -332,7 +392,7 @@ function generateJavaScriptFetch(config) {
 
     if (hdrs.length > 0) {
         lines.push('  headers: {');
-        lines.push(hdrs.map(([key, value]) => `    '${escapeJavaScriptString(key)}': '${escapeJavaScriptString(value)}'`).join(',\n'));
+        lines.push(hdrs.map(([key, value]) => `    '${escapeJsSingleQuoted(key)}': '${escapeJsSingleQuoted(value)}'`).join(',\n'));
         lines.push('  },');
     }
 
@@ -371,7 +431,7 @@ function generateJavaScriptAxios(config) {
 
     if (hdrs.length > 0) {
         lines.push('  headers: {');
-        lines.push(hdrs.map(([key, value]) => `    '${escapeJavaScriptString(key)}': '${escapeJavaScriptString(value)}'`).join(',\n'));
+        lines.push(hdrs.map(([key, value]) => `    '${escapeJsSingleQuoted(key)}': '${escapeJsSingleQuoted(value)}'`).join(',\n'));
         lines.push('  },');
     }
 
@@ -418,7 +478,7 @@ function generateGo(config) {
     lines.push('func main() {');
 
     if (includeBody) {
-        lines.push(`    payload := strings.NewReader(\`${escapeGoString(bodyInfo.text)}\`)`);
+        lines.push(`    payload := strings.NewReader("${escapeGoString(bodyInfo.text)}")`);
         lines.push('');
     } else if (bodyInfo.comment) {
         lines.push(`    // ${bodyInfo.comment}`);
@@ -479,16 +539,16 @@ function generateNodeJs(config) {
     lines.push('');
 
     lines.push('const options = {');
-    lines.push(`  hostname: '${escapeJavaScriptString(urlObj.hostname)}',`);
+    lines.push(`  hostname: '${escapeJsSingleQuoted(urlObj.hostname)}',`);
     if (urlObj.port) {
         lines.push(`  port: ${urlObj.port},`);
     }
-    lines.push(`  path: '${escapeJavaScriptString(urlObj.pathname + urlObj.search)}',`);
+    lines.push(`  path: '${escapeJsSingleQuoted(urlObj.pathname + urlObj.search)}',`);
     lines.push(`  method: '${method || 'GET'}',`);
 
     if (hdrs.length > 0) {
         lines.push('  headers: {');
-        lines.push(hdrs.map(([key, value]) => `    '${escapeJavaScriptString(key)}': '${escapeJavaScriptString(value)}'`).join(',\n'));
+        lines.push(hdrs.map(([key, value]) => `    '${escapeJsSingleQuoted(key)}': '${escapeJsSingleQuoted(value)}'`).join(',\n'));
         lines.push('  }');
     }
 
@@ -541,7 +601,7 @@ function generatePhp(config) {
     lines.push('');
 
     lines.push('curl_setopt_array($curl, [');
-    lines.push(`  CURLOPT_URL => "${escapePythonString(url)}",`);
+    lines.push(`  CURLOPT_URL => "${escapePhpDoubleQuoted(url)}",`);
     lines.push('  CURLOPT_RETURNTRANSFER => true,');
     lines.push('  CURLOPT_ENCODING => "",');
     lines.push('  CURLOPT_MAXREDIRS => 10,');
@@ -550,14 +610,14 @@ function generatePhp(config) {
 
     const bodyInfo = resolveSnippetBody(config);
     if (bodyInfo.text !== null) {
-        lines.push(`  CURLOPT_POSTFIELDS => "${escapePythonString(bodyInfo.text)}",`);
+        lines.push(`  CURLOPT_POSTFIELDS => "${escapePhpDoubleQuoted(bodyInfo.text)}",`);
     } else if (bodyInfo.comment) {
         lines.push(`  // ${bodyInfo.comment}`);
     }
 
     if (hdrs.length > 0) {
         lines.push('  CURLOPT_HTTPHEADER => [');
-        lines.push(hdrs.map(([key, value]) => `    "${escapePythonString(key)}: ${escapePythonString(value)}"`).join(',\n'));
+        lines.push(hdrs.map(([key, value]) => `    "${escapePhpDoubleQuoted(key)}: ${escapePhpDoubleQuoted(value)}"`).join(',\n'));
         lines.push('  ],');
     }
 
@@ -592,7 +652,7 @@ function generateRuby(config) {
     lines.push('require "net/http"');
     lines.push('');
 
-    lines.push(`url = URI("${escapePythonString(url)}")`);
+    lines.push(`url = URI("${escapeRubyDoubleQuoted(url)}")`);
     lines.push('');
 
     lines.push('http = Net::HTTP.new(url.host, url.port)');
@@ -607,12 +667,12 @@ function generateRuby(config) {
     lines.push(`request = Net::HTTP::${methodCapitalized}.new(url)`);
 
     for (const [key, value] of validHeaders(headers)) {
-        lines.push(`request["${escapePythonString(key)}"] = "${escapePythonString(value)}"`);
+        lines.push(`request["${escapeRubyDoubleQuoted(key)}"] = "${escapeRubyDoubleQuoted(value)}"`);
     }
 
     const bodyInfo = resolveSnippetBody(config);
     if (bodyInfo.text !== null) {
-        lines.push(`request.body = "${escapePythonString(bodyInfo.text)}"`);
+        lines.push(`request.body = "${escapeRubyDoubleQuoted(bodyInfo.text)}"`);
     } else if (bodyInfo.comment) {
         lines.push(`# ${bodyInfo.comment}`);
     }
@@ -622,6 +682,31 @@ function generateRuby(config) {
     lines.push('puts response.read_body');
 
     return lines.join('\n');
+}
+
+/**
+ * Builds the `HttpRequest.Builder` method-setter call for a Java snippet, using
+ * the correct idiom per method: `.GET()`/`.DELETE()` take no argument,
+ * `.POST()`/`.PUT()` take a body publisher, and any other method goes through
+ * `.method(name, publisher)`. `.GET(...)` with an argument does not compile.
+ *
+ * @param {string} method - Uppercased HTTP method.
+ * @param {string|null} bodyText - Serialized body, or null when there is none.
+ * @returns {string} The builder method-setter call (without leading dot indent).
+ */
+function javaMethodCall(method, bodyText) {
+    const hasBodyText = bodyText !== null;
+    const publisher = hasBodyText
+        ? `HttpRequest.BodyPublishers.ofString("${escapeGoString(bodyText)}")`
+        : 'HttpRequest.BodyPublishers.noBody()';
+
+    if (method === 'POST' || method === 'PUT') {
+        return `.${method}(${publisher})`;
+    }
+    if (!hasBodyText && (method === 'GET' || method === 'DELETE')) {
+        return `.${method}()`;
+    }
+    return `.method("${method}", ${publisher})`;
 }
 
 /**
@@ -644,7 +729,7 @@ function generateJava(config) {
     lines.push('        HttpClient client = HttpClient.newHttpClient();');
     lines.push('');
 
-    lines.push('        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()');
+    lines.push('        HttpRequest request = HttpRequest.newBuilder()');
     lines.push(`            .uri(URI.create("${escapeGoString(url)}"))`);
 
     for (const [key, value] of validHeaders(headers)) {
@@ -653,18 +738,14 @@ function generateJava(config) {
 
     const methodUpper = (method || 'GET').toUpperCase();
     const bodyInfo = resolveSnippetBody(config);
-    if (bodyInfo.text !== null) {
-        lines.push(`            .${methodUpper}(HttpRequest.BodyPublishers.ofString("${escapeGoString(bodyInfo.text)}"))`);
-    } else {
-        if (bodyInfo.comment) {
-            lines.push(`            // ${bodyInfo.comment}`);
-        }
-        lines.push(`            .${methodUpper}(HttpRequest.BodyPublishers.noBody())`);
+    if (bodyInfo.comment) {
+        lines.push(`            // ${bodyInfo.comment}`);
     }
+    lines.push(`            ${javaMethodCall(methodUpper, bodyInfo.text)}`);
 
     lines.push('            .build();');
     lines.push('');
-    lines.push('        HttpResponse<String> response = client.send(requestBuilder,');
+    lines.push('        HttpResponse<String> response = client.send(request,');
     lines.push('            HttpResponse.BodyHandlers.ofString());');
     lines.push('');
     lines.push('        System.out.println(response.statusCode());');
