@@ -126,6 +126,9 @@ jobs:
       with:
         components: clippy, rustfmt
 
+    - name: Check formatting
+      run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
     - name: Rust cache
       uses: swatinem/rust-cache@v2
       with:
@@ -148,11 +151,43 @@ jobs:
     - name: Build frontend
       run: npm run build
 
-    - name: Check formatting
-      run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-
     - name: Run clippy
       run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+
+  rust-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Install Rust stable
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Rust cache
+      uses: swatinem/rust-cache@v2
+      with:
+        workspaces: './src-tauri -> target'
+
+    - name: Install Linux dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: '22.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build frontend
+      run: npm run build
+
+    - name: Run Rust tests
+      run: cargo test --manifest-path src-tauri/Cargo.toml
 
   security:
     runs-on: ubuntu-latest
