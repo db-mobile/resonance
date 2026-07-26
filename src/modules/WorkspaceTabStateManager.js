@@ -438,8 +438,6 @@ export class WorkspaceTabStateManager {
         }
 
         if (request.protocol === 'graphql') {
-            setRequestMode(RequestMode.GRAPHQL);
-
             if (this.dom.urlInput) {
                 this.dom.urlInput.value = request.url || '';
             }
@@ -447,6 +445,8 @@ export class WorkspaceTabStateManager {
             if (graphqlUrlInput) {
                 graphqlUrlInput.value = request.url || '';
             }
+
+            setRequestMode(RequestMode.GRAPHQL);
 
             if (this.dom.pathParamsList) {
                 clearKeyValueList(this.dom.pathParamsList);
@@ -460,6 +460,7 @@ export class WorkspaceTabStateManager {
                 this.graphqlBodyManager.setGraphQLVariables(request.variables || '');
                 this.graphqlBodyManager.selectedOperationName = request.operationName || null;
                 this.graphqlBodyManager.updateOperationPicker();
+                await this.graphqlBodyManager.autoApplySchemaForUrl?.(request.url || '');
             }
 
             if (this.dom.headersList) {
