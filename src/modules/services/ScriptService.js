@@ -51,7 +51,7 @@ export class ScriptService {
         try {
             await this.repository.saveScripts(collectionId, endpointId, scripts);
         } catch (error) {
-            throw new Error(`Failed to save scripts: ${error.message}`);
+            throw new Error(`Failed to save scripts: ${error.message}`, { cause: error });
         }
     }
 

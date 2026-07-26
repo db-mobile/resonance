@@ -43,7 +43,7 @@ export class RequestBuilderService {
         const processor = new VariableProcessor();
         processor.clearDynamicCache();
 
-        let variables = {};
+        let variables;
 
         if (currentEndpoint) {
             const collection = await this._getCollectionRepository()

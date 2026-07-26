@@ -126,7 +126,7 @@ export class VariableRepository {
 
             return allVariables;
         } catch (error) {
-            throw new Error(`Failed to load variables: ${error.message}`);
+            throw new Error(`Failed to load variables: ${error.message}`, { cause: error });
         }
     }
 
@@ -230,7 +230,7 @@ export class VariableRepository {
             this._cache.set(collectionId, { ...variables });
         } catch (error) {
             this._cache.delete(collectionId);
-            throw new Error(`Failed to save collection variables: ${error.message}`);
+            throw new Error(`Failed to save collection variables: ${error.message}`, { cause: error });
         }
     }
 
@@ -251,7 +251,7 @@ export class VariableRepository {
             variables[name] = value;
             await this.setVariablesForCollection(collectionId, variables, secretKeys);
         } catch (error) {
-            throw new Error(`Failed to set variable: ${error.message}`);
+            throw new Error(`Failed to set variable: ${error.message}`, { cause: error });
         }
     }
 
@@ -271,7 +271,7 @@ export class VariableRepository {
             delete variables[name];
             await this.setVariablesForCollection(collectionId, variables, secretKeys);
         } catch (error) {
-            throw new Error(`Failed to delete variable: ${error.message}`);
+            throw new Error(`Failed to delete variable: ${error.message}`, { cause: error });
         }
     }
 

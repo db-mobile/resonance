@@ -70,7 +70,7 @@ export class MockServerRepository {
 
             return validatedData;
         } catch (error) {
-            throw new Error(`Failed to load mock server settings: ${error.message}`);
+            throw new Error(`Failed to load mock server settings: ${error.message}`, { cause: error });
         }
     }
 
@@ -95,7 +95,7 @@ export class MockServerRepository {
             await this.backendAPI.store.set(this.SETTINGS_KEY, validatedSettings);
             return validatedSettings;
         } catch (error) {
-            throw new Error(`Failed to save mock server settings: ${error.message}`);
+            throw new Error(`Failed to save mock server settings: ${error.message}`, { cause: error });
         }
     }
 
@@ -141,7 +141,7 @@ export class MockServerRepository {
 
             return await this.saveSettings(updatedSettings);
         } catch (error) {
-            throw new Error(`Failed to update mock server settings: ${error.message}`);
+            throw new Error(`Failed to update mock server settings: ${error.message}`, { cause: error });
         }
     }
 
@@ -172,7 +172,7 @@ export class MockServerRepository {
 
             return await this.saveSettings(settings);
         } catch (error) {
-            throw new Error(`Failed to set endpoint delay: ${error.message}`);
+            throw new Error(`Failed to set endpoint delay: ${error.message}`, { cause: error });
         }
     }
 
@@ -217,7 +217,7 @@ export class MockServerRepository {
 
             return await this.saveSettings(settings);
         } catch (error) {
-            throw new Error(`Failed to set custom response: ${error.message}`);
+            throw new Error(`Failed to set custom response: ${error.message}`, { cause: error });
         }
     }
 
@@ -262,7 +262,7 @@ export class MockServerRepository {
 
             return await this.saveSettings(settings);
         } catch (error) {
-            throw new Error(`Failed to set custom status code: ${error.message}`);
+            throw new Error(`Failed to set custom status code: ${error.message}`, { cause: error });
         }
     }
 
@@ -305,7 +305,7 @@ export class MockServerRepository {
 
             return await this.saveSettings(settings);
         } catch (error) {
-            throw new Error(`Failed to toggle collection: ${error.message}`);
+            throw new Error(`Failed to toggle collection: ${error.message}`, { cause: error });
         }
     }
 
@@ -338,7 +338,7 @@ export class MockServerRepository {
             await this.backendAPI.store.set(this.SETTINGS_KEY, defaultSettings);
             return defaultSettings;
         } catch (error) {
-            throw new Error(`Failed to reset mock server settings: ${error.message}`);
+            throw new Error(`Failed to reset mock server settings: ${error.message}`, { cause: error });
         }
     }
 

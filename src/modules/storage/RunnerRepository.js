@@ -63,7 +63,7 @@ export class RunnerRepository {
             this._cache = runners;
             await this.backendAPI.store.set(this.RUNNERS_KEY, runners);
         } catch (error) {
-            throw new Error(`Failed to save runners: ${error.message}`);
+            throw new Error(`Failed to save runners: ${error.message}`, { cause: error });
         }
     }
 

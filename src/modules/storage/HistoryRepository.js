@@ -66,7 +66,7 @@ export class HistoryRepository {
             const history = await this._getArrayFromStore(this.HISTORY_KEY);
             return history.sort((a, b) => b.timestamp - a.timestamp);
         } catch (error) {
-            throw new Error(`Failed to load history: ${error.message}`);
+            throw new Error(`Failed to load history: ${error.message}`, { cause: error });
         }
     }
 
@@ -111,7 +111,7 @@ export class HistoryRepository {
             await this.backendAPI.store.set(this.HISTORY_KEY, history);
             return historyEntry;
         } catch (error) {
-            throw new Error(`Failed to add history entry: ${error.message}`);
+            throw new Error(`Failed to add history entry: ${error.message}`, { cause: error });
         }
     }
 
@@ -146,7 +146,7 @@ export class HistoryRepository {
             await this.backendAPI.store.set(this.HISTORY_KEY, updatedHistory);
             return true;
         } catch (error) {
-            throw new Error(`Failed to delete history entry: ${error.message}`);
+            throw new Error(`Failed to delete history entry: ${error.message}`, { cause: error });
         }
     }
 
@@ -162,7 +162,7 @@ export class HistoryRepository {
             await this.backendAPI.store.set(this.HISTORY_KEY, []);
             return true;
         } catch (error) {
-            throw new Error(`Failed to clear history: ${error.message}`);
+            throw new Error(`Failed to clear history: ${error.message}`, { cause: error });
         }
     }
 
