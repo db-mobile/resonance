@@ -7,6 +7,10 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::{oneshot, Mutex};
 
+use super::api_request::ClientCertConfig;
+use super::http_client::{build_http_client, HttpClientOptions};
+use super::proxy::{ProxyAction, ProxyState};
+
 /// Reconnection delay used until the server sends its own `retry:` field.
 const DEFAULT_RETRY_MS: u64 = 3000;
 
@@ -44,6 +48,13 @@ pub struct SseConnectRequest {
     pub headers: Option<HashMap<String, String>>,
     #[serde(default)]
     pub last_event_id: Option<String>,
+    /// Mirrors the HTTP request options: `Some(false)` turns certificate
+    /// verification off, and the client certificate / custom CA are resolved
+    /// per host by the frontend from the certificate store.
+    #[serde(default)]
+    pub verify_ssl: Option<bool>,
+    #[serde(default)]
+    pub client_cert: Option<ClientCertConfig>,
 }
 
 #[derive(Debug, Serialize)]
@@ -405,41 +416,48 @@ async fn run_stream(
     app: AppHandle,
     connections: Connections,
     id: u64,
+    client: reqwest::Client,
     target: StreamTarget,
     mut shutdown: oneshot::Receiver<()>,
 ) {
-    let (tab_id, url) = (target.tab_id.as_str(), target.url.as_str());
-
-    match reqwest::Client::builder()
-        .pool_idle_timeout(Duration::from_secs(0))
-        .build()
-    {
-        Ok(client) => {
-            stream_loop(&app, &client, &target, &mut shutdown).await;
-        }
-        Err(e) => {
-            emit_error(
-                &app,
-                tab_id,
-                url,
-                None,
-                format!("Failed to build HTTP client: {}", e),
-            );
-        }
-    }
+    stream_loop(&app, &client, &target, &mut shutdown).await;
 
     // Only the generation that still owns the tab reports the close, so a
     // stream that was superseded by a newer connect stays silent.
-    if remove_connection_if_current(&connections, tab_id, id).await {
-        emit(&app, payload(tab_id, url, "close"));
+    if remove_connection_if_current(&connections, &target.tab_id, id).await {
+        emit(&app, payload(&target.tab_id, &target.url, "close"));
     }
+}
+
+/// Build the client for one stream. Unlike a normal request this one must have
+/// **no** timeout — a stream is expected to stay open indefinitely — and must
+/// not force an HTTP version, since `http2_prior_knowledge` would break SSE
+/// against HTTP/1 servers. TLS verification, client certificates and the proxy
+/// come from the same settings the HTTP path uses.
+fn build_sse_client(
+    request: &SseConnectRequest,
+    proxy_action: ProxyAction,
+) -> Result<reqwest::Client, String> {
+    build_http_client(
+        HttpClientOptions {
+            user_agent: format!("resonance/{}", env!("CARGO_PKG_VERSION")),
+            timeout: None,
+            http_version: None,
+            verify_ssl: request.verify_ssl != Some(false),
+            client_cert: request.client_cert.clone(),
+            follow_redirects: true,
+            disable_pooling: true,
+        },
+        proxy_action,
+    )
 }
 
 #[tauri::command]
 pub async fn sse_connect(
     app: AppHandle,
     state: State<'_, SseState>,
-    request: SseConnectRequest,
+    proxy_state: State<'_, ProxyState>,
+    mut request: SseConnectRequest,
 ) -> Result<SseCommandResponse, String> {
     if request.tab_id.trim().is_empty() {
         return Err("Tab ID is required".to_string());
@@ -447,6 +465,12 @@ pub async fn sse_connect(
     if request.url.trim().is_empty() {
         return Err("SSE URL is required".to_string());
     }
+
+    // Build the client before touching the connection map: an unusable
+    // certificate must fail this call outright rather than tear down whatever
+    // stream the tab already has running.
+    let proxy_action = proxy_state.get_proxy_config(&request.url);
+    let client = build_sse_client(&request, proxy_action)?;
 
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
     let id = state.next_id.fetch_add(1, Ordering::Relaxed);
@@ -465,11 +489,12 @@ pub async fn sse_connect(
         app.clone(),
         state.connections.clone(),
         id,
+        client,
         StreamTarget {
             tab_id: request.tab_id.clone(),
             url: request.url.clone(),
-            headers: request.headers.unwrap_or_default(),
-            last_event_id: request.last_event_id,
+            headers: request.headers.take().unwrap_or_default(),
+            last_event_id: request.last_event_id.take(),
         },
         shutdown_rx,
     ));
@@ -651,6 +676,63 @@ mod tests {
         bad_value.insert("X-Trace".to_string(), "line\nbreak".to_string());
         let err = build_header_map(&bad_value, None).expect_err("expected an error");
         assert!(err.contains("Invalid header value"));
+    }
+
+    #[test]
+    fn deserializes_a_connect_request_with_tls_options() {
+        let request: SseConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "https://example.com/events",
+            "headers": { "Authorization": "Bearer t" },
+            "lastEventId": "42",
+            "verifySsl": false,
+            "clientCert": {
+                "certPath": "/certs/client.crt",
+                "keyPath": "/certs/client.key",
+                "caPath": "/certs/ca.pem"
+            }
+        }))
+        .expect("expected the request to deserialize");
+
+        assert_eq!(request.verify_ssl, Some(false));
+        let cert = request.client_cert.expect("expected a client cert");
+        assert_eq!(cert.cert_path.as_deref(), Some("/certs/client.crt"));
+        assert_eq!(cert.ca_path.as_deref(), Some("/certs/ca.pem"));
+    }
+
+    #[test]
+    fn deserializes_a_connect_request_without_tls_options() {
+        let request: SseConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "https://example.com/events"
+        }))
+        .expect("expected the request to deserialize");
+
+        assert_eq!(request.verify_ssl, None);
+        assert!(request.client_cert.is_none());
+        assert!(request.headers.is_none());
+    }
+
+    #[test]
+    fn an_sse_client_verifies_by_default_and_builds_without_a_timeout() {
+        let request: SseConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "https://example.com/events"
+        }))
+        .unwrap();
+        assert!(build_sse_client(&request, ProxyAction::Disable).is_ok());
+    }
+
+    #[test]
+    fn an_sse_client_surfaces_a_bad_certificate_instead_of_connecting() {
+        let request: SseConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "https://example.com/events",
+            "clientCert": { "certPath": "/certs/client.crt" }
+        }))
+        .unwrap();
+        let err = build_sse_client(&request, ProxyAction::Disable).unwrap_err();
+        assert!(err.contains("both a certificate and a key"));
     }
 
     #[test]

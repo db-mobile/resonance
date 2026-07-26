@@ -46,9 +46,7 @@ export class ProxyRepository {
             const data = await this.backendAPI.store.get(this.PROXY_KEY);
 
             if (!data || typeof data !== 'object') {
-                const defaultData = this._getDefaultProxySettings();
-                await this.backendAPI.store.set(this.PROXY_KEY, defaultData);
-                return defaultData;
+                return await this.saveProxySettings(this._getDefaultProxySettings());
             }
 
             const validatedData = {
@@ -93,7 +91,10 @@ export class ProxyRepository {
 
             const validatedSettings = this._validateSettings(settings);
 
-            await this.backendAPI.store.set(this.PROXY_KEY, validatedSettings);
+            // `proxy_set` persists to the same store key *and* updates the
+            // backend's live ProxyState. Writing to the store directly would
+            // leave requests using the previous settings until the next launch.
+            await this.backendAPI.proxySettings.set(validatedSettings);
             return validatedSettings;
         } catch (error) {
             throw new Error(`Failed to save proxy settings: ${error.message}`, { cause: error });
@@ -141,9 +142,7 @@ export class ProxyRepository {
      */
     async resetToDefaults() {
         try {
-            const defaultSettings = this._getDefaultProxySettings();
-            await this.backendAPI.store.set(this.PROXY_KEY, defaultSettings);
-            return defaultSettings;
+            return await this.saveProxySettings(this._getDefaultProxySettings());
         } catch (error) {
             throw new Error(`Failed to reset proxy settings: ${error.message}`, { cause: error });
         }
@@ -199,7 +198,9 @@ export class ProxyRepository {
             useSystemProxy: typeof settings.useSystemProxy === 'boolean' ? settings.useSystemProxy : defaults.useSystemProxy,
             type: this._validateProxyType(settings.type) ? settings.type : defaults.type,
             host: this._sanitizeHost(settings.host),
-            port: this._validatePort(settings.port) ? settings.port : defaults.port,
+            port: this._validatePort(settings.port)
+                ? Number.parseInt(settings.port, 10)
+                : defaults.port,
             auth: {
                 enabled: typeof settings.auth?.enabled === 'boolean'
                     ? settings.auth.enabled
@@ -214,7 +215,11 @@ export class ProxyRepository {
             bypassList: Array.isArray(settings.bypassList)
                 ? settings.bypassList.filter(item => typeof item === 'string' && item.trim())
                 : defaults.bypassList,
-            timeout: this._validateTimeout(settings.timeout) ? settings.timeout : defaults.timeout
+            // Coerced to numbers: `proxy_set` deserializes these into u16/u64
+            // and rejects the whole payload if they arrive as strings.
+            timeout: this._validateTimeout(settings.timeout)
+                ? Number.parseInt(settings.timeout, 10)
+                : defaults.timeout
         };
     }
 
