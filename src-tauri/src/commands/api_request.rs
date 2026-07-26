@@ -646,6 +646,13 @@ pub struct RequestTimings {
 pub struct ApiResponse {
     pub success: bool,
     pub data: Option<serde_json::Value>,
+    /// True when the response body was not valid UTF-8 and is carried in
+    /// `body_base64` instead of `data` (so binary downloads survive intact).
+    #[serde(default)]
+    pub is_binary: bool,
+    /// Base64-encoded raw body, present only when `is_binary` is true.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body_base64: Option<String>,
     pub status: Option<u16>,
     pub status_text: Option<String>,
     pub headers: HashMap<String, String>,
@@ -657,6 +664,30 @@ pub struct ApiResponse {
     pub timings: RequestTimings,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cancelled: Option<bool>,
+}
+
+/// Decode a raw response body into the fields carried by [`ApiResponse`].
+///
+/// A body that parses as JSON becomes a JSON value; other valid UTF-8 becomes a
+/// string; a non-UTF-8 body is preserved base64-encoded in the third element
+/// (with `is_binary` true and `data` `None`) instead of being lossily mangled,
+/// so binary downloads survive intact and can be saved byte-for-byte.
+fn decode_response_body(bytes: &[u8]) -> (Option<serde_json::Value>, bool, Option<String>) {
+    if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) {
+        return (Some(value), false, None);
+    }
+    match std::str::from_utf8(bytes) {
+        Ok(text) => (
+            Some(serde_json::Value::String(text.to_string())),
+            false,
+            None,
+        ),
+        Err(_) => {
+            use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+            use base64::Engine;
+            (None, true, Some(BASE64_STANDARD.encode(bytes)))
+        }
+    }
 }
 
 pub struct RequestState {
@@ -699,6 +730,8 @@ pub async fn send_api_request(
         return Ok(ApiResponse {
             success: false,
             data: None,
+            is_binary: false,
+            body_base64: None,
             status: None,
             status_text: None,
             headers: HashMap::new(),
@@ -794,6 +827,8 @@ pub async fn send_api_request(
                 return Ok(ApiResponse {
                     success: false,
                     data: None,
+                    is_binary: false,
+                    body_base64: None,
                     status: None,
                     status_text: None,
                     headers: HashMap::new(),
@@ -834,6 +869,8 @@ pub async fn send_api_request(
             return Ok(ApiResponse {
                 success: false,
                 data: None,
+                is_binary: false,
+                body_base64: None,
                 status: None,
                 status_text: None,
                 headers: HashMap::new(),
@@ -1039,6 +1076,8 @@ pub async fn send_api_request(
             Ok(ApiResponse {
                 success: false,
                 data: None,
+                is_binary: false,
+                body_base64: None,
                 status: None,
                 status_text: Some("Cancelled".to_string()),
                 headers: HashMap::new(),
@@ -1092,28 +1131,15 @@ async fn process_response(
             timings.download = start_time.elapsed().as_millis() as u64 - timings.first_byte;
             timings.total = start_time.elapsed().as_millis() as u64;
 
-            // Try to parse as JSON first, fall back to raw text
-            let data: Option<serde_json::Value> = serde_json::from_slice(&bytes).ok();
-
-            // If JSON parsing failed, store raw body as string in data field
-            let data = if data.is_some() {
-                data
-            } else {
-                match String::from_utf8(bytes.to_vec()) {
-                    Ok(s) => Some(serde_json::Value::String(s)),
-                    Err(_) => {
-                        // Try lossy conversion as fallback
-                        let lossy = String::from_utf8_lossy(&bytes).to_string();
-                        Some(serde_json::Value::String(lossy))
-                    }
-                }
-            };
+            let (data, is_binary, body_base64) = decode_response_body(&bytes);
 
             *state.cancel_tx.lock().unwrap() = None;
 
             Ok(ApiResponse {
                 success: (200..300).contains(&status),
                 data,
+                is_binary,
+                body_base64,
                 status: Some(status),
                 status_text: Some(status_text),
                 headers,
@@ -1149,6 +1175,8 @@ async fn process_response(
             Ok(ApiResponse {
                 success: false,
                 data: None,
+                is_binary: false,
+                body_base64: None,
                 status: e.status().map(|s| s.as_u16()),
                 status_text: None,
                 headers: HashMap::new(),
@@ -1184,6 +1212,47 @@ pub async fn pick_upload_file(app: tauri::AppHandle) -> Result<Option<String>, S
     rx.await.map_err(|e| format!("Dialog error: {}", e))
 }
 
+/// Save a response body to a file the user picks in a native save dialog. The
+/// body is passed base64-encoded so binary responses round-trip byte-for-byte.
+/// Returns `{ success, cancelled?, filePath? }`.
+#[tauri::command]
+pub async fn save_response_body(
+    app: tauri::AppHandle,
+    default_file_name: String,
+    base64_data: String,
+) -> Result<serde_json::Value, String> {
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+    use base64::Engine;
+    use tauri_plugin_dialog::{DialogExt, FilePath};
+
+    let bytes = BASE64_STANDARD
+        .decode(base64_data.as_bytes())
+        .map_err(|e| format!("Invalid response data: {}", e))?;
+
+    let (tx, rx) = oneshot::channel::<Option<FilePath>>();
+
+    app.dialog()
+        .file()
+        .set_file_name(default_file_name)
+        .save_file(move |file_path| {
+            let _ = tx.send(file_path);
+        });
+
+    let file_path = rx.await.map_err(|e| format!("Dialog error: {}", e))?;
+
+    let Some(path) = file_path else {
+        return Ok(serde_json::json!({ "success": false, "cancelled": true }));
+    };
+
+    let file_path = path.as_path().ok_or("Invalid file path")?;
+    std::fs::write(file_path, &bytes).map_err(|e| format!("Failed to write file: {}", e))?;
+
+    Ok(serde_json::json!({
+        "success": true,
+        "filePath": file_path.to_string_lossy()
+    }))
+}
+
 #[tauri::command]
 pub async fn cancel_api_request(
     state: State<'_, RequestState>,
@@ -1200,6 +1269,40 @@ pub async fn cancel_api_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn decode_response_body_parses_json() {
+        let (data, is_binary, base64) = decode_response_body(br#"{"a":1}"#);
+        assert_eq!(data, Some(serde_json::json!({ "a": 1 })));
+        assert!(!is_binary);
+        assert!(base64.is_none());
+    }
+
+    #[test]
+    fn decode_response_body_keeps_plain_utf8_as_string() {
+        let (data, is_binary, base64) = decode_response_body(b"hello, world");
+        assert_eq!(
+            data,
+            Some(serde_json::Value::String("hello, world".to_string()))
+        );
+        assert!(!is_binary);
+        assert!(base64.is_none());
+    }
+
+    #[test]
+    fn decode_response_body_preserves_non_utf8_as_base64() {
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+        use base64::Engine;
+
+        let raw = [0x89u8, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0x01];
+        let (data, is_binary, base64) = decode_response_body(&raw);
+
+        assert!(data.is_none());
+        assert!(is_binary);
+        let encoded = base64.expect("binary body should carry base64");
+        let decoded = BASE64_STANDARD.decode(encoded.as_bytes()).unwrap();
+        assert_eq!(decoded, raw, "base64 must round-trip the exact bytes");
+    }
 
     #[test]
     fn client_cert_config_deserializes_camel_case() {

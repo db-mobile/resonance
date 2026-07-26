@@ -3,7 +3,9 @@
 mod commands;
 
 use commands::{
-    api_request::{cancel_api_request, pick_upload_file, send_api_request, RequestState},
+    api_request::{
+        cancel_api_request, pick_upload_file, save_response_body, send_api_request, RequestState,
+    },
     app::app_get_version,
     certificates::pick_certificate_file,
     collections::{
@@ -75,6 +77,15 @@ fn main() {
         .manage(MqttState::default())
         .manage(PendingUpdate::default())
         .manage(OAuth2State::default())
+        .setup(|app| {
+            use tauri::Manager;
+            if let Ok(dir) = app.path().app_data_dir() {
+                let _ = std::fs::create_dir_all(&dir);
+                commands::fs_secure::restrict_dir(&dir);
+                commands::fs_secure::restrict_file(&dir.join("resonance-store.json"));
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // App
             app_get_version,
@@ -92,6 +103,7 @@ fn main() {
             send_api_request,
             cancel_api_request,
             pick_upload_file,
+            save_response_body,
             // Proxy
             proxy_get,
             proxy_set,

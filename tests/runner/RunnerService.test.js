@@ -434,13 +434,32 @@ describe('RunnerService', () => {
         test('should return empty result for empty script', async () => {
             const result = await service._executePostResponseScript('', {}, {}, {});
 
-            expect(result).toEqual({ variablesSet: {}, logs: [] });
+            expect(result).toEqual({ variablesSet: {}, logs: [], testResults: [] });
         });
 
         test('should return empty result for whitespace-only script', async () => {
             const result = await service._executePostResponseScript('   ', {}, {}, {});
 
-            expect(result).toEqual({ variablesSet: {}, logs: [] });
+            expect(result).toEqual({ variablesSet: {}, logs: [], testResults: [] });
+        });
+
+        test('should surface testResults from the backend', async () => {
+            mockBackendAPI.scripts.executeTest.mockResolvedValue({
+                modifiedEnvironment: {},
+                logs: [],
+                errors: [],
+                testResults: [
+                    { passed: true, message: 'status is 200' },
+                    { passed: false, message: 'body has id' }
+                ]
+            });
+
+            const result = await service._executePostResponseScript('pm.test()', {}, {}, {});
+
+            expect(result.testResults).toEqual([
+                { passed: true, message: 'status is 200' },
+                { passed: false, message: 'body has id' }
+            ]);
         });
 
         test('should execute script and return variables', async () => {
@@ -765,6 +784,130 @@ describe('RunnerService', () => {
             const config = await service._buildRequestConfig(collection, endpoint, {});
 
             expect(config.headers['Authorization']).toBeUndefined();
+        });
+    });
+
+    describe('_executeRequest test-result handling', () => {
+        const request = {
+            collectionId: 'c1',
+            endpointId: 'e1',
+            name: 'R1',
+            method: 'GET',
+            path: '/x',
+            postResponseScript: 'pm.test("x", () => {})'
+        };
+
+        beforeEach(() => {
+            service._buildVariables = jest.fn().mockResolvedValue({});
+            service.collectionRepository.getById = jest
+                .fn()
+                .mockResolvedValue({ id: 'c1', endpoints: [{ id: 'e1', method: 'GET', path: '/x' }] });
+            service._buildRequestConfig = jest
+                .fn()
+                .mockResolvedValue({ url: 'http://api.test/x', method: 'GET', headers: {} });
+            mockBackendAPI.sendApiRequest.mockResolvedValue({
+                success: true,
+                status: 200,
+                data: {},
+                headers: {}
+            });
+        });
+
+        test('marks the request failed when an assertion fails', async () => {
+            mockBackendAPI.scripts.executeTest.mockResolvedValue({
+                modifiedEnvironment: {},
+                logs: [],
+                errors: [],
+                testResults: [{ passed: false, message: 'expected 201' }]
+            });
+
+            const result = await service._executeRequest(request, {}, 0);
+
+            expect(result.status).toBe('error');
+            expect(result.httpSuccess).toBe(true);
+            expect(result.testResults).toHaveLength(1);
+            expect(result.error).toContain('1 test failed');
+            expect(result.error).toContain('expected 201');
+        });
+
+        test('keeps the request passing when all assertions pass', async () => {
+            mockBackendAPI.scripts.executeTest.mockResolvedValue({
+                modifiedEnvironment: {},
+                logs: [],
+                errors: [],
+                testResults: [{ passed: true, message: 'status is 200' }]
+            });
+
+            const result = await service._executeRequest(request, {}, 0);
+
+            expect(result.status).toBe('success');
+            expect(result.httpSuccess).toBe(true);
+        });
+
+        test('marks the request failed when the script throws', async () => {
+            mockBackendAPI.scripts.executeTest.mockResolvedValue({
+                modifiedEnvironment: {},
+                logs: [],
+                errors: ['ReferenceError: foo is not defined'],
+                testResults: []
+            });
+
+            const result = await service._executeRequest(request, {}, 0);
+
+            expect(result.status).toBe('error');
+            expect(result.scriptError).toContain('ReferenceError');
+            expect(result.error).toContain('Script error');
+        });
+
+        test('still extracts variables when an assertion fails (chaining preserved)', async () => {
+            mockBackendAPI.scripts.executeTest.mockResolvedValue({
+                modifiedEnvironment: { token: 'abc' },
+                logs: [],
+                errors: [],
+                testResults: [{ passed: false, message: 'body has id' }]
+            });
+
+            const result = await service._executeRequest(request, {}, 0);
+
+            expect(result.status).toBe('error');
+            expect(result.httpSuccess).toBe(true);
+            expect(result.variablesSet).toEqual({ token: 'abc' });
+        });
+    });
+
+    describe('executeRunnerData aggregation', () => {
+        test('counts assertion failures as failed and still chains their variables', async () => {
+            service._executeRequest = jest
+                .fn()
+                .mockResolvedValueOnce({ index: 0, status: 'success', httpSuccess: true, variablesSet: { a: '1' } })
+                .mockResolvedValueOnce({ index: 1, status: 'error', httpSuccess: true, variablesSet: { b: '2' } })
+                .mockResolvedValueOnce({ index: 2, status: 'success', httpSuccess: true, variablesSet: {} });
+
+            const results = await service.executeRunnerData({
+                name: 'R',
+                requests: [{}, {}, {}],
+                options: {}
+            });
+
+            expect(results.passed).toBe(2);
+            expect(results.failed).toBe(1);
+            expect(results.variablesSet).toEqual({ a: '1', b: '2' });
+        });
+
+        test('stopOnError halts the run on an assertion failure', async () => {
+            service._executeRequest = jest
+                .fn()
+                .mockResolvedValueOnce({ index: 0, status: 'error', httpSuccess: true, variablesSet: {} });
+
+            const results = await service.executeRunnerData({
+                name: 'R',
+                requests: [{}, {}, {}],
+                options: { stopOnError: true }
+            });
+
+            expect(results.failed).toBe(1);
+            expect(results.skipped).toBe(2);
+            expect(service._executeRequest).toHaveBeenCalledTimes(1);
         });
     });
 });

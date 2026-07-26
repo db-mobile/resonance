@@ -7,6 +7,26 @@ import { HistoryRepository } from '../storage/HistoryRepository.js';
 import { statusCategory } from '../utils/statusCategory.js';
 
 /**
+ * Placeholder stored in place of a redacted credential value.
+ * @type {string}
+ */
+export const REDACTED_PLACEHOLDER = '[redacted]';
+
+/**
+ * Request header names whose values are always redacted before a history entry
+ * is persisted (case-insensitive).
+ * @type {ReadonlyArray<string>}
+ */
+export const SENSITIVE_REQUEST_HEADERS = Object.freeze(['authorization', 'proxy-authorization', 'cookie']);
+
+/**
+ * Response header names whose values are always redacted before a history entry
+ * is persisted (case-insensitive).
+ * @type {ReadonlyArray<string>}
+ */
+export const SENSITIVE_RESPONSE_HEADERS = Object.freeze(['set-cookie']);
+
+/**
  * Service for managing request history business logic
  *
  * @class
@@ -59,18 +79,26 @@ export class HistoryService {
      * @param {Object} [currentEndpoint=null] - Current endpoint context
      * @param {string} [currentEndpoint.collectionId] - Collection ID
      * @param {string} [currentEndpoint.endpointId] - Endpoint ID
+     * @param {string} [environmentName=null] - Active environment name
+     * @param {Object} [sensitive={}] - Extra credential locations to redact
+     * @param {string[]} [sensitive.headerNames] - Request header names to redact (e.g. a configured API-key header)
+     * @param {string[]} [sensitive.queryNames] - Query parameter names to redact (e.g. a configured API-key query param)
      * @returns {Promise<Object>} The created history entry
      */
-    async createHistoryEntry(requestConfig, result, currentEndpoint = null, environmentName = null) {
+    async createHistoryEntry(requestConfig, result, currentEndpoint = null, environmentName = null, sensitive = {}) {
+        const headerNames = sensitive.headerNames || [];
+        const queryNames = sensitive.queryNames || [];
+        const responseHeaders = this._redactHeaders(result.headers, SENSITIVE_RESPONSE_HEADERS);
+
         const historyEntry = {
             id: this.generateId(),
             timestamp: Date.now(),
             environmentName: environmentName || null,
             request: {
                 method: requestConfig.method,
-                url: requestConfig.url,
-                rawUrl: requestConfig.rawUrl || requestConfig.url,
-                headers: requestConfig.headers || {},
+                url: this._redactUrlQuery(requestConfig.url, queryNames),
+                rawUrl: this._redactUrlQuery(requestConfig.rawUrl || requestConfig.url, queryNames),
+                headers: this._redactHeaders(requestConfig.headers, SENSITIVE_REQUEST_HEADERS, headerNames),
                 body: requestConfig.body || null,
                 collectionId: currentEndpoint?.collectionId || null,
                 endpointId: currentEndpoint?.endpointId || null
@@ -79,7 +107,7 @@ export class HistoryService {
                 status: result.status || null,
                 statusText: result.statusText || '',
                 data: result.data || null,
-                headers: result.headers || {},
+                headers: responseHeaders,
                 ttfb: result.ttfb || null,
                 size: result.size || null
             } : {
@@ -88,7 +116,7 @@ export class HistoryService {
                 statusText: result.statusText || '',
                 message: result.message || 'Unknown error',
                 data: result.data || null,
-                headers: result.headers || {},
+                headers: responseHeaders,
                 ttfb: result.ttfb || null,
                 size: result.size || null
             },
@@ -96,6 +124,60 @@ export class HistoryService {
         };
 
         return this.repository.add(historyEntry);
+    }
+
+    /**
+     * Returns a copy of a header map with sensitive values replaced by
+     * {@link REDACTED_PLACEHOLDER}, matching header names case-insensitively.
+     * Keys (and their original casing) are preserved so the request shape is
+     * still visible in history.
+     *
+     * @private
+     * @param {Object} headers - Header key-value map
+     * @param {ReadonlyArray<string>} baseNames - Always-sensitive lowercased names
+     * @param {string[]} [extraNames=[]] - Additional names to redact
+     * @returns {Object} Redacted header map
+     */
+    _redactHeaders(headers, baseNames, extraNames = []) {
+        if (!headers || typeof headers !== 'object') {
+            return headers || {};
+        }
+        const sensitive = new Set([...baseNames, ...extraNames.map(name => String(name).toLowerCase())]);
+        const redacted = {};
+        for (const [key, value] of Object.entries(headers)) {
+            redacted[key] = sensitive.has(key.toLowerCase()) ? REDACTED_PLACEHOLDER : value;
+        }
+        return redacted;
+    }
+
+    /**
+     * Replaces the values of the named query parameters in a URL with
+     * {@link REDACTED_PLACEHOLDER}, preserving the parameter names. Returns the
+     * URL unchanged when it has no such parameters or cannot be parsed.
+     *
+     * @private
+     * @param {string} url - The URL to redact
+     * @param {string[]} [queryNames=[]] - Query parameter names to redact
+     * @returns {string} Redacted URL
+     */
+    _redactUrlQuery(url, queryNames = []) {
+        if (!url || queryNames.length === 0) {
+            return url;
+        }
+        try {
+            const parsed = new URL(url);
+            let changed = false;
+            for (const name of queryNames) {
+                if (parsed.searchParams.has(name)) {
+                    parsed.searchParams.set(name, REDACTED_PLACEHOLDER);
+                    changed = true;
+                }
+            }
+            return changed ? parsed.toString() : url;
+        } catch (e) {
+            void e;
+            return url;
+        }
     }
 
     /**

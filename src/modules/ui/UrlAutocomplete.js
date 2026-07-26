@@ -100,14 +100,21 @@ export class UrlAutocomplete {
             const url = entry.request.rawUrl || entry.request.url || '';
             const time = this.historyController.service.formatTimestamp(entry.timestamp);
 
-            li.innerHTML = `
-                <span class="url-autocomplete-method"></span>
-                <span class="url-autocomplete-url" title="${url}">${url}</span>
-                <span class="url-autocomplete-time">${time}</span>
-            `;
-            const methodEl = li.querySelector('.url-autocomplete-method');
+            const methodEl = document.createElement('span');
+            methodEl.className = 'url-autocomplete-method';
             methodEl.textContent = method;
             methodEl.style.color = this.historyController.service.getMethodColor(method);
+
+            const urlEl = document.createElement('span');
+            urlEl.className = 'url-autocomplete-url';
+            urlEl.title = url;
+            urlEl.textContent = url;
+
+            const timeEl = document.createElement('span');
+            timeEl.className = 'url-autocomplete-time';
+            timeEl.textContent = time;
+
+            li.append(methodEl, urlEl, timeEl);
 
             li.addEventListener('mousedown', (e) => {
                 e.preventDefault();

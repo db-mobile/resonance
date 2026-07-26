@@ -12,7 +12,6 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use tokio::sync::oneshot;
-use tower_http::cors::CorsLayer;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,11 +114,7 @@ pub async fn mock_server_start(
 
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
-    let app = Router::new()
-        .route("/*path", any(handle_mock_request))
-        .route("/", any(handle_mock_request))
-        .layer(CorsLayer::permissive())
-        .with_state(state.clone());
+    let app = build_router(state.clone());
 
     let addr = SocketAddr::from(([127, 0, 0, 1], settings.port));
 
@@ -293,6 +288,21 @@ fn build_routing_table(collections: &[Value]) -> Vec<MockEndpoint> {
     }
 
     endpoints
+}
+
+/// Build the mock-server router.
+///
+/// No CORS layer is attached: the app reaches the mock server through the Rust
+/// HTTP client, not the webview, so no browser origin needs cross-origin access.
+/// Without CORS headers the browser same-origin policy stays in force, so a web
+/// page the user happens to visit cannot read the loopback mock responses (which
+/// mirror collection/endpoint names and example payloads). A permissive layer
+/// here would also make the server reachable via DNS rebinding.
+fn build_router(state: MockServerState) -> Router {
+    Router::new()
+        .route("/*path", any(handle_mock_request))
+        .route("/", any(handle_mock_request))
+        .with_state(state)
 }
 
 async fn handle_mock_request(
@@ -481,5 +491,75 @@ fn generate_from_schema(schema: &Value) -> Value {
             Value::Bool(true)
         }
         _ => Value::Null,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::Request;
+    use tower::ServiceExt;
+
+    fn empty_state() -> MockServerState {
+        MockServerState {
+            endpoints: Arc::new(RwLock::new(Vec::new())),
+            settings: Arc::new(RwLock::new(MockServerSettings {
+                port: 0,
+                endpoint_delays: HashMap::new(),
+                custom_responses: HashMap::new(),
+                custom_status_codes: HashMap::new(),
+            })),
+            logs: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    #[tokio::test]
+    async fn router_does_not_reflect_cross_origin() {
+        let response = build_router(empty_state())
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/anything")
+                    .header("Origin", "https://evil.example")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert!(response
+            .headers()
+            .get("access-control-allow-origin")
+            .is_none());
+        assert!(response
+            .headers()
+            .get("access-control-allow-credentials")
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn preflight_is_not_granted_cross_origin_access() {
+        let response = build_router(empty_state())
+            .oneshot(
+                Request::builder()
+                    .method("OPTIONS")
+                    .uri("/anything")
+                    .header("Origin", "https://evil.example")
+                    .header("Access-Control-Request-Method", "GET")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert!(response
+            .headers()
+            .get("access-control-allow-origin")
+            .is_none());
+        assert!(response
+            .headers()
+            .get("access-control-allow-methods")
+            .is_none());
     }
 }

@@ -197,12 +197,13 @@ export class RunnerService {
 
                 results.requests.push(requestResult);
 
+                if (requestResult.httpSuccess && requestResult.variablesSet) {
+                    runtimeVariables = { ...runtimeVariables, ...requestResult.variablesSet };
+                    Object.assign(results.variablesSet, requestResult.variablesSet);
+                }
+
                 if (requestResult.status === 'success') {
                     results.passed++;
-                    if (requestResult.variablesSet) {
-                        runtimeVariables = { ...runtimeVariables, ...requestResult.variablesSet };
-                        Object.assign(results.variablesSet, requestResult.variablesSet);
-                    }
                 } else {
                     results.failed++;
                     if (runner.options?.stopOnError) {
@@ -286,12 +287,13 @@ export class RunnerService {
 
                 results.requests.push(requestResult);
 
+                if (requestResult.httpSuccess && requestResult.variablesSet) {
+                    runtimeVariables = { ...runtimeVariables, ...requestResult.variablesSet };
+                    Object.assign(results.variablesSet, requestResult.variablesSet);
+                }
+
                 if (requestResult.status === 'success') {
                     results.passed++;
-                    if (requestResult.variablesSet) {
-                        runtimeVariables = { ...runtimeVariables, ...requestResult.variablesSet };
-                        Object.assign(results.variablesSet, requestResult.variablesSet);
-                    }
                 } else {
                     results.failed++;
                     if (runnerData.options?.stopOnError) {
@@ -412,6 +414,7 @@ export class RunnerService {
 
             if (response.success) {
                 result.status = 'success';
+                result.httpSuccess = true;
                 result.body = response.data;
                 result.headers = response.headers || {};
                 result.cookies = response.cookies || [];
@@ -433,9 +436,19 @@ export class RunnerService {
 
                     result.variablesSet = scriptResult.variablesSet || {};
                     result.logs = scriptResult.logs || [];
+                    result.testResults = scriptResult.testResults || [];
 
                     if (scriptResult.error) {
                         result.scriptError = scriptResult.error;
+                    }
+
+                    const failureSummary = this._summarizePostScriptFailure(
+                        result.testResults,
+                        scriptResult.error
+                    );
+                    if (failureSummary) {
+                        result.status = 'error';
+                        result.error = failureSummary;
                     }
                 }
             } else {
@@ -454,6 +467,33 @@ export class RunnerService {
         }
 
         return result;
+    }
+
+    /**
+     * Summarizes a post-response script outcome into a failure message, or null
+     * when every assertion passed and the script did not error.
+     *
+     * @private
+     * @param {Array<{passed: boolean, message: string}>} testResults - Assertion results
+     * @param {string|null} scriptError - Script execution error, if any
+     * @returns {string|null} Failure summary, or null when the request passed
+     */
+    _summarizePostScriptFailure(testResults, scriptError) {
+        const failedTests = (testResults || []).filter(test => !test.passed);
+        if (failedTests.length === 0 && !scriptError) {
+            return null;
+        }
+
+        const parts = [];
+        if (failedTests.length > 0) {
+            const count = `${failedTests.length} test${failedTests.length > 1 ? 's' : ''} failed`;
+            const names = failedTests.map(test => test.message).filter(Boolean);
+            parts.push(names.length > 0 ? `${count}: ${names.join('; ')}` : count);
+        }
+        if (scriptError) {
+            parts.push(`Script error: ${scriptError}`);
+        }
+        return parts.join(' | ');
     }
 
     /**
@@ -709,7 +749,7 @@ export class RunnerService {
      */
     async _executePostResponseScript(script, request, response, currentVariables) {
         if (!script || script.trim() === '') {
-            return { variablesSet: {}, logs: [] };
+            return { variablesSet: {}, logs: [], testResults: [] };
         }
 
         try {
@@ -743,12 +783,14 @@ export class RunnerService {
             return {
                 variablesSet,
                 logs: result.logs || [],
+                testResults: result.testResults || [],
                 error: result.errors?.length > 0 ? result.errors.join('; ') : null
             };
         } catch (error) {
             return {
                 variablesSet: {},
                 logs: [],
+                testResults: [],
                 error: error.message
             };
         }
