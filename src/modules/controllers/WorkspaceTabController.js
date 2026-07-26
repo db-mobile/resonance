@@ -741,7 +741,7 @@ export class WorkspaceTabController {
             let targetTabId;
 
             if (inNewTab) {
-                const newTab = await this.createNewTab();
+                const newTab = await this.createNewTab({ protocol: endpoint.protocol });
                 targetTabId = newTab.id;
             } else {
                 await this._saveCurrentTabState();
@@ -749,6 +749,43 @@ export class WorkspaceTabController {
             }
 
             await this.endpointLoader.loadEndpoint(endpoint, targetTabId);
+        } catch (error) {
+            void error;
+        }
+    }
+
+    /**
+     * Opens a request history entry.
+     *
+     * History replay always gets its own tab, because the entry's protocol is
+     * independent of whatever the active tab holds and the shared request form
+     * only shows the fields of the current protocol. A repeat click on the same
+     * entry focuses the tab it already opened rather than stacking duplicates;
+     * that tab keeps any edits made since, so it is not reloaded.
+     *
+     * @async
+     * @param {Object} historyEntry - The history entry to open
+     * @returns {Promise<void>}
+     */
+    async loadHistoryEntry(historyEntry) {
+        try {
+            if (!historyEntry) {
+                return;
+            }
+
+            if (historyEntry.id) {
+                const tabs = await this.service.getAllTabs();
+                const existingTab = tabs.find(tab => tab.historyEntryId === historyEntry.id);
+                if (existingTab) {
+                    await this.switchTab(existingTab.id);
+                    return;
+                }
+            }
+
+            const protocol = historyEntry.request?.protocol || 'http';
+            const newTab = await this.createNewTab({ protocol });
+
+            await this.endpointLoader.loadHistoryEntry(historyEntry, newTab.id);
         } catch (error) {
             void error;
         }

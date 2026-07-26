@@ -110,7 +110,7 @@ export class SchemaController {
      */
     _updateValidationStatus() {
         const statusEl = document.getElementById('schema-validation-status');
-        if (!statusEl) {
+        if (!statusEl || !this.editor) {
             return;
         }
 
