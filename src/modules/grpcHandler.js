@@ -27,6 +27,7 @@ import {
     warnUnresolvedVariables
 } from './apiHandler.js';
 import { startOrSend as grpcStreamStartOrSend } from './grpcStreamHandler.js';
+import { recordGrpcHistory } from './grpcHistory.js';
 import { createKeyValueRow } from './keyValueManager.js';
 import { getCurrentEndpoint } from './state/currentEndpoint.js';
 
@@ -422,14 +423,18 @@ function lowercaseMetadataKeys(metadata) {
  * Authorization config folded in. Digest and AWS SigV4 sign at the HTTP transport
  * layer, which gRPC never reaches, so those are reported as unsupported instead of
  * silently sending nothing.
- * @returns {Promise<Object<string, string>>} Metadata map, before variable resolution
+ *
+ * Also reports which keys carry the credentials, so history can redact them.
+ * @returns {Promise<{metadata: Object<string, string>, sensitiveNames: string[]}>} Metadata and credential keys
  */
 async function buildGrpcMetadata() {
     const metadata = getGrpcMetadata();
+    let sensitiveNames = [];
 
     try {
         const authData = await generateEffectiveAuthData();
         getRequestBuilderService().mergeAuthData(metadata, {}, authData);
+        sensitiveNames = Object.keys(authData.headers || {}).map(name => name.toLowerCase());
 
         if (authData.authConfig || authData.awsAuth) {
             toast.warning('Digest and AWS Signature auth are not supported over gRPC');
@@ -438,7 +443,7 @@ async function buildGrpcMetadata() {
         toast.error(`gRPC auth error: ${error.message || String(error)}`);
     }
 
-    return lowercaseMetadataKeys(metadata);
+    return { metadata: lowercaseMetadataKeys(metadata), sensitiveNames };
 }
 
 /**
@@ -517,7 +522,7 @@ export async function handleGrpcSend() {
     }
 
     const rawBody = (app.grpcBodyEditor ? app.grpcBodyEditor.getContent() : grpcBodyInput?.value || '').trim();
-    const uiMetadata = await buildGrpcMetadata();
+    const { metadata: uiMetadata, sensitiveNames } = await buildGrpcMetadata();
 
     let resolved;
     try {
@@ -548,6 +553,19 @@ export async function handleGrpcSend() {
     const flags = methodFlagsCache.get(fullMethod);
     const isStreaming = !!(flags && (flags.serverStreaming || flags.clientStreaming));
 
+    const historyContext = {
+        rawTarget,
+        target,
+        fullMethod,
+        metadata,
+        requestJson,
+        useTls: !!tls.useTls,
+        protoPath: usingProto ? activeSource.protoPath : null,
+        clientStreaming: !!flags?.clientStreaming,
+        serverStreaming: !!flags?.serverStreaming,
+        sensitiveNames
+    };
+
     if (isStreaming) {
         await grpcStreamStartOrSend({
             target,
@@ -556,10 +574,13 @@ export async function handleGrpcSend() {
             metadata,
             tls,
             protoPath: usingProto ? activeSource.protoPath : null,
-            canSend: !!flags.clientStreaming
+            canSend: !!flags.clientStreaming,
+            historyContext
         });
         return;
     }
+
+    const startedAt = Date.now();
 
     try {
         updateStatusDisplay('Sending gRPC request...', null);
@@ -606,11 +627,27 @@ export async function handleGrpcSend() {
         } else {
             updateStatusDisplay(`gRPC error: ${result.statusMessage || 'unknown'}`, null);
         }
+
+        await recordGrpcHistory({
+            ...historyContext,
+            result: { ...result, ttfb: Date.now() - startedAt }
+        });
     } catch (error) {
         const msg = error.message || String(error);
         toast.error(`gRPC send error: ${msg}`);
         updateStatusDisplay(`gRPC send error: ${msg}`, null);
         displayResponseWithLineNumbersForTab(`Error: ${msg}`, null, null);
+
+        await recordGrpcHistory({
+            ...historyContext,
+            result: {
+                success: false,
+                status: null,
+                statusMessage: msg,
+                data: null,
+                ttfb: Date.now() - startedAt
+            }
+        });
     }
 }
 

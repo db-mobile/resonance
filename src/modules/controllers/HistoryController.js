@@ -3,6 +3,7 @@
  * @module controllers/HistoryController
  */
 
+import { app } from '../appContext.js';
 import { setCurrentEndpoint } from '../state/currentEndpoint.js';
 import { HistoryService } from '../services/HistoryService.js';
 import { HistoryRenderer } from '../ui/HistoryRenderer.js';
@@ -81,6 +82,11 @@ export class HistoryController {
      */
     async handleHistorySelect(historyEntry) {
         try {
+            if (historyEntry.request?.protocol === 'grpc') {
+                await this.replayGrpcEntry(historyEntry);
+                return;
+            }
+
             const urlInput = document.getElementById('url-input');
             const methodSelect = document.getElementById('method-select');
             const headersList = document.getElementById('headers-list');
@@ -137,6 +143,49 @@ export class HistoryController {
         } catch (error) {
             void error;
         }
+    }
+
+    /**
+     * Replays a gRPC history entry back into the gRPC panel.
+     *
+     * Switches the request view to gRPC mode and restores the panel through the
+     * same state applier used for tab restore, so the saved service/method and
+     * their streaming flags come back selected. Metadata is read from the entry's
+     * headers, which means credentials return as `[redacted]` — the stored value,
+     * by design — and must be re-entered before resending.
+     *
+     * @async
+     * @param {Object} historyEntry - The gRPC history entry
+     * @returns {Promise<void>}
+     */
+    async replayGrpcEntry(historyEntry) {
+        const { request } = historyEntry;
+        const grpc = request.grpc || {};
+        const fullMethod = grpc.fullMethod || '';
+        const service = fullMethod.replace(/^\//, '').split('/')[0] || '';
+        const { body } = request;
+
+        const { setRequestMode, RequestMode } = await import('../requestModeManager.js');
+        setRequestMode(RequestMode.GRPC);
+
+        if (app.applyGrpcState) {
+            app.applyGrpcState({
+                target: grpc.rawTarget || grpc.target || '',
+                service,
+                fullMethod,
+                requestJson: body === null || body === undefined
+                    ? '{}'
+                    : (typeof body === 'string' ? body : JSON.stringify(body, null, 2)),
+                metadata: request.headers || {},
+                useTls: !!grpc.useTls,
+                protoPath: grpc.protoPath || null,
+                clientStreaming: !!grpc.clientStreaming,
+                serverStreaming: !!grpc.serverStreaming
+            });
+        }
+
+        this.showRequestSection();
+        setCurrentEndpoint(null);
     }
 
     /**

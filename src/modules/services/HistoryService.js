@@ -5,6 +5,7 @@
 
 import { HistoryRepository } from '../storage/HistoryRepository.js';
 import { statusCategory } from '../utils/statusCategory.js';
+import { grpcStatusName, isGrpcStatusOk } from '../utils/grpcStatus.js';
 
 /**
  * Placeholder stored in place of a redacted credential value.
@@ -95,19 +96,22 @@ export class HistoryService {
             timestamp: Date.now(),
             environmentName: environmentName || null,
             request: {
+                protocol: requestConfig.protocol || 'http',
                 method: requestConfig.method,
                 url: this._redactUrlQuery(requestConfig.url, queryNames),
                 rawUrl: this._redactUrlQuery(requestConfig.rawUrl || requestConfig.url, queryNames),
                 headers: this._redactHeaders(requestConfig.headers, SENSITIVE_REQUEST_HEADERS, headerNames),
                 body: requestConfig.body || null,
                 collectionId: currentEndpoint?.collectionId || null,
-                endpointId: currentEndpoint?.endpointId || null
+                endpointId: currentEndpoint?.endpointId || null,
+                grpc: requestConfig.grpc || null
             },
             response: result.success || result.status ? {
-                status: result.status || null,
+                status: result.status ?? null,
                 statusText: result.statusText || '',
                 data: result.data || null,
                 headers: responseHeaders,
+                trailers: result.trailers || null,
                 ttfb: result.ttfb || null,
                 size: result.size || null
             } : {
@@ -314,9 +318,40 @@ export class HistoryService {
             'POST': 'var(--method-post, #3b82f6)',
             'PUT': 'var(--method-put, #f59e0b)',
             'DELETE': 'var(--method-delete, #ef4444)',
-            'PATCH': 'var(--method-patch, #8b5cf6)'
+            'PATCH': 'var(--method-patch, #8b5cf6)',
+            'GRPC': 'var(--method-patch-color, #8939a4)'
         };
         return colors[method] || 'var(--text-secondary)';
+    }
+
+    /**
+     * Decides how an entry's status badge should read. gRPC codes are named
+     * rather than numbered, and code 0 (OK) is a success — testing it for
+     * truthiness the way HTTP statuses are tested would render it as a failure.
+     *
+     * @param {Object} entry - History entry
+     * @returns {{text: string, color: string}|null} Badge text and colour, or
+     *   null when the entry has no status and should show the error badge
+     */
+    getStatusDisplay(entry) {
+        const status = entry?.response?.status;
+
+        if (entry?.request?.protocol === 'grpc') {
+            if (status === null || status === undefined) {
+                return null;
+            }
+            return {
+                text: grpcStatusName(status),
+                color: isGrpcStatusOk(status)
+                    ? 'var(--success-color, #10b981)'
+                    : 'var(--error-color, #ef4444)'
+            };
+        }
+
+        if (!status) {
+            return null;
+        }
+        return { text: String(status), color: this.getStatusColor(status) };
     }
 
     /**
