@@ -138,9 +138,33 @@ describe('Code Generator', () => {
             expect(code).toContain('import java.net.http.HttpClient');
             expect(code).toContain('import java.net.http.HttpRequest');
             expect(code).toContain('HttpClient.newHttpClient()');
-            expect(code).toContain('HttpRequest.Builder');
+            expect(code).toContain('HttpRequest.newBuilder()');
             expect(code).toContain('.POST(');
             expect(code).toContain('URI.create(');
+        });
+
+        test('builds an HttpRequest and sends the built request, not the builder', () => {
+            const code = generateCode('java', testConfig);
+            expect(code).toContain('HttpRequest request = HttpRequest.newBuilder()');
+            expect(code).toContain('.build();');
+            expect(code).toContain('client.send(request,');
+            expect(code).not.toContain('client.send(requestBuilder');
+        });
+
+        test('uses .GET() with no argument for a body-less GET', () => {
+            const code = generateCode('java', { method: 'GET', url: 'https://api.example.com/x', headers: {} });
+            expect(code).toContain('.GET()');
+            expect(code).not.toContain('.GET(HttpRequest');
+        });
+
+        test('uses .method() for a verb without a dedicated builder setter', () => {
+            const code = generateCode('java', {
+                method: 'PATCH',
+                url: 'https://api.example.com/x',
+                headers: {},
+                body: { a: 1 }
+            });
+            expect(code).toContain('.method("PATCH", HttpRequest.BodyPublishers.ofString(');
         });
     });
 
@@ -299,6 +323,68 @@ describe('Code Generator', () => {
         test('other generators emit a comment instead of a bogus body', () => {
             const code = generateCode('go', binaryConfig);
             expect(code).toContain('File upload bodies are only generated for cURL and Python snippets.');
+        });
+    });
+
+    describe('Injection safety / escaping', () => {
+        const withHeader = (value) => ({
+            method: 'POST',
+            url: 'https://api.example.com/x',
+            headers: { 'X-Evil': value },
+            body: { k: 'v' }
+        });
+
+        test('JS single-quoted contexts escape single quotes (fetch, axios, nodejs)', () => {
+            const config = withHeader("a'INJECT");
+            for (const id of ['javascript-fetch', 'javascript-axios', 'nodejs']) {
+                const code = generateCode(id, config);
+                expect(code).not.toMatch(/(?<!\\)'INJECT/);
+                expect(code).toContain("a\\'INJECT");
+            }
+        });
+
+        test('PHP double-quoted strings escape the $ interpolation sigil', () => {
+            const code = generateCode('php', withHeader('a$INJECT'));
+            expect(code).not.toMatch(/(?<!\\)\$INJECT/);
+            expect(code).toContain('a\\$INJECT');
+        });
+
+        test('Ruby double-quoted strings neutralize #{} interpolation', () => {
+            const code = generateCode('ruby', withHeader('a#{INJECT}'));
+            expect(code).not.toMatch(/(?<!\\)#\{INJECT/);
+            expect(code).toContain('a\\#{INJECT}');
+        });
+
+        test('double-quoted-string languages escape embedded double quotes', () => {
+            const config = withHeader('a"INJECT');
+            for (const id of ['python', 'go', 'java', 'php', 'ruby']) {
+                const code = generateCode(id, config);
+                expect(code).not.toMatch(/(?<!\\)"INJECT/);
+            }
+        });
+
+        test('backslashes in a value are escaped, not passed through raw', () => {
+            const config = withHeader('a\\INJECT');
+            for (const id of ['python', 'go', 'java', 'php', 'ruby', 'javascript-fetch', 'nodejs']) {
+                const code = generateCode(id, config);
+                expect(code).toContain('a\\\\INJECT');
+            }
+        });
+
+        test('a hostile string body cannot break out in any language', () => {
+            const config = {
+                method: 'POST',
+                url: 'https://api.example.com/x',
+                headers: {},
+                // eslint-disable-next-line no-template-curly-in-string
+                body: 'q"S\'B`T${TL}H#{RB}P$PHP\\E'
+            };
+            expect(generateCode('go', config)).not.toMatch(/(?<!\\)"S/);
+            expect(generateCode('java', config)).not.toMatch(/(?<!\\)"S/);
+            expect(generateCode('python', config)).not.toMatch(/(?<!\\)"S/);
+            expect(generateCode('php', config)).not.toMatch(/(?<!\\)\$PHP/);
+            expect(generateCode('ruby', config)).not.toMatch(/(?<!\\)#\{RB/);
+            expect(generateCode('javascript-fetch', config)).not.toMatch(/(?<!\\)\$\{TL/);
         });
     });
 });
