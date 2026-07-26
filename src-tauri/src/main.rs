@@ -3,7 +3,9 @@
 mod commands;
 
 use commands::{
-    api_request::{cancel_api_request, pick_upload_file, send_api_request, RequestState},
+    api_request::{
+        cancel_api_request, pick_upload_file, save_response_body, send_api_request, RequestState,
+    },
     app::app_get_version,
     certificates::pick_certificate_file,
     collections::{
@@ -92,6 +94,7 @@ fn main() {
             send_api_request,
             cancel_api_request,
             pick_upload_file,
+            save_response_body,
             // Proxy
             proxy_get,
             proxy_set,

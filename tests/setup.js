@@ -1,3 +1,9 @@
+// Polyfill web text encoding APIs missing from the jsdom test environment
+// (present as browser globals in the real app).
+const { TextEncoder, TextDecoder } = require('util');
+if (!global.TextEncoder) { global.TextEncoder = TextEncoder; }
+if (!global.TextDecoder) { global.TextDecoder = TextDecoder; }
+
 // Mock Tauri API
 global.window = {
   __TAURI__: true
