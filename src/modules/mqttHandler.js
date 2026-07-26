@@ -139,7 +139,7 @@ async function buildMqttTlsOptions(normalizedBroker) {
         const settings = getSettingsCache() || (await window.backendAPI.settings.get());
         skipVerify = settings?.verifySsl === false;
     } catch (_e) {
-        skipVerify = false;
+        void _e;
     }
 
     const tls = { skipVerify };

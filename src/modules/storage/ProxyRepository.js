@@ -71,7 +71,7 @@ export class ProxyRepository {
 
             return validatedData;
         } catch (error) {
-            throw new Error(`Failed to load proxy settings: ${error.message}`);
+            throw new Error(`Failed to load proxy settings: ${error.message}`, { cause: error });
         }
     }
 
@@ -96,7 +96,7 @@ export class ProxyRepository {
             await this.backendAPI.store.set(this.PROXY_KEY, validatedSettings);
             return validatedSettings;
         } catch (error) {
-            throw new Error(`Failed to save proxy settings: ${error.message}`);
+            throw new Error(`Failed to save proxy settings: ${error.message}`, { cause: error });
         }
     }
 
@@ -128,7 +128,7 @@ export class ProxyRepository {
 
             return await this.saveProxySettings(updatedSettings);
         } catch (error) {
-            throw new Error(`Failed to update proxy settings: ${error.message}`);
+            throw new Error(`Failed to update proxy settings: ${error.message}`, { cause: error });
         }
     }
 
@@ -145,7 +145,7 @@ export class ProxyRepository {
             await this.backendAPI.store.set(this.PROXY_KEY, defaultSettings);
             return defaultSettings;
         } catch (error) {
-            throw new Error(`Failed to reset proxy settings: ${error.message}`);
+            throw new Error(`Failed to reset proxy settings: ${error.message}`, { cause: error });
         }
     }
 
@@ -178,7 +178,7 @@ export class ProxyRepository {
             await this.saveProxySettings(settings);
             return settings.enabled;
         } catch (error) {
-            throw new Error(`Failed to toggle proxy: ${error.message}`);
+            throw new Error(`Failed to toggle proxy: ${error.message}`, { cause: error });
         }
     }
 

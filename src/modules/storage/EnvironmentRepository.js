@@ -139,7 +139,7 @@ export class EnvironmentRepository {
             this._cache = normalizedData;
             return normalizedData;
         } catch (error) {
-            throw new Error(`Failed to load environments: ${error.message}`);
+            throw new Error(`Failed to load environments: ${error.message}`, { cause: error });
         }
     }
 
@@ -183,7 +183,7 @@ export class EnvironmentRepository {
             this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data).catch(() => { });
             return true;
         } catch (error) {
-            throw new Error(`Failed to set active environment: ${error.message}`);
+            throw new Error(`Failed to set active environment: ${error.message}`, { cause: error });
         }
     }
 
@@ -251,7 +251,7 @@ export class EnvironmentRepository {
 
             return newEnvironment;
         } catch (error) {
-            throw new Error(`Failed to create environment: ${error.message}`);
+            throw new Error(`Failed to create environment: ${error.message}`, { cause: error });
         }
     }
 
@@ -293,7 +293,7 @@ export class EnvironmentRepository {
             await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data);
             return data.items[index];
         } catch (error) {
-            throw new Error(`Failed to update environment: ${error.message}`);
+            throw new Error(`Failed to update environment: ${error.message}`, { cause: error });
         }
     }
 
@@ -334,7 +334,7 @@ export class EnvironmentRepository {
             await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data);
             return true;
         } catch (error) {
-            throw new Error(`Failed to delete environment: ${error.message}`);
+            throw new Error(`Failed to delete environment: ${error.message}`, { cause: error });
         }
     }
 
@@ -371,7 +371,7 @@ export class EnvironmentRepository {
             await this.updateEnvironment(duplicate.id, { secretKeys: [...secretKeys] });
             return await this.getEnvironmentById(duplicate.id);
         } catch (error) {
-            throw new Error(`Failed to duplicate environment: ${error.message}`);
+            throw new Error(`Failed to duplicate environment: ${error.message}`, { cause: error });
         }
     }
 
@@ -571,7 +571,7 @@ export class EnvironmentRepository {
         try {
             return await this.getAllEnvironments();
         } catch (error) {
-            throw new Error(`Failed to export environments: ${error.message}`);
+            throw new Error(`Failed to export environments: ${error.message}`, { cause: error });
         }
     }
 
@@ -624,7 +624,7 @@ export class EnvironmentRepository {
             await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, data);
             return true;
         } catch (error) {
-            throw new Error(`Failed to import environments: ${error.message}`);
+            throw new Error(`Failed to import environments: ${error.message}`, { cause: error });
         }
     }
 }

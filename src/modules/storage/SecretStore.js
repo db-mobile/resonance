@@ -310,7 +310,7 @@ export class SecretStore {
         try {
             available = Boolean(this.backendAPI.secrets) && await this.backendAPI.secrets.keychainAvailable();
         } catch (error) {
-            available = false;
+            void error;
         }
 
         if (available) {

@@ -72,7 +72,7 @@ export class CollectionRepository {
             const collections = await this.backendAPI.collections.getAll();
             return collections || [];
         } catch (error) {
-            throw new Error(`Failed to load collections: ${error.message || error}`);
+            throw new Error(`Failed to load collections: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -91,7 +91,7 @@ export class CollectionRepository {
                 this._addToCache(collection.id, collection);
             }
         } catch (error) {
-            throw new Error(`Failed to save collection: ${error.message || error}`);
+            throw new Error(`Failed to save collection: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -121,7 +121,7 @@ export class CollectionRepository {
                 await this.backendAPI.collections.save(collection);
             }
         } catch (error) {
-            throw new Error(`Failed to save collections: ${error.message || error}`);
+            throw new Error(`Failed to save collections: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -201,7 +201,7 @@ export class CollectionRepository {
             }
             return true;
         } catch (error) {
-            throw new Error(`Failed to delete collection: ${error.message || error}`);
+            throw new Error(`Failed to delete collection: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -280,7 +280,7 @@ export class CollectionRepository {
         try {
             await this._updateEndpointFields(collectionId, endpointId, updates);
         } catch (error) {
-            throw new Error(`Failed to update endpoint fields: ${error.message || error}`);
+            throw new Error(`Failed to update endpoint fields: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -292,7 +292,7 @@ export class CollectionRepository {
                 graphqlData
             });
         } catch (error) {
-            throw new Error(`Failed to save body state: ${error.message || error}`);
+            throw new Error(`Failed to save body state: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -327,7 +327,7 @@ export class CollectionRepository {
         try {
             await this._updateEndpointField(collectionId, endpointId, 'modifiedBody', body);
         } catch (error) {
-            throw new Error(`Failed to save modified request body: ${error.message || error}`);
+            throw new Error(`Failed to save modified request body: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -344,7 +344,7 @@ export class CollectionRepository {
         try {
             await this._updateEndpointField(collectionId, endpointId, 'formBodyData', data);
         } catch (error) {
-            throw new Error(`Failed to save form body data: ${error.message || error}`);
+            throw new Error(`Failed to save form body data: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -379,7 +379,7 @@ export class CollectionRepository {
         try {
             await this._updateEndpointField(collectionId, endpointId, 'pathParams', pathParams);
         } catch (error) {
-            throw new Error(`Failed to save persisted path params: ${error.message || error}`);
+            throw new Error(`Failed to save persisted path params: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -414,7 +414,7 @@ export class CollectionRepository {
         try {
             await this._updateEndpointField(collectionId, endpointId, 'queryParams', queryParams);
         } catch (error) {
-            throw new Error(`Failed to save persisted query params: ${error.message || error}`);
+            throw new Error(`Failed to save persisted query params: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -449,7 +449,7 @@ export class CollectionRepository {
         try {
             await this._updateEndpointField(collectionId, endpointId, 'headers', headers);
         } catch (error) {
-            throw new Error(`Failed to save persisted headers: ${error.message || error}`);
+            throw new Error(`Failed to save persisted headers: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -505,7 +505,7 @@ export class CollectionRepository {
             }
             await this._updateEndpointField(collectionId, endpointId, 'authConfig', toPersist);
         } catch (error) {
-            throw new Error(`Failed to save persisted auth config: ${error.message || error}`);
+            throw new Error(`Failed to save persisted auth config: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -563,7 +563,7 @@ export class CollectionRepository {
             await this._getByIdFresh(collectionId);
             await this.update(collectionId, { authConfig: toPersist });
         } catch (error) {
-            throw new Error(`Failed to save collection auth config: ${error.message || error}`);
+            throw new Error(`Failed to save collection auth config: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -674,7 +674,7 @@ export class CollectionRepository {
             );
             await this.update(collectionId, { folders });
         } catch (error) {
-            throw new Error(`Failed to save folder auth config: ${error.message || error}`);
+            throw new Error(`Failed to save folder auth config: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -733,7 +733,7 @@ export class CollectionRepository {
         try {
             await this._updateEndpointField(collectionId, endpointId, 'url', url);
         } catch (error) {
-            throw new Error(`Failed to save persisted URL: ${error.message || error}`);
+            throw new Error(`Failed to save persisted URL: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -766,7 +766,7 @@ export class CollectionRepository {
         try {
             await this.backendAPI.store.set('collectionExpansionStates', expansionStates);
         } catch (error) {
-            throw new Error(`Failed to save collection expansion states: ${error.message || error}`);
+            throw new Error(`Failed to save collection expansion states: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -790,7 +790,7 @@ export class CollectionRepository {
             await this.backendAPI.store.set('pinnedRequests', pinned);
             return !!pinned[key];
         } catch (error) {
-            throw new Error(`Failed to toggle pinned request: ${error.message || error}`);
+            throw new Error(`Failed to toggle pinned request: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -810,7 +810,7 @@ export class CollectionRepository {
                 await this.secretStore.deleteScope(authSecretScope(collectionId, endpointId));
             }
         } catch (error) {
-            throw new Error(`Failed to delete persisted endpoint data: ${error.message || error}`);
+            throw new Error(`Failed to delete persisted endpoint data: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -860,7 +860,7 @@ export class CollectionRepository {
         try {
             await this.backendAPI.store.set('lastSelectedRequest', null);
         } catch (error) {
-            throw new Error(`Failed to clear last selected request: ${error.message || error}`);
+            throw new Error(`Failed to clear last selected request: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -878,7 +878,7 @@ export class CollectionRepository {
         try {
             await this._updateEndpointField(collectionId, endpointId, 'graphqlData', data);
         } catch (error) {
-            throw new Error(`Failed to save GraphQL data: ${error.message || error}`);
+            throw new Error(`Failed to save GraphQL data: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -903,7 +903,7 @@ export class CollectionRepository {
         try {
             await this._updateEndpointField(collectionId, endpointId, 'grpcData', data);
         } catch (error) {
-            throw new Error(`Failed to save gRPC data: ${error.message || error}`);
+            throw new Error(`Failed to save gRPC data: ${error.message || error}`, { cause: error });
         }
     }
 
@@ -930,7 +930,7 @@ export class CollectionRepository {
         try {
             await this._updateEndpointField(collectionId, endpointId, 'responseSchema', schema);
         } catch (error) {
-            throw new Error(`Failed to save response schema: ${error.message || error}`);
+            throw new Error(`Failed to save response schema: ${error.message || error}`, { cause: error });
         }
     }
 

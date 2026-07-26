@@ -50,7 +50,7 @@ export class CertificateRepository {
                     .filter(entry => entry !== null)
             };
         } catch (error) {
-            throw new Error(`Failed to load client certificates: ${error.message}`);
+            throw new Error(`Failed to load client certificates: ${error.message}`, { cause: error });
         }
     }
 
@@ -77,7 +77,7 @@ export class CertificateRepository {
             await this.backendAPI.store.set(this.CERT_KEY, validated);
             return validated;
         } catch (error) {
-            throw new Error(`Failed to save client certificates: ${error.message}`);
+            throw new Error(`Failed to save client certificates: ${error.message}`, { cause: error });
         }
     }
 

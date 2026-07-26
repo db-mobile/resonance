@@ -183,7 +183,7 @@ export async function fetchGraphQLIntrospection() {
     const builder = getRequestBuilderService();
     builder.mergeAuthData(headers, queryParams, authData);
 
-    let resolvedUrl = url;
+    let resolvedUrl;
     try {
         const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
         ({ url: resolvedUrl } = builder.processRequestComponents({
@@ -786,9 +786,9 @@ export async function handleSendRequest() {
     builder.mergeAuthData(headers, queryParams, authData);
 
     let processor;
-    let _resolvedVariables = null;
-    let queryString = '';
-    let processedPathParams = {};
+    let _resolvedVariables;
+    let queryString;
+    let processedPathParams;
     try {
         ({ variables: _resolvedVariables, processor } = await builder.resolveVariables(
             getCurrentEndpoint(), headers

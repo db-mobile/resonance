@@ -96,7 +96,7 @@ export class CookieJarService {
             }
         }
 
-        let requestHost = '';
+        let requestHost;
         try {
             requestHost = new URL(requestUrl).hostname.toLowerCase();
         } catch (_e) { return null; }
