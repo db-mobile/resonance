@@ -33,36 +33,10 @@ export class WorkspaceTabStateManager {
         const { isGrpcMode, isWebSocketMode, isSseMode, isMqttMode, isGraphQLMode } = await import('./requestModeManager.js');
         
         if (isGrpcMode()) {
-            const grpcRequestJson = app.grpcBodyEditor
-                ? app.grpcBodyEditor.getContent()
-                : (this.dom.grpcBodyInput?.value || '{}');
-            
-            const metadata = {};
-            const grpcMetadataList = document.getElementById('grpc-metadata-list');
-            if (grpcMetadataList) {
-                grpcMetadataList.querySelectorAll('.key-value-row').forEach(row => {
-                    const key = row.querySelector('.key-input')?.value?.trim();
-                    const value = row.querySelector('.value-input')?.value || '';
-                    if (key) {
-                        metadata[key] = value;
-                    }
-                });
-            }
-            
-            const grpcTlsCheckbox = document.getElementById('grpc-tls-checkbox');
-            const useTls = grpcTlsCheckbox?.checked || false;
-            
             return {
                 request: {
                     protocol: 'grpc',
-                    grpc: {
-                        target: this.dom.grpcTargetInput?.value || '',
-                        service: this.dom.grpcServiceSelect?.value || '',
-                        fullMethod: this.dom.grpcMethodSelect?.value || '',
-                        requestJson: grpcRequestJson || '{}',
-                        metadata,
-                        useTls
-                    }
+                    grpc: app.captureGrpcState ? app.captureGrpcState() : {}
                 },
                 endpoint: getCurrentEndpoint()
                     ? {
@@ -314,28 +288,11 @@ export class WorkspaceTabStateManager {
                 setTimeout(ensureGrpcTabActive, 0);
             }
             
-            if (this.dom.grpcTargetInput) {
-                this.dom.grpcTargetInput.value = request.grpc?.target || '';
+            if (app.applyGrpcState) {
+                app.applyGrpcState(request.grpc || {});
             }
-            if (this.dom.grpcBodyInput) {
-                this.dom.grpcBodyInput.value = request.grpc?.requestJson || '{}';
-            }
-            if (app.grpcBodyEditor) {
-                app.grpcBodyEditor.setContent(request.grpc?.requestJson || '{}');
-            }
-            if (this.dom.grpcServiceSelect) {
-                this.dom.grpcServiceSelect.value = request.grpc?.service || '';
-            }
-            if (this.dom.grpcMethodSelect) {
-                this.dom.grpcMethodSelect.value = request.grpc?.fullMethod || '';
-            }
-            if (app.setGrpcMetadata) {
-                app.setGrpcMetadata(request.grpc?.metadata || {});
-            }
-            if (app.setGrpcTls) {
-                app.setGrpcTls(request.grpc?.useTls || false);
-            }
-            
+
+
             if (endpoint) {
                 setCurrentEndpoint(endpoint);
             }

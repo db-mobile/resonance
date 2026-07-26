@@ -1,0 +1,29 @@
+// Second fixture: imports a sibling proto. The backend always adds the selected
+// file's own directory as an include path, so this loads as long as both files
+// stay in the same folder. Use it to check that an imported type resolves; an
+// import from any OTHER directory still fails, since the UI has no way to pass
+// extra include paths.
+
+syntax = "proto3";
+
+package resonance.demo.admin.v1;
+
+import "resonance_demo.proto";
+
+service Admin {
+  // Reuses a message defined in the imported file.
+  rpc Impersonate(resonance.demo.v1.HelloRequest) returns (Session);
+  rpc ListSessions(ListSessionsRequest) returns (stream Session);
+}
+
+message Session {
+  string session_id = 1;
+  string subject = 2;
+  resonance.demo.v1.Locale locale = 3;
+  int64 expires_at_unix_ms = 4;
+}
+
+message ListSessionsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}

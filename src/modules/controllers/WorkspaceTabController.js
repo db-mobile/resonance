@@ -168,7 +168,10 @@ export class WorkspaceTabController {
                         fullMethod: '',
                         requestJson: '{}',
                         metadata: {},
-                        useTls: false
+                        useTls: false,
+                        protoPath: null,
+                        clientStreaming: false,
+                        serverStreaming: false
                     }
                 };
             } else if (protocol === 'graphql') {

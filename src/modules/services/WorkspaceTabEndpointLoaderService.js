@@ -113,7 +113,10 @@ export class WorkspaceTabEndpointLoaderService {
                     fullMethod: grpcData.fullMethod || endpoint.path || '',
                     requestJson: grpcData.requestJson || '{}',
                     metadata: grpcData.metadata || {},
-                    useTls: grpcData.useTls || false
+                    useTls: grpcData.useTls || false,
+                    protoPath: grpcData.protoPath || null,
+                    clientStreaming: grpcData.clientStreaming || false,
+                    serverStreaming: grpcData.serverStreaming || false
                 }
             },
             isModified: false

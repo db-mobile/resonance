@@ -20,7 +20,7 @@ import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest, handleCancelRequest, handleGenerateCurl, setGraphQLBodyManager, invalidateSettingsCache, getSettingsCache, invalidateEnvironmentCache } from './modules/apiHandler.js';
 import { GraphQLBodyManager } from './modules/graphqlBodyManager.js';
 import { FormBodyManager } from './modules/formBodyManager.js';
-import { initGrpcUI, setGrpcMetadata, setGrpcTls } from './modules/grpcHandler.js';
+import { applyGrpcState, captureGrpcState, initGrpcUI, setGrpcMetadata, setGrpcTls } from './modules/grpcHandler.js';
 import { initRequestModeManager } from './modules/requestModeManager.js';
 import { initWebSocketHandler } from './modules/websocketHandler.js';
 import { initGraphQLSubscriptionHandler } from './modules/graphqlSubscriptionHandler.js';
@@ -645,6 +645,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     app.setUrlUpdating = setUrlUpdating;
     app.setGrpcMetadata = setGrpcMetadata;
     app.setGrpcTls = setGrpcTls;
+    app.captureGrpcState = captureGrpcState;
+    app.applyGrpcState = applyGrpcState;
 
     environmentSelector.initialize('environment-selector-container');
 

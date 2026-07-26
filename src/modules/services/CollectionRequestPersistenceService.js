@@ -71,39 +71,15 @@ export class CollectionRequestPersistenceService {
     }
 
     async saveGrpcRequest(collectionId, endpointId, endpoint, endpointLocations, collections) {
-        const grpcTargetInput = document.getElementById('grpc-target-input');
-        const grpcServiceSelect = document.getElementById('grpc-service-select');
-        const grpcMethodSelect = document.getElementById('grpc-method-select');
-        const grpcBodyInput = document.getElementById('grpc-body-input');
-        const grpcMetadataList = document.getElementById('grpc-metadata-list');
-        const grpcTlsCheckbox = document.getElementById('grpc-tls-checkbox');
-
-        const metadata = {};
-        if (grpcMetadataList) {
-            grpcMetadataList.querySelectorAll('.key-value-row').forEach(row => {
-                const key = row.querySelector('.key-input')?.value?.trim();
-                const value = row.querySelector('.value-input')?.value || '';
-                if (key) {
-                    metadata[key] = value;
-                }
-            });
-        }
-
-        const requestJson = app.grpcBodyEditor
-            ? app.grpcBodyEditor.getContent()
-            : (grpcBodyInput?.value || '{}');
+        const grpcState = app.captureGrpcState ? app.captureGrpcState() : {};
 
         await this.repository.saveGrpcData(collectionId, endpointId, {
-            target: grpcTargetInput?.value || '',
-            service: grpcServiceSelect?.value || '',
-            fullMethod: grpcMethodSelect?.value || endpoint.path || '',
-            requestJson: requestJson || '{}',
-            metadata,
-            useTls: grpcTlsCheckbox?.checked || false
+            ...grpcState,
+            fullMethod: grpcState.fullMethod || endpoint.path || ''
         });
 
         endpointLocations.forEach(({ endpoint: currentEndpoint }) => {
-            currentEndpoint.path = grpcMethodSelect?.value || currentEndpoint.path;
+            currentEndpoint.path = grpcState.fullMethod || currentEndpoint.path;
         });
 
         await this.repository.save(collections);

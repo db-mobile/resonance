@@ -444,15 +444,10 @@ function activateTab(tabId) {
  * @param {boolean} show
  */
 function showGrpcUrlSection(show) {
-    let grpcUrlSection = document.getElementById('grpc-url-section');
-    
-    if (show) {
-        if (!grpcUrlSection) {
-            grpcUrlSection = createGrpcUrlSection();
-        }
-        grpcUrlSection.style.display = 'flex';
-    } else if (grpcUrlSection) {
-        grpcUrlSection.style.display = 'none';
+    const grpcUrlSection = document.getElementById('grpc-url-section');
+
+    if (grpcUrlSection) {
+        grpcUrlSection.style.display = show ? 'flex' : 'none';
     }
 }
 
@@ -474,65 +469,6 @@ function showWebSocketUrlSection(show) {
     } else if (websocketUrlSection) {
         websocketUrlSection.style.display = 'none';
     }
-}
-
-/**
- * Create the gRPC URL section elements
- * @returns {HTMLElement}
- */
-function createGrpcUrlSection() {
-    const requestUrlSection = document.querySelector('.request-url-section');
-    if (!requestUrlSection) {
-        return null;
-    }
-    
-    const grpcSection = document.createElement('div');
-    grpcSection.id = 'grpc-url-section';
-    grpcSection.className = 'grpc-url-section';
-    grpcSection.style.display = 'none';
-    
-    const badge = document.createElement('span');
-    badge.className = 'method-pill';
-    badge.dataset.method = 'GRPC';
-    badge.textContent = 'gRPC';
-    
-    const targetWrapper = document.createElement('div');
-    targetWrapper.className = 'grpc-target-wrapper';
-    
-    const existingTarget = document.getElementById('grpc-target-input');
-    const targetInput = document.createElement('input');
-    targetInput.type = 'text';
-    targetInput.id = 'grpc-url-target-input';
-    targetInput.className = 'input-base url-input';
-    targetInput.placeholder = 'localhost:50051';
-    targetInput.setAttribute('aria-label', 'gRPC Target');
-    
-    if (existingTarget) {
-        targetInput.value = existingTarget.value;
-        targetInput.addEventListener('input', () => {
-            existingTarget.value = targetInput.value;
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
-        });
-        existingTarget.addEventListener('input', () => {
-            targetInput.value = existingTarget.value;
-        });
-    }
-    
-    targetWrapper.appendChild(targetInput);
-    
-    grpcSection.appendChild(badge);
-    grpcSection.appendChild(targetWrapper);
-    
-    const methodSelectContainer = document.querySelector('.method-select-container');
-    if (methodSelectContainer) {
-        methodSelectContainer.after(grpcSection);
-    } else {
-        requestUrlSection.prepend(grpcSection);
-    }
-    
-    return grpcSection;
 }
 
 /**
