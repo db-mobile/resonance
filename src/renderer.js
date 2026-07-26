@@ -148,6 +148,81 @@ const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, 
  *
  * @returns {void}
  */
+/**
+ * Save the active workspace tab (Ctrl+S).
+ *
+ * A tab already backed by a collection endpoint is written straight back to it;
+ * an unsaved tab goes through the save-to-collection dialog and is linked to the
+ * endpoint it creates. The target comes from the tab's own `endpoint` rather than
+ * the shared current-endpoint state, which other paths can leave pointing at a
+ * previously opened request — the same source the tab context menu's Save uses.
+ *
+ * @returns {Promise<void>}
+ */
+async function handleSaveShortcut() {
+    const controller = app.workspaceTabController;
+    const activeTab = controller ? await controller.service.getActiveTab() : null;
+
+    if (activeTab && activeTab.type === 'runner') {
+        return;
+    }
+
+    const tabEndpoint = activeTab?.endpoint?.collectionId && activeTab?.endpoint?.endpointId
+        ? activeTab.endpoint
+        : null;
+    const endpoint = tabEndpoint || getCurrentEndpoint();
+
+    try {
+        if (endpoint) {
+            const { saveAllRequestModifications } = await import('./modules/collectionManager.js');
+            await saveAllRequestModifications(endpoint.collectionId, endpoint.endpointId);
+
+            if (controller) {
+                await controller.markCurrentTabUnmodified();
+            }
+            toast.success(activeTab?.name ? `Saved "${activeTab.name}"` : 'Request saved');
+            return;
+        }
+
+        if (!controller || !activeTab) {
+            return;
+        }
+
+        const { saveRequestToCollection } = await import('./modules/collectionManager.js');
+        const state = await controller.stateManager.captureCurrentState();
+        const requestData = {
+            name: activeTab.name,
+            ...state.request
+        };
+
+        const result = await saveRequestToCollection(requestData);
+        if (!result) {
+            return;
+        }
+
+        setCurrentEndpoint({
+            collectionId: result.collectionId,
+            endpointId: result.endpointId
+        });
+        await controller.service.updateTab(activeTab.id, {
+            name: result.name,
+            endpoint: {
+                collectionId: result.collectionId,
+                endpointId: result.endpointId,
+                protocol: state.request.protocol || 'http'
+            }
+        });
+        controller.tabBar.updateTab(activeTab.id, { name: result.name });
+        await controller.markCurrentTabUnmodified();
+
+        toast.success(result.collectionName
+            ? `Saved "${result.name}" to ${result.collectionName}`
+            : `Saved "${result.name}"`);
+    } catch (error) {
+        toast.error(`Save failed: ${error.message || String(error)}`);
+    }
+}
+
 function initKeyboardShortcuts() {
     keyboardShortcuts.init();
 
@@ -164,45 +239,7 @@ function initKeyboardShortcuts() {
 
     keyboardShortcuts.register('KeyS', {
         ctrl: true,
-        handler: async () => {
-            if (getCurrentEndpoint()) {
-                const { saveAllRequestModifications } = await import('./modules/collectionManager.js');
-                await saveAllRequestModifications(
-                    getCurrentEndpoint().collectionId,
-                    getCurrentEndpoint().endpointId
-                );
-                if (app.workspaceTabController) {
-                    await app.workspaceTabController.markCurrentTabUnmodified();
-                }
-            } else if (app.workspaceTabController) {
-                const { saveRequestToCollection } = await import('./modules/collectionManager.js');
-                const activeTab = await app.workspaceTabController.service.getActiveTab();
-                if (activeTab && activeTab.type !== 'runner') {
-                    const state = await app.workspaceTabController.stateManager.captureCurrentState();
-                    const requestData = {
-                        name: activeTab.name,
-                        ...state.request
-                    };
-                    const result = await saveRequestToCollection(requestData);
-                    if (result) {
-                        setCurrentEndpoint({
-                            collectionId: result.collectionId,
-                            endpointId: result.endpointId
-                        });
-                        await app.workspaceTabController.service.updateTab(activeTab.id, {
-                            name: result.name,
-                            endpoint: {
-                                collectionId: result.collectionId,
-                                endpointId: result.endpointId,
-                                protocol: state.request.protocol || 'http'
-                            }
-                        });
-                        app.workspaceTabController.tabBar.updateTab(activeTab.id, { name: result.name });
-                        await app.workspaceTabController.markCurrentTabUnmodified();
-                    }
-                }
-            }
-        },
+        handler: () => handleSaveShortcut(),
         description: 'Save request',
         category: 'Request'
     });

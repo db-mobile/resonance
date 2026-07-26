@@ -243,6 +243,34 @@ export class WorkspaceTabStateManager {
     }
 
     /**
+     * Point the shared "current endpoint" at the tab being restored, clearing it
+     * when the tab is not backed by a collection endpoint.
+     *
+     * The non-HTTP protocol branches return early and so never reach the HTTP
+     * path's set-or-clear logic. Without the clear, switching to an unsaved tab
+     * left the previous tab's endpoint in place, and everything keyed off it —
+     * Ctrl+S, send-time auto-save, collection variable scope, history
+     * attribution — silently addressed the wrong request.
+     *
+     * A tab record with no `endpoint` key at all is left alone, matching the
+     * HTTP path's guard.
+     *
+     * @private
+     * @param {Object} tab - The tab being restored
+     * @param {Object|null} endpoint - The tab's endpoint, if any
+     * @returns {void}
+     */
+    _applyTabEndpoint(tab, endpoint) {
+        if (endpoint) {
+            setCurrentEndpoint(endpoint);
+            return;
+        }
+        if (Object.prototype.hasOwnProperty.call(tab, 'endpoint')) {
+            setCurrentEndpoint(null);
+        }
+    }
+
+    /**
      * Restore tab state to UI elements
      * @param {Object} tab
      * @returns {Promise<void>}
@@ -293,9 +321,7 @@ export class WorkspaceTabStateManager {
             }
 
 
-            if (endpoint) {
-                setCurrentEndpoint(endpoint);
-            }
+            this._applyTabEndpoint(tab, endpoint);
             return;
         }
 
@@ -338,9 +364,7 @@ export class WorkspaceTabStateManager {
                 this._clearResponse(tab.id);
             }
 
-            if (endpoint) {
-                setCurrentEndpoint(endpoint);
-            }
+            this._applyTabEndpoint(tab, endpoint);
             return;
         }
 
@@ -388,9 +412,7 @@ export class WorkspaceTabStateManager {
                 this._clearResponse(tab.id);
             }
 
-            if (endpoint) {
-                setCurrentEndpoint(endpoint);
-            }
+            this._applyTabEndpoint(tab, endpoint);
             return;
         }
 
@@ -444,9 +466,7 @@ export class WorkspaceTabStateManager {
                 this._clearResponse(tab.id);
             }
 
-            if (endpoint) {
-                setCurrentEndpoint(endpoint);
-            }
+            this._applyTabEndpoint(tab, endpoint);
             return;
         }
 
@@ -490,9 +510,7 @@ export class WorkspaceTabStateManager {
 
             import('./mqttHandler.js').then(m => m.refreshMqttConnectionUi(tab.id));
 
-            if (endpoint) {
-                setCurrentEndpoint(endpoint);
-            }
+            this._applyTabEndpoint(tab, endpoint);
             return;
         }
 
