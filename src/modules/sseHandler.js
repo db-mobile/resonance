@@ -44,7 +44,14 @@ async function handleBackendEvent(event) {
     if (!tabId) {
         return;
     }
-    const current = session.get(tabId) || {};
+    const current = session.get(tabId);
+
+    // A closed tab drops its session before the backend has finished unwinding,
+    // and its terminal `close` still arrives. Rendering it would resurrect the
+    // tab's response container, so anything without a live session is ignored.
+    if (!current) {
+        return;
+    }
 
     if (current.url && url && current.url !== url && payload.eventType !== 'open') {
         return;

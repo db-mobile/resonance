@@ -1,20 +1,36 @@
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, ACCEPT, CACHE_CONTROL};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
+use tokio::sync::{oneshot, Mutex};
+
+/// Reconnection delay used until the server sends its own `retry:` field.
+const DEFAULT_RETRY_MS: u64 = 3000;
+
+type Connections = Arc<Mutex<HashMap<String, SseConnection>>>;
+
+/// A live stream, keyed by tab. `id` distinguishes generations so a task that
+/// has already been replaced cannot clean up (or emit `close` for) its
+/// successor. Shutdown is cooperative: the task selects on the receiver, so it
+/// unwinds normally and still emits its terminal event.
+struct SseConnection {
+    id: u64,
+    shutdown: Option<oneshot::Sender<()>>,
+}
 
 pub struct SseState {
-    connections: Arc<Mutex<HashMap<String, JoinHandle<()>>>>,
+    connections: Connections,
+    next_id: AtomicU64,
 }
 
 impl Default for SseState {
     fn default() -> Self {
         Self {
             connections: Arc::new(Mutex::new(HashMap::new())),
+            next_id: AtomicU64::new(1),
         }
     }
 }
@@ -55,8 +71,47 @@ struct SseEventPayload {
     message: Option<String>,
 }
 
+fn payload(tab_id: &str, url: &str, event_type: &str) -> SseEventPayload {
+    SseEventPayload {
+        tab_id: tab_id.to_string(),
+        event_type: event_type.to_string(),
+        url: url.to_string(),
+        event: None,
+        data: None,
+        id: None,
+        retry: None,
+        status: None,
+        message: None,
+    }
+}
+
 fn emit(app: &AppHandle, payload: SseEventPayload) {
     let _ = app.emit("sse-event", payload);
+}
+
+fn emit_error(app: &AppHandle, tab_id: &str, url: &str, status: Option<u16>, message: String) {
+    let mut event = payload(tab_id, url, "error");
+    event.status = status;
+    event.message = Some(message);
+    emit(app, event);
+}
+
+/// Remove this tab's entry only when it still belongs to generation `id`.
+/// Returns whether the caller was still the current connection.
+async fn remove_connection_if_current(connections: &Connections, tab_id: &str, id: u64) -> bool {
+    let mut connections = connections.lock().await;
+    if matches!(connections.get(tab_id), Some(connection) if connection.id == id) {
+        connections.remove(tab_id);
+        return true;
+    }
+    false
+}
+
+#[derive(Debug, Default, PartialEq)]
+struct EventParts {
+    event: Option<String>,
+    data: Option<String>,
+    id: Option<String>,
 }
 
 #[derive(Default)]
@@ -72,11 +127,12 @@ impl PartialEvent {
         self.event.is_none() && self.data.is_empty() && self.id.is_none() && self.retry.is_none()
     }
 
-    fn dispatch(&mut self, app: &AppHandle, tab_id: &str, url: &str) {
+    /// Consume the buffered fields at a frame boundary. Returns `None` for
+    /// comment-only or empty frames. `id` is deliberately retained: per spec the
+    /// last event id persists across subsequent frames.
+    fn take_payload(&mut self) -> Option<EventParts> {
         if self.data.is_empty() && self.event.is_none() {
-            // Comment-only or empty frame; keep id but emit nothing.
-            self.event = None;
-            return;
+            return None;
         }
 
         let data = if self.data.is_empty() {
@@ -84,23 +140,13 @@ impl PartialEvent {
         } else {
             Some(self.data.join("\n"))
         };
-
-        emit(
-            app,
-            SseEventPayload {
-                tab_id: tab_id.to_string(),
-                event_type: "message".to_string(),
-                url: url.to_string(),
-                event: self.event.take(),
-                data,
-                id: self.id.clone(),
-                retry: None,
-                status: None,
-                message: None,
-            },
-        );
-
         self.data.clear();
+
+        Some(EventParts {
+            event: self.event.take(),
+            data,
+            id: self.id.clone(),
+        })
     }
 }
 
@@ -139,269 +185,253 @@ fn parse_line(line: &str, partial: &mut PartialEvent) {
     }
 }
 
-async fn run_stream(
-    app: AppHandle,
-    state: Arc<Mutex<HashMap<String, JoinHandle<()>>>>,
+/// Drain complete lines (LF- or CRLF-terminated) from `buffer`, leaving any
+/// trailing incomplete line behind. Only whole lines are decoded, so a
+/// multi-byte character split across two network chunks is reassembled before
+/// it is turned into text rather than being mangled into U+FFFD.
+fn drain_lines(buffer: &mut Vec<u8>) -> Vec<String> {
+    let mut lines = Vec::new();
+
+    while let Some(pos) = buffer.iter().position(|byte| *byte == b'\n') {
+        let mut line: Vec<u8> = buffer.drain(..=pos).collect();
+        line.pop();
+        if line.last() == Some(&b'\r') {
+            line.pop();
+        }
+        lines.push(String::from_utf8_lossy(&line).into_owned());
+    }
+
+    lines
+}
+
+/// Build the request headers for one connection attempt. An unusable
+/// caller-supplied header is fatal — sending the request without it would
+/// silently drop credentials. A `last_event_id` that cannot be encoded is
+/// skipped instead, since it originates from the server and must not make the
+/// stream permanently unresumable.
+fn build_header_map(
+    headers: &HashMap<String, String>,
+    last_event_id: Option<&str>,
+) -> Result<HeaderMap, String> {
+    let mut header_map = HeaderMap::new();
+    header_map.insert(ACCEPT, HeaderValue::from_static("text/event-stream"));
+    header_map.insert(CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+
+    for (name, value) in headers {
+        let header_name = HeaderName::from_bytes(name.as_bytes())
+            .map_err(|_| format!("Invalid header name: {}", name))?;
+        let header_value = HeaderValue::from_str(value)
+            .map_err(|_| format!("Invalid header value for: {}", name))?;
+        header_map.insert(header_name, header_value);
+    }
+
+    if let Some(id) = last_event_id {
+        if let Ok(value) = HeaderValue::from_str(id) {
+            header_map.insert(HeaderName::from_static("last-event-id"), value);
+        }
+    }
+
+    Ok(header_map)
+}
+
+fn dispatch(
+    app: &AppHandle,
+    tab_id: &str,
+    url: &str,
+    partial: &mut PartialEvent,
+    last_event_id: &mut Option<String>,
+) {
+    if let Some(parts) = partial.take_payload() {
+        let mut event = payload(tab_id, url, "message");
+        event.event = parts.event;
+        event.data = parts.data;
+        event.id = parts.id;
+        emit(app, event);
+    }
+
+    if let Some(id) = &partial.id {
+        *last_event_id = Some(id.clone());
+    }
+}
+
+/// Everything one stream needs about what it is connecting to, kept together so
+/// it can be threaded through the task without a long parameter list.
+struct StreamTarget {
     tab_id: String,
     url: String,
     headers: HashMap<String, String>,
-    initial_last_event_id: Option<String>,
-) {
-    let client = match reqwest::Client::builder()
-        .pool_idle_timeout(Duration::from_secs(0))
-        .build()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            emit(
-                &app,
-                SseEventPayload {
-                    tab_id: tab_id.clone(),
-                    event_type: "error".to_string(),
-                    url: url.clone(),
-                    event: None,
-                    data: None,
-                    id: None,
-                    retry: None,
-                    status: None,
-                    message: Some(format!("Failed to build HTTP client: {}", e)),
-                },
-            );
-            return;
-        }
-    };
+    last_event_id: Option<String>,
+}
 
-    let mut last_event_id = initial_last_event_id;
-    let mut retry_ms: u64 = 3000;
+/// Connect, stream, and reconnect until the stream fails fatally or the caller
+/// signals shutdown. Every exit path returns to `run_stream`, which owns the
+/// single terminal `close` emit.
+async fn stream_loop(
+    app: &AppHandle,
+    client: &reqwest::Client,
+    target: &StreamTarget,
+    shutdown: &mut oneshot::Receiver<()>,
+) {
+    let StreamTarget {
+        tab_id,
+        url,
+        headers,
+        last_event_id: initial_last_event_id,
+    } = target;
+    let (tab_id, url) = (tab_id.as_str(), url.as_str());
+
+    let mut last_event_id = initial_last_event_id.clone();
+    let mut retry_ms: u64 = DEFAULT_RETRY_MS;
     let mut first_connect = true;
 
     loop {
-        let mut header_map = HeaderMap::new();
-        header_map.insert(ACCEPT, HeaderValue::from_static("text/event-stream"));
-        header_map.insert(CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+        let header_map = match build_header_map(headers, last_event_id.as_deref()) {
+            Ok(map) => map,
+            Err(message) => {
+                emit_error(app, tab_id, url, None, message);
+                return;
+            }
+        };
 
-        for (k, v) in &headers {
-            let name = match HeaderName::from_bytes(k.as_bytes()) {
-                Ok(n) => n,
-                Err(_) => {
-                    emit(
-                        &app,
-                        SseEventPayload {
-                            tab_id: tab_id.clone(),
-                            event_type: "error".to_string(),
-                            url: url.clone(),
-                            event: None,
-                            data: None,
-                            id: None,
-                            retry: None,
-                            status: None,
-                            message: Some(format!("Invalid header name: {}", k)),
-                        },
-                    );
-                    break;
+        let mut response = tokio::select! {
+            _ = &mut *shutdown => return,
+            result = client.get(url).headers(header_map).send() => match result {
+                Ok(response) => response,
+                Err(e) => {
+                    emit_error(app, tab_id, url, None, format!("Connection failed: {}", e));
+                    return;
                 }
-            };
-            if let Ok(val) = HeaderValue::from_str(v) {
-                header_map.insert(name, val);
-            }
-        }
-
-        if let Some(id) = &last_event_id {
-            if let Ok(val) = HeaderValue::from_str(id) {
-                header_map.insert(HeaderName::from_static("last-event-id"), val);
-            }
-        }
-
-        let response = match client.get(&url).headers(header_map).send().await {
-            Ok(r) => r,
-            Err(e) => {
-                emit(
-                    &app,
-                    SseEventPayload {
-                        tab_id: tab_id.clone(),
-                        event_type: "error".to_string(),
-                        url: url.clone(),
-                        event: None,
-                        data: None,
-                        id: None,
-                        retry: None,
-                        status: None,
-                        message: Some(format!("Connection failed: {}", e)),
-                    },
-                );
-                break;
             }
         };
 
         let status = response.status();
         if !status.is_success() {
-            emit(
-                &app,
-                SseEventPayload {
-                    tab_id: tab_id.clone(),
-                    event_type: "error".to_string(),
-                    url: url.clone(),
-                    event: None,
-                    data: None,
-                    id: None,
-                    retry: None,
-                    status: Some(status.as_u16()),
-                    message: Some(format!("HTTP {}", status.as_u16())),
-                },
+            emit_error(
+                app,
+                tab_id,
+                url,
+                Some(status.as_u16()),
+                format!("HTTP {}", status.as_u16()),
             );
-            break;
+            return;
         }
 
         let content_type = response
             .headers()
             .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
+            .and_then(|value| value.to_str().ok())
             .unwrap_or("")
             .to_string();
 
         if !content_type.contains("text/event-stream") {
-            emit(
-                &app,
-                SseEventPayload {
-                    tab_id: tab_id.clone(),
-                    event_type: "error".to_string(),
-                    url: url.clone(),
-                    event: None,
-                    data: None,
-                    id: None,
-                    retry: None,
-                    status: Some(status.as_u16()),
-                    message: Some(format!(
-                        "Unexpected Content-Type: {}",
-                        if content_type.is_empty() {
-                            "(none)"
-                        } else {
-                            &content_type
-                        }
-                    )),
-                },
+            emit_error(
+                app,
+                tab_id,
+                url,
+                Some(status.as_u16()),
+                format!(
+                    "Unexpected Content-Type: {}",
+                    if content_type.is_empty() {
+                        "(none)"
+                    } else {
+                        &content_type
+                    }
+                ),
             );
-            break;
+            return;
         }
 
-        emit(
-            &app,
-            SseEventPayload {
-                tab_id: tab_id.clone(),
-                event_type: if first_connect { "open" } else { "reopen" }.to_string(),
-                url: url.clone(),
-                event: None,
-                data: None,
-                id: None,
-                retry: None,
-                status: Some(status.as_u16()),
-                message: None,
-            },
-        );
+        let mut open = payload(tab_id, url, if first_connect { "open" } else { "reopen" });
+        open.status = Some(status.as_u16());
+        emit(app, open);
         first_connect = false;
 
-        let mut response = response;
-        let mut buffer = String::new();
+        let mut buffer: Vec<u8> = Vec::new();
         let mut partial = PartialEvent::default();
+        let mut cancelled = false;
 
         loop {
-            match response.chunk().await {
+            let chunk = tokio::select! {
+                _ = &mut *shutdown => {
+                    cancelled = true;
+                    break;
+                }
+                result = response.chunk() => result,
+            };
+
+            match chunk {
                 Ok(Some(bytes)) => {
-                    let text = match std::str::from_utf8(&bytes) {
-                        Ok(s) => s.to_string(),
-                        Err(_) => String::from_utf8_lossy(&bytes).into_owned(),
-                    };
-                    buffer.push_str(&text);
-
-                    loop {
-                        let newline_pos = buffer.find('\n');
-                        let Some(pos) = newline_pos else { break };
-                        let mut line: String = buffer.drain(..=pos).collect();
-                        line.pop();
-                        if line.ends_with('\r') {
-                            line.pop();
-                        }
-
+                    buffer.extend_from_slice(&bytes);
+                    for line in drain_lines(&mut buffer) {
                         if line.is_empty() {
-                            partial.dispatch(&app, &tab_id, &url);
-                            if let Some(id) = &partial.id {
-                                last_event_id = Some(id.clone());
-                            }
+                            dispatch(app, tab_id, url, &mut partial, &mut last_event_id);
                         } else {
                             parse_line(&line, &mut partial);
-                            if let Some(r) = partial.retry.take() {
-                                retry_ms = r;
+                            if let Some(ms) = partial.retry.take() {
+                                retry_ms = ms;
                             }
                         }
                     }
                 }
                 Ok(None) => break,
                 Err(e) => {
-                    emit(
-                        &app,
-                        SseEventPayload {
-                            tab_id: tab_id.clone(),
-                            event_type: "error".to_string(),
-                            url: url.clone(),
-                            event: None,
-                            data: None,
-                            id: None,
-                            retry: None,
-                            status: None,
-                            message: Some(format!("Stream error: {}", e)),
-                        },
-                    );
+                    emit_error(app, tab_id, url, None, format!("Stream error: {}", e));
                     break;
                 }
             }
         }
 
+        if cancelled {
+            return;
+        }
+
         // Flush any trailing partial event if the stream ended on a non-empty buffer.
         if !partial.is_empty() {
-            partial.dispatch(&app, &tab_id, &url);
-            if let Some(id) = &partial.id {
-                last_event_id = Some(id.clone());
-            }
+            dispatch(app, tab_id, url, &mut partial, &mut last_event_id);
         }
 
-        emit(
-            &app,
-            SseEventPayload {
-                tab_id: tab_id.clone(),
-                event_type: "reconnecting".to_string(),
-                url: url.clone(),
-                event: None,
-                data: None,
-                id: None,
-                retry: Some(retry_ms),
-                status: None,
-                message: None,
-            },
-        );
+        let mut reconnecting = payload(tab_id, url, "reconnecting");
+        reconnecting.retry = Some(retry_ms);
+        emit(app, reconnecting);
 
-        tokio::time::sleep(Duration::from_millis(retry_ms)).await;
+        tokio::select! {
+            _ = &mut *shutdown => return,
+            _ = tokio::time::sleep(Duration::from_millis(retry_ms)) => {}
+        }
+    }
+}
+
+async fn run_stream(
+    app: AppHandle,
+    connections: Connections,
+    id: u64,
+    target: StreamTarget,
+    mut shutdown: oneshot::Receiver<()>,
+) {
+    let (tab_id, url) = (target.tab_id.as_str(), target.url.as_str());
+
+    match reqwest::Client::builder()
+        .pool_idle_timeout(Duration::from_secs(0))
+        .build()
+    {
+        Ok(client) => {
+            stream_loop(&app, &client, &target, &mut shutdown).await;
+        }
+        Err(e) => {
+            emit_error(
+                &app,
+                tab_id,
+                url,
+                None,
+                format!("Failed to build HTTP client: {}", e),
+            );
+        }
     }
 
-    emit(
-        &app,
-        SseEventPayload {
-            tab_id: tab_id.clone(),
-            event_type: "close".to_string(),
-            url: url.clone(),
-            event: None,
-            data: None,
-            id: None,
-            retry: None,
-            status: None,
-            message: None,
-        },
-    );
-
-    let mut connections = state.lock().await;
-    if let Some(handle) = connections.get(&tab_id) {
-        if handle.is_finished() {
-            connections.remove(&tab_id);
-        }
+    // Only the generation that still owns the tab reports the close, so a
+    // stream that was superseded by a newer connect stays silent.
+    if remove_connection_if_current(&connections, tab_id, id).await {
+        emit(&app, payload(tab_id, url, "close"));
     }
 }
 
@@ -418,39 +448,39 @@ pub async fn sse_connect(
         return Err("SSE URL is required".to_string());
     }
 
-    // Close any existing connection on this tab.
-    {
-        let mut connections = state.connections.lock().await;
-        if let Some(handle) = connections.remove(&request.tab_id) {
-            handle.abort();
+    let (shutdown_tx, shutdown_rx) = oneshot::channel();
+    let id = state.next_id.fetch_add(1, Ordering::Relaxed);
+
+    // Hold the lock across signal + spawn + insert so a concurrent connect on
+    // the same tab cannot interleave and leave the older stream registered.
+    let mut connections = state.connections.lock().await;
+
+    if let Some(previous) = connections.get_mut(&request.tab_id) {
+        if let Some(shutdown) = previous.shutdown.take() {
+            let _ = shutdown.send(());
         }
     }
 
-    let app_clone = app.clone();
-    let connections = state.connections.clone();
-    let tab_id = request.tab_id.clone();
-    let url = request.url.clone();
-    let headers = request.headers.unwrap_or_default();
-    let last_event_id = request.last_event_id;
+    tokio::spawn(run_stream(
+        app.clone(),
+        state.connections.clone(),
+        id,
+        StreamTarget {
+            tab_id: request.tab_id.clone(),
+            url: request.url.clone(),
+            headers: request.headers.unwrap_or_default(),
+            last_event_id: request.last_event_id,
+        },
+        shutdown_rx,
+    ));
 
-    let connections_for_task = connections.clone();
-    let tab_id_for_task = tab_id.clone();
-    let handle = tokio::spawn(async move {
-        run_stream(
-            app_clone,
-            connections_for_task,
-            tab_id_for_task,
-            url,
-            headers,
-            last_event_id,
-        )
-        .await;
-    });
-
-    {
-        let mut connections = state.connections.lock().await;
-        connections.insert(tab_id, handle);
-    }
+    connections.insert(
+        request.tab_id,
+        SseConnection {
+            id,
+            shutdown: Some(shutdown_tx),
+        },
+    );
 
     Ok(SseCommandResponse { success: true })
 }
@@ -464,14 +494,169 @@ pub async fn sse_close(
         return Err("Tab ID is required".to_string());
     }
 
-    let handle = {
-        let mut connections = state.connections.lock().await;
-        connections.remove(&tab_id)
-    };
-
-    if let Some(handle) = handle {
-        handle.abort();
+    // The entry stays in place: the task removes itself once it has unwound,
+    // which is what lets it emit the terminal `close` for this tab.
+    let mut connections = state.connections.lock().await;
+    if let Some(connection) = connections.get_mut(&tab_id) {
+        if let Some(shutdown) = connection.shutdown.take() {
+            let _ = shutdown.send(());
+        }
     }
 
     Ok(SseCommandResponse { success: true })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_frame(lines: &[&str]) -> PartialEvent {
+        let mut partial = PartialEvent::default();
+        for line in lines {
+            parse_line(line, &mut partial);
+        }
+        partial
+    }
+
+    #[test]
+    fn strips_exactly_one_space_after_the_colon() {
+        let partial = parse_frame(&["data: hello", "data:  indented", "data:tight"]);
+        assert_eq!(partial.data, vec!["hello", " indented", "tight"]);
+    }
+
+    #[test]
+    fn treats_a_line_without_a_colon_as_a_field_with_an_empty_value() {
+        let partial = parse_frame(&["data"]);
+        assert_eq!(partial.data, vec![""]);
+    }
+
+    #[test]
+    fn ignores_comments_and_unknown_fields() {
+        let partial = parse_frame(&[": keep-alive", "banana: yellow", ":"]);
+        assert!(partial.is_empty());
+    }
+
+    #[test]
+    fn joins_multiple_data_lines_with_a_newline() {
+        let mut partial = parse_frame(&["event: update", "data: one", "data: two"]);
+        let parts = partial.take_payload().expect("expected a payload");
+        assert_eq!(parts.event, Some("update".to_string()));
+        assert_eq!(parts.data, Some("one\ntwo".to_string()));
+    }
+
+    #[test]
+    fn an_empty_data_field_still_dispatches() {
+        let mut partial = parse_frame(&["data:"]);
+        let parts = partial.take_payload().expect("expected a payload");
+        assert_eq!(parts.data, Some(String::new()));
+    }
+
+    #[test]
+    fn ignores_an_id_containing_a_null_byte() {
+        let partial = parse_frame(&["id: a\0b"]);
+        assert_eq!(partial.id, None);
+    }
+
+    #[test]
+    fn the_last_event_id_persists_into_the_following_frame() {
+        let mut partial = parse_frame(&["id: 42", "data: first"]);
+        let first = partial.take_payload().expect("expected a payload");
+        assert_eq!(first.id, Some("42".to_string()));
+
+        parse_line("data: second", &mut partial);
+        let second = partial.take_payload().expect("expected a payload");
+        assert_eq!(second.id, Some("42".to_string()));
+        assert_eq!(second.data, Some("second".to_string()));
+    }
+
+    #[test]
+    fn parses_retry_and_ignores_a_non_numeric_one() {
+        assert_eq!(parse_frame(&["retry: 5000"]).retry, Some(5000));
+        assert_eq!(parse_frame(&["retry: soon"]).retry, None);
+    }
+
+    #[test]
+    fn take_payload_returns_none_for_empty_and_comment_only_frames() {
+        assert_eq!(PartialEvent::default().take_payload(), None);
+        assert_eq!(parse_frame(&[": ping"]).take_payload(), None);
+        assert_eq!(parse_frame(&["id: 7"]).take_payload(), None);
+    }
+
+    #[test]
+    fn take_payload_clears_data_and_event_but_not_id() {
+        let mut partial = parse_frame(&["id: 7", "event: tick", "data: x"]);
+        partial.take_payload().expect("expected a payload");
+        assert!(partial.data.is_empty());
+        assert_eq!(partial.event, None);
+        assert_eq!(partial.id, Some("7".to_string()));
+    }
+
+    #[test]
+    fn drains_lf_and_crlf_terminated_lines() {
+        let mut buffer = b"data: one\ndata: two\r\n\r\n".to_vec();
+        assert_eq!(
+            drain_lines(&mut buffer),
+            vec![
+                "data: one".to_string(),
+                "data: two".to_string(),
+                String::new()
+            ]
+        );
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn leaves_an_unterminated_line_buffered() {
+        let mut buffer = b"data: done\ndata: partial".to_vec();
+        assert_eq!(drain_lines(&mut buffer), vec!["data: done".to_string()]);
+        assert_eq!(buffer, b"data: partial");
+        assert!(drain_lines(&mut buffer).is_empty());
+    }
+
+    #[test]
+    fn reassembles_a_multi_byte_character_split_across_chunks() {
+        let frame = "data: 🎉\n".as_bytes();
+        let (head, tail) = frame.split_at(8);
+        assert!(
+            std::str::from_utf8(head).is_err(),
+            "split must land mid-character"
+        );
+
+        let mut buffer = head.to_vec();
+        assert!(drain_lines(&mut buffer).is_empty());
+
+        buffer.extend_from_slice(tail);
+        assert_eq!(drain_lines(&mut buffer), vec!["data: 🎉".to_string()]);
+    }
+
+    #[test]
+    fn builds_headers_with_accept_and_last_event_id() {
+        let mut headers = HashMap::new();
+        headers.insert("Authorization".to_string(), "Bearer token".to_string());
+
+        let map = build_header_map(&headers, Some("42")).expect("expected a header map");
+        assert_eq!(map.get(ACCEPT).unwrap(), "text/event-stream");
+        assert_eq!(map.get("authorization").unwrap(), "Bearer token");
+        assert_eq!(map.get("last-event-id").unwrap(), "42");
+    }
+
+    #[test]
+    fn rejects_an_invalid_header_name_or_value() {
+        let mut bad_name = HashMap::new();
+        bad_name.insert("Bad Header".to_string(), "value".to_string());
+        let err = build_header_map(&bad_name, None).expect_err("expected an error");
+        assert!(err.contains("Invalid header name"));
+
+        let mut bad_value = HashMap::new();
+        bad_value.insert("X-Trace".to_string(), "line\nbreak".to_string());
+        let err = build_header_map(&bad_value, None).expect_err("expected an error");
+        assert!(err.contains("Invalid header value"));
+    }
+
+    #[test]
+    fn skips_an_unusable_last_event_id_rather_than_failing() {
+        let map =
+            build_header_map(&HashMap::new(), Some("bad\nid")).expect("expected a header map");
+        assert!(map.get("last-event-id").is_none());
+    }
 }

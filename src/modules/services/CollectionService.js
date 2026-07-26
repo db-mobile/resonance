@@ -7,6 +7,7 @@ import { getCurrentEndpoint, setCurrentEndpoint } from '../state/currentEndpoint
 import { app } from '../appContext.js';
 import { setRequestBodyContent, getRequestBodyContent } from '../requestBodyHelper.js';
 import { toast } from '../ui/Toast.js';
+import { notifyUrlUpdated } from '../ui/mirroredUrlSection.js';
 
 /**
  * Service for managing API collection business logic
@@ -719,6 +720,7 @@ export class CollectionService {
             }
 
             formElements.urlInput.value = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+            notifyUrlUpdated(formElements.urlInput);
 
             if (typeof window !== 'undefined' && app.setUrlUpdating) {
                 setTimeout(() => {
