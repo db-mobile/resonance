@@ -8,6 +8,7 @@
 import { createLazyEditorProxy } from './editorLoader.js';
 import { templateLoader } from './templateLoader.js';
 import { attachCopyHandler, attachHeadersCopyHandler } from './copyHandler.js';
+import { attachSaveResponseHandler } from './responseSaver.js';
 import { PreviewManager } from './PreviewManager.js';
 
 export class ResponseContainerManager {
@@ -114,6 +115,8 @@ export class ResponseContainerManager {
         wrapper.querySelector('.preview-mode-buttons').dataset.tabId = tabId;
         wrapper.querySelectorAll('.preview-mode-btn').forEach(btn => btn.dataset.tabId = tabId);
         wrapper.querySelector('.copy-response-btn').dataset.tabId = tabId;
+        const saveBtn = wrapper.querySelector('.save-response-btn');
+        if (saveBtn) { saveBtn.dataset.tabId = tabId; }
         const headersCopyBtn = wrapper.querySelector('.copy-headers-btn');
         if (headersCopyBtn) { headersCopyBtn.dataset.tabId = tabId; }
         wrapper.querySelector('.response-body-container').dataset.tabId = tabId;
@@ -173,6 +176,11 @@ export class ResponseContainerManager {
         const copyBtn = wrapper.querySelector('.copy-response-btn');
         if (copyBtn) {
             attachCopyHandler(copyBtn, tabId);
+        }
+
+        const saveResponseBtn = wrapper.querySelector('.save-response-btn');
+        if (saveResponseBtn) {
+            attachSaveResponseHandler(saveResponseBtn, tabId);
         }
 
         const copyHeadersBtn = wrapper.querySelector('.copy-headers-btn');

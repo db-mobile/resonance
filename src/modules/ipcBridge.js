@@ -48,6 +48,7 @@ if (isTauri) {
         sendApiRequest: (requestOptions) => invoke('send_api_request', { requestOptions }),
         cancelApiRequest: () => invoke('cancel_api_request'),
         pickUploadFile: () => invoke('pick_upload_file'),
+        saveResponseBody: (defaultFileName, base64Data) => invoke('save_response_body', { defaultFileName, base64Data }),
         websocket: {
             send: (request) => invoke('websocket_send', { request }),
             close: (tabId) => invoke('websocket_close', { tabId })

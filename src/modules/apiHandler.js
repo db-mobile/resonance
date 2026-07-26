@@ -50,6 +50,7 @@ import { selectActiveOperationType } from './graphqlTransportWs.js';
 import { cancelStream as cancelGrpcStream, hasActiveStream as hasActiveGrpcStream } from './grpcStreamHandler.js';
 import { RequestBuilderService } from './services/RequestBuilderService.js';
 import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes } from './ResponseDisplayHelper.js';
+import { setResponseMeta, suggestedFileName } from './responseSaver.js';
 import { getIntrospectionQuery, buildClientSchema } from 'graphql';
 
 let responseEditor = null;
@@ -1052,16 +1053,28 @@ export async function handleSendRequest() {
 
             let formattedResponse;
             let languageHint;
-            if (typeof result.data === 'string') {
+            if (result.isBinary) {
+                const byteCount = result.size || 0;
+                formattedResponse = `[Binary response — ${byteCount} byte${byteCount === 1 ? '' : 's'}]\n\n`
+                    + `Content-Type: ${contentType || 'application/octet-stream'}\n\n`
+                    + 'This response is not text. Use the Save button in the response toolbar to write it to a file.';
+                languageHint = 'text';
+            } else if (typeof result.data === 'string') {
                 formattedResponse = result.data;
             } else {
                 formattedResponse = JSON.stringify(result.data, null, 2);
                 languageHint = 'json';
             }
 
+            setResponseMeta(requestTabId, {
+                isBinary: Boolean(result.isBinary),
+                base64: result.bodyBase64 || null,
+                suggestedName: suggestedFileName(url, contentType)
+            });
+
             displayResponseWithLineNumbersForTab(formattedResponse, contentType, requestTabId, languageHint);
 
-            if (app.schemaController) {
+            if (app.schemaController && !result.isBinary) {
                 app.schemaController.setLastResponseBody(result.data);
                 if (isGraphQLMode()) {
                     clearSchemaValidationBadge(requestTabId);
