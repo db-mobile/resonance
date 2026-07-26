@@ -8,6 +8,26 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
+/// Maximum MQTT packet size (incoming and outgoing). rumqttc defaults to only
+/// 10 KiB, which tears the connection down on any non-trivial JSON payload; a
+/// testing client needs to handle realistically large messages. Bounded so a
+/// rogue broker cannot force an unbounded per-packet allocation.
+const MAX_MQTT_PACKET_SIZE: usize = 64 * 1024 * 1024;
+
+/// Build the base MQTT options (identity, keep-alive, packet size). Credentials
+/// and TLS transport are layered on by the caller.
+fn base_mqtt_options(
+    client_id: String,
+    host: String,
+    port: u16,
+    keep_alive_secs: u64,
+) -> MqttOptions {
+    let mut options = MqttOptions::new(client_id, host, port);
+    options.set_keep_alive(Duration::from_secs(keep_alive_secs));
+    options.set_max_packet_size(MAX_MQTT_PACKET_SIZE, MAX_MQTT_PACKET_SIZE);
+    options
+}
+
 struct MqttConnection {
     client: AsyncClient,
     poll_handle: JoinHandle<()>,
@@ -214,8 +234,12 @@ async fn establish_connection(
         .filter(|id| !id.trim().is_empty())
         .unwrap_or_else(|| format!("resonance-{}", &uuid::Uuid::new_v4().to_string()[..8]));
 
-    let mut mqtt_options = MqttOptions::new(client_id, host.clone(), port);
-    mqtt_options.set_keep_alive(Duration::from_secs(request.keep_alive.unwrap_or(60)));
+    let mut mqtt_options = base_mqtt_options(
+        client_id,
+        host.clone(),
+        port,
+        request.keep_alive.unwrap_or(60),
+    );
 
     if let Some(username) = request.username.as_ref().filter(|value| !value.is_empty()) {
         mqtt_options.set_credentials(username, request.password.clone().unwrap_or_default());
@@ -488,6 +512,16 @@ pub async fn mqtt_close(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn base_options_raise_packet_size_above_default() {
+        let options = base_mqtt_options("client".to_string(), "localhost".to_string(), 1883, 60);
+        assert_eq!(options.max_packet_size(), MAX_MQTT_PACKET_SIZE);
+        assert!(
+            options.max_packet_size() > 10 * 1024,
+            "must exceed rumqttc's 10 KiB default"
+        );
+    }
 
     #[test]
     fn parses_plain_mqtt_with_explicit_port() {
