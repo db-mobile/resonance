@@ -50,11 +50,13 @@ export class HistoryController {
      * @param {Object} requestConfig - The request configuration object
      * @param {Object} result - The response result object
      * @param {Object|null} [currentEndpoint=null] - Optional current endpoint context
+     * @param {string} [environmentName=null] - Active environment name
+     * @param {Object} [sensitive={}] - Extra credential locations to redact ({ headerNames, queryNames })
      * @returns {Promise<void>}
      */
-    async addHistoryEntry(requestConfig, result, currentEndpoint = null, environmentName = null) {
+    async addHistoryEntry(requestConfig, result, currentEndpoint = null, environmentName = null, sensitive = {}) {
         try {
-            await this.service.createHistoryEntry(requestConfig, result, currentEndpoint, environmentName);
+            await this.service.createHistoryEntry(requestConfig, result, currentEndpoint, environmentName, sensitive);
             await this.renderer.refresh();
         } catch (error) {
             void error;
