@@ -130,12 +130,6 @@
   gap: var(--space-3);
 }
 
-.grpc-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
 .grpc-field-input {
   width: 100%;
 }
@@ -200,7 +194,7 @@
   gap: var(--space-3);
 }
 
-.mqtt-field-row .grpc-field {
+.mqtt-field-row .form-group {
   flex: 1;
 }
 

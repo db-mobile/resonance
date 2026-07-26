@@ -1,0 +1,16 @@
+/**
+ * Form rows: a label stacked over its control. Shared by dialogs, settings and
+ * the protocol panels, which each used to declare an identical private copy.
+ */
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.form-label {
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  opacity: var(--dim-opacity);
+}

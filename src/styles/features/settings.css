@@ -175,19 +175,6 @@
   gap: var(--space-3);
 }
 
-.proxy-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.proxy-field > label,
-.cert-field > label {
-  font-size: var(--font-size-caption);
-  font-weight: 700;
-  opacity: var(--dim-opacity);
-}
-
 .proxy-field-grow {
   flex: 1;
 }
@@ -229,12 +216,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-
-.cert-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
 }
 
 .cert-file-row {

@@ -1,19 +1,7 @@
 /**
- * Shared dialog content patterns: form groups, confirm/rename bodies,
- * the keyboard-shortcuts overlay, cURL/code-snippet output panes.
+ * Shared dialog content patterns: confirm/rename bodies, the keyboard-shortcuts
+ * overlay, cURL/code-snippet output panes. Form rows live in widgets/form.css.
  */
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.form-label {
-  font-size: var(--font-size-caption);
-  font-weight: 700;
-  opacity: var(--dim-opacity);
-}
 
 .dialog-message {
   opacity: 0.8;
