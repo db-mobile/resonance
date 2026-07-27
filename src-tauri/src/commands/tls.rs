@@ -374,7 +374,10 @@ mod tests {
         }
 
         let run = |args: &[&str]| {
-            let output = Command::new("openssl").args(args).output().expect("run openssl");
+            let output = Command::new("openssl")
+                .args(args)
+                .output()
+                .expect("run openssl");
             assert!(
                 output.status.success(),
                 "openssl {:?} failed: {}",
@@ -398,17 +401,52 @@ mod tests {
         .unwrap();
 
         run(&[
-            "req", "-x509", "-newkey", "ec", "-pkeyopt",
-            "ec_paramgen_curve:prime256v1", "-nodes", "-keyout", &ca_key, "-out", &ca_cert,
-            "-days", "1", "-subj", "/CN=resonance-test-ca",
+            "req",
+            "-x509",
+            "-newkey",
+            "ec",
+            "-pkeyopt",
+            "ec_paramgen_curve:prime256v1",
+            "-nodes",
+            "-keyout",
+            &ca_key,
+            "-out",
+            &ca_cert,
+            "-days",
+            "1",
+            "-subj",
+            "/CN=resonance-test-ca",
         ]);
         run(&[
-            "req", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes",
-            "-keyout", &server_key, "-out", &csr, "-subj", "/CN=localhost",
+            "req",
+            "-newkey",
+            "ec",
+            "-pkeyopt",
+            "ec_paramgen_curve:prime256v1",
+            "-nodes",
+            "-keyout",
+            &server_key,
+            "-out",
+            &csr,
+            "-subj",
+            "/CN=localhost",
         ]);
         run(&[
-            "x509", "-req", "-in", &csr, "-CA", &ca_cert, "-CAkey", &ca_key, "-CAcreateserial",
-            "-out", &server_cert, "-days", "1", "-extfile", ext_file.to_str().unwrap(),
+            "x509",
+            "-req",
+            "-in",
+            &csr,
+            "-CA",
+            &ca_cert,
+            "-CAkey",
+            &ca_key,
+            "-CAcreateserial",
+            "-out",
+            &server_cert,
+            "-days",
+            "1",
+            "-extfile",
+            ext_file.to_str().unwrap(),
         ]);
 
         Some(CertFixture {
@@ -427,10 +465,11 @@ mod tests {
             rustls_pemfile::certs(&mut std::io::Cursor::new(std::fs::read(cert_path).unwrap()))
                 .collect::<Result<_, _>>()
                 .unwrap();
-        let key =
-            rustls_pemfile::private_key(&mut std::io::Cursor::new(std::fs::read(key_path).unwrap()))
-                .unwrap()
-                .unwrap();
+        let key = rustls_pemfile::private_key(&mut std::io::Cursor::new(
+            std::fs::read(key_path).unwrap(),
+        ))
+        .unwrap()
+        .unwrap();
 
         let provider = Arc::new(rustls::crypto::ring::default_provider());
         let config = rustls::ServerConfig::builder_with_provider(provider)

@@ -89,6 +89,10 @@
   transition: background-color var(--transition-fast), opacity var(--transition-fast);
 }
 
+.copy-btn ~ .copy-btn {
+  margin-left: 0;
+}
+
 .copy-btn:hover {
   background-color: var(--shade-color);
   opacity: 1;
