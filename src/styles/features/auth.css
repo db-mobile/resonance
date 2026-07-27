@@ -91,16 +91,3 @@
   font-size: var(--font-size-caption);
   opacity: var(--dim-opacity);
 }
-
-.select-wrapper {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.select-wrapper .select-arrow {
-  position: absolute;
-  right: var(--space-2);
-  pointer-events: none;
-  opacity: var(--dim-opacity);
-}

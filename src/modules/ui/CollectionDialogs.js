@@ -255,7 +255,7 @@ export class CollectionDialogs {
         const collections = await this.collectionRepository.getAll();
         const defaultStoragePath = await this.backendAPI.collections.getPath().catch(() => '');
 
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             const fragment = templateLoader.cloneSync(
                 './src/templates/collections/newDialogs.html',
                 'tpl-save-to-collection-dialog'
@@ -432,13 +432,22 @@ export class CollectionDialogs {
                         await this.collectionRepository.savePersistedUrl(targetCollectionId, newEndpoint.id, requestData.url);
                     }
 
+                    const targetCollection = collections.find(entry => entry.id === targetCollectionId);
+
                     finish({
                         collectionId: targetCollectionId,
                         endpointId: newEndpoint.id,
-                        name
+                        name,
+                        collectionName: targetCollection?.name
+                            || (selectedCollectionId === '__new__' ? newCollectionInput.value.trim() : '')
                     });
                 } catch (error) {
-                    finish(null);
+                    if (!resolved) {
+                        resolved = true;
+                        keydownController.abort();
+                        dialog.remove();
+                        reject(error);
+                    }
                 }
             });
 

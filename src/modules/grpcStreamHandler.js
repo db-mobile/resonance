@@ -1,4 +1,5 @@
 import { displayResponseWithLineNumbersForTab } from './apiHandler.js';
+import { recordGrpcHistory } from './grpcHistory.js';
 import { toast } from './ui/Toast.js';
 import {
     StreamSession,
@@ -75,7 +76,41 @@ async function handleBackendEvent(event) {
             `CLOSED ${payload.status ?? 0} ${payload.statusMessage || ''}`.trim(),
             trailerStr.trim()
         );
+
+        await recordClosedStream(tabId, payload);
     }
+}
+
+/**
+ * Write the finished stream to history. The transcript stands in for a response
+ * body, and the close event carries the terminal status — an `error` event is
+ * always followed by a `close` with the same status, so recording here captures
+ * every outcome exactly once. A stream still open when the app exits is not
+ * recorded, since history entries are written once and never updated.
+ *
+ * @param {string} tabId - Tab that owned the stream
+ * @param {Object} payload - The close event payload
+ * @returns {Promise<void>}
+ */
+async function recordClosedStream(tabId, payload) {
+    const entry = session.get(tabId);
+    const context = entry?.historyContext;
+    if (!context) {
+        return;
+    }
+
+    await recordGrpcHistory({
+        ...context,
+        result: {
+            success: Number(payload.status ?? 0) === 0,
+            status: payload.status ?? 0,
+            statusMessage: payload.statusMessage || '',
+            data: entry.transcript || '',
+            headers: payload.headers || {},
+            trailers: payload.trailers || null,
+            ttfb: entry.startedAt ? Date.now() - entry.startedAt : null
+        }
+    });
 }
 
 export const initGrpcStreamHandler = createBackendEventListener(
@@ -91,8 +126,9 @@ export function hasActiveStream(tabId) {
 
 /**
  * Start a new stream or push another message into an open client/bidi stream.
- * @param {object} opts - {target, fullMethod, requestJson, metadata, tls, protoPath, canSend}
+ * @param {object} opts - {target, fullMethod, requestJson, metadata, tls, protoPath, canSend, historyContext}
  *   canSend=true for client-streaming or bidi (the stream accepts additional messages).
+ *   historyContext is stashed on the session and written to history when the stream closes.
  */
 export async function startOrSend(opts) {
     await initGrpcStreamHandler();
@@ -125,7 +161,9 @@ export async function startOrSend(opts) {
     session.set(tabId, {
         fullMethod: opts.fullMethod,
         state: 'connecting',
-        transcript: ''
+        transcript: '',
+        historyContext: opts.historyContext || null,
+        startedAt: Date.now()
     });
     displayResponseWithLineNumbersForTab('', null, tabId);
 
@@ -148,6 +186,13 @@ export async function startOrSend(opts) {
         toast.error(`gRPC stream error: ${msg}`);
         await session.append(tabId, 'ERROR', msg);
         await session.updateStatus(tabId, `gRPC stream error: ${msg}`);
+
+        if (opts.historyContext) {
+            await recordGrpcHistory({
+                ...opts.historyContext,
+                result: { success: false, status: null, statusMessage: msg, data: null }
+            });
+        }
     }
 }
 

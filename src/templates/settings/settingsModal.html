@@ -185,8 +185,8 @@
 <template id="tpl-cert-entry">
     <div class="cert-entry">
         <div class="cert-entry-header u-flex u-items-center u-justify-between">
-            <div class="cert-field cert-field-grow">
-                <label data-i18n="settings.certs_host">Host</label>
+            <div class="form-group cert-field-grow">
+                <label class="form-label" data-i18n="settings.certs_host">Host</label>
                 <input type="text" class="input-base" name="certHost" placeholder="api.example.com" autocomplete="off">
             </div>
             <label class="toggle-switch cert-enabled-toggle">
@@ -270,8 +270,8 @@
 
             <div class="proxy-manual-settings">
                 <div class="proxy-row u-flex">
-                    <div class="proxy-field proxy-field-with-arrow">
-                        <label data-i18n="settings.proxy_type">Type</label>
+                    <div class="form-group proxy-field-with-arrow">
+                        <label class="form-label" data-i18n="settings.proxy_type">Type</label>
                         <div class="select-wrapper">
                             <select name="proxyType" class="select-base proxy-type-select">
                                 <option value="http">HTTP</option>
@@ -285,12 +285,12 @@
                 </div>
 
                 <div class="proxy-row u-flex">
-                    <div class="proxy-field proxy-field-grow">
-                        <label data-i18n="settings.proxy_host">Host</label>
+                    <div class="form-group proxy-field-grow">
+                        <label class="form-label" data-i18n="settings.proxy_host">Host</label>
                         <input type="text" name="proxyHost" class="entry" placeholder="proxy.example.com">
                     </div>
-                    <div class="proxy-field proxy-field-port">
-                        <label data-i18n="settings.proxy_port">Port</label>
+                    <div class="form-group proxy-field-port">
+                        <label class="form-label" data-i18n="settings.proxy_port">Port</label>
                         <input type="number" name="proxyPort" class="entry" min="1" max="65535">
                     </div>
                 </div>
@@ -305,22 +305,22 @@
 
                 <div class="proxy-auth-fields is-hidden">
                     <div class="proxy-row u-flex">
-                        <div class="proxy-field proxy-field-grow">
-                            <label data-i18n="settings.proxy_username">Username</label>
+                        <div class="form-group proxy-field-grow">
+                            <label class="form-label" data-i18n="settings.proxy_username">Username</label>
                             <input type="text" name="proxyUsername" class="entry" autocomplete="off">
                         </div>
                     </div>
                     <div class="proxy-row u-flex">
-                        <div class="proxy-field proxy-field-grow">
-                            <label data-i18n="settings.proxy_password">Password</label>
+                        <div class="form-group proxy-field-grow">
+                            <label class="form-label" data-i18n="settings.proxy_password">Password</label>
                             <input type="password" name="proxyPassword" class="entry" autocomplete="off">
                         </div>
                     </div>
                 </div>
 
                 <div class="proxy-row u-flex">
-                    <div class="proxy-field proxy-field-grow">
-                        <label data-i18n="settings.proxy_bypass">Bypass List (comma-separated)</label>
+                    <div class="form-group proxy-field-grow">
+                        <label class="form-label" data-i18n="settings.proxy_bypass">Bypass List (comma-separated)</label>
                         <input type="text" name="proxyBypass" class="entry" placeholder="localhost, *.internal.com">
                         <p class="proxy-field-help">Domains to bypass proxy (supports wildcards: *.example.com)</p>
                     </div>

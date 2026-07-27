@@ -108,11 +108,27 @@ function getCollectionRepository() {
 }
 
 let _requestBuilderService = null;
-function getRequestBuilderService() {
+export function getRequestBuilderService() {
     if (!_requestBuilderService) {
         _requestBuilderService = new RequestBuilderService(getVariableService, getCollectionRepository);
     }
     return _requestBuilderService;
+}
+
+/**
+ * Generates auth data for the current request with 'inherit' resolved to the
+ * owning collection's auth config. Used by every interactive send path.
+ *
+ * @returns {Promise<Object>} Auth data ({headers, queryParams, authConfig, awsAuth?})
+ */
+export async function generateEffectiveAuthData() {
+    const current = getCurrentEndpoint();
+    const resolved = await resolveEffectiveAuthConfig(authManager.getAuthConfig(), {
+        collectionId: current?.collectionId,
+        endpointId: current?.endpointId,
+        repository: getCollectionRepository()
+    });
+    return authManager.generateAuthData(resolved);
 }
 
 /**
@@ -123,23 +139,7 @@ function getRequestBuilderService() {
  * @param {Object} requestConfig - Fully built request configuration
  * @returns {void}
  */
-/**
- * Generates auth data for the current request with 'inherit' resolved to the
- * owning collection's auth config. Used by every interactive send path.
- *
- * @returns {Promise<Object>} Auth data ({headers, queryParams, authConfig, awsAuth?})
- */
-async function generateEffectiveAuthData() {
-    const current = getCurrentEndpoint();
-    const resolved = await resolveEffectiveAuthConfig(authManager.getAuthConfig(), {
-        collectionId: current?.collectionId,
-        endpointId: current?.endpointId,
-        repository: getCollectionRepository()
-    });
-    return authManager.generateAuthData(resolved);
-}
-
-function warnUnresolvedVariables(processor, requestConfig) {
+export function warnUnresolvedVariables(processor, requestConfig) {
     try {
         const unresolved = processor.extractUnresolvedVariableNames({
             url: requestConfig.url,
