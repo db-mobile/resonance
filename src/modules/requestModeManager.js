@@ -4,21 +4,11 @@
  */
 
 import { app } from './appContext.js';
+import { RequestMode } from './protocols/protocolRegistry.js';
 import { setResponseTabsForProtocol } from './tabManager.js';
 import { createMirroredUrlSection, syncMirroredUrlInput } from './ui/mirroredUrlSection.js';
 
-/**
- * Request protocol modes
- * @enum {string}
- */
-export const RequestMode = {
-    HTTP: 'http',
-    WEBSOCKET: 'websocket',
-    GRPC: 'grpc',
-    SSE: 'sse',
-    MQTT: 'mqtt',
-    GRAPHQL: 'graphql'
-};
+export { RequestMode };
 
 /**
  * Current request mode

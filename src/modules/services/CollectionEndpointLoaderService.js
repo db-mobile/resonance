@@ -4,6 +4,11 @@
  */
 
 import { app } from '../appContext.js';
+import {
+    getProtocol,
+    projectPersistedData,
+    endpointHttpMethod
+} from '../protocols/protocolRegistry.js';
 
 /**
  * Coordinates endpoint hydration for selection and restore flows.
@@ -77,38 +82,29 @@ export class CollectionEndpointLoaderService {
             requestBodyString = this.collectionService.generateRequestBody(endpoint.requestBody);
         }
 
-        const isGrpc = endpoint.protocol === 'grpc';
-        const isWebSocket = endpoint.protocol === 'websocket';
-        const isGraphQL = endpoint.protocol === 'graphql';
+        const descriptor = getProtocol(endpoint.protocol);
         const persistedData = await this.repository.getAllPersistedEndpointData(collection.id, endpoint.id);
-
-        let protocol = 'http';
-        if (isGrpc) {
-            protocol = 'grpc';
-        } else if (isWebSocket) {
-            protocol = 'websocket';
-        } else if (isGraphQL) {
-            protocol = 'graphql';
-        }
+        const allowed = projectPersistedData(descriptor, persistedData);
 
         const endpointData = {
             ...endpoint,
             collectionId: collection.id,
-            protocol,
+            protocol: descriptor.id,
             collectionBaseUrl: collection.baseUrl,
             collectionDefaultHeaders: collection.defaultHeaders,
             path: endpoint.path,
-            method: endpoint.method,
+            method: endpointHttpMethod(endpoint),
             requestBodyString,
-            persistedUrl: isGrpc ? null : persistedData.url,
-            persistedAuthConfig: (isGrpc || isWebSocket) ? null : persistedData.authConfig,
-            persistedPathParams: (isGrpc || isWebSocket || isGraphQL) ? [] : persistedData.pathParams,
-            persistedQueryParams: (isGrpc || isGraphQL) ? [] : persistedData.queryParams,
-            persistedHeaders: isGrpc ? [] : persistedData.headers,
-            persistedBody: isGrpc ? null : persistedData.modifiedBody,
-            persistedFormBodyData: (isGrpc || isWebSocket) ? null : persistedData.formBodyData,
-            persistedGraphQLData: (isGrpc || isWebSocket) ? null : persistedData.graphqlData,
-            grpcData: isGrpc ? persistedData.grpcData : null
+            persistedUrl: allowed.url,
+            persistedAuthConfig: allowed.authConfig,
+            persistedPathParams: allowed.pathParams,
+            persistedQueryParams: allowed.queryParams,
+            persistedHeaders: allowed.headers,
+            persistedBody: allowed.modifiedBody,
+            persistedFormBodyData: allowed.formBodyData,
+            persistedGraphQLData: allowed.graphqlData,
+            persistedMqttData: allowed.mqttData,
+            grpcData: allowed.grpcData
         };
 
         await app.workspaceTabController.loadEndpoint(endpointData, false);
