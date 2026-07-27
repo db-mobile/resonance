@@ -4,20 +4,11 @@
  */
 
 import { app } from './appContext.js';
+import { RequestMode } from './protocols/protocolRegistry.js';
 import { setResponseTabsForProtocol } from './tabManager.js';
+import { createMirroredUrlSection, syncMirroredUrlInput } from './ui/mirroredUrlSection.js';
 
-/**
- * Request protocol modes
- * @enum {string}
- */
-export const RequestMode = {
-    HTTP: 'http',
-    WEBSOCKET: 'websocket',
-    GRPC: 'grpc',
-    SSE: 'sse',
-    MQTT: 'mqtt',
-    GRAPHQL: 'graphql'
-};
+export { RequestMode };
 
 /**
  * Current request mode
@@ -38,10 +29,19 @@ const HTTP_ONLY_TABS = ['path-params'];
 const HTTP_AND_WEBSOCKET_TABS = ['query-params', 'headers', 'body'];
 
 /**
- * Tabs shown in SSE mode (no body, since SSE is GET-only)
+ * Tabs shown in SSE mode. A streaming endpoint may take a request document
+ * (POST + JSON is the norm for LLM-style streams), so Body is available, and
+ * Authorization is editable rather than inherit-only.
  * @type {string[]}
  */
-const SSE_TABS = ['query-params', 'headers'];
+const SSE_TABS = ['query-params', 'headers', 'body', 'authorization'];
+
+/**
+ * Body modes offered in SSE mode. A streaming request sends one document;
+ * multipart and binary uploads have no meaning here.
+ * @type {string[]}
+ */
+const SSE_BODY_MODES = ['json', 'text'];
 
 /**
  * Tabs shown in MQTT mode (broker config tab + message payload)
@@ -169,6 +169,9 @@ function updateUIForMode(mode) {
         app.graphqlBodyManager.setGraphQLModeEnabled(false);
     }
 
+    // Every mode starts from the full body-mode list; SSE narrows it below.
+    restrictBodyModes(null);
+
     if (mode === RequestMode.GRPC) {
         if (methodSelectContainer) {
             methodSelectContainer.style.display = 'none';
@@ -214,8 +217,10 @@ function updateUIForMode(mode) {
             activateTab('grpc');
         }
     } else if (mode === RequestMode.SSE) {
+        // Both the method select and the SSE badge are shown: the method is
+        // now the user's to choose, and the badge still marks the protocol.
         if (methodSelectContainer) {
-            methodSelectContainer.style.display = 'none';
+            methodSelectContainer.style.display = '';
         }
         if (urlInputContainer) {
             urlInputContainer.style.display = 'none';
@@ -240,8 +245,12 @@ function updateUIForMode(mode) {
         });
 
         if (bodyModeContainer) {
-            bodyModeContainer.style.display = 'none';
+            bodyModeContainer.style.display = '';
         }
+        if (bodyModeSelect) {
+            bodyModeSelect.disabled = false;
+        }
+        restrictBodyModes(SSE_BODY_MODES);
         if (app.graphqlBodyManager) {
             app.graphqlBodyManager.setGraphQLModeEnabled(false);
         }
@@ -440,19 +449,144 @@ function activateTab(tabId) {
 }
 
 /**
+ * The full body-mode list, captured from the markup so option labels stay in
+ * one place. Refreshed whenever the complete set is present, so a later edit or
+ * translation is picked up rather than pinned at first use.
+ * @type {{value: string, text: string}[]|null}
+ */
+let bodyModeOptionTemplate = null;
+
+/**
+ * Limit which body modes the mode select offers. Pass `null` to restore the
+ * full list. When the current selection is no longer allowed it falls back to
+ * the first permitted mode, switching the body panel with it.
+ *
+ * Options are added and removed rather than marked `hidden`: WebKit — which is
+ * what the app actually runs on under Linux — ignores `hidden` on `<option>`,
+ * so hidden entries would still appear in the dropdown.
+ *
+ * @param {string[]|null} allowed
+ */
+function restrictBodyModes(allowed) {
+    const bodyModeSelect = document.getElementById('body-mode-select');
+    if (!bodyModeSelect) {
+        return;
+    }
+
+    if (bodyModeSelect.options.length >= (bodyModeOptionTemplate?.length || 0)) {
+        bodyModeOptionTemplate = Array.from(bodyModeSelect.options, (option) => ({
+            value: option.value,
+            text: option.textContent
+        }));
+    }
+
+    const wanted = allowed
+        ? bodyModeOptionTemplate.filter((option) => allowed.includes(option.value))
+        : bodyModeOptionTemplate;
+
+    const present = Array.from(bodyModeSelect.options, (option) => option.value).join(',');
+    if (present !== wanted.map((option) => option.value).join(',')) {
+        const selected = bodyModeSelect.value;
+        bodyModeSelect.textContent = '';
+        for (const { value, text } of wanted) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = text;
+            bodyModeSelect.appendChild(option);
+        }
+        bodyModeSelect.value = selected;
+    }
+
+    if (!bodyModeSelect.value && wanted.length > 0) {
+        bodyModeSelect.value = wanted[0].value;
+        app.graphqlBodyManager?.switchMode(wanted[0].value);
+    }
+}
+
+/**
+ * Per-mode configuration for the protocol URL bars that replace the HTTP
+ * method select while a non-HTTP mode is active. `syncQueryParams` is off for
+ * the MQTT broker: it is not a query-bearing URL, so driving the query-params
+ * table from it would only clear it. gRPC is absent because its bar, with the
+ * TLS toggle, lives in the markup and drives `grpc-target-input` directly.
+ */
+const MIRRORED_URL_SECTIONS = {
+    websocket: {
+        sectionId: 'websocket-url-section',
+        method: 'WS',
+        label: 'WS',
+        inputId: 'websocket-url-input',
+        inputType: 'url',
+        placeholder: 'wss://echo.websocket.events',
+        ariaLabel: 'WebSocket URL',
+        peerId: 'url-input',
+        syncQueryParams: true
+    },
+    sse: {
+        sectionId: 'sse-url-section',
+        method: 'SSE',
+        label: 'SSE',
+        inputId: 'sse-url-input',
+        inputType: 'url',
+        placeholder: 'https://example.com/events',
+        ariaLabel: 'SSE URL',
+        peerId: 'url-input',
+        syncQueryParams: true
+    },
+    graphql: {
+        sectionId: 'graphql-url-section',
+        method: 'GRAPHQL',
+        label: 'GraphQL',
+        inputId: 'graphql-url-input',
+        inputType: 'url',
+        placeholder: 'https://api.example.com/graphql',
+        ariaLabel: 'GraphQL Endpoint URL',
+        peerId: 'url-input',
+        syncQueryParams: true
+    },
+    mqtt: {
+        sectionId: 'mqtt-url-section',
+        method: 'MQTT',
+        label: 'MQTT',
+        inputId: 'mqtt-broker-input',
+        inputType: 'text',
+        placeholder: 'mqtt://localhost:1883',
+        ariaLabel: 'MQTT Broker URL',
+        peerId: 'url-input'
+    }
+};
+
+/**
+ * Show or hide one of the protocol URL bars, creating it on first use.
+ * @param {keyof MIRRORED_URL_SECTIONS} mode
+ * @param {boolean} show
+ */
+function toggleMirroredUrlSection(mode, show) {
+    const config = MIRRORED_URL_SECTIONS[mode];
+    let section = document.getElementById(config.sectionId);
+
+    if (show) {
+        if (!section) {
+            section = createMirroredUrlSection(config);
+        }
+        if (section) {
+            syncMirroredUrlInput(config.inputId, config.peerId);
+            section.style.display = 'flex';
+        }
+    } else if (section) {
+        section.style.display = 'none';
+    }
+}
+
+/**
  * Show or hide the gRPC URL section elements
  * @param {boolean} show
  */
 function showGrpcUrlSection(show) {
-    let grpcUrlSection = document.getElementById('grpc-url-section');
-    
-    if (show) {
-        if (!grpcUrlSection) {
-            grpcUrlSection = createGrpcUrlSection();
-        }
-        grpcUrlSection.style.display = 'flex';
-    } else if (grpcUrlSection) {
-        grpcUrlSection.style.display = 'none';
+    const grpcUrlSection = document.getElementById('grpc-url-section');
+
+    if (grpcUrlSection) {
+        grpcUrlSection.style.display = show ? 'flex' : 'none';
     }
 }
 
@@ -461,382 +595,19 @@ function showGrpcUrlSection(show) {
  * @param {boolean} show
  */
 function showWebSocketUrlSection(show) {
-    let websocketUrlSection = document.getElementById('websocket-url-section');
-
-    if (show) {
-        if (!websocketUrlSection) {
-            websocketUrlSection = createWebSocketUrlSection();
-        }
-        if (websocketUrlSection) {
-            syncWebSocketUrlInput();
-            websocketUrlSection.style.display = 'flex';
-        }
-    } else if (websocketUrlSection) {
-        websocketUrlSection.style.display = 'none';
-    }
-}
-
-/**
- * Create the gRPC URL section elements
- * @returns {HTMLElement}
- */
-function createGrpcUrlSection() {
-    const requestUrlSection = document.querySelector('.request-url-section');
-    if (!requestUrlSection) {
-        return null;
-    }
-    
-    const grpcSection = document.createElement('div');
-    grpcSection.id = 'grpc-url-section';
-    grpcSection.className = 'grpc-url-section';
-    grpcSection.style.display = 'none';
-    
-    const badge = document.createElement('span');
-    badge.className = 'method-pill';
-    badge.dataset.method = 'GRPC';
-    badge.textContent = 'gRPC';
-    
-    const targetWrapper = document.createElement('div');
-    targetWrapper.className = 'grpc-target-wrapper';
-    
-    const existingTarget = document.getElementById('grpc-target-input');
-    const targetInput = document.createElement('input');
-    targetInput.type = 'text';
-    targetInput.id = 'grpc-url-target-input';
-    targetInput.className = 'input-base url-input';
-    targetInput.placeholder = 'localhost:50051';
-    targetInput.setAttribute('aria-label', 'gRPC Target');
-    
-    if (existingTarget) {
-        targetInput.value = existingTarget.value;
-        targetInput.addEventListener('input', () => {
-            existingTarget.value = targetInput.value;
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
-        });
-        existingTarget.addEventListener('input', () => {
-            targetInput.value = existingTarget.value;
-        });
-    }
-    
-    targetWrapper.appendChild(targetInput);
-    
-    grpcSection.appendChild(badge);
-    grpcSection.appendChild(targetWrapper);
-    
-    const methodSelectContainer = document.querySelector('.method-select-container');
-    if (methodSelectContainer) {
-        methodSelectContainer.after(grpcSection);
-    } else {
-        requestUrlSection.prepend(grpcSection);
-    }
-    
-    return grpcSection;
-}
-
-/**
- * Create the WebSocket URL section elements
- * @returns {HTMLElement}
- */
-function createWebSocketUrlSection() {
-    const requestUrlSection = document.querySelector('.request-url-section');
-    if (!requestUrlSection) {
-        return null;
-    }
-
-    const websocketSection = document.createElement('div');
-    websocketSection.id = 'websocket-url-section';
-    websocketSection.className = 'grpc-url-section';
-    websocketSection.style.display = 'none';
-
-    const badge = document.createElement('span');
-    badge.className = 'method-pill';
-    badge.dataset.method = 'WS';
-    badge.textContent = 'WS';
-
-    const targetWrapper = document.createElement('div');
-    targetWrapper.className = 'grpc-target-wrapper';
-
-    const existingUrlInput = document.getElementById('url-input');
-    const urlInput = document.createElement('input');
-    urlInput.type = 'url';
-    urlInput.id = 'websocket-url-input';
-    urlInput.className = 'input-base url-input';
-    urlInput.placeholder = 'wss://echo.websocket.events';
-    urlInput.setAttribute('aria-label', 'WebSocket URL');
-
-    if (existingUrlInput) {
-        urlInput.value = existingUrlInput.value;
-        urlInput.addEventListener('input', () => {
-            existingUrlInput.value = urlInput.value;
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
-        });
-        existingUrlInput.addEventListener('input', () => {
-            urlInput.value = existingUrlInput.value;
-        });
-    }
-
-    targetWrapper.appendChild(urlInput);
-    websocketSection.appendChild(badge);
-    websocketSection.appendChild(targetWrapper);
-
-    const methodSelectContainer = document.querySelector('.method-select-container');
-    if (methodSelectContainer) {
-        methodSelectContainer.after(websocketSection);
-    } else {
-        requestUrlSection.prepend(websocketSection);
-    }
-
-    return websocketSection;
+    toggleMirroredUrlSection('websocket', show);
 }
 
 function showSseUrlSection(show) {
-    let sseUrlSection = document.getElementById('sse-url-section');
-
-    if (show) {
-        if (!sseUrlSection) {
-            sseUrlSection = createSseUrlSection();
-        }
-        if (sseUrlSection) {
-            syncSseUrlInput();
-            sseUrlSection.style.display = 'flex';
-        }
-    } else if (sseUrlSection) {
-        sseUrlSection.style.display = 'none';
-    }
-}
-
-function createSseUrlSection() {
-    const requestUrlSection = document.querySelector('.request-url-section');
-    if (!requestUrlSection) {
-        return null;
-    }
-
-    const sseSection = document.createElement('div');
-    sseSection.id = 'sse-url-section';
-    sseSection.className = 'grpc-url-section';
-    sseSection.style.display = 'none';
-
-    const badge = document.createElement('span');
-    badge.className = 'method-pill';
-    badge.dataset.method = 'SSE';
-    badge.textContent = 'SSE';
-
-    const targetWrapper = document.createElement('div');
-    targetWrapper.className = 'grpc-target-wrapper';
-
-    const existingUrlInput = document.getElementById('url-input');
-    const urlInput = document.createElement('input');
-    urlInput.type = 'url';
-    urlInput.id = 'sse-url-input';
-    urlInput.className = 'input-base url-input';
-    urlInput.placeholder = 'https://example.com/events';
-    urlInput.setAttribute('aria-label', 'SSE URL');
-
-    if (existingUrlInput) {
-        urlInput.value = existingUrlInput.value;
-        urlInput.addEventListener('input', () => {
-            existingUrlInput.value = urlInput.value;
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
-        });
-        existingUrlInput.addEventListener('input', () => {
-            urlInput.value = existingUrlInput.value;
-        });
-    }
-
-    targetWrapper.appendChild(urlInput);
-    sseSection.appendChild(badge);
-    sseSection.appendChild(targetWrapper);
-
-    const methodSelectContainer = document.querySelector('.method-select-container');
-    if (methodSelectContainer) {
-        methodSelectContainer.after(sseSection);
-    } else {
-        requestUrlSection.prepend(sseSection);
-    }
-
-    return sseSection;
-}
-
-function syncSseUrlInput() {
-    const existingUrlInput = document.getElementById('url-input');
-    const sseUrlInput = document.getElementById('sse-url-input');
-
-    if (existingUrlInput && sseUrlInput) {
-        sseUrlInput.value = existingUrlInput.value;
-    }
+    toggleMirroredUrlSection('sse', show);
 }
 
 function showGraphQLUrlSection(show) {
-    let graphqlUrlSection = document.getElementById('graphql-url-section');
-
-    if (show) {
-        if (!graphqlUrlSection) {
-            graphqlUrlSection = createGraphQLUrlSection();
-        }
-        if (graphqlUrlSection) {
-            syncGraphQLUrlInput();
-            graphqlUrlSection.style.display = 'flex';
-        }
-    } else if (graphqlUrlSection) {
-        graphqlUrlSection.style.display = 'none';
-    }
-}
-
-function createGraphQLUrlSection() {
-    const requestUrlSection = document.querySelector('.request-url-section');
-    if (!requestUrlSection) {
-        return null;
-    }
-
-    const graphqlSection = document.createElement('div');
-    graphqlSection.id = 'graphql-url-section';
-    graphqlSection.className = 'grpc-url-section';
-    graphqlSection.style.display = 'none';
-
-    const badge = document.createElement('span');
-    badge.className = 'method-pill';
-    badge.dataset.method = 'GRAPHQL';
-    badge.textContent = 'GraphQL';
-
-    const targetWrapper = document.createElement('div');
-    targetWrapper.className = 'grpc-target-wrapper';
-
-    const existingUrlInput = document.getElementById('url-input');
-    const urlInput = document.createElement('input');
-    urlInput.type = 'url';
-    urlInput.id = 'graphql-url-input';
-    urlInput.className = 'input-base url-input';
-    urlInput.placeholder = 'https://api.example.com/graphql';
-    urlInput.setAttribute('aria-label', 'GraphQL Endpoint URL');
-
-    if (existingUrlInput) {
-        urlInput.value = existingUrlInput.value;
-        urlInput.addEventListener('input', () => {
-            existingUrlInput.value = urlInput.value;
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
-        });
-        existingUrlInput.addEventListener('input', () => {
-            urlInput.value = existingUrlInput.value;
-        });
-    }
-
-    targetWrapper.appendChild(urlInput);
-    graphqlSection.appendChild(badge);
-    graphqlSection.appendChild(targetWrapper);
-
-    const methodSelectContainer = document.querySelector('.method-select-container');
-    if (methodSelectContainer) {
-        methodSelectContainer.after(graphqlSection);
-    } else {
-        requestUrlSection.prepend(graphqlSection);
-    }
-
-    return graphqlSection;
-}
-
-function syncGraphQLUrlInput() {
-    const existingUrlInput = document.getElementById('url-input');
-    const graphqlUrlInput = document.getElementById('graphql-url-input');
-
-    if (existingUrlInput && graphqlUrlInput) {
-        graphqlUrlInput.value = existingUrlInput.value;
-    }
+    toggleMirroredUrlSection('graphql', show);
 }
 
 function showMqttUrlSection(show) {
-    let mqttUrlSection = document.getElementById('mqtt-url-section');
-
-    if (show) {
-        if (!mqttUrlSection) {
-            mqttUrlSection = createMqttUrlSection();
-        }
-        if (mqttUrlSection) {
-            syncMqttBrokerInput();
-            mqttUrlSection.style.display = 'flex';
-        }
-    } else if (mqttUrlSection) {
-        mqttUrlSection.style.display = 'none';
-    }
-}
-
-function createMqttUrlSection() {
-    const requestUrlSection = document.querySelector('.request-url-section');
-    if (!requestUrlSection) {
-        return null;
-    }
-
-    const mqttSection = document.createElement('div');
-    mqttSection.id = 'mqtt-url-section';
-    mqttSection.className = 'grpc-url-section';
-    mqttSection.style.display = 'none';
-
-    const badge = document.createElement('span');
-    badge.className = 'method-pill';
-    badge.dataset.method = 'MQTT';
-    badge.textContent = 'MQTT';
-
-    const targetWrapper = document.createElement('div');
-    targetWrapper.className = 'grpc-target-wrapper';
-
-    const existingUrlInput = document.getElementById('url-input');
-    const brokerInput = document.createElement('input');
-    brokerInput.type = 'text';
-    brokerInput.id = 'mqtt-broker-input';
-    brokerInput.className = 'input-base url-input';
-    brokerInput.placeholder = 'mqtt://localhost:1883';
-    brokerInput.setAttribute('aria-label', 'MQTT Broker URL');
-
-    if (existingUrlInput) {
-        brokerInput.value = existingUrlInput.value;
-        brokerInput.addEventListener('input', () => {
-            existingUrlInput.value = brokerInput.value;
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
-        });
-        existingUrlInput.addEventListener('input', () => {
-            brokerInput.value = existingUrlInput.value;
-        });
-    }
-
-    targetWrapper.appendChild(brokerInput);
-    mqttSection.appendChild(badge);
-    mqttSection.appendChild(targetWrapper);
-
-    const methodSelectContainer = document.querySelector('.method-select-container');
-    if (methodSelectContainer) {
-        methodSelectContainer.after(mqttSection);
-    } else {
-        requestUrlSection.prepend(mqttSection);
-    }
-
-    return mqttSection;
-}
-
-function syncMqttBrokerInput() {
-    const existingUrlInput = document.getElementById('url-input');
-    const mqttBrokerInput = document.getElementById('mqtt-broker-input');
-
-    if (existingUrlInput && mqttBrokerInput) {
-        mqttBrokerInput.value = existingUrlInput.value;
-    }
-}
-
-function syncWebSocketUrlInput() {
-    const existingUrlInput = document.getElementById('url-input');
-    const websocketUrlInput = document.getElementById('websocket-url-input');
-
-    if (existingUrlInput && websocketUrlInput) {
-        websocketUrlInput.value = existingUrlInput.value;
-    }
+    toggleMirroredUrlSection('mqtt', show);
 }
 
 /**

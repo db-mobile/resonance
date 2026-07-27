@@ -38,6 +38,8 @@
  * @property {Function} [setUrlUpdating]
  * @property {Function} [setGrpcMetadata]
  * @property {Function} [setGrpcTls]
+ * @property {Function} [captureGrpcState]
+ * @property {Function} [applyGrpcState]
  * @property {Function} [invalidateApiHandlerSettingsCache]
  * @property {Function} [invalidateApiHandlerEnvironmentCache]
  * @property {Function} [getApiHandlerSettingsCache]

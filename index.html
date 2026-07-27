@@ -153,6 +153,21 @@
                         <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                     </div>
 
+                    <div id="grpc-url-section" class="grpc-url-section" style="display: none;">
+                        <span class="method-pill" data-method="GRPC">gRPC</span>
+                        <div class="grpc-target-wrapper">
+                            <input type="text"
+                                   id="grpc-target-input"
+                                   class="entry url-input monospace"
+                                   placeholder="localhost:50051"
+                                   aria-label="gRPC Target">
+                        </div>
+                        <label class="check-label toggle-switch grpc-url-tls">
+                            <input type="checkbox" id="grpc-tls-checkbox" class="switch" aria-label="Use TLS">
+                            <span>TLS</span>
+                        </label>
+                    </div>
+
                     <input type="url"
                            id="url-input"
                            class="entry url-input monospace"
@@ -378,15 +393,8 @@
                                     <span id="grpc-connection-status" class="status-pill badge neutral" data-state="idle" role="status"></span>
                                 </header>
                                 <div class="grpc-source-card-body">
-                                    <label class="grpc-field">
-                                        <span class="grpc-field-label caption dim-label">Target</span>
-                                        <input id="grpc-target-input" type="text" class="entry grpc-field-input monospace" placeholder="localhost:50051" aria-label="gRPC Target">
-                                    </label>
+                                    <p class="grpc-source-card-hint caption dim-label">Fetch service definitions from the server itself.</p>
                                     <div class="grpc-source-card-actions">
-                                        <label class="check-label toggle-switch">
-                                            <input type="checkbox" id="grpc-tls-checkbox" class="switch" aria-label="Use TLS">
-                                            <span>TLS</span>
-                                        </label>
                                         <button id="grpc-connect-btn" class="button small" aria-label="Connect via Reflection">
                                             Connect
                                         </button>
@@ -403,6 +411,7 @@
                                     <div class="grpc-proto-filename-row">
                                         <span id="grpc-proto-filename" class="proto-filename caption" aria-live="polite"></span>
                                     </div>
+                                    <p class="grpc-source-card-hint caption dim-label">Use type definitions from a local file.</p>
                                     <div class="grpc-source-card-actions">
                                         <button id="grpc-load-proto-btn" class="button small" aria-label="Load Proto File">
                                             <span class="icon icon-14 icon-file"></span>
@@ -415,7 +424,7 @@
                                 </div>
                             </article>
                         </div>
-                        <p class="grpc-hint caption dim-label">Connect to a server with reflection enabled, or load a <code>.proto</code> file to use type definitions directly.</p>
+                        <p class="grpc-hint caption dim-label">Pick how the service and method lists are populated — whichever you use last is the active source. The target above applies to both.</p>
                     </section>
 
                     <section class="grpc-selectors">
@@ -447,7 +456,7 @@
                 </div>
 
                 <div class="tab-content" id="grpc-metadata" role="tabpanel">
-                    <ul id="grpc-metadata-list" class="key-value-list" aria-label="gRPC Metadata"></ul>
+                    <div id="grpc-metadata-list" class="key-value-list" role="group" aria-label="gRPC Metadata"></div>
                     <button type="button" id="grpc-add-metadata-btn" class="button flat small add-row-btn">
                         <span class="icon icon-12 icon-plus"></span> Add Metadata
                     </button>
@@ -473,18 +482,18 @@
                                 <h4 class="grpc-source-card-title heading" data-i18n="mqtt.section_messaging">Messaging</h4>
                             </header>
                             <div class="grpc-source-card-body">
-                                <label class="grpc-field">
+                                <label class="form-group">
                                     <span class="grpc-field-label caption dim-label" data-i18n="mqtt.subscribe_topic">Subscribe Topic</span>
                                     <input type="text" id="mqtt-subscribe-input" class="entry grpc-field-input monospace"
                                            placeholder="sensors/#" aria-label="MQTT Subscribe Topic">
                                 </label>
                                 <div class="mqtt-field-row">
-                                    <label class="grpc-field mqtt-field-grow">
+                                    <label class="form-group mqtt-field-grow">
                                         <span class="grpc-field-label caption dim-label" data-i18n="mqtt.publish_topic">Publish Topic</span>
                                         <input type="text" id="mqtt-topic-input" class="entry grpc-field-input monospace"
                                                placeholder="sensors/temperature" aria-label="MQTT Publish Topic">
                                     </label>
-                                    <label class="grpc-field mqtt-field-qos">
+                                    <label class="form-group mqtt-field-qos">
                                         <span class="grpc-field-label caption dim-label" data-i18n="mqtt.qos">QoS</span>
                                         <div class="select-wrapper select-wrap">
                                             <select id="mqtt-qos-select" class="select-base" aria-label="MQTT QoS Level">
@@ -504,18 +513,18 @@
                                 <h4 class="grpc-source-card-title heading" data-i18n="mqtt.section_connection_auth">Connection &amp; Auth</h4>
                             </header>
                             <div class="grpc-source-card-body">
-                                <label class="grpc-field">
+                                <label class="form-group">
                                     <span class="grpc-field-label caption dim-label" data-i18n="mqtt.client_id">Client ID</span>
                                     <input type="text" id="mqtt-client-id-input" class="entry grpc-field-input monospace"
                                            placeholder="auto-generated" aria-label="MQTT Client ID">
                                 </label>
                                 <div class="mqtt-field-row">
-                                    <label class="grpc-field">
+                                    <label class="form-group">
                                         <span class="grpc-field-label caption dim-label" data-i18n="mqtt.username">Username</span>
                                         <input type="text" id="mqtt-username-input" class="entry grpc-field-input"
                                                placeholder="(optional)" autocomplete="off" aria-label="MQTT Username">
                                     </label>
-                                    <label class="grpc-field">
+                                    <label class="form-group">
                                         <span class="grpc-field-label caption dim-label" data-i18n="mqtt.password">Password</span>
                                         <input type="password" id="mqtt-password-input" class="entry grpc-field-input"
                                                placeholder="(optional)" autocomplete="off" aria-label="MQTT Password">

@@ -119,6 +119,24 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.1.5" date="2026-07-27">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Give SSE support for request method and body, editable auth, and TLS, certificate and proxy parity with HTTP</li>
+          <li>Fix SSE stream lifecycle, frame parsing, retry bounds, connect timeout, and URL/query-parameter mirroring</li>
+          <li>Honour TLS settings on WebSocket and GraphQL subscription connections</li>
+          <li>Resolve variables and auth in gRPC requests and record gRPC calls in request history</li>
+          <li>Preserve the endpoint protocol through a shared protocol registry</li>
+          <li>Keep the GraphQL schema tree alive across tab switches</li>
+          <li>Open history entries in their own workspace tab</li>
+          <li>Fix Ctrl+S saving into the previously opened request</li>
+          <li>Bound streaming transcripts and coalesce their persistence</li>
+          <li>Decode legacy-charset response bodies as text instead of binary</li>
+          <li>Fix the chevron floating outside dialog dropdowns and align response toolbar actions to the right edge</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.1.4" date="2026-07-26">
       <description>
         <p>Feature stabilization release</p>

@@ -134,7 +134,7 @@ export class HistoryRenderer {
     }
 
     renderHistoryItem(entry) {
-        const statusColor = this.service.getStatusColor(entry.response?.status);
+        const statusDisplay = this.service.getStatusDisplay(entry);
         const methodColor = this.service.getMethodColor(entry.request.method);
         const timestamp = this.service.formatTimestamp(entry.timestamp);
         const url = this.service.truncateUrl(entry.request.url, 60);
@@ -167,14 +167,14 @@ export class HistoryRenderer {
         }
 
         if (statusSlotEl) {
-            if (entry.response?.status) {
+            if (statusDisplay) {
                 const statusFragment = templateLoader.cloneSync(
                     './src/templates/history/historyRenderer.html',
                     'tpl-history-status-badge'
                 );
                 const statusEl = statusFragment.firstElementChild;
-                statusEl.textContent = entry.response.status;
-                statusEl.style.setProperty('--history-status-color', statusColor);
+                statusEl.textContent = statusDisplay.text;
+                statusEl.style.setProperty('--history-status-color', statusDisplay.color);
                 statusSlotEl.appendChild(statusEl);
             } else {
                 const statusFragment = templateLoader.cloneSync(

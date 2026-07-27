@@ -33,36 +33,10 @@ export class WorkspaceTabStateManager {
         const { isGrpcMode, isWebSocketMode, isSseMode, isMqttMode, isGraphQLMode } = await import('./requestModeManager.js');
         
         if (isGrpcMode()) {
-            const grpcRequestJson = app.grpcBodyEditor
-                ? app.grpcBodyEditor.getContent()
-                : (this.dom.grpcBodyInput?.value || '{}');
-            
-            const metadata = {};
-            const grpcMetadataList = document.getElementById('grpc-metadata-list');
-            if (grpcMetadataList) {
-                grpcMetadataList.querySelectorAll('.key-value-row').forEach(row => {
-                    const key = row.querySelector('.key-input')?.value?.trim();
-                    const value = row.querySelector('.value-input')?.value || '';
-                    if (key) {
-                        metadata[key] = value;
-                    }
-                });
-            }
-            
-            const grpcTlsCheckbox = document.getElementById('grpc-tls-checkbox');
-            const useTls = grpcTlsCheckbox?.checked || false;
-            
             return {
                 request: {
                     protocol: 'grpc',
-                    grpc: {
-                        target: this.dom.grpcTargetInput?.value || '',
-                        service: this.dom.grpcServiceSelect?.value || '',
-                        fullMethod: this.dom.grpcMethodSelect?.value || '',
-                        requestJson: grpcRequestJson || '{}',
-                        metadata,
-                        useTls
-                    }
+                    grpc: app.captureGrpcState ? app.captureGrpcState() : {}
                 },
                 endpoint: getCurrentEndpoint()
                     ? {
@@ -76,17 +50,26 @@ export class WorkspaceTabStateManager {
 
         if (isSseMode()) {
             const sseUrlInput = document.getElementById('sse-url-input');
+            const sseBodyMode = document.getElementById('body-mode-select')?.value === 'text'
+                ? 'text'
+                : 'json';
+            const authConfig = authManager.getAuthConfig();
             return {
                 request: {
                     protocol: 'sse',
                     url: sseUrlInput?.value || this.dom.urlInput?.value || '',
-                    method: 'GET',
+                    method: this.dom.methodSelect?.value || 'GET',
                     pathParams: {},
                     queryParams: parseKeyValuePairs(this.dom.queryParamsList),
                     headers: parseKeyValuePairs(this.dom.headersList),
-                    body: { mode: 'none', content: '' },
-                    authType: 'none',
-                    authConfig: {}
+                    body: {
+                        mode: sseBodyMode,
+                        content: sseBodyMode === 'text'
+                            ? (app.requestBodyTextEditor?.getContent() || '')
+                            : (getRequestBodyContent() || '')
+                    },
+                    authType: authConfig?.type || 'none',
+                    authConfig: authConfig?.config || {}
                 },
                 endpoint: getCurrentEndpoint()
                     ? {
@@ -269,6 +252,34 @@ export class WorkspaceTabStateManager {
     }
 
     /**
+     * Point the shared "current endpoint" at the tab being restored, clearing it
+     * when the tab is not backed by a collection endpoint.
+     *
+     * The non-HTTP protocol branches return early and so never reach the HTTP
+     * path's set-or-clear logic. Without the clear, switching to an unsaved tab
+     * left the previous tab's endpoint in place, and everything keyed off it —
+     * Ctrl+S, send-time auto-save, collection variable scope, history
+     * attribution — silently addressed the wrong request.
+     *
+     * A tab record with no `endpoint` key at all is left alone, matching the
+     * HTTP path's guard.
+     *
+     * @private
+     * @param {Object} tab - The tab being restored
+     * @param {Object|null} endpoint - The tab's endpoint, if any
+     * @returns {void}
+     */
+    _applyTabEndpoint(tab, endpoint) {
+        if (endpoint) {
+            setCurrentEndpoint(endpoint);
+            return;
+        }
+        if (Object.prototype.hasOwnProperty.call(tab, 'endpoint')) {
+            setCurrentEndpoint(null);
+        }
+    }
+
+    /**
      * Restore tab state to UI elements
      * @param {Object} tab
      * @returns {Promise<void>}
@@ -314,31 +325,12 @@ export class WorkspaceTabStateManager {
                 setTimeout(ensureGrpcTabActive, 0);
             }
             
-            if (this.dom.grpcTargetInput) {
-                this.dom.grpcTargetInput.value = request.grpc?.target || '';
+            if (app.applyGrpcState) {
+                app.applyGrpcState(request.grpc || {});
             }
-            if (this.dom.grpcBodyInput) {
-                this.dom.grpcBodyInput.value = request.grpc?.requestJson || '{}';
-            }
-            if (app.grpcBodyEditor) {
-                app.grpcBodyEditor.setContent(request.grpc?.requestJson || '{}');
-            }
-            if (this.dom.grpcServiceSelect) {
-                this.dom.grpcServiceSelect.value = request.grpc?.service || '';
-            }
-            if (this.dom.grpcMethodSelect) {
-                this.dom.grpcMethodSelect.value = request.grpc?.fullMethod || '';
-            }
-            if (app.setGrpcMetadata) {
-                app.setGrpcMetadata(request.grpc?.metadata || {});
-            }
-            if (app.setGrpcTls) {
-                app.setGrpcTls(request.grpc?.useTls || false);
-            }
-            
-            if (endpoint) {
-                setCurrentEndpoint(endpoint);
-            }
+
+
+            this._applyTabEndpoint(tab, endpoint);
             return;
         }
 
@@ -351,6 +343,18 @@ export class WorkspaceTabStateManager {
             const sseUrlInput = document.getElementById('sse-url-input');
             if (sseUrlInput) {
                 sseUrlInput.value = request.url || '';
+            }
+
+            if (this.dom.methodSelect) {
+                this.dom.methodSelect.value = request.method || 'GET';
+            }
+
+            if (request.body?.mode === 'text') {
+                this.graphqlBodyManager?.switchMode('text');
+                app.requestBodyTextEditor?.setContent(request.body.content || '');
+            } else {
+                this.graphqlBodyManager?.switchMode('json');
+                setRequestBodyContent(request.body?.content || '');
             }
 
             if (this.dom.queryParamsList) {
@@ -372,6 +376,13 @@ export class WorkspaceTabStateManager {
                 }
             }
 
+            if (authManager) {
+                authManager.loadAuthConfig({
+                    type: request.authType || 'none',
+                    config: request.authConfig || {}
+                });
+            }
+
             const activeResponseTab = tab.activeResponseTab || 'response-body';
             activateTab('response', activeResponseTab);
 
@@ -381,9 +392,7 @@ export class WorkspaceTabStateManager {
                 this._clearResponse(tab.id);
             }
 
-            if (endpoint) {
-                setCurrentEndpoint(endpoint);
-            }
+            this._applyTabEndpoint(tab, endpoint);
             return;
         }
 
@@ -431,15 +440,11 @@ export class WorkspaceTabStateManager {
                 this._clearResponse(tab.id);
             }
 
-            if (endpoint) {
-                setCurrentEndpoint(endpoint);
-            }
+            this._applyTabEndpoint(tab, endpoint);
             return;
         }
 
         if (request.protocol === 'graphql') {
-            setRequestMode(RequestMode.GRAPHQL);
-
             if (this.dom.urlInput) {
                 this.dom.urlInput.value = request.url || '';
             }
@@ -447,6 +452,8 @@ export class WorkspaceTabStateManager {
             if (graphqlUrlInput) {
                 graphqlUrlInput.value = request.url || '';
             }
+
+            setRequestMode(RequestMode.GRAPHQL);
 
             if (this.dom.pathParamsList) {
                 clearKeyValueList(this.dom.pathParamsList);
@@ -460,6 +467,7 @@ export class WorkspaceTabStateManager {
                 this.graphqlBodyManager.setGraphQLVariables(request.variables || '');
                 this.graphqlBodyManager.selectedOperationName = request.operationName || null;
                 this.graphqlBodyManager.updateOperationPicker();
+                await this.graphqlBodyManager.autoApplySchemaForUrl?.(request.url || '');
             }
 
             if (this.dom.headersList) {
@@ -487,9 +495,7 @@ export class WorkspaceTabStateManager {
                 this._clearResponse(tab.id);
             }
 
-            if (endpoint) {
-                setCurrentEndpoint(endpoint);
-            }
+            this._applyTabEndpoint(tab, endpoint);
             return;
         }
 
@@ -533,9 +539,7 @@ export class WorkspaceTabStateManager {
 
             import('./mqttHandler.js').then(m => m.refreshMqttConnectionUi(tab.id));
 
-            if (endpoint) {
-                setCurrentEndpoint(endpoint);
-            }
+            this._applyTabEndpoint(tab, endpoint);
             return;
         }
 

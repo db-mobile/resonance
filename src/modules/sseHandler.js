@@ -1,4 +1,5 @@
 import { clearResponseDisplayForTab } from './apiHandler.js';
+import { resolveTlsOptions } from './tlsOptions.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
 import {
@@ -21,6 +22,11 @@ const session = new StreamSession({
     })
 });
 
+/**
+ * Render one dispatched event the way it arrived on the wire. `retry` is not
+ * shown here: it never rides along with a message — the backend applies it and
+ * reports it on the `reconnecting` event instead.
+ */
 function formatMessage(payload) {
     const parts = [];
     if (payload.event) {
@@ -28,9 +34,6 @@ function formatMessage(payload) {
     }
     if (payload.id) {
         parts.push(`id: ${payload.id}`);
-    }
-    if (payload.retry !== null && payload.retry !== undefined) {
-        parts.push(`retry: ${payload.retry}`);
     }
     if (payload.data !== null && payload.data !== undefined) {
         parts.push(payload.data);
@@ -44,7 +47,14 @@ async function handleBackendEvent(event) {
     if (!tabId) {
         return;
     }
-    const current = session.get(tabId) || {};
+    const current = session.get(tabId);
+
+    // A closed tab drops its session before the backend has finished unwinding,
+    // and its terminal `close` still arrives. Rendering it would resurrect the
+    // tab's response container, so anything without a live session is ignored.
+    if (!current) {
+        return;
+    }
 
     if (current.url && url && current.url !== url && payload.eventType !== 'open') {
         return;
@@ -119,7 +129,14 @@ export const initSseHandler = createBackendEventListener(
     handleBackendEvent
 );
 
-export async function handleSseConnect(url, headers = {}) {
+/**
+ * @param {string} url
+ * @param {Object<string, string>} [headers]
+ * @param {object} [options]
+ * @param {string} [options.method] - defaults to GET on the backend.
+ * @param {string|null} [options.body] - raw body, replayed on each reconnect.
+ */
+export async function handleSseConnect(url, headers = {}, { method, body } = {}) {
     await initSseHandler();
 
     if (!window.backendAPI?.sse) {
@@ -151,11 +168,18 @@ export async function handleSseConnect(url, headers = {}) {
         await window.backendAPI.sse.connect({
             tabId,
             url: trimmed,
+            method,
+            body,
             headers,
-            lastEventId
+            lastEventId,
+            ...(await resolveTlsOptions(trimmed))
         });
         await session.updateStatus(tabId, 'SSE connecting...', null);
     } catch (error) {
+        // The stream never started, so nothing will emit a terminal event for
+        // it — drop the session rather than leave the tab stuck on "connecting".
+        session.remove(tabId);
+        await session.updateStatus(tabId, 'SSE connection failed', null);
         toast.error(`SSE connection failed: ${error.message || error}`);
     }
 }

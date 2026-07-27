@@ -84,6 +84,7 @@ fn main() {
                 commands::fs_secure::restrict_dir(&dir);
                 commands::fs_secure::restrict_file(&dir.join("resonance-store.json"));
             }
+            commands::proxy::hydrate_from_store(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

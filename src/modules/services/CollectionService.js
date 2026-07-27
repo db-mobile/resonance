@@ -5,8 +5,15 @@
 
 import { getCurrentEndpoint, setCurrentEndpoint } from '../state/currentEndpoint.js';
 import { app } from '../appContext.js';
+import {
+    getProtocol,
+    derivePath,
+    deriveMethod,
+    deriveHttpMethod
+} from '../protocols/protocolRegistry.js';
 import { setRequestBodyContent, getRequestBodyContent } from '../requestBodyHelper.js';
 import { toast } from '../ui/Toast.js';
+import { notifyUrlUpdated } from '../ui/mirroredUrlSection.js';
 
 /**
  * Service for managing API collection business logic
@@ -257,29 +264,15 @@ export class CollectionService {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }
 
-            const isGrpc = requestData.protocol === 'grpc';
-            const isWebSocket = requestData.protocol === 'websocket';
-            const isGraphQL = requestData.protocol === 'graphql';
-
-            let protocol = 'http';
-            let { method } = requestData;
-            if (isGrpc) {
-                protocol = 'grpc';
-                method = 'GRPC';
-            } else if (isWebSocket) {
-                protocol = 'websocket';
-                method = 'WS';
-            } else if (isGraphQL) {
-                protocol = 'graphql';
-                method = 'GQL';
-            }
+            const descriptor = getProtocol(requestData.protocol);
+            const httpMethod = deriveHttpMethod(descriptor, requestData);
 
             const newEndpoint = {
                 id: this.generateEndpointId(collection),
                 name: requestData.name,
-                protocol,
-                method,
-                path: isGrpc ? requestData.fullMethod : ((isWebSocket || isGraphQL) ? (requestData.url || requestData.path) : requestData.path),
+                protocol: descriptor.id,
+                method: deriveMethod(descriptor, requestData),
+                path: derivePath(descriptor, requestData),
                 description: '',
                 parameters: {
                     query: {},
@@ -290,12 +283,16 @@ export class CollectionService {
                 headers: {}
             };
 
+            if (httpMethod) {
+                newEndpoint.httpMethod = httpMethod;
+            }
+
             collection.endpoints = collection.endpoints || [];
             collection.endpoints.push(newEndpoint);
 
             if (collection.folders && collection.folders.length > 0) {
                 const basePath = this.extractBasePath(
-                    isGrpc ? '/grpc' : (isWebSocket ? '/websocket' : (isGraphQL ? '/graphql' : requestData.path))
+                    descriptor.folderBucket ?? requestData.path
                 );
                 
                 let targetFolder = collection.folders.find(folder => folder.name === basePath);
@@ -314,37 +311,66 @@ export class CollectionService {
 
             await this.repository.update(collectionId, collection);
 
-            if (isGrpc) {
-                await this.repository.saveGrpcData(collectionId, newEndpoint.id, {
-                    target: requestData.target || '',
-                    service: requestData.service || '',
-                    fullMethod: requestData.fullMethod || '',
-                    requestJson: requestData.requestJson || '{}'
-                });
-            } else if (isWebSocket) {
-                await this.repository.savePersistedUrl(
-                    collectionId,
-                    newEndpoint.id,
-                    requestData.url || requestData.path || ''
-                );
-            } else if (isGraphQL) {
-                await this.repository.savePersistedUrl(
-                    collectionId,
-                    newEndpoint.id,
-                    requestData.url || requestData.path || ''
-                );
-                await this.repository.saveGraphQLData(collectionId, newEndpoint.id, {
-                    query: requestData.query || '',
-                    variables: requestData.variables || '',
-                    operationName: requestData.operationName || null
-                });
-            }
+            await this.persistNewEndpointSidecars(collectionId, newEndpoint.id, descriptor, requestData);
 
             this.statusDisplay.update(`Added new request: ${requestData.name}`, null);
             return newEndpoint;
         } catch (error) {
             this.statusDisplay.update(`Error adding request: ${error.message}`, null);
             throw error;
+        }
+    }
+
+    /**
+     * Writes the per-protocol sidecar data a freshly created endpoint needs.
+     *
+     * Which writes happen is decided by the protocol descriptor rather than by
+     * the protocol id, so a protocol that stores a URL gets one without needing
+     * a branch here.
+     *
+     * @private
+     * @param {string} collectionId - The collection identifier
+     * @param {string} endpointId - The new endpoint's identifier
+     * @param {Object} descriptor - The protocol descriptor
+     * @param {Object} requestData - The captured request data
+     * @returns {Promise<void>}
+     */
+    async persistNewEndpointSidecars(collectionId, endpointId, descriptor, requestData) {
+        const { createSidecars } = descriptor;
+
+        if (createSidecars.includes('url')) {
+            await this.repository.savePersistedUrl(
+                collectionId,
+                endpointId,
+                requestData.url || requestData.broker || requestData.path || ''
+            );
+        }
+
+        if (createSidecars.includes('grpcData')) {
+            await this.repository.saveGrpcData(collectionId, endpointId, {
+                target: requestData.target || '',
+                service: requestData.service || '',
+                fullMethod: requestData.fullMethod || '',
+                requestJson: requestData.requestJson || '{}'
+            });
+        }
+
+        if (createSidecars.includes('graphqlData')) {
+            await this.repository.saveGraphQLData(collectionId, endpointId, {
+                query: requestData.query || '',
+                variables: requestData.variables || '',
+                operationName: requestData.operationName || null
+            });
+        }
+
+        if (createSidecars.includes('mqttData')) {
+            await this.repository.saveMqttData(collectionId, endpointId, {
+                clientId: requestData.clientId || '',
+                username: requestData.username || '',
+                subscribeTopic: requestData.subscribeTopic || '',
+                publishTopic: requestData.publishTopic || '',
+                qos: requestData.qos || 0
+            });
         }
     }
 
@@ -719,6 +745,7 @@ export class CollectionService {
             }
 
             formElements.urlInput.value = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+            notifyUrlUpdated(formElements.urlInput);
 
             if (typeof window !== 'undefined' && app.setUrlUpdating) {
                 setTimeout(() => {

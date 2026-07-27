@@ -5,15 +5,20 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::{mpsc, Mutex};
 use tokio_tungstenite::{
-    connect_async,
+    connect_async_tls_with_config,
     tungstenite::{client::IntoClientRequest, protocol::Message},
 };
+
+use super::api_request::ClientCertConfig;
+use super::tls::{build_ws_connector, ws_uri_is_secure};
 
 #[derive(Clone)]
 struct WebSocketConnection {
     sender: mpsc::UnboundedSender<WebSocketCommand>,
     url: String,
     headers: HashMap<String, String>,
+    verify_ssl: bool,
+    client_cert: Option<ClientCertConfig>,
 }
 
 enum WebSocketCommand {
@@ -42,6 +47,14 @@ pub struct WebSocketSendRequest {
     pub headers: Option<HashMap<String, String>>,
     #[serde(default)]
     pub message: Option<String>,
+    /// Mirrors the HTTP and SSE request options: `Some(false)` turns
+    /// certificate verification off, and the client certificate / custom CA are
+    /// resolved per host by the frontend from the certificate store. Both only
+    /// apply to `wss://` URLs.
+    #[serde(default)]
+    pub verify_ssl: Option<bool>,
+    #[serde(default)]
+    pub client_cert: Option<ClientCertConfig>,
 }
 
 #[derive(Debug, Serialize)]
@@ -84,6 +97,8 @@ async fn establish_connection(
     tab_id: String,
     url: String,
     headers: HashMap<String, String>,
+    verify_ssl: bool,
+    client_cert: Option<ClientCertConfig>,
 ) -> Result<mpsc::UnboundedSender<WebSocketCommand>, String> {
     let mut request = url
         .clone()
@@ -99,7 +114,15 @@ async fn establish_connection(
         request.headers_mut().insert(header_name, header_value);
     }
 
-    let (stream, _) = connect_async(request)
+    // Only `wss://` needs a TLS connector. Building one for a plaintext socket
+    // would let a stale certificate path break a connection that never uses it.
+    let connector = if ws_uri_is_secure(request.uri()) {
+        Some(build_ws_connector(verify_ssl, client_cert.as_ref())?)
+    } else {
+        None
+    };
+
+    let (stream, _) = connect_async_tls_with_config(request, None, false, connector)
         .await
         .map_err(|error| format!("Failed to connect: {}", error))?;
 
@@ -114,6 +137,8 @@ async fn establish_connection(
                 sender: sender.clone(),
                 url: url.clone(),
                 headers: headers.clone(),
+                verify_ssl,
+                client_cert: client_cert.clone(),
             },
         );
     }
@@ -256,6 +281,8 @@ async fn get_or_create_connection(
     tab_id: &str,
     url: &str,
     headers: &HashMap<String, String>,
+    verify_ssl: bool,
+    client_cert: &Option<ClientCertConfig>,
 ) -> Result<mpsc::UnboundedSender<WebSocketCommand>, String> {
     let existing = {
         let connections = state.connections.lock().await;
@@ -263,7 +290,14 @@ async fn get_or_create_connection(
     };
 
     if let Some(connection) = existing {
-        if connection.url == url && connection.headers == *headers {
+        // The TLS material is part of the identity of the socket: reusing a
+        // connection opened under different certificate settings would silently
+        // ignore the change the user just made.
+        if connection.url == url
+            && connection.headers == *headers
+            && connection.verify_ssl == verify_ssl
+            && connection.client_cert == *client_cert
+        {
             return Ok(connection.sender);
         }
 
@@ -278,6 +312,8 @@ async fn get_or_create_connection(
         tab_id.to_string(),
         url.to_string(),
         headers.clone(),
+        verify_ssl,
+        client_cert.clone(),
     )
     .await
 }
@@ -298,6 +334,7 @@ pub async fn websocket_send(
 
     let message = request.message.unwrap_or_default();
     let headers = request.headers.unwrap_or_default();
+    let verify_ssl = request.verify_ssl != Some(false);
 
     let sender = match get_or_create_connection(
         app.clone(),
@@ -305,6 +342,8 @@ pub async fn websocket_send(
         &request.tab_id,
         &request.url,
         &headers,
+        verify_ssl,
+        &request.client_cert,
     )
     .await
     {
@@ -353,4 +392,61 @@ pub async fn websocket_close(
     }
 
     Ok(WebSocketCommandResponse { success: true })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserializes_a_send_request_with_tls_options() {
+        let request: WebSocketSendRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "wss://example.com/socket",
+            "headers": { "Authorization": "Bearer t" },
+            "message": "ping",
+            "verifySsl": false,
+            "clientCert": {
+                "certPath": "/certs/client.crt",
+                "keyPath": "/certs/client.key",
+                "caPath": "/certs/ca.pem"
+            }
+        }))
+        .expect("expected the request to deserialize");
+
+        assert_eq!(request.verify_ssl, Some(false));
+        let cert = request.client_cert.expect("expected a client cert");
+        assert_eq!(cert.cert_path.as_deref(), Some("/certs/client.crt"));
+        assert_eq!(cert.ca_path.as_deref(), Some("/certs/ca.pem"));
+    }
+
+    /// A payload from before the TLS fields existed must still deserialize, and
+    /// an absent `verifySsl` has to mean verification stays on.
+    #[test]
+    fn a_request_without_tls_options_verifies_by_default() {
+        let request: WebSocketSendRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "wss://example.com/socket"
+        }))
+        .expect("expected the request to deserialize");
+
+        assert_eq!(request.verify_ssl, None);
+        assert!(request.client_cert.is_none());
+        assert!(request.verify_ssl != Some(false));
+    }
+
+    #[test]
+    fn only_a_secure_url_takes_the_connector_path() {
+        let secure = "wss://example.com/socket"
+            .to_string()
+            .into_client_request()
+            .unwrap();
+        let plain = "ws://example.com/socket"
+            .to_string()
+            .into_client_request()
+            .unwrap();
+
+        assert!(ws_uri_is_secure(secure.uri()));
+        assert!(!ws_uri_is_secure(plain.uri()));
+    }
 }

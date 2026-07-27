@@ -3,12 +3,9 @@
  * @module controllers/HistoryController
  */
 
-import { setCurrentEndpoint } from '../state/currentEndpoint.js';
+import { app } from '../appContext.js';
 import { HistoryService } from '../services/HistoryService.js';
 import { HistoryRenderer } from '../ui/HistoryRenderer.js';
-import { updateUrlFromQueryParams } from '../keyValueManager.js';
-import { setRequestBodyContent } from '../requestBodyHelper.js';
-import { templateLoader } from '../templateLoader.js';
 
 /**
  * Controller for coordinating request history operations between UI and services
@@ -66,165 +63,29 @@ export class HistoryController {
     /**
      * Handles user selection of a history entry
      *
-     * Loads the historical request data into the form UI for replay.
-     * Populates URL, method, headers, query params, and body from history.
-     * Clears current endpoint association since this is from history.
+     * Opens the entry in the workspace, which always means a tab of the entry's
+     * own protocol: the shared request form only shows the fields of the current
+     * protocol, so writing an HTTP entry into a gRPC tab would go unseen.
+     * Clicking the same entry again focuses the tab it already opened.
+     *
+     * Credentials were redacted when the entry was stored, so they come back as
+     * `[redacted]` and must be re-entered before resending.
      *
      * @async
      * @param {Object} historyEntry - The history entry object
      * @param {Object} historyEntry.request - The request data
-     * @param {string} historyEntry.request.url - Request URL
-     * @param {string} historyEntry.request.method - HTTP method
-     * @param {Object} [historyEntry.request.headers] - Request headers
-     * @param {Object} [historyEntry.request.body] - Request body
      * @returns {Promise<void>}
      */
     async handleHistorySelect(historyEntry) {
         try {
-            const urlInput = document.getElementById('url-input');
-            const methodSelect = document.getElementById('method-select');
-            const headersList = document.getElementById('headers-list');
-            const queryParamsList = document.getElementById('query-params-list');
-            const pathParamsList = document.getElementById('path-params-list');
-
-            if (urlInput) {
-                const rawUrl = historyEntry.request.rawUrl || historyEntry.request.url;
-                urlInput.value = rawUrl.split('?')[0];
+            if (!app.workspaceTabController) {
+                return;
             }
 
-            if (methodSelect) {
-                methodSelect.value = historyEntry.request.method;
-            }
-
-            if (historyEntry.request.body) {
-                setRequestBodyContent(JSON.stringify(historyEntry.request.body, null, 2));
-            } else {
-                setRequestBodyContent('');
-            }
-
-            this.clearKeyValueList(headersList);
-            this.clearKeyValueList(queryParamsList);
-            this.clearKeyValueList(pathParamsList);
-
-            if (historyEntry.request.headers && Object.keys(historyEntry.request.headers).length > 0) {
-                this.populateKeyValueList(headersList, historyEntry.request.headers);
-            } else {
-                this.addKeyValueRow(headersList, 'Content-Type', 'application/json');
-            }
-
-            const urlObj = new URL(historyEntry.request.url);
-            const queryParams = {};
-            urlObj.searchParams.forEach((value, key) => {
-                queryParams[key] = value;
-            });
-
-            if (Object.keys(queryParams).length > 0) {
-                this.populateKeyValueList(queryParamsList, queryParams);
-            } else {
-                this.addKeyValueRow(queryParamsList);
-            }
-
-            if (pathParamsList && pathParamsList.children.length === 0) {
-                this.addKeyValueRow(pathParamsList);
-            }
-
-            updateUrlFromQueryParams();
-
-            this.showRequestSection();
-
-            setCurrentEndpoint(null);
-
+            await app.workspaceTabController.loadHistoryEntry(historyEntry);
         } catch (error) {
             void error;
         }
-    }
-
-    /**
-     * Clears all rows from a key-value list element
-     *
-     * @param {HTMLElement} listElement - The list container element
-     * @returns {void}
-     */
-    clearKeyValueList(listElement) {
-        if (!listElement) {return;}
-        listElement.innerHTML = '';
-    }
-
-    /**
-     * Populates a key-value list with data
-     *
-     * @param {HTMLElement} listElement - The list container element
-     * @param {Object} data - Key-value pairs to populate
-     * @returns {void}
-     */
-    populateKeyValueList(listElement, data) {
-        if (!listElement || !data) {return;}
-
-        Object.entries(data).forEach(([key, value]) => {
-            this.addKeyValueRow(listElement, key, value);
-        });
-    }
-
-    /**
-     * Adds a key-value row to a list element
-     *
-     * Creates a row with key and value inputs, remove button, and auto-add behavior.
-     * Preserves special characters like template variables in values.
-     *
-     * @param {HTMLElement} listElement - The list container element
-     * @param {string} [key=''] - Initial key value
-     * @param {string} [value=''] - Initial value
-     * @returns {void}
-     */
-    addKeyValueRow(listElement, key = '', value = '') {
-        if (!listElement) {return;}
-
-        const fragment = templateLoader.cloneSync(
-            './src/templates/history/historyController.html',
-            'tpl-key-value-row'
-        );
-        const row = fragment.firstElementChild;
-
-        listElement.appendChild(row);
-
-        const removeBtn = row.querySelector('.btn-danger');
-        if (removeBtn) {
-            removeBtn.addEventListener('click', () => {
-                row.remove();
-                if (listElement.children.length === 0) {
-                    this.addKeyValueRow(listElement);
-                }
-            });
-        }
-
-        const keyInput = row.querySelector('.key-input');
-        const valueInput = row.querySelector('.value-input');
-
-        if (keyInput) {keyInput.value = key;}
-        if (valueInput) {valueInput.value = value;}
-
-        const handleInput = () => {
-            if (keyInput.value || valueInput.value) {
-                const isLastRow = !row.nextElementSibling;
-                if (isLastRow) {
-                    this.addKeyValueRow(listElement);
-                }
-            }
-        };
-
-        if (keyInput) {keyInput.addEventListener('input', handleInput);}
-        if (valueInput) {valueInput.addEventListener('input', handleInput);}
-    }
-
-    /**
-     * Shows the request section in the UI
-     *
-     * Placeholder method for switching UI views from history to request section.
-     * Implementation depends on how the history panel is integrated.
-     *
-     * @returns {void}
-     */
-    showRequestSection() {
     }
 
     /**

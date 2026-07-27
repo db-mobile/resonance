@@ -1,20 +1,54 @@
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, ACCEPT, CACHE_CONTROL};
+use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
+use tokio::sync::{oneshot, Mutex};
+
+use super::api_request::ClientCertConfig;
+use super::http_client::{build_http_client, HttpClientOptions};
+use super::proxy::{ProxyAction, ProxyState};
+
+/// Reconnection delay used until the server sends its own `retry:` field.
+const DEFAULT_RETRY_MS: u64 = 3000;
+
+/// Floor for a server-supplied `retry:`. A server asking for 0 would otherwise
+/// spin the reconnect loop as fast as the machine allows.
+const MIN_RETRY_MS: u64 = 250;
+
+/// How many consecutive reconnects may deliver nothing before the stream gives
+/// up. A stream that keeps producing data resets the count, so a long-lived
+/// connection that reconnects occasionally never accumulates towards it.
+const MAX_SILENT_RECONNECTS: u32 = 10;
+
+/// Bounds the TCP+TLS handshake only — never the stream itself, which is
+/// expected to stay open indefinitely.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+
+type Connections = Arc<Mutex<HashMap<String, SseConnection>>>;
+
+/// A live stream, keyed by tab. `id` distinguishes generations so a task that
+/// has already been replaced cannot clean up (or emit `close` for) its
+/// successor. Shutdown is cooperative: the task selects on the receiver, so it
+/// unwinds normally and still emits its terminal event.
+struct SseConnection {
+    id: u64,
+    shutdown: Option<oneshot::Sender<()>>,
+}
 
 pub struct SseState {
-    connections: Arc<Mutex<HashMap<String, JoinHandle<()>>>>,
+    connections: Connections,
+    next_id: AtomicU64,
 }
 
 impl Default for SseState {
     fn default() -> Self {
         Self {
             connections: Arc::new(Mutex::new(HashMap::new())),
+            next_id: AtomicU64::new(1),
         }
     }
 }
@@ -28,6 +62,21 @@ pub struct SseConnectRequest {
     pub headers: Option<HashMap<String, String>>,
     #[serde(default)]
     pub last_event_id: Option<String>,
+    /// Mirrors the HTTP request options: `Some(false)` turns certificate
+    /// verification off, and the client certificate / custom CA are resolved
+    /// per host by the frontend from the certificate store.
+    #[serde(default)]
+    pub verify_ssl: Option<bool>,
+    #[serde(default)]
+    pub client_cert: Option<ClientCertConfig>,
+    /// Defaults to GET. A streaming endpoint that takes a request document —
+    /// an LLM completion, say — is normally a POST.
+    #[serde(default)]
+    pub method: Option<String>,
+    /// Raw request body, replayed verbatim on every reconnect. The frontend
+    /// serializes it and sets the matching Content-Type header.
+    #[serde(default)]
+    pub body: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -55,8 +104,47 @@ struct SseEventPayload {
     message: Option<String>,
 }
 
+fn payload(tab_id: &str, url: &str, event_type: &str) -> SseEventPayload {
+    SseEventPayload {
+        tab_id: tab_id.to_string(),
+        event_type: event_type.to_string(),
+        url: url.to_string(),
+        event: None,
+        data: None,
+        id: None,
+        retry: None,
+        status: None,
+        message: None,
+    }
+}
+
 fn emit(app: &AppHandle, payload: SseEventPayload) {
     let _ = app.emit("sse-event", payload);
+}
+
+fn emit_error(app: &AppHandle, tab_id: &str, url: &str, status: Option<u16>, message: String) {
+    let mut event = payload(tab_id, url, "error");
+    event.status = status;
+    event.message = Some(message);
+    emit(app, event);
+}
+
+/// Remove this tab's entry only when it still belongs to generation `id`.
+/// Returns whether the caller was still the current connection.
+async fn remove_connection_if_current(connections: &Connections, tab_id: &str, id: u64) -> bool {
+    let mut connections = connections.lock().await;
+    if matches!(connections.get(tab_id), Some(connection) if connection.id == id) {
+        connections.remove(tab_id);
+        return true;
+    }
+    false
+}
+
+#[derive(Debug, Default, PartialEq)]
+struct EventParts {
+    event: Option<String>,
+    data: Option<String>,
+    id: Option<String>,
 }
 
 #[derive(Default)]
@@ -72,35 +160,27 @@ impl PartialEvent {
         self.event.is_none() && self.data.is_empty() && self.id.is_none() && self.retry.is_none()
     }
 
-    fn dispatch(&mut self, app: &AppHandle, tab_id: &str, url: &str) {
-        if self.data.is_empty() && self.event.is_none() {
-            // Comment-only or empty frame; keep id but emit nothing.
+    /// Consume the buffered fields at a frame boundary, following the spec's
+    /// dispatch rules: a frame with no `data` field does not dispatch at all,
+    /// even when it names an event type, and the event type is discarded with
+    /// it. A single empty `data:` still dispatches, carrying an empty string.
+    ///
+    /// `id` is deliberately retained — per spec the last event id persists
+    /// across subsequent frames.
+    fn take_payload(&mut self) -> Option<EventParts> {
+        if self.data.is_empty() {
             self.event = None;
-            return;
+            return None;
         }
 
-        let data = if self.data.is_empty() {
-            None
-        } else {
-            Some(self.data.join("\n"))
-        };
-
-        emit(
-            app,
-            SseEventPayload {
-                tab_id: tab_id.to_string(),
-                event_type: "message".to_string(),
-                url: url.to_string(),
-                event: self.event.take(),
-                data,
-                id: self.id.clone(),
-                retry: None,
-                status: None,
-                message: None,
-            },
-        );
-
+        let data = self.data.join("\n");
         self.data.clear();
+
+        Some(EventParts {
+            event: self.event.take(),
+            data: Some(data),
+            id: self.id.clone(),
+        })
     }
 }
 
@@ -139,277 +219,354 @@ fn parse_line(line: &str, partial: &mut PartialEvent) {
     }
 }
 
-async fn run_stream(
-    app: AppHandle,
-    state: Arc<Mutex<HashMap<String, JoinHandle<()>>>>,
+/// Drain complete lines from `buffer`, leaving any trailing incomplete line
+/// behind. All three terminators the spec allows are honoured: LF, CRLF, and a
+/// lone CR.
+///
+/// Only whole lines are decoded, so a multi-byte character split across two
+/// network chunks is reassembled before it is turned into text rather than
+/// being mangled into U+FFFD. A CR at the very end of the buffer is left in
+/// place: it cannot yet be told apart from the first half of a CRLF.
+fn drain_lines(buffer: &mut Vec<u8>) -> Vec<String> {
+    let mut lines = Vec::new();
+
+    while let Some(pos) = buffer
+        .iter()
+        .position(|byte| *byte == b'\n' || *byte == b'\r')
+    {
+        if buffer[pos] == b'\r' && pos + 1 == buffer.len() {
+            break;
+        }
+
+        let terminator = if buffer[pos] == b'\r' && buffer.get(pos + 1) == Some(&b'\n') {
+            2
+        } else {
+            1
+        };
+
+        let line: Vec<u8> = buffer.drain(..pos).collect();
+        buffer.drain(..terminator);
+        lines.push(String::from_utf8_lossy(&line).into_owned());
+    }
+
+    lines
+}
+
+/// Build the request headers for one connection attempt. An unusable
+/// caller-supplied header is fatal — sending the request without it would
+/// silently drop credentials. A `last_event_id` that cannot be encoded is
+/// skipped instead, since it originates from the server and must not make the
+/// stream permanently unresumable.
+fn build_header_map(
+    headers: &HashMap<String, String>,
+    last_event_id: Option<&str>,
+) -> Result<HeaderMap, String> {
+    let mut header_map = HeaderMap::new();
+    header_map.insert(ACCEPT, HeaderValue::from_static("text/event-stream"));
+    header_map.insert(CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+
+    for (name, value) in headers {
+        let header_name = HeaderName::from_bytes(name.as_bytes())
+            .map_err(|_| format!("Invalid header name: {}", name))?;
+        let header_value = HeaderValue::from_str(value)
+            .map_err(|_| format!("Invalid header value for: {}", name))?;
+        header_map.insert(header_name, header_value);
+    }
+
+    if let Some(id) = last_event_id {
+        if let Ok(value) = HeaderValue::from_str(id) {
+            header_map.insert(HeaderName::from_static("last-event-id"), value);
+        }
+    }
+
+    Ok(header_map)
+}
+
+fn dispatch(
+    app: &AppHandle,
+    tab_id: &str,
+    url: &str,
+    partial: &mut PartialEvent,
+    last_event_id: &mut Option<String>,
+) {
+    if let Some(parts) = partial.take_payload() {
+        let mut event = payload(tab_id, url, "message");
+        event.event = parts.event;
+        event.data = parts.data;
+        event.id = parts.id;
+        emit(app, event);
+    }
+
+    if let Some(id) = &partial.id {
+        *last_event_id = Some(id.clone());
+    }
+}
+
+/// Everything one stream needs about what it is connecting to, kept together so
+/// it can be threaded through the task without a long parameter list.
+struct StreamTarget {
     tab_id: String,
     url: String,
+    method: Method,
+    body: Option<String>,
     headers: HashMap<String, String>,
-    initial_last_event_id: Option<String>,
-) {
-    let client = match reqwest::Client::builder()
-        .pool_idle_timeout(Duration::from_secs(0))
-        .build()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            emit(
-                &app,
-                SseEventPayload {
-                    tab_id: tab_id.clone(),
-                    event_type: "error".to_string(),
-                    url: url.clone(),
-                    event: None,
-                    data: None,
-                    id: None,
-                    retry: None,
-                    status: None,
-                    message: Some(format!("Failed to build HTTP client: {}", e)),
-                },
-            );
-            return;
-        }
-    };
+    last_event_id: Option<String>,
+}
 
-    let mut last_event_id = initial_last_event_id;
-    let mut retry_ms: u64 = 3000;
+/// Apply the reconnect-delay floor to a server-supplied `retry:`.
+fn clamp_retry(ms: u64) -> u64 {
+    ms.max(MIN_RETRY_MS)
+}
+
+fn give_up_message() -> String {
+    format!(
+        "Gave up after {} reconnects without receiving any data",
+        MAX_SILENT_RECONNECTS
+    )
+}
+
+/// Announce the pending reconnect and wait out the retry delay. Returns false
+/// when the caller asked to shut down while waiting.
+async fn wait_before_retry(
+    app: &AppHandle,
+    tab_id: &str,
+    url: &str,
+    retry_ms: u64,
+    shutdown: &mut oneshot::Receiver<()>,
+) -> bool {
+    let mut reconnecting = payload(tab_id, url, "reconnecting");
+    reconnecting.retry = Some(retry_ms);
+    emit(app, reconnecting);
+
+    tokio::select! {
+        _ = &mut *shutdown => false,
+        _ = tokio::time::sleep(Duration::from_millis(retry_ms)) => true,
+    }
+}
+
+/// Connect, stream, and reconnect until the stream fails fatally or the caller
+/// signals shutdown. Every exit path returns to `run_stream`, which owns the
+/// single terminal `close` emit.
+async fn stream_loop(
+    app: &AppHandle,
+    client: &reqwest::Client,
+    target: &StreamTarget,
+    shutdown: &mut oneshot::Receiver<()>,
+) {
+    let StreamTarget {
+        tab_id,
+        url,
+        method,
+        body,
+        headers,
+        last_event_id: initial_last_event_id,
+    } = target;
+    let (tab_id, url) = (tab_id.as_str(), url.as_str());
+
+    let mut last_event_id = initial_last_event_id.clone();
+    let mut retry_ms: u64 = DEFAULT_RETRY_MS;
     let mut first_connect = true;
+    let mut silent_reconnects: u32 = 0;
 
     loop {
-        let mut header_map = HeaderMap::new();
-        header_map.insert(ACCEPT, HeaderValue::from_static("text/event-stream"));
-        header_map.insert(CACHE_CONTROL, HeaderValue::from_static("no-cache"));
-
-        for (k, v) in &headers {
-            let name = match HeaderName::from_bytes(k.as_bytes()) {
-                Ok(n) => n,
-                Err(_) => {
-                    emit(
-                        &app,
-                        SseEventPayload {
-                            tab_id: tab_id.clone(),
-                            event_type: "error".to_string(),
-                            url: url.clone(),
-                            event: None,
-                            data: None,
-                            id: None,
-                            retry: None,
-                            status: None,
-                            message: Some(format!("Invalid header name: {}", k)),
-                        },
-                    );
-                    break;
-                }
-            };
-            if let Ok(val) = HeaderValue::from_str(v) {
-                header_map.insert(name, val);
+        let header_map = match build_header_map(headers, last_event_id.as_deref()) {
+            Ok(map) => map,
+            Err(message) => {
+                emit_error(app, tab_id, url, None, message);
+                return;
             }
+        };
+
+        // The body is re-sent on every attempt: a reconnect has to repeat the
+        // original request, not replay a consumed stream.
+        let mut attempt = client.request(method.clone(), url).headers(header_map);
+        if let Some(body) = body {
+            attempt = attempt.body(body.clone());
         }
 
-        if let Some(id) = &last_event_id {
-            if let Ok(val) = HeaderValue::from_str(id) {
-                header_map.insert(HeaderName::from_static("last-event-id"), val);
-            }
-        }
+        let sent = tokio::select! {
+            _ = &mut *shutdown => return,
+            result = attempt.send() => result,
+        };
 
-        let response = match client.get(&url).headers(header_map).send().await {
-            Ok(r) => r,
+        let mut response = match sent {
+            Ok(response) => response,
             Err(e) => {
-                emit(
-                    &app,
-                    SseEventPayload {
-                        tab_id: tab_id.clone(),
-                        event_type: "error".to_string(),
-                        url: url.clone(),
-                        event: None,
-                        data: None,
-                        id: None,
-                        retry: None,
-                        status: None,
-                        message: Some(format!("Connection failed: {}", e)),
-                    },
-                );
-                break;
+                emit_error(app, tab_id, url, None, format!("Connection failed: {}", e));
+                // The first connect failing is the user's problem to see now —
+                // a wrong URL or a server that is down. Once a stream has been
+                // established, a failure is a blip worth retrying.
+                if first_connect {
+                    return;
+                }
+                silent_reconnects += 1;
+                if silent_reconnects >= MAX_SILENT_RECONNECTS {
+                    emit_error(app, tab_id, url, None, give_up_message());
+                    return;
+                }
+                if !wait_before_retry(app, tab_id, url, retry_ms, shutdown).await {
+                    return;
+                }
+                continue;
             }
         };
 
         let status = response.status();
         if !status.is_success() {
-            emit(
-                &app,
-                SseEventPayload {
-                    tab_id: tab_id.clone(),
-                    event_type: "error".to_string(),
-                    url: url.clone(),
-                    event: None,
-                    data: None,
-                    id: None,
-                    retry: None,
-                    status: Some(status.as_u16()),
-                    message: Some(format!("HTTP {}", status.as_u16())),
-                },
+            emit_error(
+                app,
+                tab_id,
+                url,
+                Some(status.as_u16()),
+                format!("HTTP {}", status.as_u16()),
             );
-            break;
+            return;
         }
 
         let content_type = response
             .headers()
             .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
+            .and_then(|value| value.to_str().ok())
             .unwrap_or("")
             .to_string();
 
         if !content_type.contains("text/event-stream") {
-            emit(
-                &app,
-                SseEventPayload {
-                    tab_id: tab_id.clone(),
-                    event_type: "error".to_string(),
-                    url: url.clone(),
-                    event: None,
-                    data: None,
-                    id: None,
-                    retry: None,
-                    status: Some(status.as_u16()),
-                    message: Some(format!(
-                        "Unexpected Content-Type: {}",
-                        if content_type.is_empty() {
-                            "(none)"
-                        } else {
-                            &content_type
-                        }
-                    )),
-                },
+            emit_error(
+                app,
+                tab_id,
+                url,
+                Some(status.as_u16()),
+                format!(
+                    "Unexpected Content-Type: {}",
+                    if content_type.is_empty() {
+                        "(none)"
+                    } else {
+                        &content_type
+                    }
+                ),
             );
-            break;
+            return;
         }
 
-        emit(
-            &app,
-            SseEventPayload {
-                tab_id: tab_id.clone(),
-                event_type: if first_connect { "open" } else { "reopen" }.to_string(),
-                url: url.clone(),
-                event: None,
-                data: None,
-                id: None,
-                retry: None,
-                status: Some(status.as_u16()),
-                message: None,
-            },
-        );
+        let mut open = payload(tab_id, url, if first_connect { "open" } else { "reopen" });
+        open.status = Some(status.as_u16());
+        emit(app, open);
         first_connect = false;
 
-        let mut response = response;
-        let mut buffer = String::new();
+        let mut buffer: Vec<u8> = Vec::new();
         let mut partial = PartialEvent::default();
+        let mut cancelled = false;
+        let mut delivered_data = false;
 
         loop {
-            match response.chunk().await {
+            let chunk = tokio::select! {
+                _ = &mut *shutdown => {
+                    cancelled = true;
+                    break;
+                }
+                result = response.chunk() => result,
+            };
+
+            match chunk {
                 Ok(Some(bytes)) => {
-                    let text = match std::str::from_utf8(&bytes) {
-                        Ok(s) => s.to_string(),
-                        Err(_) => String::from_utf8_lossy(&bytes).into_owned(),
-                    };
-                    buffer.push_str(&text);
-
-                    loop {
-                        let newline_pos = buffer.find('\n');
-                        let Some(pos) = newline_pos else { break };
-                        let mut line: String = buffer.drain(..=pos).collect();
-                        line.pop();
-                        if line.ends_with('\r') {
-                            line.pop();
-                        }
-
+                    if !bytes.is_empty() {
+                        delivered_data = true;
+                    }
+                    buffer.extend_from_slice(&bytes);
+                    for line in drain_lines(&mut buffer) {
                         if line.is_empty() {
-                            partial.dispatch(&app, &tab_id, &url);
-                            if let Some(id) = &partial.id {
-                                last_event_id = Some(id.clone());
-                            }
+                            dispatch(app, tab_id, url, &mut partial, &mut last_event_id);
                         } else {
                             parse_line(&line, &mut partial);
-                            if let Some(r) = partial.retry.take() {
-                                retry_ms = r;
+                            if let Some(ms) = partial.retry.take() {
+                                retry_ms = clamp_retry(ms);
                             }
                         }
                     }
                 }
                 Ok(None) => break,
                 Err(e) => {
-                    emit(
-                        &app,
-                        SseEventPayload {
-                            tab_id: tab_id.clone(),
-                            event_type: "error".to_string(),
-                            url: url.clone(),
-                            event: None,
-                            data: None,
-                            id: None,
-                            retry: None,
-                            status: None,
-                            message: Some(format!("Stream error: {}", e)),
-                        },
-                    );
+                    emit_error(app, tab_id, url, None, format!("Stream error: {}", e));
                     break;
                 }
             }
         }
 
+        if cancelled {
+            return;
+        }
+
+        // A connection that produced something is evidence the endpoint works,
+        // so only runs of empty ones count towards giving up.
+        if delivered_data {
+            silent_reconnects = 0;
+        } else {
+            silent_reconnects += 1;
+        }
+
         // Flush any trailing partial event if the stream ended on a non-empty buffer.
         if !partial.is_empty() {
-            partial.dispatch(&app, &tab_id, &url);
-            if let Some(id) = &partial.id {
-                last_event_id = Some(id.clone());
-            }
+            dispatch(app, tab_id, url, &mut partial, &mut last_event_id);
         }
 
-        emit(
-            &app,
-            SseEventPayload {
-                tab_id: tab_id.clone(),
-                event_type: "reconnecting".to_string(),
-                url: url.clone(),
-                event: None,
-                data: None,
-                id: None,
-                retry: Some(retry_ms),
-                status: None,
-                message: None,
-            },
-        );
+        if silent_reconnects >= MAX_SILENT_RECONNECTS {
+            emit_error(app, tab_id, url, None, give_up_message());
+            return;
+        }
 
-        tokio::time::sleep(Duration::from_millis(retry_ms)).await;
+        if !wait_before_retry(app, tab_id, url, retry_ms, shutdown).await {
+            return;
+        }
     }
+}
 
-    emit(
-        &app,
-        SseEventPayload {
-            tab_id: tab_id.clone(),
-            event_type: "close".to_string(),
-            url: url.clone(),
-            event: None,
-            data: None,
-            id: None,
-            retry: None,
-            status: None,
-            message: None,
+async fn run_stream(
+    app: AppHandle,
+    connections: Connections,
+    id: u64,
+    client: reqwest::Client,
+    target: StreamTarget,
+    mut shutdown: oneshot::Receiver<()>,
+) {
+    stream_loop(&app, &client, &target, &mut shutdown).await;
+
+    // Only the generation that still owns the tab reports the close, so a
+    // stream that was superseded by a newer connect stays silent.
+    if remove_connection_if_current(&connections, &target.tab_id, id).await {
+        emit(&app, payload(&target.tab_id, &target.url, "close"));
+    }
+}
+
+/// Build the client for one stream. Unlike a normal request this one must have
+/// **no** timeout — a stream is expected to stay open indefinitely — and must
+/// not force an HTTP version, since `http2_prior_knowledge` would break SSE
+/// against HTTP/1 servers. TLS verification, client certificates and the proxy
+/// come from the same settings the HTTP path uses.
+fn build_sse_client(
+    request: &SseConnectRequest,
+    proxy_action: ProxyAction,
+) -> Result<reqwest::Client, String> {
+    build_http_client(
+        HttpClientOptions {
+            user_agent: format!("resonance/{}", env!("CARGO_PKG_VERSION")),
+            timeout: None,
+            connect_timeout: Some(CONNECT_TIMEOUT),
+            http_version: None,
+            verify_ssl: request.verify_ssl != Some(false),
+            client_cert: request.client_cert.clone(),
+            follow_redirects: true,
+            disable_pooling: true,
         },
-    );
-
-    let mut connections = state.lock().await;
-    if let Some(handle) = connections.get(&tab_id) {
-        if handle.is_finished() {
-            connections.remove(&tab_id);
-        }
-    }
+        proxy_action,
+    )
 }
 
 #[tauri::command]
 pub async fn sse_connect(
     app: AppHandle,
     state: State<'_, SseState>,
-    request: SseConnectRequest,
+    proxy_state: State<'_, ProxyState>,
+    mut request: SseConnectRequest,
 ) -> Result<SseCommandResponse, String> {
     if request.tab_id.trim().is_empty() {
         return Err("Tab ID is required".to_string());
@@ -418,39 +575,55 @@ pub async fn sse_connect(
         return Err("SSE URL is required".to_string());
     }
 
-    // Close any existing connection on this tab.
-    {
-        let mut connections = state.connections.lock().await;
-        if let Some(handle) = connections.remove(&request.tab_id) {
-            handle.abort();
+    let method = match request.method.as_deref() {
+        Some(method) => method
+            .parse::<Method>()
+            .map_err(|e| format!("Invalid HTTP method: {}", e))?,
+        None => Method::GET,
+    };
+
+    // Build the client before touching the connection map: an unusable
+    // certificate must fail this call outright rather than tear down whatever
+    // stream the tab already has running.
+    let proxy_action = proxy_state.get_proxy_config(&request.url);
+    let client = build_sse_client(&request, proxy_action)?;
+
+    let (shutdown_tx, shutdown_rx) = oneshot::channel();
+    let id = state.next_id.fetch_add(1, Ordering::Relaxed);
+
+    // Hold the lock across signal + spawn + insert so a concurrent connect on
+    // the same tab cannot interleave and leave the older stream registered.
+    let mut connections = state.connections.lock().await;
+
+    if let Some(previous) = connections.get_mut(&request.tab_id) {
+        if let Some(shutdown) = previous.shutdown.take() {
+            let _ = shutdown.send(());
         }
     }
 
-    let app_clone = app.clone();
-    let connections = state.connections.clone();
-    let tab_id = request.tab_id.clone();
-    let url = request.url.clone();
-    let headers = request.headers.unwrap_or_default();
-    let last_event_id = request.last_event_id;
+    tokio::spawn(run_stream(
+        app.clone(),
+        state.connections.clone(),
+        id,
+        client,
+        StreamTarget {
+            tab_id: request.tab_id.clone(),
+            url: request.url.clone(),
+            method,
+            body: request.body.take(),
+            headers: request.headers.take().unwrap_or_default(),
+            last_event_id: request.last_event_id.take(),
+        },
+        shutdown_rx,
+    ));
 
-    let connections_for_task = connections.clone();
-    let tab_id_for_task = tab_id.clone();
-    let handle = tokio::spawn(async move {
-        run_stream(
-            app_clone,
-            connections_for_task,
-            tab_id_for_task,
-            url,
-            headers,
-            last_event_id,
-        )
-        .await;
-    });
-
-    {
-        let mut connections = state.connections.lock().await;
-        connections.insert(tab_id, handle);
-    }
+    connections.insert(
+        request.tab_id,
+        SseConnection {
+            id,
+            shutdown: Some(shutdown_tx),
+        },
+    );
 
     Ok(SseCommandResponse { success: true })
 }
@@ -464,14 +637,370 @@ pub async fn sse_close(
         return Err("Tab ID is required".to_string());
     }
 
-    let handle = {
-        let mut connections = state.connections.lock().await;
-        connections.remove(&tab_id)
-    };
-
-    if let Some(handle) = handle {
-        handle.abort();
+    // The entry stays in place: the task removes itself once it has unwound,
+    // which is what lets it emit the terminal `close` for this tab.
+    let mut connections = state.connections.lock().await;
+    if let Some(connection) = connections.get_mut(&tab_id) {
+        if let Some(shutdown) = connection.shutdown.take() {
+            let _ = shutdown.send(());
+        }
     }
 
     Ok(SseCommandResponse { success: true })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_frame(lines: &[&str]) -> PartialEvent {
+        let mut partial = PartialEvent::default();
+        for line in lines {
+            parse_line(line, &mut partial);
+        }
+        partial
+    }
+
+    #[test]
+    fn strips_exactly_one_space_after_the_colon() {
+        let partial = parse_frame(&["data: hello", "data:  indented", "data:tight"]);
+        assert_eq!(partial.data, vec!["hello", " indented", "tight"]);
+    }
+
+    #[test]
+    fn treats_a_line_without_a_colon_as_a_field_with_an_empty_value() {
+        let partial = parse_frame(&["data"]);
+        assert_eq!(partial.data, vec![""]);
+    }
+
+    #[test]
+    fn ignores_comments_and_unknown_fields() {
+        let partial = parse_frame(&[": keep-alive", "banana: yellow", ":"]);
+        assert!(partial.is_empty());
+    }
+
+    #[test]
+    fn joins_multiple_data_lines_with_a_newline() {
+        let mut partial = parse_frame(&["event: update", "data: one", "data: two"]);
+        let parts = partial.take_payload().expect("expected a payload");
+        assert_eq!(parts.event, Some("update".to_string()));
+        assert_eq!(parts.data, Some("one\ntwo".to_string()));
+    }
+
+    #[test]
+    fn an_empty_data_field_still_dispatches() {
+        let mut partial = parse_frame(&["data:"]);
+        let parts = partial.take_payload().expect("expected a payload");
+        assert_eq!(parts.data, Some(String::new()));
+    }
+
+    #[test]
+    fn ignores_an_id_containing_a_null_byte() {
+        let partial = parse_frame(&["id: a\0b"]);
+        assert_eq!(partial.id, None);
+    }
+
+    #[test]
+    fn the_last_event_id_persists_into_the_following_frame() {
+        let mut partial = parse_frame(&["id: 42", "data: first"]);
+        let first = partial.take_payload().expect("expected a payload");
+        assert_eq!(first.id, Some("42".to_string()));
+
+        parse_line("data: second", &mut partial);
+        let second = partial.take_payload().expect("expected a payload");
+        assert_eq!(second.id, Some("42".to_string()));
+        assert_eq!(second.data, Some("second".to_string()));
+    }
+
+    #[test]
+    fn parses_retry_and_ignores_a_non_numeric_one() {
+        assert_eq!(parse_frame(&["retry: 5000"]).retry, Some(5000));
+        assert_eq!(parse_frame(&["retry: soon"]).retry, None);
+    }
+
+    #[test]
+    fn take_payload_returns_none_for_empty_and_comment_only_frames() {
+        assert_eq!(PartialEvent::default().take_payload(), None);
+        assert_eq!(parse_frame(&[": ping"]).take_payload(), None);
+        assert_eq!(parse_frame(&["id: 7"]).take_payload(), None);
+    }
+
+    #[test]
+    fn take_payload_clears_data_and_event_but_not_id() {
+        let mut partial = parse_frame(&["id: 7", "event: tick", "data: x"]);
+        partial.take_payload().expect("expected a payload");
+        assert!(partial.data.is_empty());
+        assert_eq!(partial.event, None);
+        assert_eq!(partial.id, Some("7".to_string()));
+    }
+
+    #[test]
+    fn a_frame_without_data_does_not_dispatch() {
+        // Per spec an event type with no data field is not dispatched, and the
+        // type is discarded rather than leaking into the next frame.
+        let mut partial = parse_frame(&["event: ping"]);
+        assert_eq!(partial.take_payload(), None);
+        assert_eq!(partial.event, None);
+
+        parse_line("data: after", &mut partial);
+        let parts = partial.take_payload().expect("expected a payload");
+        assert_eq!(parts.event, None);
+        assert_eq!(parts.data, Some("after".to_string()));
+    }
+
+    #[test]
+    fn drains_lines_terminated_by_a_bare_cr() {
+        let mut buffer = b"data: one\rdata: two\r".to_vec();
+        assert_eq!(drain_lines(&mut buffer), vec!["data: one".to_string()]);
+        // The trailing CR is held back: it could still turn out to be a CRLF.
+        assert_eq!(buffer, b"data: two\r");
+
+        buffer.extend_from_slice(b"data: three\n");
+        assert_eq!(
+            drain_lines(&mut buffer),
+            vec!["data: two".to_string(), "data: three".to_string()]
+        );
+    }
+
+    #[test]
+    fn treats_a_crlf_split_across_chunks_as_one_terminator() {
+        let mut buffer = b"data: one\r".to_vec();
+        assert!(drain_lines(&mut buffer).is_empty());
+
+        buffer.extend_from_slice(b"\ndata: two\n");
+        assert_eq!(
+            drain_lines(&mut buffer),
+            vec!["data: one".to_string(), "data: two".to_string()]
+        );
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn a_bare_cr_marks_a_frame_boundary() {
+        let mut buffer = b"data: one\r\rdata: two\n".to_vec();
+        assert_eq!(
+            drain_lines(&mut buffer),
+            vec![
+                "data: one".to_string(),
+                String::new(),
+                "data: two".to_string()
+            ]
+        );
+    }
+
+    /// The exact body a server emitting mixed terminators produces, captured
+    /// off the wire: bare-CR frames, a CRLF split across two writes, and an
+    /// event type with no data.
+    #[test]
+    fn parses_a_real_mixed_terminator_body() {
+        let chunks: [&[u8]; 2] = [
+            b"data: cr-one\r\revent: tick\rdata: cr-two\r\rdata: split\r",
+            b"\n\nevent: ping\n\ndata: last\n\n",
+        ];
+
+        let mut buffer: Vec<u8> = Vec::new();
+        let mut partial = PartialEvent::default();
+        let mut dispatched = Vec::new();
+
+        for chunk in chunks {
+            buffer.extend_from_slice(chunk);
+            for line in drain_lines(&mut buffer) {
+                if line.is_empty() {
+                    if let Some(parts) = partial.take_payload() {
+                        dispatched.push((parts.event, parts.data));
+                    }
+                } else {
+                    parse_line(&line, &mut partial);
+                }
+            }
+        }
+
+        assert_eq!(
+            dispatched,
+            vec![
+                (None, Some("cr-one".to_string())),
+                (Some("tick".to_string()), Some("cr-two".to_string())),
+                (None, Some("split".to_string())),
+                (None, Some("last".to_string())),
+            ]
+        );
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn clamps_a_zero_or_tiny_retry_to_the_floor() {
+        assert_eq!(clamp_retry(0), MIN_RETRY_MS);
+        assert_eq!(clamp_retry(10), MIN_RETRY_MS);
+        assert_eq!(clamp_retry(5000), 5000);
+    }
+
+    #[test]
+    fn the_give_up_message_names_the_attempt_count() {
+        assert!(give_up_message().contains(&MAX_SILENT_RECONNECTS.to_string()));
+    }
+
+    #[test]
+    fn drains_lf_and_crlf_terminated_lines() {
+        let mut buffer = b"data: one\ndata: two\r\n\r\n".to_vec();
+        assert_eq!(
+            drain_lines(&mut buffer),
+            vec![
+                "data: one".to_string(),
+                "data: two".to_string(),
+                String::new()
+            ]
+        );
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn leaves_an_unterminated_line_buffered() {
+        let mut buffer = b"data: done\ndata: partial".to_vec();
+        assert_eq!(drain_lines(&mut buffer), vec!["data: done".to_string()]);
+        assert_eq!(buffer, b"data: partial");
+        assert!(drain_lines(&mut buffer).is_empty());
+    }
+
+    #[test]
+    fn reassembles_a_multi_byte_character_split_across_chunks() {
+        let frame = "data: 🎉\n".as_bytes();
+        let (head, tail) = frame.split_at(8);
+        assert!(
+            std::str::from_utf8(head).is_err(),
+            "split must land mid-character"
+        );
+
+        let mut buffer = head.to_vec();
+        assert!(drain_lines(&mut buffer).is_empty());
+
+        buffer.extend_from_slice(tail);
+        assert_eq!(drain_lines(&mut buffer), vec!["data: 🎉".to_string()]);
+    }
+
+    #[test]
+    fn builds_headers_with_accept_and_last_event_id() {
+        let mut headers = HashMap::new();
+        headers.insert("Authorization".to_string(), "Bearer token".to_string());
+
+        let map = build_header_map(&headers, Some("42")).expect("expected a header map");
+        assert_eq!(map.get(ACCEPT).unwrap(), "text/event-stream");
+        assert_eq!(map.get("authorization").unwrap(), "Bearer token");
+        assert_eq!(map.get("last-event-id").unwrap(), "42");
+    }
+
+    #[test]
+    fn rejects_an_invalid_header_name_or_value() {
+        let mut bad_name = HashMap::new();
+        bad_name.insert("Bad Header".to_string(), "value".to_string());
+        let err = build_header_map(&bad_name, None).expect_err("expected an error");
+        assert!(err.contains("Invalid header name"));
+
+        let mut bad_value = HashMap::new();
+        bad_value.insert("X-Trace".to_string(), "line\nbreak".to_string());
+        let err = build_header_map(&bad_value, None).expect_err("expected an error");
+        assert!(err.contains("Invalid header value"));
+    }
+
+    #[test]
+    fn deserializes_a_connect_request_with_tls_options() {
+        let request: SseConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "https://example.com/events",
+            "headers": { "Authorization": "Bearer t" },
+            "lastEventId": "42",
+            "verifySsl": false,
+            "clientCert": {
+                "certPath": "/certs/client.crt",
+                "keyPath": "/certs/client.key",
+                "caPath": "/certs/ca.pem"
+            }
+        }))
+        .expect("expected the request to deserialize");
+
+        assert_eq!(request.verify_ssl, Some(false));
+        let cert = request.client_cert.expect("expected a client cert");
+        assert_eq!(cert.cert_path.as_deref(), Some("/certs/client.crt"));
+        assert_eq!(cert.ca_path.as_deref(), Some("/certs/ca.pem"));
+    }
+
+    #[test]
+    fn deserializes_a_connect_request_with_a_method_and_body() {
+        let request: SseConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "https://api.example.com/v1/stream",
+            "method": "POST",
+            "body": "{\"prompt\":\"hi\",\"stream\":true}"
+        }))
+        .expect("expected the request to deserialize");
+
+        assert_eq!(request.method.as_deref(), Some("POST"));
+        assert_eq!(
+            request.body.as_deref(),
+            Some("{\"prompt\":\"hi\",\"stream\":true}")
+        );
+        assert_eq!(
+            request
+                .method
+                .as_deref()
+                .unwrap()
+                .parse::<Method>()
+                .unwrap(),
+            Method::POST
+        );
+    }
+
+    #[test]
+    fn an_absent_method_means_get_and_an_invalid_one_is_rejected() {
+        let request: SseConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "https://example.com/events"
+        }))
+        .unwrap();
+        assert!(request.method.is_none());
+        assert!(request.body.is_none());
+
+        assert!("GET FETCH".parse::<Method>().is_err());
+    }
+
+    #[test]
+    fn deserializes_a_connect_request_without_tls_options() {
+        let request: SseConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "https://example.com/events"
+        }))
+        .expect("expected the request to deserialize");
+
+        assert_eq!(request.verify_ssl, None);
+        assert!(request.client_cert.is_none());
+        assert!(request.headers.is_none());
+    }
+
+    #[test]
+    fn an_sse_client_verifies_by_default_and_builds_without_a_timeout() {
+        let request: SseConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "https://example.com/events"
+        }))
+        .unwrap();
+        assert!(build_sse_client(&request, ProxyAction::Disable).is_ok());
+    }
+
+    #[test]
+    fn an_sse_client_surfaces_a_bad_certificate_instead_of_connecting() {
+        let request: SseConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "https://example.com/events",
+            "clientCert": { "certPath": "/certs/client.crt" }
+        }))
+        .unwrap();
+        let err = build_sse_client(&request, ProxyAction::Disable).unwrap_err();
+        assert!(err.contains("both a certificate and a key"));
+    }
+
+    #[test]
+    fn skips_an_unusable_last_event_id_rather_than_failing() {
+        let map =
+            build_header_map(&HashMap::new(), Some("bad\nid")).expect("expected a header map");
+        assert!(map.get("last-event-id").is_none());
+    }
 }

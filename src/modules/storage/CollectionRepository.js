@@ -248,6 +248,7 @@ export class CollectionRepository {
             graphqlData: data.graphqlData || null,
             formBodyData: data.formBodyData || null,
             grpcData: data.grpcData || null,
+            mqttData: data.mqttData || null,
             responseSchema: data.responseSchema || null
         };
     }
@@ -911,6 +912,41 @@ export class CollectionRepository {
         try {
             const data = await this._getEndpointData(collectionId, endpointId);
             return data.grpcData || null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /**
+     * Saves MQTT connection and topic settings for an endpoint
+     *
+     * @async
+     * @param {string} collectionId - The ID of the collection
+     * @param {string} endpointId - The ID of the endpoint
+     * @param {Object} data - MQTT data { clientId, username, subscribeTopic, publishTopic, qos }
+     * @returns {Promise<void>}
+     * @throws {Error} If save operation fails
+     */
+    async saveMqttData(collectionId, endpointId, data) {
+        try {
+            await this._updateEndpointField(collectionId, endpointId, 'mqttData', data);
+        } catch (error) {
+            throw new Error(`Failed to save MQTT data: ${error.message || error}`, { cause: error });
+        }
+    }
+
+    /**
+     * Retrieves MQTT connection and topic settings for an endpoint
+     *
+     * @async
+     * @param {string} collectionId - The ID of the collection
+     * @param {string} endpointId - The ID of the endpoint
+     * @returns {Promise<Object|null>} MQTT data or null if not found
+     */
+    async getMqttData(collectionId, endpointId) {
+        try {
+            const data = await this._getEndpointData(collectionId, endpointId);
+            return data.mqttData || null;
         } catch (error) {
             return null;
         }

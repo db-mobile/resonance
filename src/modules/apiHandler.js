@@ -108,11 +108,27 @@ function getCollectionRepository() {
 }
 
 let _requestBuilderService = null;
-function getRequestBuilderService() {
+export function getRequestBuilderService() {
     if (!_requestBuilderService) {
         _requestBuilderService = new RequestBuilderService(getVariableService, getCollectionRepository);
     }
     return _requestBuilderService;
+}
+
+/**
+ * Generates auth data for the current request with 'inherit' resolved to the
+ * owning collection's auth config. Used by every interactive send path.
+ *
+ * @returns {Promise<Object>} Auth data ({headers, queryParams, authConfig, awsAuth?})
+ */
+export async function generateEffectiveAuthData() {
+    const current = getCurrentEndpoint();
+    const resolved = await resolveEffectiveAuthConfig(authManager.getAuthConfig(), {
+        collectionId: current?.collectionId,
+        endpointId: current?.endpointId,
+        repository: getCollectionRepository()
+    });
+    return authManager.generateAuthData(resolved);
 }
 
 /**
@@ -123,23 +139,7 @@ function getRequestBuilderService() {
  * @param {Object} requestConfig - Fully built request configuration
  * @returns {void}
  */
-/**
- * Generates auth data for the current request with 'inherit' resolved to the
- * owning collection's auth config. Used by every interactive send path.
- *
- * @returns {Promise<Object>} Auth data ({headers, queryParams, authConfig, awsAuth?})
- */
-async function generateEffectiveAuthData() {
-    const current = getCurrentEndpoint();
-    const resolved = await resolveEffectiveAuthConfig(authManager.getAuthConfig(), {
-        collectionId: current?.collectionId,
-        endpointId: current?.endpointId,
-        repository: getCollectionRepository()
-    });
-    return authManager.generateAuthData(resolved);
-}
-
-function warnUnresolvedVariables(processor, requestConfig) {
+export function warnUnresolvedVariables(processor, requestConfig) {
     try {
         const unresolved = processor.extractUnresolvedVariableNames({
             url: requestConfig.url,
@@ -615,6 +615,68 @@ async function handleGraphQLSubscriptionRequest() {
     }
 }
 
+/**
+ * Set a header only when the user has not supplied it themselves, matching
+ * however they capitalised it.
+ * @param {Object<string, string>} headers
+ * @param {string} name
+ * @param {string} value
+ */
+function setDefaultHeader(headers, name, value) {
+    const existing = Object.keys(headers).find(
+        (key) => key.toLowerCase() === name.toLowerCase()
+    );
+    if (!existing) {
+        headers[name] = value;
+    }
+}
+
+/**
+ * Build the request body for an SSE stream. Returns the raw string the backend
+ * should send, or null for a method that carries no body. Adds a Content-Type
+ * when the user has not set one.
+ *
+ * SSE offers only the JSON and text body modes (see `SSE_BODY_MODES`), so a
+ * stream sends one document — there is no multipart or binary variant.
+ *
+ * @param {string} method
+ * @param {Object<string, string>} headers - mutated with a default Content-Type.
+ * @param {Object} variables
+ * @param {Object} processor
+ * @returns {string|null}
+ * @throws {Error} when the JSON body does not parse.
+ */
+function buildSseBody(method, headers, variables, processor) {
+    if (method === 'GET' || method === 'HEAD') {
+        return null;
+    }
+
+    const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
+
+    if (bodyMode === 'text') {
+        const raw = app.requestBodyTextEditor ? app.requestBodyTextEditor.getContent() : '';
+        if (!raw.trim()) {
+            return null;
+        }
+        setDefaultHeader(headers, 'Content-Type', 'text/plain');
+        return processor.processTemplate(raw, variables);
+    }
+
+    const raw = getRequestBodyContent().trim();
+    if (!raw) {
+        return null;
+    }
+
+    const resolved = processor.processTemplate(raw, variables);
+    try {
+        JSON.parse(resolved);
+    } catch (e) {
+        throw new Error(`Invalid Body JSON: ${e.message}`, { cause: e });
+    }
+    setDefaultHeader(headers, 'Content-Type', 'application/json');
+    return resolved;
+}
+
 export async function handleSendRequest() {
     if (isGrpcMode()) {
         return handleGrpcSend();
@@ -686,21 +748,22 @@ export async function handleSendRequest() {
         const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
         const headers = parseKeyValuePairs(document.getElementById('headers-list'));
         const authData = await generateEffectiveAuthData();
+        const method = methodSelect?.value || 'GET';
 
         const builder = getRequestBuilderService();
         builder.mergeAuthData(headers, queryParams, authData);
 
+        let sseBody;
+        let resolved;
         try {
-            const { variables, processor } = await builder.resolveVariables(
-                getCurrentEndpoint(), headers
-            );
+            resolved = await builder.resolveVariables(getCurrentEndpoint(), headers);
             const result = builder.processRequestComponents({
                 url: sseUrl,
                 pathParams: {},
                 headers,
                 queryParams,
-                variables,
-                processor
+                variables: resolved.variables,
+                processor: resolved.processor
             });
             sseUrl = result.url;
         } catch (error) {
@@ -708,9 +771,17 @@ export async function handleSendRequest() {
             return;
         }
 
+        try {
+            sseBody = buildSseBody(method, headers, resolved.variables, resolved.processor);
+        } catch (error) {
+            toast.error(error.message);
+            updateStatusDisplay(error.message, null);
+            return;
+        }
+
         setRequestInProgress(true);
         try {
-            await handleSseConnect(sseUrl, headers);
+            await handleSseConnect(sseUrl, headers, { method, body: sseBody });
         } finally {
             setRequestInProgress(false);
         }

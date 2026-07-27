@@ -6,6 +6,7 @@
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { DocGeneratorService } from '../services/DocGeneratorService.js';
+import { getProtocol } from '../protocols/protocolRegistry.js';
 
 /**
  * Collection dialog helper for creating and configuring collection-related modals.
@@ -157,33 +158,20 @@ export class CollectionDialogs {
             });
 
             const updateProtocolUI = () => {
-                const isGrpc = protocolSelect.value === 'grpc';
-                const isWebSocket = protocolSelect.value === 'websocket';
-                const isGraphQL = protocolSelect.value === 'graphql';
-                const isUrlBased = isWebSocket || isGraphQL;
-                methodGroup?.classList.toggle('is-hidden', isGrpc || isUrlBased);
-                pathInput.parentElement.classList.toggle('is-hidden', isGrpc);
-                grpcTargetGroup.classList.toggle('is-hidden', !isGrpc);
-                if (pathLabel) {
-                    pathLabel.textContent = isUrlBased ? 'URL:' : 'Path:';
-                }
-                if (isGraphQL) {
-                    pathInput.placeholder = 'https://api.example.com/graphql';
-                } else if (isWebSocket) {
-                    pathInput.placeholder = 'wss://echo.websocket.events';
-                } else {
-                    pathInput.placeholder = '/api/endpoint';
-                }
+                const descriptor = getProtocol(protocolSelect.value);
 
-                if (isGrpc) {
-                    methodSelect.required = false;
-                    pathInput.required = false;
-                    grpcTargetInput.required = true;
-                } else {
-                    methodSelect.required = !isUrlBased;
-                    pathInput.required = true;
-                    grpcTargetInput.required = false;
+                methodGroup?.classList.toggle('is-hidden', !descriptor.needsMethod);
+                pathInput.parentElement.classList.toggle('is-hidden', descriptor.needsTarget);
+                grpcTargetGroup.classList.toggle('is-hidden', !descriptor.needsTarget);
+
+                if (pathLabel) {
+                    pathLabel.textContent = descriptor.urlBased ? 'URL:' : 'Path:';
                 }
+                pathInput.placeholder = descriptor.pathPlaceholder;
+
+                methodSelect.required = descriptor.needsMethod;
+                pathInput.required = !descriptor.needsTarget;
+                grpcTargetInput.required = descriptor.needsTarget;
             };
 
             protocolSelect.addEventListener('change', updateProtocolUI);
@@ -194,47 +182,51 @@ export class CollectionDialogs {
                 const name = nameInput.value.trim();
                 const protocol = protocolSelect.value;
 
-                if (protocol === 'grpc') {
+                const descriptor = getProtocol(protocol);
+
+                if (!name) {
+                    return;
+                }
+
+                if (descriptor.needsTarget) {
                     const target = grpcTargetInput.value.trim();
-                    if (name && target) {
+                    if (target) {
                         finish({
                             name,
-                            protocol: 'grpc',
+                            protocol: descriptor.id,
                             target,
                             fullMethod: '',
                             requestJson: '{}'
                         });
                     }
-                } else if (protocol === 'websocket') {
-                    const url = pathInput.value.trim();
-                    if (name && url) {
-                        finish({
-                            name,
-                            protocol: 'websocket',
-                            url
-                        });
-                    }
-                } else if (protocol === 'graphql') {
-                    const url = pathInput.value.trim();
-                    if (name && url) {
-                        finish({
-                            name,
-                            protocol: 'graphql',
-                            url
-                        });
-                    }
-                } else {
-                    const method = methodSelect.value;
-                    const path = pathInput.value.trim();
-                    if (name && method && path) {
-                        finish({
-                            name,
-                            protocol: 'http',
-                            method,
-                            path: path.startsWith('/') ? path : `/${  path}`
-                        });
-                    }
+                    return;
                 }
+
+                const entered = pathInput.value.trim();
+                if (!entered) {
+                    return;
+                }
+
+                if (descriptor.urlBased) {
+                    finish({
+                        name,
+                        protocol: descriptor.id,
+                        url: entered,
+                        method: descriptor.needsMethod ? methodSelect.value : undefined
+                    });
+                    return;
+                }
+
+                if (descriptor.needsMethod && !methodSelect.value) {
+                    return;
+                }
+
+                finish({
+                    name,
+                    protocol: descriptor.id,
+                    method: methodSelect.value,
+                    path: entered.startsWith('/') ? entered : `/${  entered}`
+                });
             });
 
             dialog.addEventListener('click', (e) => {
@@ -255,7 +247,7 @@ export class CollectionDialogs {
         const collections = await this.collectionRepository.getAll();
         const defaultStoragePath = await this.backendAPI.collections.getPath().catch(() => '');
 
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             const fragment = templateLoader.cloneSync(
                 './src/templates/collections/newDialogs.html',
                 'tpl-save-to-collection-dialog'
@@ -376,28 +368,38 @@ export class CollectionDialogs {
                         targetCollectionId = newCollection.id;
                     }
 
+                    const descriptor = getProtocol(requestData.protocol);
+                    const address = requestData.url || requestData.broker || '';
+
                     const endpointData = {
                         name,
-                        protocol: requestData.protocol || 'http',
+                        protocol: descriptor.id,
                         method: requestData.method || 'GET',
-                        path: requestData.url || '/'
+                        path: address || '/'
                     };
 
-                    if (requestData.protocol === 'grpc' && requestData.grpc) {
+                    if (descriptor.urlBased) {
+                        endpointData.url = address;
+                    }
+
+                    if (descriptor.needsTarget && requestData.grpc) {
                         endpointData.target = requestData.grpc.target;
                         endpointData.fullMethod = requestData.grpc.fullMethod;
                         endpointData.requestJson = requestData.grpc.requestJson;
                     }
 
-                    if (requestData.protocol === 'websocket') {
-                        endpointData.url = requestData.url;
-                    }
-
-                    if (requestData.protocol === 'graphql') {
-                        endpointData.url = requestData.url;
+                    if (descriptor.createSidecars.includes('graphqlData')) {
                         endpointData.query = requestData.query || '';
                         endpointData.variables = requestData.variables || '';
                         endpointData.operationName = requestData.operationName || null;
+                    }
+
+                    if (descriptor.createSidecars.includes('mqttData')) {
+                        endpointData.clientId = requestData.clientId || '';
+                        endpointData.username = requestData.username || '';
+                        endpointData.subscribeTopic = requestData.subscribeTopic || '';
+                        endpointData.publishTopic = requestData.publishTopic || '';
+                        endpointData.qos = requestData.qos || 0;
                     }
 
                     const newEndpoint = await this.collectionService.addRequestToCollection(targetCollectionId, endpointData);
@@ -428,17 +430,26 @@ export class CollectionDialogs {
                         });
                     }
 
-                    if (requestData.url) {
-                        await this.collectionRepository.savePersistedUrl(targetCollectionId, newEndpoint.id, requestData.url);
+                    if (address) {
+                        await this.collectionRepository.savePersistedUrl(targetCollectionId, newEndpoint.id, address);
                     }
+
+                    const targetCollection = collections.find(entry => entry.id === targetCollectionId);
 
                     finish({
                         collectionId: targetCollectionId,
                         endpointId: newEndpoint.id,
-                        name
+                        name,
+                        collectionName: targetCollection?.name
+                            || (selectedCollectionId === '__new__' ? newCollectionInput.value.trim() : '')
                     });
                 } catch (error) {
-                    finish(null);
+                    if (!resolved) {
+                        resolved = true;
+                        keydownController.abort();
+                        dialog.remove();
+                        reject(error);
+                    }
                 }
             });
 

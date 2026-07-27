@@ -66,6 +66,12 @@
   display: flex;
 }
 
+.grpc-url-tls {
+  flex-shrink: 0;
+  gap: var(--space-2);
+  margin-left: var(--space-3);
+}
+
 .grpc-target-wrapper > input {
   width: 100%;
   border-top-left-radius: 0;

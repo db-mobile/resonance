@@ -53,6 +53,7 @@ describe('CollectionRepository', () => {
                 graphqlData: { query: 'query { users }', variables: '{}' },
                 formBodyData: null,
                 grpcData: { service: 'UserService', method: 'GetUser' },
+                mqttData: null,
                 responseSchema: null
             });
             expect(mockBackendAPI.collections.getEndpointData).toHaveBeenCalledWith('collection_1', 'endpoint_1');
@@ -74,6 +75,7 @@ describe('CollectionRepository', () => {
                 graphqlData: null,
                 formBodyData: null,
                 grpcData: null,
+                mqttData: null,
                 responseSchema: null
             });
         });
@@ -96,6 +98,7 @@ describe('CollectionRepository', () => {
                 graphqlData: null,
                 formBodyData: null,
                 grpcData: null,
+                mqttData: null,
                 responseSchema: null
             });
         });
@@ -115,6 +118,7 @@ describe('CollectionRepository', () => {
                 graphqlData: null,
                 formBodyData: null,
                 grpcData: null,
+                mqttData: null,
                 responseSchema: null
             });
         });

@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "3.1.4"
+version = "3.1.5"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -58,6 +58,8 @@ webpki-roots = "0.26"
 # Utilities
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
+# Legacy charset decoding for response bodies (WHATWG labels, pure Rust)
+encoding_rs = "0.8"
 thiserror = "1"
 tracing = "0.1"
 regex = "1"

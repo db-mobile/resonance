@@ -68,6 +68,8 @@ pub struct EndpointData {
     #[serde(default)]
     pub grpc_data: Option<Value>,
     #[serde(default)]
+    pub mqtt_data: Option<Value>,
+    #[serde(default)]
     pub response_schema: Option<Value>,
 }
 
@@ -877,6 +879,7 @@ fn migrate_endpoint_data(
             graphql_data: graphql_data.get(&key).cloned(),
             form_body_data: None,
             grpc_data: grpc_data.get(&key).cloned(),
+            mqtt_data: None,
             response_schema: None,
         };
 

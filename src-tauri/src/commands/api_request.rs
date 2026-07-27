@@ -1,5 +1,5 @@
 use hmac::{Hmac, Mac};
-use reqwest::{Client, Method, RequestBuilder, Response};
+use reqwest::{Method, RequestBuilder, Response};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
@@ -11,6 +11,7 @@ use tokio::sync::oneshot;
 use tokio::time::timeout as tokio_timeout;
 use uuid::Uuid;
 
+use super::http_client::{build_http_client, HttpClientOptions};
 use super::proxy::{ProxyAction, ProxyState};
 
 /// Maximum time to spend on the TCP+TLS timing probe before giving up.
@@ -551,7 +552,7 @@ pub struct AwsAuthConfig {
 /// All fields are filesystem paths to PEM-encoded files. Only paths are sent
 /// from the frontend (the certificate store persists paths, never cert bytes);
 /// the backend reads and parses the files here.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientCertConfig {
     /// PEM certificate chain to present to the server (mTLS).
@@ -573,60 +574,6 @@ impl ClientCertConfig {
         self.cert_path.as_deref().is_some_and(|p| !p.is_empty())
             || self.ca_path.as_deref().is_some_and(|p| !p.is_empty())
     }
-}
-
-/// Apply a [`ClientCertConfig`] to a reqwest [`ClientBuilder`]: load the client
-/// identity (cert chain + key) for mTLS and add any custom CA roots. Returns a
-/// descriptive error so the UI can surface load/parse failures instead of an
-/// opaque TLS handshake error.
-fn apply_client_cert(
-    mut builder: reqwest::ClientBuilder,
-    cert: &ClientCertConfig,
-) -> Result<reqwest::ClientBuilder, String> {
-    // Client identity (mTLS): requires both a cert chain and a private key.
-    let cert_path = cert.cert_path.as_deref().filter(|p| !p.is_empty());
-    let key_path = cert.key_path.as_deref().filter(|p| !p.is_empty());
-    match (cert_path, key_path) {
-        (Some(cert_path), Some(key_path)) => {
-            let cert_pem = std::fs::read(cert_path).map_err(|e| {
-                format!(
-                    "Client certificate could not be read ({}): {}",
-                    cert_path, e
-                )
-            })?;
-            let key_pem = std::fs::read(key_path)
-                .map_err(|e| format!("Client key could not be read ({}): {}", key_path, e))?;
-            let mut pem = cert_pem;
-            pem.push(b'\n');
-            pem.extend_from_slice(&key_pem);
-            let identity = reqwest::Identity::from_pem(&pem).map_err(|e| {
-                format!(
-                    "Client certificate could not be loaded (expects a PEM cert chain plus an unencrypted private key in PKCS#8, RSA, or SEC1 form): {}",
-                    e
-                )
-            })?;
-            builder = builder.identity(identity);
-        }
-        (Some(_), None) | (None, Some(_)) => {
-            return Err(
-                "Client certificate requires both a certificate and a key file".to_string(),
-            );
-        }
-        (None, None) => {}
-    }
-
-    // Custom CA trust: add each CA in the bundle to the default roots.
-    if let Some(ca_path) = cert.ca_path.as_deref().filter(|p| !p.is_empty()) {
-        let ca_pem = std::fs::read(ca_path)
-            .map_err(|e| format!("CA certificate could not be read ({}): {}", ca_path, e))?;
-        let cas = reqwest::Certificate::from_pem_bundle(&ca_pem)
-            .map_err(|e| format!("CA certificate could not be parsed ({}): {}", ca_path, e))?;
-        for ca in cas {
-            builder = builder.add_root_certificate(ca);
-        }
-    }
-
-    Ok(builder)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -666,28 +613,99 @@ pub struct ApiResponse {
     pub cancelled: Option<bool>,
 }
 
+/// Extract the `charset` parameter from a Content-Type header value.
+fn charset_from_content_type(content_type: &str) -> Option<&str> {
+    content_type.split(';').skip(1).find_map(|param| {
+        let (name, value) = param.split_once('=')?;
+        if !name.trim().eq_ignore_ascii_case("charset") {
+            return None;
+        }
+        Some(value.trim().trim_matches('"'))
+    })
+}
+
+/// True when a Content-Type describes a body meant to be read as text.
+fn content_type_is_textual(content_type: &str) -> bool {
+    let mime = content_type
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_ascii_lowercase();
+
+    mime.starts_with("text/")
+        || mime.ends_with("+json")
+        || mime.ends_with("+xml")
+        || mime.ends_with("+yaml")
+        || matches!(
+            mime.as_str(),
+            "application/json"
+                | "application/xml"
+                | "application/javascript"
+                | "application/ecmascript"
+                | "application/x-javascript"
+                | "application/graphql"
+                | "application/yaml"
+                | "application/x-yaml"
+                | "application/x-ndjson"
+                | "application/x-www-form-urlencoded"
+        )
+}
+
+/// Decode a body that is not valid UTF-8 using the charset the server declared.
+///
+/// Servers still serve legacy encodings (`text/html; charset=ISO-8859-1`), whose
+/// high bytes are not valid UTF-8; decoding them per the declared label is what
+/// browsers do. Textual bodies with no usable charset fall back to windows-1252,
+/// the legacy default, since every byte maps to a character there. Anything else
+/// stays binary.
+fn decode_with_declared_charset(bytes: &[u8], content_type: Option<&str>) -> Option<String> {
+    let content_type = content_type?;
+    let textual = content_type_is_textual(content_type);
+    let encoding = match charset_from_content_type(content_type)
+        .and_then(|label| encoding_rs::Encoding::for_label(label.as_bytes()))
+    {
+        Some(encoding) => encoding,
+        None if textual => encoding_rs::WINDOWS_1252,
+        None => return None,
+    };
+
+    let (text, _, had_errors) = encoding.decode(bytes);
+    if had_errors && !textual {
+        return None;
+    }
+    Some(text.into_owned())
+}
+
 /// Decode a raw response body into the fields carried by [`ApiResponse`].
 ///
 /// A body that parses as JSON becomes a JSON value; other valid UTF-8 becomes a
-/// string; a non-UTF-8 body is preserved base64-encoded in the third element
-/// (with `is_binary` true and `data` `None`) instead of being lossily mangled,
-/// so binary downloads survive intact and can be saved byte-for-byte.
-fn decode_response_body(bytes: &[u8]) -> (Option<serde_json::Value>, bool, Option<String>) {
+/// string; a body in the legacy charset declared by `content_type` is decoded to
+/// a string through that charset. Anything left is preserved base64-encoded in
+/// the third element (with `is_binary` true and `data` `None`) instead of being
+/// lossily mangled, so binary downloads survive intact and can be saved
+/// byte-for-byte.
+fn decode_response_body(
+    bytes: &[u8],
+    content_type: Option<&str>,
+) -> (Option<serde_json::Value>, bool, Option<String>) {
     if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) {
         return (Some(value), false, None);
     }
-    match std::str::from_utf8(bytes) {
-        Ok(text) => (
+    if let Ok(text) = std::str::from_utf8(bytes) {
+        return (
             Some(serde_json::Value::String(text.to_string())),
             false,
             None,
-        ),
-        Err(_) => {
-            use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-            use base64::Engine;
-            (None, true, Some(BASE64_STANDARD.encode(bytes)))
-        }
+        );
     }
+    if let Some(text) = decode_with_declared_charset(bytes, content_type) {
+        return (Some(serde_json::Value::String(text)), false, None);
+    }
+
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+    use base64::Engine;
+    (None, true, Some(BASE64_STANDARD.encode(bytes)))
 }
 
 pub struct RequestState {
@@ -786,86 +804,26 @@ pub async fn send_api_request(
         }
     }
 
-    // Build client with optional proxy and HTTP version
-    // Use timeout from request options: None means no timeout, Some(0) also means no timeout
-    let mut client_builder =
-        Client::builder().user_agent(format!("resonance/{}", env!("CARGO_PKG_VERSION")));
+    // Timeout from request options: None means no timeout, Some(0) also means no timeout.
+    let timeout = request_options
+        .timeout
+        .filter(|ms| *ms > 0)
+        .map(Duration::from_millis);
 
-    // Only set timeout if provided and > 0
-    if let Some(timeout_ms) = request_options.timeout {
-        if timeout_ms > 0 {
-            client_builder = client_builder.timeout(Duration::from_millis(timeout_ms));
-        }
-    }
+    let client_options = HttpClientOptions {
+        user_agent: format!("resonance/{}", env!("CARGO_PKG_VERSION")),
+        timeout,
+        connect_timeout: None,
+        http_version: request_options.http_version.clone(),
+        verify_ssl: request_options.verify_ssl != Some(false),
+        client_cert: request_options.client_cert.clone(),
+        follow_redirects: request_options.follow_redirects != Some(false),
+        disable_pooling: false,
+    };
 
-    // Configure HTTP version based on settings
-    // Note: With rustls-tls + http2 feature, ALPN will negotiate HTTP/2 by default for HTTPS
-    match request_options.http_version.as_deref() {
-        Some("http1") => {
-            // Force HTTP/1.1 only - disable HTTP/2 completely
-            client_builder = client_builder.http1_only();
-        }
-        Some("http2") => {
-            // Force HTTP/2 with prior knowledge (no ALPN negotiation)
-            client_builder = client_builder.http2_prior_knowledge();
-        }
-        _ => {
-            // "auto" or unset - let ALPN negotiate
-        }
-    }
-
-    // Disable SSL verification if requested (e.g. for self-signed certs in dev)
-    if request_options.verify_ssl == Some(false) {
-        client_builder = client_builder.danger_accept_invalid_certs(true);
-    }
-
-    // Apply client certificate (mTLS) and/or custom CA trust resolved for this host.
-    if let Some(client_cert) = &request_options.client_cert {
-        match apply_client_cert(client_builder, client_cert) {
-            Ok(b) => client_builder = b,
-            Err(message) => {
-                return Ok(ApiResponse {
-                    success: false,
-                    data: None,
-                    is_binary: false,
-                    body_base64: None,
-                    status: None,
-                    status_text: None,
-                    headers: HashMap::new(),
-                    set_cookies: vec![],
-                    message: Some(message),
-                    ttfb: None,
-                    size: None,
-                    timings,
-                    cancelled: None,
-                });
-            }
-        }
-    }
-
-    // Disable redirect following if requested
-    if request_options.follow_redirects == Some(false) {
-        client_builder = client_builder.redirect(reqwest::redirect::Policy::none());
-    }
-
-    // Apply proxy decision resolved earlier. `Disable` must call `no_proxy()`
-    // explicitly — otherwise reqwest would still honour HTTP(S)_PROXY env vars
-    // and platform settings by default.
-    match proxy_action {
-        ProxyAction::Disable => {
-            client_builder = client_builder.no_proxy();
-        }
-        ProxyAction::UseSystem => {
-            // reqwest auto-detects system proxy; nothing to configure.
-        }
-        ProxyAction::Manual(proxy) => {
-            client_builder = client_builder.proxy(*proxy);
-        }
-    }
-
-    let client = match client_builder.build() {
-        Ok(c) => c,
-        Err(e) => {
+    let client = match build_http_client(client_options, proxy_action) {
+        Ok(client) => client,
+        Err(message) => {
             return Ok(ApiResponse {
                 success: false,
                 data: None,
@@ -875,7 +833,7 @@ pub async fn send_api_request(
                 status_text: None,
                 headers: HashMap::new(),
                 set_cookies: vec![],
-                message: Some(format!("Client build error: {}", e)),
+                message: Some(message),
                 ttfb: None,
                 size: None,
                 timings,
@@ -1131,7 +1089,8 @@ async fn process_response(
             timings.download = start_time.elapsed().as_millis() as u64 - timings.first_byte;
             timings.total = start_time.elapsed().as_millis() as u64;
 
-            let (data, is_binary, body_base64) = decode_response_body(&bytes);
+            let (data, is_binary, body_base64) =
+                decode_response_body(&bytes, headers.get("content-type").map(String::as_str));
 
             *state.cancel_tx.lock().unwrap() = None;
 
@@ -1272,7 +1231,7 @@ mod tests {
 
     #[test]
     fn decode_response_body_parses_json() {
-        let (data, is_binary, base64) = decode_response_body(br#"{"a":1}"#);
+        let (data, is_binary, base64) = decode_response_body(br#"{"a":1}"#, None);
         assert_eq!(data, Some(serde_json::json!({ "a": 1 })));
         assert!(!is_binary);
         assert!(base64.is_none());
@@ -1280,7 +1239,7 @@ mod tests {
 
     #[test]
     fn decode_response_body_keeps_plain_utf8_as_string() {
-        let (data, is_binary, base64) = decode_response_body(b"hello, world");
+        let (data, is_binary, base64) = decode_response_body(b"hello, world", None);
         assert_eq!(
             data,
             Some(serde_json::Value::String("hello, world".to_string()))
@@ -1295,13 +1254,56 @@ mod tests {
         use base64::Engine;
 
         let raw = [0x89u8, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0x01];
-        let (data, is_binary, base64) = decode_response_body(&raw);
+        let (data, is_binary, base64) =
+            decode_response_body(&raw, Some("application/octet-stream"));
 
         assert!(data.is_none());
         assert!(is_binary);
         let encoded = base64.expect("binary body should carry base64");
         let decoded = BASE64_STANDARD.decode(encoded.as_bytes()).unwrap();
         assert_eq!(decoded, raw, "base64 must round-trip the exact bytes");
+    }
+
+    #[test]
+    fn decode_response_body_decodes_declared_latin1_html_as_text() {
+        let raw = [b'G', b'r', b'u', 0xdf, b'e'];
+        let (data, is_binary, base64) =
+            decode_response_body(&raw, Some("text/html; charset=ISO-8859-1"));
+
+        assert_eq!(data, Some(serde_json::Value::String("Gruße".to_string())));
+        assert!(!is_binary, "declared legacy charsets are text, not binary");
+        assert!(base64.is_none());
+    }
+
+    #[test]
+    fn decode_response_body_decodes_textual_body_without_charset() {
+        let raw = [b'c', b'a', b'f', 0xe9];
+        let (data, is_binary, _) = decode_response_body(&raw, Some("text/plain"));
+
+        assert_eq!(data, Some(serde_json::Value::String("café".to_string())));
+        assert!(!is_binary);
+    }
+
+    #[test]
+    fn decode_response_body_keeps_image_with_text_charset_binary() {
+        let raw = [0x89u8, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0x01];
+        let (_, is_binary, base64) = decode_response_body(&raw, Some("image/png"));
+
+        assert!(is_binary);
+        assert!(base64.is_some());
+    }
+
+    #[test]
+    fn charset_from_content_type_reads_quoted_and_bare_labels() {
+        assert_eq!(
+            charset_from_content_type("text/html; charset=ISO-8859-1"),
+            Some("ISO-8859-1")
+        );
+        assert_eq!(
+            charset_from_content_type("text/html;charset=\"utf-8\""),
+            Some("utf-8")
+        );
+        assert_eq!(charset_from_content_type("text/html"), None);
     }
 
     #[test]
@@ -1436,112 +1438,5 @@ mod tests {
                 ("b".to_string(), "3".to_string()),
             ]
         );
-    }
-
-    #[test]
-    fn apply_client_cert_requires_both_cert_and_key() {
-        let cfg = ClientCertConfig {
-            cert_path: Some("/certs/client.crt".into()),
-            key_path: None,
-            ca_path: None,
-        };
-        let err = apply_client_cert(Client::builder(), &cfg).unwrap_err();
-        assert!(err.contains("both a certificate and a key"));
-    }
-
-    #[test]
-    fn apply_client_cert_reports_missing_file() {
-        let cfg = ClientCertConfig {
-            cert_path: Some("/nonexistent/client.crt".into()),
-            key_path: Some("/nonexistent/client.key".into()),
-            ca_path: None,
-        };
-        let err = apply_client_cert(Client::builder(), &cfg).unwrap_err();
-        assert!(err.contains("could not be read"));
-    }
-
-    #[test]
-    fn apply_client_cert_noop_when_empty() {
-        let cfg = ClientCertConfig {
-            cert_path: None,
-            key_path: None,
-            ca_path: None,
-        };
-        // Should succeed and leave the builder usable.
-        let builder = apply_client_cert(Client::builder(), &cfg).unwrap();
-        assert!(builder.build().is_ok());
-    }
-
-    /// End-to-end check that the production loader parses real PEM material:
-    /// generate a self-signed cert + unencrypted PKCS#8 key with `openssl`, then
-    /// assert the client identity and a custom CA both load and build a client.
-    /// Skipped automatically when `openssl` is unavailable.
-    #[test]
-    fn apply_client_cert_loads_real_pem_material() {
-        use std::process::Command;
-
-        let openssl_ok = Command::new("openssl")
-            .arg("version")
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-        if !openssl_ok {
-            eprintln!("skipping apply_client_cert_loads_real_pem_material: openssl not available");
-            return;
-        }
-
-        let dir = std::env::temp_dir().join(format!("resonance-mtls-test-{}", Uuid::new_v4()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let cert_path = dir.join("cert.pem");
-        let key_path = dir.join("key.pem");
-
-        // Self-signed cert with an unencrypted PKCS#8 EC key (-nodes).
-        let status = Command::new("openssl")
-            .args([
-                "req",
-                "-x509",
-                "-newkey",
-                "ec",
-                "-pkeyopt",
-                "ec_paramgen_curve:prime256v1",
-                "-nodes",
-                "-keyout",
-                key_path.to_str().unwrap(),
-                "-out",
-                cert_path.to_str().unwrap(),
-                "-days",
-                "1",
-                "-subj",
-                "/CN=resonance-mtls-test",
-            ])
-            .output()
-            .expect("run openssl");
-        assert!(
-            status.status.success(),
-            "openssl failed: {}",
-            String::from_utf8_lossy(&status.stderr)
-        );
-
-        // Client identity (cert chain + key) loads and builds.
-        let identity_cfg = ClientCertConfig {
-            cert_path: Some(cert_path.to_string_lossy().into()),
-            key_path: Some(key_path.to_string_lossy().into()),
-            ca_path: None,
-        };
-        let builder = apply_client_cert(Client::builder(), &identity_cfg)
-            .expect("client identity should load from real PEM");
-        assert!(builder.build().is_ok());
-
-        // The same self-signed cert is a valid single-entry CA bundle.
-        let ca_cfg = ClientCertConfig {
-            cert_path: None,
-            key_path: None,
-            ca_path: Some(cert_path.to_string_lossy().into()),
-        };
-        let builder = apply_client_cert(Client::builder(), &ca_cfg)
-            .expect("custom CA should load from real PEM");
-        assert!(builder.build().is_ok());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 }
