@@ -742,6 +742,7 @@ pub async fn send_api_request(
     let client_options = HttpClientOptions {
         user_agent: format!("resonance/{}", env!("CARGO_PKG_VERSION")),
         timeout,
+        connect_timeout: None,
         http_version: request_options.http_version.clone(),
         verify_ssl: request_options.verify_ssl != Some(false),
         client_cert: request_options.client_cert.clone(),

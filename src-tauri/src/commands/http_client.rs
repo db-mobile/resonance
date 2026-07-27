@@ -24,6 +24,10 @@ pub struct HttpClientOptions {
     /// Total request timeout. `None` leaves the client without one — required
     /// for streaming responses.
     pub timeout: Option<Duration>,
+    /// Bounds the connect phase alone. A streaming caller sets this so a server
+    /// that accepts nothing cannot hang the request forever, while leaving the
+    /// established stream itself untimed.
+    pub connect_timeout: Option<Duration>,
     /// `"http1"`, `"http2"`, or `None`/anything else to let ALPN negotiate.
     pub http_version: Option<String>,
     pub verify_ssl: bool,
@@ -46,6 +50,10 @@ pub fn build_http_client(
 
     if let Some(timeout) = opts.timeout {
         builder = builder.timeout(timeout);
+    }
+
+    if let Some(connect_timeout) = opts.connect_timeout {
+        builder = builder.connect_timeout(connect_timeout);
     }
 
     if opts.disable_pooling {
@@ -158,6 +166,7 @@ mod tests {
         HttpClientOptions {
             user_agent: "resonance-test".to_string(),
             timeout: None,
+            connect_timeout: None,
             http_version: None,
             verify_ssl: true,
             client_cert: None,

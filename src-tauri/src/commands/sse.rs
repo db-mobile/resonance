@@ -15,6 +15,19 @@ use super::proxy::{ProxyAction, ProxyState};
 /// Reconnection delay used until the server sends its own `retry:` field.
 const DEFAULT_RETRY_MS: u64 = 3000;
 
+/// Floor for a server-supplied `retry:`. A server asking for 0 would otherwise
+/// spin the reconnect loop as fast as the machine allows.
+const MIN_RETRY_MS: u64 = 250;
+
+/// How many consecutive reconnects may deliver nothing before the stream gives
+/// up. A stream that keeps producing data resets the count, so a long-lived
+/// connection that reconnects occasionally never accumulates towards it.
+const MAX_SILENT_RECONNECTS: u32 = 10;
+
+/// Bounds the TCP+TLS handshake only — never the stream itself, which is
+/// expected to stay open indefinitely.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+
 type Connections = Arc<Mutex<HashMap<String, SseConnection>>>;
 
 /// A live stream, keyed by tab. `id` distinguishes generations so a task that
@@ -147,24 +160,25 @@ impl PartialEvent {
         self.event.is_none() && self.data.is_empty() && self.id.is_none() && self.retry.is_none()
     }
 
-    /// Consume the buffered fields at a frame boundary. Returns `None` for
-    /// comment-only or empty frames. `id` is deliberately retained: per spec the
-    /// last event id persists across subsequent frames.
+    /// Consume the buffered fields at a frame boundary, following the spec's
+    /// dispatch rules: a frame with no `data` field does not dispatch at all,
+    /// even when it names an event type, and the event type is discarded with
+    /// it. A single empty `data:` still dispatches, carrying an empty string.
+    ///
+    /// `id` is deliberately retained — per spec the last event id persists
+    /// across subsequent frames.
     fn take_payload(&mut self) -> Option<EventParts> {
-        if self.data.is_empty() && self.event.is_none() {
+        if self.data.is_empty() {
+            self.event = None;
             return None;
         }
 
-        let data = if self.data.is_empty() {
-            None
-        } else {
-            Some(self.data.join("\n"))
-        };
+        let data = self.data.join("\n");
         self.data.clear();
 
         Some(EventParts {
             event: self.event.take(),
-            data,
+            data: Some(data),
             id: self.id.clone(),
         })
     }
@@ -205,19 +219,33 @@ fn parse_line(line: &str, partial: &mut PartialEvent) {
     }
 }
 
-/// Drain complete lines (LF- or CRLF-terminated) from `buffer`, leaving any
-/// trailing incomplete line behind. Only whole lines are decoded, so a
-/// multi-byte character split across two network chunks is reassembled before
-/// it is turned into text rather than being mangled into U+FFFD.
+/// Drain complete lines from `buffer`, leaving any trailing incomplete line
+/// behind. All three terminators the spec allows are honoured: LF, CRLF, and a
+/// lone CR.
+///
+/// Only whole lines are decoded, so a multi-byte character split across two
+/// network chunks is reassembled before it is turned into text rather than
+/// being mangled into U+FFFD. A CR at the very end of the buffer is left in
+/// place: it cannot yet be told apart from the first half of a CRLF.
 fn drain_lines(buffer: &mut Vec<u8>) -> Vec<String> {
     let mut lines = Vec::new();
 
-    while let Some(pos) = buffer.iter().position(|byte| *byte == b'\n') {
-        let mut line: Vec<u8> = buffer.drain(..=pos).collect();
-        line.pop();
-        if line.last() == Some(&b'\r') {
-            line.pop();
+    while let Some(pos) = buffer
+        .iter()
+        .position(|byte| *byte == b'\n' || *byte == b'\r')
+    {
+        if buffer[pos] == b'\r' && pos + 1 == buffer.len() {
+            break;
         }
+
+        let terminator = if buffer[pos] == b'\r' && buffer.get(pos + 1) == Some(&b'\n') {
+            2
+        } else {
+            1
+        };
+
+        let line: Vec<u8> = buffer.drain(..pos).collect();
+        buffer.drain(..terminator);
         lines.push(String::from_utf8_lossy(&line).into_owned());
     }
 
@@ -285,6 +313,37 @@ struct StreamTarget {
     last_event_id: Option<String>,
 }
 
+/// Apply the reconnect-delay floor to a server-supplied `retry:`.
+fn clamp_retry(ms: u64) -> u64 {
+    ms.max(MIN_RETRY_MS)
+}
+
+fn give_up_message() -> String {
+    format!(
+        "Gave up after {} reconnects without receiving any data",
+        MAX_SILENT_RECONNECTS
+    )
+}
+
+/// Announce the pending reconnect and wait out the retry delay. Returns false
+/// when the caller asked to shut down while waiting.
+async fn wait_before_retry(
+    app: &AppHandle,
+    tab_id: &str,
+    url: &str,
+    retry_ms: u64,
+    shutdown: &mut oneshot::Receiver<()>,
+) -> bool {
+    let mut reconnecting = payload(tab_id, url, "reconnecting");
+    reconnecting.retry = Some(retry_ms);
+    emit(app, reconnecting);
+
+    tokio::select! {
+        _ = &mut *shutdown => false,
+        _ = tokio::time::sleep(Duration::from_millis(retry_ms)) => true,
+    }
+}
+
 /// Connect, stream, and reconnect until the stream fails fatally or the caller
 /// signals shutdown. Every exit path returns to `run_stream`, which owns the
 /// single terminal `close` emit.
@@ -307,6 +366,7 @@ async fn stream_loop(
     let mut last_event_id = initial_last_event_id.clone();
     let mut retry_ms: u64 = DEFAULT_RETRY_MS;
     let mut first_connect = true;
+    let mut silent_reconnects: u32 = 0;
 
     loop {
         let header_map = match build_header_map(headers, last_event_id.as_deref()) {
@@ -324,14 +384,30 @@ async fn stream_loop(
             attempt = attempt.body(body.clone());
         }
 
-        let mut response = tokio::select! {
+        let sent = tokio::select! {
             _ = &mut *shutdown => return,
-            result = attempt.send() => match result {
-                Ok(response) => response,
-                Err(e) => {
-                    emit_error(app, tab_id, url, None, format!("Connection failed: {}", e));
+            result = attempt.send() => result,
+        };
+
+        let mut response = match sent {
+            Ok(response) => response,
+            Err(e) => {
+                emit_error(app, tab_id, url, None, format!("Connection failed: {}", e));
+                // The first connect failing is the user's problem to see now —
+                // a wrong URL or a server that is down. Once a stream has been
+                // established, a failure is a blip worth retrying.
+                if first_connect {
                     return;
                 }
+                silent_reconnects += 1;
+                if silent_reconnects >= MAX_SILENT_RECONNECTS {
+                    emit_error(app, tab_id, url, None, give_up_message());
+                    return;
+                }
+                if !wait_before_retry(app, tab_id, url, retry_ms, shutdown).await {
+                    return;
+                }
+                continue;
             }
         };
 
@@ -380,6 +456,7 @@ async fn stream_loop(
         let mut buffer: Vec<u8> = Vec::new();
         let mut partial = PartialEvent::default();
         let mut cancelled = false;
+        let mut delivered_data = false;
 
         loop {
             let chunk = tokio::select! {
@@ -392,6 +469,9 @@ async fn stream_loop(
 
             match chunk {
                 Ok(Some(bytes)) => {
+                    if !bytes.is_empty() {
+                        delivered_data = true;
+                    }
                     buffer.extend_from_slice(&bytes);
                     for line in drain_lines(&mut buffer) {
                         if line.is_empty() {
@@ -399,7 +479,7 @@ async fn stream_loop(
                         } else {
                             parse_line(&line, &mut partial);
                             if let Some(ms) = partial.retry.take() {
-                                retry_ms = ms;
+                                retry_ms = clamp_retry(ms);
                             }
                         }
                     }
@@ -416,18 +496,26 @@ async fn stream_loop(
             return;
         }
 
+        // A connection that produced something is evidence the endpoint works,
+        // so only runs of empty ones count towards giving up.
+        if delivered_data {
+            silent_reconnects = 0;
+        } else {
+            silent_reconnects += 1;
+        }
+
         // Flush any trailing partial event if the stream ended on a non-empty buffer.
         if !partial.is_empty() {
             dispatch(app, tab_id, url, &mut partial, &mut last_event_id);
         }
 
-        let mut reconnecting = payload(tab_id, url, "reconnecting");
-        reconnecting.retry = Some(retry_ms);
-        emit(app, reconnecting);
+        if silent_reconnects >= MAX_SILENT_RECONNECTS {
+            emit_error(app, tab_id, url, None, give_up_message());
+            return;
+        }
 
-        tokio::select! {
-            _ = &mut *shutdown => return,
-            _ = tokio::time::sleep(Duration::from_millis(retry_ms)) => {}
+        if !wait_before_retry(app, tab_id, url, retry_ms, shutdown).await {
+            return;
         }
     }
 }
@@ -462,6 +550,7 @@ fn build_sse_client(
         HttpClientOptions {
             user_agent: format!("resonance/{}", env!("CARGO_PKG_VERSION")),
             timeout: None,
+            connect_timeout: Some(CONNECT_TIMEOUT),
             http_version: None,
             verify_ssl: request.verify_ssl != Some(false),
             client_cert: request.client_cert.clone(),
@@ -643,6 +732,111 @@ mod tests {
         assert!(partial.data.is_empty());
         assert_eq!(partial.event, None);
         assert_eq!(partial.id, Some("7".to_string()));
+    }
+
+    #[test]
+    fn a_frame_without_data_does_not_dispatch() {
+        // Per spec an event type with no data field is not dispatched, and the
+        // type is discarded rather than leaking into the next frame.
+        let mut partial = parse_frame(&["event: ping"]);
+        assert_eq!(partial.take_payload(), None);
+        assert_eq!(partial.event, None);
+
+        parse_line("data: after", &mut partial);
+        let parts = partial.take_payload().expect("expected a payload");
+        assert_eq!(parts.event, None);
+        assert_eq!(parts.data, Some("after".to_string()));
+    }
+
+    #[test]
+    fn drains_lines_terminated_by_a_bare_cr() {
+        let mut buffer = b"data: one\rdata: two\r".to_vec();
+        assert_eq!(drain_lines(&mut buffer), vec!["data: one".to_string()]);
+        // The trailing CR is held back: it could still turn out to be a CRLF.
+        assert_eq!(buffer, b"data: two\r");
+
+        buffer.extend_from_slice(b"data: three\n");
+        assert_eq!(
+            drain_lines(&mut buffer),
+            vec!["data: two".to_string(), "data: three".to_string()]
+        );
+    }
+
+    #[test]
+    fn treats_a_crlf_split_across_chunks_as_one_terminator() {
+        let mut buffer = b"data: one\r".to_vec();
+        assert!(drain_lines(&mut buffer).is_empty());
+
+        buffer.extend_from_slice(b"\ndata: two\n");
+        assert_eq!(
+            drain_lines(&mut buffer),
+            vec!["data: one".to_string(), "data: two".to_string()]
+        );
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn a_bare_cr_marks_a_frame_boundary() {
+        let mut buffer = b"data: one\r\rdata: two\n".to_vec();
+        assert_eq!(
+            drain_lines(&mut buffer),
+            vec![
+                "data: one".to_string(),
+                String::new(),
+                "data: two".to_string()
+            ]
+        );
+    }
+
+    /// The exact body a server emitting mixed terminators produces, captured
+    /// off the wire: bare-CR frames, a CRLF split across two writes, and an
+    /// event type with no data.
+    #[test]
+    fn parses_a_real_mixed_terminator_body() {
+        let chunks: [&[u8]; 2] = [
+            b"data: cr-one\r\revent: tick\rdata: cr-two\r\rdata: split\r",
+            b"\n\nevent: ping\n\ndata: last\n\n",
+        ];
+
+        let mut buffer: Vec<u8> = Vec::new();
+        let mut partial = PartialEvent::default();
+        let mut dispatched = Vec::new();
+
+        for chunk in chunks {
+            buffer.extend_from_slice(chunk);
+            for line in drain_lines(&mut buffer) {
+                if line.is_empty() {
+                    if let Some(parts) = partial.take_payload() {
+                        dispatched.push((parts.event, parts.data));
+                    }
+                } else {
+                    parse_line(&line, &mut partial);
+                }
+            }
+        }
+
+        assert_eq!(
+            dispatched,
+            vec![
+                (None, Some("cr-one".to_string())),
+                (Some("tick".to_string()), Some("cr-two".to_string())),
+                (None, Some("split".to_string())),
+                (None, Some("last".to_string())),
+            ]
+        );
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn clamps_a_zero_or_tiny_retry_to_the_floor() {
+        assert_eq!(clamp_retry(0), MIN_RETRY_MS);
+        assert_eq!(clamp_retry(10), MIN_RETRY_MS);
+        assert_eq!(clamp_retry(5000), 5000);
+    }
+
+    #[test]
+    fn the_give_up_message_names_the_attempt_count() {
+        assert!(give_up_message().contains(&MAX_SILENT_RECONNECTS.to_string()));
     }
 
     #[test]

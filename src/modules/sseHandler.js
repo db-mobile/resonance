@@ -22,6 +22,11 @@ const session = new StreamSession({
     })
 });
 
+/**
+ * Render one dispatched event the way it arrived on the wire. `retry` is not
+ * shown here: it never rides along with a message — the backend applies it and
+ * reports it on the `reconnecting` event instead.
+ */
 function formatMessage(payload) {
     const parts = [];
     if (payload.event) {
@@ -29,9 +34,6 @@ function formatMessage(payload) {
     }
     if (payload.id) {
         parts.push(`id: ${payload.id}`);
-    }
-    if (payload.retry !== null && payload.retry !== undefined) {
-        parts.push(`retry: ${payload.retry}`);
     }
     if (payload.data !== null && payload.data !== undefined) {
         parts.push(payload.data);
