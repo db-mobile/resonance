@@ -158,7 +158,14 @@ async function buildSseTlsOptions(url) {
     return tls;
 }
 
-export async function handleSseConnect(url, headers = {}) {
+/**
+ * @param {string} url
+ * @param {Object<string, string>} [headers]
+ * @param {object} [options]
+ * @param {string} [options.method] - defaults to GET on the backend.
+ * @param {string|null} [options.body] - raw body, replayed on each reconnect.
+ */
+export async function handleSseConnect(url, headers = {}, { method, body } = {}) {
     await initSseHandler();
 
     if (!window.backendAPI?.sse) {
@@ -190,6 +197,8 @@ export async function handleSseConnect(url, headers = {}) {
         await window.backendAPI.sse.connect({
             tabId,
             url: trimmed,
+            method,
+            body,
             headers,
             lastEventId,
             ...(await buildSseTlsOptions(trimmed))

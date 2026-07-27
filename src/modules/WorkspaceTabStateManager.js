@@ -76,17 +76,26 @@ export class WorkspaceTabStateManager {
 
         if (isSseMode()) {
             const sseUrlInput = document.getElementById('sse-url-input');
+            const sseBodyMode = document.getElementById('body-mode-select')?.value === 'text'
+                ? 'text'
+                : 'json';
+            const authConfig = authManager.getAuthConfig();
             return {
                 request: {
                     protocol: 'sse',
                     url: sseUrlInput?.value || this.dom.urlInput?.value || '',
-                    method: 'GET',
+                    method: this.dom.methodSelect?.value || 'GET',
                     pathParams: {},
                     queryParams: parseKeyValuePairs(this.dom.queryParamsList),
                     headers: parseKeyValuePairs(this.dom.headersList),
-                    body: { mode: 'none', content: '' },
-                    authType: 'none',
-                    authConfig: {}
+                    body: {
+                        mode: sseBodyMode,
+                        content: sseBodyMode === 'text'
+                            ? (app.requestBodyTextEditor?.getContent() || '')
+                            : (getRequestBodyContent() || '')
+                    },
+                    authType: authConfig?.type || 'none',
+                    authConfig: authConfig?.config || {}
                 },
                 endpoint: getCurrentEndpoint()
                     ? {
@@ -353,6 +362,18 @@ export class WorkspaceTabStateManager {
                 sseUrlInput.value = request.url || '';
             }
 
+            if (this.dom.methodSelect) {
+                this.dom.methodSelect.value = request.method || 'GET';
+            }
+
+            if (request.body?.mode === 'text') {
+                this.graphqlBodyManager?.switchMode('text');
+                app.requestBodyTextEditor?.setContent(request.body.content || '');
+            } else {
+                this.graphqlBodyManager?.switchMode('json');
+                setRequestBodyContent(request.body?.content || '');
+            }
+
             if (this.dom.queryParamsList) {
                 clearKeyValueList(this.dom.queryParamsList);
                 if (request.queryParams && Object.keys(request.queryParams).length > 0) {
@@ -370,6 +391,13 @@ export class WorkspaceTabStateManager {
                 } else {
                     addKeyValueRow(this.dom.headersList);
                 }
+            }
+
+            if (authManager) {
+                authManager.loadAuthConfig({
+                    type: request.authType || 'none',
+                    config: request.authConfig || {}
+                });
             }
 
             const activeResponseTab = tab.activeResponseTab || 'response-body';

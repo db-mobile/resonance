@@ -1,4 +1,5 @@
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, ACCEPT, CACHE_CONTROL};
+use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -55,6 +56,14 @@ pub struct SseConnectRequest {
     pub verify_ssl: Option<bool>,
     #[serde(default)]
     pub client_cert: Option<ClientCertConfig>,
+    /// Defaults to GET. A streaming endpoint that takes a request document —
+    /// an LLM completion, say — is normally a POST.
+    #[serde(default)]
+    pub method: Option<String>,
+    /// Raw request body, replayed verbatim on every reconnect. The frontend
+    /// serializes it and sets the matching Content-Type header.
+    #[serde(default)]
+    pub body: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -270,6 +279,8 @@ fn dispatch(
 struct StreamTarget {
     tab_id: String,
     url: String,
+    method: Method,
+    body: Option<String>,
     headers: HashMap<String, String>,
     last_event_id: Option<String>,
 }
@@ -286,6 +297,8 @@ async fn stream_loop(
     let StreamTarget {
         tab_id,
         url,
+        method,
+        body,
         headers,
         last_event_id: initial_last_event_id,
     } = target;
@@ -304,9 +317,16 @@ async fn stream_loop(
             }
         };
 
+        // The body is re-sent on every attempt: a reconnect has to repeat the
+        // original request, not replay a consumed stream.
+        let mut attempt = client.request(method.clone(), url).headers(header_map);
+        if let Some(body) = body {
+            attempt = attempt.body(body.clone());
+        }
+
         let mut response = tokio::select! {
             _ = &mut *shutdown => return,
-            result = client.get(url).headers(header_map).send() => match result {
+            result = attempt.send() => match result {
                 Ok(response) => response,
                 Err(e) => {
                     emit_error(app, tab_id, url, None, format!("Connection failed: {}", e));
@@ -466,6 +486,13 @@ pub async fn sse_connect(
         return Err("SSE URL is required".to_string());
     }
 
+    let method = match request.method.as_deref() {
+        Some(method) => method
+            .parse::<Method>()
+            .map_err(|e| format!("Invalid HTTP method: {}", e))?,
+        None => Method::GET,
+    };
+
     // Build the client before touching the connection map: an unusable
     // certificate must fail this call outright rather than tear down whatever
     // stream the tab already has running.
@@ -493,6 +520,8 @@ pub async fn sse_connect(
         StreamTarget {
             tab_id: request.tab_id.clone(),
             url: request.url.clone(),
+            method,
+            body: request.body.take(),
             headers: request.headers.take().unwrap_or_default(),
             last_event_id: request.last_event_id.take(),
         },
@@ -698,6 +727,45 @@ mod tests {
         let cert = request.client_cert.expect("expected a client cert");
         assert_eq!(cert.cert_path.as_deref(), Some("/certs/client.crt"));
         assert_eq!(cert.ca_path.as_deref(), Some("/certs/ca.pem"));
+    }
+
+    #[test]
+    fn deserializes_a_connect_request_with_a_method_and_body() {
+        let request: SseConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "https://api.example.com/v1/stream",
+            "method": "POST",
+            "body": "{\"prompt\":\"hi\",\"stream\":true}"
+        }))
+        .expect("expected the request to deserialize");
+
+        assert_eq!(request.method.as_deref(), Some("POST"));
+        assert_eq!(
+            request.body.as_deref(),
+            Some("{\"prompt\":\"hi\",\"stream\":true}")
+        );
+        assert_eq!(
+            request
+                .method
+                .as_deref()
+                .unwrap()
+                .parse::<Method>()
+                .unwrap(),
+            Method::POST
+        );
+    }
+
+    #[test]
+    fn an_absent_method_means_get_and_an_invalid_one_is_rejected() {
+        let request: SseConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "https://example.com/events"
+        }))
+        .unwrap();
+        assert!(request.method.is_none());
+        assert!(request.body.is_none());
+
+        assert!("GET FETCH".parse::<Method>().is_err());
     }
 
     #[test]

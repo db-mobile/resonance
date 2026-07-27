@@ -39,10 +39,19 @@ const HTTP_ONLY_TABS = ['path-params'];
 const HTTP_AND_WEBSOCKET_TABS = ['query-params', 'headers', 'body'];
 
 /**
- * Tabs shown in SSE mode (no body, since SSE is GET-only)
+ * Tabs shown in SSE mode. A streaming endpoint may take a request document
+ * (POST + JSON is the norm for LLM-style streams), so Body is available, and
+ * Authorization is editable rather than inherit-only.
  * @type {string[]}
  */
-const SSE_TABS = ['query-params', 'headers'];
+const SSE_TABS = ['query-params', 'headers', 'body', 'authorization'];
+
+/**
+ * Body modes offered in SSE mode. A streaming request sends one document;
+ * multipart and binary uploads have no meaning here.
+ * @type {string[]}
+ */
+const SSE_BODY_MODES = ['json', 'text'];
 
 /**
  * Tabs shown in MQTT mode (broker config tab + message payload)
@@ -170,6 +179,9 @@ function updateUIForMode(mode) {
         app.graphqlBodyManager.setGraphQLModeEnabled(false);
     }
 
+    // Every mode starts from the full body-mode list; SSE narrows it below.
+    restrictBodyModes(null);
+
     if (mode === RequestMode.GRPC) {
         if (methodSelectContainer) {
             methodSelectContainer.style.display = 'none';
@@ -215,8 +227,10 @@ function updateUIForMode(mode) {
             activateTab('grpc');
         }
     } else if (mode === RequestMode.SSE) {
+        // Both the method select and the SSE badge are shown: the method is
+        // now the user's to choose, and the badge still marks the protocol.
         if (methodSelectContainer) {
-            methodSelectContainer.style.display = 'none';
+            methodSelectContainer.style.display = '';
         }
         if (urlInputContainer) {
             urlInputContainer.style.display = 'none';
@@ -241,8 +255,12 @@ function updateUIForMode(mode) {
         });
 
         if (bodyModeContainer) {
-            bodyModeContainer.style.display = 'none';
+            bodyModeContainer.style.display = '';
         }
+        if (bodyModeSelect) {
+            bodyModeSelect.disabled = false;
+        }
+        restrictBodyModes(SSE_BODY_MODES);
         if (app.graphqlBodyManager) {
             app.graphqlBodyManager.setGraphQLModeEnabled(false);
         }
@@ -437,6 +455,61 @@ function activateTab(tabId) {
     const tabBtn = document.querySelector(`.request-config .tab-nav .tab-button[data-tab="${tabId}"]`);
     if (tabBtn) {
         tabBtn.click();
+    }
+}
+
+/**
+ * The full body-mode list, captured from the markup so option labels stay in
+ * one place. Refreshed whenever the complete set is present, so a later edit or
+ * translation is picked up rather than pinned at first use.
+ * @type {{value: string, text: string}[]|null}
+ */
+let bodyModeOptionTemplate = null;
+
+/**
+ * Limit which body modes the mode select offers. Pass `null` to restore the
+ * full list. When the current selection is no longer allowed it falls back to
+ * the first permitted mode, switching the body panel with it.
+ *
+ * Options are added and removed rather than marked `hidden`: WebKit — which is
+ * what the app actually runs on under Linux — ignores `hidden` on `<option>`,
+ * so hidden entries would still appear in the dropdown.
+ *
+ * @param {string[]|null} allowed
+ */
+function restrictBodyModes(allowed) {
+    const bodyModeSelect = document.getElementById('body-mode-select');
+    if (!bodyModeSelect) {
+        return;
+    }
+
+    if (bodyModeSelect.options.length >= (bodyModeOptionTemplate?.length || 0)) {
+        bodyModeOptionTemplate = Array.from(bodyModeSelect.options, (option) => ({
+            value: option.value,
+            text: option.textContent
+        }));
+    }
+
+    const wanted = allowed
+        ? bodyModeOptionTemplate.filter((option) => allowed.includes(option.value))
+        : bodyModeOptionTemplate;
+
+    const present = Array.from(bodyModeSelect.options, (option) => option.value).join(',');
+    if (present !== wanted.map((option) => option.value).join(',')) {
+        const selected = bodyModeSelect.value;
+        bodyModeSelect.textContent = '';
+        for (const { value, text } of wanted) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = text;
+            bodyModeSelect.appendChild(option);
+        }
+        bodyModeSelect.value = selected;
+    }
+
+    if (!bodyModeSelect.value && wanted.length > 0) {
+        bodyModeSelect.value = wanted[0].value;
+        app.graphqlBodyManager?.switchMode(wanted[0].value);
     }
 }
 

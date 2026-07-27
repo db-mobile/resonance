@@ -154,7 +154,7 @@ export class WorkspaceTabController {
                     pathParams: {},
                     queryParams: {},
                     headers: {},
-                    body: { mode: 'none', content: '' },
+                    body: { mode: 'json', content: '' },
                     authType: 'none',
                     authConfig: {}
                 };
