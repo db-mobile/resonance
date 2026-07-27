@@ -7,6 +7,7 @@ pub mod graphql_subscription;
 pub mod grpc_proto;
 pub mod grpc_reflection;
 pub mod grpc_streaming;
+pub mod http_client;
 pub mod import_export;
 pub mod mock_server;
 pub mod mqtt;

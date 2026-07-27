@@ -10,7 +10,7 @@ const STORE_FILE: &str = "resonance-store.json";
 /// The store plugin writes it with the process umask (typically world-readable),
 /// so it holds request history, the cookie jar, and any plaintext-fallback
 /// secrets — tighten it after every save.
-fn restrict_store_file(app: &AppHandle) {
+pub(crate) fn restrict_store_file(app: &AppHandle) {
     if let Ok(dir) = app.path().app_data_dir() {
         restrict_file(&dir.join(STORE_FILE));
     }
@@ -27,15 +27,9 @@ fn get_default_for_key(key: &str) -> Value {
         "activeWorkspaceTabId" => Value::Null,
         "theme" => serde_json::json!("system"),
         "accentColor" => serde_json::json!("blue"),
-        "proxySettings" => serde_json::json!({
-            "enabled": false,
-            "mode": "manual",
-            "manualConfig": {
-                "httpProxy": "",
-                "httpsProxy": "",
-                "noProxy": ""
-            }
-        }),
+        "proxySettings" => {
+            serde_json::to_value(super::proxy::ProxySettings::default()).unwrap_or(Value::Null)
+        }
         "mockServerSettings" => serde_json::json!({
             "port": 3001,
             "delay": 0,

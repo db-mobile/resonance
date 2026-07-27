@@ -2,6 +2,7 @@ import { getCurrentEndpoint } from './state/currentEndpoint.js';
 import { app } from './appContext.js';
 import { pathParamsList, addPathParamBtn, headersList, addHeaderBtn, queryParamsList, addQueryParamBtn, urlInput } from './domElements.js';
 import { debounce } from './utils/debounce.js';
+import { notifyUrlUpdated } from './ui/mirroredUrlSection.js';
 
 const debounceAutoSave = debounce((callback) => callback(), 500);
 
@@ -139,6 +140,7 @@ export function updateUrlFromQueryParams() {
 
         isUpdatingUrlFromQueryParams = true;
         urlInput.value = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+        notifyUrlUpdated(urlInput);
         setTimeout(() => {
             isUpdatingUrlFromQueryParams = false;
         }, 0);

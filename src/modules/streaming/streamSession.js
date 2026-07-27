@@ -1,6 +1,7 @@
 import { app } from '../appContext.js';
 import { displayResponseWithLineNumbersForTab } from '../apiHandler.js';
 import { updateResponseSize, updateResponseTime, updateStatusDisplay } from '../statusDisplay.js';
+import { debounce } from '../utils/debounce.js';
 
 /**
  * Shared scaffolding for the streaming-protocol handlers (WebSocket, SSE, MQTT,
@@ -62,8 +63,31 @@ export function createBackendEventListener(eventName, isBackendAvailable, handle
     };
 }
 
+/**
+ * A transcript is a debugging view of a live stream, not a log file: a chatty
+ * endpoint would otherwise grow it without limit, and since every event
+ * re-renders and re-persists the whole thing, the cost per event would grow
+ * with the transcript. The oldest entries are dropped once either bound is hit.
+ */
+const MAX_TRANSCRIPT_ENTRIES = 500;
+const MAX_TRANSCRIPT_CHARS = 256 * 1024;
+
+/**
+ * Persisting on every event turns a fast stream into a write storm against the
+ * tab store. Only the last write in a burst matters, so coalesce them.
+ */
+const PERSIST_DEBOUNCE_MS = 400;
+
+const ENTRY_SEPARATOR = '\n\n';
+
 function timestamp() {
     return new Date().toLocaleTimeString();
+}
+
+function droppedNotice(count) {
+    return count === 1
+        ? '[1 earlier entry dropped]'
+        : `[${count} earlier entries dropped]`;
 }
 
 /**
@@ -80,6 +104,8 @@ export class StreamSession {
      */
     constructor({ buildResponseMeta = null } = {}) {
         this._entries = new Map();
+        this._buffers = new Map();
+        this._persisters = new Map();
         this._buildResponseMeta = buildResponseMeta;
     }
 
@@ -93,6 +119,10 @@ export class StreamSession {
 
     remove(tabId) {
         this._entries.delete(tabId);
+        this._buffers.delete(tabId);
+        // The tab is gone; a queued write would target a tab that no longer exists.
+        this._persisters.get(tabId)?.cancel();
+        this._persisters.delete(tabId);
     }
 
     /**
@@ -117,20 +147,92 @@ export class StreamSession {
         const current = this.get(tabId) || {};
         const header = `[${timestamp()}] ${label}`;
         const line = content ? `${header}\n${content}` : header;
-        const existing = current.transcript || '';
-        const transcript = existing ? `${existing}\n\n${line}` : line;
 
+        const buffer = this._bufferFor(tabId, current);
+        this._push(buffer, line);
+        this._trim(buffer);
+
+        const transcript = this._compose(buffer);
         this.set(tabId, { ...current, transcript });
         displayResponseWithLineNumbersForTab(transcript, 'text/plain', tabId);
-        await this._persist(tabId, transcript);
+        this._schedulePersist(tabId);
     }
 
-    async _persist(tabId, transcript) {
+    /**
+     * The entry buffer backing a tab's transcript. Handlers reset a transcript
+     * by setting it to `''` when a new connection starts, so an empty
+     * transcript means the buffer is stale and starts again.
+     */
+    _bufferFor(tabId, current) {
+        let buffer = this._buffers.get(tabId);
+        if (!buffer || !current.transcript) {
+            buffer = { sizes: [], dropped: 0, chars: 0, body: '' };
+            this._buffers.set(tabId, buffer);
+        }
+        return buffer;
+    }
+
+    /**
+     * The composed body is maintained incrementally rather than re-joined from
+     * the entries on every event: at steady state each append drops one entry
+     * and adds one, so a rebuild would cost the full cap per event. Only entry
+     * *sizes* are kept, which is all trimming needs.
+     */
+    _push(buffer, line) {
+        buffer.body = buffer.body ? buffer.body + ENTRY_SEPARATOR + line : line;
+        buffer.sizes.push(line.length);
+        buffer.chars += line.length + ENTRY_SEPARATOR.length;
+    }
+
+    /**
+     * Drop oldest entries until both bounds hold. The newest entry is always
+     * kept, however large it is — truncating an event's body would misrepresent
+     * what the server actually sent.
+     */
+    _trim(buffer) {
+        while (
+            buffer.sizes.length > 1
+            && (buffer.sizes.length > MAX_TRANSCRIPT_ENTRIES
+                || buffer.chars > MAX_TRANSCRIPT_CHARS)
+        ) {
+            const size = buffer.sizes.shift();
+            buffer.body = buffer.body.slice(size + ENTRY_SEPARATOR.length);
+            buffer.chars -= size + ENTRY_SEPARATOR.length;
+            buffer.dropped += 1;
+        }
+    }
+
+    _compose(buffer) {
+        return buffer.dropped > 0
+            ? droppedNotice(buffer.dropped) + ENTRY_SEPARATOR + buffer.body
+            : buffer.body;
+    }
+
+    _schedulePersist(tabId) {
+        if (!this._buildResponseMeta || !tabId) {
+            return;
+        }
+        let persist = this._persisters.get(tabId);
+        if (!persist) {
+            persist = debounce(() => this._persist(tabId), PERSIST_DEBOUNCE_MS);
+            this._persisters.set(tabId, persist);
+        }
+        persist();
+    }
+
+    async _persist(tabId) {
         if (!this._buildResponseMeta || !app.workspaceTabController || !tabId) {
             return;
         }
-        const entry = this.get(tabId) || {};
-        const response = this._buildResponseMeta(entry, transcript, entry.state || 'closed');
+        const entry = this.get(tabId);
+        if (!entry) {
+            return;
+        }
+        const response = this._buildResponseMeta(
+            entry,
+            entry.transcript || '',
+            entry.state || 'closed'
+        );
         if (!response) {
             return;
         }

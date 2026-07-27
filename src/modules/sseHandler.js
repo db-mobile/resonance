@@ -1,4 +1,5 @@
-import { clearResponseDisplayForTab } from './apiHandler.js';
+import { app } from './appContext.js';
+import { clearResponseDisplayForTab, getSettingsCache } from './apiHandler.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
 import {
@@ -21,6 +22,11 @@ const session = new StreamSession({
     })
 });
 
+/**
+ * Render one dispatched event the way it arrived on the wire. `retry` is not
+ * shown here: it never rides along with a message — the backend applies it and
+ * reports it on the `reconnecting` event instead.
+ */
 function formatMessage(payload) {
     const parts = [];
     if (payload.event) {
@@ -28,9 +34,6 @@ function formatMessage(payload) {
     }
     if (payload.id) {
         parts.push(`id: ${payload.id}`);
-    }
-    if (payload.retry !== null && payload.retry !== undefined) {
-        parts.push(`retry: ${payload.retry}`);
     }
     if (payload.data !== null && payload.data !== undefined) {
         parts.push(payload.data);
@@ -44,7 +47,14 @@ async function handleBackendEvent(event) {
     if (!tabId) {
         return;
     }
-    const current = session.get(tabId) || {};
+    const current = session.get(tabId);
+
+    // A closed tab drops its session before the backend has finished unwinding,
+    // and its terminal `close` still arrives. Rendering it would resurrect the
+    // tab's response container, so anything without a live session is ignored.
+    if (!current) {
+        return;
+    }
 
     if (current.url && url && current.url !== url && payload.eventType !== 'open') {
         return;
@@ -119,7 +129,45 @@ export const initSseHandler = createBackendEventListener(
     handleBackendEvent
 );
 
-export async function handleSseConnect(url, headers = {}) {
+/**
+ * Resolve the per-request TLS options the backend needs, mirroring what the
+ * HTTP path sends: the global verify-SSL toggle plus any client certificate or
+ * custom CA registered for this host. Both lookups are best-effort — a stream
+ * should still be attempted if settings or the certificate store are unreadable.
+ * @param {string} url - the resolved SSE URL.
+ * @returns {Promise<{verifySsl: boolean, clientCert?: object}>}
+ */
+async function buildSseTlsOptions(url) {
+    let verifySsl = true;
+    try {
+        // The cache is only warm once an HTTP request has been sent this
+        // session, so an SSE-only session has to read the settings itself.
+        const settings = getSettingsCache() || (await window.backendAPI.settings.get());
+        verifySsl = settings?.verifySsl !== false;
+    } catch (_e) {
+        void _e;
+    }
+
+    const tls = { verifySsl };
+    try {
+        const clientCert = app.certificateController?.getForHost(new URL(url).host);
+        if (clientCert) {
+            tls.clientCert = clientCert;
+        }
+    } catch (_e) {
+        /* certificate lookup is best-effort */
+    }
+    return tls;
+}
+
+/**
+ * @param {string} url
+ * @param {Object<string, string>} [headers]
+ * @param {object} [options]
+ * @param {string} [options.method] - defaults to GET on the backend.
+ * @param {string|null} [options.body] - raw body, replayed on each reconnect.
+ */
+export async function handleSseConnect(url, headers = {}, { method, body } = {}) {
     await initSseHandler();
 
     if (!window.backendAPI?.sse) {
@@ -151,11 +199,18 @@ export async function handleSseConnect(url, headers = {}) {
         await window.backendAPI.sse.connect({
             tabId,
             url: trimmed,
+            method,
+            body,
             headers,
-            lastEventId
+            lastEventId,
+            ...(await buildSseTlsOptions(trimmed))
         });
         await session.updateStatus(tabId, 'SSE connecting...', null);
     } catch (error) {
+        // The stream never started, so nothing will emit a terminal event for
+        // it — drop the session rather than leave the tab stuck on "connecting".
+        session.remove(tabId);
+        await session.updateStatus(tabId, 'SSE connection failed', null);
         toast.error(`SSE connection failed: ${error.message || error}`);
     }
 }
