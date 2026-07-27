@@ -7,6 +7,7 @@
  */
 
 import { clearResponseDisplayForTab } from './apiHandler.js';
+import { resolveTlsOptions } from './tlsOptions.js';
 import { toast } from './ui/Toast.js';
 import {
     StreamSession,
@@ -53,12 +54,19 @@ function parseMessage(raw) {
     }
 }
 
+/**
+ * Send one protocol frame. The TLS options ride on every frame because the
+ * backend keys its socket reuse on them: they are resolved once when the
+ * subscription starts and carried on the session entry, so every frame of a
+ * subscription presents the same material and never forces a reconnect.
+ */
 async function sendFrame(tabId, entry, messageObj) {
     await window.backendAPI.graphqlSubscription.send({
         tabId,
         url: entry.url,
         headers: entry.headers || {},
-        message: JSON.stringify(messageObj)
+        message: JSON.stringify(messageObj),
+        ...(entry.tls || {})
     });
 }
 
@@ -223,6 +231,7 @@ export async function handleGraphQLSubscriptionStart({ url, headers = {}, query,
         query,
         variables,
         operationName,
+        tls: await resolveTlsOptions(normalizedUrl),
         state: 'connecting',
         acked: false,
         transcript: ''

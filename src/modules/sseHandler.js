@@ -1,5 +1,5 @@
-import { app } from './appContext.js';
-import { clearResponseDisplayForTab, getSettingsCache } from './apiHandler.js';
+import { clearResponseDisplayForTab } from './apiHandler.js';
+import { resolveTlsOptions } from './tlsOptions.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
 import {
@@ -130,37 +130,6 @@ export const initSseHandler = createBackendEventListener(
 );
 
 /**
- * Resolve the per-request TLS options the backend needs, mirroring what the
- * HTTP path sends: the global verify-SSL toggle plus any client certificate or
- * custom CA registered for this host. Both lookups are best-effort — a stream
- * should still be attempted if settings or the certificate store are unreadable.
- * @param {string} url - the resolved SSE URL.
- * @returns {Promise<{verifySsl: boolean, clientCert?: object}>}
- */
-async function buildSseTlsOptions(url) {
-    let verifySsl = true;
-    try {
-        // The cache is only warm once an HTTP request has been sent this
-        // session, so an SSE-only session has to read the settings itself.
-        const settings = getSettingsCache() || (await window.backendAPI.settings.get());
-        verifySsl = settings?.verifySsl !== false;
-    } catch (_e) {
-        void _e;
-    }
-
-    const tls = { verifySsl };
-    try {
-        const clientCert = app.certificateController?.getForHost(new URL(url).host);
-        if (clientCert) {
-            tls.clientCert = clientCert;
-        }
-    } catch (_e) {
-        /* certificate lookup is best-effort */
-    }
-    return tls;
-}
-
-/**
  * @param {string} url
  * @param {Object<string, string>} [headers]
  * @param {object} [options]
@@ -203,7 +172,7 @@ export async function handleSseConnect(url, headers = {}, { method, body } = {})
             body,
             headers,
             lastEventId,
-            ...(await buildSseTlsOptions(trimmed))
+            ...(await resolveTlsOptions(trimmed))
         });
         await session.updateStatus(tabId, 'SSE connecting...', null);
     } catch (error) {

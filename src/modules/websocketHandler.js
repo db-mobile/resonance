@@ -1,5 +1,6 @@
 import { getRequestBodyContent } from './requestBodyHelper.js';
 import { clearResponseDisplayForTab } from './apiHandler.js';
+import { resolveTlsOptions } from './tlsOptions.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
 import {
@@ -143,7 +144,8 @@ export async function handleWebSocketSend(url, headers = {}) {
             tabId,
             url: normalizedUrl,
             message,
-            headers
+            headers,
+            ...(await resolveTlsOptions(normalizedUrl))
         });
     } catch (error) {
         toast.error(`WebSocket connection failed: ${error.message}`);

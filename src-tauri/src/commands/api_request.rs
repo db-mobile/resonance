@@ -552,7 +552,7 @@ pub struct AwsAuthConfig {
 /// All fields are filesystem paths to PEM-encoded files. Only paths are sent
 /// from the frontend (the certificate store persists paths, never cert bytes);
 /// the backend reads and parses the files here.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientCertConfig {
     /// PEM certificate chain to present to the server (mTLS).
