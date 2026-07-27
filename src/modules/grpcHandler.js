@@ -19,29 +19,47 @@ import {
 
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
-import { displayResponseWithLineNumbersForTab, getSettingsCache } from './apiHandler.js';
+import {
+    displayResponseWithLineNumbersForTab,
+    generateEffectiveAuthData,
+    getRequestBuilderService,
+    getSettingsCache,
+    warnUnresolvedVariables
+} from './apiHandler.js';
 import { startOrSend as grpcStreamStartOrSend } from './grpcStreamHandler.js';
+import { recordGrpcHistory } from './grpcHistory.js';
+import { createKeyValueRow } from './keyValueManager.js';
+import { getCurrentEndpoint } from './state/currentEndpoint.js';
 
 let lastTarget = null;
 let methodsCache = new Map();
 const methodFlagsCache = new Map();
 
-let protoFileMode = false;
-let loadedProtoPath = null;
+/**
+ * Which definition source currently drives the service/method lists. Reflection and
+ * a loaded proto file are mutually exclusive: whichever was used last wins, and the
+ * other card stands down so sends can never route through a stale proto path.
+ * @type {{kind: 'none'|'reflection'|'proto', protoPath: string|null}}
+ */
+const activeSource = { kind: 'none', protoPath: null };
+
+function setActiveSource(kind, protoPath = null) {
+    activeSource.kind = kind;
+    activeSource.protoPath = protoPath;
+    updateSourceCards();
+}
+
+function updateSourceCards() {
+    document.querySelectorAll('.grpc-source-card[data-source]').forEach(card => {
+        card.setAttribute('data-active', String(card.dataset.source === activeSource.kind));
+    });
+}
 
 function addMetadataRow(key = '', value = '') {
     if (!grpcMetadataList) {
         return;
     }
-    const li = document.createElement('li');
-    li.className = 'key-value-row';
-    li.innerHTML = `
-        <input type="text" class="key-input" placeholder="Key" value="${key}">
-        <input type="text" class="value-input" placeholder="Value" value="${value}">
-        <button type="button" class="btn-xs btn-danger remove-row-btn" aria-label="Remove">Remove</button>
-    `;
-    li.querySelector('.remove-row-btn').addEventListener('click', () => li.remove());
-    grpcMetadataList.appendChild(li);
+    grpcMetadataList.appendChild(createKeyValueRow(key, value));
 }
 
 function clearMetadataList() {
@@ -53,7 +71,11 @@ function clearMetadataList() {
     }
 }
 
-function getMetadata() {
+/**
+ * Read the metadata key/value rows as a plain object, skipping unnamed rows.
+ * @returns {Object<string, string>} Metadata map
+ */
+export function getGrpcMetadata() {
     const metadata = {};
     if (!grpcMetadataList) {
         return metadata;
@@ -106,6 +128,25 @@ function addOption(select, value, label) {
     select.appendChild(opt);
 }
 
+/**
+ * Add an option only if the select does not already offer that value, then select it.
+ * Restoring a saved request has no service/method list to hand, so the saved values
+ * are injected as options — otherwise assigning `.value` silently resolves to ''.
+ * @param {HTMLSelectElement} select - Target select
+ * @param {string} value - Option value to guarantee
+ * @param {string} label - Visible label
+ */
+function ensureOption(select, value, label) {
+    if (!select || !value) {
+        return;
+    }
+    const exists = Array.from(select.options).some(opt => opt.value === value);
+    if (!exists) {
+        addOption(select, value, label);
+    }
+    select.value = value;
+}
+
 function methodKindFromFlags(flags) {
     if (!flags) {
         return '';
@@ -155,6 +196,81 @@ export function setGrpcTls(useTls) {
     if (grpcTlsCheckbox) {
         grpcTlsCheckbox.checked = !!useTls;
     }
+}
+
+/**
+ * Snapshot the gRPC panel for persistence. Includes the selected method's streaming
+ * flags and the active proto path so a restored request can be sent without first
+ * re-running reflection.
+ * @returns {Object} Persistable gRPC request state
+ */
+export function captureGrpcState() {
+    const fullMethod = grpcMethodSelect?.value || '';
+    const flags = methodFlagsCache.get(fullMethod) || {};
+    const requestJson = app.grpcBodyEditor
+        ? app.grpcBodyEditor.getContent()
+        : grpcBodyInput?.value;
+
+    return {
+        target: grpcTargetInput?.value || '',
+        service: grpcServiceSelect?.value || '',
+        fullMethod,
+        requestJson: requestJson || '{}',
+        metadata: getGrpcMetadata(),
+        useTls: grpcTlsCheckbox?.checked || false,
+        protoPath: activeSource.protoPath,
+        clientStreaming: !!flags.clientStreaming,
+        serverStreaming: !!flags.serverStreaming
+    };
+}
+
+/**
+ * Restore the gRPC panel from persisted state without touching the network. The saved
+ * service/method are injected as options and their streaming flags rehydrated, so Send
+ * dispatches to the right (unary vs streaming) path straight away. Connect or
+ * Load .proto refreshes the full lists on demand.
+ * @param {Object} grpcData - State previously produced by captureGrpcState
+ */
+export function applyGrpcState(grpcData) {
+    const data = grpcData || {};
+
+    if (grpcTargetInput) {
+        grpcTargetInput.value = data.target || '';
+    }
+    if (grpcBodyInput) {
+        grpcBodyInput.value = data.requestJson || '{}';
+    }
+    if (app.grpcBodyEditor) {
+        app.grpcBodyEditor.setContent(data.requestJson || '{}');
+    }
+    setGrpcMetadata(data.metadata || {});
+    setGrpcTls(data.useTls);
+
+    methodsCache = new Map();
+    methodFlagsCache.clear();
+    clearSelect(grpcServiceSelect);
+    clearSelect(grpcMethodSelect);
+
+    ensureOption(grpcServiceSelect, data.service, data.service);
+    ensureOption(grpcMethodSelect, data.fullMethod, data.fullMethod);
+    if (data.fullMethod) {
+        methodFlagsCache.set(data.fullMethod, {
+            clientStreaming: !!data.clientStreaming,
+            serverStreaming: !!data.serverStreaming
+        });
+    }
+    updateMethodKindBadge(data.fullMethod || null);
+
+    if (data.protoPath) {
+        setActiveSource('proto', data.protoPath);
+        updateProtoUI(true, data.protoPath);
+        setGrpcStatus('', null);
+        return;
+    }
+
+    setActiveSource(data.fullMethod ? 'reflection' : 'none', null);
+    updateProtoUI(false, null);
+    setGrpcStatus(data.fullMethod ? 'Restored' : '', 'idle');
 }
 
 /**
@@ -219,8 +335,8 @@ async function loadMethods(target, serviceName) {
 }
 
 async function onConnect() {
-    const target = grpcTargetInput?.value?.trim();
-    if (!target) {
+    const rawTarget = grpcTargetInput?.value?.trim();
+    if (!rawTarget) {
         updateStatusDisplay('gRPC target is empty', null);
         return;
     }
@@ -229,9 +345,17 @@ async function onConnect() {
         setGrpcStatus('Connecting…', 'connecting');
         updateStatusDisplay('Connecting to gRPC server...', null);
 
+        const target = await resolveGrpcTarget(rawTarget);
         const services = await loadServices(target);
         lastTarget = target;
         methodsCache = new Map();
+
+        const previousProtoPath = activeSource.protoPath;
+        setActiveSource('reflection', null);
+        if (previousProtoPath) {
+            window.backendAPI.grpc.unloadProto(previousProtoPath).catch(() => { });
+            updateProtoUI(false, null);
+        }
 
         if (services.length === 0) {
             setGrpcStatus('No services', 'error');
@@ -257,18 +381,19 @@ async function onServiceChange() {
         return;
     }
 
-    if (protoFileMode && methodsCache.has(serviceName)) {
+    if (activeSource.kind === 'proto' && methodsCache.has(serviceName)) {
         populateMethodOptions(methodsCache.get(serviceName));
         return;
     }
 
-    const target = grpcTargetInput?.value?.trim();
-    if (!target) {
+    const rawTarget = grpcTargetInput?.value?.trim();
+    if (!rawTarget) {
         return;
     }
 
     try {
         setGrpcStatus('Loading methods…', 'connecting');
+        const target = await resolveGrpcTarget(rawTarget);
         const methods = await loadMethods(target, serviceName);
         populateMethodOptions(methods);
         setGrpcStatus('Connected', 'connected');
@@ -279,30 +404,167 @@ async function onServiceChange() {
     }
 }
 
+/**
+ * Metadata keys must be lowercase ASCII on the wire; header names produced by the
+ * auth manager (and typed by hand) are normalised so servers accept them.
+ * @param {Object<string, string>} metadata - Raw metadata map
+ * @returns {Object<string, string>} Map with lowercased keys
+ */
+function lowercaseMetadataKeys(metadata) {
+    const normalized = {};
+    Object.entries(metadata).forEach(([key, value]) => {
+        normalized[key.toLowerCase()] = value;
+    });
+    return normalized;
+}
+
+/**
+ * Build the outgoing metadata: the panel's key/value rows with the effective
+ * Authorization config folded in. Digest and AWS SigV4 sign at the HTTP transport
+ * layer, which gRPC never reaches, so those are reported as unsupported instead of
+ * silently sending nothing.
+ *
+ * Also reports which keys carry the credentials, so history can redact them.
+ * @returns {Promise<{metadata: Object<string, string>, sensitiveNames: string[]}>} Metadata and credential keys
+ */
+async function buildGrpcMetadata() {
+    const metadata = getGrpcMetadata();
+    let sensitiveNames = [];
+
+    try {
+        const authData = await generateEffectiveAuthData();
+        getRequestBuilderService().mergeAuthData(metadata, {}, authData);
+        sensitiveNames = Object.keys(authData.headers || {}).map(name => name.toLowerCase());
+
+        if (authData.authConfig || authData.awsAuth) {
+            toast.warning('Digest and AWS Signature auth are not supported over gRPC');
+        }
+    } catch (error) {
+        toast.error(`gRPC auth error: ${error.message || String(error)}`);
+    }
+
+    return { metadata: lowercaseMetadataKeys(metadata), sensitiveNames };
+}
+
+/**
+ * Resolve {{variables}} in the target, message and metadata. Deliberately avoids
+ * RequestBuilderService.processRequestComponents, which prefixes scheme-less URLs
+ * with https:// — a gRPC target is a bare host:port. The message is resolved as
+ * text before parsing so variables can appear inside JSON values.
+ * @param {string} target - Raw target
+ * @param {string} rawBody - Raw request JSON text
+ * @param {Object} metadata - Raw metadata map
+ * @returns {Promise<{target: string, rawBody: string, metadata: Object}>} Resolved request parts
+ */
+async function resolveGrpcRequest(target, rawBody, metadata) {
+    const builder = getRequestBuilderService();
+    const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), {});
+
+    const resolved = {
+        target: processor.processTemplate(target, variables),
+        rawBody: processor.processTemplate(rawBody, variables),
+        metadata: processor.processObject(metadata, variables)
+    };
+
+    warnUnresolvedVariables(processor, {
+        url: resolved.target,
+        headers: resolved.metadata,
+        body: resolved.rawBody
+    });
+
+    return resolved;
+}
+
+/**
+ * Resolve variables in the target alone, for the paths that only talk to the
+ * server (Connect, method listing, skeleton generation).
+ * @param {string} rawTarget - Target as typed, possibly containing {{variables}}
+ * @returns {Promise<string>} Resolved target
+ */
+async function resolveGrpcTarget(rawTarget) {
+    const { target } = await resolveGrpcRequest(rawTarget, '', {});
+    return target;
+}
+
+/**
+ * Guarantee the active proto file is present in the backend registry, which is
+ * in-memory and therefore empty after a restart even though the path was restored.
+ * @returns {Promise<boolean>} True when the proto is loaded and usable
+ */
+async function ensureProtoLoaded() {
+    const { protoPath } = activeSource;
+    if (!protoPath) {
+        return false;
+    }
+
+    try {
+        const loaded = await window.backendAPI.grpc.listLoadedProtos();
+        if (Array.isArray(loaded) && loaded.includes(protoPath)) {
+            return true;
+        }
+        await window.backendAPI.grpc.parseProtoFile(protoPath, null);
+        return true;
+    } catch (error) {
+        const msg = error.message || String(error);
+        toast.error(`Proto file unavailable: ${msg}`);
+        updateStatusDisplay(`Proto file unavailable: ${msg}`, null);
+        return false;
+    }
+}
+
 export async function handleGrpcSend() {
-    const target = grpcTargetInput?.value?.trim();
+    const rawTarget = grpcTargetInput?.value?.trim();
     const fullMethod = grpcMethodSelect?.value;
 
-    if (!target || !fullMethod) {
+    if (!rawTarget || !fullMethod) {
         updateStatusDisplay('gRPC target/method missing', null);
         return;
     }
 
+    const rawBody = (app.grpcBodyEditor ? app.grpcBodyEditor.getContent() : grpcBodyInput?.value || '').trim();
+    const { metadata: uiMetadata, sensitiveNames } = await buildGrpcMetadata();
+
+    let resolved;
+    try {
+        resolved = await resolveGrpcRequest(rawTarget, rawBody, uiMetadata);
+    } catch (error) {
+        updateStatusDisplay(`Variable processing error: ${error.message || String(error)}`, null);
+        return;
+    }
+
+    const { target, metadata } = resolved;
+
     let requestJson = {};
-    const raw = (app.grpcBodyEditor ? app.grpcBodyEditor.getContent() : grpcBodyInput?.value || '').trim();
-    if (raw) {
+    if (resolved.rawBody) {
         try {
-            requestJson = JSON.parse(raw);
+            requestJson = JSON.parse(resolved.rawBody);
         } catch (e) {
             toast.error(`Invalid gRPC JSON: ${e.message}`);
             return;
         }
     }
 
-    const metadata = getMetadata();
+    const usingProto = activeSource.kind === 'proto' && !!activeSource.protoPath;
+    if (usingProto && !(await ensureProtoLoaded())) {
+        return;
+    }
+
     const tls = await buildTlsOptions(target);
     const flags = methodFlagsCache.get(fullMethod);
     const isStreaming = !!(flags && (flags.serverStreaming || flags.clientStreaming));
+
+    const historyContext = {
+        rawTarget,
+        target,
+        fullMethod,
+        metadata,
+        requestJson,
+        useTls: !!tls.useTls,
+        protoPath: usingProto ? activeSource.protoPath : null,
+        clientStreaming: !!flags?.clientStreaming,
+        serverStreaming: !!flags?.serverStreaming,
+        sensitiveNames
+    };
 
     if (isStreaming) {
         await grpcStreamStartOrSend({
@@ -311,19 +573,22 @@ export async function handleGrpcSend() {
             requestJson,
             metadata,
             tls,
-            protoPath: protoFileMode ? loadedProtoPath : null,
-            canSend: !!flags.clientStreaming
+            protoPath: usingProto ? activeSource.protoPath : null,
+            canSend: !!flags.clientStreaming,
+            historyContext
         });
         return;
     }
+
+    const startedAt = Date.now();
 
     try {
         updateStatusDisplay('Sending gRPC request...', null);
         displayResponseWithLineNumbersForTab('Sending gRPC request...', null, null);
 
         let result;
-        if (protoFileMode && loadedProtoPath) {
-            result = await window.backendAPI.grpc.protoInvokeUnary(loadedProtoPath, {
+        if (usingProto) {
+            result = await window.backendAPI.grpc.protoInvokeUnary(activeSource.protoPath, {
                 target,
                 fullMethod,
                 requestJson,
@@ -362,11 +627,27 @@ export async function handleGrpcSend() {
         } else {
             updateStatusDisplay(`gRPC error: ${result.statusMessage || 'unknown'}`, null);
         }
+
+        await recordGrpcHistory({
+            ...historyContext,
+            result: { ...result, ttfb: Date.now() - startedAt }
+        });
     } catch (error) {
         const msg = error.message || String(error);
         toast.error(`gRPC send error: ${msg}`);
         updateStatusDisplay(`gRPC send error: ${msg}`, null);
         displayResponseWithLineNumbersForTab(`Error: ${msg}`, null, null);
+
+        await recordGrpcHistory({
+            ...historyContext,
+            result: {
+                success: false,
+                status: null,
+                statusMessage: msg,
+                data: null,
+                ttfb: Date.now() - startedAt
+            }
+        });
     }
 }
 
@@ -385,8 +666,8 @@ export async function loadProtoFile(protoPath, includePaths = null) {
 
         const protoInfo = await window.backendAPI.grpc.parseProtoFile(protoPath, includePaths);
 
-        loadedProtoPath = protoPath;
-        protoFileMode = true;
+        setActiveSource('proto', protoPath);
+        setGrpcStatus('', 'idle');
         methodsCache = new Map();
 
         clearSelect(grpcServiceSelect);
@@ -416,11 +697,10 @@ export async function loadProtoFile(protoPath, includePaths = null) {
  * Clear proto file mode and return to reflection mode
  */
 export function clearProtoFile() {
-    if (loadedProtoPath) {
-        window.backendAPI.grpc.unloadProto(loadedProtoPath).catch(() => { });
+    if (activeSource.protoPath) {
+        window.backendAPI.grpc.unloadProto(activeSource.protoPath).catch(() => { });
     }
-    protoFileMode = false;
-    loadedProtoPath = null;
+    setActiveSource('none', null);
     methodsCache = new Map();
     methodFlagsCache.clear();
     clearSelect(grpcServiceSelect);
@@ -501,7 +781,16 @@ export function initGrpcUI() {
                 app.workspaceTabController.markCurrentTabModified();
             }
         });
+
+        grpcMetadataList.addEventListener('click', (event) => {
+            if (event.target.closest('.remove-row-btn')
+                && app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+                app.workspaceTabController.markCurrentTabModified();
+            }
+        });
     }
+
+    updateSourceCards();
 }
 
 async function onGenerateSkeleton() {
@@ -516,14 +805,18 @@ async function onGenerateSkeleton() {
         updateStatusDisplay('Generating input skeleton...', null);
         
         let skeleton;
-        if (protoFileMode && loadedProtoPath) {
-            skeleton = await window.backendAPI.grpc.protoGetInputSkeleton(loadedProtoPath, fullMethod);
+        if (activeSource.kind === 'proto' && activeSource.protoPath) {
+            if (!(await ensureProtoLoaded())) {
+                return;
+            }
+            skeleton = await window.backendAPI.grpc.protoGetInputSkeleton(activeSource.protoPath, fullMethod);
         } else {
-            const target = grpcTargetInput?.value?.trim();
-            if (!target) {
+            const rawTarget = grpcTargetInput?.value?.trim();
+            if (!rawTarget) {
                 updateStatusDisplay('Enter a target first', null);
                 return;
             }
+            const target = await resolveGrpcTarget(rawTarget);
             const tls = await buildTlsOptions(target);
             skeleton = await window.backendAPI.grpc.getInputSkeleton(target, fullMethod, tls);
         }

@@ -417,6 +417,7 @@ export class GraphQLBodyManager {
     async autoApplySchemaForUrl(url) {
         const targetUrl = (url || this._getCurrentUrl()).trim();
         if (!targetUrl) {
+            this._refreshExplorerIfOpen();
             return;
         }
 

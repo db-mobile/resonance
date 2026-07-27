@@ -516,20 +516,11 @@ function restrictBodyModes(allowed) {
 /**
  * Per-mode configuration for the protocol URL bars that replace the HTTP
  * method select while a non-HTTP mode is active. `syncQueryParams` is off for
- * the gRPC target and the MQTT broker: neither is a query-bearing URL, so
- * driving the query-params table from them would only clear it.
+ * the MQTT broker: it is not a query-bearing URL, so driving the query-params
+ * table from it would only clear it. gRPC is absent because its bar, with the
+ * TLS toggle, lives in the markup and drives `grpc-target-input` directly.
  */
 const MIRRORED_URL_SECTIONS = {
-    grpc: {
-        sectionId: 'grpc-url-section',
-        method: 'GRPC',
-        label: 'gRPC',
-        inputId: 'grpc-url-target-input',
-        inputType: 'text',
-        placeholder: 'localhost:50051',
-        ariaLabel: 'gRPC Target',
-        peerId: 'grpc-target-input'
-    },
     websocket: {
         sectionId: 'websocket-url-section',
         method: 'WS',
@@ -602,7 +593,11 @@ function toggleMirroredUrlSection(mode, show) {
  * @param {boolean} show
  */
 function showGrpcUrlSection(show) {
-    toggleMirroredUrlSection('grpc', show);
+    const grpcUrlSection = document.getElementById('grpc-url-section');
+
+    if (grpcUrlSection) {
+        grpcUrlSection.style.display = show ? 'flex' : 'none';
+    }
 }
 
 /**

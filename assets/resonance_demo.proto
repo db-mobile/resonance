@@ -1,0 +1,111 @@
+// Test fixture for the gRPC panel. Self-contained (no imports) so it loads from
+// any directory. Covers all four method kinds and a spread of field types that
+// exercise the input-skeleton generator.
+
+syntax = "proto3";
+
+package resonance.demo.v1;
+
+// Every method kind, so the Method dropdown shows one of each and the kind badge
+// can be checked against unary / server-stream / client-stream / bidi.
+service Greeter {
+  // Unary.
+  rpc SayHello(HelloRequest) returns (HelloReply);
+
+  // Server streaming: one request, many replies.
+  rpc CountDown(CountDownRequest) returns (stream Tick);
+
+  // Client streaming: many requests, one reply. Finishing the stream is what
+  // Cancel currently does (the backend half-closes on cancel).
+  rpc UploadNotes(stream Note) returns (UploadSummary);
+
+  // Bidirectional streaming.
+  rpc Converse(stream ChatMessage) returns (stream ChatMessage);
+}
+
+// A second service, so switching the Service dropdown reloads the method list.
+service Diagnostics {
+  rpc Ping(PingRequest) returns (PingReply);
+  rpc Watch(PingRequest) returns (stream HealthEvent);
+}
+
+enum Locale {
+  LOCALE_UNSPECIFIED = 0;
+  LOCALE_EN = 1;
+  LOCALE_DE = 2;
+  LOCALE_PT_BR = 3;
+}
+
+message HelloRequest {
+  string name = 1;
+  Locale locale = 2;
+
+  // Nested message: the skeleton generator should recurse into this.
+  Caller caller = 3;
+
+  // Repeated field: the skeleton renders a single-element array.
+  repeated string tags = 4;
+
+  // Map field: the skeleton renders {"key": "value"}.
+  map<string, string> labels = 5;
+
+  message Caller {
+    string id = 1;
+    string user_agent = 2;
+  }
+}
+
+message HelloReply {
+  string message = 1;
+  Locale locale = 2;
+  int64 served_at_unix_ms = 3;
+}
+
+message CountDownRequest {
+  // Number of Tick messages the server should stream back.
+  int32 from = 1;
+  int32 interval_ms = 2;
+}
+
+message Tick {
+  int32 value = 1;
+  bool final = 2;
+}
+
+message Note {
+  string body = 1;
+  double weight = 2;
+  bytes attachment = 3;
+}
+
+message UploadSummary {
+  int32 accepted = 1;
+  int32 rejected = 2;
+  repeated string errors = 3;
+}
+
+message ChatMessage {
+  string author = 1;
+  string text = 2;
+  int64 sent_at_unix_ms = 3;
+}
+
+message PingRequest {
+  string echo = 1;
+}
+
+message PingReply {
+  string echo = 1;
+  uint32 hops = 2;
+}
+
+message HealthEvent {
+  Status status = 1;
+  string detail = 2;
+
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_SERVING = 1;
+    STATUS_NOT_SERVING = 2;
+  }
+}

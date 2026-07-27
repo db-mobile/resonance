@@ -17,17 +17,29 @@ select.select-base:hover {
   background-color: color-mix(in srgb, currentColor 15%, var(--shade-color));
 }
 
-.select-wrap {
+.select-wrap,
+.select-wrapper {
   position: relative;
   display: inline-flex;
   align-items: center;
 }
 
-.select-wrap > .select-arrow {
+.select-wrap > .select-arrow,
+.select-wrapper > .select-arrow {
   position: absolute;
   right: var(--space-2);
   pointer-events: none;
   opacity: var(--dim-opacity);
+}
+
+.form-group > .select-wrap,
+.form-group > .select-wrapper {
+  display: flex;
+}
+
+.form-group > .select-wrap > select,
+.form-group > .select-wrapper > select {
+  width: 100%;
 }
 
 select.select.compact,

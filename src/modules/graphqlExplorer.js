@@ -584,6 +584,8 @@ export class GraphQLExplorer {
         this.onQueryChange = onQueryChange || null;
         this.onVariablesChange = onVariablesChange || null;
         this.railEl.innerHTML = '';
+        this.treeEl = null;
+        this.noticeEl = null;
 
         if (!schema) {
             this._renderEmpty('Load the schema (Schema button) to browse and build queries.');
