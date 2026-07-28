@@ -17,9 +17,9 @@ pub(crate) fn load_collection_for_export(
 ) -> Result<Collection, String> {
     let collection_dir = storage_collections::resolve_collection_dir(app, collection_id)?
         .ok_or_else(|| format!("Collection {} not found", collection_id))?;
+    let paths = storage_collections::CollectionPaths::from_dir(collection_dir);
 
-    let collection_file = collection_dir.join("collection.json");
-    let content = fs::read_to_string(&collection_file)
+    let content = fs::read_to_string(paths.collection_json())
         .map_err(|e| format!("Failed to read collection.json: {}", e))?;
     let raw: Value =
         serde_json::from_str(&content).map_err(|e| format!("Failed to parse collection: {}", e))?;
@@ -54,7 +54,7 @@ pub(crate) fn load_collection_for_export(
         .and_then(|v| serde_json::from_value(v.clone()).ok())
         .unwrap_or_default();
 
-    let variables_file = collection_dir.join("variables.json");
+    let variables_file = paths.variables_json();
     let variables: Option<Vec<VariableEntry>> = if variables_file.exists() {
         fs::read_to_string(&variables_file)
             .ok()
@@ -77,11 +77,7 @@ pub(crate) fn load_collection_for_export(
         None
     };
 
-    attach_endpoint_data(
-        &collection_dir.join("requests"),
-        &mut endpoints,
-        &mut folders,
-    );
+    attach_endpoint_data(&paths.requests(), &mut endpoints, &mut folders);
 
     Ok(Collection {
         id,

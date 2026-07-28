@@ -90,6 +90,56 @@ pub(crate) fn ensure_default_collections_dir(app: &AppHandle) -> Result<PathBuf,
     Ok(dir)
 }
 
+/// The on-disk layout of one collection, resolved once so the filenames live in
+/// a single place rather than being re-joined at every call site.
+pub(crate) struct CollectionPaths {
+    pub dir: PathBuf,
+}
+
+impl CollectionPaths {
+    /// Resolve a registered collection, reporting it missing if the index has
+    /// no usable entry.
+    fn resolve(app: &AppHandle, collection_id: &str) -> Result<Self, String> {
+        let dir = resolve_collection_dir(app, collection_id)?
+            .ok_or_else(|| format!("Collection {} not found", collection_id))?;
+        Ok(Self { dir })
+    }
+
+    pub(crate) fn from_dir(dir: PathBuf) -> Self {
+        Self { dir }
+    }
+
+    fn of(dir: &Path) -> Self {
+        Self::from_dir(dir.to_path_buf())
+    }
+
+    pub(crate) fn collection_json(&self) -> PathBuf {
+        self.dir.join("collection.json")
+    }
+
+    pub(crate) fn requests(&self) -> PathBuf {
+        self.dir.join("requests")
+    }
+
+    pub(crate) fn variables_json(&self) -> PathBuf {
+        self.dir.join("variables.json")
+    }
+
+    /// Create the requests directory if it is missing, and restrict it either
+    /// way. Restricting unconditionally is deliberate: a directory that already
+    /// exists may predate the hardening, or have been created by an older
+    /// version under a looser umask.
+    pub(crate) fn ensure_requests(&self) -> Result<PathBuf, String> {
+        let requests = self.requests();
+        if !requests.exists() {
+            fs::create_dir_all(&requests)
+                .map_err(|e| format!("Failed to create requests dir: {}", e))?;
+        }
+        restrict_dir(&requests);
+        Ok(requests)
+    }
+}
+
 fn get_collection_index(app: &AppHandle) -> Result<HashMap<String, String>, String> {
     let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
     let value = store
@@ -217,12 +267,11 @@ fn read_json_file<T: for<'de> Deserialize<'de>>(path: &PathBuf) -> Result<T, Str
 }
 
 fn is_collection_dir(path: &Path) -> bool {
-    path.is_dir() && path.join("collection.json").exists()
+    path.is_dir() && CollectionPaths::of(path).collection_json().exists()
 }
 
 fn read_collection_from_dir(path: &Path) -> Result<Collection, String> {
-    let collection_file = path.join("collection.json");
-    let mut collection: Collection = read_json_file(&collection_file)?;
+    let mut collection: Collection = read_json_file(&CollectionPaths::of(path).collection_json())?;
     collection.storage_path = Some(path.to_string_lossy().to_string());
     Ok(collection)
 }
@@ -381,7 +430,7 @@ fn sync_endpoint_data_file_names(
     collection_dir: &Path,
     collection: &Collection,
 ) -> Result<(), String> {
-    let requests_dir = collection_dir.join("requests");
+    let requests_dir = CollectionPaths::of(collection_dir).requests();
     if !requests_dir.exists() {
         return Ok(());
     }
@@ -497,8 +546,10 @@ pub(crate) fn persist_collection(
         }
     }
 
-    let collection_file = target_dir.join("collection.json");
-    write_json_file(&collection_file, &persisted)?;
+    write_json_file(
+        &CollectionPaths::of(&target_dir).collection_json(),
+        &persisted,
+    )?;
     sync_endpoint_data_file_names(&target_dir, &persisted)?;
     register_collection_path(app, &persisted.id, &target_dir)?;
 
@@ -570,11 +621,10 @@ pub async fn collections_get_all(app: AppHandle) -> Result<Vec<Collection>, Stri
 
 #[tauri::command]
 pub async fn collection_get(app: AppHandle, collection_id: String) -> Result<Collection, String> {
-    let collection_dir = resolve_collection_dir(&app, &collection_id)?
-        .ok_or_else(|| format!("Collection {} not found", collection_id))?;
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
 
-    let collection = read_collection_from_dir(&collection_dir)?;
-    register_collection_path(&app, &collection.id, &collection_dir)?;
+    let collection = read_collection_from_dir(&paths.dir)?;
+    register_collection_path(&app, &collection.id, &paths.dir)?;
     Ok(collection)
 }
 
@@ -604,9 +654,7 @@ pub async fn collection_get_endpoint_data(
     collection_id: String,
     endpoint_id: String,
 ) -> Result<EndpointData, String> {
-    let collection_dir = resolve_collection_dir(&app, &collection_id)?
-        .ok_or_else(|| format!("Collection {} not found", collection_id))?;
-    let requests_dir = collection_dir.join("requests");
+    let requests_dir = CollectionPaths::resolve(&app, &collection_id)?.requests();
 
     let Some(endpoint_file) = find_endpoint_data_file(&requests_dir, &endpoint_id)? else {
         return Ok(EndpointData::default());
@@ -628,19 +676,13 @@ pub async fn collection_save_endpoint_data(
     }
 
     let collection = collection_get(app.clone(), collection_id.clone()).await?;
-    let collection_dir = PathBuf::from(
+    let paths = CollectionPaths::from_dir(PathBuf::from(
         collection
             .storage_path
             .clone()
             .ok_or_else(|| "Collection storage path missing".to_string())?,
-    );
-    let requests_dir = collection_dir.join("requests");
-
-    if !requests_dir.exists() {
-        fs::create_dir_all(&requests_dir)
-            .map_err(|e| format!("Failed to create requests dir: {}", e))?;
-    }
-    restrict_dir(&requests_dir);
+    ));
+    let requests_dir = paths.ensure_requests()?;
 
     let endpoint_name = find_endpoint_name_in_collection(&collection, &endpoint_id)
         .unwrap_or_else(|| endpoint_id.clone());
@@ -666,9 +708,7 @@ pub async fn collection_delete_endpoint_data(
     collection_id: String,
     endpoint_id: String,
 ) -> Result<(), String> {
-    let collection_dir = resolve_collection_dir(&app, &collection_id)?
-        .ok_or_else(|| format!("Collection {} not found", collection_id))?;
-    let requests_dir = collection_dir.join("requests");
+    let requests_dir = CollectionPaths::resolve(&app, &collection_id)?.requests();
 
     if let Some(endpoint_file) = find_endpoint_data_file(&requests_dir, &endpoint_id)? {
         fs::remove_file(&endpoint_file)
@@ -683,9 +723,7 @@ pub async fn collection_get_variables(
     app: AppHandle,
     collection_id: String,
 ) -> Result<Vec<Value>, String> {
-    let collection_dir = resolve_collection_dir(&app, &collection_id)?
-        .ok_or_else(|| format!("Collection {} not found", collection_id))?;
-    let variables_file = collection_dir.join("variables.json");
+    let variables_file = CollectionPaths::resolve(&app, &collection_id)?.variables_json();
 
     if !variables_file.exists() {
         return Ok(vec![]);
@@ -700,8 +738,7 @@ pub async fn collection_save_variables(
     collection_id: String,
     mut variables: Vec<Value>,
 ) -> Result<(), String> {
-    let collection_dir = resolve_collection_dir(&app, &collection_id)?
-        .ok_or_else(|| format!("Collection {} not found", collection_id))?;
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
 
     // Defense in depth: a variable flagged secret must never carry its value into the
     // git-friendly variables.json. The real value lives in the frontend SecretStore.
@@ -713,8 +750,7 @@ pub async fn collection_save_variables(
         }
     }
 
-    let variables_file = collection_dir.join("variables.json");
-    write_json_file(&variables_file, &variables)?;
+    write_json_file(&paths.variables_json(), &variables)?;
 
     Ok(())
 }
@@ -832,15 +868,12 @@ fn migrate_endpoint_data(
         }
     }
 
-    let collection_dir = resolve_collection_dir(app, collection_id)?
-        .ok_or_else(|| format!("Collection {} not found", collection_id))?;
-    let requests_dir = collection_dir.join("requests");
-
-    if !endpoint_ids.is_empty() && !requests_dir.exists() {
-        fs::create_dir_all(&requests_dir)
-            .map_err(|e| format!("Failed to create requests dir: {}", e))?;
-        restrict_dir(&requests_dir);
-    }
+    let paths = CollectionPaths::resolve(app, collection_id)?;
+    let requests_dir = if endpoint_ids.is_empty() {
+        paths.requests()
+    } else {
+        paths.ensure_requests()?
+    };
 
     for endpoint_id in endpoint_ids {
         let key = format!("{}_{}", collection_id, endpoint_id);
@@ -914,10 +947,8 @@ fn migrate_variables(
 
     if let Value::Array(vars) = variables {
         if !vars.is_empty() {
-            let collection_dir = resolve_collection_dir(app, collection_id)?
-                .ok_or_else(|| format!("Collection {} not found", collection_id))?;
-            let variables_file = collection_dir.join("variables.json");
-            write_json_file(&variables_file, &vars)?;
+            let paths = CollectionPaths::resolve(app, collection_id)?;
+            write_json_file(&paths.variables_json(), &vars)?;
         }
     }
 

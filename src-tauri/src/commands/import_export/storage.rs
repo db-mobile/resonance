@@ -5,8 +5,6 @@
 use super::{Collection, VariableEntry};
 use crate::commands::collections as storage_collections;
 use crate::commands::collections::write_json_file;
-use crate::commands::fs_secure::restrict_dir;
-use std::fs;
 use std::path::PathBuf;
 use tauri::AppHandle;
 use tauri_plugin_dialog::{DialogExt, FilePath};
@@ -109,8 +107,8 @@ fn save_collection_variables(
     }
 
     if !variables.is_empty() {
-        let variables_file = collection_dir.join("variables.json");
-        write_json_file(&variables_file, &variables)?;
+        let paths = storage_collections::CollectionPaths::from_dir(collection_dir.to_path_buf());
+        write_json_file(&paths.variables_json(), &variables)?;
     }
 
     Ok(())
@@ -123,7 +121,7 @@ fn save_endpoint_data_files(
     collection: &Collection,
     collection_dir: &std::path::Path,
 ) -> Result<(), String> {
-    let requests_dir = collection_dir.join("requests");
+    let paths = storage_collections::CollectionPaths::from_dir(collection_dir.to_path_buf());
     let mut written: std::collections::HashSet<&str> = std::collections::HashSet::new();
 
     for endpoint in &collection.endpoints {
@@ -134,11 +132,9 @@ fn save_endpoint_data_files(
             continue;
         }
 
-        if !requests_dir.exists() {
-            fs::create_dir_all(&requests_dir)
-                .map_err(|e| format!("Failed to create requests dir: {}", e))?;
-            restrict_dir(&requests_dir);
-        }
+        // Created on first write rather than up front, so importing a
+        // collection with no endpoint payloads leaves no empty directory.
+        let requests_dir = paths.ensure_requests()?;
 
         let data = storage_collections::EndpointData {
             scripts: endpoint.scripts.clone(),

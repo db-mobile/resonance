@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use tokio::sync::oneshot;
@@ -212,6 +212,55 @@ pub async fn collections_pick_import_file(
         .map(|path| path.to_string_lossy().to_string()))
 }
 
+/// The payload every export command returns when the user dismisses the save
+/// dialog. Distinct from an error: cancelling is a normal outcome.
+fn cancelled_export() -> Value {
+    serde_json::json!({ "success": false, "cancelled": true })
+}
+
+/// Run a save dialog seeded with the last used directory, returning `None` when
+/// the user cancels.
+///
+/// Callers do their own work *after* this resolves, so a cancelled dialog never
+/// pays for serializing an export that is about to be thrown away.
+async fn pick_save_path(
+    app: &AppHandle,
+    default_file_name: String,
+    filter_name: &str,
+    extensions: &[&str],
+) -> Result<Option<PathBuf>, String> {
+    let (tx, rx) = oneshot::channel::<Option<FilePath>>();
+
+    let mut dialog = app
+        .dialog()
+        .file()
+        .set_file_name(default_file_name)
+        .add_filter(filter_name, extensions);
+
+    if let Some(last_dir) = get_last_import_directory(app) {
+        dialog = dialog.set_directory(last_dir);
+    }
+
+    dialog.save_file(move |file_path| {
+        let _ = tx.send(file_path);
+    });
+
+    let Some(path) = rx.await.map_err(|e| format!("Dialog error: {}", e))? else {
+        return Ok(None);
+    };
+
+    let path = path.as_path().ok_or("Invalid file path")?.to_path_buf();
+    Ok(Some(path))
+}
+
+/// Write an export and remember its directory for the next dialog. Returns the
+/// path as the frontend reports it.
+fn write_export(app: &AppHandle, path: &Path, content: &str) -> Result<String, String> {
+    save_last_import_directory(app, path);
+    std::fs::write(path, content).map_err(|e| format!("Failed to write file: {}", e))?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 pub async fn export_openapi(
     app: AppHandle,
@@ -220,57 +269,33 @@ pub async fn export_openapi(
 ) -> Result<Value, String> {
     let collection = load_collection_for_export(&app, &collection_id)?;
 
-    // Show save dialog
-    let file_ext = if format == "yaml" { "yaml" } else { "json" };
-    let (tx, rx) = oneshot::channel::<Option<FilePath>>();
+    let is_yaml = format == "yaml";
+    let file_ext = if is_yaml { "yaml" } else { "json" };
+    let filter_name = if is_yaml { "YAML Files" } else { "JSON Files" };
 
-    let mut dialog = app
-        .dialog()
-        .file()
-        .set_file_name(format!("{}.openapi.{}", collection.name, file_ext))
-        .add_filter(
-            if format == "yaml" {
-                "YAML Files"
-            } else {
-                "JSON Files"
-            },
-            &[file_ext],
-        );
-
-    // Set starting directory to last used location
-    if let Some(last_dir) = get_last_import_directory(&app) {
-        dialog = dialog.set_directory(last_dir);
-    }
-
-    dialog.save_file(move |file_path| {
-        let _ = tx.send(file_path);
-    });
-
-    let file_path = rx.await.map_err(|e| format!("Dialog error: {}", e))?;
-
-    let Some(path) = file_path else {
-        return Ok(serde_json::json!({ "success": false, "cancelled": true }));
+    let Some(path) = pick_save_path(
+        &app,
+        format!("{}.openapi.{}", collection.name, file_ext),
+        filter_name,
+        &[file_ext],
+    )
+    .await?
+    else {
+        return Ok(cancelled_export());
     };
 
-    // Convert to OpenAPI format
     let (openapi_spec, skipped) = collection_to_openapi(&collection);
-
-    let content = if format == "yaml" {
+    let content = if is_yaml {
         serde_yaml_ng::to_string(&openapi_spec).map_err(|e| e.to_string())?
     } else {
         serde_json::to_string_pretty(&openapi_spec).map_err(|e| e.to_string())?
     };
 
-    let file_path = path.as_path().ok_or("Invalid file path")?;
-
-    // Save the directory for next time
-    save_last_import_directory(&app, file_path);
-
-    std::fs::write(file_path, content).map_err(|e| format!("Failed to write file: {}", e))?;
+    let file_path = write_export(&app, &path, &content)?;
 
     Ok(serde_json::json!({
         "success": true,
-        "filePath": file_path.to_string_lossy(),
+        "filePath": file_path,
         "format": format,
         "skipped": {
             "count": skipped.len(),
@@ -283,43 +308,25 @@ pub async fn export_openapi(
 pub async fn export_postman(app: AppHandle, collection_id: String) -> Result<Value, String> {
     let collection = load_collection_for_export(&app, &collection_id)?;
 
-    // Show save dialog
-    let (tx, rx) = oneshot::channel::<Option<FilePath>>();
-
-    let mut dialog = app
-        .dialog()
-        .file()
-        .set_file_name(format!("{}.postman_collection.json", collection.name))
-        .add_filter("Postman Collection", &["json"]);
-
-    // Set starting directory to last used location
-    if let Some(last_dir) = get_last_import_directory(&app) {
-        dialog = dialog.set_directory(last_dir);
-    }
-
-    dialog.save_file(move |file_path| {
-        let _ = tx.send(file_path);
-    });
-
-    let file_path = rx.await.map_err(|e| format!("Dialog error: {}", e))?;
-
-    let Some(path) = file_path else {
-        return Ok(serde_json::json!({ "success": false, "cancelled": true }));
+    let Some(path) = pick_save_path(
+        &app,
+        format!("{}.postman_collection.json", collection.name),
+        "Postman Collection",
+        &["json"],
+    )
+    .await?
+    else {
+        return Ok(cancelled_export());
     };
 
     let (postman_collection, skipped) = collection_to_postman(&collection);
     let content = serde_json::to_string_pretty(&postman_collection).map_err(|e| e.to_string())?;
 
-    let file_path = path.as_path().ok_or("Invalid file path")?;
-
-    // Save the directory for next time
-    save_last_import_directory(&app, file_path);
-
-    std::fs::write(file_path, content).map_err(|e| format!("Failed to write file: {}", e))?;
+    let file_path = write_export(&app, &path, &content)?;
 
     Ok(serde_json::json!({
         "success": true,
-        "filePath": file_path.to_string_lossy(),
+        "filePath": file_path,
         "skipped": {
             "count": skipped.len(),
             "items": skipped
@@ -333,37 +340,15 @@ pub async fn save_json_export(
     default_file_name: String,
     content: String,
 ) -> Result<Value, String> {
-    let (tx, rx) = oneshot::channel::<Option<FilePath>>();
-
-    let mut dialog = app
-        .dialog()
-        .file()
-        .set_file_name(default_file_name)
-        .add_filter("JSON Files", &["json"]);
-
-    if let Some(last_dir) = get_last_import_directory(&app) {
-        dialog = dialog.set_directory(last_dir);
-    }
-
-    dialog.save_file(move |file_path| {
-        let _ = tx.send(file_path);
-    });
-
-    let file_path = rx.await.map_err(|e| format!("Dialog error: {}", e))?;
-
-    let Some(path) = file_path else {
-        return Ok(serde_json::json!({ "success": false, "cancelled": true }));
+    let Some(path) = pick_save_path(&app, default_file_name, "JSON Files", &["json"]).await? else {
+        return Ok(cancelled_export());
     };
 
-    let file_path = path.as_path().ok_or("Invalid file path")?;
-
-    save_last_import_directory(&app, file_path);
-
-    std::fs::write(file_path, content).map_err(|e| format!("Failed to write file: {}", e))?;
+    let file_path = write_export(&app, &path, &content)?;
 
     Ok(serde_json::json!({
         "success": true,
-        "filePath": file_path.to_string_lossy()
+        "filePath": file_path
     }))
 }
 
@@ -374,43 +359,20 @@ pub async fn save_documentation(
     content: String,
     mime_type: String,
 ) -> Result<Value, String> {
-    let (tx, rx) = oneshot::channel::<Option<FilePath>>();
-
-    // Determine file extension and filter based on mime type
     let (filter_name, extensions): (&str, &[&str]) = match mime_type.as_str() {
         "text/html" => ("HTML Files", &["html"]),
         "text/markdown" => ("Markdown Files", &["md"]),
         _ => ("All Files", &["*"]),
     };
 
-    let mut dialog = app
-        .dialog()
-        .file()
-        .set_file_name(default_file_name)
-        .add_filter(filter_name, extensions);
-
-    if let Some(last_dir) = get_last_import_directory(&app) {
-        dialog = dialog.set_directory(last_dir);
-    }
-
-    dialog.save_file(move |file_path| {
-        let _ = tx.send(file_path);
-    });
-
-    let file_path = rx.await.map_err(|e| format!("Dialog error: {}", e))?;
-
-    let Some(path) = file_path else {
-        return Ok(serde_json::json!({ "success": false, "cancelled": true }));
+    let Some(path) = pick_save_path(&app, default_file_name, filter_name, extensions).await? else {
+        return Ok(cancelled_export());
     };
 
-    let file_path = path.as_path().ok_or("Invalid file path")?;
-
-    save_last_import_directory(&app, file_path);
-
-    std::fs::write(file_path, content).map_err(|e| format!("Failed to write file: {}", e))?;
+    let file_path = write_export(&app, &path, &content)?;
 
     Ok(serde_json::json!({
         "success": true,
-        "filePath": file_path.to_string_lossy()
+        "filePath": file_path
     }))
 }
