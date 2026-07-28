@@ -18,11 +18,13 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{mpsc, Mutex};
 use tokio_tungstenite::{
-    connect_async_tls_with_config,
+    client_async_tls_with_config, connect_async_tls_with_config,
     tungstenite::{client::IntoClientRequest, protocol::Message},
 };
 
 use super::api_request::ClientCertConfig;
+use super::proxy::{ProxySettings, WsProxyAction};
+use super::proxy_tunnel::connect_through_proxy;
 use super::tls::{build_ws_connector, ws_uri_is_secure};
 
 /// Everything that differs between the two transports. All fields are static:
@@ -142,6 +144,20 @@ impl WsEventPayload {
     }
 }
 
+/// Host and port to name in the `CONNECT` request. Tungstenite has already
+/// validated the scheme, so the only defaulting needed is the port.
+fn target_authority(
+    uri: &tokio_tungstenite::tungstenite::http::Uri,
+    is_secure: bool,
+) -> Result<(String, u16), String> {
+    let host = uri
+        .host()
+        .ok_or_else(|| "The URL has no host to tunnel to".to_string())?
+        .to_string();
+    let port = uri.port_u16().unwrap_or(if is_secure { 443 } else { 80 });
+    Ok((host, port))
+}
+
 fn emit_event(app: &AppHandle, channel: &WsChannel, payload: WsEventPayload) {
     let _ = app.emit(channel.event_name, payload);
 }
@@ -163,6 +179,7 @@ async fn establish_connection(
     headers: HashMap<String, String>,
     verify_ssl: bool,
     client_cert: Option<ClientCertConfig>,
+    proxy: WsProxyAction,
 ) -> Result<mpsc::UnboundedSender<WsCommand>, String> {
     let mut request = url.clone().into_client_request().map_err(|error| {
         format!(
@@ -198,16 +215,83 @@ async fn establish_connection(
 
     // Only `wss://` needs a TLS connector. Building one for a plaintext socket
     // would let a stale certificate path break a connection that never uses it.
-    let connector = if ws_uri_is_secure(request.uri()) {
+    let is_secure = ws_uri_is_secure(request.uri());
+    let connector = if is_secure {
         Some(build_ws_connector(verify_ssl, client_cert.as_ref())?)
     } else {
         None
     };
 
-    let (stream, _) = connect_async_tls_with_config(request, None, false, connector)
-        .await
-        .map_err(|error| format!("Failed to connect: {}", error))?;
+    // tokio-tungstenite dials the target itself and knows nothing about
+    // proxies, so a tunnel has to be opened here and the handshake run over it.
+    // Both arms hand their stream to the same generic pump, which keeps the
+    // unproxied path on tungstenite's own connect.
+    match proxy {
+        WsProxyAction::Unsupported { proxy_type } => Err(format!(
+            "A {} proxy is configured, which {} connections cannot use. \
+             Switch the proxy to HTTP or HTTPS, or add this host to the bypass list.",
+            proxy_type.to_uppercase(),
+            channel.request_label
+        )),
+        WsProxyAction::Direct => {
+            let (stream, _) = connect_async_tls_with_config(request, None, false, connector)
+                .await
+                .map_err(|error| format!("Failed to connect: {}", error))?;
+            Ok(spawn_pumps(
+                app,
+                channel,
+                connections,
+                tab_id,
+                url,
+                headers,
+                verify_ssl,
+                client_cert,
+                stream,
+            )
+            .await)
+        }
+        WsProxyAction::Tunnel(endpoint) => {
+            let (host, port) = target_authority(request.uri(), is_secure)?;
+            let tunnel = connect_through_proxy(&endpoint, &host, port).await?;
+            let (stream, _) = client_async_tls_with_config(request, tunnel, None, connector)
+                .await
+                .map_err(|error| format!("Failed to connect through proxy: {}", error))?;
+            Ok(spawn_pumps(
+                app,
+                channel,
+                connections,
+                tab_id,
+                url,
+                headers,
+                verify_ssl,
+                client_cert,
+                stream,
+            )
+            .await)
+        }
+    }
+}
 
+/// Register the connection, announce it, and start the writer/reader tasks.
+///
+/// Generic over the transport so the proxied and unproxied paths share it: the
+/// former is tunnelled through a boxed stream, the latter is whatever
+/// tungstenite dialled.
+#[allow(clippy::too_many_arguments)]
+async fn spawn_pumps<S>(
+    app: AppHandle,
+    channel: &'static WsChannel,
+    connections: WsConnections,
+    tab_id: String,
+    url: String,
+    headers: HashMap<String, String>,
+    verify_ssl: bool,
+    client_cert: Option<ClientCertConfig>,
+    stream: tokio_tungstenite::WebSocketStream<S>,
+) -> mpsc::UnboundedSender<WsCommand>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
     let (mut writer, mut reader) = stream.split();
     let (sender, mut receiver) = mpsc::unbounded_channel::<WsCommand>();
 
@@ -318,7 +402,7 @@ async fn establish_connection(
         remove_connection_if_current(&read_connections, &tab_id, &url).await;
     });
 
-    Ok(sender)
+    sender
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -331,6 +415,7 @@ async fn get_or_create_connection(
     headers: &HashMap<String, String>,
     verify_ssl: bool,
     client_cert: &Option<ClientCertConfig>,
+    proxy: WsProxyAction,
 ) -> Result<mpsc::UnboundedSender<WsCommand>, String> {
     let existing = {
         let guard = connections.lock().await;
@@ -363,6 +448,7 @@ async fn get_or_create_connection(
         headers.clone(),
         verify_ssl,
         client_cert.clone(),
+        proxy,
     )
     .await
 }
@@ -372,6 +458,7 @@ pub(crate) async fn send(
     app: AppHandle,
     channel: &'static WsChannel,
     connections: &WsConnections,
+    proxy_settings: &ProxySettings,
     request: WsSendRequest,
 ) -> Result<WsCommandResponse, String> {
     if request.tab_id.trim().is_empty() {
@@ -395,6 +482,7 @@ pub(crate) async fn send(
         &headers,
         verify_ssl,
         &request.client_cert,
+        proxy_settings.ws_proxy_action(&request.url),
     )
     .await
     {

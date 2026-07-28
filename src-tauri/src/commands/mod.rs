@@ -13,6 +13,7 @@ pub mod mock_server;
 pub mod mqtt;
 pub mod oauth;
 pub mod proxy;
+pub mod proxy_tunnel;
 pub mod scripts;
 pub mod secrets;
 pub mod sse;

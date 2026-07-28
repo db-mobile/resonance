@@ -109,7 +109,82 @@ pub enum ProxyAction {
     Manual(Box<Proxy>),
 }
 
+/// Scheme of a proxy a caller must dial itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProxyScheme {
+    Http,
+    Https,
+}
+
+/// A resolved proxy in the structured form transports need to dial it
+/// themselves. [`ProxyAction::Manual`] wraps an opaque [`Proxy`] that only
+/// reqwest can use, so anything building its own connection needs this instead.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProxyEndpoint {
+    pub scheme: ProxyScheme,
+    pub host: String,
+    pub port: u16,
+    /// Basic credentials, already split into username and password.
+    pub auth: Option<(String, String)>,
+}
+
+/// What a non-reqwest transport should do about proxying for a given URL.
+///
+/// Distinct from [`ProxyAction`] because reqwest resolves system proxies and
+/// SOCKS itself, whereas a hand-built transport has to be told explicitly.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WsProxyAction {
+    /// Connect straight to the target.
+    Direct,
+    /// Open an HTTP `CONNECT` tunnel through this proxy first.
+    Tunnel(ProxyEndpoint),
+    /// Configured proxy type this transport cannot honour. Reported to the user
+    /// rather than ignored, so a proxied setup never leaks a direct connection.
+    Unsupported { proxy_type: String },
+}
+
 impl ProxySettings {
+    /// Resolve the proxy decision for a transport that dials its own socket.
+    ///
+    /// Mirrors [`Self::proxy_action`]'s enable and bypass rules so the WebSocket
+    /// transports agree with the HTTP path on *whether* to proxy, then resolves
+    /// the concrete endpoint that reqwest would otherwise have found on its own.
+    pub fn ws_proxy_action(&self, url: &str) -> WsProxyAction {
+        if !self.enabled || Self::should_bypass(url, &self.bypass_list) {
+            return WsProxyAction::Direct;
+        }
+
+        if self.use_system_proxy {
+            return match system_proxy_for(url) {
+                Some(endpoint) => WsProxyAction::Tunnel(endpoint),
+                None => WsProxyAction::Direct,
+            };
+        }
+
+        let scheme = match self.proxy_type.to_ascii_lowercase().as_str() {
+            "http" => ProxyScheme::Http,
+            "https" => ProxyScheme::Https,
+            other => {
+                return WsProxyAction::Unsupported {
+                    proxy_type: other.to_string(),
+                }
+            }
+        };
+
+        let auth = if self.auth.enabled && !self.auth.username.is_empty() {
+            Some((self.auth.username.clone(), self.auth.password.clone()))
+        } else {
+            None
+        };
+
+        WsProxyAction::Tunnel(ProxyEndpoint {
+            scheme,
+            host: self.host.clone(),
+            port: self.port,
+            auth,
+        })
+    }
+
     /// Resolve the proxy decision for `url` from a settings snapshot. Lives on
     /// the settings rather than on [`ProxyState`] so callers that only hold a
     /// clone — script `sendRequest`, which runs on a blocking thread with no
@@ -141,6 +216,7 @@ impl ProxySettings {
         ProxyAction::Manual(Box::new(proxy))
     }
 
+    /// Shared by both resolvers so the bypass rules cannot drift apart.
     fn should_bypass(url: &str, bypass_list: &[String]) -> bool {
         if let Ok(parsed) = url::Url::parse(url) {
             if let Some(host) = parsed.host_str() {
@@ -168,6 +244,104 @@ impl ProxySettings {
         }
         false
     }
+}
+
+/// Parse a proxy URL from the environment into an endpoint. A bare
+/// `host:port` (accepted by most tools) is treated as `http://`.
+pub(crate) fn parse_proxy_url(raw: &str) -> Option<ProxyEndpoint> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return None;
+    }
+
+    let normalized = if raw.contains("://") {
+        raw.to_string()
+    } else {
+        format!("http://{}", raw)
+    };
+
+    let parsed = url::Url::parse(&normalized).ok()?;
+    let scheme = match parsed.scheme() {
+        "http" => ProxyScheme::Http,
+        "https" => ProxyScheme::Https,
+        _ => return None,
+    };
+    let host = parsed.host_str()?.to_string();
+    let port = parsed.port().unwrap_or(match scheme {
+        ProxyScheme::Http => 80,
+        ProxyScheme::Https => 443,
+    });
+
+    let auth = match (parsed.username(), parsed.password()) {
+        ("", _) => None,
+        (user, password) => Some((
+            urlencoding_decode(user),
+            urlencoding_decode(password.unwrap_or_default()),
+        )),
+    };
+
+    Some(ProxyEndpoint {
+        scheme,
+        host,
+        port,
+        auth,
+    })
+}
+
+/// Percent-decode a userinfo component. Credentials in a proxy URL are
+/// percent-encoded, and the proxy expects the decoded bytes.
+fn urlencoding_decode(value: &str) -> String {
+    percent_decode(value).unwrap_or_else(|| value.to_string())
+}
+
+fn percent_decode(value: &str) -> Option<String> {
+    let bytes = value.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            let hex = value.get(index + 1..index + 3)?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            index += 3;
+        } else {
+            out.push(bytes[index]);
+            index += 1;
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
+/// Resolve the ambient proxy for `url` the way conventional tooling does:
+/// scheme-specific variable first, then `ALL_PROXY`, with `NO_PROXY` able to
+/// veto. Both upper and lower case spellings are accepted.
+fn system_proxy_for(url: &str) -> Option<ProxyEndpoint> {
+    let is_secure = url::Url::parse(url)
+        .ok()
+        .is_some_and(|parsed| matches!(parsed.scheme(), "https" | "wss"));
+
+    if let Some(no_proxy) = env_var("NO_PROXY") {
+        let patterns: Vec<String> = no_proxy.split(',').map(|p| p.trim().to_string()).collect();
+        if patterns.iter().any(|p| p == "*") || ProxySettings::should_bypass(url, &patterns) {
+            return None;
+        }
+    }
+
+    let scheme_var = if is_secure {
+        "HTTPS_PROXY"
+    } else {
+        "HTTP_PROXY"
+    };
+    let raw = env_var(scheme_var).or_else(|| env_var("ALL_PROXY"))?;
+    parse_proxy_url(&raw)
+}
+
+/// Read an environment variable in either case, preferring the conventional
+/// upper-case spelling.
+fn env_var(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
+        .or_else(|| std::env::var(name.to_lowercase()).ok())
+        .filter(|value| !value.trim().is_empty())
 }
 
 impl ProxyState {
@@ -413,6 +587,105 @@ mod tests {
             ProxySettings::default().proxy_action("https://example.com"),
             ProxyAction::Disable
         ));
+    }
+
+    #[test]
+    fn ws_tunnels_through_a_manual_http_proxy() {
+        let settings = ProxySettings {
+            auth: ProxyAuth {
+                enabled: true,
+                username: "user".to_string(),
+                password: "secret".to_string(),
+            },
+            ..enabled_manual()
+        };
+
+        assert_eq!(
+            settings.ws_proxy_action("wss://example.com/socket"),
+            WsProxyAction::Tunnel(ProxyEndpoint {
+                scheme: ProxyScheme::Http,
+                host: "127.0.0.1".to_string(),
+                port: 3128,
+                auth: Some(("user".to_string(), "secret".to_string())),
+            })
+        );
+    }
+
+    /// The WebSocket resolver must agree with the HTTP one about *whether* to
+    /// proxy, or a bypassed host would be tunnelled on one path and not the other.
+    #[test]
+    fn ws_honours_the_same_disable_and_bypass_rules_as_http() {
+        assert_eq!(
+            ProxySettings::default().ws_proxy_action("wss://example.com"),
+            WsProxyAction::Direct
+        );
+
+        let settings = ProxySettings {
+            bypass_list: vec!["*.internal.test".to_string()],
+            ..enabled_manual()
+        };
+        assert_eq!(
+            settings.ws_proxy_action("wss://api.internal.test/socket"),
+            WsProxyAction::Direct
+        );
+        assert!(matches!(
+            settings.ws_proxy_action("wss://example.com/socket"),
+            WsProxyAction::Tunnel(_)
+        ));
+    }
+
+    /// A SOCKS proxy must be reported, never silently ignored: falling back to a
+    /// direct connection would leak traffic the user asked to have proxied.
+    #[test]
+    fn ws_reports_socks_rather_than_connecting_direct() {
+        for proxy_type in ["socks4", "socks5", "SOCKS5"] {
+            let settings = ProxySettings {
+                proxy_type: proxy_type.to_string(),
+                ..enabled_manual()
+            };
+            assert_eq!(
+                settings.ws_proxy_action("wss://example.com/socket"),
+                WsProxyAction::Unsupported {
+                    proxy_type: proxy_type.to_ascii_lowercase()
+                },
+                "{} should be reported as unsupported",
+                proxy_type
+            );
+        }
+    }
+
+    #[test]
+    fn parses_proxy_urls_from_the_environment() {
+        assert_eq!(
+            parse_proxy_url("http://proxy.test:3128"),
+            Some(ProxyEndpoint {
+                scheme: ProxyScheme::Http,
+                host: "proxy.test".to_string(),
+                port: 3128,
+                auth: None,
+            })
+        );
+
+        // A bare host:port is what most tooling accepts; default to http.
+        assert_eq!(
+            parse_proxy_url("proxy.test:8080").map(|e| (e.scheme, e.port)),
+            Some((ProxyScheme::Http, 8080))
+        );
+
+        // Scheme defaults when the port is omitted.
+        assert_eq!(
+            parse_proxy_url("https://proxy.test").map(|e| e.port),
+            Some(443)
+        );
+
+        // Credentials are percent-decoded before they reach the proxy.
+        assert_eq!(
+            parse_proxy_url("http://us%40er:p%40ss@proxy.test:3128").and_then(|e| e.auth),
+            Some(("us@er".to_string(), "p@ss".to_string()))
+        );
+
+        assert_eq!(parse_proxy_url(""), None);
+        assert_eq!(parse_proxy_url("socks5://proxy.test:1080"), None);
     }
 
     #[test]
