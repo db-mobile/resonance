@@ -1097,58 +1097,6 @@ export class AuthManager {
         return this.currentAuthConfig;
     }
 
-    /**
-     * Sets authentication type
-     *
-     * @param {string} authType - Authentication type to set
-     * @returns {void}
-     */
-    setAuthType(authType) {
-        if (this.authTypeSelect) {
-            this.authTypeSelect.value = authType;
-        }
-        this.currentAuthConfig.type = authType;
-        this.renderAuthFields(authType);
-    }
-
-    /**
-     * Sets authentication configuration
-     *
-     * @param {Object} authConfig - Authentication configuration
-     * @param {string} authConfig.type - Authentication type
-     * @param {Object} authConfig.config - Authentication configuration details
-     * @returns {void}
-     */
-    setAuthConfig(authConfig) {
-        this.currentAuthConfig = {
-            type: authConfig.type || 'none',
-            config: authConfig.config || {}
-        };
-
-        if (this.authTypeSelect) {
-            this.authTypeSelect.value = this.currentAuthConfig.type;
-        }
-
-        this.renderAuthFields(this.currentAuthConfig.type);
-    }
-
-    /**
-     * Resets authentication configuration to default (none)
-     *
-     * @returns {void}
-     */
-    resetAuthConfig() {
-        this.currentAuthConfig = {
-            type: 'none',
-            config: {}
-        };
-
-        if (this.authTypeSelect) {
-            this.authTypeSelect.value = 'none';
-        }
-
-        this.renderAuthFields('none');
-    }
 }
 
 /**

@@ -13,14 +13,14 @@ import './modules/ipcBridge.js';
 
 import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInput, methodSelect, bodyInput, bodyEditorContainer, bodyTextEditorContainer, grpcBodyInput, grpcBodyEditorContainer } from './modules/domElements.js';
 
-import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl, setUrlUpdating } from './modules/keyValueManager.js';
+import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest, handleCancelRequest, handleGenerateCurl, setGraphQLBodyManager, invalidateSettingsCache, getSettingsCache, invalidateEnvironmentCache } from './modules/apiHandler.js';
 import { GraphQLBodyManager } from './modules/graphqlBodyManager.js';
 import { FormBodyManager } from './modules/formBodyManager.js';
-import { applyGrpcState, captureGrpcState, initGrpcUI, setGrpcMetadata, setGrpcTls } from './modules/grpcHandler.js';
+import { applyGrpcState, captureGrpcState, initGrpcUI } from './modules/grpcHandler.js';
 import { initRequestModeManager } from './modules/requestModeManager.js';
 import { initWebSocketHandler } from './modules/websocketHandler.js';
 import { initGraphQLSubscriptionHandler } from './modules/graphqlSubscriptionHandler.js';
@@ -679,9 +679,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             await controller.handleCollectionAuth(collection);
         }
     };
-    app.setUrlUpdating = setUrlUpdating;
-    app.setGrpcMetadata = setGrpcMetadata;
-    app.setGrpcTls = setGrpcTls;
     app.captureGrpcState = captureGrpcState;
     app.applyGrpcState = applyGrpcState;
 
@@ -813,9 +810,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     activateTab('response', 'response-body');
 
-    document.addEventListener('languageChanged', (_event) => {
-    });
-
     updateStatusDisplay('Ready', null);
 
     initKeyValueListeners();
@@ -853,7 +847,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const pathParamsList = document.getElementById('path-params-list');
     const headersList = document.getElementById('headers-list');
-    const _queryParamsList = document.getElementById('query-params-list');
 
     if (pathParamsList.children.length === 0) {addKeyValueRow(pathParamsList);}
     if (headersList.children.length === 0) {addKeyValueRow(headersList, 'Content-Type', 'application/json');}

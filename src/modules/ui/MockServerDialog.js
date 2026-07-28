@@ -413,25 +413,6 @@ export class MockServerDialog {
     }
 
     /**
-     * Handles endpoint delay change
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {number} delayMs - Delay in milliseconds
-     */
-    async handleSetDelay(collectionId, endpointId, delayMs) {
-        try {
-            const result = await this.controller.handleSetDelay(collectionId, endpointId, delayMs);
-            if (!result.success) {
-                this.showAlert(result.message);
-            }
-        } catch (error) {
-            void error;
-        }
-    }
-
-    /**
      * Handles clear logs action
      *
      * @async

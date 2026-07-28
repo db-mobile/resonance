@@ -919,15 +919,7 @@ export async function handleSendRequest() {
     const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
     if (['POST', 'PUT', 'PATCH'].includes(method) || bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'binary') {
         try {
-            let variables = _resolvedVariables;
-            if (variables === null) {
-                const variableService = getVariableService();
-                if (getCurrentEndpoint()) {
-                    variables = await variableService.getVariablesForCollection(getCurrentEndpoint().collectionId);
-                } else {
-                    variables = await variableService.getVariables();
-                }
-            }
+            const variables = _resolvedVariables;
 
             if (isGraphQLMode() && graphqlBodyManager) {
                 let queryText = graphqlBodyManager.getGraphQLQuery().trim();

@@ -818,21 +818,6 @@ export class CollectionRepository {
     }
 
     /**
-     * Retrieves the last selected request
-     *
-     * @async
-     * @returns {Promise<Object|null>} Object with collectionId and endpointId or null
-     */
-    async getLastSelectedRequest() {
-        try {
-            const lastSelected = await this.backendAPI.store.get('lastSelectedRequest');
-            return lastSelected || null;
-        } catch (error) {
-            return null;
-        }
-    }
-
-    /**
      * Saves the last selected request for UI state restoration
      *
      * @async
