@@ -568,7 +568,7 @@ fn setup_jest(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<
                 return JSON.stringify(__testResults__);
             }
             
-            return { expect: expect, test: test, it: it, describe: describe, __collectResults__: __collectResults__, __testResults__: __testResults__ };
+            return { expect: expect, test: test, it: it, describe: describe, __collectResults__: __collectResults__ };
         })()
     "#;
 
@@ -602,15 +602,6 @@ fn setup_jest(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<
                 .register_global_property(
                     js_string!("__collectResults__"),
                     collect_fn,
-                    Attribute::all(),
-                )
-                .map_err(|e| e.to_string())?;
-        }
-        if let Ok(results_arr) = obj.get(js_string!("__testResults__"), context) {
-            context
-                .register_global_property(
-                    js_string!("__testResults__"),
-                    results_arr,
                     Attribute::all(),
                 )
                 .map_err(|e| e.to_string())?;

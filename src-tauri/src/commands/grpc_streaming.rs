@@ -176,7 +176,7 @@ pub async fn grpc_stream_start(
         .parse()
         .map_err(|e| format!("Invalid method path: {}", e))?;
 
-    let codec = DynamicMessageCodec::new(input_desc.clone(), output_desc);
+    let codec = DynamicMessageCodec::new(output_desc);
     let tab_id = request.tab_id.clone();
     let full_method = request.full_method.clone();
     let metadata = request.metadata.clone();

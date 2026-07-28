@@ -74,7 +74,7 @@ pub async fn grpc_invoke_unary(
         .get_message_by_name(&strip_leading_dot(&output_type))
         .ok_or_else(|| format!("Output message type not found: {}", output_type))?;
 
-    let input_msg = json_to_dynamic_message(&request.request_json, input_desc.clone())?;
+    let input_msg = json_to_dynamic_message(&request.request_json, input_desc)?;
 
     let channel = create_channel(&target, &request.tls).await?;
 
@@ -97,7 +97,7 @@ pub async fn grpc_invoke_unary(
         .parse()
         .map_err(|e| format!("Invalid method path: {}", e))?;
 
-    let codec = DynamicMessageCodec::new(input_desc, output_desc);
+    let codec = DynamicMessageCodec::new(output_desc);
 
     let call_fut = grpc.unary(req, path, codec);
     let response = if let Some(ms) = request.deadline_ms {
@@ -400,16 +400,6 @@ pub async fn grpc_reflection_list_services(
     Ok(serde_json::to_value(services).unwrap())
 }
 
-#[allow(dead_code)]
-fn normalize_target(target: String) -> String {
-    let trimmed = target.trim().to_string();
-    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
-        trimmed
-    } else {
-        format!("http://{}", trimmed)
-    }
-}
-
 pub(crate) fn normalize_target_with_tls(target: &str, use_tls: bool) -> String {
     let trimmed = target.trim();
     if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
@@ -592,7 +582,7 @@ pub async fn grpc_get_input_skeleton(
     Ok(skeleton)
 }
 
-fn generate_message_skeleton(desc: &prost_reflect::MessageDescriptor) -> Value {
+pub(crate) fn generate_message_skeleton(desc: &prost_reflect::MessageDescriptor) -> Value {
     let mut obj = serde_json::Map::new();
 
     for field in desc.fields() {
@@ -683,20 +673,12 @@ pub(crate) async fn build_descriptor_pool_for_method_with_tls(
 }
 
 pub(crate) struct DynamicMessageCodec {
-    #[allow(dead_code)]
-    input_desc: prost_reflect::MessageDescriptor,
     output_desc: prost_reflect::MessageDescriptor,
 }
 
 impl DynamicMessageCodec {
-    pub(crate) fn new(
-        input_desc: prost_reflect::MessageDescriptor,
-        output_desc: prost_reflect::MessageDescriptor,
-    ) -> Self {
-        Self {
-            input_desc,
-            output_desc,
-        }
+    pub(crate) fn new(output_desc: prost_reflect::MessageDescriptor) -> Self {
+        Self { output_desc }
     }
 }
 

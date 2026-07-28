@@ -532,8 +532,6 @@ fn form_rows_to_pairs(rows: &[serde_json::Value]) -> Vec<(String, String)> {
 pub struct AuthConfig {
     pub username: String,
     pub password: String,
-    #[serde(default)]
-    pub auth_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

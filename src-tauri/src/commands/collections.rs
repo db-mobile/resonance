@@ -81,12 +81,7 @@ fn get_default_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir.join(COLLECTIONS_DIR))
 }
 
-/// Get the collections directory path for user reference
-fn get_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    get_default_collections_dir(app)
-}
-
-fn ensure_default_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn ensure_default_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = get_default_collections_dir(app)?;
     if !dir.exists() {
         fs::create_dir_all(&dir).map_err(|e| format!("Failed to create collections dir: {}", e))?;
@@ -158,7 +153,7 @@ fn save_last_collection_directory(app: &AppHandle, dir: &Path) {
     }
 }
 
-fn write_json_file<T: Serialize>(path: &PathBuf, data: &T) -> Result<(), String> {
+pub(crate) fn write_json_file<T: Serialize>(path: &PathBuf, data: &T) -> Result<(), String> {
     let json = serde_json::to_string_pretty(data)
         .map_err(|e| format!("Failed to serialize JSON: {}", e))?;
     fs::write(path, json).map_err(|e| format!("Failed to write file: {}", e))?;
@@ -931,7 +926,7 @@ fn migrate_variables(
 
 #[tauri::command]
 pub async fn collections_get_path(app: AppHandle) -> Result<String, String> {
-    let path = get_collections_dir(&app)?;
+    let path = get_default_collections_dir(&app)?;
     Ok(path.to_string_lossy().to_string())
 }
 

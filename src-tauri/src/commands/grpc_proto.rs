@@ -8,8 +8,11 @@ use tauri::{AppHandle, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use tokio::sync::oneshot;
 
-pub use super::grpc_reflection::GrpcUnaryRequest;
-use super::grpc_reflection::{create_channel, normalize_target_with_tls};
+use super::grpc_reflection::{
+    create_channel, dynamic_message_to_json, generate_message_skeleton, json_to_dynamic_message,
+    metadata_to_json_map, normalize_target_with_tls, resolve_method_types, strip_leading_dot,
+    DynamicMessageCodec, GrpcUnaryRequest,
+};
 
 /// State to hold loaded proto file descriptors
 pub struct ProtoState {
@@ -142,7 +145,7 @@ pub async fn grpc_proto_get_input_skeleton(
             .ok_or_else(|| format!("Proto file not loaded: {}", proto_path))?
     };
 
-    let (input_type, _) = resolve_method_types_from_pool(&pool, &full_method)?;
+    let (input_type, _) = resolve_method_types(&pool, &full_method)?;
 
     let input_desc = pool
         .get_message_by_name(&strip_leading_dot(&input_type))
@@ -172,7 +175,7 @@ pub async fn grpc_proto_invoke_unary(
     };
 
     let target = normalize_target_with_tls(&request.target, request.tls.use_tls);
-    let (input_type, output_type) = resolve_method_types_from_pool(&pool, &request.full_method)?;
+    let (input_type, output_type) = resolve_method_types(&pool, &request.full_method)?;
 
     let input_desc = pool
         .get_message_by_name(&strip_leading_dot(&input_type))
@@ -181,7 +184,7 @@ pub async fn grpc_proto_invoke_unary(
         .get_message_by_name(&strip_leading_dot(&output_type))
         .ok_or_else(|| format!("Output message type not found: {}", output_type))?;
 
-    let input_msg = json_to_dynamic_message(&request.request_json, input_desc.clone())?;
+    let input_msg = json_to_dynamic_message(&request.request_json, input_desc)?;
 
     let channel = create_channel(&target, &request.tls).await?;
 
@@ -204,7 +207,7 @@ pub async fn grpc_proto_invoke_unary(
         .parse()
         .map_err(|e| format!("Invalid method path: {}", e))?;
 
-    let codec = DynamicMessageCodec::new(input_desc, output_desc);
+    let codec = DynamicMessageCodec::new(output_desc);
 
     let call_fut = grpc.unary(req, path, codec);
     let response: Result<tonic::Response<DynamicMessage>, tonic::Status> =
@@ -358,203 +361,3 @@ mod protox_parse {
     }
 }
 
-fn strip_leading_dot(name: &str) -> String {
-    name.strip_prefix('.').unwrap_or(name).to_string()
-}
-
-fn resolve_method_types_from_pool(
-    pool: &DescriptorPool,
-    full_method: &str,
-) -> Result<(String, String), String> {
-    let trimmed = full_method.trim();
-    if !trimmed.starts_with('/') {
-        return Err("fullMethod must start with '/'".to_string());
-    }
-
-    let parts: Vec<&str> = trimmed.split('/').filter(|p| !p.is_empty()).collect();
-    if parts.len() != 2 {
-        return Err("fullMethod must be in the form '/package.Service/Method'".to_string());
-    }
-
-    let service_name = parts[0];
-    let method_name = parts[1];
-
-    let service = pool
-        .get_service_by_name(service_name)
-        .ok_or_else(|| format!("Service not found in descriptors: {}", service_name))?;
-
-    let method = service
-        .methods()
-        .find(|m| m.name() == method_name)
-        .ok_or_else(|| format!("Method not found: {} on {}", method_name, service_name))?;
-
-    Ok((
-        method.input().full_name().to_string(),
-        method.output().full_name().to_string(),
-    ))
-}
-
-fn json_to_dynamic_message(
-    value: &Value,
-    desc: prost_reflect::MessageDescriptor,
-) -> Result<DynamicMessage, String> {
-    let json = value.to_string();
-    let mut de = serde_json::Deserializer::from_str(&json);
-    DynamicMessage::deserialize(desc, &mut de)
-        .map_err(|e| format!("Failed to map JSON to protobuf: {}", e))
-}
-
-fn dynamic_message_to_json(msg: &DynamicMessage) -> Result<Value, String> {
-    serde_json::to_value(msg).map_err(|e| format!("Failed to map protobuf to JSON: {}", e))
-}
-
-fn metadata_to_json_map(meta: &tonic::metadata::MetadataMap) -> Value {
-    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-    use base64::Engine;
-    use tonic::metadata::KeyAndValueRef;
-
-    let mut map = serde_json::Map::new();
-    for kv in meta.iter() {
-        match kv {
-            KeyAndValueRef::Ascii(key, value) => {
-                if let Ok(s) = value.to_str() {
-                    map.insert(key.to_string(), Value::String(s.to_string()));
-                }
-            }
-            KeyAndValueRef::Binary(key, value) => {
-                map.insert(
-                    key.to_string(),
-                    Value::String(format!(
-                        "base64:{}",
-                        BASE64_STANDARD.encode(value.as_encoded_bytes())
-                    )),
-                );
-            }
-        }
-    }
-    Value::Object(map)
-}
-
-fn generate_message_skeleton(desc: &prost_reflect::MessageDescriptor) -> Value {
-    let mut obj = serde_json::Map::new();
-
-    for field in desc.fields() {
-        let field_name = field.name().to_string();
-        let field_value = generate_field_skeleton(&field);
-
-        if field.is_list() {
-            obj.insert(field_name, Value::Array(vec![field_value]));
-        } else if field.is_map() {
-            let mut map_obj = serde_json::Map::new();
-            map_obj.insert("key".to_string(), Value::String("value".to_string()));
-            obj.insert(field_name, Value::Object(map_obj));
-        } else {
-            obj.insert(field_name, field_value);
-        }
-    }
-
-    Value::Object(obj)
-}
-
-fn generate_field_skeleton(field: &prost_reflect::FieldDescriptor) -> Value {
-    use prost_reflect::Kind;
-
-    match field.kind() {
-        Kind::Double | Kind::Float => Value::Number(serde_json::Number::from_f64(0.0).unwrap()),
-        Kind::Int32 | Kind::Sint32 | Kind::Sfixed32 => Value::Number(0.into()),
-        Kind::Int64 | Kind::Sint64 | Kind::Sfixed64 => Value::Number(0.into()),
-        Kind::Uint32 | Kind::Fixed32 => Value::Number(0.into()),
-        Kind::Uint64 | Kind::Fixed64 => Value::Number(0.into()),
-        Kind::Bool => Value::Bool(false),
-        Kind::String => Value::String(String::new()),
-        Kind::Bytes => Value::String(String::new()),
-        Kind::Message(msg_desc) => generate_message_skeleton(&msg_desc),
-        Kind::Enum(enum_desc) => {
-            if let Some(first_value) = enum_desc.values().next() {
-                Value::String(first_value.name().to_string())
-            } else {
-                Value::Number(0.into())
-            }
-        }
-    }
-}
-
-// Codec for dynamic messages
-struct DynamicMessageCodec {
-    #[allow(dead_code)]
-    input_desc: prost_reflect::MessageDescriptor,
-    output_desc: prost_reflect::MessageDescriptor,
-}
-
-impl DynamicMessageCodec {
-    fn new(
-        input_desc: prost_reflect::MessageDescriptor,
-        output_desc: prost_reflect::MessageDescriptor,
-    ) -> Self {
-        Self {
-            input_desc,
-            output_desc,
-        }
-    }
-}
-
-impl tonic::codec::Codec for DynamicMessageCodec {
-    type Encode = DynamicMessage;
-    type Decode = DynamicMessage;
-    type Encoder = DynamicMessageEncoder;
-    type Decoder = DynamicMessageDecoder;
-
-    fn encoder(&mut self) -> Self::Encoder {
-        DynamicMessageEncoder
-    }
-
-    fn decoder(&mut self) -> Self::Decoder {
-        DynamicMessageDecoder {
-            desc: self.output_desc.clone(),
-        }
-    }
-}
-
-struct DynamicMessageEncoder;
-
-impl tonic::codec::Encoder for DynamicMessageEncoder {
-    type Item = DynamicMessage;
-    type Error = tonic::Status;
-
-    fn encode(
-        &mut self,
-        item: Self::Item,
-        dst: &mut tonic::codec::EncodeBuf<'_>,
-    ) -> Result<(), Self::Error> {
-        use prost::Message;
-        dst.reserve(item.encoded_len());
-        item.encode(dst)
-            .map_err(|e| tonic::Status::internal(format!("encode error: {}", e)))
-    }
-}
-
-struct DynamicMessageDecoder {
-    desc: prost_reflect::MessageDescriptor,
-}
-
-impl tonic::codec::Decoder for DynamicMessageDecoder {
-    type Item = DynamicMessage;
-    type Error = tonic::Status;
-
-    fn decode(
-        &mut self,
-        src: &mut tonic::codec::DecodeBuf<'_>,
-    ) -> Result<Option<Self::Item>, Self::Error> {
-        use bytes::Buf;
-        use prost::Message;
-
-        if src.remaining() == 0 {
-            return Ok(None);
-        }
-
-        let mut msg = DynamicMessage::new(self.desc.clone());
-        msg.merge(src)
-            .map_err(|e| tonic::Status::internal(format!("decode error: {}", e)))?;
-        Ok(Some(msg))
-    }
-}
