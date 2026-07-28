@@ -360,4 +360,3 @@ mod protox_parse {
         Err("protoc not found. Please install Protocol Buffers compiler.".to_string())
     }
 }
-

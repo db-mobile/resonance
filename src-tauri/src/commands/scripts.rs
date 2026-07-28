@@ -7,8 +7,11 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::Duration;
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 use tauri_plugin_store::StoreExt;
+
+use super::http_client::{build_http_client, HttpClientOptions};
+use super::proxy::{ProxySettings, ProxyState};
 
 const STORE_FILE: &str = "resonance-store.json";
 const SCRIPTS_KEY: &str = "persistedScripts";
@@ -208,6 +211,7 @@ fn execute_script(
     script: &str,
     ctx: Rc<RefCell<ScriptContext>>,
     capture_request: bool,
+    proxy_settings: ProxySettings,
 ) -> Result<(), String> {
     let mut context = Context::default();
 
@@ -224,7 +228,7 @@ fn execute_script(
     setup_pm(&mut context, pm_ctx)?;
 
     // Setup sendRequest (must come after pm so the glue can attach pm.sendRequest)
-    setup_send_request(&mut context)?;
+    setup_send_request(&mut context, proxy_settings)?;
 
     let baseline = if capture_request {
         stringify_request_global(&mut context).ok().flatten()
@@ -824,7 +828,17 @@ struct SendRequestResponse {
 /// thread): the future is driven with `Handle::block_on`, which panics on
 /// async worker threads. Outside any tokio runtime (unit tests) a one-off
 /// current-thread runtime is created instead.
-fn perform_send_request(options: SendRequestOptions) -> Result<SendRequestResponse, String> {
+///
+/// The client is assembled through [`build_http_client`] with the app's proxy
+/// settings applied, so a script request reaches a host behind the configured
+/// proxy exactly as the main request path does. TLS verification stays at the
+/// secure default and no client identity is attached: both are resolved
+/// per-host by the frontend for the request being sent, and a script may call
+/// any host, so the parent request's certificate must not follow it there.
+fn perform_send_request(
+    options: SendRequestOptions,
+    proxy_settings: &ProxySettings,
+) -> Result<SendRequestResponse, String> {
     let timeout_ms = options.timeout.unwrap_or(10_000).min(60_000);
     let method_str = options
         .method
@@ -834,11 +848,23 @@ fn perform_send_request(options: SendRequestOptions) -> Result<SendRequestRespon
     let method = reqwest::Method::from_bytes(method_str.as_bytes())
         .map_err(|_| format!("sendRequest: invalid HTTP method: {}", method_str))?;
 
+    let proxy_action = proxy_settings.proxy_action(&options.url);
+
     let fut = async move {
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_millis(timeout_ms))
-            .build()
-            .map_err(|e| format!("sendRequest: {}", e))?;
+        let client = build_http_client(
+            HttpClientOptions {
+                user_agent: format!("resonance/{}", env!("CARGO_PKG_VERSION")),
+                timeout: Some(Duration::from_millis(timeout_ms)),
+                connect_timeout: None,
+                http_version: None,
+                verify_ssl: true,
+                client_cert: None,
+                follow_redirects: true,
+                disable_pooling: false,
+            },
+            proxy_action,
+        )
+        .map_err(|e| format!("sendRequest: {}", e))?;
 
         let mut request = client.request(method, &options.url);
         if let Some(headers) = &options.headers {
@@ -899,11 +925,7 @@ fn perform_send_request(options: SendRequestOptions) -> Result<SendRequestRespon
 /// Native backend for the JS `sendRequest` global. Takes an options JSON
 /// string and returns a response JSON string; failures become catchable JS
 /// errors so scripts can try/catch them.
-fn send_request_raw_native(
-    _this: &JsValue,
-    args: &[JsValue],
-    _context: &mut Context,
-) -> JsResult<JsValue> {
+fn send_request_raw_native(args: &[JsValue], proxy_settings: &ProxySettings) -> JsResult<JsValue> {
     let options_json = args
         .first()
         .and_then(|v| v.as_string())
@@ -916,8 +938,8 @@ fn send_request_raw_native(
         JsNativeError::typ().with_message(format!("sendRequest: invalid options: {}", e))
     })?;
 
-    let response =
-        perform_send_request(options).map_err(|e| JsNativeError::error().with_message(e))?;
+    let response = perform_send_request(options, proxy_settings)
+        .map_err(|e| JsNativeError::error().with_message(e))?;
 
     let json = serde_json::to_string(&response).map_err(|e| {
         JsNativeError::error()
@@ -930,13 +952,15 @@ fn send_request_raw_native(
 /// Register the native HTTP bridge plus the `sendRequest` / `pm.sendRequest`
 /// JS wrapper. Accepts a URL string or an options object; a Postman-style
 /// callback is supported and invoked synchronously.
-fn setup_send_request(context: &mut Context) -> Result<(), String> {
+fn setup_send_request(context: &mut Context, proxy_settings: ProxySettings) -> Result<(), String> {
+    let send_fn = unsafe {
+        NativeFunction::from_closure(move |_, args, _| {
+            send_request_raw_native(args, &proxy_settings)
+        })
+    };
+
     context
-        .register_global_callable(
-            js_string!("__sendRequestRaw__"),
-            1,
-            NativeFunction::from_fn_ptr(send_request_raw_native),
-        )
+        .register_global_callable(js_string!("__sendRequestRaw__"), 1, send_fn)
         .map_err(|e| e.to_string())?;
 
     let glue_code = r#"
@@ -1008,7 +1032,11 @@ fn setup_send_request(context: &mut Context) -> Result<(), String> {
 /// Runs synchronously; callers must invoke it from a blocking thread because
 /// `sendRequest` drives its HTTP future with `Handle::block_on`, which panics
 /// on async worker threads.
-fn run_script_sync(script_data: ScriptExecutionData, capture_request: bool) -> ScriptResult {
+fn run_script_sync(
+    script_data: ScriptExecutionData,
+    capture_request: bool,
+    proxy_settings: ProxySettings,
+) -> ScriptResult {
     let ctx = Rc::new(RefCell::new(ScriptContext {
         logs: Vec::new(),
         test_results: Vec::new(),
@@ -1018,7 +1046,12 @@ fn run_script_sync(script_data: ScriptExecutionData, capture_request: bool) -> S
         environment: script_data.environment,
     }));
 
-    let result = execute_script(&script_data.script, ctx.clone(), capture_request);
+    let result = execute_script(
+        &script_data.script,
+        ctx.clone(),
+        capture_request,
+        proxy_settings,
+    );
     let ctx_ref = ctx.borrow();
     let modified_request = capture_request.then(|| ctx_ref.request.clone());
 
@@ -1039,6 +1072,7 @@ fn run_script_sync(script_data: ScriptExecutionData, capture_request: bool) -> S
 
 #[tauri::command]
 pub async fn script_execute_pre_request(
+    proxy_state: State<'_, ProxyState>,
     script_data: ScriptExecutionData,
 ) -> Result<ScriptResult, String> {
     if script_data.script.trim().is_empty() {
@@ -1052,13 +1086,17 @@ pub async fn script_execute_pre_request(
         });
     }
 
-    tokio::task::spawn_blocking(move || run_script_sync(script_data, true))
+    let proxy_settings = proxy_state.snapshot();
+    tokio::task::spawn_blocking(move || run_script_sync(script_data, true, proxy_settings))
         .await
         .map_err(|e| format!("Script execution failed: {}", e))
 }
 
 #[tauri::command]
-pub async fn script_execute_test(script_data: ScriptExecutionData) -> Result<ScriptResult, String> {
+pub async fn script_execute_test(
+    proxy_state: State<'_, ProxyState>,
+    script_data: ScriptExecutionData,
+) -> Result<ScriptResult, String> {
     if script_data.script.trim().is_empty() {
         return Ok(ScriptResult {
             success: true,
@@ -1070,7 +1108,8 @@ pub async fn script_execute_test(script_data: ScriptExecutionData) -> Result<Scr
         });
     }
 
-    tokio::task::spawn_blocking(move || run_script_sync(script_data, false))
+    let proxy_settings = proxy_state.snapshot();
+    tokio::task::spawn_blocking(move || run_script_sync(script_data, false, proxy_settings))
         .await
         .map_err(|e| format!("Script execution failed: {}", e))
 }
@@ -1096,7 +1135,7 @@ mod tests {
             request,
             ..Default::default()
         }));
-        let result = execute_script(script, ctx.clone(), true);
+        let result = execute_script(script, ctx.clone(), true, ProxySettings::default());
         let request = ctx.borrow().request.clone();
         (result, request)
     }
@@ -1207,6 +1246,7 @@ mod tests {
             r#"request.url = "https://changed.example.com";"#,
             ctx.clone(),
             false,
+            ProxySettings::default(),
         )
         .expect("script should execute");
         assert_eq!(ctx.borrow().request["url"], json!("https://example.com"));
@@ -1218,7 +1258,7 @@ mod tests {
             request: default_request(),
             ..Default::default()
         }));
-        let result = execute_script(script, ctx.clone(), false);
+        let result = execute_script(script, ctx.clone(), false, ProxySettings::default());
         let env = ctx.borrow().environment_changes.clone();
         (result, env)
     }
@@ -1478,11 +1518,14 @@ mod tests {
             environment.set('status', String(res.status));
         "#
         );
-        let result = script_execute_test(ScriptExecutionData {
+        let script_data = ScriptExecutionData {
             script,
             request: default_request(),
             response: None,
             environment: HashMap::new(),
+        };
+        let result = tokio::task::spawn_blocking(move || {
+            run_script_sync(script_data, false, ProxySettings::default())
         })
         .await
         .expect("command should succeed");

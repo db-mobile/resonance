@@ -1,9 +1,11 @@
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::State;
+
+use super::http_client::{build_http_client, HttpClientOptions};
+use super::proxy::ProxyState;
 
 /// OAuth 2.0 Configuration for token requests
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -206,13 +208,30 @@ pub fn oauth2_build_authorization_url(params: AuthorizationUrlParams) -> Result<
     Ok(url.to_string())
 }
 
-/// Exchange credentials for an OAuth 2.0 access token
+/// Exchange credentials for an OAuth 2.0 access token.
+///
+/// Built through [`build_http_client`] so the token endpoint is reached through
+/// the configured proxy, as the request whose token this is will be.
 #[tauri::command]
-pub async fn oauth2_get_token(config: OAuth2Config) -> Result<OAuth2TokenResponse, String> {
-    let client = Client::builder()
-        .user_agent(format!("resonance/{}", env!("CARGO_PKG_VERSION")))
-        .build()
-        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+pub async fn oauth2_get_token(
+    proxy_state: State<'_, ProxyState>,
+    config: OAuth2Config,
+) -> Result<OAuth2TokenResponse, String> {
+    let proxy_action = proxy_state.get_proxy_config(&config.token_url);
+    let client = build_http_client(
+        HttpClientOptions {
+            user_agent: format!("resonance/{}", env!("CARGO_PKG_VERSION")),
+            timeout: None,
+            connect_timeout: None,
+            http_version: None,
+            verify_ssl: true,
+            client_cert: None,
+            follow_redirects: true,
+            disable_pooling: false,
+        },
+        proxy_action,
+    )
+    .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
     let mut form_params: HashMap<String, String> = HashMap::new();
 

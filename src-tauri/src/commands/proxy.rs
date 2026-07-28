@@ -109,40 +109,39 @@ pub enum ProxyAction {
     Manual(Box<Proxy>),
 }
 
-impl ProxyState {
-    pub fn get_proxy_config(&self, url: &str) -> ProxyAction {
-        let settings = self.settings.read().unwrap();
-
-        if !settings.enabled {
+impl ProxySettings {
+    /// Resolve the proxy decision for `url` from a settings snapshot. Lives on
+    /// the settings rather than on [`ProxyState`] so callers that only hold a
+    /// clone — script `sendRequest`, which runs on a blocking thread with no
+    /// access to Tauri state — reach the same decision as the HTTP path.
+    pub fn proxy_action(&self, url: &str) -> ProxyAction {
+        if !self.enabled {
             return ProxyAction::Disable;
         }
 
-        if self.should_bypass(url, &settings.bypass_list) {
+        if Self::should_bypass(url, &self.bypass_list) {
             return ProxyAction::Disable;
         }
 
-        if settings.use_system_proxy {
+        if self.use_system_proxy {
             return ProxyAction::UseSystem;
         }
 
-        let proxy_url = format!(
-            "{}://{}:{}",
-            settings.proxy_type, settings.host, settings.port
-        );
+        let proxy_url = format!("{}://{}:{}", self.proxy_type, self.host, self.port);
 
         let mut proxy = match Proxy::all(&proxy_url) {
             Ok(p) => p,
             Err(_) => return ProxyAction::Disable,
         };
 
-        if settings.auth.enabled && !settings.auth.username.is_empty() {
-            proxy = proxy.basic_auth(&settings.auth.username, &settings.auth.password);
+        if self.auth.enabled && !self.auth.username.is_empty() {
+            proxy = proxy.basic_auth(&self.auth.username, &self.auth.password);
         }
 
         ProxyAction::Manual(Box::new(proxy))
     }
 
-    fn should_bypass(&self, url: &str, bypass_list: &[String]) -> bool {
+    fn should_bypass(url: &str, bypass_list: &[String]) -> bool {
         if let Ok(parsed) = url::Url::parse(url) {
             if let Some(host) = parsed.host_str() {
                 for pattern in bypass_list {
@@ -168,6 +167,18 @@ impl ProxyState {
             }
         }
         false
+    }
+}
+
+impl ProxyState {
+    pub fn get_proxy_config(&self, url: &str) -> ProxyAction {
+        self.settings.read().unwrap().proxy_action(url)
+    }
+
+    /// Snapshot of the current settings, for callers that need to resolve a
+    /// proxy off the Tauri state thread.
+    pub fn snapshot(&self) -> ProxySettings {
+        self.settings.read().unwrap().clone()
     }
 }
 
@@ -383,6 +394,44 @@ mod tests {
         let state = state_with(enabled_manual());
         assert!(matches!(
             state.get_proxy_config("https://example.com"),
+            ProxyAction::Manual(_)
+        ));
+    }
+
+    /// A settings snapshot must reach the same decision as the live state, so
+    /// script `sendRequest` proxies exactly as the main request path does.
+    #[test]
+    fn a_snapshot_resolves_the_same_action_as_the_state() {
+        let state = state_with(enabled_manual());
+        let snapshot = state.snapshot();
+
+        assert!(matches!(
+            snapshot.proxy_action("https://example.com"),
+            ProxyAction::Manual(_)
+        ));
+        assert!(matches!(
+            ProxySettings::default().proxy_action("https://example.com"),
+            ProxyAction::Disable
+        ));
+    }
+
+    #[test]
+    fn a_bypassed_host_disables_the_proxy() {
+        let settings = ProxySettings {
+            bypass_list: vec!["*.internal.test".to_string(), "localhost".to_string()],
+            ..enabled_manual()
+        };
+
+        assert!(matches!(
+            settings.proxy_action("https://api.internal.test/v1"),
+            ProxyAction::Disable
+        ));
+        assert!(matches!(
+            settings.proxy_action("http://localhost:8080"),
+            ProxyAction::Disable
+        ));
+        assert!(matches!(
+            settings.proxy_action("https://example.com"),
             ProxyAction::Manual(_)
         ));
     }
