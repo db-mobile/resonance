@@ -160,17 +160,60 @@ export class RunnerService {
             throw new Error('Runner not found');
         }
 
+        return this._execute(runner, {
+            runnerId,
+            runnerName: runner.name,
+            onProgress,
+            onFinish: () => this.repository.updateLastRun(runnerId)
+        });
+    }
+
+    /**
+     * Executes runner data directly without requiring a saved runner
+     *
+     * @async
+     * @param {Object} runnerData - Runner configuration with requests array
+     * @param {Function} [onProgress] - Progress callback (requestIndex, total, result)
+     * @returns {Promise<Object>} Execution results
+     */
+    async executeRunnerData(runnerData, onProgress) {
+        if (this.isRunning) {
+            throw new Error('A runner is already executing');
+        }
+
+        return this._execute(runnerData, {
+            runnerId: null,
+            runnerName: runnerData.name || 'Untitled Runner',
+            onProgress
+        });
+    }
+
+    /**
+     * Runs a request sequence, chaining variables between requests.
+     *
+     * @private
+     * @async
+     * @param {Object} runner - Runner-shaped object supplying `requests` and `options`
+     * @param {Object} identity - Run identity and hooks
+     * @param {string|null} identity.runnerId - Saved runner ID, or null for an unsaved run
+     * @param {string} identity.runnerName - Name to report in the results
+     * @param {Function} [identity.onProgress] - Progress callback (requestIndex, total, result)
+     * @param {Function} [identity.onFinish] - Awaited in the `finally`, before run-completed
+     * @returns {Promise<Object>} Execution results
+     * @throws {Error} If the runner has no requests
+     */
+    async _execute(runner, { runnerId, runnerName, onProgress, onFinish = null }) {
         if (!runner.requests || runner.requests.length === 0) {
             throw new Error('Runner has no requests to execute');
         }
 
         this.isRunning = true;
         this.shouldStop = false;
-        this.currentRunId = runnerId;
+        this.currentRunId = runnerId ?? 'temp';
 
         const results = {
             runnerId,
-            runnerName: runner.name,
+            runnerName,
             startTime: Date.now(),
             endTime: null,
             totalRequests: runner.requests.length,
@@ -229,95 +272,9 @@ export class RunnerService {
             this.shouldStop = false;
             this.currentRunId = null;
 
-            await this.repository.updateLastRun(runnerId);
-
-            this._notifyListeners('run-completed', results);
-        }
-
-        return results;
-    }
-
-    /**
-     * Executes runner data directly without requiring a saved runner
-     *
-     * @async
-     * @param {Object} runnerData - Runner configuration with requests array
-     * @param {Function} [onProgress] - Progress callback (requestIndex, total, result)
-     * @returns {Promise<Object>} Execution results
-     */
-    async executeRunnerData(runnerData, onProgress) {
-        if (this.isRunning) {
-            throw new Error('A runner is already executing');
-        }
-
-        if (!runnerData.requests || runnerData.requests.length === 0) {
-            throw new Error('Runner has no requests to execute');
-        }
-
-        this.isRunning = true;
-        this.shouldStop = false;
-        this.currentRunId = 'temp';
-
-        const results = {
-            runnerId: null,
-            runnerName: runnerData.name || 'Untitled Runner',
-            startTime: Date.now(),
-            endTime: null,
-            totalRequests: runnerData.requests.length,
-            passed: 0,
-            failed: 0,
-            skipped: 0,
-            requests: [],
-            variablesSet: {}
-        };
-
-        let runtimeVariables = {};
-
-        this._notifyListeners('run-started', { runnerId: null, total: runnerData.requests.length });
-
-        try {
-            for (let i = 0; i < runnerData.requests.length; i++) {
-                if (this.shouldStop) {
-                    this._markRemainingAsSkipped(runnerData.requests, results, i, 'Execution stopped by user');
-                    break;
-                }
-
-                const request = runnerData.requests[i];
-                const requestResult = await this._executeRequest(request, runtimeVariables, i);
-
-                results.requests.push(requestResult);
-
-                if (requestResult.httpSuccess && requestResult.variablesSet) {
-                    runtimeVariables = { ...runtimeVariables, ...requestResult.variablesSet };
-                    Object.assign(results.variablesSet, requestResult.variablesSet);
-                }
-
-                if (requestResult.status === 'success') {
-                    results.passed++;
-                } else {
-                    results.failed++;
-                    if (runnerData.options?.stopOnError) {
-                        this._markRemainingAsSkipped(runnerData.requests, results, i + 1, 'Skipped due to previous error');
-                        break;
-                    }
-                }
-
-                if (onProgress) {
-                    onProgress(i, runnerData.requests.length, requestResult);
-                }
-                this._notifyListeners('request-completed', { index: i, result: requestResult });
-
-                if (runnerData.options?.delayMs > 0 && i < runnerData.requests.length - 1) {
-                    await this._delay(runnerData.options.delayMs);
-                }
+            if (onFinish) {
+                await onFinish();
             }
-        } finally {
-            results.endTime = Date.now();
-            results.totalTime = results.endTime - results.startTime;
-
-            this.isRunning = false;
-            this.shouldStop = false;
-            this.currentRunId = null;
 
             this._notifyListeners('run-completed', results);
         }

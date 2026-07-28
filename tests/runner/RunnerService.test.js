@@ -875,6 +875,98 @@ describe('RunnerService', () => {
         });
     });
 
+    describe('saved vs unsaved runs differ only in identity and last-run bookkeeping', () => {
+        beforeEach(() => {
+            service._executeRequest = jest
+                .fn()
+                .mockResolvedValue({ index: 0, status: 'success', httpSuccess: true, variablesSet: {} });
+        });
+
+        test('a saved run carries its id and name and stamps last-run', async () => {
+            mockRepository.getById.mockResolvedValue({
+                id: 'runner_1',
+                name: 'Smoke',
+                requests: [{}],
+                options: {}
+            });
+            const started = [];
+            service.addListener((event, data) => {
+                if (event === 'run-started') {
+                    started.push(data);
+                }
+            });
+
+            const results = await service.executeRunner('runner_1');
+
+            expect(results.runnerId).toBe('runner_1');
+            expect(results.runnerName).toBe('Smoke');
+            expect(started).toEqual([{ runnerId: 'runner_1', total: 1 }]);
+            expect(mockRepository.updateLastRun).toHaveBeenCalledWith('runner_1');
+        });
+
+        test('an unsaved run has a null id, a default name, and never stamps last-run', async () => {
+            const started = [];
+            service.addListener((event, data) => {
+                if (event === 'run-started') {
+                    started.push(data);
+                }
+            });
+
+            const results = await service.executeRunnerData({ requests: [{}], options: {} });
+
+            expect(results.runnerId).toBeNull();
+            expect(results.runnerName).toBe('Untitled Runner');
+            expect(started).toEqual([{ runnerId: null, total: 1 }]);
+            expect(mockRepository.updateLastRun).not.toHaveBeenCalled();
+        });
+
+        test('a saved runner with no name keeps its name undefined', async () => {
+            mockRepository.getById.mockResolvedValue({ id: 'runner_1', requests: [{}], options: {} });
+
+            const results = await service.executeRunner('runner_1');
+
+            expect(results.runnerName).toBeUndefined();
+        });
+
+        test('an unsaved run keeps an explicit name', async () => {
+            const results = await service.executeRunnerData({ name: 'Ad hoc', requests: [{}], options: {} });
+
+            expect(results.runnerName).toBe('Ad hoc');
+        });
+
+        test('both paths release the running lock and emit run-completed', async () => {
+            mockRepository.getById.mockResolvedValue({ id: 'runner_1', name: 'S', requests: [{}], options: {} });
+            const completed = [];
+            service.addListener((event, data) => {
+                if (event === 'run-completed') {
+                    completed.push(data);
+                }
+            });
+
+            await service.executeRunner('runner_1');
+            expect(service.isRunning).toBe(false);
+            expect(service.currentRunId).toBeNull();
+
+            await service.executeRunnerData({ requests: [{}], options: {} });
+            expect(service.isRunning).toBe(false);
+            expect(service.currentRunId).toBeNull();
+
+            expect(completed).toHaveLength(2);
+            expect(completed[0].runnerId).toBe('runner_1');
+            expect(completed[1].runnerId).toBeNull();
+        });
+
+        test('a saved run still stamps last-run when a request throws', async () => {
+            mockRepository.getById.mockResolvedValue({ id: 'runner_1', name: 'S', requests: [{}], options: {} });
+            service._executeRequest = jest.fn().mockRejectedValue(new Error('boom'));
+
+            await expect(service.executeRunner('runner_1')).rejects.toThrow('boom');
+
+            expect(mockRepository.updateLastRun).toHaveBeenCalledWith('runner_1');
+            expect(service.isRunning).toBe(false);
+        });
+    });
+
     describe('executeRunnerData aggregation', () => {
         test('counts assertion failures as failed and still chains their variables', async () => {
             service._executeRequest = jest

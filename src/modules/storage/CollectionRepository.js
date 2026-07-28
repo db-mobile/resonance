@@ -248,11 +248,7 @@ export class CollectionRepository {
     }
 
     /**
-     * Reads one field from an endpoint's sidecar data, falling back to that
-     * field's empty value.
-     *
-     * `_getEndpointData` already absorbs read failures and yields `{}`, so a
-     * missing file and an absent field are the same case here.
+     * Reads one sidecar field, falling back to `empty` (`_getEndpointData` already absorbs read failures).
      *
      * @private
      * @async
@@ -268,8 +264,7 @@ export class CollectionRepository {
     }
 
     /**
-     * Writes one field of an endpoint's sidecar data, leaving its siblings
-     * intact, and labels any write failure with the field it was saving.
+     * Writes one sidecar field, leaving its siblings intact.
      *
      * @private
      * @async
@@ -422,17 +417,13 @@ export class CollectionRepository {
     }
 
     /**
-     * Merges a scope's stored secrets back into an auth config read from disk.
-     *
-     * The persisted copy holds empty placeholders where literal credentials were,
-     * so this is what makes a config usable for building a request.
+     * Merges a scope's stored secrets back into a persisted auth config.
      *
      * @private
      * @async
      * @param {string} scope - SecretStore scope owning this config's secrets
      * @param {Object|null} authConfig - The redacted config as persisted
-     * @returns {Promise<Object|null>} The hydrated config, or the input unchanged
-     *   when there is nothing to merge
+     * @returns {Promise<Object|null>} The hydrated config, or the input unchanged when there is nothing to merge
      */
     async _hydrateAuthConfig(scope, authConfig) {
         if (!authConfig || !this.secretStore) {
@@ -443,20 +434,13 @@ export class CollectionRepository {
     }
 
     /**
-     * Moves an auth config's literal credentials into a SecretStore scope and
-     * returns the redacted copy that is safe to persist.
-     *
-     * Secrets the config no longer carries are deleted from the scope, so a
-     * credential cannot outlive the field that held it — switching a field from
-     * a literal to a `{{template}}`, or changing auth type entirely, must not
-     * leave the old value behind in the keychain.
+     * Moves literal credentials into `scope`, prunes ones the config dropped, and returns the redacted copy.
      *
      * @private
      * @async
      * @param {string} scope - SecretStore scope to own this config's secrets
      * @param {Object|null} authConfig - The config as supplied by the caller
-     * @returns {Promise<Object|null>} The redacted config to persist, or the
-     *   input unchanged when there is no secret store to split into
+     * @returns {Promise<Object|null>} The redacted config to persist, or the input unchanged when there is no secret store
      */
     async _persistAuthSecrets(scope, authConfig) {
         if (!authConfig || !this.secretStore) {
