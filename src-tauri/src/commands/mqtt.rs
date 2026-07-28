@@ -32,6 +32,9 @@ struct MqttConnection {
     client: AsyncClient,
     poll_handle: JoinHandle<()>,
     config_key: String,
+    /// Kept so failures raised outside the connect path — a publish error, say —
+    /// can still name the broker in their event.
+    broker: String,
 }
 
 pub struct MqttState {
@@ -109,6 +112,51 @@ struct MqttEventPayload {
     message: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     qos: Option<u8>,
+}
+
+impl MqttEventPayload {
+    fn new(tab_id: &str, broker: &str, event_type: &str) -> Self {
+        Self {
+            tab_id: tab_id.to_string(),
+            event_type: event_type.to_string(),
+            broker: broker.to_string(),
+            topic: None,
+            message: None,
+            qos: None,
+        }
+    }
+
+    fn connect(tab_id: &str, broker: &str) -> Self {
+        Self::new(tab_id, broker, "connect")
+    }
+
+    fn disconnect(tab_id: &str, broker: &str) -> Self {
+        Self::new(tab_id, broker, "disconnect")
+    }
+
+    fn message(tab_id: &str, broker: &str, topic: String, body: String, qos: u8) -> Self {
+        Self {
+            topic: Some(topic),
+            message: Some(body),
+            qos: Some(qos),
+            ..Self::new(tab_id, broker, "message")
+        }
+    }
+
+    fn error(tab_id: &str, broker: &str, message: String) -> Self {
+        Self {
+            message: Some(message),
+            ..Self::new(tab_id, broker, "error")
+        }
+    }
+
+    /// A failure that concerns one topic rather than the connection as a whole.
+    fn error_on_topic(tab_id: &str, broker: &str, topic: String, message: String) -> Self {
+        Self {
+            topic: Some(topic),
+            ..Self::error(tab_id, broker, message)
+        }
+    }
 }
 
 fn emit_event(app: &AppHandle, payload: MqttEventPayload) {
@@ -268,28 +316,20 @@ async fn establish_connection(
                 Ok(Event::Incoming(Packet::ConnAck(_))) => {
                     emit_event(
                         &poll_app,
-                        MqttEventPayload {
-                            tab_id: poll_tab_id.clone(),
-                            event_type: "connect".to_string(),
-                            broker: poll_broker.clone(),
-                            topic: None,
-                            message: None,
-                            qos: None,
-                        },
+                        MqttEventPayload::connect(&poll_tab_id, &poll_broker),
                     );
                 }
                 Ok(Event::Incoming(Packet::Publish(publish))) => {
                     let body = String::from_utf8_lossy(&publish.payload).to_string();
                     emit_event(
                         &poll_app,
-                        MqttEventPayload {
-                            tab_id: poll_tab_id.clone(),
-                            event_type: "message".to_string(),
-                            broker: poll_broker.clone(),
-                            topic: Some(publish.topic.clone()),
-                            message: Some(body),
-                            qos: Some(publish.qos as u8),
-                        },
+                        MqttEventPayload::message(
+                            &poll_tab_id,
+                            &poll_broker,
+                            publish.topic.clone(),
+                            body,
+                            publish.qos as u8,
+                        ),
                     );
                 }
                 Ok(Event::Incoming(Packet::Disconnect)) => {
@@ -299,14 +339,7 @@ async fn establish_connection(
                 Err(error) => {
                     emit_event(
                         &poll_app,
-                        MqttEventPayload {
-                            tab_id: poll_tab_id.clone(),
-                            event_type: "error".to_string(),
-                            broker: poll_broker.clone(),
-                            topic: None,
-                            message: Some(error.to_string()),
-                            qos: None,
-                        },
+                        MqttEventPayload::error(&poll_tab_id, &poll_broker, error.to_string()),
                     );
                     break;
                 }
@@ -318,14 +351,7 @@ async fn establish_connection(
         // not run — the frontend already handles UI cleanup in those paths.
         emit_event(
             &poll_app,
-            MqttEventPayload {
-                tab_id: poll_tab_id.clone(),
-                event_type: "disconnect".to_string(),
-                broker: poll_broker.clone(),
-                topic: None,
-                message: None,
-                qos: None,
-            },
+            MqttEventPayload::disconnect(&poll_tab_id, &poll_broker),
         );
         remove_connection(&poll_state, &poll_tab_id).await;
     });
@@ -336,6 +362,7 @@ async fn establish_connection(
             client: client.clone(),
             poll_handle,
             config_key,
+            broker: request.broker.clone(),
         },
     );
     drop(connections);
@@ -358,14 +385,7 @@ pub async fn mqtt_connect(
         Err(error) => {
             emit_event(
                 &app,
-                MqttEventPayload {
-                    tab_id: request.tab_id.clone(),
-                    event_type: "error".to_string(),
-                    broker: request.broker.clone(),
-                    topic: None,
-                    message: Some(error.clone()),
-                    qos: None,
-                },
+                MqttEventPayload::error(&request.tab_id, &request.broker, error.clone()),
             );
             return Err(error);
         }
@@ -407,14 +427,7 @@ pub async fn mqtt_connect(
             Err(error) => {
                 emit_event(
                     &app,
-                    MqttEventPayload {
-                        tab_id: request.tab_id.clone(),
-                        event_type: "error".to_string(),
-                        broker: request.broker.clone(),
-                        topic: None,
-                        message: Some(error.clone()),
-                        qos: None,
-                    },
+                    MqttEventPayload::error(&request.tab_id, &request.broker, error.clone()),
                 );
                 return Err(error);
             }
@@ -431,14 +444,12 @@ pub async fn mqtt_connect(
             let message = format!("Failed to subscribe to '{}': {}", topic.trim(), error);
             emit_event(
                 &app,
-                MqttEventPayload {
-                    tab_id: request.tab_id.clone(),
-                    event_type: "error".to_string(),
-                    broker: request.broker.clone(),
-                    topic: Some(topic.trim().to_string()),
-                    message: Some(message.clone()),
-                    qos: None,
-                },
+                MqttEventPayload::error_on_topic(
+                    &request.tab_id,
+                    &request.broker,
+                    topic.trim().to_string(),
+                    message.clone(),
+                ),
             );
             return Err(message);
         }
@@ -457,14 +468,15 @@ pub async fn mqtt_publish(
         return Err("Publish topic is required".to_string());
     }
 
-    let client = {
+    let connection = {
         let connections = state.connections.lock().await;
         connections
             .get(&request.tab_id)
-            .map(|connection| connection.client.clone())
+            .map(|connection| (connection.client.clone(), connection.broker.clone()))
     };
 
-    let client = client.ok_or_else(|| "Not connected to an MQTT broker".to_string())?;
+    let (client, broker) =
+        connection.ok_or_else(|| "Not connected to an MQTT broker".to_string())?;
 
     let qos = qos_from_u8(request.qos.unwrap_or(0));
     let payload = request.payload.unwrap_or_default();
@@ -477,14 +489,12 @@ pub async fn mqtt_publish(
             let message = format!("Failed to publish to '{}': {}", request.topic.trim(), error);
             emit_event(
                 &app,
-                MqttEventPayload {
-                    tab_id: request.tab_id.clone(),
-                    event_type: "error".to_string(),
-                    broker: String::new(),
-                    topic: Some(request.topic.trim().to_string()),
-                    message: Some(message.clone()),
-                    qos: None,
-                },
+                MqttEventPayload::error_on_topic(
+                    &request.tab_id,
+                    &broker,
+                    request.topic.trim().to_string(),
+                    message.clone(),
+                ),
             );
             message
         })?;
@@ -512,6 +522,57 @@ pub async fn mqtt_close(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The payload is a frontend contract, so pin what each constructor emits
+    /// and — just as importantly — what it leaves out.
+    #[test]
+    fn payload_constructors_emit_the_expected_wire_shapes() {
+        let json = |payload: MqttEventPayload| serde_json::to_value(payload).unwrap();
+
+        let connect = json(MqttEventPayload::connect("tab-1", "mqtt://broker:1883"));
+        assert_eq!(connect["tabId"], "tab-1");
+        assert_eq!(connect["eventType"], "connect");
+        assert_eq!(connect["broker"], "mqtt://broker:1883");
+        assert!(connect.get("topic").is_none());
+        assert!(connect.get("message").is_none());
+        assert!(connect.get("qos").is_none());
+
+        let message = json(MqttEventPayload::message(
+            "tab-1",
+            "mqtt://broker:1883",
+            "sensors/temp".to_string(),
+            "21.5".to_string(),
+            1,
+        ));
+        assert_eq!(message["eventType"], "message");
+        assert_eq!(message["topic"], "sensors/temp");
+        assert_eq!(message["message"], "21.5");
+        assert_eq!(message["qos"], 1);
+
+        let error = json(MqttEventPayload::error(
+            "tab-1",
+            "mqtt://broker:1883",
+            "boom".to_string(),
+        ));
+        assert_eq!(error["eventType"], "error");
+        assert_eq!(error["message"], "boom");
+        assert!(error.get("topic").is_none());
+
+        let topic_error = json(MqttEventPayload::error_on_topic(
+            "tab-1",
+            "mqtt://broker:1883",
+            "sensors/temp".to_string(),
+            "boom".to_string(),
+        ));
+        assert_eq!(topic_error["eventType"], "error");
+        assert_eq!(topic_error["topic"], "sensors/temp");
+        assert_eq!(topic_error["message"], "boom");
+
+        assert_eq!(
+            json(MqttEventPayload::disconnect("tab-1", "mqtt://broker:1883"))["eventType"],
+            "disconnect"
+        );
+    }
 
     #[test]
     fn base_options_raise_packet_size_above_default() {

@@ -73,6 +73,23 @@ pub struct EndpointData {
     pub response_schema: Option<Value>,
 }
 
+impl EndpointData {
+    /// True when the legacy store held anything worth writing to an endpoint
+    /// file. Only the fields the migration populates are considered; the rest
+    /// are always `None` on this path.
+    fn has_migrated_content(&self) -> bool {
+        self.modified_body.is_some()
+            || !self.path_params.is_empty()
+            || !self.query_params.is_empty()
+            || !self.headers.is_empty()
+            || self.auth_config.is_some()
+            || self.url.is_some()
+            || self.scripts.is_some()
+            || self.graphql_data.is_some()
+            || self.grpc_data.is_some()
+    }
+}
+
 fn get_default_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let app_data_dir = app
         .path()
@@ -81,18 +98,63 @@ fn get_default_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir.join(COLLECTIONS_DIR))
 }
 
-/// Get the collections directory path for user reference
-fn get_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    get_default_collections_dir(app)
-}
-
-fn ensure_default_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn ensure_default_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = get_default_collections_dir(app)?;
     if !dir.exists() {
         fs::create_dir_all(&dir).map_err(|e| format!("Failed to create collections dir: {}", e))?;
     }
     restrict_dir(&dir);
     Ok(dir)
+}
+
+/// The on-disk layout of one collection, resolved once so the filenames live in
+/// a single place rather than being re-joined at every call site.
+pub(crate) struct CollectionPaths {
+    pub dir: PathBuf,
+}
+
+impl CollectionPaths {
+    /// Resolve a registered collection, reporting it missing if the index has
+    /// no usable entry.
+    fn resolve(app: &AppHandle, collection_id: &str) -> Result<Self, String> {
+        let dir = resolve_collection_dir(app, collection_id)?
+            .ok_or_else(|| format!("Collection {} not found", collection_id))?;
+        Ok(Self { dir })
+    }
+
+    pub(crate) fn from_dir(dir: PathBuf) -> Self {
+        Self { dir }
+    }
+
+    fn of(dir: &Path) -> Self {
+        Self::from_dir(dir.to_path_buf())
+    }
+
+    pub(crate) fn collection_json(&self) -> PathBuf {
+        self.dir.join("collection.json")
+    }
+
+    pub(crate) fn requests(&self) -> PathBuf {
+        self.dir.join("requests")
+    }
+
+    pub(crate) fn variables_json(&self) -> PathBuf {
+        self.dir.join("variables.json")
+    }
+
+    /// Create the requests directory if it is missing, and restrict it either
+    /// way. Restricting unconditionally is deliberate: a directory that already
+    /// exists may predate the hardening, or have been created by an older
+    /// version under a looser umask.
+    pub(crate) fn ensure_requests(&self) -> Result<PathBuf, String> {
+        let requests = self.requests();
+        if !requests.exists() {
+            fs::create_dir_all(&requests)
+                .map_err(|e| format!("Failed to create requests dir: {}", e))?;
+        }
+        restrict_dir(&requests);
+        Ok(requests)
+    }
 }
 
 fn get_collection_index(app: &AppHandle) -> Result<HashMap<String, String>, String> {
@@ -158,7 +220,7 @@ fn save_last_collection_directory(app: &AppHandle, dir: &Path) {
     }
 }
 
-fn write_json_file<T: Serialize>(path: &PathBuf, data: &T) -> Result<(), String> {
+pub(crate) fn write_json_file<T: Serialize>(path: &PathBuf, data: &T) -> Result<(), String> {
     let json = serde_json::to_string_pretty(data)
         .map_err(|e| format!("Failed to serialize JSON: {}", e))?;
     fs::write(path, json).map_err(|e| format!("Failed to write file: {}", e))?;
@@ -222,12 +284,11 @@ fn read_json_file<T: for<'de> Deserialize<'de>>(path: &PathBuf) -> Result<T, Str
 }
 
 fn is_collection_dir(path: &Path) -> bool {
-    path.is_dir() && path.join("collection.json").exists()
+    path.is_dir() && CollectionPaths::of(path).collection_json().exists()
 }
 
 fn read_collection_from_dir(path: &Path) -> Result<Collection, String> {
-    let collection_file = path.join("collection.json");
-    let mut collection: Collection = read_json_file(&collection_file)?;
+    let mut collection: Collection = read_json_file(&CollectionPaths::of(path).collection_json())?;
     collection.storage_path = Some(path.to_string_lossy().to_string());
     Ok(collection)
 }
@@ -386,7 +447,7 @@ fn sync_endpoint_data_file_names(
     collection_dir: &Path,
     collection: &Collection,
 ) -> Result<(), String> {
-    let requests_dir = collection_dir.join("requests");
+    let requests_dir = CollectionPaths::of(collection_dir).requests();
     if !requests_dir.exists() {
         return Ok(());
     }
@@ -502,8 +563,10 @@ pub(crate) fn persist_collection(
         }
     }
 
-    let collection_file = target_dir.join("collection.json");
-    write_json_file(&collection_file, &persisted)?;
+    write_json_file(
+        &CollectionPaths::of(&target_dir).collection_json(),
+        &persisted,
+    )?;
     sync_endpoint_data_file_names(&target_dir, &persisted)?;
     register_collection_path(app, &persisted.id, &target_dir)?;
 
@@ -575,11 +638,10 @@ pub async fn collections_get_all(app: AppHandle) -> Result<Vec<Collection>, Stri
 
 #[tauri::command]
 pub async fn collection_get(app: AppHandle, collection_id: String) -> Result<Collection, String> {
-    let collection_dir = resolve_collection_dir(&app, &collection_id)?
-        .ok_or_else(|| format!("Collection {} not found", collection_id))?;
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
 
-    let collection = read_collection_from_dir(&collection_dir)?;
-    register_collection_path(&app, &collection.id, &collection_dir)?;
+    let collection = read_collection_from_dir(&paths.dir)?;
+    register_collection_path(&app, &collection.id, &paths.dir)?;
     Ok(collection)
 }
 
@@ -609,9 +671,7 @@ pub async fn collection_get_endpoint_data(
     collection_id: String,
     endpoint_id: String,
 ) -> Result<EndpointData, String> {
-    let collection_dir = resolve_collection_dir(&app, &collection_id)?
-        .ok_or_else(|| format!("Collection {} not found", collection_id))?;
-    let requests_dir = collection_dir.join("requests");
+    let requests_dir = CollectionPaths::resolve(&app, &collection_id)?.requests();
 
     let Some(endpoint_file) = find_endpoint_data_file(&requests_dir, &endpoint_id)? else {
         return Ok(EndpointData::default());
@@ -633,19 +693,13 @@ pub async fn collection_save_endpoint_data(
     }
 
     let collection = collection_get(app.clone(), collection_id.clone()).await?;
-    let collection_dir = PathBuf::from(
+    let paths = CollectionPaths::from_dir(PathBuf::from(
         collection
             .storage_path
             .clone()
             .ok_or_else(|| "Collection storage path missing".to_string())?,
-    );
-    let requests_dir = collection_dir.join("requests");
-
-    if !requests_dir.exists() {
-        fs::create_dir_all(&requests_dir)
-            .map_err(|e| format!("Failed to create requests dir: {}", e))?;
-    }
-    restrict_dir(&requests_dir);
+    ));
+    let requests_dir = paths.ensure_requests()?;
 
     let endpoint_name = find_endpoint_name_in_collection(&collection, &endpoint_id)
         .unwrap_or_else(|| endpoint_id.clone());
@@ -671,9 +725,7 @@ pub async fn collection_delete_endpoint_data(
     collection_id: String,
     endpoint_id: String,
 ) -> Result<(), String> {
-    let collection_dir = resolve_collection_dir(&app, &collection_id)?
-        .ok_or_else(|| format!("Collection {} not found", collection_id))?;
-    let requests_dir = collection_dir.join("requests");
+    let requests_dir = CollectionPaths::resolve(&app, &collection_id)?.requests();
 
     if let Some(endpoint_file) = find_endpoint_data_file(&requests_dir, &endpoint_id)? {
         fs::remove_file(&endpoint_file)
@@ -688,9 +740,7 @@ pub async fn collection_get_variables(
     app: AppHandle,
     collection_id: String,
 ) -> Result<Vec<Value>, String> {
-    let collection_dir = resolve_collection_dir(&app, &collection_id)?
-        .ok_or_else(|| format!("Collection {} not found", collection_id))?;
-    let variables_file = collection_dir.join("variables.json");
+    let variables_file = CollectionPaths::resolve(&app, &collection_id)?.variables_json();
 
     if !variables_file.exists() {
         return Ok(vec![]);
@@ -705,8 +755,7 @@ pub async fn collection_save_variables(
     collection_id: String,
     mut variables: Vec<Value>,
 ) -> Result<(), String> {
-    let collection_dir = resolve_collection_dir(&app, &collection_id)?
-        .ok_or_else(|| format!("Collection {} not found", collection_id))?;
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
 
     // Defense in depth: a variable flagged secret must never carry its value into the
     // git-friendly variables.json. The real value lives in the frontend SecretStore.
@@ -718,8 +767,7 @@ pub async fn collection_save_variables(
         }
     }
 
-    let variables_file = collection_dir.join("variables.json");
-    write_json_file(&variables_file, &variables)?;
+    write_json_file(&paths.variables_json(), &variables)?;
 
     Ok(())
 }
@@ -780,38 +828,39 @@ pub async fn collections_migrate(app: AppHandle) -> Result<u32, String> {
     Ok(migrated_count)
 }
 
+/// Read one of the legacy global-store maps, defaulting to an empty object so a
+/// key that was never written behaves like one holding nothing.
+fn legacy_map(store: &tauri_plugin_store::Store<tauri::Wry>, key: &str) -> Value {
+    store
+        .get(key)
+        .unwrap_or(Value::Object(serde_json::Map::new()))
+}
+
+fn legacy_string(map: &Value, key: &str) -> Option<String> {
+    map.get(key).and_then(|v| v.as_str()).map(str::to_string)
+}
+
+fn legacy_array(map: &Value, key: &str) -> Vec<Value> {
+    map.get(key)
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default()
+}
+
 fn migrate_endpoint_data(
     app: &AppHandle,
     store: &tauri_plugin_store::Store<tauri::Wry>,
     collection_id: &str,
 ) -> Result<(), String> {
-    let modified_bodies = store
-        .get("modifiedRequestBodies")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let path_params = store
-        .get("persistedPathParams")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let query_params = store
-        .get("persistedQueryParams")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let headers = store
-        .get("persistedHeaders")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let auth_configs = store
-        .get("persistedAuthConfigs")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let urls = store
-        .get("persistedUrls")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let scripts = store
-        .get("persistedScripts")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let graphql_data = store
-        .get("graphqlData")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let grpc_data = store
-        .get("grpcData")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
+    let modified_bodies = legacy_map(store, "modifiedRequestBodies");
+    let path_params = legacy_map(store, "persistedPathParams");
+    let query_params = legacy_map(store, "persistedQueryParams");
+    let headers = legacy_map(store, "persistedHeaders");
+    let auth_configs = legacy_map(store, "persistedAuthConfigs");
+    let urls = legacy_map(store, "persistedUrls");
+    let scripts = legacy_map(store, "persistedScripts");
+    let graphql_data = legacy_map(store, "graphqlData");
+    let grpc_data = legacy_map(store, "grpcData");
 
     let prefix = format!("{}_", collection_id);
     let mut endpoint_ids: HashSet<String> = HashSet::new();
@@ -837,44 +886,23 @@ fn migrate_endpoint_data(
         }
     }
 
-    let collection_dir = resolve_collection_dir(app, collection_id)?
-        .ok_or_else(|| format!("Collection {} not found", collection_id))?;
-    let requests_dir = collection_dir.join("requests");
-
-    if !endpoint_ids.is_empty() && !requests_dir.exists() {
-        fs::create_dir_all(&requests_dir)
-            .map_err(|e| format!("Failed to create requests dir: {}", e))?;
-        restrict_dir(&requests_dir);
-    }
+    let paths = CollectionPaths::resolve(app, collection_id)?;
+    let requests_dir = if endpoint_ids.is_empty() {
+        paths.requests()
+    } else {
+        paths.ensure_requests()?
+    };
 
     for endpoint_id in endpoint_ids {
         let key = format!("{}_{}", collection_id, endpoint_id);
 
         let mut endpoint_data = EndpointData {
-            modified_body: modified_bodies
-                .get(&key)
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            path_params: path_params
-                .get(&key)
-                .and_then(|v| v.as_array())
-                .cloned()
-                .unwrap_or_default(),
-            query_params: query_params
-                .get(&key)
-                .and_then(|v| v.as_array())
-                .cloned()
-                .unwrap_or_default(),
-            headers: headers
-                .get(&key)
-                .and_then(|v| v.as_array())
-                .cloned()
-                .unwrap_or_default(),
+            modified_body: legacy_string(&modified_bodies, &key),
+            path_params: legacy_array(&path_params, &key),
+            query_params: legacy_array(&query_params, &key),
+            headers: legacy_array(&headers, &key),
             auth_config: auth_configs.get(&key).cloned(),
-            url: urls
-                .get(&key)
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
+            url: legacy_string(&urls, &key),
             scripts: scripts.get(&key).cloned(),
             graphql_data: graphql_data.get(&key).cloned(),
             form_body_data: None,
@@ -883,16 +911,7 @@ fn migrate_endpoint_data(
             response_schema: None,
         };
 
-        if endpoint_data.modified_body.is_some()
-            || !endpoint_data.path_params.is_empty()
-            || !endpoint_data.query_params.is_empty()
-            || !endpoint_data.headers.is_empty()
-            || endpoint_data.auth_config.is_some()
-            || endpoint_data.url.is_some()
-            || endpoint_data.scripts.is_some()
-            || endpoint_data.graphql_data.is_some()
-            || endpoint_data.grpc_data.is_some()
-        {
+        if endpoint_data.has_migrated_content() {
             if let Some(auth) = endpoint_data.auth_config.as_mut() {
                 redact_auth_secrets(auth);
             }
@@ -919,10 +938,8 @@ fn migrate_variables(
 
     if let Value::Array(vars) = variables {
         if !vars.is_empty() {
-            let collection_dir = resolve_collection_dir(app, collection_id)?
-                .ok_or_else(|| format!("Collection {} not found", collection_id))?;
-            let variables_file = collection_dir.join("variables.json");
-            write_json_file(&variables_file, &vars)?;
+            let paths = CollectionPaths::resolve(app, collection_id)?;
+            write_json_file(&paths.variables_json(), &vars)?;
         }
     }
 
@@ -931,7 +948,7 @@ fn migrate_variables(
 
 #[tauri::command]
 pub async fn collections_get_path(app: AppHandle) -> Result<String, String> {
-    let path = get_collections_dir(&app)?;
+    let path = get_default_collections_dir(&app)?;
     Ok(path.to_string_lossy().to_string())
 }
 

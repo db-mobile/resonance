@@ -4,6 +4,7 @@ use super::{Collection, Endpoint, Folder, VariableEntry};
 use crate::commands::scripts::ScriptData;
 use serde_json::Value;
 use std::collections::HashSet;
+use std::sync::LazyLock;
 
 /// Script blocks inherited from the Postman collection and ancestor folders,
 /// already prefixed with provenance banners. Postman executes collection,
@@ -470,21 +471,7 @@ fn extract_postman_oauth2(params: Option<&Vec<Value>>) -> Value {
         config.insert("usePkce".to_string(), Value::Bool(use_pkce));
     }
 
-    let mappings = [
-        ("accessTokenUrl", "tokenUrl"),
-        ("authUrl", "authorizationUrl"),
-        ("clientId", "clientId"),
-        ("clientSecret", "clientSecret"),
-        ("scope", "scope"),
-        ("redirect_uri", "redirectUri"),
-        ("username", "username"),
-        ("password", "password"),
-        ("audience", "audience"),
-        ("client_authentication", "clientAuthMethod"),
-        ("headerPrefix", "headerPrefix"),
-        ("accessToken", "token"),
-    ];
-    for (postman_key, app_key) in mappings {
+    for (postman_key, app_key) in super::storage::OAUTH2_KEY_MAP {
         if let Some(value) = auth_param(params, postman_key).filter(|v| !v.is_empty()) {
             config.insert(app_key.to_string(), Value::String(value.to_string()));
         }
@@ -633,9 +620,16 @@ fn extract_postman_url(url: Option<&Value>) -> String {
 
     // Convert Postman :param format to {{param}} format
     // e.g., /posts/:id -> /posts/{{id}}
-    let re = regex::Regex::new(r":([a-zA-Z_][a-zA-Z0-9_]*)").unwrap();
-    re.replace_all(&raw_url, "{{$1}}").to_string()
+    PATH_PARAM_PATTERN
+        .replace_all(&raw_url, "{{$1}}")
+        .to_string()
 }
+
+/// Postman's `:name` path placeholders. Compiled once: this runs per endpoint,
+/// and a large collection re-parsing the pattern thousands of times during an
+/// import is pure waste.
+static PATH_PARAM_PATTERN: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r":([a-zA-Z_][a-zA-Z0-9_]*)").expect("valid regex"));
 
 /// Extract parameters from Postman URL object and request headers
 fn extract_postman_parameters(url: Option<&Value>, request: &Value) -> Option<Value> {

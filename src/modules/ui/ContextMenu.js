@@ -236,25 +236,6 @@ export class ContextMenu {
     }
 
     /**
-     * Creates SVG icon for import action
-     *
-     * @static
-     * @returns {string} SVG markup for import icon
-     */
-    static createImportIcon() {
-        return 'icon-import';
-    }
-
-    /**
-     * Creates script/code icon SVG markup
-     * @static
-     * @returns {string} SVG path markup
-     */
-    static createScriptIcon() {
-        return 'icon-script';
-    }
-
-    /**
      * Creates document/documentation icon
      * @static
      * @returns {string} Icon class name

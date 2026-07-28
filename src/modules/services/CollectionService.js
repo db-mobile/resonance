@@ -3,7 +3,6 @@
  * @module services/CollectionService
  */
 
-import { getCurrentEndpoint, setCurrentEndpoint } from '../state/currentEndpoint.js';
 import { app } from '../appContext.js';
 import {
     getProtocol,
@@ -11,9 +10,8 @@ import {
     deriveMethod,
     deriveHttpMethod
 } from '../protocols/protocolRegistry.js';
-import { setRequestBodyContent, getRequestBodyContent } from '../requestBodyHelper.js';
+import { getRequestBodyContent } from '../requestBodyHelper.js';
 import { toast } from '../ui/Toast.js';
-import { notifyUrlUpdated } from '../ui/mirroredUrlSection.js';
 
 /**
  * Service for managing API collection business logic
@@ -37,7 +35,6 @@ export class CollectionService {
         this.repository = repository;
         this.schemaProcessor = schemaProcessor;
         this.statusDisplay = statusDisplay;
-        this.originalBodyValues = new Map();
     }
 
     /**
@@ -515,390 +512,6 @@ export class CollectionService {
         }
     }
 
-    /**
-     * Loads an endpoint into the request form
-     *
-     * Saves current endpoint state before switching, then populates form with
-     * endpoint data including URL, method, parameters, headers, body, and auth.
-     * Uses persisted values if available, otherwise falls back to endpoint defaults.
-     *
-     * @async
-     * @param {Object} collection - The collection containing the endpoint
-     * @param {Object} endpoint - The endpoint to load
-     * @param {Object} formElements - DOM form element references
-     * @param {HTMLInputElement} formElements.urlInput - URL input field
-     * @param {HTMLSelectElement} formElements.methodSelect - Method dropdown
-     * @param {HTMLElement} formElements.pathParamsList - Path params container
-     * @param {HTMLElement} formElements.queryParamsList - Query params container
-     * @param {HTMLElement} formElements.headersList - Headers container
-     * @param {HTMLTextAreaElement} formElements.bodyInput - Request body textarea
-     * @returns {Promise<void>}
-     * @throws {Error} If form population fails
-     */
-    async loadEndpointIntoForm(collection, endpoint, formElements) {
-        try {
-            this.schemaProcessor.setOpenApiSpec(collection._openApiSpec);
-
-            if (getCurrentEndpoint()) {
-                await this.saveRequestBodyModification(
-                    getCurrentEndpoint().collectionId,
-                    getCurrentEndpoint().endpointId,
-                    formElements.bodyInput
-                );
-                await this.saveCurrentPathParams(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId, formElements);
-                await this.saveCurrentQueryParams(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId, formElements);
-                await this.saveCurrentHeaders(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId, formElements);
-                await this.saveCurrentAuthConfig(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
-            }
-            setCurrentEndpoint({ collectionId: collection.id, endpointId: endpoint.id });
-
-            this.populateUrlAndMethod(collection, endpoint, formElements);
-            await this.populatePathParams(endpoint, formElements);
-            await this.populateHeaders(collection, endpoint, formElements);
-            await this.populateQueryParams(endpoint, formElements);
-            await this.populateRequestBody(collection, endpoint, formElements);
-            await this.populateAuthConfig(collection.id, endpoint.id);
-
-            this.statusDisplay.update(`Loaded endpoint: ${endpoint.name}`, null);
-        } catch (error) {
-            this.statusDisplay.update(`Error loading endpoint: ${error.message}`, null);
-            throw error;
-        }
-    }
-
-    /**
-     * Populates URL and HTTP method fields
-     *
-     * Converts path parameters to variable template format ({{paramName}}).
-     *
-     * @private
-     * @param {Object} collection - The collection
-     * @param {Object} endpoint - The endpoint
-     * @param {Object} formElements - Form element references
-     * @returns {void}
-     */
-    populateUrlAndMethod(collection, endpoint, formElements) {
-        let fullUrl = endpoint.path;
-        if (collection.baseUrl && !endpoint.path.includes('{{baseUrl}}')) {
-            fullUrl = `{{baseUrl}}${  endpoint.path}`;
-        }
-
-        if (endpoint.parameters?.path) {
-            Object.entries(endpoint.parameters.path).forEach(([key, _param]) => {
-                const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const singleBraceParamRegex = new RegExp(`(?<!\\{)\\{${escapedKey}\\}(?!\\})`, 'g');
-                fullUrl = fullUrl.replace(singleBraceParamRegex, `{{${key}}}`);
-            });
-        }
-
-        formElements.urlInput.value = fullUrl;
-        formElements.methodSelect.value = endpoint.method;
-    }
-
-    /**
-     * Populates path parameters from endpoint or persisted data
-     *
-     * @async
-     * @private
-     * @param {Object} endpoint - The endpoint object
-     * @param {Object} formElements - Form element references
-     * @returns {Promise<void>}
-     */
-    async populatePathParams(endpoint, formElements) {
-        this.clearKeyValueList(formElements.pathParamsList);
-
-        const persistedPathParams = await this.repository.getPersistedPathParams(getCurrentEndpoint().collectionId, endpoint.id);
-
-        if (persistedPathParams.length > 0) {
-            persistedPathParams.forEach(param => {
-                this.addKeyValueRow(formElements.pathParamsList, param.key, param.value);
-            });
-        } else if (endpoint.parameters?.path) {
-                Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
-                    const value = param.example || '';
-                    this.addKeyValueRow(formElements.pathParamsList, key, value);
-                });
-            }
-
-        if (formElements.pathParamsList.children.length === 0) {
-            this.addKeyValueRow(formElements.pathParamsList);
-        }
-    }
-
-    /**
-     * Populates headers from collection defaults, endpoint spec, or persisted data
-     *
-     * @async
-     * @private
-     * @param {Object} collection - The collection object
-     * @param {Object} endpoint - The endpoint object
-     * @param {Object} formElements - Form element references
-     * @returns {Promise<void>}
-     */
-    async populateHeaders(collection, endpoint, formElements) {
-        this.clearKeyValueList(formElements.headersList);
-
-        const persistedHeaders = await this.repository.getPersistedHeaders(collection.id, endpoint.id);
-        
-        if (persistedHeaders.length > 0) {
-            persistedHeaders.forEach(header => {
-                this.addKeyValueRow(formElements.headersList, header.key, header.value);
-            });
-        } else {
-            if (collection.defaultHeaders) {
-                Object.entries(collection.defaultHeaders).forEach(([key, value]) => {
-                    this.addKeyValueRow(formElements.headersList, key, value);
-                });
-            }
-
-            if (endpoint.parameters?.header) {
-                Object.entries(endpoint.parameters.header).forEach(([key, param]) => {
-                    this.addKeyValueRow(formElements.headersList, key, param.example || '');
-                });
-            }
-
-            if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-                const contentType = endpoint.requestBody?.contentType || 'application/json';
-                const existingContentType = Array.from(formElements.headersList.children).find(row => {
-                    const keyInput = row.querySelector('.key-input');
-                    return keyInput && keyInput.value.toLowerCase() === 'content-type';
-                });
-                if (!existingContentType) {
-                    this.addKeyValueRow(formElements.headersList, 'Content-Type', contentType);
-                }
-            }
-        }
-
-        if (formElements.headersList.children.length === 0) {
-            this.addKeyValueRow(formElements.headersList);
-        }
-    }
-
-    /**
-     * Populates query parameters from endpoint spec or persisted data
-     *
-     * Also updates URL with encoded query string.
-     *
-     * @async
-     * @private
-     * @param {Object} endpoint - The endpoint object
-     * @param {Object} formElements - Form element references
-     * @returns {Promise<void>}
-     */
-    async populateQueryParams(endpoint, formElements) {
-        this.clearKeyValueList(formElements.queryParamsList);
-
-        const persistedQueryParams = await this.repository.getPersistedQueryParams(getCurrentEndpoint().collectionId, endpoint.id);
-
-        if (persistedQueryParams.length > 0) {
-            persistedQueryParams.forEach(param => {
-                this.addKeyValueRow(formElements.queryParamsList, param.key, param.value);
-            });
-        } else if (endpoint.parameters?.query) {
-                Object.entries(endpoint.parameters.query).forEach(([key, param]) => {
-                    this.addKeyValueRow(formElements.queryParamsList, key, param.example || '');
-                });
-            }
-
-        if (formElements.queryParamsList.children.length === 0) {
-            this.addKeyValueRow(formElements.queryParamsList);
-        }
-
-        this.updateUrlWithQueryParams(formElements);
-    }
-
-    /**
-     * Updates URL input field with encoded query parameters
-     *
-     * Preserves variable placeholders like {{variableName}} during encoding.
-     * Prevents circular updates with setUrlUpdating flag.
-     *
-     * @private
-     * @param {Object} formElements - Form element references
-     * @returns {void}
-     */
-    updateUrlWithQueryParams(formElements) {
-        try {
-            const queryParams = this.parseKeyValuePairs(formElements.queryParamsList);
-            const urlString = formElements.urlInput.value.trim();
-
-            if (!urlString) {
-                return;
-            }
-
-            const questionMarkIndex = urlString.indexOf('?');
-            const baseUrl = questionMarkIndex >= 0 ? urlString.substring(0, questionMarkIndex) : urlString;
-
-            const queryPairs = [];
-            queryParams.forEach(({ key, value }) => {
-                if (key) {
-                    const encodedKey = this.encodeValuePreservingPlaceholders(key);
-                    const encodedValue = this.encodeValuePreservingPlaceholders(value);
-                    queryPairs.push(`${encodedKey}=${encodedValue}`);
-                }
-            });
-
-            const queryString = queryPairs.join('&');
-
-            if (typeof window !== 'undefined' && app.setUrlUpdating) {
-                app.setUrlUpdating(true);
-            }
-
-            formElements.urlInput.value = queryString ? `${baseUrl}?${queryString}` : baseUrl;
-            notifyUrlUpdated(formElements.urlInput);
-
-            if (typeof window !== 'undefined' && app.setUrlUpdating) {
-                setTimeout(() => {
-                    app.setUrlUpdating(false);
-                }, 0);
-            }
-        } catch (error) {
-            if (typeof window !== 'undefined' && app.setUrlUpdating) {
-                app.setUrlUpdating(false);
-            }
-        }
-    }
-
-    /**
-     * URL encodes a value while preserving variable placeholders
-     *
-     * Temporarily replaces {{variableName}} patterns before encoding,
-     * then restores them after encoding.
-     *
-     * @private
-     * @param {string} value - The value to encode
-     * @returns {string} URL-encoded value with preserved placeholders
-     */
-    encodeValuePreservingPlaceholders(value) {
-        const placeholders = [];
-        let index = 0;
-
-        const withPlaceholders = value.replace(/\{\{[^}]+\}\}/g, (match) => {
-            const placeholder = `__PLACEHOLDER_${index}__`;
-            placeholders.push({ placeholder, original: match });
-            index++;
-            return placeholder;
-        });
-
-        const encoded = encodeURIComponent(withPlaceholders);
-
-        let result = encoded;
-        placeholders.forEach(({ placeholder, original }) => {
-            result = result.replace(placeholder, original);
-        });
-
-        return result;
-    }
-
-    /**
-     * Populates request body from persisted data, generated example, or defaults
-     *
-     * @async
-     * @private
-     * @param {Object} collection - The collection object
-     * @param {Object} endpoint - The endpoint object
-     * @param {Object} _formElements - Form element references (unused, kept for API compatibility)
-     * @returns {Promise<void>}
-     */
-    async populateRequestBody(collection, endpoint, _formElements) {
-        const formBodyData = await this.repository.getFormBodyData(collection.id, endpoint.id);
-
-        if (formBodyData && (formBodyData.mode === 'formdata' || formBodyData.mode === 'urlencoded')) {
-            if (app.graphqlBodyManager) {
-                app.graphqlBodyManager.switchMode(formBodyData.mode);
-            }
-            if (app.formBodyManager) {
-                if (formBodyData.mode === 'formdata') {
-                    app.formBodyManager.setFormDataRows(formBodyData.fields);
-                } else {
-                    app.formBodyManager.setUrlencodedRows(formBodyData.fields);
-                }
-            }
-            const key = `${collection.id}_${endpoint.id}`;
-            this.originalBodyValues.set(key, JSON.stringify(formBodyData.fields || []));
-            return;
-        }
-
-        if (formBodyData && formBodyData.mode === 'binary') {
-            if (app.graphqlBodyManager) {
-                app.graphqlBodyManager.switchMode('binary');
-            }
-            if (app.formBodyManager) {
-                app.formBodyManager.setBinaryBody(formBodyData);
-            }
-            const key = `${collection.id}_${endpoint.id}`;
-            this.originalBodyValues.set(key, JSON.stringify({
-                filePath: formBodyData.filePath || '',
-                contentType: formBodyData.contentType || ''
-            }));
-            return;
-        }
-
-        if (formBodyData && formBodyData.mode === 'text') {
-            if (app.graphqlBodyManager) {
-                app.graphqlBodyManager.switchMode('text');
-            }
-            if (app.requestBodyTextEditor) {
-                app.requestBodyTextEditor.setContent(formBodyData.content || '');
-            }
-            const key = `${collection.id}_${endpoint.id}`;
-            this.originalBodyValues.set(key, formBodyData.content || '');
-            return;
-        }
-
-        const importedBodyType = endpoint.requestBody?.type;
-        if (importedBodyType === 'formdata' || importedBodyType === 'urlencoded') {
-            if (app.graphqlBodyManager) {
-                app.graphqlBodyManager.switchMode(importedBodyType);
-            }
-            if (app.formBodyManager) {
-                if (importedBodyType === 'formdata') {
-                    app.formBodyManager.setFormDataRows(endpoint.requestBody.fields);
-                } else {
-                    app.formBodyManager.setUrlencodedRows(endpoint.requestBody.fields);
-                }
-            }
-            const key = `${collection.id}_${endpoint.id}`;
-            this.originalBodyValues.set(key, JSON.stringify(endpoint.requestBody.fields || []));
-            return;
-        }
-
-        const graphqlData = await this.repository.getGraphQLData(collection.id, endpoint.id);
-
-        if (graphqlData && graphqlData.mode === 'graphql') {
-            if (app.graphqlBodyManager) {
-                app.graphqlBodyManager.setGraphQLModeEnabled(true);
-                app.graphqlBodyManager.setGraphQLQuery(graphqlData.query || '');
-                app.graphqlBodyManager.setGraphQLVariables(graphqlData.variables || '');
-            }
-
-            const key = `${collection.id}_${endpoint.id}`;
-            this.originalBodyValues.set(key, graphqlData.query || '');
-        } else {
-            if (app.graphqlBodyManager) {
-                app.graphqlBodyManager.setGraphQLModeEnabled(false);
-            }
-
-            const persistedBody = await this.repository.getModifiedRequestBody(collection.id, endpoint.id);
-
-            let bodyContent;
-            if (persistedBody) {
-                bodyContent = persistedBody;
-            } else if (endpoint.requestBody) {
-                bodyContent = this.generateRequestBody(endpoint.requestBody);
-            } else if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-                bodyContent = JSON.stringify({ 'data': 'example' }, null, 2);
-            } else {
-                bodyContent = '';
-            }
-
-            setRequestBodyContent(bodyContent);
-
-            const key = `${collection.id}_${endpoint.id}`;
-            this.originalBodyValues.set(key, bodyContent);
-        }
-    }
-
     async saveRequestBodyModification(collectionId, endpointId, _bodyInput) {
         await this.saveModifiedRequestBody(collectionId, endpointId);
     }
@@ -906,7 +519,6 @@ export class CollectionService {
     /**
      * Generates request body from OpenAPI schema or examples
      *
-     * @private
      * @param {Object} requestBody - The request body spec from OpenAPI
      * @returns {string} Generated JSON request body
      */
@@ -918,7 +530,7 @@ export class CollectionService {
         if (requestBody.schema) {
             const resolvedSchema = this.schemaProcessor.resolveSchemaRefs(requestBody.schema);
             const placeholder = this.schemaProcessor.generateExampleFromSchema(resolvedSchema);
-            
+
             if (placeholder && placeholder !== 'null' && placeholder !== null && placeholder !== undefined) {
                 return placeholder;
             }
@@ -934,17 +546,6 @@ export class CollectionService {
         return JSON.stringify({ 'data': 'example' }, null, 2);
     }
 
-    /**
-     * Saves modified request body to persistence layer
-     *
-     * Only saves if body has changed from original value.
-     *
-     * @async
-     * @private
-     * @param {string} collectionId - The collection ID
-     * @param {string} endpointId - The endpoint ID
-     * @returns {Promise<void>}
-     */
     captureRequestBodyState() {
         const bodyModeSelect = document.getElementById('body-mode-select');
         const bodyMode = bodyModeSelect?.value || 'json';
@@ -1092,57 +693,6 @@ export class CollectionService {
     }
 
     /**
-     * Saves current authentication configuration to persistence layer
-     *
-     * @async
-     * @private
-     * @param {string} collectionId - The collection ID
-     * @param {string} endpointId - The endpoint ID
-     * @returns {Promise<void>}
-     */
-    async saveCurrentAuthConfig(collectionId, endpointId) {
-        try {
-            if (app.authManager) {
-                const authConfig = app.authManager.getAuthConfig();
-                await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
-            }
-        } catch (error) {
-            void error;
-        }
-    }
-
-    /**
-     * Populates authentication configuration from persisted data or endpoint defaults
-     *
-     * @async
-     * @private
-     * @param {string} collectionId - The collection ID
-     * @param {string} endpointId - The endpoint ID
-     * @returns {Promise<void>}
-     */
-    async populateAuthConfig(collectionId, endpointId) {
-        try {
-            if (app.authManager) {
-                const authConfig = await this.repository.getPersistedAuthConfig(collectionId, endpointId);
-                if (authConfig) {
-                    app.authManager.loadAuthConfig(authConfig);
-                } else {
-                    const collection = await this.repository.getById(collectionId);
-                    const endpoint = collection?.endpoints?.find(ep => ep.id === endpointId);
-
-                    if (endpoint?.security) {
-                        app.authManager.loadAuthConfig(endpoint.security);
-                    } else {
-                        app.authManager.loadAuthConfig({ type: 'inherit', config: {} });
-                    }
-                }
-            }
-        } catch (error) {
-            void error;
-        }
-    }
-
-    /**
      * Parses key-value pairs from a container element
      *
      * @private
@@ -1181,41 +731,4 @@ export class CollectionService {
         }
     }
 
-    /**
-     * Adds a key-value row to a container
-     *
-     * Creates input fields and remove button.
-     *
-     * @private
-     * @param {HTMLElement} container - Container to add row to
-     * @param {string} [key=''] - Initial key value
-     * @param {string} [value=''] - Initial value
-     * @returns {void}
-     */
-    addKeyValueRow(container, key = '', value = '') {
-        const row = document.createElement('div');
-        row.className = 'key-value-row';
-
-        const keyInput = document.createElement('input');
-        keyInput.type = 'text';
-        keyInput.className = 'key-input';
-        keyInput.placeholder = 'Key';
-        keyInput.value = key;
-
-        const valueInput = document.createElement('input');
-        valueInput.type = 'text';
-        valueInput.className = 'value-input';
-        valueInput.placeholder = 'Value';
-        valueInput.value = value;
-
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'btn-xs btn-danger remove-row-btn';
-        removeBtn.textContent = 'Remove';
-
-        row.appendChild(keyInput);
-        row.appendChild(valueInput);
-        row.appendChild(removeBtn);
-
-        container.appendChild(row);
-    }
 }

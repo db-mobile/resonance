@@ -32,42 +32,9 @@ export class CollectionEndpointLoaderService {
 
     async handleEndpointClick(collection, endpoint) {
         try {
-            if (app.workspaceTabController) {
-                await this.loadEndpointIntoWorkspaceTab(collection, endpoint);
-            } else {
-                const formElements = this.getFormElements();
-                await this.collectionService.loadEndpointIntoForm(collection, endpoint, formElements);
-            }
+            await this.loadEndpointIntoWorkspaceTab(collection, endpoint);
 
             await this.repository.saveLastSelectedRequest(collection.id, endpoint.id);
-            this.setActiveEndpoint?.(collection.id, endpoint.id);
-        } catch (error) {
-            void error;
-        }
-    }
-
-    async restoreLastSelectedRequest() {
-        try {
-            const lastSelected = await this.repository.getLastSelectedRequest();
-
-            if (!lastSelected || !lastSelected.collectionId || !lastSelected.endpointId) {
-                return;
-            }
-
-            const collection = await this.repository.getById(lastSelected.collectionId);
-            if (!collection) {
-                await this.repository.clearLastSelectedRequest();
-                return;
-            }
-
-            const endpoint = this.findEndpointInCollection(collection, lastSelected.endpointId);
-            if (!endpoint) {
-                await this.repository.clearLastSelectedRequest();
-                return;
-            }
-
-            const formElements = this.getFormElements();
-            await this.collectionService.loadEndpointIntoForm(collection, endpoint, formElements);
             this.setActiveEndpoint?.(collection.id, endpoint.id);
         } catch (error) {
             void error;

@@ -96,36 +96,6 @@ export class CollectionRepository {
     }
 
     /**
-     * Saves collections array to storage (legacy compatibility)
-     * 
-     * Note: This method saves each collection individually. For better performance,
-     * prefer using saveOne() when updating a single collection.
-     *
-     * @async
-     * @param {Array<Object>} collections - Array of collection objects to save
-     * @returns {Promise<void>}
-     * @throws {Error} If storage write fails
-     */
-    async save(collections) {
-        try {
-            const existingIds = await this.backendAPI.collections.list();
-            const newIds = collections.map(c => c.id);
-
-            for (const id of existingIds) {
-                if (!newIds.includes(id)) {
-                    await this.backendAPI.collections.delete(id);
-                }
-            }
-
-            for (const collection of collections) {
-                await this.backendAPI.collections.save(collection);
-            }
-        } catch (error) {
-            throw new Error(`Failed to save collections: ${error.message || error}`, { cause: error });
-        }
-    }
-
-    /**
      * Retrieves a collection by its ID
      *
      * @async
@@ -277,6 +247,43 @@ export class CollectionRepository {
         await this._saveEndpointData(collectionId, endpointId, data);
     }
 
+    /**
+     * Reads one sidecar field, falling back to `empty` (`_getEndpointData` already absorbs read failures).
+     *
+     * @private
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {string} field - Sidecar field name
+     * @param {*} empty - Value to return when the field holds nothing
+     * @returns {Promise<*>} The stored value or `empty`
+     */
+    async _readSidecar(collectionId, endpointId, field, empty) {
+        const data = await this._getEndpointData(collectionId, endpointId);
+        return data[field] || empty;
+    }
+
+    /**
+     * Writes one sidecar field, leaving its siblings intact.
+     *
+     * @private
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {string} field - Sidecar field name
+     * @param {*} value - Value to persist
+     * @param {string} label - Human-readable field name for the error message
+     * @returns {Promise<void>}
+     * @throws {Error} If the write fails
+     */
+    async _writeSidecar(collectionId, endpointId, field, value, label) {
+        try {
+            await this._updateEndpointField(collectionId, endpointId, field, value);
+        } catch (error) {
+            throw new Error(`Failed to save ${label}: ${error.message || error}`, { cause: error });
+        }
+    }
+
     async updateEndpointFields(collectionId, endpointId, updates) {
         try {
             await this._updateEndpointFields(collectionId, endpointId, updates);
@@ -306,12 +313,7 @@ export class CollectionRepository {
      * @returns {Promise<string|null>} The modified request body or null if not found
      */
     async getModifiedRequestBody(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.modifiedBody || null;
-        } catch (error) {
-            return null;
-        }
+        return this._readSidecar(collectionId, endpointId, 'modifiedBody', null);
     }
 
     /**
@@ -325,28 +327,15 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async saveModifiedRequestBody(collectionId, endpointId, body) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'modifiedBody', body);
-        } catch (error) {
-            throw new Error(`Failed to save modified request body: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'modifiedBody', body, 'modified request body');
     }
 
     async getFormBodyData(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data?.formBodyData || null;
-        } catch (error) {
-            return null;
-        }
+        return this._readSidecar(collectionId, endpointId, 'formBodyData', null);
     }
 
     async saveFormBodyData(collectionId, endpointId, data) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'formBodyData', data);
-        } catch (error) {
-            throw new Error(`Failed to save form body data: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'formBodyData', data, 'form body data');
     }
 
     /**
@@ -358,12 +347,7 @@ export class CollectionRepository {
      * @returns {Promise<Array>} Array of path parameter objects or empty array
      */
     async getPersistedPathParams(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.pathParams || [];
-        } catch (error) {
-            return [];
-        }
+        return this._readSidecar(collectionId, endpointId, 'pathParams', []);
     }
 
     /**
@@ -377,11 +361,7 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async savePersistedPathParams(collectionId, endpointId, pathParams) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'pathParams', pathParams);
-        } catch (error) {
-            throw new Error(`Failed to save persisted path params: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'pathParams', pathParams, 'persisted path params');
     }
 
     /**
@@ -393,12 +373,7 @@ export class CollectionRepository {
      * @returns {Promise<Array>} Array of query parameter objects or empty array
      */
     async getPersistedQueryParams(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.queryParams || [];
-        } catch (error) {
-            return [];
-        }
+        return this._readSidecar(collectionId, endpointId, 'queryParams', []);
     }
 
     /**
@@ -412,11 +387,7 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async savePersistedQueryParams(collectionId, endpointId, queryParams) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'queryParams', queryParams);
-        } catch (error) {
-            throw new Error(`Failed to save persisted query params: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'queryParams', queryParams, 'persisted query params');
     }
 
     /**
@@ -428,12 +399,7 @@ export class CollectionRepository {
      * @returns {Promise<Array>} Array of header objects or empty array
      */
     async getPersistedHeaders(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.headers || [];
-        } catch (error) {
-            return [];
-        }
+        return this._readSidecar(collectionId, endpointId, 'headers', []);
     }
 
     /**
@@ -447,11 +413,54 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async savePersistedHeaders(collectionId, endpointId, headers) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'headers', headers);
-        } catch (error) {
-            throw new Error(`Failed to save persisted headers: ${error.message || error}`, { cause: error });
+        return this._writeSidecar(collectionId, endpointId, 'headers', headers, 'persisted headers');
+    }
+
+    /**
+     * Merges a scope's stored secrets back into a persisted auth config.
+     *
+     * @private
+     * @async
+     * @param {string} scope - SecretStore scope owning this config's secrets
+     * @param {Object|null} authConfig - The redacted config as persisted
+     * @returns {Promise<Object|null>} The hydrated config, or the input unchanged when there is nothing to merge
+     */
+    async _hydrateAuthConfig(scope, authConfig) {
+        if (!authConfig || !this.secretStore) {
+            return authConfig;
         }
+        const secrets = await this.secretStore.getScope(scope);
+        return mergeAuthSecrets(authConfig, secrets);
+    }
+
+    /**
+     * Moves literal credentials into `scope`, prunes ones the config dropped, and returns the redacted copy.
+     *
+     * @private
+     * @async
+     * @param {string} scope - SecretStore scope to own this config's secrets
+     * @param {Object|null} authConfig - The config as supplied by the caller
+     * @returns {Promise<Object|null>} The redacted config to persist, or the input unchanged when there is no secret store
+     */
+    async _persistAuthSecrets(scope, authConfig) {
+        if (!authConfig || !this.secretStore) {
+            return authConfig;
+        }
+
+        const { redacted, secrets } = splitAuthSecrets(authConfig);
+
+        for (const field of Object.keys(secrets)) {
+            await this.secretStore.set(scope, field, secrets[field]);
+        }
+
+        const stored = await this.secretStore.getScope(scope);
+        for (const field of Object.keys(stored)) {
+            if (!Object.prototype.hasOwnProperty.call(secrets, field)) {
+                await this.secretStore.delete(scope, field);
+            }
+        }
+
+        return redacted;
     }
 
     /**
@@ -465,12 +474,10 @@ export class CollectionRepository {
     async getPersistedAuthConfig(collectionId, endpointId) {
         try {
             const data = await this._getEndpointData(collectionId, endpointId);
-            const authConfig = data.authConfig || null;
-            if (!authConfig || !this.secretStore) {
-                return authConfig;
-            }
-            const secrets = await this.secretStore.getScope(authSecretScope(collectionId, endpointId));
-            return mergeAuthSecrets(authConfig, secrets);
+            return this._hydrateAuthConfig(
+                authSecretScope(collectionId, endpointId),
+                data.authConfig || null
+            );
         } catch (error) {
             return null;
         }
@@ -488,22 +495,10 @@ export class CollectionRepository {
      */
     async savePersistedAuthConfig(collectionId, endpointId, authConfig) {
         try {
-            let toPersist = authConfig;
-            if (authConfig && this.secretStore) {
-                const { redacted, secrets } = splitAuthSecrets(authConfig);
-                const scope = authSecretScope(collectionId, endpointId);
-                const fields = Object.keys(secrets);
-                for (const field of fields) {
-                    await this.secretStore.set(scope, field, secrets[field]);
-                }
-                const stored = await this.secretStore.getScope(scope);
-                for (const field of Object.keys(stored)) {
-                    if (!Object.prototype.hasOwnProperty.call(secrets, field)) {
-                        await this.secretStore.delete(scope, field);
-                    }
-                }
-                toPersist = redacted;
-            }
+            const toPersist = await this._persistAuthSecrets(
+                authSecretScope(collectionId, endpointId),
+                authConfig
+            );
             await this._updateEndpointField(collectionId, endpointId, 'authConfig', toPersist);
         } catch (error) {
             throw new Error(`Failed to save persisted auth config: ${error.message || error}`, { cause: error });
@@ -521,12 +516,10 @@ export class CollectionRepository {
     async getCollectionAuthConfig(collectionId) {
         try {
             const collection = await this._getByIdFresh(collectionId);
-            const authConfig = collection?.authConfig || null;
-            if (!authConfig || !this.secretStore) {
-                return authConfig;
-            }
-            const secrets = await this.secretStore.getScope(collectionAuthSecretScope(collectionId));
-            return mergeAuthSecrets(authConfig, secrets);
+            return this._hydrateAuthConfig(
+                collectionAuthSecretScope(collectionId),
+                collection?.authConfig || null
+            );
         } catch (error) {
             return null;
         }
@@ -537,34 +530,46 @@ export class CollectionRepository {
      * into the SecretStore (scope auth:<collectionId>:__collection__) and the
      * persisted collection.json keeps a redacted copy.
      *
+     * Reads the collection fresh before updating so the merge in `update()` sees
+     * auth edits made through a sibling repository instance rather than this
+     * instance's cached copy.
+     *
      * @async
      * @param {string} collectionId - The collection ID
      * @param {Object} authConfig - The authentication configuration ({type, config})
      * @returns {Promise<void>}
-     * @throws {Error} If save operation fails
+     * @throws {Error} If the collection is missing or the save fails
      */
     async saveCollectionAuthConfig(collectionId, authConfig) {
         try {
-            let toPersist = authConfig;
-            if (authConfig && this.secretStore) {
-                const { redacted, secrets } = splitAuthSecrets(authConfig);
-                const scope = collectionAuthSecretScope(collectionId);
-                const fields = Object.keys(secrets);
-                for (const field of fields) {
-                    await this.secretStore.set(scope, field, secrets[field]);
-                }
-                const stored = await this.secretStore.getScope(scope);
-                for (const field of Object.keys(stored)) {
-                    if (!Object.prototype.hasOwnProperty.call(secrets, field)) {
-                        await this.secretStore.delete(scope, field);
-                    }
-                }
-                toPersist = redacted;
+            const toPersist = await this._persistAuthSecrets(
+                collectionAuthSecretScope(collectionId),
+                authConfig
+            );
+            const collection = await this._getByIdFresh(collectionId);
+            if (!collection) {
+                throw new Error(`Collection with id ${collectionId} not found`);
             }
-            await this._getByIdFresh(collectionId);
             await this.update(collectionId, { authConfig: toPersist });
         } catch (error) {
             throw new Error(`Failed to save collection auth config: ${error.message || error}`, { cause: error });
+        }
+    }
+
+    /**
+     * Reads one collection straight from the backend, without consulting or
+     * touching the cache.
+     *
+     * @private
+     * @async
+     * @param {string} id - The collection ID
+     * @returns {Promise<Object|undefined>} The collection or undefined
+     */
+    async _readFromBackend(id) {
+        try {
+            return await this.backendAPI.collections.get(id);
+        } catch (error) {
+            return undefined;
         }
     }
 
@@ -581,15 +586,30 @@ export class CollectionRepository {
      * @returns {Promise<Object|undefined>} The collection or undefined
      */
     async _getByIdFresh(id) {
-        try {
-            const collection = await this.backendAPI.collections.get(id);
-            if (collection) {
-                this._addToCache(id, collection);
-            }
-            return collection;
-        } catch (error) {
-            return undefined;
+        const collection = await this._readFromBackend(id);
+        if (collection) {
+            this._addToCache(id, collection);
         }
+        return collection;
+    }
+
+    /**
+     * Reads one collection for a read-modify-write cycle: callers mutate the
+     * returned object in place and then persist it with saveOne().
+     *
+     * Deliberately leaves the cache untouched. Caching an object that is about
+     * to be mutated would let a failed write strand mutated-but-unpersisted
+     * state where getById() would serve it as truth; saveOne() caches the
+     * object once the write succeeds, so the cache only ever holds persisted
+     * state. Reading a single collection also keeps an edit to one request from
+     * depending on every collection being readable.
+     *
+     * @async
+     * @param {string} id - The collection ID
+     * @returns {Promise<Object|undefined>} The collection or undefined
+     */
+    async readForUpdate(id) {
+        return this._readFromBackend(id);
     }
 
     /**
@@ -625,12 +645,10 @@ export class CollectionRepository {
         try {
             const collection = await this._getByIdFresh(collectionId);
             const folder = (collection?.folders || []).find((f) => f.id === folderId);
-            const authConfig = folder?.authConfig || null;
-            if (!authConfig || !this.secretStore) {
-                return authConfig;
-            }
-            const secrets = await this.secretStore.getScope(folderAuthSecretScope(collectionId, folderId));
-            return mergeAuthSecrets(authConfig, secrets);
+            return this._hydrateAuthConfig(
+                folderAuthSecretScope(collectionId, folderId),
+                folder?.authConfig || null
+            );
         } catch (error) {
             return null;
         }
@@ -650,22 +668,10 @@ export class CollectionRepository {
      */
     async saveFolderAuthConfig(collectionId, folderId, authConfig) {
         try {
-            let toPersist = authConfig;
-            if (authConfig && this.secretStore) {
-                const { redacted, secrets } = splitAuthSecrets(authConfig);
-                const scope = folderAuthSecretScope(collectionId, folderId);
-                const fields = Object.keys(secrets);
-                for (const field of fields) {
-                    await this.secretStore.set(scope, field, secrets[field]);
-                }
-                const stored = await this.secretStore.getScope(scope);
-                for (const field of Object.keys(stored)) {
-                    if (!Object.prototype.hasOwnProperty.call(secrets, field)) {
-                        await this.secretStore.delete(scope, field);
-                    }
-                }
-                toPersist = redacted;
-            }
+            const toPersist = await this._persistAuthSecrets(
+                folderAuthSecretScope(collectionId, folderId),
+                authConfig
+            );
             const collection = await this._getByIdFresh(collectionId);
             if (!collection) {
                 throw new Error(`Collection with id ${collectionId} not found`);
@@ -712,12 +718,7 @@ export class CollectionRepository {
      * @returns {Promise<string|null>} The persisted URL or null if not found
      */
     async getPersistedUrl(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.url || null;
-        } catch (error) {
-            return null;
-        }
+        return this._readSidecar(collectionId, endpointId, 'url', null);
     }
 
     /**
@@ -731,11 +732,7 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async savePersistedUrl(collectionId, endpointId, url) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'url', url);
-        } catch (error) {
-            throw new Error(`Failed to save persisted URL: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'url', url, 'persisted URL');
     }
 
     /**
@@ -816,21 +813,6 @@ export class CollectionRepository {
     }
 
     /**
-     * Retrieves the last selected request
-     *
-     * @async
-     * @returns {Promise<Object|null>} Object with collectionId and endpointId or null
-     */
-    async getLastSelectedRequest() {
-        try {
-            const lastSelected = await this.backendAPI.store.get('lastSelectedRequest');
-            return lastSelected || null;
-        } catch (error) {
-            return null;
-        }
-    }
-
-    /**
      * Saves the last selected request for UI state restoration
      *
      * @async
@@ -876,11 +858,7 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async saveGraphQLData(collectionId, endpointId, data) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'graphqlData', data);
-        } catch (error) {
-            throw new Error(`Failed to save GraphQL data: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'graphqlData', data, 'GraphQL data');
     }
 
     /**
@@ -892,29 +870,15 @@ export class CollectionRepository {
      * @returns {Promise<Object|null>} GraphQL data or null if not found
      */
     async getGraphQLData(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.graphqlData || null;
-        } catch (error) {
-            return null;
-        }
+        return this._readSidecar(collectionId, endpointId, 'graphqlData', null);
     }
 
     async saveGrpcData(collectionId, endpointId, data) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'grpcData', data);
-        } catch (error) {
-            throw new Error(`Failed to save gRPC data: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'grpcData', data, 'gRPC data');
     }
 
     async getGrpcData(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.grpcData || null;
-        } catch (error) {
-            return null;
-        }
+        return this._readSidecar(collectionId, endpointId, 'grpcData', null);
     }
 
     /**
@@ -928,11 +892,7 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async saveMqttData(collectionId, endpointId, data) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'mqttData', data);
-        } catch (error) {
-            throw new Error(`Failed to save MQTT data: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'mqttData', data, 'MQTT data');
     }
 
     /**
@@ -944,12 +904,7 @@ export class CollectionRepository {
      * @returns {Promise<Object|null>} MQTT data or null if not found
      */
     async getMqttData(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.mqttData || null;
-        } catch (error) {
-            return null;
-        }
+        return this._readSidecar(collectionId, endpointId, 'mqttData', null);
     }
 
     /**
@@ -963,11 +918,7 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async saveResponseSchema(collectionId, endpointId, schema) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'responseSchema', schema);
-        } catch (error) {
-            throw new Error(`Failed to save response schema: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'responseSchema', schema, 'response schema');
     }
 
     /**
@@ -979,11 +930,6 @@ export class CollectionRepository {
      * @returns {Promise<Object|null>} The JSON Schema object or null if not found
      */
     async getResponseSchema(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.responseSchema || null;
-        } catch (error) {
-            return null;
-        }
+        return this._readSidecar(collectionId, endpointId, 'responseSchema', null);
     }
 }

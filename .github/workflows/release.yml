@@ -541,3 +541,15 @@ jobs:
         git add Casks/resonance.rb
         git commit -m "Update upstream to v${VERSION}"
         git push
+
+  update-winget:
+    needs: [release]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Submit manifest to winget-pkgs
+      uses: vedantmgoyal9/winget-releaser@v2
+      with:
+        identifier: DBMobile.Resonance
+        installers-regex: '-setup\.exe$'
+        token: ${{ secrets.WINGET_TOKEN }}

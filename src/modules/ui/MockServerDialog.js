@@ -6,6 +6,7 @@
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { SchemaProcessor } from '../schema/SchemaProcessor.js';
+import { pushEscapeHandler } from './modalEscape.js';
 
 /**
  * UI Dialog for managing mock server
@@ -27,7 +28,7 @@ export class MockServerDialog {
         this.resolve = null;
         this.statusPoller = null;
         this.logsPoller = null;
-        this.escapeHandler = null;
+        this.releaseEscape = null;
     }
 
     /**
@@ -143,12 +144,7 @@ export class MockServerDialog {
             }
         });
 
-        this.escapeHandler = (e) => {
-            if (e.key === 'Escape') {
-                this.close();
-            }
-        };
-        document.addEventListener('keydown', this.escapeHandler);
+        this.releaseEscape = pushEscapeHandler(() => this.close());
     }
 
     /**
@@ -406,25 +402,6 @@ export class MockServerDialog {
                     this.controller.getCollections()
                 ]);
                 await this.renderCollections(collections, settings);
-            }
-        } catch (error) {
-            void error;
-        }
-    }
-
-    /**
-     * Handles endpoint delay change
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {number} delayMs - Delay in milliseconds
-     */
-    async handleSetDelay(collectionId, endpointId, delayMs) {
-        try {
-            const result = await this.controller.handleSetDelay(collectionId, endpointId, delayMs);
-            if (!result.success) {
-                this.showAlert(result.message);
             }
         } catch (error) {
             void error;
@@ -756,9 +733,15 @@ export class MockServerDialog {
             errorDiv.textContent = '';
         }
 
+        let releaseEscape = null;
         const cleanup = () => {
-            document.body.removeChild(overlay);
+            if (releaseEscape) {
+                releaseEscape();
+                releaseEscape = null;
+            }
+            overlay.remove();
         };
+        releaseEscape = pushEscapeHandler(cleanup);
 
         textarea.addEventListener('input', () => {
             try {
@@ -828,14 +811,6 @@ export class MockServerDialog {
                 closeHandler();
             }
         });
-
-        const escapeHandler = (e) => {
-            if (e.key === 'Escape') {
-                closeHandler();
-                document.removeEventListener('keydown', escapeHandler);
-            }
-        };
-        document.addEventListener('keydown', escapeHandler);
     }
 
     /**
@@ -913,9 +888,9 @@ export class MockServerDialog {
             this.logsPoller = null;
         }
 
-        if (this.escapeHandler) {
-            document.removeEventListener('keydown', this.escapeHandler);
-            this.escapeHandler = null;
+        if (this.releaseEscape) {
+            this.releaseEscape();
+            this.releaseEscape = null;
         }
 
         if (this.dialog) {

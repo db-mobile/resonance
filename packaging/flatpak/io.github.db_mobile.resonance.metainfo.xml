@@ -119,6 +119,23 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.1.6" date="2026-07-28">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Tunnel WebSocket and GraphQL subscription connections through the configured proxy</li>
+          <li>Apply the configured proxy to requests sent from pre-request scripts</li>
+          <li>Fix AWS Signature signing to cover the body that is actually sent and emit the session token only when set</li>
+          <li>Report unsupported Digest authentication challenges instead of silently dropping them</li>
+          <li>Keep the stored API key location when reopening a request</li>
+          <li>Write only the edited collection when saving a request, leaving other collection files untouched</li>
+          <li>Ignore streaming events for workspace tabs that have already been closed</li>
+          <li>Fix empty MQTT broker fields and speed up Postman collection imports</li>
+          <li>Make Escape close the topmost dialog consistently across all dialogs</li>
+          <li>Run saved and unsaved collection runners through the same execution path</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.1.5" date="2026-07-27">
       <description>
         <p>Feature stabilization release</p>

@@ -3,9 +3,7 @@
  * @module storage/WorkspaceTabRepository
  */
 
-import logger from '../logger.js';
 
-const _log = logger.scope('WorkspaceTabRepository');
 
 /**
  * Repository for managing workspace tab persistence

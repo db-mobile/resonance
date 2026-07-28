@@ -14,6 +14,7 @@
 import { templateLoader } from '../templateLoader.js';
 import { toast } from './Toast.js';
 import { DynamicVariablesReferenceDialog } from './DynamicVariablesReferenceDialog.js';
+import { pushEscapeHandler } from './modalEscape.js';
 
 export class VariableManager {
     /**
@@ -23,7 +24,7 @@ export class VariableManager {
         this.dialog = null;
         this.onSave = null;
         this.onCancel = null;
-        this.keyDownHandler = null;
+        this.releaseEscape = null;
     }
 
     /**
@@ -219,14 +220,11 @@ export class VariableManager {
             }
         });
 
-        this.keyDownHandler = this.handleKeyDown.bind(this);
-        document.addEventListener('keydown', this.keyDownHandler, { once: false });
-    }
-
-    handleKeyDown(e) {
-        if (e.key === 'Escape' && this.dialog) {
-            this.close();
-        }
+        this.releaseEscape = pushEscapeHandler(() => {
+            if (this.dialog) {
+                this.close();
+            }
+        });
     }
 
     save() {
@@ -285,11 +283,11 @@ export class VariableManager {
     }
 
     cleanup() {
+        if (this.releaseEscape) {
+            this.releaseEscape();
+            this.releaseEscape = null;
+        }
         if (this.dialog) {
-            if (this.keyDownHandler) {
-                document.removeEventListener('keydown', this.keyDownHandler);
-                this.keyDownHandler = null;
-            }
             this.dialog.remove();
             this.dialog = null;
         }

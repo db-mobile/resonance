@@ -10,9 +10,7 @@ import { parseKeyValuePairs, populateKeyValueList, clearKeyValueList, addKeyValu
 import { authManager } from './authManager.js';
 import { displayResponseWithLineNumbersForTab, clearResponseDisplayForTab, clearSchemaValidationBadge, clearGraphQLErrorsBadge } from './apiHandler.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
-import logger from './logger.js';
 
-const _log = logger.scope('WorkspaceTabStateManager');
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
 import { formatCookiesAsHtml } from './cookieParser.js';
 import { activateTab } from './tabManager.js';
@@ -667,27 +665,6 @@ export class WorkspaceTabStateManager {
     }
 
     /**
-     * Update tab with response data
-     * @param {string} tabId
-     * @param {Object} responseData
-     * @returns {Object} Update object for tab
-     */
-    captureResponse(responseData) {
-        return {
-            response: {
-                data: responseData.data,
-                headers: responseData.headers || {},
-                status: responseData.status,
-                statusText: responseData.statusText,
-                ttfb: responseData.ttfb,
-                size: responseData.size,
-                timings: responseData.timings,
-                cookies: responseData.cookies || []
-            }
-        };
-    }
-
-    /**
      * Restore response to UI (private)
      * @private
      */
@@ -779,26 +756,4 @@ export class WorkspaceTabStateManager {
         }
     }
 
-    /**
-     * Create a new empty state
-     * @returns {Object}
-     */
-    createEmptyState() {
-        return {
-            request: {
-                protocol: 'http',
-                url: '',
-                method: 'GET',
-                pathParams: {},
-                queryParams: {},
-                headers: { 'Content-Type': 'application/json' },
-                body: { mode: 'json', content: '' },
-                authType: 'none',
-                authConfig: {}
-            },
-            response: null,
-            endpoint: null,
-            activeResponseTab: 'response-body'
-        };
-    }
 }

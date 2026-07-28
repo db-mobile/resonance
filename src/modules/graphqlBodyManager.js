@@ -21,7 +21,6 @@ export class GraphQLBodyManager {
         this._pendingQuery = null;
         this._variablesString = '';
         this.currentMode = 'json';
-        this.isGraphQLModeEnabled = false;
 
         this.schemaCache = new Map();
         this.currentSchema = null;
@@ -547,7 +546,6 @@ export class GraphQLBodyManager {
                     this._pendingQuery = null;
                 }
                 this.graphqlEditor.onChange((content) => {
-                    this.saveCurrentState();
                     this.updateOperationPicker();
                     this._markTabModified();
                     if (this.isDocsRailOpen()) {
@@ -614,19 +612,10 @@ export class GraphQLBodyManager {
     }
 
     /**
-     * Get current mode
-     * @returns {string} 'json' or 'graphql'
-     */
-    getCurrentMode() {
-        return this.currentMode;
-    }
-
-    /**
      * Enable GraphQL mode for current endpoint
      * @param {boolean} enable
      */
     setGraphQLModeEnabled(enable) {
-        this.isGraphQLModeEnabled = enable;
         if (enable) {
             this.switchMode('graphql');
         } else {
@@ -640,12 +629,6 @@ export class GraphQLBodyManager {
      */
     isGraphQLMode() {
         return this.currentMode === 'graphql';
-    }
-
-    /**
-     * Save current state (placeholder - will integrate with CollectionRepository)
-     */
-    async saveCurrentState() {
     }
 
     /**

@@ -46,4 +46,3 @@ const rootLogger = {
 };
 
 export default rootLogger;
-export { scope };

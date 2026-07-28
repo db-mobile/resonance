@@ -204,6 +204,36 @@ describe('CollectionRepository', () => {
 
             await expect(repository.saveOne({ id: 'col_1' })).rejects.toThrow('Failed to save collection');
         });
+
+        test('should never enumerate or delete other collections', async () => {
+            mockBackendAPI.collections.save.mockResolvedValue();
+
+            await repository.saveOne({ id: 'col_1', name: 'Test Collection' });
+
+            expect(mockBackendAPI.collections.list).not.toHaveBeenCalled();
+            expect(mockBackendAPI.collections.delete).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('readForUpdate', () => {
+        test('should read from the backend without populating the cache', async () => {
+            const collection = { id: 'col_1', name: 'Test Collection' };
+            mockBackendAPI.collections.get.mockResolvedValue(collection);
+
+            const result = await repository.readForUpdate('col_1');
+
+            expect(result).toBe(collection);
+            expect(mockBackendAPI.collections.get).toHaveBeenCalledTimes(1);
+
+            await repository.getById('col_1');
+            expect(mockBackendAPI.collections.get).toHaveBeenCalledTimes(2);
+        });
+
+        test('should return undefined when the collection cannot be read', async () => {
+            mockBackendAPI.collections.get.mockRejectedValue(new Error('Unreadable file'));
+
+            await expect(repository.readForUpdate('col_1')).resolves.toBeUndefined();
+        });
     });
 
     describe('delete', () => {

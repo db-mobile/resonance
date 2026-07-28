@@ -3,6 +3,7 @@
  * Displays active environment and allows quick switching
  */
 import { templateLoader } from '../templateLoader.js';
+import { pushEscapeHandler } from './modalEscape.js';
 
 export class EnvironmentSelector {
     constructor(environmentService, onEnvironmentSwitch, onManageClick) {
@@ -12,6 +13,7 @@ export class EnvironmentSelector {
         this.container = null;
         this.dropdown = null;
         this.isOpen = false;
+        this.releaseEscape = null;
         this.activeEnvironment = null;
     }
 
@@ -78,12 +80,6 @@ export class EnvironmentSelector {
 
         document.addEventListener('click', (e) => {
             if (this.isOpen && !this.container.contains(e.target)) {
-                this.closeDropdown();
-            }
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.isOpen) {
                 this.closeDropdown();
             }
         });
@@ -169,6 +165,7 @@ export class EnvironmentSelector {
 
             this.dropdown.classList.remove('is-hidden');
             this.isOpen = true;
+            this.releaseEscape = pushEscapeHandler(() => this.closeDropdown());
 
             this.positionDropdown();
         } catch (error) {
@@ -180,6 +177,10 @@ export class EnvironmentSelector {
      * Close dropdown
      */
     closeDropdown() {
+        if (this.releaseEscape) {
+            this.releaseEscape();
+            this.releaseEscape = null;
+        }
         if (this.dropdown) {
             this.dropdown.classList.add('is-hidden');
         }

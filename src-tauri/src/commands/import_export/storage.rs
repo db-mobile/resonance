@@ -4,18 +4,33 @@
 
 use super::{Collection, VariableEntry};
 use crate::commands::collections as storage_collections;
-use crate::commands::fs_secure::{restrict_dir, restrict_file};
-use serde::Serialize;
-use std::fs;
+use crate::commands::collections::write_json_file;
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_store::StoreExt;
 use tokio::sync::oneshot;
 
 const STORE_FILE: &str = "resonance-store.json";
 const LAST_IMPORT_DIR_KEY: &str = "lastImportDirectory";
-const COLLECTIONS_DIR: &str = "collections";
+
+/// Postman OAuth2 parameter names paired with the app's config keys, as
+/// `(postman_key, app_key)`. Import reads it left to right and export right to
+/// left; one table keeps the two directions from drifting apart.
+pub(crate) const OAUTH2_KEY_MAP: [(&str, &str); 12] = [
+    ("accessTokenUrl", "tokenUrl"),
+    ("authUrl", "authorizationUrl"),
+    ("clientId", "clientId"),
+    ("clientSecret", "clientSecret"),
+    ("scope", "scope"),
+    ("redirect_uri", "redirectUri"),
+    ("username", "username"),
+    ("password", "password"),
+    ("audience", "audience"),
+    ("client_authentication", "clientAuthMethod"),
+    ("headerPrefix", "headerPrefix"),
+    ("accessToken", "token"),
+];
 
 pub(crate) fn is_http_method(method: &str) -> bool {
     matches!(
@@ -52,42 +67,12 @@ pub(crate) fn save_last_import_directory(app: &AppHandle, file_path: &std::path:
     }
 }
 
-/// Get the collections directory path
-fn get_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
-    Ok(app_data_dir.join(COLLECTIONS_DIR))
-}
-
-/// Ensure the collections directory exists
-fn ensure_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = get_collections_dir(app)?;
-    if !dir.exists() {
-        fs::create_dir_all(&dir).map_err(|e| format!("Failed to create collections dir: {}", e))?;
-    }
-    restrict_dir(&dir);
-    Ok(dir)
-}
-
-/// Write JSON to file with pretty printing
-fn write_json_file<T: Serialize>(path: &PathBuf, data: &T) -> Result<(), String> {
-    let json = serde_json::to_string_pretty(data)
-        .map_err(|e| format!("Failed to serialize JSON: {}", e))?;
-    fs::write(path, json).map_err(|e| format!("Failed to write file: {}", e))?;
-    restrict_file(path);
-    Ok(())
-}
-
 /// Save a collection to the file-based storage format
 pub(crate) fn save_collection_to_files(
     app: &AppHandle,
     collection: &Collection,
     storage_parent_path: Option<String>,
 ) -> Result<(), String> {
-    ensure_collections_dir(app)?;
-
     let endpoints = serde_json::to_value(&collection.endpoints)
         .map_err(|e| format!("Failed to serialize endpoints: {}", e))?;
     let folders = serde_json::to_value(&collection.folders)
@@ -140,8 +125,8 @@ fn save_collection_variables(
     }
 
     if !variables.is_empty() {
-        let variables_file = collection_dir.join("variables.json");
-        write_json_file(&variables_file, &variables)?;
+        let paths = storage_collections::CollectionPaths::from_dir(collection_dir.to_path_buf());
+        write_json_file(&paths.variables_json(), &variables)?;
     }
 
     Ok(())
@@ -154,7 +139,7 @@ fn save_endpoint_data_files(
     collection: &Collection,
     collection_dir: &std::path::Path,
 ) -> Result<(), String> {
-    let requests_dir = collection_dir.join("requests");
+    let paths = storage_collections::CollectionPaths::from_dir(collection_dir.to_path_buf());
     let mut written: std::collections::HashSet<&str> = std::collections::HashSet::new();
 
     for endpoint in &collection.endpoints {
@@ -165,11 +150,9 @@ fn save_endpoint_data_files(
             continue;
         }
 
-        if !requests_dir.exists() {
-            fs::create_dir_all(&requests_dir)
-                .map_err(|e| format!("Failed to create requests dir: {}", e))?;
-            restrict_dir(&requests_dir);
-        }
+        // Created on first write rather than up front, so importing a
+        // collection with no endpoint payloads leaves no empty directory.
+        let requests_dir = paths.ensure_requests()?;
 
         let data = storage_collections::EndpointData {
             scripts: endpoint.scripts.clone(),

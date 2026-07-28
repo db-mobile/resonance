@@ -532,8 +532,6 @@ fn form_rows_to_pairs(rows: &[serde_json::Value]) -> Vec<(String, String)> {
 pub struct AuthConfig {
     pub username: String,
     pub password: String,
-    #[serde(default)]
-    pub auth_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -862,23 +860,33 @@ pub async fn send_api_request(
         .map(|h| h.keys().any(|k| k.to_lowercase() == "content-type"))
         .unwrap_or(false);
 
+    // A file-backed body is read once, here, and the same bytes are used for
+    // both the AWS signature and the request itself. Reading it a second time
+    // when building the request would leave a window in which the file changes
+    // between signing and sending, producing a signature that does not match
+    // the payload.
+    let binary_body_bytes: Option<Vec<u8>> = match &request_options.body {
+        Some(b) if body_type == "binary" => {
+            let binary: BinaryBody = serde_json::from_value(b.clone())
+                .map_err(|e| format!("Invalid binary body: {}", e))?;
+            Some(read_body_file(&binary.file_path)?)
+        }
+        _ => None,
+    };
+
     // Compute AWS Signature V4 headers if configured.
     // This must happen before building the request because the signature covers
     // the method, URL, headers, and body hash.
     let aws_headers: Option<HashMap<String, String>> = if let Some(aws) = &request_options.aws_auth
     {
-        // For "binary" the signature must cover the actual file bytes. For
+        // For "binary" the signature covers the actual file bytes. For
         // "formdata" the multipart boundary is generated per send, so a correct
         // signature is not possible here (pre-existing limitation); other body
         // types keep the historical JSON serialization.
-        let body_bytes = match &request_options.body {
-            Some(b) if request_options.body_type.as_deref() == Some("binary") => {
-                let binary: BinaryBody = serde_json::from_value(b.clone())
-                    .map_err(|e| format!("Invalid binary body: {}", e))?;
-                read_body_file(&binary.file_path)?
-            }
-            Some(b) => serde_json::to_vec(b).unwrap_or_default(),
-            None => Vec::new(),
+        let body_bytes = match (&binary_body_bytes, &request_options.body) {
+            (Some(bytes), _) => bytes.clone(),
+            (None, Some(b)) => serde_json::to_vec(b).unwrap_or_default(),
+            (None, None) => Vec::new(),
         };
         let existing = request_options.headers.clone().unwrap_or_default();
         Some(build_aws_v4_headers(
@@ -892,9 +900,9 @@ pub async fn send_api_request(
         None
     };
 
-    // Helper to build a request. Returns Result so body-file read errors
-    // surface as clean command errors; called again for the digest-auth retry,
-    // which re-reads any file-backed body from disk.
+    // Helper to build a request. Returns Result so body-decode errors surface
+    // as clean command errors; called again for the digest-auth retry, which
+    // reuses the bytes read before signing rather than re-reading the file.
     let build_request = |auth_header: Option<String>| -> Result<RequestBuilder, String> {
         let mut rb = client.request(method.clone(), &request_options.url);
         if let Some(headers) = &request_options.headers {
@@ -948,7 +956,7 @@ pub async fn send_api_request(
                 if let Some(body) = &request_options.body {
                     let binary: BinaryBody = serde_json::from_value(body.clone())
                         .map_err(|e| format!("Invalid binary body: {}", e))?;
-                    let bytes = read_body_file(&binary.file_path)?;
+                    let bytes = binary_body_bytes.clone().unwrap_or_default();
                     rb = rb.body(bytes);
                     if !user_has_content_type {
                         rb = rb.header(
@@ -990,7 +998,11 @@ pub async fn send_api_request(
         result = request_future => {
             match result {
                 Ok(response) => {
-                    // Check for 401 with Digest challenge - retry with auth if credentials provided
+                    // Check for 401 with Digest challenge - retry with auth if credentials provided.
+                    // A challenge we cannot answer (an unsupported algorithm, say) is reported on
+                    // the 401 we return, so the user sees why the credentials were never sent
+                    // rather than a bare 401.
+                    let mut digest_error: Option<String> = None;
                     if response.status().as_u16() == 401 {
                         if let Some(auth_config) = &request_options.auth {
                             if let Some(www_auth) = response.headers().get("www-authenticate") {
@@ -1011,7 +1023,7 @@ pub async fn send_api_request(
                                                 return process_response(retry_result, &mut timings, start_time, &state).await;
                                             }
                                             Err(e) => {
-                                                let _ = e;
+                                                digest_error = Some(e);
                                             }
                                         }
                                     }
@@ -1020,7 +1032,13 @@ pub async fn send_api_request(
                         }
                     }
 
-                    process_response(Ok(response), &mut timings, start_time, &state).await
+                    let mut api_response =
+                        process_response(Ok(response), &mut timings, start_time, &state).await?;
+                    if let Some(e) = digest_error {
+                        api_response.message =
+                            Some(format!("Digest authentication failed: {}", e));
+                    }
+                    Ok(api_response)
                 }
                 Err(e) => {
                     process_response(Err(e), &mut timings, start_time, &state).await
@@ -1228,6 +1246,117 @@ pub async fn cancel_api_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn digest_challenge(algorithm: &str) -> DigestChallenge {
+        DigestChallenge {
+            realm: "test-realm".to_string(),
+            nonce: "abc123".to_string(),
+            qop: Some("auth".to_string()),
+            opaque: None,
+            algorithm: algorithm.to_string(),
+        }
+    }
+
+    #[test]
+    fn digest_header_is_built_for_md5() {
+        let header =
+            build_digest_auth_header("user", "pass", "GET", "/api", &digest_challenge("MD5"))
+                .expect("MD5 is supported");
+
+        assert!(header.starts_with("Digest "));
+        assert!(header.contains(r#"username="user""#));
+        assert!(header.contains(r#"realm="test-realm""#));
+        assert!(header.contains(r#"uri="/api""#));
+        assert!(header.contains("algorithm=MD5"));
+        assert!(header.contains("qop=auth"));
+        assert!(!header.contains("pass"));
+    }
+
+    /// An unanswerable challenge must report why rather than be discarded — the
+    /// caller turns this into the message on the returned 401.
+    #[test]
+    fn digest_header_rejects_an_unsupported_algorithm() {
+        let err =
+            build_digest_auth_header("user", "pass", "GET", "/api", &digest_challenge("SHA-256"))
+                .expect_err("SHA-256 is not implemented");
+
+        assert!(err.contains("Unsupported algorithm"), "got: {}", err);
+        assert!(err.contains("SHA-256"), "got: {}", err);
+    }
+
+    fn aws_config() -> AwsAuthConfig {
+        AwsAuthConfig {
+            access_key_id: "AKIDEXAMPLE".to_string(),
+            secret_access_key: "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY".to_string(),
+            region: "us-east-1".to_string(),
+            service: "s3".to_string(),
+            session_token: None,
+        }
+    }
+
+    /// The signature commits to the payload, so the bytes handed to the signer
+    /// must be the bytes that get sent. Signing two different bodies must not
+    /// produce the same Authorization header.
+    #[test]
+    fn aws_signature_covers_the_body_bytes() {
+        let headers = HashMap::new();
+        let a = build_aws_v4_headers(
+            &aws_config(),
+            "PUT",
+            "https://example.s3.amazonaws.com/key",
+            &headers,
+            b"first payload",
+        )
+        .expect("signing succeeds");
+        let b = build_aws_v4_headers(
+            &aws_config(),
+            "PUT",
+            "https://example.s3.amazonaws.com/key",
+            &headers,
+            b"second payload",
+        )
+        .expect("signing succeeds");
+
+        assert_eq!(
+            a.get("x-amz-content-sha256"),
+            Some(&sha256_hex(b"first payload"))
+        );
+        assert_eq!(
+            b.get("x-amz-content-sha256"),
+            Some(&sha256_hex(b"second payload"))
+        );
+        assert_ne!(a.get("Authorization"), b.get("Authorization"));
+    }
+
+    #[test]
+    fn aws_session_token_is_emitted_only_when_present() {
+        let headers = HashMap::new();
+        let without = build_aws_v4_headers(
+            &aws_config(),
+            "GET",
+            "https://example.s3.amazonaws.com/key",
+            &headers,
+            b"",
+        )
+        .expect("signing succeeds");
+        assert!(!without.contains_key("x-amz-security-token"));
+
+        let with = build_aws_v4_headers(
+            &AwsAuthConfig {
+                session_token: Some("token-value".to_string()),
+                ..aws_config()
+            },
+            "GET",
+            "https://example.s3.amazonaws.com/key",
+            &headers,
+            b"",
+        )
+        .expect("signing succeeds");
+        assert_eq!(
+            with.get("x-amz-security-token"),
+            Some(&"token-value".to_string())
+        );
+    }
 
     #[test]
     fn decode_response_body_parses_json() {

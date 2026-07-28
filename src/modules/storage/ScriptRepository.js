@@ -73,14 +73,6 @@ export class ScriptRepository {
     }
 
     /**
-     * Get all scripts (for debugging/export purposes)
-     * @returns {Promise<Object>} All scripts
-     */
-    async getAllScripts() {
-        return this._getObjectFromStore(this.SCRIPTS_KEY);
-    }
-
-    /**
      * Helper to safely get object from store with fallback
      * Handles packaged app environments where store may return undefined
      * @private

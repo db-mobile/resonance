@@ -4,6 +4,7 @@
  */
 
 import { templateLoader } from '../templateLoader.js';
+import { pushEscapeHandler } from './modalEscape.js';
 
 /**
  * Shared scaffolding for overlay modal dialogs.
@@ -23,8 +24,8 @@ export class BaseModal {
         this.overlay = null;
         /** @type {HTMLElement|null} The dialog element hosting the template. */
         this.dialog = null;
-        /** @type {((e: KeyboardEvent) => void)|null} Global Escape handler, if any. */
-        this._keydownHandler = null;
+        /** @type {(() => void)|null} Releases this modal's Escape registration, if any. */
+        this._releaseEscape = null;
     }
 
     /**
@@ -68,12 +69,7 @@ export class BaseModal {
         }
 
         if (closeOnEscape) {
-            this._keydownHandler = (e) => {
-                if (e.key === 'Escape') {
-                    this.onDismiss();
-                }
-            };
-            document.addEventListener('keydown', this._keydownHandler);
+            this._releaseEscape = pushEscapeHandler(() => this.onDismiss());
         }
 
         return this.dialog;
@@ -97,9 +93,9 @@ export class BaseModal {
      * @returns {void}
      */
     destroy() {
-        if (this._keydownHandler) {
-            document.removeEventListener('keydown', this._keydownHandler);
-            this._keydownHandler = null;
+        if (this._releaseEscape) {
+            this._releaseEscape();
+            this._releaseEscape = null;
         }
         if (this.overlay) {
             this.overlay.remove();

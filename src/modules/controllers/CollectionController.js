@@ -982,23 +982,6 @@ export class CollectionController {
     }
 
     /**
-     * Processes and substitutes variables in form elements except URL
-     *
-     * Substitutes template variables in body, headers, and query params only.
-     * Used when URL should remain as template for user visibility.
-     *
-     * @async
-     * @param {string} collectionId - Collection ID for variable lookup
-     * @param {Object} formElements - Object containing form element references
-     * @returns {Promise<void>}
-     */
-    async processFormVariablesExceptUrl(collectionId, formElements) {
-        await this.variableApplicationService.processFormVariables(collectionId, formElements, {
-            includeUrl: false
-        });
-    }
-
-    /**
      * Gets references to form elements in the UI
      *
      * @returns {Object} Object containing references to form input elements
@@ -1020,43 +1003,4 @@ export class CollectionController {
         };
     }
 
-    /**
-     * Gets variables for the currently loaded collection
-     *
-     * @async
-     * @returns {Promise<Object>} Variables object for current collection, or empty object if no endpoint loaded
-     */
-    async getCurrentCollectionVariables() {
-        if (getCurrentEndpoint()) {
-            return this.variableService.getVariablesForCollection(getCurrentEndpoint().collectionId);
-        }
-        return {};
-    }
-
-    /**
-     * Processes a request object with variable substitution
-     *
-     * @async
-     * @param {Object} request - Request configuration object
-     * @returns {Promise<Object>} Processed request with substituted variables
-     */
-    async processRequestForVariables(request) {
-        if (getCurrentEndpoint()) {
-            return this.variableService.processRequest(request, getCurrentEndpoint().collectionId);
-        }
-        return request;
-    }
-
-    /**
-     * Restores the last selected request from storage
-     *
-     * Loads the previously selected endpoint into the form on application startup.
-     * Clears saved selection if collection or endpoint no longer exists.
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
-    async restoreLastSelectedRequest() {
-        await this.endpointLoaderService.restoreLastSelectedRequest();
-    }
 }
