@@ -37,8 +37,7 @@ export class CollectionRequestPersistenceService {
             const { parseKeyValuePairs } = await import('../keyValueManager.js');
             const { authManager } = await import('../authManager.js');
 
-            const collections = await this.repository.getAll();
-            const collection = collections.find(c => c.id === collectionId);
+            const collection = await this.repository.readForUpdate(collectionId);
             if (!collection) {
                 return;
             }
@@ -48,7 +47,7 @@ export class CollectionRequestPersistenceService {
             const descriptor = getProtocol(endpoint?.protocol);
 
             const savers = {
-                grpc: () => this.saveGrpcRequest(collectionId, endpointId, endpoint, endpointLocations, collections),
+                grpc: () => this.saveGrpcRequest(collectionId, endpointId, endpoint, endpointLocations, collection),
                 websocket: () => this.saveWebSocketRequest(collectionId, endpointId, parseKeyValuePairs),
                 graphql: () => this.saveGraphQLRequest(collectionId, endpointId, parseKeyValuePairs, authManager),
                 sse: () => this.saveSseRequest(collectionId, endpointId, parseKeyValuePairs, authManager),
@@ -63,7 +62,20 @@ export class CollectionRequestPersistenceService {
         }
     }
 
-    async saveGrpcRequest(collectionId, endpointId, endpoint, endpointLocations, collections) {
+    /**
+     * Persists a gRPC endpoint's captured state and mirrors the resolved method
+     * onto every stored copy of the endpoint.
+     *
+     * @param {string} collectionId - The collection identifier
+     * @param {string} endpointId - The endpoint identifier
+     * @param {Object} endpoint - The endpoint record being saved
+     * @param {Array<Object>} endpointLocations - Locations whose `endpoint` values
+     *   are references into `collection`, so mutating them and saving
+     *   `collection` persists every copy
+     * @param {Object} collection - The owning collection, already read for update
+     * @returns {Promise<void>}
+     */
+    async saveGrpcRequest(collectionId, endpointId, endpoint, endpointLocations, collection) {
         const grpcState = app.captureGrpcState ? app.captureGrpcState() : {};
 
         await this.repository.saveGrpcData(collectionId, endpointId, {
@@ -75,7 +87,7 @@ export class CollectionRequestPersistenceService {
             currentEndpoint.path = grpcState.fullMethod || currentEndpoint.path;
         });
 
-        await this.repository.save(collections);
+        await this.repository.saveOne(collection);
         await this.refreshCollections();
     }
 
@@ -233,8 +245,7 @@ export class CollectionRequestPersistenceService {
      * @returns {Promise<void>}
      */
     async patchEndpointRecords(collectionId, endpointId, patch) {
-        const collections = await this.repository.getAll();
-        const collection = collections.find(c => c.id === collectionId);
+        const collection = await this.repository.readForUpdate(collectionId);
         if (!collection) {
             return;
         }
@@ -256,7 +267,7 @@ export class CollectionRequestPersistenceService {
             Object.assign(endpoint, patch);
         });
 
-        await this.repository.save(collections);
+        await this.repository.saveOne(collection);
     }
 
     async saveHttpRequest(collectionId, endpointId, parseKeyValuePairs, authManager) {
@@ -323,8 +334,7 @@ export class CollectionRequestPersistenceService {
     async updateEndpointPathFromUrl(collectionId, endpointId, url) {
         try {
             const path = this.normalizePath(url);
-            const collections = await this.repository.getAll();
-            const collection = collections.find(c => c.id === collectionId);
+            const collection = await this.repository.readForUpdate(collectionId);
 
             if (!collection) {
                 return;
@@ -344,7 +354,7 @@ export class CollectionRequestPersistenceService {
                 endpoint.path = path;
             });
 
-            await this.repository.save(collections);
+            await this.repository.saveOne(collection);
             await this.refreshCollections();
         } catch (error) {
             void error;

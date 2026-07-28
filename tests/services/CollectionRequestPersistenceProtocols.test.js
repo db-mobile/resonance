@@ -36,8 +36,8 @@ describe('CollectionRequestPersistenceService protocol routing', () => {
         };
 
         repository = {
-            getAll: jest.fn().mockResolvedValue([collection]),
-            save: jest.fn().mockResolvedValue(undefined),
+            readForUpdate: jest.fn().mockResolvedValue(collection),
+            saveOne: jest.fn().mockResolvedValue(undefined),
             updateEndpointFields: jest.fn().mockResolvedValue(undefined),
             savePersistedUrl: jest.fn().mockResolvedValue(undefined),
             savePersistedQueryParams: jest.fn().mockResolvedValue(undefined),
@@ -123,13 +123,13 @@ describe('CollectionRequestPersistenceService protocol routing', () => {
             await service.patchEndpointRecords('c1', 'sse1', { httpMethod: 'PUT' });
 
             expect(collection.endpoints[0].httpMethod).toBe('PUT');
-            expect(repository.save).toHaveBeenCalled();
+            expect(repository.saveOne).toHaveBeenCalledWith(collection);
         });
 
         test('does not write when nothing changed', async () => {
             await service.patchEndpointRecords('c1', 'sse1', { httpMethod: 'GET' });
 
-            expect(repository.save).not.toHaveBeenCalled();
+            expect(repository.saveOne).not.toHaveBeenCalled();
         });
     });
 

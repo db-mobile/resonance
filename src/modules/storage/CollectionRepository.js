@@ -96,36 +96,6 @@ export class CollectionRepository {
     }
 
     /**
-     * Saves collections array to storage (legacy compatibility)
-     * 
-     * Note: This method saves each collection individually. For better performance,
-     * prefer using saveOne() when updating a single collection.
-     *
-     * @async
-     * @param {Array<Object>} collections - Array of collection objects to save
-     * @returns {Promise<void>}
-     * @throws {Error} If storage write fails
-     */
-    async save(collections) {
-        try {
-            const existingIds = await this.backendAPI.collections.list();
-            const newIds = collections.map(c => c.id);
-
-            for (const id of existingIds) {
-                if (!newIds.includes(id)) {
-                    await this.backendAPI.collections.delete(id);
-                }
-            }
-
-            for (const collection of collections) {
-                await this.backendAPI.collections.save(collection);
-            }
-        } catch (error) {
-            throw new Error(`Failed to save collections: ${error.message || error}`, { cause: error });
-        }
-    }
-
-    /**
      * Retrieves a collection by its ID
      *
      * @async
@@ -569,6 +539,23 @@ export class CollectionRepository {
     }
 
     /**
+     * Reads one collection straight from the backend, without consulting or
+     * touching the cache.
+     *
+     * @private
+     * @async
+     * @param {string} id - The collection ID
+     * @returns {Promise<Object|undefined>} The collection or undefined
+     */
+    async _readFromBackend(id) {
+        try {
+            return await this.backendAPI.collections.get(id);
+        } catch (error) {
+            return undefined;
+        }
+    }
+
+    /**
      * Reads a collection directly from the backend, bypassing (and refreshing)
      * this instance's LRU cache. Several repository instances exist at runtime
      * (controller, apiHandler, runner), each with its own cache; auth
@@ -581,15 +568,30 @@ export class CollectionRepository {
      * @returns {Promise<Object|undefined>} The collection or undefined
      */
     async _getByIdFresh(id) {
-        try {
-            const collection = await this.backendAPI.collections.get(id);
-            if (collection) {
-                this._addToCache(id, collection);
-            }
-            return collection;
-        } catch (error) {
-            return undefined;
+        const collection = await this._readFromBackend(id);
+        if (collection) {
+            this._addToCache(id, collection);
         }
+        return collection;
+    }
+
+    /**
+     * Reads one collection for a read-modify-write cycle: callers mutate the
+     * returned object in place and then persist it with saveOne().
+     *
+     * Deliberately leaves the cache untouched. Caching an object that is about
+     * to be mutated would let a failed write strand mutated-but-unpersisted
+     * state where getById() would serve it as truth; saveOne() caches the
+     * object once the write succeeds, so the cache only ever holds persisted
+     * state. Reading a single collection also keeps an edit to one request from
+     * depending on every collection being readable.
+     *
+     * @async
+     * @param {string} id - The collection ID
+     * @returns {Promise<Object|undefined>} The collection or undefined
+     */
+    async readForUpdate(id) {
+        return this._readFromBackend(id);
     }
 
     /**
