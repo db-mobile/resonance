@@ -326,14 +326,11 @@ export class DocGeneratorService {
             }
         }
 
-        let responseSchema = persistedData?.responseSchema;
-        if (!responseSchema) {
-            const endpointData = await this.collectionRepository.getAllPersistedEndpointData(
-                collection.id,
-                endpoint.id
-            );
-            responseSchema = endpointData?.responseSchema;
-        }
+        const schemaSource = persistedData ?? await this.collectionRepository.getAllPersistedEndpointData(
+            collection.id,
+            endpoint.id
+        );
+        const responseSchema = schemaSource?.responseSchema;
         if (responseSchema) {
             lines.push('#### Response Schema');
             lines.push('');
@@ -534,14 +531,11 @@ export class DocGeneratorService {
             html.push('</div>');
         }
 
-        let responseSchema = persistedData?.responseSchema;
-        if (!responseSchema) {
-            const endpointData = await this.collectionRepository.getAllPersistedEndpointData(
-                collection.id,
-                endpoint.id
-            );
-            responseSchema = endpointData?.responseSchema;
-        }
+        const schemaSource = persistedData ?? await this.collectionRepository.getAllPersistedEndpointData(
+            collection.id,
+            endpoint.id
+        );
+        const responseSchema = schemaSource?.responseSchema;
         if (responseSchema) {
             html.push('<details class="schema-section">');
             html.push('<summary><h4>Response Schema</h4></summary>');

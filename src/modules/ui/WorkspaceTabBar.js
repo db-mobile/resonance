@@ -82,8 +82,9 @@ export class WorkspaceTabBar {
 
         if (!this.resizeObserver) {
             this.resizeObserver = new ResizeObserver(() => this._updateScrollButtons());
-            this.resizeObserver.observe(tabBar);
         }
+        this.resizeObserver.disconnect();
+        this.resizeObserver.observe(tabBar);
     }
 
     /**

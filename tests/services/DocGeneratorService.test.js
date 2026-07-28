@@ -372,6 +372,19 @@ describe('DocGeneratorService', () => {
     });
 
     describe('persisted data handling', () => {
+        test('reads each endpoint\'s persisted data once per document', async () => {
+            mockCollectionRepository.getAllPersistedEndpointData.mockResolvedValue({
+                responseSchema: null,
+                queryParams: []
+            });
+
+            await service.generateMarkdown(mockCollection, { includePersistedData: true });
+
+            expect(mockCollectionRepository.getAllPersistedEndpointData).toHaveBeenCalledTimes(
+                mockCollection.endpoints.length
+            );
+        });
+
         test('should fetch persisted data when includePersistedData is true', async () => {
             mockCollectionRepository.getAllPersistedEndpointData.mockResolvedValue({
                 modifiedBody: '{"custom": "data"}',

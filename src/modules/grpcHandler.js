@@ -31,7 +31,6 @@ import { recordGrpcHistory } from './grpcHistory.js';
 import { createKeyValueRow } from './keyValueManager.js';
 import { getCurrentEndpoint } from './state/currentEndpoint.js';
 
-let lastTarget = null;
 let methodsCache = new Map();
 const methodFlagsCache = new Map();
 
@@ -347,7 +346,6 @@ async function onConnect() {
 
         const target = await resolveGrpcTarget(rawTarget);
         const services = await loadServices(target);
-        lastTarget = target;
         methodsCache = new Map();
 
         const previousProtoPath = activeSource.protoPath;
@@ -752,7 +750,7 @@ export function initGrpcUI() {
             }
         });
         if (!grpcTargetInput.value) {
-            grpcTargetInput.value = lastTarget || 'grpcb.in:9000';
+            grpcTargetInput.value = 'grpcb.in:9000';
         }
     }
 
