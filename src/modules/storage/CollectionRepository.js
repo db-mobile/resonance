@@ -247,6 +247,48 @@ export class CollectionRepository {
         await this._saveEndpointData(collectionId, endpointId, data);
     }
 
+    /**
+     * Reads one field from an endpoint's sidecar data, falling back to that
+     * field's empty value.
+     *
+     * `_getEndpointData` already absorbs read failures and yields `{}`, so a
+     * missing file and an absent field are the same case here.
+     *
+     * @private
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {string} field - Sidecar field name
+     * @param {*} empty - Value to return when the field holds nothing
+     * @returns {Promise<*>} The stored value or `empty`
+     */
+    async _readSidecar(collectionId, endpointId, field, empty) {
+        const data = await this._getEndpointData(collectionId, endpointId);
+        return data[field] || empty;
+    }
+
+    /**
+     * Writes one field of an endpoint's sidecar data, leaving its siblings
+     * intact, and labels any write failure with the field it was saving.
+     *
+     * @private
+     * @async
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {string} field - Sidecar field name
+     * @param {*} value - Value to persist
+     * @param {string} label - Human-readable field name for the error message
+     * @returns {Promise<void>}
+     * @throws {Error} If the write fails
+     */
+    async _writeSidecar(collectionId, endpointId, field, value, label) {
+        try {
+            await this._updateEndpointField(collectionId, endpointId, field, value);
+        } catch (error) {
+            throw new Error(`Failed to save ${label}: ${error.message || error}`, { cause: error });
+        }
+    }
+
     async updateEndpointFields(collectionId, endpointId, updates) {
         try {
             await this._updateEndpointFields(collectionId, endpointId, updates);
@@ -276,12 +318,7 @@ export class CollectionRepository {
      * @returns {Promise<string|null>} The modified request body or null if not found
      */
     async getModifiedRequestBody(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.modifiedBody || null;
-        } catch (error) {
-            return null;
-        }
+        return this._readSidecar(collectionId, endpointId, 'modifiedBody', null);
     }
 
     /**
@@ -295,28 +332,15 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async saveModifiedRequestBody(collectionId, endpointId, body) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'modifiedBody', body);
-        } catch (error) {
-            throw new Error(`Failed to save modified request body: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'modifiedBody', body, 'modified request body');
     }
 
     async getFormBodyData(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data?.formBodyData || null;
-        } catch (error) {
-            return null;
-        }
+        return this._readSidecar(collectionId, endpointId, 'formBodyData', null);
     }
 
     async saveFormBodyData(collectionId, endpointId, data) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'formBodyData', data);
-        } catch (error) {
-            throw new Error(`Failed to save form body data: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'formBodyData', data, 'form body data');
     }
 
     /**
@@ -328,12 +352,7 @@ export class CollectionRepository {
      * @returns {Promise<Array>} Array of path parameter objects or empty array
      */
     async getPersistedPathParams(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.pathParams || [];
-        } catch (error) {
-            return [];
-        }
+        return this._readSidecar(collectionId, endpointId, 'pathParams', []);
     }
 
     /**
@@ -347,11 +366,7 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async savePersistedPathParams(collectionId, endpointId, pathParams) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'pathParams', pathParams);
-        } catch (error) {
-            throw new Error(`Failed to save persisted path params: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'pathParams', pathParams, 'persisted path params');
     }
 
     /**
@@ -363,12 +378,7 @@ export class CollectionRepository {
      * @returns {Promise<Array>} Array of query parameter objects or empty array
      */
     async getPersistedQueryParams(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.queryParams || [];
-        } catch (error) {
-            return [];
-        }
+        return this._readSidecar(collectionId, endpointId, 'queryParams', []);
     }
 
     /**
@@ -382,11 +392,7 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async savePersistedQueryParams(collectionId, endpointId, queryParams) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'queryParams', queryParams);
-        } catch (error) {
-            throw new Error(`Failed to save persisted query params: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'queryParams', queryParams, 'persisted query params');
     }
 
     /**
@@ -398,12 +404,7 @@ export class CollectionRepository {
      * @returns {Promise<Array>} Array of header objects or empty array
      */
     async getPersistedHeaders(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.headers || [];
-        } catch (error) {
-            return [];
-        }
+        return this._readSidecar(collectionId, endpointId, 'headers', []);
     }
 
     /**
@@ -417,11 +418,7 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async savePersistedHeaders(collectionId, endpointId, headers) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'headers', headers);
-        } catch (error) {
-            throw new Error(`Failed to save persisted headers: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'headers', headers, 'persisted headers');
     }
 
     /**
@@ -714,12 +711,7 @@ export class CollectionRepository {
      * @returns {Promise<string|null>} The persisted URL or null if not found
      */
     async getPersistedUrl(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.url || null;
-        } catch (error) {
-            return null;
-        }
+        return this._readSidecar(collectionId, endpointId, 'url', null);
     }
 
     /**
@@ -733,11 +725,7 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async savePersistedUrl(collectionId, endpointId, url) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'url', url);
-        } catch (error) {
-            throw new Error(`Failed to save persisted URL: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'url', url, 'persisted URL');
     }
 
     /**
@@ -863,11 +851,7 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async saveGraphQLData(collectionId, endpointId, data) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'graphqlData', data);
-        } catch (error) {
-            throw new Error(`Failed to save GraphQL data: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'graphqlData', data, 'GraphQL data');
     }
 
     /**
@@ -879,29 +863,15 @@ export class CollectionRepository {
      * @returns {Promise<Object|null>} GraphQL data or null if not found
      */
     async getGraphQLData(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.graphqlData || null;
-        } catch (error) {
-            return null;
-        }
+        return this._readSidecar(collectionId, endpointId, 'graphqlData', null);
     }
 
     async saveGrpcData(collectionId, endpointId, data) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'grpcData', data);
-        } catch (error) {
-            throw new Error(`Failed to save gRPC data: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'grpcData', data, 'gRPC data');
     }
 
     async getGrpcData(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.grpcData || null;
-        } catch (error) {
-            return null;
-        }
+        return this._readSidecar(collectionId, endpointId, 'grpcData', null);
     }
 
     /**
@@ -915,11 +885,7 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async saveMqttData(collectionId, endpointId, data) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'mqttData', data);
-        } catch (error) {
-            throw new Error(`Failed to save MQTT data: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'mqttData', data, 'MQTT data');
     }
 
     /**
@@ -931,12 +897,7 @@ export class CollectionRepository {
      * @returns {Promise<Object|null>} MQTT data or null if not found
      */
     async getMqttData(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.mqttData || null;
-        } catch (error) {
-            return null;
-        }
+        return this._readSidecar(collectionId, endpointId, 'mqttData', null);
     }
 
     /**
@@ -950,11 +911,7 @@ export class CollectionRepository {
      * @throws {Error} If save operation fails
      */
     async saveResponseSchema(collectionId, endpointId, schema) {
-        try {
-            await this._updateEndpointField(collectionId, endpointId, 'responseSchema', schema);
-        } catch (error) {
-            throw new Error(`Failed to save response schema: ${error.message || error}`, { cause: error });
-        }
+        return this._writeSidecar(collectionId, endpointId, 'responseSchema', schema, 'response schema');
     }
 
     /**
@@ -966,11 +923,6 @@ export class CollectionRepository {
      * @returns {Promise<Object|null>} The JSON Schema object or null if not found
      */
     async getResponseSchema(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return data.responseSchema || null;
-        } catch (error) {
-            return null;
-        }
+        return this._readSidecar(collectionId, endpointId, 'responseSchema', null);
     }
 }
