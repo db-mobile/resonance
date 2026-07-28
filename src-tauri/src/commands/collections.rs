@@ -73,6 +73,23 @@ pub struct EndpointData {
     pub response_schema: Option<Value>,
 }
 
+impl EndpointData {
+    /// True when the legacy store held anything worth writing to an endpoint
+    /// file. Only the fields the migration populates are considered; the rest
+    /// are always `None` on this path.
+    fn has_migrated_content(&self) -> bool {
+        self.modified_body.is_some()
+            || !self.path_params.is_empty()
+            || !self.query_params.is_empty()
+            || !self.headers.is_empty()
+            || self.auth_config.is_some()
+            || self.url.is_some()
+            || self.scripts.is_some()
+            || self.graphql_data.is_some()
+            || self.grpc_data.is_some()
+    }
+}
+
 fn get_default_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let app_data_dir = app
         .path()
@@ -811,38 +828,39 @@ pub async fn collections_migrate(app: AppHandle) -> Result<u32, String> {
     Ok(migrated_count)
 }
 
+/// Read one of the legacy global-store maps, defaulting to an empty object so a
+/// key that was never written behaves like one holding nothing.
+fn legacy_map(store: &tauri_plugin_store::Store<tauri::Wry>, key: &str) -> Value {
+    store
+        .get(key)
+        .unwrap_or(Value::Object(serde_json::Map::new()))
+}
+
+fn legacy_string(map: &Value, key: &str) -> Option<String> {
+    map.get(key).and_then(|v| v.as_str()).map(str::to_string)
+}
+
+fn legacy_array(map: &Value, key: &str) -> Vec<Value> {
+    map.get(key)
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default()
+}
+
 fn migrate_endpoint_data(
     app: &AppHandle,
     store: &tauri_plugin_store::Store<tauri::Wry>,
     collection_id: &str,
 ) -> Result<(), String> {
-    let modified_bodies = store
-        .get("modifiedRequestBodies")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let path_params = store
-        .get("persistedPathParams")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let query_params = store
-        .get("persistedQueryParams")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let headers = store
-        .get("persistedHeaders")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let auth_configs = store
-        .get("persistedAuthConfigs")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let urls = store
-        .get("persistedUrls")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let scripts = store
-        .get("persistedScripts")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let graphql_data = store
-        .get("graphqlData")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
-    let grpc_data = store
-        .get("grpcData")
-        .unwrap_or(Value::Object(serde_json::Map::new()));
+    let modified_bodies = legacy_map(store, "modifiedRequestBodies");
+    let path_params = legacy_map(store, "persistedPathParams");
+    let query_params = legacy_map(store, "persistedQueryParams");
+    let headers = legacy_map(store, "persistedHeaders");
+    let auth_configs = legacy_map(store, "persistedAuthConfigs");
+    let urls = legacy_map(store, "persistedUrls");
+    let scripts = legacy_map(store, "persistedScripts");
+    let graphql_data = legacy_map(store, "graphqlData");
+    let grpc_data = legacy_map(store, "grpcData");
 
     let prefix = format!("{}_", collection_id);
     let mut endpoint_ids: HashSet<String> = HashSet::new();
@@ -879,30 +897,12 @@ fn migrate_endpoint_data(
         let key = format!("{}_{}", collection_id, endpoint_id);
 
         let mut endpoint_data = EndpointData {
-            modified_body: modified_bodies
-                .get(&key)
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            path_params: path_params
-                .get(&key)
-                .and_then(|v| v.as_array())
-                .cloned()
-                .unwrap_or_default(),
-            query_params: query_params
-                .get(&key)
-                .and_then(|v| v.as_array())
-                .cloned()
-                .unwrap_or_default(),
-            headers: headers
-                .get(&key)
-                .and_then(|v| v.as_array())
-                .cloned()
-                .unwrap_or_default(),
+            modified_body: legacy_string(&modified_bodies, &key),
+            path_params: legacy_array(&path_params, &key),
+            query_params: legacy_array(&query_params, &key),
+            headers: legacy_array(&headers, &key),
             auth_config: auth_configs.get(&key).cloned(),
-            url: urls
-                .get(&key)
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
+            url: legacy_string(&urls, &key),
             scripts: scripts.get(&key).cloned(),
             graphql_data: graphql_data.get(&key).cloned(),
             form_body_data: None,
@@ -911,16 +911,7 @@ fn migrate_endpoint_data(
             response_schema: None,
         };
 
-        if endpoint_data.modified_body.is_some()
-            || !endpoint_data.path_params.is_empty()
-            || !endpoint_data.query_params.is_empty()
-            || !endpoint_data.headers.is_empty()
-            || endpoint_data.auth_config.is_some()
-            || endpoint_data.url.is_some()
-            || endpoint_data.scripts.is_some()
-            || endpoint_data.graphql_data.is_some()
-            || endpoint_data.grpc_data.is_some()
-        {
+        if endpoint_data.has_migrated_content() {
             if let Some(auth) = endpoint_data.auth_config.as_mut() {
                 redact_auth_secrets(auth);
             }

@@ -32,6 +32,9 @@ struct MqttConnection {
     client: AsyncClient,
     poll_handle: JoinHandle<()>,
     config_key: String,
+    /// Kept so failures raised outside the connect path — a publish error, say —
+    /// can still name the broker in their event.
+    broker: String,
 }
 
 pub struct MqttState {
@@ -359,6 +362,7 @@ async fn establish_connection(
             client: client.clone(),
             poll_handle,
             config_key,
+            broker: request.broker.clone(),
         },
     );
     drop(connections);
@@ -464,14 +468,15 @@ pub async fn mqtt_publish(
         return Err("Publish topic is required".to_string());
     }
 
-    let client = {
+    let connection = {
         let connections = state.connections.lock().await;
         connections
             .get(&request.tab_id)
-            .map(|connection| connection.client.clone())
+            .map(|connection| (connection.client.clone(), connection.broker.clone()))
     };
 
-    let client = client.ok_or_else(|| "Not connected to an MQTT broker".to_string())?;
+    let (client, broker) =
+        connection.ok_or_else(|| "Not connected to an MQTT broker".to_string())?;
 
     let qos = qos_from_u8(request.qos.unwrap_or(0));
     let payload = request.payload.unwrap_or_default();
@@ -484,11 +489,9 @@ pub async fn mqtt_publish(
             let message = format!("Failed to publish to '{}': {}", request.topic.trim(), error);
             emit_event(
                 &app,
-                // The broker URL is not stored on the connection handle, so a
-                // publish failure reports an empty one.
                 MqttEventPayload::error_on_topic(
                     &request.tab_id,
-                    "",
+                    &broker,
                     request.topic.trim().to_string(),
                     message.clone(),
                 ),

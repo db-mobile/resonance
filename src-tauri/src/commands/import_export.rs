@@ -152,32 +152,9 @@ pub async fn import_postman_collection(
 
 #[tauri::command]
 pub async fn import_postman_environment(app: AppHandle) -> Result<Option<Value>, String> {
-    let (tx, rx) = oneshot::channel::<Option<FilePath>>();
-
-    let mut dialog = app
-        .dialog()
-        .file()
-        .add_filter("Postman Environment", &["json"]);
-
-    // Set starting directory to last used location
-    if let Some(last_dir) = get_last_import_directory(&app) {
-        dialog = dialog.set_directory(last_dir);
-    }
-
-    dialog.pick_file(move |file_path| {
-        let _ = tx.send(file_path);
-    });
-
-    let file_path = rx.await.map_err(|e| format!("Dialog error: {}", e))?;
-
-    let Some(path) = file_path else {
+    let Some(file_path) = pick_import_file_with_kind(&app, "postman_environment").await? else {
         return Ok(None);
     };
-
-    let file_path = path.as_path().ok_or("Invalid file path")?;
-
-    // Save the directory for next time
-    save_last_import_directory(&app, file_path);
 
     let content =
         std::fs::read_to_string(file_path).map_err(|e| format!("Failed to read file: {}", e))?;

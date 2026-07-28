@@ -362,21 +362,7 @@ fn oauth2_to_postman(config: Option<&Value>) -> Option<Value> {
     }
 
     let manual = postman_grant.is_none();
-    let mappings = [
-        ("tokenUrl", "accessTokenUrl"),
-        ("authorizationUrl", "authUrl"),
-        ("clientId", "clientId"),
-        ("clientSecret", "clientSecret"),
-        ("scope", "scope"),
-        ("redirectUri", "redirect_uri"),
-        ("username", "username"),
-        ("password", "password"),
-        ("audience", "audience"),
-        ("clientAuthMethod", "client_authentication"),
-        ("headerPrefix", "headerPrefix"),
-        ("token", "accessToken"),
-    ];
-    for (app_key, postman_key) in mappings {
+    for (postman_key, app_key) in super::storage::OAUTH2_KEY_MAP {
         if manual && !matches!(postman_key, "accessToken" | "headerPrefix") {
             continue;
         }

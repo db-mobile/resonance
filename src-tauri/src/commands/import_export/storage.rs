@@ -14,6 +14,24 @@ use tokio::sync::oneshot;
 const STORE_FILE: &str = "resonance-store.json";
 const LAST_IMPORT_DIR_KEY: &str = "lastImportDirectory";
 
+/// Postman OAuth2 parameter names paired with the app's config keys, as
+/// `(postman_key, app_key)`. Import reads it left to right and export right to
+/// left; one table keeps the two directions from drifting apart.
+pub(crate) const OAUTH2_KEY_MAP: [(&str, &str); 12] = [
+    ("accessTokenUrl", "tokenUrl"),
+    ("authUrl", "authorizationUrl"),
+    ("clientId", "clientId"),
+    ("clientSecret", "clientSecret"),
+    ("scope", "scope"),
+    ("redirect_uri", "redirectUri"),
+    ("username", "username"),
+    ("password", "password"),
+    ("audience", "audience"),
+    ("client_authentication", "clientAuthMethod"),
+    ("headerPrefix", "headerPrefix"),
+    ("accessToken", "token"),
+];
+
 pub(crate) fn is_http_method(method: &str) -> bool {
     matches!(
         method.to_ascii_uppercase().as_str(),
