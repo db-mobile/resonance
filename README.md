@@ -113,7 +113,11 @@ Or download the `.dmg` from the [latest release](https://github.com/db-mobile/re
 
 ### Windows
 
-Download the `.msi` or `.exe` installer from the [latest release](https://github.com/db-mobile/resonance/releases/latest).
+```powershell
+winget install DBMobile.Resonance
+```
+
+Or download the `.exe` installer from the [latest release](https://github.com/db-mobile/resonance/releases/latest).
 
 ### From Source
 
