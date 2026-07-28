@@ -313,7 +313,9 @@ export class AuthManager {
             keyLocationSelect.addEventListener('change', (e) => {
                 this.currentAuthConfig.config.location = e.target.value;
             });
-            this.currentAuthConfig.config.location = 'header';
+            if (!this.currentAuthConfig.config.location) {
+                this.currentAuthConfig.config.location = 'header';
+            }
         }
     }
 
