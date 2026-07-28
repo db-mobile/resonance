@@ -80,8 +80,81 @@ impl Default for GrpcStreamingState {
     }
 }
 
+impl GrpcStreamEventPayload {
+    fn new(tab_id: &str, full_method: &str, event_type: &str) -> Self {
+        Self {
+            tab_id: tab_id.to_string(),
+            event_type: event_type.to_string(),
+            full_method: full_method.to_string(),
+            message: None,
+            status: None,
+            status_message: None,
+            headers: None,
+            trailers: None,
+        }
+    }
+
+    /// Response headers are only known up front for the paths that await the
+    /// stream's opening metadata; client-streaming reports them with the reply.
+    fn open(tab_id: &str, full_method: &str, headers: Option<Value>) -> Self {
+        Self {
+            headers,
+            ..Self::new(tab_id, full_method, "open")
+        }
+    }
+
+    fn message(tab_id: &str, full_method: &str, data: Value, headers: Option<Value>) -> Self {
+        Self {
+            message: Some(data),
+            headers,
+            ..Self::new(tab_id, full_method, "message")
+        }
+    }
+
+    fn close_ok(tab_id: &str, full_method: &str, trailers: Option<Value>) -> Self {
+        Self {
+            status: Some(0),
+            status_message: Some("OK".to_string()),
+            trailers,
+            ..Self::new(tab_id, full_method, "close")
+        }
+    }
+
+    fn close(tab_id: &str, full_method: &str, status: i32, status_message: String) -> Self {
+        Self {
+            status: Some(status),
+            status_message: Some(status_message),
+            ..Self::new(tab_id, full_method, "close")
+        }
+    }
+
+    fn error(tab_id: &str, full_method: &str, status: i32, status_message: String) -> Self {
+        Self {
+            status: Some(status),
+            status_message: Some(status_message),
+            ..Self::new(tab_id, full_method, "error")
+        }
+    }
+}
+
 fn emit(app: &AppHandle, payload: GrpcStreamEventPayload) {
     let _ = app.emit("grpc-stream-event", payload);
+}
+
+/// A failed stream reports its status twice: as `error` so the UI can surface
+/// it, then as `close` so the stream is torn down like any other. Both carry
+/// the same code and message.
+fn emit_error_and_close(app: &AppHandle, tab_id: &str, full_method: &str, status: &tonic::Status) {
+    let code = status.code() as i32;
+    let message = status.message().to_string();
+    emit(
+        app,
+        GrpcStreamEventPayload::error(tab_id, full_method, code, message.clone()),
+    );
+    emit(
+        app,
+        GrpcStreamEventPayload::close(tab_id, full_method, code, message),
+    );
 }
 
 fn apply_metadata<T>(
@@ -197,16 +270,7 @@ pub async fn grpc_stream_start(
 
         emit(
             &app,
-            GrpcStreamEventPayload {
-                tab_id: tab_id.clone(),
-                event_type: "open".to_string(),
-                full_method: full_method.clone(),
-                message: None,
-                status: None,
-                status_message: None,
-                headers: None,
-                trailers: None,
-            },
+            GrpcStreamEventPayload::open(&tab_id, &full_method, None),
         );
 
         let read_app = app.clone();
@@ -222,58 +286,20 @@ pub async fn grpc_stream_start(
                     let data = dynamic_message_to_json(&msg).unwrap_or(Value::Null);
                     emit(
                         &read_app,
-                        GrpcStreamEventPayload {
-                            tab_id: read_tab_id.clone(),
-                            event_type: "message".to_string(),
-                            full_method: read_full_method.clone(),
-                            message: Some(data),
-                            status: None,
-                            status_message: None,
-                            headers: Some(headers),
-                            trailers: None,
-                        },
+                        GrpcStreamEventPayload::message(
+                            &read_tab_id,
+                            &read_full_method,
+                            data,
+                            Some(headers),
+                        ),
                     );
                     emit(
                         &read_app,
-                        GrpcStreamEventPayload {
-                            tab_id: read_tab_id.clone(),
-                            event_type: "close".to_string(),
-                            full_method: read_full_method.clone(),
-                            message: None,
-                            status: Some(0),
-                            status_message: Some("OK".to_string()),
-                            headers: None,
-                            trailers: None,
-                        },
+                        GrpcStreamEventPayload::close_ok(&read_tab_id, &read_full_method, None),
                     );
                 }
                 Err(status) => {
-                    emit(
-                        &read_app,
-                        GrpcStreamEventPayload {
-                            tab_id: read_tab_id.clone(),
-                            event_type: "error".to_string(),
-                            full_method: read_full_method.clone(),
-                            message: None,
-                            status: Some(status.code() as i32),
-                            status_message: Some(status.message().to_string()),
-                            headers: None,
-                            trailers: None,
-                        },
-                    );
-                    emit(
-                        &read_app,
-                        GrpcStreamEventPayload {
-                            tab_id: read_tab_id.clone(),
-                            event_type: "close".to_string(),
-                            full_method: read_full_method.clone(),
-                            message: None,
-                            status: Some(status.code() as i32),
-                            status_message: Some(status.message().to_string()),
-                            headers: None,
-                            trailers: None,
-                        },
-                    );
+                    emit_error_and_close(&read_app, &read_tab_id, &read_full_method, &status);
                 }
             }
 
@@ -335,16 +361,7 @@ pub async fn grpc_stream_start(
 
     emit(
         &app,
-        GrpcStreamEventPayload {
-            tab_id: tab_id.clone(),
-            event_type: "open".to_string(),
-            full_method: full_method.clone(),
-            message: None,
-            status: None,
-            status_message: None,
-            headers: Some(headers),
-            trailers: None,
-        },
+        GrpcStreamEventPayload::open(&tab_id, &full_method, Some(headers)),
     );
 
     let read_app = app.clone();
@@ -359,16 +376,12 @@ pub async fn grpc_stream_start(
                     let data = dynamic_message_to_json(&msg).unwrap_or(Value::Null);
                     emit(
                         &read_app,
-                        GrpcStreamEventPayload {
-                            tab_id: read_tab_id.clone(),
-                            event_type: "message".to_string(),
-                            full_method: read_full_method.clone(),
-                            message: Some(data),
-                            status: None,
-                            status_message: None,
-                            headers: None,
-                            trailers: None,
-                        },
+                        GrpcStreamEventPayload::message(
+                            &read_tab_id,
+                            &read_full_method,
+                            data,
+                            None,
+                        ),
                     );
                 }
                 Ok(None) => {
@@ -380,46 +393,12 @@ pub async fn grpc_stream_start(
                         .map(|m| metadata_to_json_map(&m));
                     emit(
                         &read_app,
-                        GrpcStreamEventPayload {
-                            tab_id: read_tab_id.clone(),
-                            event_type: "close".to_string(),
-                            full_method: read_full_method.clone(),
-                            message: None,
-                            status: Some(0),
-                            status_message: Some("OK".to_string()),
-                            headers: None,
-                            trailers,
-                        },
+                        GrpcStreamEventPayload::close_ok(&read_tab_id, &read_full_method, trailers),
                     );
                     break;
                 }
                 Err(status) => {
-                    emit(
-                        &read_app,
-                        GrpcStreamEventPayload {
-                            tab_id: read_tab_id.clone(),
-                            event_type: "error".to_string(),
-                            full_method: read_full_method.clone(),
-                            message: None,
-                            status: Some(status.code() as i32),
-                            status_message: Some(status.message().to_string()),
-                            headers: None,
-                            trailers: None,
-                        },
-                    );
-                    emit(
-                        &read_app,
-                        GrpcStreamEventPayload {
-                            tab_id: read_tab_id.clone(),
-                            event_type: "close".to_string(),
-                            full_method: read_full_method.clone(),
-                            message: None,
-                            status: Some(status.code() as i32),
-                            status_message: Some(status.message().to_string()),
-                            headers: None,
-                            trailers: None,
-                        },
-                    );
+                    emit_error_and_close(&read_app, &read_tab_id, &read_full_method, &status);
                     break;
                 }
             }
@@ -504,18 +483,119 @@ pub async fn grpc_stream_cancel(
             abort.abort();
             emit(
                 &app,
-                GrpcStreamEventPayload {
-                    tab_id,
-                    event_type: "close".to_string(),
-                    full_method,
-                    message: None,
-                    status: Some(tonic::Code::Cancelled as i32),
-                    status_message: Some("cancelled".to_string()),
-                    headers: None,
-                    trailers: None,
-                },
+                GrpcStreamEventPayload::close(
+                    &tab_id,
+                    &full_method,
+                    tonic::Code::Cancelled as i32,
+                    "cancelled".to_string(),
+                ),
             );
         }
     }
     Ok(GrpcStreamCommandResponse { success: true })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn json(payload: GrpcStreamEventPayload) -> Value {
+        serde_json::to_value(payload).unwrap()
+    }
+
+    /// The payload is a frontend contract, so pin what each constructor emits
+    /// and — just as importantly — what it leaves out.
+    #[test]
+    fn payload_constructors_emit_the_expected_wire_shapes() {
+        let open = json(GrpcStreamEventPayload::open(
+            "tab-1",
+            "/pkg.Svc/Method",
+            None,
+        ));
+        assert_eq!(open["tabId"], "tab-1");
+        assert_eq!(open["eventType"], "open");
+        assert_eq!(open["fullMethod"], "/pkg.Svc/Method");
+        assert!(open.get("headers").is_none());
+        assert!(open.get("status").is_none());
+
+        let open_with_headers = json(GrpcStreamEventPayload::open(
+            "tab-1",
+            "/pkg.Svc/Method",
+            Some(serde_json::json!({ "x-trace": "abc" })),
+        ));
+        assert_eq!(open_with_headers["headers"]["x-trace"], "abc");
+
+        let message = json(GrpcStreamEventPayload::message(
+            "tab-1",
+            "/pkg.Svc/Method",
+            serde_json::json!({ "ok": true }),
+            None,
+        ));
+        assert_eq!(message["eventType"], "message");
+        assert_eq!(message["message"]["ok"], true);
+        assert!(message.get("headers").is_none());
+
+        let close_ok = json(GrpcStreamEventPayload::close_ok(
+            "tab-1",
+            "/pkg.Svc/Method",
+            None,
+        ));
+        assert_eq!(close_ok["eventType"], "close");
+        assert_eq!(close_ok["status"], 0);
+        assert_eq!(close_ok["statusMessage"], "OK");
+        assert!(close_ok.get("trailers").is_none());
+
+        let close_ok_trailers = json(GrpcStreamEventPayload::close_ok(
+            "tab-1",
+            "/pkg.Svc/Method",
+            Some(serde_json::json!({ "grpc-status": "0" })),
+        ));
+        assert_eq!(close_ok_trailers["trailers"]["grpc-status"], "0");
+
+        let error = json(GrpcStreamEventPayload::error(
+            "tab-1",
+            "/pkg.Svc/Method",
+            14,
+            "unavailable".to_string(),
+        ));
+        assert_eq!(error["eventType"], "error");
+        assert_eq!(error["status"], 14);
+        assert_eq!(error["statusMessage"], "unavailable");
+
+        let close = json(GrpcStreamEventPayload::close(
+            "tab-1",
+            "/pkg.Svc/Method",
+            1,
+            "cancelled".to_string(),
+        ));
+        assert_eq!(close["eventType"], "close");
+        assert_eq!(close["status"], 1);
+        assert_eq!(close["statusMessage"], "cancelled");
+    }
+
+    /// A failure emits error then close, both carrying the same status, so the
+    /// UI can surface the reason and still tear the stream down.
+    #[test]
+    fn an_error_and_its_close_carry_the_same_status() {
+        let status = tonic::Status::new(tonic::Code::Unavailable, "backend down");
+        let code = status.code() as i32;
+
+        let error = json(GrpcStreamEventPayload::error(
+            "tab-1",
+            "/pkg.Svc/Method",
+            code,
+            status.message().to_string(),
+        ));
+        let close = json(GrpcStreamEventPayload::close(
+            "tab-1",
+            "/pkg.Svc/Method",
+            code,
+            status.message().to_string(),
+        ));
+
+        assert_eq!(error["status"], close["status"]);
+        assert_eq!(error["statusMessage"], close["statusMessage"]);
+        assert_eq!(error["eventType"], "error");
+        assert_eq!(close["eventType"], "close");
+    }
 }
