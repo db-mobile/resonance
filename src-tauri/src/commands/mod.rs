@@ -20,3 +20,4 @@ pub mod store;
 pub mod tls;
 pub mod updater;
 pub mod websocket;
+pub mod ws_stream;
