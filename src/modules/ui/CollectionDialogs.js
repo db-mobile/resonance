@@ -7,6 +7,7 @@ import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { DocGeneratorService } from '../services/DocGeneratorService.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
+import { pushEscapeHandler } from './modalEscape.js';
 
 /**
  * Collection dialog helper for creating and configuring collection-related modals.
@@ -100,11 +101,8 @@ export class CollectionDialogs {
                 }
             });
 
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    finish(null);
-                }
-            }, { signal: keydownController.signal });
+            const releaseEscape = pushEscapeHandler(() => finish(null));
+            keydownController.signal.addEventListener('abort', releaseEscape, { once: true });
         });
     }
 
@@ -235,11 +233,8 @@ export class CollectionDialogs {
                 }
             });
 
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    finish(null);
-                }
-            }, { signal: keydownController.signal });
+            const releaseEscape = pushEscapeHandler(() => finish(null));
+            keydownController.signal.addEventListener('abort', releaseEscape, { once: true });
         });
     }
 
@@ -459,11 +454,8 @@ export class CollectionDialogs {
                 }
             });
 
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    finish(null);
-                }
-            }, { signal: keydownController.signal });
+            const releaseEscape = pushEscapeHandler(() => finish(null));
+            keydownController.signal.addEventListener('abort', releaseEscape, { once: true });
         });
     }
 
@@ -546,11 +538,8 @@ export class CollectionDialogs {
                 }
             });
 
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    finish(null);
-                }
-            }, { signal: keydownController.signal });
+            const releaseEscape = pushEscapeHandler(() => finish(null));
+            keydownController.signal.addEventListener('abort', releaseEscape, { once: true });
         });
     }
 
@@ -639,11 +628,8 @@ export class CollectionDialogs {
                 resolve(result);
             };
 
-            const escapeHandler = (e) => {
-                if (e.key === 'Escape') {
-                    void closeDialog(null);
-                }
-            };
+            const releaseEscape = pushEscapeHandler(() => void closeDialog(null));
+            keydownController.signal.addEventListener('abort', releaseEscape, { once: true });
 
             closeBtn.addEventListener('click', () => {
                 void closeDialog(null);
@@ -694,10 +680,6 @@ export class CollectionDialogs {
                 if (e.target === dialog) {
                     void closeDialog(null);
                 }
-            });
-
-            document.addEventListener('keydown', escapeHandler, {
-                signal: keydownController.signal
             });
         });
     }

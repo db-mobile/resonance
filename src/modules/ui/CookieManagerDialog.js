@@ -5,6 +5,7 @@
 
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
+import { pushEscapeHandler } from './modalEscape.js';
 
 export class CookieManagerDialog {
     constructor(cookieJarService, environmentService) {
@@ -12,7 +13,7 @@ export class CookieManagerDialog {
         this.environmentService = environmentService;
         this.dialog = null;
         this.resolve = null;
-        this.escapeHandler = null;
+        this.releaseEscape = null;
         this._allCookies = [];
         this._environments = [];
         this._environmentId = 'default';
@@ -311,12 +312,13 @@ export class CookieManagerDialog {
             }
         });
 
-        this.escapeHandler = (e) => {
-            if (e.key !== 'Escape') { return; }
-            if (this._envDropdownOpen) { this._closeEnvDropdown(content); return; }
+        this.releaseEscape = pushEscapeHandler(() => {
+            if (this._envDropdownOpen) {
+                this._closeEnvDropdown(content);
+                return;
+            }
             close();
-        };
-        document.addEventListener('keydown', this.escapeHandler);
+        });
 
         searchInput.addEventListener('input', (e) => {
             const term = e.target.value.trim();
@@ -339,9 +341,9 @@ export class CookieManagerDialog {
     }
 
     _close() {
-        if (this.escapeHandler) {
-            document.removeEventListener('keydown', this.escapeHandler);
-            this.escapeHandler = null;
+        if (this.releaseEscape) {
+            this.releaseEscape();
+            this.releaseEscape = null;
         }
         if (this.dialog) {
             this.dialog.remove();

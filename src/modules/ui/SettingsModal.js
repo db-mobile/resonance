@@ -5,6 +5,7 @@
 
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
+import { pushEscapeHandler } from './modalEscape.js';
 
 export class SettingsModal {
     constructor(themeManager, i18nManager = null, httpVersionManager = null, timeoutManager = null, proxyController = null, certificateController = null) {
@@ -678,13 +679,7 @@ export class SettingsModal {
             }
         });
 
-        const escapeHandler = (e) => {
-            if (e.key === 'Escape') {
-                this.hide(overlay);
-                document.removeEventListener('keydown', escapeHandler);
-            }
-        };
-        document.addEventListener('keydown', escapeHandler);
+        this._releaseEscape = pushEscapeHandler(() => this.hide(overlay));
     }
 
     attachProxyEventListeners(overlay) {
@@ -808,6 +803,10 @@ export class SettingsModal {
         if (!this.isOpen) {return;}
 
         this.isOpen = false;
+        if (this._releaseEscape) {
+            this._releaseEscape();
+            this._releaseEscape = null;
+        }
         overlay.remove();
     }
 }

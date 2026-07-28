@@ -10,6 +10,7 @@ import { app } from '../../appContext.js';
 import { templateLoader } from '../../templateLoader.js';
 import { ScriptEditor } from '../../scriptEditor.bundle.js';
 import { JSONEditor } from '../../jsonEditor.bundle.js';
+import { pushEscapeHandler } from '../modalEscape.js';
 
 /**
  * Modal dialog for editing a single runner request's overrides and script.
@@ -24,6 +25,7 @@ export class RequestEditorModal {
         this.request = null;
         this._onSave = null;
         this._keyHandler = null;
+        this._releaseEscape = null;
     }
 
     /**
@@ -102,6 +104,11 @@ export class RequestEditorModal {
                 : (request.postResponseScript || '');
 
             this._onSave?.();
+        }
+
+        if (this._releaseEscape) {
+            this._releaseEscape();
+            this._releaseEscape = null;
         }
 
         if (this._keyHandler) {
@@ -274,10 +281,10 @@ export class RequestEditorModal {
             }
         });
 
+        this._releaseEscape = pushEscapeHandler(() => this.close(false));
+
         this._keyHandler = (e) => {
-            if (e.key === 'Escape') {
-                this.close(false);
-            } else if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+            if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
                 this.close(true);
             }

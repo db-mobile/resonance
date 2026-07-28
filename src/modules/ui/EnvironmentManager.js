@@ -5,6 +5,7 @@
 import { templateLoader } from '../templateLoader.js';
 import { DynamicVariablesReferenceDialog } from './DynamicVariablesReferenceDialog.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
+import { pushEscapeHandler } from './modalEscape.js';
 
 export class EnvironmentManager {
     constructor(environmentService) {
@@ -12,6 +13,7 @@ export class EnvironmentManager {
         this.dialog = null;
         this.currentEnvironmentId = null;
         this.resolve = null;
+        this.releaseEscape = null;
     }
 
     /**
@@ -75,12 +77,7 @@ export class EnvironmentManager {
             }
         });
 
-        this.escapeHandler = (e) => {
-            if (e.key === 'Escape') {
-                this.close(true);
-            }
-        };
-        document.addEventListener('keydown', this.escapeHandler);
+        this.releaseEscape = pushEscapeHandler(() => this.close(true));
     }
 
     /**
@@ -604,17 +601,22 @@ export class EnvironmentManager {
                     const okBtn = dialog.querySelector('#input-dialog-ok');
                     const cancelBtn = dialog.querySelector('#input-dialog-cancel');
 
+                    let releaseEscape = null;
                     const cleanup = (value) => {
-                        document.body.removeChild(overlay);
+                        if (releaseEscape) {
+                            releaseEscape();
+                            releaseEscape = null;
+                        }
+                        overlay.remove();
                         resolve(value);
                     };
+                    releaseEscape = pushEscapeHandler(() => cleanup(null));
 
                     okBtn.addEventListener('click', () => cleanup(input.value.trim()));
                     cancelBtn.addEventListener('click', () => cleanup(null));
 
                     input.addEventListener('keydown', (e) => {
                         if (e.key === 'Enter') {cleanup(input.value.trim());}
-                        if (e.key === 'Escape') {cleanup(null);}
                     });
 
                     overlay.addEventListener('click', (e) => {
@@ -654,21 +656,31 @@ export class EnvironmentManager {
 
                 const okBtn = dialog.querySelector('#alert-dialog-ok');
 
+                let releaseEscape = null;
+                let onEnter = null;
                 const cleanup = () => {
-                    document.body.removeChild(overlay);
+                    if (releaseEscape) {
+                        releaseEscape();
+                        releaseEscape = null;
+                    }
+                    if (onEnter) {
+                        document.removeEventListener('keydown', onEnter);
+                        onEnter = null;
+                    }
+                    overlay.remove();
                 };
+                onEnter = (e) => {
+                    if (e.key === 'Enter') {
+                        cleanup();
+                    }
+                };
+                releaseEscape = pushEscapeHandler(cleanup);
+                document.addEventListener('keydown', onEnter);
 
                 okBtn.addEventListener('click', cleanup);
 
                 overlay.addEventListener('click', (e) => {
                     if (e.target === overlay) {cleanup();}
-                });
-
-                document.addEventListener('keydown', function escapeHandler(e) {
-                    if (e.key === 'Escape' || e.key === 'Enter') {
-                        cleanup();
-                        document.removeEventListener('keydown', escapeHandler);
-                    }
                 });
             })
             .catch((error) => {
@@ -742,13 +754,14 @@ export class EnvironmentManager {
      * Close dialog
      */
     close(changed = false) {
-        if (this.dialog) {
-            document.body.removeChild(this.dialog);
-            this.dialog = null;
+        if (this.releaseEscape) {
+            this.releaseEscape();
+            this.releaseEscape = null;
         }
 
-        if (this.escapeHandler) {
-            document.removeEventListener('keydown', this.escapeHandler);
+        if (this.dialog) {
+            this.dialog.remove();
+            this.dialog = null;
         }
 
         if (this.resolve) {
