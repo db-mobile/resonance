@@ -422,6 +422,64 @@ export class CollectionRepository {
     }
 
     /**
+     * Merges a scope's stored secrets back into an auth config read from disk.
+     *
+     * The persisted copy holds empty placeholders where literal credentials were,
+     * so this is what makes a config usable for building a request.
+     *
+     * @private
+     * @async
+     * @param {string} scope - SecretStore scope owning this config's secrets
+     * @param {Object|null} authConfig - The redacted config as persisted
+     * @returns {Promise<Object|null>} The hydrated config, or the input unchanged
+     *   when there is nothing to merge
+     */
+    async _hydrateAuthConfig(scope, authConfig) {
+        if (!authConfig || !this.secretStore) {
+            return authConfig;
+        }
+        const secrets = await this.secretStore.getScope(scope);
+        return mergeAuthSecrets(authConfig, secrets);
+    }
+
+    /**
+     * Moves an auth config's literal credentials into a SecretStore scope and
+     * returns the redacted copy that is safe to persist.
+     *
+     * Secrets the config no longer carries are deleted from the scope, so a
+     * credential cannot outlive the field that held it — switching a field from
+     * a literal to a `{{template}}`, or changing auth type entirely, must not
+     * leave the old value behind in the keychain.
+     *
+     * @private
+     * @async
+     * @param {string} scope - SecretStore scope to own this config's secrets
+     * @param {Object|null} authConfig - The config as supplied by the caller
+     * @returns {Promise<Object|null>} The redacted config to persist, or the
+     *   input unchanged when there is no secret store to split into
+     */
+    async _persistAuthSecrets(scope, authConfig) {
+        if (!authConfig || !this.secretStore) {
+            return authConfig;
+        }
+
+        const { redacted, secrets } = splitAuthSecrets(authConfig);
+
+        for (const field of Object.keys(secrets)) {
+            await this.secretStore.set(scope, field, secrets[field]);
+        }
+
+        const stored = await this.secretStore.getScope(scope);
+        for (const field of Object.keys(stored)) {
+            if (!Object.prototype.hasOwnProperty.call(secrets, field)) {
+                await this.secretStore.delete(scope, field);
+            }
+        }
+
+        return redacted;
+    }
+
+    /**
      * Retrieves persisted authentication config for a specific endpoint
      *
      * @async
@@ -432,12 +490,10 @@ export class CollectionRepository {
     async getPersistedAuthConfig(collectionId, endpointId) {
         try {
             const data = await this._getEndpointData(collectionId, endpointId);
-            const authConfig = data.authConfig || null;
-            if (!authConfig || !this.secretStore) {
-                return authConfig;
-            }
-            const secrets = await this.secretStore.getScope(authSecretScope(collectionId, endpointId));
-            return mergeAuthSecrets(authConfig, secrets);
+            return this._hydrateAuthConfig(
+                authSecretScope(collectionId, endpointId),
+                data.authConfig || null
+            );
         } catch (error) {
             return null;
         }
@@ -455,22 +511,10 @@ export class CollectionRepository {
      */
     async savePersistedAuthConfig(collectionId, endpointId, authConfig) {
         try {
-            let toPersist = authConfig;
-            if (authConfig && this.secretStore) {
-                const { redacted, secrets } = splitAuthSecrets(authConfig);
-                const scope = authSecretScope(collectionId, endpointId);
-                const fields = Object.keys(secrets);
-                for (const field of fields) {
-                    await this.secretStore.set(scope, field, secrets[field]);
-                }
-                const stored = await this.secretStore.getScope(scope);
-                for (const field of Object.keys(stored)) {
-                    if (!Object.prototype.hasOwnProperty.call(secrets, field)) {
-                        await this.secretStore.delete(scope, field);
-                    }
-                }
-                toPersist = redacted;
-            }
+            const toPersist = await this._persistAuthSecrets(
+                authSecretScope(collectionId, endpointId),
+                authConfig
+            );
             await this._updateEndpointField(collectionId, endpointId, 'authConfig', toPersist);
         } catch (error) {
             throw new Error(`Failed to save persisted auth config: ${error.message || error}`, { cause: error });
@@ -488,12 +532,10 @@ export class CollectionRepository {
     async getCollectionAuthConfig(collectionId) {
         try {
             const collection = await this._getByIdFresh(collectionId);
-            const authConfig = collection?.authConfig || null;
-            if (!authConfig || !this.secretStore) {
-                return authConfig;
-            }
-            const secrets = await this.secretStore.getScope(collectionAuthSecretScope(collectionId));
-            return mergeAuthSecrets(authConfig, secrets);
+            return this._hydrateAuthConfig(
+                collectionAuthSecretScope(collectionId),
+                collection?.authConfig || null
+            );
         } catch (error) {
             return null;
         }
@@ -504,31 +546,26 @@ export class CollectionRepository {
      * into the SecretStore (scope auth:<collectionId>:__collection__) and the
      * persisted collection.json keeps a redacted copy.
      *
+     * Reads the collection fresh before updating so the merge in `update()` sees
+     * auth edits made through a sibling repository instance rather than this
+     * instance's cached copy.
+     *
      * @async
      * @param {string} collectionId - The collection ID
      * @param {Object} authConfig - The authentication configuration ({type, config})
      * @returns {Promise<void>}
-     * @throws {Error} If save operation fails
+     * @throws {Error} If the collection is missing or the save fails
      */
     async saveCollectionAuthConfig(collectionId, authConfig) {
         try {
-            let toPersist = authConfig;
-            if (authConfig && this.secretStore) {
-                const { redacted, secrets } = splitAuthSecrets(authConfig);
-                const scope = collectionAuthSecretScope(collectionId);
-                const fields = Object.keys(secrets);
-                for (const field of fields) {
-                    await this.secretStore.set(scope, field, secrets[field]);
-                }
-                const stored = await this.secretStore.getScope(scope);
-                for (const field of Object.keys(stored)) {
-                    if (!Object.prototype.hasOwnProperty.call(secrets, field)) {
-                        await this.secretStore.delete(scope, field);
-                    }
-                }
-                toPersist = redacted;
+            const toPersist = await this._persistAuthSecrets(
+                collectionAuthSecretScope(collectionId),
+                authConfig
+            );
+            const collection = await this._getByIdFresh(collectionId);
+            if (!collection) {
+                throw new Error(`Collection with id ${collectionId} not found`);
             }
-            await this._getByIdFresh(collectionId);
             await this.update(collectionId, { authConfig: toPersist });
         } catch (error) {
             throw new Error(`Failed to save collection auth config: ${error.message || error}`, { cause: error });
@@ -624,12 +661,10 @@ export class CollectionRepository {
         try {
             const collection = await this._getByIdFresh(collectionId);
             const folder = (collection?.folders || []).find((f) => f.id === folderId);
-            const authConfig = folder?.authConfig || null;
-            if (!authConfig || !this.secretStore) {
-                return authConfig;
-            }
-            const secrets = await this.secretStore.getScope(folderAuthSecretScope(collectionId, folderId));
-            return mergeAuthSecrets(authConfig, secrets);
+            return this._hydrateAuthConfig(
+                folderAuthSecretScope(collectionId, folderId),
+                folder?.authConfig || null
+            );
         } catch (error) {
             return null;
         }
@@ -649,22 +684,10 @@ export class CollectionRepository {
      */
     async saveFolderAuthConfig(collectionId, folderId, authConfig) {
         try {
-            let toPersist = authConfig;
-            if (authConfig && this.secretStore) {
-                const { redacted, secrets } = splitAuthSecrets(authConfig);
-                const scope = folderAuthSecretScope(collectionId, folderId);
-                const fields = Object.keys(secrets);
-                for (const field of fields) {
-                    await this.secretStore.set(scope, field, secrets[field]);
-                }
-                const stored = await this.secretStore.getScope(scope);
-                for (const field of Object.keys(stored)) {
-                    if (!Object.prototype.hasOwnProperty.call(secrets, field)) {
-                        await this.secretStore.delete(scope, field);
-                    }
-                }
-                toPersist = redacted;
-            }
+            const toPersist = await this._persistAuthSecrets(
+                folderAuthSecretScope(collectionId, folderId),
+                authConfig
+            );
             const collection = await this._getByIdFresh(collectionId);
             if (!collection) {
                 throw new Error(`Collection with id ${collectionId} not found`);

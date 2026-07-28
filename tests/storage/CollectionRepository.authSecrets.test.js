@@ -198,6 +198,40 @@ describe('CollectionRepository auth secret redaction', () => {
             expect(savedCollection.folders.find((f) => f.id === 'f2').authConfig).toBeUndefined();
         });
 
+        test('switching auth type drops stale folder-scope secrets', async () => {
+            await repository.saveFolderAuthConfig('c1', 'f1', {
+                type: 'bearer',
+                config: { token: 'sk-folder' }
+            });
+            expect(await secretStore.has('auth:c1:__folder__:f1', 'token')).toBe(true);
+
+            await repository.saveFolderAuthConfig('c1', 'f1', {
+                type: 'basic',
+                config: { username: 'u', password: 'p@ss' }
+            });
+            expect(await secretStore.has('auth:c1:__folder__:f1', 'token')).toBe(false);
+            expect(await secretStore.get('auth:c1:__folder__:f1', 'password')).toBe('p@ss');
+        });
+
+        test('one folder losing a secret leaves a sibling folder untouched', async () => {
+            await repository.saveFolderAuthConfig('c1', 'f1', {
+                type: 'bearer',
+                config: { token: 'sk-one' }
+            });
+            await repository.saveFolderAuthConfig('c1', 'f2', {
+                type: 'bearer',
+                config: { token: 'sk-two' }
+            });
+
+            await repository.saveFolderAuthConfig('c1', 'f1', {
+                type: 'basic',
+                config: { username: 'u', password: 'p' }
+            });
+
+            expect(await secretStore.has('auth:c1:__folder__:f1', 'token')).toBe(false);
+            expect(await secretStore.get('auth:c1:__folder__:f2', 'token')).toBe('sk-two');
+        });
+
         test('getFolderAuthConfig rehydrates the credential', async () => {
             await repository.saveFolderAuthConfig('c1', 'f1', {
                 type: 'bearer',
