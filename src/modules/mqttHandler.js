@@ -158,12 +158,26 @@ async function buildMqttTlsOptions(normalizedBroker) {
     return tls;
 }
 
+/**
+ * Handles a backend MQTT event for one tab.
+ *
+ * A closed tab drops its session before the backend has finished unwinding, and
+ * its terminal `disconnect` still arrives. Rendering it would resurrect the
+ * tab's response container, so anything without a live session is ignored.
+ *
+ * @param {{payload: Object}} event - Tauri event carrying the broker payload
+ * @returns {Promise<void>}
+ */
 async function handleBackendEvent(event) {
     const payload = event.payload || {};
     const { tabId, broker = '' } = payload;
-    const current = session.get(tabId) || {};
 
     if (!tabId) {
+        return;
+    }
+
+    const current = session.get(tabId);
+    if (!current) {
         return;
     }
 

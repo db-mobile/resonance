@@ -39,12 +39,26 @@ function normalizeWebSocketUrl(url) {
     return `ws://${url}`;
 }
 
+/**
+ * Handles a backend WebSocket event for one tab.
+ *
+ * A closed tab drops its session before the backend has finished unwinding, and
+ * its terminal `close` still arrives. Rendering it would resurrect the tab's
+ * response container, so anything without a live session is ignored.
+ *
+ * @param {{payload: Object}} event - Tauri event carrying the socket payload
+ * @returns {Promise<void>}
+ */
 async function handleBackendEvent(event) {
     const payload = event.payload || {};
     const { tabId, url = '' } = payload;
-    const current = session.get(tabId) || {};
 
     if (!tabId) {
+        return;
+    }
+
+    const current = session.get(tabId);
+    if (!current) {
         return;
     }
 
