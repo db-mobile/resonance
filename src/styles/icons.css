@@ -127,6 +127,11 @@
   mask-image: url("../../assets/ui/file.svg");
 }
 
+.icon-folder {
+  -webkit-mask-image: url("../../assets/ui/folder.svg");
+  mask-image: url("../../assets/ui/folder.svg");
+}
+
 .icon-gear {
   -webkit-mask-image: url("../../assets/ui/gear.svg");
   mask-image: url("../../assets/ui/gear.svg");

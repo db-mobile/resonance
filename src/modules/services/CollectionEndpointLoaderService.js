@@ -4,6 +4,7 @@
  */
 
 import { app } from '../appContext.js';
+import { findRequest } from '../collections/collectionTree.js';
 import {
     getProtocol,
     projectPersistedData,
@@ -77,26 +78,13 @@ export class CollectionEndpointLoaderService {
         await app.workspaceTabController.loadEndpoint(endpointData, false);
     }
 
+    /**
+     * Finds an endpoint by id anywhere in a collection.
+     * @param {Object} collection - The collection to search
+     * @param {string} endpointId - The endpoint id to look for
+     * @returns {Object|null} The endpoint, or null when absent
+     */
     findEndpointInCollection(collection, endpointId) {
-        if (collection.endpoints) {
-            const endpoint = collection.endpoints.find(current => current.id === endpointId);
-            if (endpoint) {
-                return endpoint;
-            }
-        }
-
-        if (collection.folders) {
-            for (const folder of collection.folders) {
-                if (!folder.endpoints) {
-                    continue;
-                }
-                const endpoint = folder.endpoints.find(current => current.id === endpointId);
-                if (endpoint) {
-                    return endpoint;
-                }
-            }
-        }
-
-        return null;
+        return findRequest(collection, endpointId);
     }
 }

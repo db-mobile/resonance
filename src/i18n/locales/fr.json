@@ -26,7 +26,9 @@
         "import_postman": "Importer Postman",
         "import_postman_sub": "Depuis un fichier exporté",
         "import_curl": "Importer cURL",
-        "import_curl_sub": "Collez une commande cURL"
+        "import_curl_sub": "Collez une commande cURL",
+        "open_existing": "Ouvrir un dossier",
+        "open_existing_sub": "Une collection déjà sur le disque"
       }
     },
     "search_empty": {
@@ -38,7 +40,8 @@
     "openapi": "Collection OpenAPI",
     "postman_collection": "Collection Postman",
     "postman_environment": "Environnement Postman",
-    "curl": "Commande cURL"
+    "curl": "Commande cURL",
+    "open_existing": "Dossier existant"
   },
   "import_dialog": {
     "title": "Importer une collection",
@@ -69,7 +72,9 @@
     "delete_title": "Supprimer la collection",
     "confirm_delete": "Êtes-vous sûr de vouloir supprimer la collection \"{{name}}\" ?\n\nCette action ne peut pas être annulée.",
     "import_success": "Collection importée avec succès",
-    "import_error": "Échec de l'importation de la collection"
+    "import_error": "Échec de l'importation de la collection",
+    "close_title": "Fermer la collection",
+    "confirm_close": "Retirer \"{{name}}\" de la liste ?\n\nLe dossier et ses fichiers restent sur le disque, et les identifiants enregistrés sont conservés. Vous pourrez le rouvrir plus tard."
   },
   "endpoint": {
     "delete_title": "Supprimer la requête",
@@ -92,7 +97,8 @@
     "rename_request": "Renommer la requête",
     "delete_request": "Supprimer la requête",
     "pin_request": "Épingler la requête",
-    "unpin_request": "Désépingler la requête"
+    "unpin_request": "Désépingler la requête",
+    "close_collection": "Fermer la collection"
   },
   "docs": {
     "title": "Générer la documentation",

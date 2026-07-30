@@ -99,6 +99,11 @@ keyring = { version = "3", default-features = false, features = ["apple-native"]
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { version = "3", default-features = false, features = ["windows-native"] }
 
+[dev-dependencies]
+# Temp dirs that clean themselves up even when a test panics, which the
+# hand-rolled temp_dir().join(Uuid) pattern in fs_secure.rs does not.
+tempfile = "3"
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

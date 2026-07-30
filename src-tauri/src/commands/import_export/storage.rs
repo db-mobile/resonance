@@ -4,7 +4,6 @@
 
 use super::{Collection, VariableEntry};
 use crate::commands::collections as storage_collections;
-use crate::commands::collections::write_json_file;
 use std::path::PathBuf;
 use tauri::AppHandle;
 use tauri_plugin_dialog::{DialogExt, FilePath};
@@ -78,7 +77,36 @@ pub(crate) fn save_collection_to_files(
     let folders = serde_json::to_value(&collection.folders)
         .map_err(|e| format!("Failed to serialize folders: {}", e))?;
 
-    let persisted = storage_collections::persist_collection(
+    let mut variables = collection.variables.clone().unwrap_or_default();
+    if variables.is_empty() {
+        if let Some(base_url) = collection.base_url.as_ref().filter(|s| !s.is_empty()) {
+            variables.push(VariableEntry {
+                key: "baseUrl".to_string(),
+                value: base_url.clone(),
+            });
+        }
+    }
+    let variables = variables
+        .iter()
+        .map(|entry| serde_json::to_value(entry).unwrap_or(serde_json::Value::Null))
+        .filter(|v| !v.is_null())
+        .collect::<Vec<_>>();
+
+    let mut endpoint_data = std::collections::HashMap::new();
+    for endpoint in &collection.endpoints {
+        if endpoint.scripts.is_none() && endpoint.graphql_data.is_none() {
+            continue;
+        }
+        endpoint_data.entry(endpoint.id.clone()).or_insert_with(|| {
+            storage_collections::EndpointData {
+                scripts: endpoint.scripts.clone(),
+                graphql_data: endpoint.graphql_data.clone(),
+                ..Default::default()
+            }
+        });
+    }
+
+    storage_collections::persist_imported_collection(
         app,
         storage_collections::Collection {
             id: collection.id.clone(),
@@ -91,78 +119,11 @@ pub(crate) fn save_collection_to_files(
             open_api_spec: None,
             storage_path: None,
             storage_parent_path,
+            linked: false,
         },
+        variables,
+        endpoint_data,
     )?;
-
-    let collection_dir = PathBuf::from(
-        persisted
-            .storage_path
-            .ok_or_else(|| "Collection storage path missing".to_string())?,
-    );
-
-    save_collection_variables(collection, &collection_dir)?;
-    save_endpoint_data_files(collection, &collection_dir)?;
-
-    Ok(())
-}
-
-/// Write the imported collection variables to variables.json. Falls back to a
-/// lone baseUrl entry (the pre-existing behavior) for importers that don't
-/// produce a variable list, e.g. OpenAPI.
-fn save_collection_variables(
-    collection: &Collection,
-    collection_dir: &std::path::Path,
-) -> Result<(), String> {
-    let mut variables = collection.variables.clone().unwrap_or_default();
-
-    if variables.is_empty() {
-        if let Some(base_url) = collection.base_url.as_ref().filter(|s| !s.is_empty()) {
-            variables.push(VariableEntry {
-                key: "baseUrl".to_string(),
-                value: base_url.clone(),
-            });
-        }
-    }
-
-    if !variables.is_empty() {
-        let paths = storage_collections::CollectionPaths::from_dir(collection_dir.to_path_buf());
-        write_json_file(&paths.variables_json(), &variables)?;
-    }
-
-    Ok(())
-}
-
-/// Persist imported per-endpoint payloads (scripts, GraphQL bodies) into the
-/// endpoint data files the app reads them from. Endpoints appear in both the
-/// flat list and their folder, so writes are deduped by id.
-fn save_endpoint_data_files(
-    collection: &Collection,
-    collection_dir: &std::path::Path,
-) -> Result<(), String> {
-    let paths = storage_collections::CollectionPaths::from_dir(collection_dir.to_path_buf());
-    let mut written: std::collections::HashSet<&str> = std::collections::HashSet::new();
-
-    for endpoint in &collection.endpoints {
-        if endpoint.scripts.is_none() && endpoint.graphql_data.is_none() {
-            continue;
-        }
-        if !written.insert(endpoint.id.as_str()) {
-            continue;
-        }
-
-        // Created on first write rather than up front, so importing a
-        // collection with no endpoint payloads leaves no empty directory.
-        let requests_dir = paths.ensure_requests()?;
-
-        let data = storage_collections::EndpointData {
-            scripts: endpoint.scripts.clone(),
-            graphql_data: endpoint.graphql_data.clone(),
-            ..Default::default()
-        };
-        let file_name =
-            storage_collections::desired_endpoint_file_name(&endpoint.name, &endpoint.id);
-        write_json_file(&requests_dir.join(file_name), &data)?;
-    }
 
     Ok(())
 }

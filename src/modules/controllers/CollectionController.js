@@ -176,7 +176,8 @@ export class CollectionController {
                 'new-collection': this.handleNewCollection,
                 'import-openapi': () => this.importOpenApiFile(),
                 'import-postman': () => this.importPostmanCollection(),
-                'import-curl': () => this.handleImportCurl(null)
+                'import-curl': () => this.handleImportCurl(null),
+                'open-existing': () => this.handleOpenExisting()
             },
             onEndpointClick: this.handleEndpointClick,
             onContextMenu: this.handleContextMenu,
@@ -211,49 +212,62 @@ export class CollectionController {
         }
 
         return collections.reduce((filteredCollections, collection) => {
-            const filteredCollection = { ...collection };
             const hasCollectionNameMatch = this.matchesSearchQuery(collection.name, query);
-            let hasNestedRequestMatch = false;
 
-            if (Array.isArray(collection.folders) && collection.folders.length > 0) {
-                filteredCollection.folders = collection.folders.reduce((filteredFolders, folder) => {
-                    const matchingEndpoints = (folder.endpoints || []).filter(endpoint => this.endpointMatchesQuery(endpoint, query));
-                    const hasFolderNameMatch = this.matchesSearchQuery(folder.name, query);
+            const endpoints = (collection.endpoints || []).filter(endpoint =>
+                this.endpointMatchesQuery(endpoint, query)
+            );
+            const folders = this.filterFolders(collection.folders, query);
 
-                    if (hasFolderNameMatch) {
-                        filteredFolders.push({
-                            ...folder,
-                            __searchExpand: matchingEndpoints.length > 0
-                        });
-                    } else if (matchingEndpoints.length > 0) {
-                        filteredFolders.push({
-                            ...folder,
-                            endpoints: matchingEndpoints,
-                            __searchExpand: true
-                        });
-                        hasNestedRequestMatch = true;
-                    }
+            const hasNestedRequestMatch =
+                endpoints.length > 0 || folders.some(folder => folder.__searchExpand);
 
-                    if (matchingEndpoints.length > 0) {
-                        hasNestedRequestMatch = true;
-                    }
-
-                    return filteredFolders;
-                }, []);
-            } else {
-                filteredCollection.endpoints = (collection.endpoints || []).filter(endpoint => this.endpointMatchesQuery(endpoint, query));
-                hasNestedRequestMatch = filteredCollection.endpoints.length > 0;
+            if (!hasCollectionNameMatch && endpoints.length === 0 && folders.length === 0) {
+                return filteredCollections;
             }
 
-            const hasMatchingFolders = Array.isArray(filteredCollection.folders) && filteredCollection.folders.length > 0;
-            const hasMatchingEndpoints = Array.isArray(filteredCollection.endpoints) && filteredCollection.endpoints.length > 0;
-
-            if (hasCollectionNameMatch || hasMatchingFolders || hasMatchingEndpoints) {
-                filteredCollection.__searchExpand = hasNestedRequestMatch;
-                filteredCollections.push(filteredCollection);
-            }
+            filteredCollections.push({
+                ...collection,
+                endpoints,
+                folders,
+                __searchExpand: hasNestedRequestMatch
+            });
 
             return filteredCollections;
+        }, []);
+    }
+
+    /**
+     * Filters a folder tree to the branches that match, at any depth.
+     *
+     * A folder is kept when its own name matches (with all its contents) or
+     * when something inside it matches (narrowed to the matches).
+     *
+     * @param {Array} folders - Folders to filter
+     * @param {string} query - The search query
+     * @returns {Array} The matching folders, marked for auto-expansion
+     */
+    filterFolders(folders, query) {
+        return (folders || []).reduce((kept, folder) => {
+            const matchingEndpoints = (folder.endpoints || []).filter(endpoint =>
+                this.endpointMatchesQuery(endpoint, query)
+            );
+            const matchingFolders = this.filterFolders(folder.folders, query);
+            const hasNameMatch = this.matchesSearchQuery(folder.name, query);
+            const hasDescendantMatch = matchingEndpoints.length > 0 || matchingFolders.length > 0;
+
+            if (hasNameMatch) {
+                kept.push({ ...folder, __searchExpand: hasDescendantMatch });
+            } else if (hasDescendantMatch) {
+                kept.push({
+                    ...folder,
+                    endpoints: matchingEndpoints,
+                    folders: matchingFolders,
+                    __searchExpand: true
+                });
+            }
+
+            return kept;
         }, []);
     }
 
@@ -346,13 +360,24 @@ export class CollectionController {
                 iconClass: ContextMenu.createRenameIcon(),
                 onClick: () => this.handleRename(collection)
             },
-            {
-                label: 'Delete Collection',
-                translationKey: 'context_menu.delete_collection',
-                iconClass: ContextMenu.createDeleteIcon(),
-                className: 'context-menu-delete',
-                onClick: () => this.handleDelete(collection)
-            }
+            // A collection opened in place lives in a directory the app does
+            // not own, so it is closed rather than deleted. The backend
+            // refuses to delete one either way; omitting the item here just
+            // keeps the destructive option off a user's git checkout.
+            collection.linked
+                ? {
+                    label: 'Close Collection',
+                    translationKey: 'context_menu.close_collection',
+                    iconClass: ContextMenu.createDeleteIcon(),
+                    onClick: () => this.handleClose(collection)
+                }
+                : {
+                    label: 'Delete Collection',
+                    translationKey: 'context_menu.delete_collection',
+                    iconClass: ContextMenu.createDeleteIcon(),
+                    className: 'context-menu-delete',
+                    onClick: () => this.handleDelete(collection)
+                }
         ];
 
         this.contextMenu.show(event, menuItems);
@@ -647,6 +672,118 @@ export class CollectionController {
             await this.loadCollectionsWithExpansionState();
         }
         return result;
+    }
+
+    /**
+     * Removes a collection from the list, leaving its files alone.
+     *
+     * The counterpart to opening a collection in place: its directory belongs
+     * to the user, usually a git checkout, so closing must be reversible.
+     *
+     * @async
+     * @param {Object} collection - The collection to close
+     * @returns {Promise<void>}
+     */
+    async handleClose(collection) {
+        const confirmMessage = app.i18n ?
+            app.i18n.t('collection.confirm_close', { name: collection.name }) :
+            `Remove "${collection.name}" from the list?\n\nThe folder and its files stay on disk, and stored credentials are kept. You can open it again later.`;
+
+        const title = app.i18n ?
+            app.i18n.t('collection.close_title') || 'Close Collection' :
+            'Close Collection';
+
+        const confirmText = app.i18n ?
+            app.i18n.t('common.close') || 'Close' :
+            'Close';
+
+        const cancelText = app.i18n ?
+            app.i18n.t('common.cancel') || 'Cancel' :
+            'Cancel';
+
+        const confirmed = await this.confirmDialog.show(confirmMessage, {
+            title,
+            confirmText,
+            cancelText
+        });
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            // Deliberately not cleanupCollectionVariables: it routes to
+            // collection_save_variables, which rewrites the collection on disk
+            // and would blank variables.yaml in the user's working copy.
+            await this.service.closeCollection(collection.id);
+            await this.closeTabsForCollection(collection.id);
+            await this.loadCollections();
+            toast.success(`Collection "${collection.name}" closed`);
+        } catch (error) {
+            toast.error(`Failed to close collection: ${error.message}`);
+        }
+    }
+
+    /**
+     * Closes any workspace tabs belonging to a collection.
+     *
+     * Without this the app restores a tab whose collection no longer resolves.
+     *
+     * @async
+     * @param {string} collectionId - The collection whose tabs should close
+     * @returns {Promise<void>}
+     */
+    async closeTabsForCollection(collectionId) {
+        try {
+            if (!app.workspaceTabController) {
+                return;
+            }
+            const tabs = await app.workspaceTabController.service.getAllTabs();
+            for (const tab of tabs.filter(tab => tab.collectionId === collectionId)) {
+                await app.workspaceTabController.closeTab(tab.id);
+            }
+        } catch (error) {
+            void error;
+        }
+    }
+
+    /**
+     * Opens a collection directory that already exists on disk, in place.
+     *
+     * @async
+     * @returns {Promise<void>}
+     */
+    async handleOpenExisting() {
+        // `false` keeps this pick out of the "last used" default: it is a
+        // collection, not a parent to create new collections inside.
+        const path = await this.backendAPI.collections.pickDirectory(false).catch(() => null);
+        if (!path) {
+            return;
+        }
+
+        try {
+            const result = await this.service.openExistingCollection(path);
+            await this.loadCollections();
+
+            const opened = result.opened.length;
+            if (opened > 0) {
+                toast.success(
+                    opened === 1
+                        ? `Opened "${result.opened[0].name}"`
+                        : `Opened ${opened} collections`
+                );
+            }
+
+            for (const alreadyOpen of result.alreadyOpen) {
+                toast.info(`"${alreadyOpen}" is already open`);
+            }
+            for (const failure of result.failed) {
+                toast.error(failure.reason);
+            }
+        } catch (error) {
+            const message = typeof error === 'string' ? error : (error.message || 'Unknown error');
+            toast.error(message);
+        }
     }
 
     /**

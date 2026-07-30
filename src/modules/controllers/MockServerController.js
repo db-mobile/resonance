@@ -4,6 +4,7 @@
  */
 
 import { SchemaProcessor } from '../schema/SchemaProcessor.js';
+import { findRequest } from '../collections/collectionTree.js';
 
 /**
  * Controller for coordinating mock server operations
@@ -284,19 +285,7 @@ export class MockServerController {
     }
 
     _findEndpoint(collection, endpointId) {
-        if (collection.endpoints) {
-            const found = collection.endpoints.find(e => e.id === endpointId);
-            if (found) {return found;}
-        }
-        if (collection.folders) {
-            for (const folder of collection.folders) {
-                if (folder.endpoints) {
-                    const found = folder.endpoints.find(e => e.id === endpointId);
-                    if (found) {return found;}
-                }
-            }
-        }
-        return null;
+        return findRequest(collection, endpointId);
     }
 
     _extractResponseSchema(endpoint) {

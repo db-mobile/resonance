@@ -6,6 +6,7 @@
 import { app } from '../appContext.js';
 import { getRequestBodyContent } from '../requestBodyHelper.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
+import { findRequest, updateRequest } from '../collections/collectionTree.js';
 
 /**
  * Handles saving request edits for HTTP, WebSocket, and gRPC collection endpoints.
@@ -42,12 +43,11 @@ export class CollectionRequestPersistenceService {
                 return;
             }
 
-            const endpointLocations = this.findAllEndpointLocations(collection, endpointId);
-            const endpoint = endpointLocations.length > 0 ? endpointLocations[0].endpoint : null;
+            const endpoint = findRequest(collection, endpointId);
             const descriptor = getProtocol(endpoint?.protocol);
 
             const savers = {
-                grpc: () => this.saveGrpcRequest(collectionId, endpointId, endpoint, endpointLocations, collection),
+                grpc: () => this.saveGrpcRequest(collectionId, endpointId, endpoint, collection),
                 websocket: () => this.saveWebSocketRequest(collectionId, endpointId, parseKeyValuePairs),
                 graphql: () => this.saveGraphQLRequest(collectionId, endpointId, parseKeyValuePairs, authManager),
                 sse: () => this.saveSseRequest(collectionId, endpointId, parseKeyValuePairs, authManager),
@@ -69,13 +69,10 @@ export class CollectionRequestPersistenceService {
      * @param {string} collectionId - The collection identifier
      * @param {string} endpointId - The endpoint identifier
      * @param {Object} endpoint - The endpoint record being saved
-     * @param {Array<Object>} endpointLocations - Locations whose `endpoint` values
-     *   are references into `collection`, so mutating them and saving
-     *   `collection` persists every copy
      * @param {Object} collection - The owning collection, already read for update
      * @returns {Promise<void>}
      */
-    async saveGrpcRequest(collectionId, endpointId, endpoint, endpointLocations, collection) {
+    async saveGrpcRequest(collectionId, endpointId, endpoint, collection) {
         const grpcState = app.captureGrpcState ? app.captureGrpcState() : {};
 
         await this.repository.saveGrpcData(collectionId, endpointId, {
@@ -83,11 +80,8 @@ export class CollectionRequestPersistenceService {
             fullMethod: grpcState.fullMethod || endpoint.path || ''
         });
 
-        endpointLocations.forEach(({ endpoint: currentEndpoint }) => {
-            currentEndpoint.path = grpcState.fullMethod || currentEndpoint.path;
-        });
-
-        await this.repository.saveOne(collection);
+        const path = grpcState.fullMethod || endpoint.path;
+        await this.repository.saveOne(updateRequest(collection, endpointId, { path }) ?? collection);
         await this.refreshCollections();
     }
 
@@ -250,24 +244,17 @@ export class CollectionRequestPersistenceService {
             return;
         }
 
-        const locations = this.findAllEndpointLocations(collection, endpointId);
-        if (locations.length === 0) {
+        const endpoint = findRequest(collection, endpointId);
+        if (!endpoint) {
             return;
         }
 
-        const changed = locations.some(({ endpoint }) =>
-            Object.entries(patch).some(([key, value]) => endpoint[key] !== value)
-        );
-
+        const changed = Object.entries(patch).some(([key, value]) => endpoint[key] !== value);
         if (!changed) {
             return;
         }
 
-        locations.forEach(({ endpoint }) => {
-            Object.assign(endpoint, patch);
-        });
-
-        await this.repository.saveOne(collection);
+        await this.repository.saveOne(updateRequest(collection, endpointId, patch));
     }
 
     async saveHttpRequest(collectionId, endpointId, parseKeyValuePairs, authManager) {
@@ -340,21 +327,12 @@ export class CollectionRequestPersistenceService {
                 return;
             }
 
-            const foundLocations = this.findAllEndpointLocations(collection, endpointId);
-            if (foundLocations.length === 0) {
+            const endpoint = findRequest(collection, endpointId);
+            if (!endpoint || endpoint.path === path) {
                 return;
             }
 
-            const pathChanged = foundLocations.some(({ endpoint }) => endpoint.path !== path);
-            if (!pathChanged) {
-                return;
-            }
-
-            foundLocations.forEach(({ endpoint }) => {
-                endpoint.path = path;
-            });
-
-            await this.repository.saveOne(collection);
+            await this.repository.saveOne(updateRequest(collection, endpointId, { path }));
             await this.refreshCollections();
         } catch (error) {
             void error;
@@ -497,26 +475,4 @@ export class CollectionRequestPersistenceService {
         return path;
     }
 
-    findAllEndpointLocations(collection, endpointId) {
-        const foundLocations = [];
-
-        const topLevelEndpoint = collection.endpoints?.find(endpoint => endpoint.id === endpointId);
-        if (topLevelEndpoint) {
-            foundLocations.push({ endpoint: topLevelEndpoint });
-        }
-
-        if (collection.folders) {
-            for (const folder of collection.folders) {
-                if (!folder.endpoints) {
-                    continue;
-                }
-                const folderEndpoint = folder.endpoints.find(endpoint => endpoint.id === endpointId);
-                if (folderEndpoint) {
-                    foundLocations.push({ endpoint: folderEndpoint });
-                }
-            }
-        }
-
-        return foundLocations;
-    }
 }

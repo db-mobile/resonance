@@ -285,6 +285,119 @@ describe('CollectionRepository auth secret redaction', () => {
             expect(resolved.config.token).toBe('sk-collection');
         });
 
+        test('folder auth survives a request being renamed in the same folder', async () => {
+            await repository.saveFolderAuthConfig('c1', 'f1', {
+                type: 'bearer',
+                config: { token: 'sk-folder' }
+            });
+
+            const collection = await repository.getById('c1');
+            const renamed = {
+                ...collection,
+                folders: collection.folders.map((folder) =>
+                    folder.id === 'f1'
+                        ? { ...folder, endpoints: [{ id: 'e1', name: 'Renamed' }] }
+                        : folder
+                )
+            };
+            await repository.saveOne(renamed);
+            repository._byIdCache.clear();
+
+            const resolved = await repository.getInheritedAuthConfig('c1', 'e1');
+            expect(resolved.config.token).toBe('sk-folder');
+        });
+
+        describe('nested folders', () => {
+            beforeEach(() => {
+                savedCollection = {
+                    id: 'c1',
+                    name: 'Test',
+                    items: [
+                        {
+                            type: 'folder',
+                            id: 'outer',
+                            name: 'outer',
+                            items: [
+                                { type: 'request', id: 'outerRequest' },
+                                {
+                                    type: 'folder',
+                                    id: 'inner',
+                                    name: 'inner',
+                                    items: [{ type: 'request', id: 'innerRequest' }]
+                                }
+                            ]
+                        }
+                    ]
+                };
+                repository._byIdCache.clear();
+            });
+
+            test('the innermost folder that defines auth wins', async () => {
+                await repository.saveFolderAuthConfig('c1', 'outer', {
+                    type: 'bearer',
+                    config: { token: 'sk-outer' }
+                });
+                await repository.saveFolderAuthConfig('c1', 'inner', {
+                    type: 'bearer',
+                    config: { token: 'sk-inner' }
+                });
+                repository._byIdCache.clear();
+
+                const resolved = await repository.getInheritedAuthConfig('c1', 'innerRequest');
+                expect(resolved.config.token).toBe('sk-inner');
+            });
+
+            test('an inheriting inner folder falls through to the outer folder', async () => {
+                await repository.saveFolderAuthConfig('c1', 'outer', {
+                    type: 'bearer',
+                    config: { token: 'sk-outer' }
+                });
+                await repository.saveFolderAuthConfig('c1', 'inner', { type: 'inherit', config: {} });
+                repository._byIdCache.clear();
+
+                const resolved = await repository.getInheritedAuthConfig('c1', 'innerRequest');
+                expect(resolved.config.token).toBe('sk-outer');
+            });
+
+            test('an inheriting chain falls all the way through to collection auth', async () => {
+                await repository.saveCollectionAuthConfig('c1', {
+                    type: 'bearer',
+                    config: { token: 'sk-collection' }
+                });
+                repository._byIdCache.clear();
+
+                const resolved = await repository.getInheritedAuthConfig('c1', 'innerRequest');
+                expect(resolved.config.token).toBe('sk-collection');
+            });
+
+            test('an inner folder of explicit none opts its requests out', async () => {
+                await repository.saveFolderAuthConfig('c1', 'outer', {
+                    type: 'bearer',
+                    config: { token: 'sk-outer' }
+                });
+                await repository.saveFolderAuthConfig('c1', 'inner', { type: 'none', config: {} });
+                repository._byIdCache.clear();
+
+                const resolved = await repository.getInheritedAuthConfig('c1', 'innerRequest');
+                expect(resolved.type).toBe('none');
+            });
+
+            test('a sibling request in the outer folder keeps the outer auth', async () => {
+                await repository.saveFolderAuthConfig('c1', 'outer', {
+                    type: 'bearer',
+                    config: { token: 'sk-outer' }
+                });
+                await repository.saveFolderAuthConfig('c1', 'inner', {
+                    type: 'bearer',
+                    config: { token: 'sk-inner' }
+                });
+                repository._byIdCache.clear();
+
+                const resolved = await repository.getInheritedAuthConfig('c1', 'outerRequest');
+                expect(resolved.config.token).toBe('sk-outer');
+            });
+        });
+
         test('auth edits saved via one repository instance are visible to another', async () => {
             const otherRepository = new CollectionRepository(mockBackendAPI, secretStore);
             await otherRepository.getInheritedAuthConfig('c1', 'e1');

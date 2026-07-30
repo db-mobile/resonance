@@ -27,7 +27,7 @@ import { initGraphQLSubscriptionHandler } from './modules/graphqlSubscriptionHan
 import { initSseHandler } from './modules/sseHandler.js';
 import { initMqttHandler, handleMqttCancel } from './modules/mqttHandler.js';
 import { initGrpcStreamHandler } from './modules/grpcStreamHandler.js';
-import { loadCollections, importOpenApiFile, importPostmanCollection, importPostmanEnvironment, importCurl, initializeBodyTracking } from './modules/collectionManager.js';
+import { loadCollections, importOpenApiFile, importPostmanCollection, importPostmanEnvironment, importCurl, openExistingCollection, initializeBodyTracking } from './modules/collectionManager.js';
 import { ThemeManager } from './modules/themeManager.js';
 import { SettingsModal } from './modules/ui/SettingsModal.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
@@ -554,6 +554,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 translationKey: 'import.curl',
                 icon: '<path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>',
                 onClick: importCurl
+            },
+            {
+                label: 'Existing Folder',
+                translationKey: 'import.open_existing',
+                icon: '<path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path>',
+                onClick: openExistingCollection
             }
         ]);
     });

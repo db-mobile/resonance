@@ -67,7 +67,9 @@ describe('CollectionRequestPersistenceService with an unreadable collection on d
         expect(backendAPI.collections.save).toHaveBeenCalledWith(
             expect.objectContaining({ id: 'c1' })
         );
-        expect(readable.endpoints[0].httpMethod).toBe('POST');
+
+        const saved = backendAPI.collections.save.mock.calls.at(-1)[0];
+        expect(saved.endpoints[0].httpMethod).toBe('POST');
     });
 
     test('updateEndpointPathFromUrl leaves the unreadable collection on disk', async () => {

@@ -4,6 +4,21 @@
  */
 
 import { splitAuthSecrets, mergeAuthSecrets, authSecretScope, collectionAuthSecretScope, folderAuthSecretScope } from '../auth/authSecrets.js';
+import { findFolder, folderChainForRequest, updateFolder } from '../collections/collectionTree.js';
+import { fromWire, toWire, listFromWire } from './collectionMapper.js';
+
+/**
+ * Collection fields updateMetadata() may patch. The request tree is excluded:
+ * a shallow merge of two trees is meaningless, so it goes through saveTree().
+ */
+const METADATA_FIELDS = Object.freeze([
+    'name',
+    'baseUrl',
+    'defaultHeaders',
+    'authConfig',
+    'storagePath',
+    'storageParentPath'
+]);
 
 /**
  * Repository for managing collection data persistence
@@ -70,7 +85,7 @@ export class CollectionRepository {
     async getAll() {
         try {
             const collections = await this.backendAPI.collections.getAll();
-            return collections || [];
+            return listFromWire(collections);
         } catch (error) {
             throw new Error(`Failed to load collections: ${error.message || error}`, { cause: error });
         }
@@ -86,7 +101,7 @@ export class CollectionRepository {
      */
     async saveOne(collection) {
         try {
-            await this.backendAPI.collections.save(collection);
+            await this.backendAPI.collections.save(toWire(collection));
             if (collection?.id) {
                 this._addToCache(collection.id, collection);
             }
@@ -110,11 +125,11 @@ export class CollectionRepository {
             return cached;
         }
         try {
-            const collection = await this.backendAPI.collections.get(id);
+            const collection = fromWire(await this.backendAPI.collections.get(id));
             if (collection) {
                 this._addToCache(id, collection);
             }
-            return collection;
+            return collection ?? undefined;
         } catch (error) {
             return undefined;
         }
@@ -134,22 +149,66 @@ export class CollectionRepository {
     }
 
     /**
-     * Updates an existing collection
+     * Updates a collection's own metadata, leaving its request tree alone.
+     *
+     * Restricted to the scalar fields on purpose: a shallow merge cannot
+     * meaningfully combine two request trees, so patching `endpoints`/`folders`
+     * this way would silently replace one wholesale. Use saveTree() for the
+     * tree and saveOne() for a whole collection read for update.
      *
      * @async
      * @param {string} id - The collection ID to update
-     * @param {Object} updatedCollection - Object with properties to update
+     * @param {Object} patch - Metadata fields to merge in
      * @returns {Promise<Object>} The updated collection object
-     * @throws {Error} If collection not found or save fails
+     * @throws {Error} If the collection is missing or the patch touches the tree
      */
-    async update(id, updatedCollection) {
+    async updateMetadata(id, patch) {
+        const unsupported = Object.keys(patch).filter(
+            (key) => !METADATA_FIELDS.includes(key)
+        );
+        if (unsupported.length > 0) {
+            throw new Error(
+                `updateMetadata cannot patch ${unsupported.join(', ')}; use saveTree() or saveOne()`
+            );
+        }
+
         const existing = await this.getById(id);
 
         if (!existing) {
             throw new Error(`Collection with id ${id} not found`);
         }
 
-        const merged = { ...existing, ...updatedCollection };
+        const merged = { ...existing, ...patch };
+        await this.saveOne(merged);
+        return merged;
+    }
+
+    /**
+     * Replaces a collection's request tree, leaving its metadata alone.
+     *
+     * @async
+     * @param {string} id - The collection ID to update
+     * @param {Object} tree - The tree to persist
+     * @param {Array} [tree.items] - The nested request tree
+     * @param {Array} [tree.endpoints] - Root-level endpoints (legacy shape)
+     * @param {Array} [tree.folders] - Folders and their endpoints (legacy shape)
+     * @returns {Promise<Object>} The updated collection object
+     * @throws {Error} If the collection is missing or the save fails
+     */
+    async saveTree(id, { items, endpoints, folders }) {
+        const existing = await this.getById(id);
+
+        if (!existing) {
+            throw new Error(`Collection with id ${id} not found`);
+        }
+
+        const merged = { ...existing };
+        for (const [field, value] of Object.entries({ items, endpoints, folders })) {
+            if (value !== undefined) {
+                merged[field] = value;
+            }
+        }
+
         await this.saveOne(merged);
         return merged;
     }
@@ -173,6 +232,42 @@ export class CollectionRepository {
         } catch (error) {
             throw new Error(`Failed to delete collection: ${error.message || error}`, { cause: error });
         }
+    }
+
+    /**
+     * Removes a collection from the list without touching its files.
+     *
+     * The counterpart to opening a collection in place. Stored credentials are
+     * deliberately kept: they are the only part of such a collection that does
+     * not live in its directory, and re-opening the same directory restores it
+     * under the same id, so discarding them would make Close destructive in
+     * the one dimension the files are not.
+     *
+     * @async
+     * @param {string} id - The collection ID to close
+     * @returns {Promise<boolean>} True when the collection is no longer listed
+     * @throws {Error} If the backend call fails
+     */
+    async close(id) {
+        try {
+            await this.backendAPI.collections.close(id);
+            this._byIdCache.delete(id);
+            return true;
+        } catch (error) {
+            throw new Error(`Failed to close collection: ${error.message || error}`, { cause: error });
+        }
+    }
+
+    /**
+     * Registers an existing collection directory, using it where it is.
+     *
+     * @async
+     * @param {string} path - The directory the user picked
+     * @returns {Promise<Object>} `{ opened, alreadyOpen, failed }`
+     * @throws {Error} If nothing there can be opened
+     */
+    async openExisting(path) {
+        return this.backendAPI.collections.openExisting(path);
     }
 
     /**
@@ -550,7 +645,7 @@ export class CollectionRepository {
             if (!collection) {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }
-            await this.update(collectionId, { authConfig: toPersist });
+            await this.updateMetadata(collectionId, { authConfig: toPersist });
         } catch (error) {
             throw new Error(`Failed to save collection auth config: ${error.message || error}`, { cause: error });
         }
@@ -567,7 +662,7 @@ export class CollectionRepository {
      */
     async _readFromBackend(id) {
         try {
-            return await this.backendAPI.collections.get(id);
+            return fromWire(await this.backendAPI.collections.get(id)) ?? undefined;
         } catch (error) {
             return undefined;
         }
@@ -624,9 +719,7 @@ export class CollectionRepository {
     async findFolderForEndpoint(collectionId, endpointId) {
         try {
             const collection = await this._getByIdFresh(collectionId);
-            return (collection?.folders || []).find(
-                (folder) => (folder.endpoints || []).some((ep) => ep.id === endpointId)
-            ) || null;
+            return folderChainForRequest(collection, endpointId).at(-1) || null;
         } catch (error) {
             return null;
         }
@@ -644,7 +737,7 @@ export class CollectionRepository {
     async getFolderAuthConfig(collectionId, folderId) {
         try {
             const collection = await this._getByIdFresh(collectionId);
-            const folder = (collection?.folders || []).find((f) => f.id === folderId);
+            const folder = findFolder(collection, folderId);
             return this._hydrateAuthConfig(
                 folderAuthSecretScope(collectionId, folderId),
                 folder?.authConfig || null
@@ -676,19 +769,23 @@ export class CollectionRepository {
             if (!collection) {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }
-            const folders = (collection.folders || []).map(
-                (folder) => folder.id === folderId ? { ...folder, authConfig: toPersist } : folder
-            );
-            await this.update(collectionId, { folders });
+            const updated = updateFolder(collection, folderId, { authConfig: toPersist });
+            if (!updated) {
+                throw new Error(`Folder with id ${folderId} not found in collection`);
+            }
+            await this.saveTree(collectionId, updated);
         } catch (error) {
             throw new Error(`Failed to save folder auth config: ${error.message || error}`, { cause: error });
         }
     }
 
     /**
-     * Resolves the auth config an endpoint inherits: its folder's auth when
-     * the folder defines one (explicit "none" opts the folder out), otherwise
-     * the collection's auth. Secrets are merged in either case.
+     * Resolves the auth config an endpoint inherits: the nearest enclosing
+     * folder that defines one (explicit "none" opts that subtree out),
+     * otherwise the collection's auth. Secrets are merged in either case.
+     *
+     * Walks the folder chain innermost-first, so a nested folder's auth wins
+     * over its parent's.
      *
      * @async
      * @param {string} collectionId - The collection ID
@@ -697,11 +794,16 @@ export class CollectionRepository {
      */
     async getInheritedAuthConfig(collectionId, endpointId) {
         try {
-            const folder = endpointId
-                ? await this.findFolderForEndpoint(collectionId, endpointId)
-                : null;
-            if (folder?.authConfig?.type && folder.authConfig.type !== 'inherit') {
-                return this.getFolderAuthConfig(collectionId, folder.id);
+            if (endpointId) {
+                const collection = await this._getByIdFresh(collectionId);
+                const chain = folderChainForRequest(collection, endpointId);
+
+                for (let index = chain.length - 1; index >= 0; index -= 1) {
+                    const folder = chain[index];
+                    if (folder?.authConfig?.type && folder.authConfig.type !== 'inherit') {
+                        return this.getFolderAuthConfig(collectionId, folder.id);
+                    }
+                }
             }
             return this.getCollectionAuthConfig(collectionId);
         } catch (error) {

@@ -7,117 +7,72 @@ use crate::commands::collections as storage_collections;
 use crate::commands::scripts::ScriptData;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
-use std::fs;
-use std::path::Path;
 use tauri::AppHandle;
 
 pub(crate) fn load_collection_for_export(
     app: &AppHandle,
     collection_id: &str,
 ) -> Result<Collection, String> {
-    let collection_dir = storage_collections::resolve_collection_dir(app, collection_id)?
-        .ok_or_else(|| format!("Collection {} not found", collection_id))?;
-    let paths = storage_collections::CollectionPaths::from_dir(collection_dir);
+    let (stored, raw_variables, endpoint_data) =
+        storage_collections::load_for_export(app, collection_id)?;
 
-    let content = fs::read_to_string(paths.collection_json())
-        .map_err(|e| format!("Failed to read collection.json: {}", e))?;
-    let raw: Value =
-        serde_json::from_str(&content).map_err(|e| format!("Failed to parse collection: {}", e))?;
+    let mut endpoints: Vec<Endpoint> =
+        serde_json::from_value(Value::Array(stored.endpoints.clone())).unwrap_or_default();
+    let mut folders: Vec<Folder> =
+        serde_json::from_value(Value::Array(stored.folders.clone())).unwrap_or_default();
 
-    let id = raw
-        .get("id")
-        .and_then(|v| v.as_str())
-        .unwrap_or(collection_id)
-        .to_string();
-    let name = raw
-        .get("name")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    let description = raw
-        .get("description")
-        .and_then(|v| v.as_str())
-        .map(String::from);
-    let base_url = raw
-        .get("baseUrl")
-        .and_then(|v| v.as_str())
-        .filter(|s| !s.is_empty())
-        .map(String::from);
-
-    let mut endpoints: Vec<Endpoint> = raw
-        .get("endpoints")
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .unwrap_or_default();
-
-    let mut folders: Vec<Folder> = raw
-        .get("folders")
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .unwrap_or_default();
-
-    let variables_file = paths.variables_json();
-    let variables: Option<Vec<VariableEntry>> = if variables_file.exists() {
-        fs::read_to_string(&variables_file)
-            .ok()
-            .and_then(|s| serde_json::from_str::<Vec<Value>>(&s).ok())
-            .map(|entries| {
-                entries
-                    .into_iter()
-                    .filter_map(|e| {
-                        let key = e.get("key")?.as_str()?.to_string();
-                        let value = e
-                            .get("value")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or_default()
-                            .to_string();
-                        Some(VariableEntry { key, value })
-                    })
-                    .collect()
-            })
-    } else {
+    let variables: Option<Vec<VariableEntry>> = if raw_variables.is_empty() {
         None
+    } else {
+        Some(
+            raw_variables
+                .into_iter()
+                .filter_map(|entry| {
+                    let key = entry.get("key")?.as_str()?.to_string();
+                    let value = entry
+                        .get("value")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_default()
+                        .to_string();
+                    Some(VariableEntry { key, value })
+                })
+                .collect(),
+        )
     };
 
-    attach_endpoint_data(&paths.requests(), &mut endpoints, &mut folders);
+    attach_endpoint_data(&endpoint_data, &mut endpoints, &mut folders);
 
     Ok(Collection {
-        id,
-        name,
-        description,
-        base_url,
+        id: stored.id,
+        name: stored.name,
+        description: None,
+        base_url: Some(stored.base_url).filter(|s| !s.is_empty()),
         endpoints,
         folders,
         variables,
-        auth_config: raw.get("authConfig").filter(|v| v.is_object()).cloned(),
+        auth_config: stored.auth_config,
     })
 }
 
-/// Cached per-endpoint payload: (scripts, graphql_data), None when no data file exists.
-type EndpointPayload = Option<(Option<Value>, Option<Value>)>;
-
-/// Populate the transient `scripts`/`graphql_data` fields from each endpoint's
-/// data file so they can be serialized on export. Data is read once per
-/// endpoint id and applied to both the flat and folder occurrences.
-fn attach_endpoint_data(requests_dir: &Path, endpoints: &mut [Endpoint], folders: &mut [Folder]) {
-    let mut cache: HashMap<String, EndpointPayload> = HashMap::new();
-
-    let mut fill = |endpoint: &mut Endpoint| {
-        let data = cache.entry(endpoint.id.clone()).or_insert_with(|| {
-            storage_collections::find_endpoint_data_file(requests_dir, &endpoint.id)
-                .ok()
-                .flatten()
-                .and_then(|path| fs::read_to_string(path).ok())
-                .and_then(|s| serde_json::from_str::<storage_collections::EndpointData>(&s).ok())
-                .map(|d| (d.scripts, d.graphql_data))
-        });
-        if let Some((scripts, graphql_data)) = data {
-            endpoint.scripts = scripts.clone();
-            endpoint.graphql_data = graphql_data.clone();
+/// Populate the transient `scripts`/`graphql_data` fields so they can be
+/// serialized on export. An endpoint appears in both the flat list and its
+/// folder, so both occurrences are filled from the same stored payload.
+fn attach_endpoint_data(
+    data: &HashMap<String, storage_collections::EndpointData>,
+    endpoints: &mut [Endpoint],
+    folders: &mut [Folder],
+) {
+    let fill = |endpoint: &mut Endpoint| {
+        if let Some(stored) = data.get(&endpoint.id) {
+            endpoint.scripts = stored.scripts.clone();
+            endpoint.graphql_data = stored.graphql_data.clone();
         }
     };
 
     for endpoint in endpoints.iter_mut() {
         fill(endpoint);
     }
+
     for folder in folders.iter_mut() {
         for endpoint in folder.endpoints.iter_mut() {
             fill(endpoint);

@@ -134,7 +134,10 @@ describe('CollectionRepository', () => {
 
             const result = await repository.getAll();
 
-            expect(result).toEqual(collections);
+            expect(result).toEqual([
+                { id: 'col_1', name: 'Collection 1', endpoints: [], folders: [] },
+                { id: 'col_2', name: 'Collection 2', endpoints: [], folders: [] }
+            ]);
         });
 
         test('should return empty array when no collections', async () => {
@@ -159,7 +162,12 @@ describe('CollectionRepository', () => {
 
             const result = await repository.getById('col_1');
 
-            expect(result).toEqual(collection);
+            expect(result).toEqual({
+                id: 'col_1',
+                name: 'Test Collection',
+                endpoints: [],
+                folders: []
+            });
         });
 
         test('should cache collection after fetch', async () => {
@@ -179,6 +187,85 @@ describe('CollectionRepository', () => {
             const result = await repository.getById('non_existent');
 
             expect(result).toBeUndefined();
+        });
+    });
+
+    describe('updateMetadata', () => {
+        beforeEach(() => {
+            mockBackendAPI.collections.get.mockResolvedValue({
+                id: 'col_1',
+                name: 'Old',
+                endpoints: [{ id: 'e1' }],
+                folders: []
+            });
+            mockBackendAPI.collections.save.mockResolvedValue();
+        });
+
+        test('patches a metadata field and leaves the tree alone', async () => {
+            const result = await repository.updateMetadata('col_1', { name: 'New' });
+
+            expect(result.name).toBe('New');
+            expect(result.endpoints).toEqual([{ id: 'e1' }]);
+        });
+
+        test('refuses to patch the request tree', async () => {
+            await expect(repository.updateMetadata('col_1', { endpoints: [] }))
+                .rejects.toThrow(/cannot patch endpoints/);
+            await expect(repository.updateMetadata('col_1', { folders: [] }))
+                .rejects.toThrow(/cannot patch folders/);
+
+            expect(mockBackendAPI.collections.save).not.toHaveBeenCalled();
+        });
+
+        test('throws for a missing collection', async () => {
+            mockBackendAPI.collections.get.mockResolvedValue(null);
+
+            await expect(repository.updateMetadata('nope', { name: 'New' }))
+                .rejects.toThrow('Collection with id nope not found');
+        });
+    });
+
+    describe('saveTree', () => {
+        beforeEach(() => {
+            mockBackendAPI.collections.get.mockResolvedValue({
+                id: 'col_1',
+                name: 'Test',
+                endpoints: [{ id: 'e1' }],
+                folders: []
+            });
+            mockBackendAPI.collections.save.mockResolvedValue();
+        });
+
+        test('replaces the legacy tree and preserves metadata', async () => {
+            const result = await repository.saveTree('col_1', {
+                endpoints: [{ id: 'e2' }],
+                folders: [{ id: 'f1', endpoints: [] }]
+            });
+
+            expect(result.name).toBe('Test');
+            expect(result.endpoints).toEqual([{ id: 'e2' }]);
+            expect(result.folders).toEqual([{ id: 'f1', endpoints: [] }]);
+        });
+
+        test('replaces a nested items tree', async () => {
+            const items = [{ type: 'request', id: 'r1' }];
+
+            const result = await repository.saveTree('col_1', { items });
+
+            expect(result.items).toEqual(items);
+        });
+
+        test('leaves fields the caller omitted untouched', async () => {
+            const result = await repository.saveTree('col_1', { folders: [{ id: 'f1' }] });
+
+            expect(result.endpoints).toEqual([{ id: 'e1' }]);
+        });
+
+        test('throws for a missing collection', async () => {
+            mockBackendAPI.collections.get.mockResolvedValue(null);
+
+            await expect(repository.saveTree('nope', { endpoints: [] }))
+                .rejects.toThrow('Collection with id nope not found');
         });
     });
 
@@ -222,7 +309,12 @@ describe('CollectionRepository', () => {
 
             const result = await repository.readForUpdate('col_1');
 
-            expect(result).toBe(collection);
+            expect(result).toEqual({
+                id: 'col_1',
+                name: 'Test Collection',
+                endpoints: [],
+                folders: []
+            });
             expect(mockBackendAPI.collections.get).toHaveBeenCalledTimes(1);
 
             await repository.getById('col_1');

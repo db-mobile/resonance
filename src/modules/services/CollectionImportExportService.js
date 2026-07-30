@@ -5,6 +5,7 @@
 
 import { app } from '../appContext.js';
 import { toast } from '../ui/Toast.js';
+import { flattenRequests } from '../collections/collectionTree.js';
 
 /**
  * Handles collection import/export flows and documentation generation.
@@ -329,12 +330,7 @@ export class CollectionImportExportService {
             return;
         }
 
-        const allEndpoints = [
-            ...(collection.endpoints || []),
-            ...(collection.folders || []).flatMap(folder => folder.endpoints || [])
-        ];
-
-        for (const endpoint of allEndpoints) {
+        for (const endpoint of flattenRequests(collection)) {
             await this.saveEndpointResponseSchema(collection.id, endpoint);
         }
     }

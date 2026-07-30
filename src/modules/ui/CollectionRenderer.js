@@ -13,6 +13,7 @@
  */
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
+import { flattenRequests, rootRequests, topLevelFolders } from '../collections/collectionTree.js';
 
 export class CollectionRenderer {
     /**
@@ -166,16 +167,26 @@ export class CollectionRenderer {
                 collectionElement?.classList.add('expanded');
             }
 
-            (collection.folders || []).forEach(folder => {
-                if (!folder.__searchExpand) {
-                    return;
-                }
+            this.expandMatchingFolders(collection, collection.folders);
+        });
+    }
 
+    /**
+     * Expands every folder a search matched, at any nesting depth.
+     *
+     * @param {Object} collection - The owning collection
+     * @param {Array} folders - Folders to walk
+     */
+    expandMatchingFolders(collection, folders) {
+        (folders || []).forEach(folder => {
+            if (folder.__searchExpand) {
                 const folderElement = this.container.querySelector(
                     `.collection-item[data-collection-id="${collection.id}"] .folder-item[data-folder-id="${folder.id}"]`
                 );
                 folderElement?.classList.add('expanded');
-            });
+            }
+
+            this.expandMatchingFolders(collection, folder.folders);
         });
     }
 
@@ -201,13 +212,7 @@ export class CollectionRenderer {
 
         const pinnedEntries = [];
         collections.forEach(collection => {
-            const allEndpoints = [];
-            if (collection.folders && collection.folders.length > 0) {
-                collection.folders.forEach(folder => allEndpoints.push(...folder.endpoints));
-            } else {
-                allEndpoints.push(...collection.endpoints);
-            }
-            allEndpoints.forEach(endpoint => {
+            flattenRequests(collection).forEach(endpoint => {
                 if (pinnedRequests[`${collection.id}_${endpoint.id}`]) {
                     pinnedEntries.push({ collection, endpoint });
                 }
@@ -299,28 +304,28 @@ export class CollectionRenderer {
      * Renders either folders (if present) or endpoints directly. Supports
      * nested folder structure for organizing endpoints.
      *
+     * Root-level requests render above the folders, so a collection holding both
+     * shows all of its requests rather than only the foldered ones.
+     *
      * @param {Object} collection - Collection object
-     * @param {Array} [collection.folders] - Optional array of folder objects
-     * @param {Array} collection.endpoints - Array of endpoint objects
      * @param {Object} eventHandlers - Event handler callbacks
-     * @returns {HTMLDivElement} Container element with endpoints or folders
+     * @param {Object} [pinnedRequests] - Pin state keyed `${collectionId}_${endpointId}`
+     * @returns {HTMLDivElement} Container element with endpoints and folders
      */
     createEndpointsContainer(collection, eventHandlers, pinnedRequests = {}) {
         const endpointsDiv = document.createElement('div');
         endpointsDiv.className = 'collection-endpoints';
 
-        if (collection.folders && collection.folders.length > 0) {
-            collection.folders.forEach(folder => {
-                const folderDiv = this.createFolderElement(folder, collection, eventHandlers, pinnedRequests);
-                endpointsDiv.appendChild(folderDiv);
-            });
-        } else {
-            collection.endpoints.forEach(endpoint => {
-                const isPinned = !!pinnedRequests[`${collection.id}_${endpoint.id}`];
-                const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers, isPinned);
-                endpointsDiv.appendChild(endpointDiv);
-            });
-        }
+        rootRequests(collection).forEach(endpoint => {
+            const isPinned = !!pinnedRequests[`${collection.id}_${endpoint.id}`];
+            const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers, isPinned);
+            endpointsDiv.appendChild(endpointDiv);
+        });
+
+        topLevelFolders(collection).forEach(folder => {
+            const folderDiv = this.createFolderElement(folder, collection, eventHandlers, pinnedRequests);
+            endpointsDiv.appendChild(folderDiv);
+        });
 
         return endpointsDiv;
     }
@@ -331,12 +336,17 @@ export class CollectionRenderer {
      * Builds folder element with header, toggle, and nested endpoints. Supports
      * expansion/collapse with state persistence.
      *
+     * Nested folders render inside their parent, so the tree mirrors the
+     * directory structure on disk.
+     *
      * @param {Object} folder - Folder object to render
      * @param {string} folder.id - Unique folder identifier
      * @param {string} folder.name - Folder display name
      * @param {Array} folder.endpoints - Array of endpoint objects in this folder
+     * @param {Array} [folder.folders] - Nested folders
      * @param {Object} collection - Parent collection object
      * @param {Object} eventHandlers - Event handler callbacks
+     * @param {Object} [pinnedRequests] - Pin state keyed `${collectionId}_${endpointId}`
      * @returns {HTMLDivElement} The created folder element
      */
     createFolderElement(folder, collection, eventHandlers, pinnedRequests = {}) {
@@ -369,10 +379,15 @@ export class CollectionRenderer {
         const folderEndpoints = document.createElement('div');
         folderEndpoints.className = 'folder-endpoints';
 
-        folder.endpoints.forEach(endpoint => {
+        (folder.endpoints || []).forEach(endpoint => {
             const isPinned = !!pinnedRequests[`${collection.id}_${endpoint.id}`];
             const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers, isPinned);
             folderEndpoints.appendChild(endpointDiv);
+        });
+
+        (folder.folders || []).forEach(child => {
+            const childDiv = this.createFolderElement(child, collection, eventHandlers, pinnedRequests);
+            folderEndpoints.appendChild(childDiv);
         });
 
         folderDiv.appendChild(folderHeader);

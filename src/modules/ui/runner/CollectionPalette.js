@@ -6,6 +6,7 @@
  */
 
 import { templateLoader } from '../../templateLoader.js';
+import { flattenRequests } from '../../collections/collectionTree.js';
 
 /**
  * Renders the collection/endpoint source tree and reports endpoint adds.
@@ -99,23 +100,9 @@ export class CollectionPalette {
      * @returns {Array<Object>} Array of HTTP endpoints
      */
     _getAllEndpoints(collection) {
-        const endpoints = [];
-
-        const isHttp = e => e.protocol !== 'grpc' && e.protocol !== 'websocket';
-
-        if (collection.endpoints) {
-            endpoints.push(...collection.endpoints.filter(isHttp));
-        }
-
-        if (collection.folders) {
-            collection.folders.forEach(folder => {
-                if (folder.endpoints) {
-                    endpoints.push(...folder.endpoints.filter(isHttp));
-                }
-            });
-        }
-
-        return endpoints;
+        return flattenRequests(collection).filter(
+            endpoint => endpoint.protocol !== 'grpc' && endpoint.protocol !== 'websocket'
+        );
     }
 
     /**
