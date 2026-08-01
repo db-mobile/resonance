@@ -278,6 +278,7 @@ export class CollectionRenderer {
      *
      * @param {Object} collection - Collection object
      * @param {string} collection.name - Collection name to display
+     * @param {string} [collection.gitBranch] - Branch of the repository the collection lives in
      * @returns {HTMLDivElement} Collection header element
      */
     createCollectionHeader(collection) {
@@ -295,7 +296,70 @@ export class CollectionRenderer {
         headerDiv.appendChild(toggleDiv);
         headerDiv.appendChild(nameDiv);
 
+        if (collection.gitBranch) {
+            headerDiv.appendChild(this.createGitBadge(collection.gitBranch));
+        }
+
         return headerDiv;
+    }
+
+    /**
+     * Creates the branch badge shown on a collection stored in a Git repository.
+     * @param {string} branch - Branch name, or short object ID when HEAD is detached
+     * @returns {HTMLSpanElement} Badge element
+     */
+    createGitBadge(branch) {
+        const badge = document.createElement('span');
+        badge.className = 'badge neutral collection-git-badge';
+        badge.title = branch;
+
+        const icon = document.createElement('span');
+        icon.className = 'icon icon-12 icon-branch';
+
+        const label = document.createElement('span');
+        label.className = 'collection-git-branch';
+        label.textContent = branch;
+
+        badge.appendChild(icon);
+        badge.appendChild(label);
+
+        return badge;
+    }
+
+    /**
+     * Updates branch badges on the collections already rendered.
+     *
+     * Patches the existing rows rather than re-rendering: a branch switched in
+     * a terminal must not collapse the tree the user is working in.
+     *
+     * @param {Object} branchesById - Branch name keyed by collection ID; a missing key means no repository
+     * @returns {void}
+     */
+    updateGitBadges(branchesById = {}) {
+        const items = this.container.querySelectorAll('.collection-item[data-collection-id]');
+
+        items.forEach(item => {
+            const header = item.querySelector('.collection-header');
+            if (!header) {
+                return;
+            }
+
+            const branch = branchesById[item.dataset.collectionId];
+            const badge = header.querySelector('.collection-git-badge');
+
+            if (!branch) {
+                badge?.remove();
+                return;
+            }
+
+            if (!badge) {
+                header.appendChild(this.createGitBadge(branch));
+                return;
+            }
+
+            badge.title = branch;
+            badge.querySelector('.collection-git-branch').textContent = branch;
+        });
     }
 
     /**

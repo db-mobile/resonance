@@ -11,6 +11,7 @@ use tokio::sync::oneshot;
 
 use super::fs_secure::{restrict_dir, restrict_file};
 
+mod git;
 mod ipc;
 mod layout;
 mod legacy;
@@ -62,6 +63,11 @@ pub struct Collection {
     /// state, never something the frontend can assert.
     #[serde(default, skip_deserializing)]
     pub linked: bool,
+    /// Branch of the Git working tree the collection directory sits in, when
+    /// it sits in one. Derived on every read, like `linked`: never accepted
+    /// from the frontend and never written to disk.
+    #[serde(default, skip_deserializing, skip_serializing_if = "Option::is_none")]
+    pub git_branch: Option<String>,
 }
 
 /// Request data stored per-endpoint
@@ -263,19 +269,25 @@ fn is_collection_dir(path: &Path) -> bool {
 /// A v2 tree is projected back into the shape the frontend expects, so reading
 /// the new format is invisible to the renderer.
 fn read_collection_from_dir(path: &Path) -> Result<Collection, String> {
-    match Layout::detect(path) {
+    let mut collection = match Layout::detect(path) {
         Some(Layout::V2) => {
             let loaded = read_collection_dir(path)?;
-            Ok(to_ipc_collection(&loaded, &path.to_string_lossy(), false))
+            to_ipc_collection(&loaded, &path.to_string_lossy(), false)
         }
         Some(Layout::V1) => {
             let mut collection: Collection =
                 read_json_file(&CollectionPaths::of(path).collection_json())?;
             collection.storage_path = Some(path.to_string_lossy().to_string());
-            Ok(collection)
+            collection
         }
-        None => Err(format!("{} is not a collection directory", path.display())),
-    }
+        None => return Err(format!("{} is not a collection directory", path.display())),
+    };
+
+    // Every read of a collection off disk funnels through here, and the branch
+    // is as much a fn(&Path) as the rest of the read, so one call covers list,
+    // get, and open alike.
+    collection.git_branch = git::branch_for_dir(path);
+    Ok(collection)
 }
 
 fn extract_endpoint_name(endpoint: &Value) -> Option<String> {
@@ -1328,6 +1340,29 @@ pub async fn collections_get_path(app: AppHandle) -> Result<String, String> {
     Ok(path.to_string_lossy().to_string())
 }
 
+/// Current Git branch of every registered collection, keyed by collection id.
+///
+/// Branches also ride along on each `Collection`, but a checkout switched in a
+/// terminal has to be picked up without re-reading every request file, so this
+/// answers from the index alone: a few directory probes and one small read.
+/// Collections outside a working tree are left out rather than reported null.
+///
+/// @param app - Tauri app handle
+/// @returns Branch name (or short object id when HEAD is detached) per collection
+#[tauri::command]
+pub async fn collections_git_branches(app: AppHandle) -> Result<HashMap<String, String>, String> {
+    let index = get_collection_index(&app)?;
+    let mut branches = HashMap::new();
+
+    for (collection_id, path) in index {
+        if let Some(branch) = git::branch_for_dir(Path::new(&path)) {
+            branches.insert(collection_id, branch);
+        }
+    }
+
+    Ok(branches)
+}
+
 /// Picks a folder.
 ///
 /// @param app - Tauri app handle
@@ -1626,6 +1661,7 @@ mod convert_on_save {
             storage_path: None,
             storage_parent_path: None,
             linked: false,
+            git_branch: None,
         };
 
         let mut seed = HashMap::new();
@@ -1680,6 +1716,7 @@ mod convert_on_save {
             storage_path: None,
             storage_parent_path: None,
             linked: false,
+            git_branch: None,
         };
 
         let mut seed = HashMap::new();

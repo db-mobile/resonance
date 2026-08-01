@@ -236,6 +236,7 @@ pub(crate) fn to_ipc_collection(
         storage_path: Some(storage_path.to_string()),
         storage_parent_path: None,
         linked,
+        git_branch: None,
     }
 }
 
@@ -851,6 +852,7 @@ mod tests {
             storage_path: None,
             storage_parent_path: None,
             linked: false,
+            git_branch: None,
         };
 
         let mut data = HashMap::new();
@@ -941,6 +943,7 @@ mod save_path {
             storage_path: None,
             storage_parent_path: None,
             linked: false,
+            git_branch: None,
         }
     }
 

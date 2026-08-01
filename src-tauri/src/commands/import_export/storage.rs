@@ -120,6 +120,7 @@ pub(crate) fn save_collection_to_files(
             storage_path: None,
             storage_parent_path,
             linked: false,
+            git_branch: None,
         },
         variables,
         endpoint_data,

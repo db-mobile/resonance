@@ -47,6 +47,11 @@
   mask-image: url("../../assets/ui/alert-circle.svg");
 }
 
+.icon-branch {
+  -webkit-mask-image: url("../../assets/ui/branch.svg");
+  mask-image: url("../../assets/ui/branch.svg");
+}
+
 .icon-check {
   -webkit-mask-image: url("../../assets/ui/check.svg");
   mask-image: url("../../assets/ui/check.svg");

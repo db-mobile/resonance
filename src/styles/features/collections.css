@@ -73,6 +73,24 @@
   font-weight: 600;
 }
 
+.collection-git-badge {
+  flex-shrink: 0;
+  max-width: 45%;
+  padding: 1px var(--space-2);
+  font-weight: 500;
+  opacity: var(--dim-opacity);
+}
+
+.collection-header:hover .collection-git-badge {
+  opacity: 1;
+}
+
+.collection-git-branch {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .collection-endpoints,
 .folder-endpoints,
 .pinned-section-endpoints {

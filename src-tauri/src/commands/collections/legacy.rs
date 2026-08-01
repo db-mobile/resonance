@@ -373,6 +373,7 @@ mod tests {
             storage_path: Some("/home/someone/.local/share/resonance/collections/petstore".into()),
             storage_parent_path: None,
             linked: false,
+            git_branch: None,
         }
     }
 
@@ -906,6 +907,7 @@ mod end_to_end {
             storage_path: Some("/machine/specific/path".into()),
             storage_parent_path: None,
             linked: false,
+            git_branch: None,
         };
 
         let mut data = HashMap::new();
@@ -983,6 +985,7 @@ mod end_to_end {
             storage_path: None,
             storage_parent_path: None,
             linked: false,
+            git_branch: None,
         };
 
         let temp = TempDir::new().unwrap();

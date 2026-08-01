@@ -124,7 +124,52 @@ export class CollectionController {
         this.handleGenerateDocumentation = this.handleGenerateDocumentation.bind(this);
         this.handleTogglePinned = this.handleTogglePinned.bind(this);
 
+        this.gitRefreshInFlight = false;
+        this.refreshGitBranches = this.refreshGitBranches.bind(this);
+
         this.initializeCollectionsSearch();
+        this.initializeGitBranchRefresh();
+    }
+
+    /**
+     * Re-reads Git branches whenever the window regains focus.
+     *
+     * A `git checkout` happens in a terminal, so the app only ever learns about
+     * it on the way back in. Focus is the cheapest signal for that, and avoids
+     * keeping a filesystem watcher alive per collection.
+     *
+     * @returns {void}
+     */
+    initializeGitBranchRefresh() {
+        window.addEventListener('focus', this.refreshGitBranches);
+    }
+
+    /**
+     * Updates the branch shown for every collection.
+     *
+     * Failures are swallowed: the badge is decoration, and a collection whose
+     * directory has gone missing must not put an error in front of the user.
+     *
+     * @async
+     * @returns {Promise<void>}
+     */
+    async refreshGitBranches() {
+        if (this.gitRefreshInFlight) {
+            return;
+        }
+        this.gitRefreshInFlight = true;
+
+        try {
+            const branches = await this.repository.gitBranches();
+            this.allCollections.forEach(collection => {
+                collection.gitBranch = branches[collection.id] ?? null;
+            });
+            this.renderer.updateGitBadges(branches);
+        } catch (error) {
+            return;
+        } finally {
+            this.gitRefreshInFlight = false;
+        }
     }
 
     /**

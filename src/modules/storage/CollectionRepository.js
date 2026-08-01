@@ -271,6 +271,19 @@ export class CollectionRepository {
     }
 
     /**
+     * Reads the current Git branch of every registered collection.
+     *
+     * Cheaper than reloading collections: the backend answers from the
+     * collection index without touching a single request file.
+     *
+     * @async
+     * @returns {Promise<Object>} Branch name keyed by collection ID, omitting collections outside a repository
+     */
+    async gitBranches() {
+        return this.backendAPI.collections.gitBranches();
+    }
+
+    /**
      * Helper to get endpoint data
      * @private
      */
