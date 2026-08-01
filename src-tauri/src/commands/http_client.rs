@@ -2,18 +2,23 @@
 //!
 //! This is deliberately separate from [`crate::commands::tls`]: `tls.rs` holds
 //! rustls primitives (identity/CA loading, `ClientConfig` builders) for the
-//! protocols that speak rustls directly — gRPC, MQTT, and the HTTP timing probe
-//! — whereas this module assembles reqwest clients, which take the same
-//! material through reqwest's own `identity`/`add_root_certificate` API.
+//! protocols that speak rustls directly — gRPC, MQTT, and the WebSocket
+//! transports — whereas this module assembles reqwest clients, which take the
+//! same material through reqwest's own `identity`/`add_root_certificate` API.
 //!
 //! Both HTTP requests and SSE streams build their client here so the two stay
 //! in step on TLS verification, client certificates, and proxying.
+//!
+//! Request timings come from [`crate::commands::timing`], attached here so they
+//! measure the connection the client actually opens.
 
 use reqwest::Client;
+use std::sync::Arc;
 use std::time::Duration;
 
 use super::api_request::ClientCertConfig;
 use super::proxy::ProxyAction;
+use super::timing::{TimingLayer, TimingRecorder, TimingResolver};
 
 /// Everything that varies between the clients this app builds. There is
 /// deliberately no `Default`: each call site spells out every field, so a new
@@ -36,6 +41,10 @@ pub struct HttpClientOptions {
     /// Evict pooled connections immediately. Streaming callers set this so a
     /// reconnect opens a fresh connection rather than reusing a stale one.
     pub disable_pooling: bool,
+    /// Collects DNS and connect timings from the connection this client opens.
+    /// Only the request path reports these; the other callers pass `None` and
+    /// pay nothing for the instrumentation.
+    pub timing_recorder: Option<Arc<TimingRecorder>>,
 }
 
 /// Build a client from `opts`, applying the caller's already-resolved proxy
@@ -58,6 +67,14 @@ pub fn build_http_client(
 
     if opts.disable_pooling {
         builder = builder.pool_idle_timeout(Duration::from_secs(0));
+    }
+
+    // The resolver runs inside the connector call, so timing both yields DNS on
+    // its own and the connect phase as the difference.
+    if let Some(recorder) = &opts.timing_recorder {
+        builder = builder
+            .dns_resolver(TimingResolver::new(Arc::clone(recorder)))
+            .connector_layer(TimingLayer::new(Arc::clone(recorder)));
     }
 
     // With rustls-tls + http2, ALPN negotiates HTTP/2 by default for HTTPS.
@@ -172,12 +189,22 @@ mod tests {
             client_cert: None,
             follow_redirects: true,
             disable_pooling: false,
+            timing_recorder: None,
         }
     }
 
     #[test]
     fn builds_a_client_from_default_options() {
         assert!(build_http_client(base_options(), ProxyAction::Disable).is_ok());
+    }
+
+    #[test]
+    fn builds_a_client_with_timing_instrumentation() {
+        let opts = HttpClientOptions {
+            timing_recorder: Some(TimingRecorder::new()),
+            ..base_options()
+        };
+        assert!(build_http_client(opts, ProxyAction::Disable).is_ok());
     }
 
     #[test]

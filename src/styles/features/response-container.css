@@ -271,6 +271,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+.performance-note {
+  font-size: var(--font-size-caption);
+  opacity: var(--dim-opacity);
+}
+
 .performance-breakdown {
   display: flex;
   flex-direction: column;
@@ -281,7 +286,7 @@
 .performance-breakdown > h4,
 .performance-summary > h4,
 .timing-legend > h4 {
-  font-size: var(--font-size-heading);
+  font-size: var(--font-size-title-4);
   font-weight: 700;
 }
 
@@ -321,11 +326,11 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-base);
 }
 
 .timing-label {
-  flex: 0 0 170px;
+  flex: 0 0 190px;
   opacity: var(--dim-opacity);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -347,7 +352,7 @@
 }
 
 .timing-value {
-  flex: 0 0 72px;
+  flex: 0 0 84px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -368,12 +373,12 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-small);
   opacity: 0.8;
 }
 
 .legend-color {
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
   border-radius: 3px;
 }
