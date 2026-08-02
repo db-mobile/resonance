@@ -26,7 +26,9 @@
         "import_postman": "Import Postman",
         "import_postman_sub": "From an export file",
         "import_curl": "Import cURL",
-        "import_curl_sub": "Paste a cURL command"
+        "import_curl_sub": "Paste a cURL command",
+        "open_existing": "Open Folder",
+        "open_existing_sub": "A collection already on disk"
       }
     },
     "search_empty": {
@@ -38,7 +40,8 @@
     "openapi": "OpenAPI Collection",
     "postman_collection": "Postman Collection",
     "postman_environment": "Postman Environment",
-    "curl": "cURL Command"
+    "curl": "cURL Command",
+    "open_existing": "Existing Folder"
   },
   "import_dialog": {
     "title": "Import Collection",
@@ -69,7 +72,9 @@
     "delete_title": "Delete Collection",
     "confirm_delete": "Are you sure you want to delete the collection \"{{name}}\"?\n\nThis action cannot be undone.",
     "import_success": "Collection imported successfully",
-    "import_error": "Failed to import collection"
+    "import_error": "Failed to import collection",
+    "close_title": "Close Collection",
+    "confirm_close": "Remove \"{{name}}\" from the list?\n\nThe folder and its files stay on disk, and stored credentials are kept. You can open it again later."
   },
   "endpoint": {
     "delete_title": "Delete Request",
@@ -92,7 +97,8 @@
     "rename_request": "Rename Request",
     "delete_request": "Delete Request",
     "pin_request": "Pin Request",
-    "unpin_request": "Unpin Request"
+    "unpin_request": "Unpin Request",
+    "close_collection": "Close Collection"
   },
   "docs": {
     "title": "Generate Documentation",

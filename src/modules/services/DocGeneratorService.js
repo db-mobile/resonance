@@ -5,6 +5,7 @@
 
 import { generateCode, SUPPORTED_LANGUAGES } from '../codeGenerator.js';
 import { escapeHtml } from '../htmlUtils.js';
+import { flattenRequests, rootRequests, topLevelFolders } from '../collections/collectionTree.js';
 
 /**
  * Service for generating API documentation from collections
@@ -73,15 +74,40 @@ export class DocGeneratorService {
      * @returns {boolean} True if collection has HTTP endpoints
      */
     hasHttpEndpoints(collection) {
-        if (collection.folders && collection.folders.length > 0) {
-            for (const folder of collection.folders) {
-                if (this._filterHttpEndpoints(folder.endpoints).length > 0) {
-                    return true;
-                }
-            }
-            return false;
+        return this._filterHttpEndpoints(flattenRequests(collection)).length > 0;
+    }
+
+    /**
+     * Groups a collection's HTTP requests by the folder they sit in.
+     *
+     * Root-level requests come first under an unnamed group, then each folder
+     * in tree order, so a collection holding both is fully documented.
+     *
+     * @private
+     * @param {Object} collection - The collection to group
+     * @returns {Array<{name: (string|null), endpoints: Array<Object>}>} Non-empty groups
+     */
+    _groupByFolder(collection) {
+        const groups = [];
+
+        const roots = this._filterHttpEndpoints(rootRequests(collection));
+        if (roots.length > 0) {
+            groups.push({ name: null, endpoints: roots });
         }
-        return this._filterHttpEndpoints(collection.endpoints).length > 0;
+
+        const walk = (folders, prefix) => {
+            (folders || []).forEach(folder => {
+                const name = prefix ? `${prefix} / ${folder.name}` : folder.name;
+                const endpoints = this._filterHttpEndpoints(folder.endpoints || []);
+                if (endpoints.length > 0) {
+                    groups.push({ name, endpoints });
+                }
+                walk(folder.folders, name);
+            });
+        };
+        walk(topLevelFolders(collection), '');
+
+        return groups;
     }
 
     /**
@@ -118,48 +144,25 @@ export class DocGeneratorService {
         lines.push('## Table of Contents');
         lines.push('');
         
-        if (collection.folders && collection.folders.length > 0) {
-            for (const folder of collection.folders) {
-                const httpEndpoints = this._filterHttpEndpoints(folder.endpoints);
-                if (httpEndpoints.length === 0) {continue;}
-                
-                const folderId = this._slugify(folder.name);
-                lines.push(`- [${folder.name}](#${folderId})`);
-                for (const endpoint of httpEndpoints) {
-                    const endpointId = this._slugify(`${endpoint.method}-${endpoint.name || endpoint.path}`);
-                    lines.push(`  - [${endpoint.method} ${endpoint.name || endpoint.path}](#${endpointId})`);
-                }
+        for (const group of this._groupByFolder(collection)) {
+            const indent = group.name ? '  ' : '';
+            if (group.name) {
+                lines.push(`- [${group.name}](#${this._slugify(group.name)})`);
             }
-        } else {
-            const httpEndpoints = this._filterHttpEndpoints(collection.endpoints);
-            for (const endpoint of httpEndpoints) {
+            for (const endpoint of group.endpoints) {
                 const endpointId = this._slugify(`${endpoint.method}-${endpoint.name || endpoint.path}`);
-                lines.push(`- [${endpoint.method} ${endpoint.name || endpoint.path}](#${endpointId})`);
+                lines.push(`${indent}- [${endpoint.method} ${endpoint.name || endpoint.path}](#${endpointId})`);
             }
         }
         lines.push('');
 
-        if (collection.folders && collection.folders.length > 0) {
-            for (const folder of collection.folders) {
-                const httpEndpoints = this._filterHttpEndpoints(folder.endpoints);
-                if (httpEndpoints.length === 0) {continue;}
-                
-                lines.push(`## ${folder.name}`);
+        for (const group of this._groupByFolder(collection)) {
+            if (group.name) {
+                lines.push(`## ${group.name}`);
                 lines.push('');
-
-                for (const endpoint of httpEndpoints) {
-                    const endpointDoc = await this._generateEndpointMarkdown(
-                        collection,
-                        endpoint,
-                        includePersistedData,
-                        languages
-                    );
-                    lines.push(endpointDoc);
-                }
             }
-        } else {
-            const httpEndpoints = this._filterHttpEndpoints(collection.endpoints);
-            for (const endpoint of httpEndpoints) {
+
+            for (const endpoint of group.endpoints) {
                 const endpointDoc = await this._generateEndpointMarkdown(
                     collection,
                     endpoint,
@@ -394,15 +397,9 @@ export class DocGeneratorService {
             });
         };
 
-        if (collection.folders && collection.folders.length > 0) {
-            for (const folder of collection.folders) {
-                for (const endpoint of folder.endpoints || []) {
-                    await processEndpoint(endpoint, folder.name);
-                }
-            }
-        } else if (collection.endpoints) {
-            for (const endpoint of collection.endpoints) {
-                await processEndpoint(endpoint);
+        for (const group of this._groupByFolder(collection)) {
+            for (const endpoint of group.endpoints) {
+                await processEndpoint(endpoint, group.name ?? undefined);
             }
         }
 
@@ -416,26 +413,21 @@ export class DocGeneratorService {
     _generateHtmlToc(collection) {
         const items = [];
 
-        if (collection.folders && collection.folders.length > 0) {
-            for (const folder of collection.folders) {
-                const httpEndpoints = this._filterHttpEndpoints(folder.endpoints);
-                if (httpEndpoints.length === 0) {continue;}
-                
-                const folderId = this._slugify(folder.name);
-                items.push(`<li><a href="#${folderId}">${escapeHtml(folder.name)}</a>`);
-                items.push('<ul>');
-                for (const endpoint of httpEndpoints) {
-                    const endpointId = this._slugify(`${endpoint.method}-${endpoint.name || endpoint.path}`);
-                    items.push(`<li><a href="#${endpointId}"><span class="method method-${endpoint.method.toLowerCase()}">${endpoint.method}</span> ${escapeHtml(endpoint.name || endpoint.path)}</a></li>`);
-                }
-                items.push('</ul></li>');
+        const linkFor = (endpoint) => {
+            const endpointId = this._slugify(`${endpoint.method}-${endpoint.name || endpoint.path}`);
+            return `<li><a href="#${endpointId}"><span class="method method-${endpoint.method.toLowerCase()}">${endpoint.method}</span> ${escapeHtml(endpoint.name || endpoint.path)}</a></li>`;
+        };
+
+        for (const group of this._groupByFolder(collection)) {
+            if (!group.name) {
+                group.endpoints.forEach(endpoint => items.push(linkFor(endpoint)));
+                continue;
             }
-        } else {
-            const httpEndpoints = this._filterHttpEndpoints(collection.endpoints);
-            for (const endpoint of httpEndpoints) {
-                const endpointId = this._slugify(`${endpoint.method}-${endpoint.name || endpoint.path}`);
-                items.push(`<li><a href="#${endpointId}"><span class="method method-${endpoint.method.toLowerCase()}">${endpoint.method}</span> ${escapeHtml(endpoint.name || endpoint.path)}</a></li>`);
-            }
+
+            items.push(`<li><a href="#${this._slugify(group.name)}">${escapeHtml(group.name)}</a>`);
+            items.push('<ul>');
+            group.endpoints.forEach(endpoint => items.push(linkFor(endpoint)));
+            items.push('</ul></li>');
         }
 
         return `<ul>${items.join('')}</ul>`;

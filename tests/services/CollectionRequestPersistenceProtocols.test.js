@@ -100,18 +100,21 @@ describe('CollectionRequestPersistenceService protocol routing', () => {
         expect(repository.savePersistedAuthConfig).not.toHaveBeenCalled();
     });
 
+    const savedEndpoint = (endpointId) => {
+        const saved = repository.saveOne.mock.calls.at(-1)[0];
+        return saved.endpoints.find(endpoint => endpoint.id === endpointId);
+    };
+
     test('an SSE endpoint records a changed HTTP verb', async () => {
         await service.saveAllRequestModifications('c1', 'sse1');
 
-        const sseEndpoint = collection.endpoints.find(endpoint => endpoint.id === 'sse1');
-        expect(sseEndpoint.httpMethod).toBe('POST');
+        expect(savedEndpoint('sse1').httpMethod).toBe('POST');
     });
 
     test('an http endpoint still has its path rewritten from the url', async () => {
         await service.saveAllRequestModifications('c1', 'http1');
 
-        const httpEndpoint = collection.endpoints.find(endpoint => endpoint.id === 'http1');
-        expect(httpEndpoint.path).toBe('/v1/stream');
+        expect(savedEndpoint('http1').path).toBe('/v1/stream');
     });
 
     describe('patchEndpointRecords', () => {
@@ -122,8 +125,15 @@ describe('CollectionRequestPersistenceService protocol routing', () => {
 
             await service.patchEndpointRecords('c1', 'sse1', { httpMethod: 'PUT' });
 
-            expect(collection.endpoints[0].httpMethod).toBe('PUT');
-            expect(repository.saveOne).toHaveBeenCalledWith(collection);
+            const saved = repository.saveOne.mock.calls.at(-1)[0];
+            expect(saved.endpoints.find(endpoint => endpoint.id === 'sse1').httpMethod).toBe('PUT');
+            expect(saved.folders[0].endpoints.find(endpoint => endpoint.id === 'sse1').httpMethod).toBe('PUT');
+        });
+
+        test('does not mutate the collection it was handed', async () => {
+            await service.patchEndpointRecords('c1', 'sse1', { httpMethod: 'PUT' });
+
+            expect(collection.endpoints[0].httpMethod).toBe('GET');
         });
 
         test('does not write when nothing changed', async () => {

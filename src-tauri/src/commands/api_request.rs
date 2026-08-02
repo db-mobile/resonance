@@ -6,97 +6,12 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::State;
-use tokio::net::TcpStream;
 use tokio::sync::oneshot;
-use tokio::time::timeout as tokio_timeout;
 use uuid::Uuid;
 
 use super::http_client::{build_http_client, HttpClientOptions};
-use super::proxy::{ProxyAction, ProxyState};
-
-/// Maximum time to spend on the TCP+TLS timing probe before giving up.
-const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
-
-/// Dangerous cert verifier used only when the request has `verify_ssl: false`.
-/// Kept in sync with reqwest's `danger_accept_invalid_certs(true)` behavior so
-/// the probe does not fail on self-signed certs where the real request succeeds.
-use super::tls::NoCertVerifier;
-
-fn build_probe_tls_config(verify_ssl: bool) -> rustls::ClientConfig {
-    let provider = Arc::new(rustls::crypto::ring::default_provider());
-    let builder = rustls::ClientConfig::builder_with_provider(provider)
-        .with_safe_default_protocol_versions()
-        .expect("rustls safe default protocol versions");
-
-    if verify_ssl {
-        let mut root_store = rustls::RootCertStore::empty();
-        root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-        builder
-            .with_root_certificates(root_store)
-            .with_no_client_auth()
-    } else {
-        builder
-            .dangerous()
-            .with_custom_certificate_verifier(Arc::new(NoCertVerifier))
-            .with_no_client_auth()
-    }
-}
-
-/// Measure TCP and (for HTTPS) TLS handshake times against `host:port` via a
-/// separate short-lived probe connection. Returns `(tcp_ms, tls_ms)`. Any error
-/// is logged and reported as `None` — the caller must proceed regardless.
-async fn measure_connection_timings(
-    host: &str,
-    port: u16,
-    is_https: bool,
-    verify_ssl: bool,
-) -> (Option<u64>, Option<u64>) {
-    let tcp_start = Instant::now();
-    let connect_future = TcpStream::connect((host, port));
-    let tcp_stream = match tokio_timeout(PROBE_TIMEOUT, connect_future).await {
-        Ok(Ok(stream)) => stream,
-        Ok(Err(e)) => {
-            tracing::warn!("TCP timing probe failed for {}:{} - {}", host, port, e);
-            return (None, None);
-        }
-        Err(_) => {
-            tracing::warn!("TCP timing probe timed out for {}:{}", host, port);
-            return (None, None);
-        }
-    };
-    let tcp_ms = tcp_start.elapsed().as_millis() as u64;
-
-    if !is_https {
-        return (Some(tcp_ms), None);
-    }
-
-    let server_name = match rustls::pki_types::ServerName::try_from(host.to_string()) {
-        Ok(name) => name,
-        Err(e) => {
-            tracing::warn!("Invalid TLS server name {} - {}", host, e);
-            return (Some(tcp_ms), None);
-        }
-    };
-
-    let config = build_probe_tls_config(verify_ssl);
-    let connector = tokio_rustls::TlsConnector::from(Arc::new(config));
-
-    let tls_start = Instant::now();
-    let tls_future = connector.connect(server_name, tcp_stream);
-    let tls_ms = match tokio_timeout(PROBE_TIMEOUT, tls_future).await {
-        Ok(Ok(_tls_stream)) => Some(tls_start.elapsed().as_millis() as u64),
-        Ok(Err(e)) => {
-            tracing::warn!("TLS timing probe failed for {} - {}", host, e);
-            None
-        }
-        Err(_) => {
-            tracing::warn!("TLS timing probe timed out for {}", host);
-            None
-        }
-    };
-
-    (Some(tcp_ms), tls_ms)
-}
+use super::proxy::ProxyState;
+use super::timing::TimingRecorder;
 
 /// Digest authentication challenge parsed from WWW-Authenticate header
 #[derive(Debug, Clone)]
@@ -564,26 +479,46 @@ pub struct ClientCertConfig {
     pub ca_path: Option<String>,
 }
 
-impl ClientCertConfig {
-    /// Whether any certificate material is configured. Used to skip the TLS
-    /// timing probe (which uses the default trust roots and no client auth and
-    /// would otherwise fail/mislead against mTLS or private-CA endpoints).
-    fn is_active(&self) -> bool {
-        self.cert_path.as_deref().is_some_and(|p| !p.is_empty())
-            || self.ca_path.as_deref().is_some_and(|p| !p.is_empty())
-    }
-}
-
+/// Phase breakdown of a request, all measured on the connection the request
+/// actually used.
+///
+/// Durations are fractional milliseconds: sub-millisecond phases are normal
+/// against localhost, and whole milliseconds would report them as zero. `None`
+/// means the phase was not measured, which is distinct from a measured zero —
+/// a reused connection performs no connect, and a SOCKS proxy resolves names
+/// remotely so the local resolver never runs.
+///
+/// TCP and TLS are reported together as `connect`: reqwest nests its TCP
+/// connector inside the TLS connector with no hook between them.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RequestTimings {
+    /// Unix milliseconds at which the command was entered.
     pub start_time: u64,
-    pub dns_lookup: u64,
-    pub tcp_connection: u64,
-    pub tls_handshake: u64,
-    pub first_byte: u64,
-    pub download: u64,
-    pub total: u64,
+    pub dns: Option<f64>,
+    pub connect: Option<f64>,
+    /// Server think time: TTFB less the phases that preceded it.
+    pub waiting: Option<f64>,
+    pub download: f64,
+    pub total: f64,
+    /// Connections opened. Above one means redirects or an auth retry, and the
+    /// phases above are their sum rather than a single connection's.
+    pub connect_count: u32,
+}
+
+impl RequestTimings {
+    /// A breakdown for a request that never got far enough to measure phases.
+    fn unmeasured(start_time: u64) -> Self {
+        Self {
+            start_time,
+            dns: None,
+            connect: None,
+            waiting: None,
+            download: 0.0,
+            total: 0.0,
+            connect_count: 0,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -728,18 +663,8 @@ pub async fn send_api_request(
     let (cancel_tx, cancel_rx) = oneshot::channel();
     *state.cancel_tx.lock().unwrap() = Some(cancel_tx);
 
-    let start_time = Instant::now();
     let start_timestamp = chrono::Utc::now().timestamp_millis() as u64;
-
-    let mut timings = RequestTimings {
-        start_time: start_timestamp,
-        dns_lookup: 0,
-        tcp_connection: 0,
-        tls_handshake: 0,
-        first_byte: 0,
-        download: 0,
-        total: 0,
-    };
+    let mut timings = RequestTimings::unmeasured(start_timestamp);
 
     // Validate URL
     if request_options.url.is_empty() {
@@ -760,47 +685,12 @@ pub async fn send_api_request(
         });
     }
 
-    // Parse URL and measure DNS + TCP + TLS timings via a short-lived probe
-    // connection. The probe uses a separate TCP (and optional TLS) handshake
-    // ahead of the real reqwest call, since reqwest/hyper does not expose
-    // per-stage connection timings. Probe results are best-effort: any failure
-    // is logged and the affected field stays at 0.
-    // Probe is skipped when a proxy is active — measuring through a CONNECT
-    // tunnel would require reimplementing proxy auth, which is out of scope.
-    let parsed_url = url::Url::parse(&request_options.url).ok();
-    let is_https = request_options.url.starts_with("https://");
-    // Resolve the proxy decision once: used below to skip the timing probe and
-    // again when building the reqwest client.
     let proxy_action = proxy_state.get_proxy_config(&request_options.url);
-    // Skip the timing probe through a proxy (would require CONNECT-tunnel auth)
-    // and when client-cert/custom-CA material is configured (the probe uses the
-    // default trust roots and no client auth, so it would fail or mislead).
-    let client_cert_active = request_options
-        .client_cert
-        .as_ref()
-        .is_some_and(ClientCertConfig::is_active);
-    let skip_probe = !matches!(proxy_action, ProxyAction::Disable) || client_cert_active;
 
-    if let Some(ref url) = parsed_url {
-        if let Some(host) = url.host_str() {
-            let port = url
-                .port_or_known_default()
-                .unwrap_or(if is_https { 443 } else { 80 });
-            let lookup_addr = format!("{}:{}", host, port);
-
-            let dns_start = Instant::now();
-            let _ = tokio::net::lookup_host(&lookup_addr).await;
-            timings.dns_lookup = dns_start.elapsed().as_millis() as u64;
-
-            if !skip_probe {
-                let verify_ssl = request_options.verify_ssl != Some(false);
-                let (tcp_ms, tls_ms) =
-                    measure_connection_timings(host, port, is_https, verify_ssl).await;
-                timings.tcp_connection = tcp_ms.unwrap_or(0);
-                timings.tls_handshake = tls_ms.unwrap_or(0);
-            }
-        }
-    }
+    // Collects DNS and connect timings from the connection this request opens.
+    // Proxied and mTLS requests need no special handling: the connector layer
+    // times whatever connection reqwest actually establishes.
+    let recorder = TimingRecorder::new();
 
     // Timeout from request options: None means no timeout, Some(0) also means no timeout.
     let timeout = request_options
@@ -817,6 +707,7 @@ pub async fn send_api_request(
         client_cert: request_options.client_cert.clone(),
         follow_redirects: request_options.follow_redirects != Some(false),
         disable_pooling: false,
+        timing_recorder: Some(Arc::clone(&recorder)),
     };
 
     let client = match build_http_client(client_options, proxy_action) {
@@ -991,6 +882,12 @@ pub async fn send_api_request(
         Ok(rb)
     };
 
+    // The clock starts here rather than at command entry so the total covers
+    // the request alone. Client assembly and body preparation are not phases
+    // the breakdown can attribute, and counting them would leave the waterfall
+    // segments summing to less than the total.
+    let start_time = Instant::now();
+
     // Execute request with cancellation support
     let request_future = build_request(None)?.send();
 
@@ -1020,7 +917,7 @@ pub async fn send_api_request(
                                             Ok(auth_header) => {
                                                 // Retry with digest auth
                                                 let retry_result = build_request(Some(auth_header))?.send().await;
-                                                return process_response(retry_result, &mut timings, start_time, &state).await;
+                                                return process_response(retry_result, &mut timings, start_time, &recorder, &state).await;
                                             }
                                             Err(e) => {
                                                 digest_error = Some(e);
@@ -1033,7 +930,7 @@ pub async fn send_api_request(
                     }
 
                     let mut api_response =
-                        process_response(Ok(response), &mut timings, start_time, &state).await?;
+                        process_response(Ok(response), &mut timings, start_time, &recorder, &state).await?;
                     if let Some(e) = digest_error {
                         api_response.message =
                             Some(format!("Digest authentication failed: {}", e));
@@ -1041,12 +938,16 @@ pub async fn send_api_request(
                     Ok(api_response)
                 }
                 Err(e) => {
-                    process_response(Err(e), &mut timings, start_time, &state).await
+                    process_response(Err(e), &mut timings, start_time, &recorder, &state).await
                 }
             }
         }
         _ = cancel_rx => {
-            timings.total = start_time.elapsed().as_millis() as u64;
+            timings.total = elapsed_millis(start_time);
+            let snapshot = recorder.snapshot();
+            timings.dns = snapshot.dns;
+            timings.connect = snapshot.connect;
+            timings.connect_count = snapshot.connect_count;
             *state.cancel_tx.lock().unwrap() = None;
 
             Ok(ApiResponse {
@@ -1068,16 +969,36 @@ pub async fn send_api_request(
     }
 }
 
+/// Elapsed time as fractional milliseconds, so sub-millisecond phases against
+/// a local server are not truncated away.
+fn elapsed_millis(since: Instant) -> f64 {
+    since.elapsed().as_secs_f64() * 1000.0
+}
+
+/// Apply the phases collected on the request's own connection, splitting TTFB
+/// into what the connection cost and what the server spent thinking.
+fn apply_connection_phases(timings: &mut RequestTimings, recorder: &TimingRecorder, ttfb_ms: f64) {
+    let snapshot = recorder.snapshot();
+    let measured = snapshot.dns.unwrap_or(0.0) + snapshot.connect.unwrap_or(0.0);
+
+    timings.dns = snapshot.dns;
+    timings.connect = snapshot.connect;
+    timings.connect_count = snapshot.connect_count;
+    timings.waiting = Some((ttfb_ms - measured).max(0.0));
+}
+
 /// Process response and build ApiResponse
 async fn process_response(
     result: Result<Response, reqwest::Error>,
     timings: &mut RequestTimings,
     start_time: Instant,
+    recorder: &TimingRecorder,
     state: &State<'_, RequestState>,
 ) -> Result<ApiResponse, String> {
     match result {
         Ok(response) => {
-            timings.first_byte = start_time.elapsed().as_millis() as u64;
+            let ttfb_ms = elapsed_millis(start_time);
+            apply_connection_phases(timings, recorder, ttfb_ms);
 
             let status = response.status().as_u16();
             let status_text = response
@@ -1104,8 +1025,8 @@ async fn process_response(
             let bytes = response.bytes().await.map_err(|e| e.to_string())?;
             let size = bytes.len();
 
-            timings.download = start_time.elapsed().as_millis() as u64 - timings.first_byte;
-            timings.total = start_time.elapsed().as_millis() as u64;
+            timings.total = elapsed_millis(start_time);
+            timings.download = (timings.total - ttfb_ms).max(0.0);
 
             let (data, is_binary, body_base64) =
                 decode_response_body(&bytes, headers.get("content-type").map(String::as_str));
@@ -1122,14 +1043,20 @@ async fn process_response(
                 headers,
                 set_cookies,
                 message: None,
-                ttfb: Some(timings.first_byte),
+                ttfb: Some(ttfb_ms.round() as u64),
                 size: Some(size),
                 timings: timings.clone(),
                 cancelled: None,
             })
         }
         Err(e) => {
-            timings.total = start_time.elapsed().as_millis() as u64;
+            timings.total = elapsed_millis(start_time);
+            // Whatever phases completed before the failure are still real, but
+            // there is no first byte to derive a waiting phase from.
+            let snapshot = recorder.snapshot();
+            timings.dns = snapshot.dns;
+            timings.connect = snapshot.connect;
+            timings.connect_count = snapshot.connect_count;
             *state.cancel_tx.lock().unwrap() = None;
 
             // Provide specific error messages for common error types
@@ -1446,30 +1373,6 @@ mod tests {
         assert_eq!(cfg.cert_path.as_deref(), Some("/certs/client.crt"));
         assert_eq!(cfg.key_path.as_deref(), Some("/certs/client.key"));
         assert_eq!(cfg.ca_path.as_deref(), Some("/certs/ca.pem"));
-    }
-
-    #[test]
-    fn is_active_reflects_cert_or_ca_presence() {
-        let empty = ClientCertConfig {
-            cert_path: None,
-            key_path: None,
-            ca_path: Some(String::new()),
-        };
-        assert!(!empty.is_active());
-
-        let with_cert = ClientCertConfig {
-            cert_path: Some("/certs/client.crt".into()),
-            key_path: Some("/certs/client.key".into()),
-            ca_path: None,
-        };
-        assert!(with_cert.is_active());
-
-        let ca_only = ClientCertConfig {
-            cert_path: None,
-            key_path: None,
-            ca_path: Some("/certs/ca.pem".into()),
-        };
-        assert!(ca_only.is_active());
     }
 
     #[test]

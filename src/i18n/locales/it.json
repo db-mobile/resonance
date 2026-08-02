@@ -26,7 +26,9 @@
         "import_postman": "Importa Postman",
         "import_postman_sub": "Da un file esportato",
         "import_curl": "Importa cURL",
-        "import_curl_sub": "Incolla un comando cURL"
+        "import_curl_sub": "Incolla un comando cURL",
+        "open_existing": "Apri cartella",
+        "open_existing_sub": "Una raccolta già presente su disco"
       }
     },
     "search_empty": {
@@ -38,7 +40,8 @@
     "openapi": "Collezione OpenAPI",
     "postman_collection": "Collezione Postman",
     "postman_environment": "Ambiente Postman",
-    "curl": "Comando cURL"
+    "curl": "Comando cURL",
+    "open_existing": "Cartella esistente"
   },
   "import_dialog": {
     "title": "Importa collezione",
@@ -69,7 +72,9 @@
     "delete_title": "Elimina collezione",
     "confirm_delete": "Sei sicuro di voler eliminare la collezione \"{{name}}\"?\n\nQuesta azione non può essere annullata.",
     "import_success": "Collezione importata con successo",
-    "import_error": "Errore nell'importazione della collezione"
+    "import_error": "Errore nell'importazione della collezione",
+    "close_title": "Chiudi raccolta",
+    "confirm_close": "Rimuovere \"{{name}}\" dall'elenco?\n\nLa cartella e i suoi file restano sul disco e le credenziali salvate vengono mantenute. Potrai riaprirla più tardi."
   },
   "endpoint": {
     "delete_title": "Elimina richiesta",
@@ -92,7 +97,8 @@
     "rename_request": "Rinomina richiesta",
     "delete_request": "Elimina richiesta",
     "pin_request": "Fissa richiesta",
-    "unpin_request": "Rimuovi dalla barra"
+    "unpin_request": "Rimuovi dalla barra",
+    "close_collection": "Chiudi raccolta"
   },
   "docs": {
     "title": "Genera documentazione",

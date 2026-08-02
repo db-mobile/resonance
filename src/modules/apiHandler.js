@@ -6,6 +6,7 @@ import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './s
 import { parseKeyValuePairs } from './keyValueManager.js';
 import { saveAllRequestModifications } from './collectionManager.js';
 import { debounce } from './utils/debounce.js';
+import { findRequest } from './collections/collectionTree.js';
 
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -892,15 +893,8 @@ export async function handleSendRequest() {
                 const collection = await getCollectionRepository().getById(getCurrentEndpoint().collectionId);
                 
                 if (collection) {
-                    let endpoint = collection.endpoints?.find(e => e.id === getCurrentEndpoint().endpointId);
-                    
-                    if (!endpoint && collection.folders) {
-                        for (const folder of collection.folders) {
-                            endpoint = folder.endpoints?.find(e => e.id === getCurrentEndpoint().endpointId);
-                            if (endpoint) { break; }
-                        }
-                    }
-                    
+                    const endpoint = findRequest(collection, getCurrentEndpoint().endpointId);
+
                     if (endpoint && endpoint.path) {
                         let mockPath = endpoint.path;
                         for (const [key, value] of Object.entries(processedPathParams)) {

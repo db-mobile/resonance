@@ -4,6 +4,7 @@
  */
 
 import { app } from '../appContext.js';
+import { flattenRequests, topLevelFolders, findRequest, updateRequest, removeRequest } from '../collections/collectionTree.js';
 import {
     getProtocol,
     derivePath,
@@ -94,7 +95,7 @@ export class CollectionService {
         try {
             this.statusDisplay.update('Renaming collection...', null);
 
-            const updatedCollection = await this.repository.update(collectionId, { name: newName });
+            const updatedCollection = await this.repository.updateMetadata(collectionId, { name: newName });
 
             this.statusDisplay.update(`Collection renamed to "${newName}"`, null);
             return updatedCollection;
@@ -114,6 +115,48 @@ export class CollectionService {
      */
     async deleteCollection(collectionId) {
         await this.repository.delete(collectionId);
+        return true;
+    }
+
+    /**
+     * Opens a collection directory that already exists on disk, in place.
+     *
+     * Nothing is copied. The directory is registered where it is, so the app
+     * treats it as the user's own and never renames or deletes it.
+     *
+     * @async
+     * @param {string} path - The directory the user picked
+     * @returns {Promise<Object>} `{ opened, alreadyOpen, failed }`
+     * @throws {Error} If nothing there can be opened
+     */
+    async openExistingCollection(path) {
+        try {
+            this.statusDisplay.update('Opening collection...', null);
+
+            const result = await this.repository.openExisting(path);
+
+            const count = result.opened.length;
+            this.statusDisplay.update(
+                count > 0 ? `Opened ${count} collection${count === 1 ? '' : 's'}` : '',
+                null
+            );
+            return result;
+        } catch (error) {
+            const message = typeof error === 'string' ? error : (error.message || 'Unknown error');
+            this.statusDisplay.update('', null);
+            throw new Error(message, { cause: error });
+        }
+    }
+
+    /**
+     * Removes a collection from the list, leaving every file on disk.
+     *
+     * @async
+     * @param {string} collectionId - The collection to close
+     * @returns {Promise<boolean>} True when it is no longer listed
+     */
+    async closeCollection(collectionId) {
+        await this.repository.close(collectionId);
         return true;
     }
 
@@ -287,13 +330,16 @@ export class CollectionService {
             collection.endpoints = collection.endpoints || [];
             collection.endpoints.push(newEndpoint);
 
+            // Auto-foldering only kicks in for a collection that already uses
+            // folders, so a flat collection stays flat. Preserved from the
+            // original behaviour deliberately.
             if (collection.folders && collection.folders.length > 0) {
                 const basePath = this.extractBasePath(
                     descriptor.folderBucket ?? requestData.path
                 );
-                
-                let targetFolder = collection.folders.find(folder => folder.name === basePath);
-                
+
+                let targetFolder = topLevelFolders(collection).find(folder => folder.name === basePath);
+
                 if (!targetFolder) {
                     targetFolder = {
                         id: `folder_${basePath}`.replace(/[^a-zA-Z0-9]/g, '_'),
@@ -302,11 +348,12 @@ export class CollectionService {
                     };
                     collection.folders.push(targetFolder);
                 }
-                
+
+                targetFolder.endpoints = targetFolder.endpoints || [];
                 targetFolder.endpoints.push(newEndpoint);
             }
 
-            await this.repository.update(collectionId, collection);
+            await this.repository.saveOne(collection);
 
             await this.persistNewEndpointSidecars(collectionId, newEndpoint.id, descriptor, requestData);
 
@@ -374,18 +421,24 @@ export class CollectionService {
     /**
      * Generates a unique endpoint ID within a collection
      *
+     * Ids are timestamp-and-random rather than a counter over the existing
+     * ones. A counter reuses the id of a deleted request, which would let the
+     * new request inherit the old one's keychain credentials, pinned state,
+     * scripts and mock overrides, all of which are keyed by endpoint id
+     * outside the collection file. It is also a pure function of collection
+     * contents, so two people branching from the same commit would mint the
+     * same id and their merge would carry two requests claiming it.
+     *
      * @private
      * @param {Object} collection - The collection object
      * @returns {string} A unique endpoint identifier
      */
     generateEndpointId(collection) {
-        const existingIds = collection.endpoints.map(endpoint => endpoint.id);
-        let counter = 1;
-        let newId = `custom_${counter}`;
+        const existingIds = new Set(flattenRequests(collection).map(endpoint => endpoint.id));
 
-        while (existingIds.includes(newId)) {
-            counter++;
-            newId = `custom_${counter}`;
+        let newId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        while (existingIds.has(newId)) {
+            newId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         }
 
         return newId;
@@ -429,33 +482,14 @@ export class CollectionService {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }
 
-            let updatedEndpoint = null;
-
-            if (collection.endpoints) {
-                const endpoint = collection.endpoints.find(ep => ep.id === endpointId);
-                if (endpoint) {
-                    endpoint.name = newName;
-                    updatedEndpoint = endpoint;
-                }
-            }
-
-            if (collection.folders && collection.folders.length > 0) {
-                collection.folders.forEach(folder => {
-                    if (folder.endpoints) {
-                        const endpoint = folder.endpoints.find(ep => ep.id === endpointId);
-                        if (endpoint) {
-                            endpoint.name = newName;
-                            updatedEndpoint = endpoint;
-                        }
-                    }
-                });
-            }
-
-            if (!updatedEndpoint) {
+            const renamed = updateRequest(collection, endpointId, { name: newName });
+            if (!renamed) {
                 throw new Error(`Endpoint with id ${endpointId} not found in collection`);
             }
 
-            await this.repository.update(collectionId, collection);
+            const updatedEndpoint = findRequest(renamed, endpointId);
+
+            await this.repository.saveOne(renamed);
 
             this.statusDisplay.update(`Request renamed to "${newName}"`, null);
             return updatedEndpoint;
@@ -486,21 +520,12 @@ export class CollectionService {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }
 
-            if (collection.endpoints) {
-                collection.endpoints = collection.endpoints.filter(endpoint => endpoint.id !== endpointId);
-            }
+            // An emptied folder is kept: it is a real directory on disk now, and
+            // one a user made deliberately should not vanish when its last
+            // request is deleted.
+            const reduced = removeRequest(collection, endpointId) ?? collection;
 
-            if (collection.folders && collection.folders.length > 0) {
-                collection.folders.forEach(folder => {
-                    if (folder.endpoints) {
-                        folder.endpoints = folder.endpoints.filter(endpoint => endpoint.id !== endpointId);
-                    }
-                });
-
-                collection.folders = collection.folders.filter(folder => folder.endpoints && folder.endpoints.length > 0);
-            }
-
-            await this.repository.update(collectionId, collection);
+            await this.repository.saveOne(reduced);
 
             await this.repository.deletePersistedEndpointData(collectionId, endpointId);
 

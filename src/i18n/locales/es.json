@@ -26,7 +26,9 @@
         "import_postman": "Importar Postman",
         "import_postman_sub": "Desde un archivo exportado",
         "import_curl": "Importar cURL",
-        "import_curl_sub": "Pega un comando cURL"
+        "import_curl_sub": "Pega un comando cURL",
+        "open_existing": "Abrir carpeta",
+        "open_existing_sub": "Una colección ya guardada en disco"
       }
     },
     "search_empty": {
@@ -38,7 +40,8 @@
     "openapi": "Colección OpenAPI",
     "postman_collection": "Colección Postman",
     "postman_environment": "Entorno Postman",
-    "curl": "Comando cURL"
+    "curl": "Comando cURL",
+    "open_existing": "Carpeta existente"
   },
   "import_dialog": {
     "title": "Importar colección",
@@ -69,7 +72,9 @@
     "delete_title": "Eliminar colección",
     "confirm_delete": "¿Estás seguro de que quieres eliminar la colección \"{{name}}\"?\n\nEsta acción no se puede deshacer.",
     "import_success": "Colección importada con éxito",
-    "import_error": "Error al importar la colección"
+    "import_error": "Error al importar la colección",
+    "close_title": "Cerrar colección",
+    "confirm_close": "¿Quitar \"{{name}}\" de la lista?\n\nLa carpeta y sus archivos permanecen en el disco, y las credenciales guardadas se conservan. Puedes volver a abrirla más tarde."
   },
   "endpoint": {
     "delete_title": "Eliminar solicitud",
@@ -92,7 +97,8 @@
     "rename_request": "Renombrar solicitud",
     "delete_request": "Eliminar solicitud",
     "pin_request": "Fijar solicitud",
-    "unpin_request": "Desfijar solicitud"
+    "unpin_request": "Desfijar solicitud",
+    "close_collection": "Cerrar colección"
   },
   "docs": {
     "title": "Generar documentación",

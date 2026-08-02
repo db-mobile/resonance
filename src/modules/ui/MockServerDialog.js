@@ -7,6 +7,7 @@ import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { SchemaProcessor } from '../schema/SchemaProcessor.js';
 import { pushEscapeHandler } from './modalEscape.js';
+import { flattenRequests } from '../collections/collectionTree.js';
 
 /**
  * UI Dialog for managing mock server
@@ -210,7 +211,7 @@ export class MockServerDialog {
 
         for (const collection of collections) {
             const isEnabled = settings.enabledCollections.includes(collection.id);
-            const endpoints = collection.endpoints || [];
+            const endpoints = flattenRequests(collection);
             const httpEndpoints = endpoints.filter(e => !['WS', 'GRPC'].includes(e.method?.toUpperCase()));
 
             if (httpEndpoints.length === 0) {

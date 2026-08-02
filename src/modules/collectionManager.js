@@ -94,6 +94,17 @@ export function importPostmanEnvironment() {
 }
 
 /**
+ * Opens a folder dialog and adds an existing collection directory in place
+ *
+ * @async
+ * @returns {Promise<void>}
+ */
+export function openExistingCollection() {
+    const controller = initializeController();
+    return controller.handleOpenExisting();
+}
+
+/**
  * Opens cURL import dialog
  *
  * @async

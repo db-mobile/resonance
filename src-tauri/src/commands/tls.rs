@@ -1,5 +1,5 @@
-//! Shared TLS building blocks used by the HTTP timing probe, the gRPC
-//! channel builder, the MQTT transport, and the WebSocket transports: the
+//! Shared TLS building blocks used by the gRPC channel builder, the MQTT
+//! transport, and the WebSocket transports: the
 //! danger accept-all certificate verifier, PEM loading/parsing helpers for
 //! client identities and CA bundles, and rustls client config builders.
 

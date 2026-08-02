@@ -11,6 +11,7 @@ import { CollectionRepository } from '../storage/CollectionRepository.js';
 import { CertificateRepository } from '../storage/CertificateRepository.js';
 import { CertificateService } from './CertificateService.js';
 import { normalizeFormRows } from '../utils/formDataRows.js';
+import { findRequest } from '../collections/collectionTree.js';
 
 /**
  * Service for managing collection runner operations and execution
@@ -491,17 +492,7 @@ export class RunnerService {
      * @returns {Object|null} Endpoint or null
      */
     _findEndpoint(collection, endpointId) {
-        let endpoint = collection.endpoints?.find(e => e.id === endpointId);
-        if (endpoint) {return endpoint;}
-
-        if (collection.folders) {
-            for (const folder of collection.folders) {
-                endpoint = folder.endpoints?.find(e => e.id === endpointId);
-                if (endpoint) {return endpoint;}
-            }
-        }
-
-        return null;
+        return findRequest(collection, endpointId);
     }
 
     /**

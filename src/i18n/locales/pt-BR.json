@@ -26,7 +26,9 @@
         "import_postman": "Importar Postman",
         "import_postman_sub": "De um arquivo exportado",
         "import_curl": "Importar cURL",
-        "import_curl_sub": "Cole um comando cURL"
+        "import_curl_sub": "Cole um comando cURL",
+        "open_existing": "Abrir pasta",
+        "open_existing_sub": "Uma coleção já salva no disco"
       }
     },
     "search_empty": {
@@ -38,7 +40,8 @@
     "openapi": "Coleção OpenAPI",
     "postman_collection": "Coleção Postman",
     "postman_environment": "Ambiente Postman",
-    "curl": "Comando cURL"
+    "curl": "Comando cURL",
+    "open_existing": "Pasta existente"
   },
   "import_dialog": {
     "title": "Importar coleção",
@@ -69,7 +72,9 @@
     "delete_title": "Excluir Coleção",
     "confirm_delete": "Tem certeza de que deseja excluir a coleção \"{{name}}\"?\n\nEsta ação não pode ser desfeita.",
     "import_success": "Coleção importada com sucesso",
-    "import_error": "Falha ao importar coleção"
+    "import_error": "Falha ao importar coleção",
+    "close_title": "Fechar coleção",
+    "confirm_close": "Remover \"{{name}}\" da lista?\n\nA pasta e seus arquivos permanecem no disco, e as credenciais salvas são mantidas. Você pode abri-la novamente depois."
   },
   "endpoint": {
     "delete_title": "Excluir Requisição",
@@ -92,7 +97,8 @@
     "rename_request": "Renomear Requisição",
     "delete_request": "Excluir Requisição",
     "pin_request": "Fixar Requisição",
-    "unpin_request": "Desafixar Requisição"
+    "unpin_request": "Desafixar Requisição",
+    "close_collection": "Fechar coleção"
   },
   "docs": {
     "title": "Gerar Documentação",

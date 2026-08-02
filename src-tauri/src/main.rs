@@ -9,11 +9,11 @@ use commands::{
     app::app_get_version,
     certificates::pick_certificate_file,
     collections::{
-        collection_delete, collection_delete_endpoint_data, collection_get,
+        collection_close, collection_delete, collection_delete_endpoint_data, collection_get,
         collection_get_endpoint_data, collection_get_variables, collection_save,
         collection_save_endpoint_data, collection_save_variables, collections_get_all,
-        collections_get_path, collections_list, collections_migrate, collections_needs_migration,
-        collections_pick_directory,
+        collections_get_path, collections_git_branches, collections_list, collections_migrate,
+        collections_needs_migration, collections_open_existing, collections_pick_directory,
     },
     graphql_subscription::{
         graphql_subscription_close, graphql_subscription_send, GraphqlSubscriptionState,
@@ -185,7 +185,10 @@ fn main() {
             collections_needs_migration,
             collections_migrate,
             collections_get_path,
+            collections_git_branches,
             collections_pick_directory,
+            collections_open_existing,
+            collection_close,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -17,7 +17,8 @@ describe('CollectionService.addRequestToCollection protocol handling', () => {
         collection = { id: 'c1', name: 'Test', endpoints: [], folders: [] };
         repository = {
             getById: jest.fn().mockResolvedValue(collection),
-            update: jest.fn().mockResolvedValue(undefined),
+            saveOne: jest.fn().mockResolvedValue(undefined),
+            updateMetadata: jest.fn().mockResolvedValue(undefined),
             savePersistedUrl: jest.fn().mockResolvedValue(undefined),
             saveGrpcData: jest.fn().mockResolvedValue(undefined),
             saveGraphQLData: jest.fn().mockResolvedValue(undefined),

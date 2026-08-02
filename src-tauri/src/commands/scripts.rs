@@ -861,6 +861,7 @@ fn perform_send_request(
                 client_cert: None,
                 follow_redirects: true,
                 disable_pooling: false,
+                timing_recorder: None,
             },
             proxy_action,
         )
