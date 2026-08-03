@@ -1,8 +1,17 @@
 //! OpenAPI specification parsing: converts a spec `Value` into a `Collection`.
 
-use super::{Collection, Endpoint, Folder};
+use super::{Collection, Endpoint, Folder, VariableEntry};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
+
+/// Collection variables the imported auth configs reference, so a credential the
+/// spec only declares the shape of is filled once per collection rather than
+/// once per request. Empty values on import; a `{{ref}}` also survives the
+/// secret redaction that blanks literal credentials before they reach disk.
+const BEARER_TOKEN_VARIABLE: &str = "bearerToken";
+const USERNAME_VARIABLE: &str = "authUsername";
+const PASSWORD_VARIABLE: &str = "authPassword";
+const API_KEY_VARIABLE: &str = "apiKey";
 
 /// Hard cap on `$ref` resolution depth. Cycle detection stops self-referential
 /// schemas; this is a safety net for pathologically deep (but acyclic) specs.
@@ -110,6 +119,15 @@ pub(crate) fn parse_openapi_spec(spec: Value) -> Result<Collection, String> {
     // Flatten all endpoints for the endpoints array
     let all_endpoints: Vec<Endpoint> = folders.iter().flat_map(|f| f.endpoints.clone()).collect();
 
+    let collection_auth = extract_openapi_security(spec.get("security"), &spec);
+    let variables = seed_variables(
+        base_url.as_deref(),
+        all_endpoints
+            .iter()
+            .filter_map(|e| e.security.as_ref())
+            .chain(collection_auth.iter()),
+    );
+
     Ok(Collection {
         id: uuid::Uuid::new_v4().to_string(),
         name,
@@ -117,9 +135,62 @@ pub(crate) fn parse_openapi_spec(spec: Value) -> Result<Collection, String> {
         base_url,
         endpoints: all_endpoints,
         folders,
-        variables: None,
-        auth_config: extract_openapi_security(spec.get("security"), &spec),
+        variables,
+        auth_config: collection_auth,
     })
+}
+
+/// Collection variables an imported spec needs: `baseUrl` plus one entry per
+/// credential placeholder the imported auth configs actually reference.
+///
+/// @param base_url - The spec's first server URL, when it has one
+/// @param auth_configs - Every auth config the import produced
+/// @returns The variables to seed, or None when there are none
+fn seed_variables<'a>(
+    base_url: Option<&str>,
+    auth_configs: impl Iterator<Item = &'a Value>,
+) -> Option<Vec<VariableEntry>> {
+    let mut variables: Vec<VariableEntry> = Vec::new();
+
+    if let Some(base_url) = base_url.filter(|url| !url.is_empty()) {
+        variables.push(VariableEntry {
+            key: "baseUrl".to_string(),
+            value: base_url.to_string(),
+        });
+    }
+
+    let referenced: HashSet<&str> = auth_configs
+        .filter_map(|auth| auth.get("config"))
+        .filter_map(|config| config.as_object())
+        .flat_map(|config| config.values())
+        .filter_map(|value| value.as_str())
+        .flat_map(|value| {
+            [
+                BEARER_TOKEN_VARIABLE,
+                USERNAME_VARIABLE,
+                PASSWORD_VARIABLE,
+                API_KEY_VARIABLE,
+            ]
+            .into_iter()
+            .filter(move |name| value == format!("{{{{{}}}}}", name))
+        })
+        .collect();
+
+    for name in [
+        BEARER_TOKEN_VARIABLE,
+        USERNAME_VARIABLE,
+        PASSWORD_VARIABLE,
+        API_KEY_VARIABLE,
+    ] {
+        if referenced.contains(name) {
+            variables.push(VariableEntry {
+                key: name.to_string(),
+                value: String::new(),
+            });
+        }
+    }
+
+    Some(variables).filter(|v| !v.is_empty())
 }
 
 /// Extract the base path (first segment) from a full path for folder grouping
@@ -551,21 +622,21 @@ fn extract_openapi_security(security: Option<&Value>, spec: &Value) -> Option<Va
                 "bearer" => Some(serde_json::json!({
                     "type": "bearer",
                     "config": {
-                        "token": ""
+                        "token": format!("{{{{{}}}}}", BEARER_TOKEN_VARIABLE)
                     }
                 })),
                 "basic" => Some(serde_json::json!({
                     "type": "basic",
                     "config": {
-                        "username": "",
-                        "password": ""
+                        "username": format!("{{{{{}}}}}", USERNAME_VARIABLE),
+                        "password": format!("{{{{{}}}}}", PASSWORD_VARIABLE)
                     }
                 })),
                 "digest" => Some(serde_json::json!({
                     "type": "digest",
                     "config": {
-                        "username": "",
-                        "password": ""
+                        "username": format!("{{{{{}}}}}", USERNAME_VARIABLE),
+                        "password": format!("{{{{{}}}}}", PASSWORD_VARIABLE)
                     }
                 })),
                 _ => None,
@@ -585,7 +656,7 @@ fn extract_openapi_security(security: Option<&Value>, spec: &Value) -> Option<Va
                 "type": "api-key",
                 "config": {
                     "keyName": key_name,
-                    "keyValue": "",
+                    "keyValue": format!("{{{{{}}}}}", API_KEY_VARIABLE),
                     "location": location
                 }
             }))
@@ -613,6 +684,90 @@ mod tests {
                 }
             }
         })
+    }
+
+    fn operation_security_spec() -> Value {
+        json!({
+            "info": { "title": "Secured API" },
+            "servers": [{ "url": "https://api.example.com" }],
+            "components": {
+                "securitySchemes": {
+                    "BearerAuth": { "type": "http", "scheme": "bearer" }
+                }
+            },
+            "paths": {
+                "/company-users": {
+                    "get": {
+                        "summary": "Retrieves list of company users.",
+                        "security": [{ "BearerAuth": [] }],
+                        "responses": { "200": { "description": "ok" } }
+                    }
+                },
+                "/access-tokens": {
+                    "post": {
+                        "summary": "Creates an access token.",
+                        "responses": { "201": { "description": "created" } }
+                    }
+                }
+            }
+        })
+    }
+
+    #[test]
+    fn an_operations_security_requirement_lands_on_the_endpoint() {
+        let collection = parse_openapi_spec(operation_security_spec()).unwrap();
+
+        let secured = collection
+            .endpoints
+            .iter()
+            .find(|e| e.path == "/company-users")
+            .unwrap();
+        assert_eq!(
+            secured.security,
+            Some(json!({ "type": "bearer", "config": { "token": "{{bearerToken}}" } }))
+        );
+
+        let open = collection
+            .endpoints
+            .iter()
+            .find(|e| e.path == "/access-tokens")
+            .unwrap();
+        assert!(open.security.is_none());
+    }
+
+    #[test]
+    fn credential_placeholders_are_seeded_as_collection_variables() {
+        let collection = parse_openapi_spec(operation_security_spec()).unwrap();
+        let variables = collection.variables.unwrap();
+
+        let entry = |key: &str| {
+            variables
+                .iter()
+                .find(|v| v.key == key)
+                .map(|v| v.value.clone())
+        };
+
+        assert_eq!(entry("baseUrl").as_deref(), Some("https://api.example.com"));
+        assert_eq!(entry("bearerToken").as_deref(), Some(""));
+        assert!(entry("apiKey").is_none());
+        assert!(entry("authUsername").is_none());
+    }
+
+    #[test]
+    fn a_spec_with_no_security_seeds_only_the_base_url() {
+        let spec = json!({
+            "info": { "title": "Open API" },
+            "servers": [{ "url": "https://api.example.com" }],
+            "paths": {
+                "/ping": { "get": { "responses": { "200": { "description": "ok" } } } }
+            }
+        });
+
+        let collection = parse_openapi_spec(spec).unwrap();
+        let variables = collection.variables.unwrap();
+
+        assert_eq!(variables.len(), 1);
+        assert_eq!(variables[0].key, "baseUrl");
     }
 
     #[test]

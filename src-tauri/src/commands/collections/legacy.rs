@@ -196,6 +196,12 @@ pub(crate) fn scripts_from_v1(value: Option<&Value>) -> Scripts {
 
 /// Rejoins one endpoint's metadata and its data file into a request document.
 ///
+/// A v1 endpoint carries two auth sources: the `security` block an OpenAPI
+/// import derived from the operation's security requirement, and the
+/// `authConfig` the user edited. The data file wins where it exists; the spec
+/// requirement is the fallback, so an imported request keeps the auth its
+/// operation declares instead of silently falling back to "inherit".
+///
 /// @param endpoint - The endpoint entry from collection.json
 /// @param data - The endpoint's data file, if it had one
 /// @param seq - Position in its folder, derived from the v1 array order
@@ -238,6 +244,10 @@ pub(crate) fn endpoint_to_request(
         doc.mqtt = data.mqtt_data.clone().filter(|v| !v.is_null());
         doc.scripts = scripts_from_v1(data.scripts.as_ref());
         doc.response_schema = data.response_schema.clone().filter(|v| !v.is_null());
+    }
+
+    if doc.auth.is_none() {
+        doc.auth = object_field(endpoint, "security");
     }
 
     doc
@@ -529,6 +539,45 @@ mod tests {
         assert_eq!(doc.params.query.len(), 1);
         assert_eq!(doc.auth.as_ref().unwrap()["type"], "bearer");
         assert!(doc.response_schema.is_some());
+    }
+
+    #[test]
+    fn a_spec_security_requirement_becomes_the_requests_auth() {
+        let endpoint = json!({
+            "id": "r1",
+            "name": "Secured",
+            "security": {"type": "bearer", "config": {"token": "{{bearerToken}}"}}
+        });
+
+        let converted = convert(&v1_collection(vec![endpoint], vec![]), HashMap::new());
+        let auth = converted.root.requests[0].doc.auth.as_ref().unwrap();
+
+        assert_eq!(auth["type"], "bearer");
+        assert_eq!(auth["config"]["token"], "{{bearerToken}}");
+    }
+
+    #[test]
+    fn an_edited_auth_config_wins_over_the_spec_requirement() {
+        let endpoint = json!({
+            "id": "r1",
+            "name": "Secured",
+            "security": {"type": "bearer", "config": {"token": "{{bearerToken}}"}}
+        });
+        let mut data = HashMap::new();
+        data.insert(
+            "r1".to_string(),
+            EndpointData {
+                auth_config: Some(json!({"type": "none", "config": {}})),
+                ..Default::default()
+            },
+        );
+
+        let converted = convert(&v1_collection(vec![endpoint], vec![]), data);
+
+        assert_eq!(
+            converted.root.requests[0].doc.auth.as_ref().unwrap()["type"],
+            "none"
+        );
     }
 
     #[test]

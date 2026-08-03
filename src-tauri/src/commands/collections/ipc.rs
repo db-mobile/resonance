@@ -255,6 +255,12 @@ fn ipc_string(value: &Value, key: &str) -> Option<String> {
 /// live state — body, params, auth, scripts — arrives through
 /// `collection_save_endpoint_data` and must survive a structural save
 /// untouched, or editing a folder name would wipe every request in it.
+///
+/// The one exception is `security`, which an OpenAPI import derives from the
+/// operation's security requirement: it seeds the auth of a request that has
+/// none yet, so an imported request starts out with the auth its spec declares
+/// instead of falling back to "inherit". A request whose auth is already set,
+/// including an explicit "none" or "inherit", keeps it.
 fn overlay_metadata(doc: &mut RequestDoc, endpoint: &Value) {
     if let Some(name) = ipc_string(endpoint, "name") {
         doc.name = name;
@@ -273,6 +279,10 @@ fn overlay_metadata(doc: &mut RequestDoc, endpoint: &Value) {
     }
     if let Some(responses) = endpoint.get("responses").filter(|v| !v.is_null()) {
         doc.spec.responses = Some(responses.clone());
+    }
+
+    if doc.auth.is_none() {
+        doc.auth = endpoint.get("security").filter(|v| !v.is_null()).cloned();
     }
 }
 
@@ -1006,6 +1016,53 @@ mod save_path {
         assert_eq!(root.requests[0].doc.name, "Fresh");
         assert_eq!(root.requests[0].doc.method.as_deref(), Some("GET"));
         assert!(root.requests[0].source.is_none());
+    }
+
+    /// An OpenAPI import reaches the writer as an IPC collection whose
+    /// endpoints carry the operation's security requirement as `security`. It
+    /// has to become the request's auth, or the request lands with none and
+    /// silently inherits the collection's (typically absent) auth instead.
+    #[test]
+    fn an_imported_security_requirement_becomes_the_requests_auth() {
+        let endpoint = json!({
+            "id": "r1",
+            "name": "Retrieves list of company users.",
+            "method": "GET",
+            "path": "/company-users",
+            "security": {"type": "bearer", "config": {"token": "{{bearerToken}}"}}
+        });
+        let incoming = ipc_collection(
+            vec![endpoint.clone()],
+            vec![json!({"id": "f1", "name": "company-users", "endpoints": [endpoint]})],
+        );
+
+        let root = tree_from_ipc(&incoming, None);
+        let auth = root.folders[0].requests[0].doc.auth.as_ref().unwrap();
+
+        assert_eq!(auth["type"], "bearer");
+        assert_eq!(auth["config"]["token"], "{{bearerToken}}");
+    }
+
+    /// A re-import must not undo an edit: the spec requirement only fills auth
+    /// that is not set, so a request the user switched to No Auth stays there.
+    #[test]
+    fn an_edited_auth_survives_a_save_carrying_a_security_requirement() {
+        let existing = existing_with_state();
+        let incoming = ipc_collection(
+            vec![json!({
+                "id": "r1",
+                "name": "Create Pet",
+                "security": {"type": "api-key", "config": {"keyName": "X-Key"}}
+            })],
+            vec![],
+        );
+
+        let root = tree_from_ipc(&incoming, Some(&existing));
+
+        assert_eq!(
+            root.requests[0].doc.auth.as_ref().unwrap()["type"],
+            "bearer"
+        );
     }
 
     /// The IPC shape duplicates a foldered request into the flat list; the
