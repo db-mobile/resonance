@@ -6,7 +6,7 @@
  */
 import { getCurrentEndpoint, setCurrentEndpoint } from './state/currentEndpoint.js';
 import { app } from './appContext.js';
-import { parseKeyValuePairs, populateKeyValueList, clearKeyValueList, addKeyValueRow, updateUrlFromQueryParams } from './keyValueManager.js';
+import { parseKeyValuePairs, parseKeyValueRows, populateKeyValueList, clearKeyValueList, addKeyValueRow, updateUrlFromQueryParams } from './keyValueManager.js';
 import { authManager } from './authManager.js';
 import { displayResponseWithLineNumbersForTab, clearResponseDisplayForTab, clearSchemaValidationBadge, clearGraphQLErrorsBadge } from './apiHandler.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
@@ -58,8 +58,8 @@ export class WorkspaceTabStateManager {
                     url: sseUrlInput?.value || this.dom.urlInput?.value || '',
                     method: this.dom.methodSelect?.value || 'GET',
                     pathParams: {},
-                    queryParams: parseKeyValuePairs(this.dom.queryParamsList),
-                    headers: parseKeyValuePairs(this.dom.headersList),
+                    queryParams: parseKeyValueRows(this.dom.queryParamsList),
+                    headers: parseKeyValueRows(this.dom.headersList),
                     body: {
                         mode: sseBodyMode,
                         content: sseBodyMode === 'text'
@@ -89,8 +89,8 @@ export class WorkspaceTabStateManager {
                     url: websocketUrlInput?.value || this.dom.urlInput?.value || '',
                     method: 'WS',
                     pathParams: {},
-                    queryParams: parseKeyValuePairs(this.dom.queryParamsList),
-                    headers: parseKeyValuePairs(this.dom.headersList),
+                    queryParams: parseKeyValueRows(this.dom.queryParamsList),
+                    headers: parseKeyValueRows(this.dom.headersList),
                     body: {
                         mode: 'json',
                         content: getRequestBodyContent() || ''
@@ -153,7 +153,7 @@ export class WorkspaceTabStateManager {
                     query: this.graphqlBodyManager ? this.graphqlBodyManager.getGraphQLQuery() : '',
                     variables: this.graphqlBodyManager ? this.graphqlBodyManager.getGraphQLVariables() : '',
                     operationName: this.graphqlBodyManager ? this.graphqlBodyManager.getSelectedOperationName() : null,
-                    headers: parseKeyValuePairs(this.dom.headersList),
+                    headers: parseKeyValueRows(this.dom.headersList),
                     authType: authConfig.type || 'none',
                     authConfig: authConfig.config || {}
                 },
@@ -169,8 +169,8 @@ export class WorkspaceTabStateManager {
         }
 
         const pathParams = parseKeyValuePairs(this.dom.pathParamsList);
-        const queryParams = parseKeyValuePairs(this.dom.queryParamsList);
-        const headers = parseKeyValuePairs(this.dom.headersList);
+        const queryParams = parseKeyValueRows(this.dom.queryParamsList);
+        const headers = parseKeyValueRows(this.dom.headersList);
 
         const authConfig = authManager.getAuthConfig();
 

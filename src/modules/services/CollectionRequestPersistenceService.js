@@ -9,6 +9,21 @@ import { getProtocol } from '../protocols/protocolRegistry.js';
 import { findRequest, updateRequest } from '../collections/collectionTree.js';
 
 /**
+ * Read key-value rows for persistence, keeping the enabled flag when available
+ * @param {HTMLElement} list - The key-value list element
+ * @param {Function} parseKeyValuePairs - Flat map parser used as fallback
+ * @param {Function} [parseKeyValueRows] - Row parser that preserves disabled rows
+ * @returns {Array<Object>} Rows as {key, value, enabled}
+ */
+function readPersistedRows(list, parseKeyValuePairs, parseKeyValueRows) {
+    if (parseKeyValueRows) {
+        return parseKeyValueRows(list);
+    }
+
+    return Object.entries(parseKeyValuePairs(list)).map(([key, value]) => ({ key, value }));
+}
+
+/**
  * Handles saving request edits for HTTP, WebSocket, and gRPC collection endpoints.
  */
 export class CollectionRequestPersistenceService {
@@ -35,7 +50,7 @@ export class CollectionRequestPersistenceService {
 
     async saveAllRequestModifications(collectionId, endpointId) {
         try {
-            const { parseKeyValuePairs } = await import('../keyValueManager.js');
+            const { parseKeyValuePairs, parseKeyValueRows } = await import('../keyValueManager.js');
             const { authManager } = await import('../authManager.js');
 
             const collection = await this.repository.readForUpdate(collectionId);
@@ -48,11 +63,11 @@ export class CollectionRequestPersistenceService {
 
             const savers = {
                 grpc: () => this.saveGrpcRequest(collectionId, endpointId, endpoint, collection),
-                websocket: () => this.saveWebSocketRequest(collectionId, endpointId, parseKeyValuePairs),
-                graphql: () => this.saveGraphQLRequest(collectionId, endpointId, parseKeyValuePairs, authManager),
-                sse: () => this.saveSseRequest(collectionId, endpointId, parseKeyValuePairs, authManager),
+                websocket: () => this.saveWebSocketRequest(collectionId, endpointId, parseKeyValuePairs, parseKeyValueRows),
+                graphql: () => this.saveGraphQLRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows),
+                sse: () => this.saveSseRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows),
                 mqtt: () => this.saveMqttRequest(collectionId, endpointId),
-                http: () => this.saveHttpRequest(collectionId, endpointId, parseKeyValuePairs, authManager)
+                http: () => this.saveHttpRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows)
             };
 
             await (savers[descriptor.builder] || savers.http)();
@@ -85,7 +100,7 @@ export class CollectionRequestPersistenceService {
         await this.refreshCollections();
     }
 
-    async saveWebSocketRequest(collectionId, endpointId, parseKeyValuePairs) {
+    async saveWebSocketRequest(collectionId, endpointId, parseKeyValuePairs, parseKeyValueRows) {
         const { urlInput, queryParamsList, headersList, bodyInput } = this.getRequestFormElements(
             getProtocol('websocket')
         );
@@ -95,14 +110,12 @@ export class CollectionRequestPersistenceService {
         }
 
         if (queryParamsList) {
-            const queryParams = parseKeyValuePairs(queryParamsList);
-            const queryParamsArray = Object.entries(queryParams).map(([key, value]) => ({ key, value }));
+            const queryParamsArray = readPersistedRows(queryParamsList, parseKeyValuePairs, parseKeyValueRows);
             await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParamsArray);
         }
 
         if (headersList) {
-            const headers = parseKeyValuePairs(headersList);
-            const headersArray = Object.entries(headers).map(([key, value]) => ({ key, value }));
+            const headersArray = readPersistedRows(headersList, parseKeyValuePairs, parseKeyValueRows);
             await this.repository.savePersistedHeaders(collectionId, endpointId, headersArray);
         }
 
@@ -113,7 +126,7 @@ export class CollectionRequestPersistenceService {
         await this.refreshCollections();
     }
 
-    async saveGraphQLRequest(collectionId, endpointId, parseKeyValuePairs, authManager) {
+    async saveGraphQLRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows) {
         const { urlInput, headersList } = this.getRequestFormElements(getProtocol('graphql'));
         const { graphqlBodyManager } = app;
 
@@ -122,8 +135,7 @@ export class CollectionRequestPersistenceService {
         }
 
         if (headersList) {
-            const headers = parseKeyValuePairs(headersList);
-            const headersArray = Object.entries(headers).map(([key, value]) => ({ key, value }));
+            const headersArray = readPersistedRows(headersList, parseKeyValuePairs, parseKeyValueRows);
             await this.repository.savePersistedHeaders(collectionId, endpointId, headersArray);
         }
 
@@ -157,7 +169,7 @@ export class CollectionRequestPersistenceService {
      * @param {Object} authManager - Authentication manager
      * @returns {Promise<void>}
      */
-    async saveSseRequest(collectionId, endpointId, parseKeyValuePairs, authManager) {
+    async saveSseRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows) {
         const descriptor = getProtocol('sse');
         const { urlInput, queryParamsList, headersList, bodyInput } = this.getRequestFormElements(descriptor);
 
@@ -166,14 +178,12 @@ export class CollectionRequestPersistenceService {
         }
 
         if (queryParamsList) {
-            const queryParams = parseKeyValuePairs(queryParamsList);
-            const queryParamsArray = Object.entries(queryParams).map(([key, value]) => ({ key, value }));
+            const queryParamsArray = readPersistedRows(queryParamsList, parseKeyValuePairs, parseKeyValueRows);
             await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParamsArray);
         }
 
         if (headersList) {
-            const headers = parseKeyValuePairs(headersList);
-            const headersArray = Object.entries(headers).map(([key, value]) => ({ key, value }));
+            const headersArray = readPersistedRows(headersList, parseKeyValuePairs, parseKeyValueRows);
             await this.repository.savePersistedHeaders(collectionId, endpointId, headersArray);
         }
 
@@ -257,7 +267,7 @@ export class CollectionRequestPersistenceService {
         await this.repository.saveOne(updateRequest(collection, endpointId, patch));
     }
 
-    async saveHttpRequest(collectionId, endpointId, parseKeyValuePairs, authManager) {
+    async saveHttpRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows) {
         const descriptor = getProtocol('http');
         const { urlInput, pathParamsList, queryParamsList, headersList, bodyInput } =
             this.getRequestFormElements(descriptor);
@@ -269,8 +279,8 @@ export class CollectionRequestPersistenceService {
         }
 
         let pathParams = {};
-        let queryParams = {};
-        let headers = {};
+        let queryParams = [];
+        let headers = [];
 
         if (pathParamsList) {
             pathParams = parseKeyValuePairs(pathParamsList);
@@ -278,13 +288,13 @@ export class CollectionRequestPersistenceService {
         }
 
         if (queryParamsList) {
-            queryParams = parseKeyValuePairs(queryParamsList);
-            updates.queryParams = Object.entries(queryParams).map(([key, value]) => ({ key, value }));
+            queryParams = readPersistedRows(queryParamsList, parseKeyValuePairs, parseKeyValueRows);
+            updates.queryParams = queryParams;
         }
 
         if (headersList) {
-            headers = parseKeyValuePairs(headersList);
-            updates.headers = Object.entries(headers).map(([key, value]) => ({ key, value }));
+            headers = readPersistedRows(headersList, parseKeyValuePairs, parseKeyValueRows);
+            updates.headers = headers;
         }
 
         const bodyState = bodyInput ? this.collectionService.captureRequestBodyState() : null;

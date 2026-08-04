@@ -131,8 +131,12 @@ export class RequestQueue {
             const config = await this._onResolveEndpointDefaults(collectionId, endpointId);
             return {
                 pathParams: (config?.pathParams || []).map(p => ({ key: p.key, value: p.value })),
-                queryParams: (config?.queryParams || []).map(p => ({ key: p.key, value: p.value })),
-                headers: (config?.headers || []).map(p => ({ key: p.key, value: p.value })),
+                queryParams: (config?.queryParams || [])
+                    .filter(p => p.enabled !== false)
+                    .map(p => ({ key: p.key, value: p.value })),
+                headers: (config?.headers || [])
+                    .filter(p => p.enabled !== false)
+                    .map(p => ({ key: p.key, value: p.value })),
                 body: config?.body || ''
             };
         } catch (error) {

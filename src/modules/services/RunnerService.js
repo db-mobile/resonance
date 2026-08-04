@@ -11,6 +11,7 @@ import { CollectionRepository } from '../storage/CollectionRepository.js';
 import { CertificateRepository } from '../storage/CertificateRepository.js';
 import { CertificateService } from './CertificateService.js';
 import { normalizeFormRows } from '../utils/formDataRows.js';
+import { activeKeyValueRows } from '../utils/keyValueRows.js';
 import { findRequest } from '../collections/collectionTree.js';
 
 /**
@@ -515,8 +516,12 @@ export class RunnerService {
         const persistedAuthConfig = await this.collectionRepository.getPersistedAuthConfig(collection.id, endpoint.id);
 
         const effectivePathParams = overrides?.pathParams?.length ? overrides.pathParams : persistedPathParams;
-        const effectiveQueryParams = overrides?.queryParams?.length ? overrides.queryParams : persistedQueryParams;
-        const effectiveHeaders = overrides?.headers?.length ? overrides.headers : persistedHeaders;
+        const effectiveQueryParams = activeKeyValueRows(
+            overrides?.queryParams?.length ? overrides.queryParams : persistedQueryParams
+        );
+        const effectiveHeaders = activeKeyValueRows(
+            overrides?.headers?.length ? overrides.headers : persistedHeaders
+        );
         const overrideBody = typeof overrides?.body === 'string' && overrides.body.trim() !== '' ? overrides.body : null;
 
         let effectiveAuthConfig = persistedAuthConfig || endpoint.security || { type: 'inherit', config: {} };

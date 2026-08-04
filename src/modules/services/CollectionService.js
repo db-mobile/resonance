@@ -722,7 +722,7 @@ export class CollectionService {
      *
      * @private
      * @param {HTMLElement} container - Container with key-value rows
-     * @returns {Array<Object>} Array of {key, value} objects
+     * @returns {Array<Object>} Array of {key, value} objects, with `enabled` for toggleable rows
      */
     parseKeyValuePairs(container) {
         const pairs = [];
@@ -733,10 +733,17 @@ export class CollectionService {
             const valueInput = row.querySelector('.value-input');
 
             if (keyInput && valueInput && keyInput.value.trim()) {
-                pairs.push({
+                const pair = {
                     key: keyInput.value.trim(),
                     value: valueInput.value.trim()
-                });
+                };
+
+                const enabledCheckbox = row.querySelector('.row-enabled-checkbox');
+                if (enabledCheckbox) {
+                    pair.enabled = enabledCheckbox.checked;
+                }
+
+                pairs.push(pair);
             }
         });
 

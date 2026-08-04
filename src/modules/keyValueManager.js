@@ -15,9 +15,29 @@ export function setUrlUpdating(value) {
     isUpdatingUrlFromQueryParams = value;
 }
 
-export function createKeyValueRow(key = '', value = '') {
+/**
+ * Build a key-value row, optionally with an enable/disable checkbox
+ * @param {string} key - Initial key
+ * @param {string} value - Initial value
+ * @param {Object} [options] - Row options
+ * @param {boolean} [options.toggleable] - Whether the row gets an enabled checkbox
+ * @param {boolean} [options.enabled] - Initial checkbox state
+ * @returns {HTMLElement} The row element
+ */
+export function createKeyValueRow(key = '', value = '', options = {}) {
     const row = document.createElement('div');
     row.classList.add('key-value-row');
+
+    if (options.toggleable) {
+        const enabledInput = document.createElement('input');
+        enabledInput.type = 'checkbox';
+        enabledInput.classList.add('check', 'row-enabled-checkbox');
+        enabledInput.checked = options.enabled !== false;
+        enabledInput.setAttribute('aria-label', 'Enable parameter');
+        enabledInput.title = 'Enable parameter';
+        row.appendChild(enabledInput);
+        row.classList.toggle('row-disabled', options.enabled === false);
+    }
 
     const keyInput = document.createElement('input');
     keyInput.type = 'text';
@@ -47,9 +67,38 @@ export function createKeyValueRow(key = '', value = '') {
     return row;
 }
 
-export function addKeyValueRow(listContainer, key = '', value = '') {
-    const newRow = createKeyValueRow(key, value);
+/**
+ * Whether rows of a list carry an enable/disable checkbox
+ * @param {HTMLElement} listContainer - The list element
+ * @returns {boolean} True when the list opts into toggleable rows
+ */
+function isToggleableList(listContainer) {
+    return listContainer?.dataset?.toggleableRows === 'true';
+}
+
+/**
+ * Append a key-value row to a list
+ * @param {HTMLElement} listContainer - The list element
+ * @param {string} key - Initial key
+ * @param {string} value - Initial value
+ * @param {boolean} [enabled] - Initial enabled state for toggleable lists
+ * @returns {void}
+ */
+export function addKeyValueRow(listContainer, key = '', value = '', enabled = true) {
+    const newRow = createKeyValueRow(key, value, {
+        toggleable: isToggleableList(listContainer),
+        enabled
+    });
     listContainer.appendChild(newRow);
+}
+
+/**
+ * Read the enabled state of a row
+ * @param {HTMLElement} row - The row element
+ * @returns {boolean} False only when a present checkbox is unchecked
+ */
+export function isRowEnabled(row) {
+    return row.querySelector('.row-enabled-checkbox')?.checked !== false;
 }
 
 export function parseKeyValuePairs(listContainer) {
@@ -61,7 +110,7 @@ export function parseKeyValuePairs(listContainer) {
         const key = keyInput.value.trim();
         const value = valueInput.value.trim();
 
-        if (key) {
+        if (key && isRowEnabled(row)) {
             result[key] = value;
         }
     });
@@ -69,12 +118,41 @@ export function parseKeyValuePairs(listContainer) {
 }
 
 /**
+ * Read every row of a list, disabled ones included
+ * @param {HTMLElement} listContainer - The list element
+ * @returns {Array<Object>} Rows as {key, value, enabled}
+ */
+export function parseKeyValueRows(listContainer) {
+    if (!listContainer) {return [];}
+
+    const rows = [];
+    listContainer.querySelectorAll('.key-value-row').forEach(row => {
+        const key = row.querySelector('.key-input')?.value.trim() || '';
+        const value = row.querySelector('.value-input')?.value.trim() || '';
+
+        if (key) {
+            rows.push({ key, value, enabled: isRowEnabled(row) });
+        }
+    });
+    return rows;
+}
+
+/**
  * Populate a key-value list with data
  * @param {HTMLElement} listContainer
- * @param {Object} data - Key-value pairs to populate
+ * @param {Object|Array<Object>} data - Key-value map or array of {key, value, enabled} rows
  */
 export function populateKeyValueList(listContainer, data) {
     if (!listContainer || !data) {return;}
+
+    if (Array.isArray(data)) {
+        data.forEach(row => {
+            if (row && row.key !== undefined) {
+                addKeyValueRow(listContainer, row.key, row.value || '', row.enabled !== false);
+            }
+        });
+        return;
+    }
 
     Object.entries(data).forEach(([key, value]) => {
         addKeyValueRow(listContainer, key, value);
@@ -149,40 +227,54 @@ export function updateUrlFromQueryParams() {
     }
 }
 
+/**
+ * Snapshot the disabled query param rows so a URL round trip cannot destroy them
+ * @returns {Array<Object>} Rows as {index, key, value}
+ */
+function captureDisabledQueryParams() {
+    const disabledRows = [];
+    queryParamsList.querySelectorAll('.key-value-row').forEach((row, index) => {
+        if (!isRowEnabled(row)) {
+            disabledRows.push({
+                index,
+                key: row.querySelector('.key-input')?.value || '',
+                value: row.querySelector('.value-input')?.value || ''
+            });
+        }
+    });
+    return disabledRows;
+}
+
+/**
+ * Re-insert disabled query param rows at the positions they were captured from
+ * @param {Array<Object>} disabledRows - Rows from captureDisabledQueryParams
+ * @returns {void}
+ */
+function restoreDisabledQueryParams(disabledRows) {
+    disabledRows.forEach(({ index, key, value }) => {
+        const row = createKeyValueRow(key, value, {
+            toggleable: isToggleableList(queryParamsList),
+            enabled: false
+        });
+        queryParamsList.insertBefore(row, queryParamsList.children[index] || null);
+    });
+}
+
 export function updateQueryParamsFromUrl() {
     if (isUpdatingUrlFromQueryParams) {
         return;
     }
 
+    const disabledRows = captureDisabledQueryParams();
+
     try {
         const urlString = urlInput.value.trim();
-
-        if (!urlString) {
-            queryParamsList.innerHTML = '';
-            addKeyValueRow(queryParamsList);
-            return;
-        }
-
         const questionMarkIndex = urlString.indexOf('?');
+        const queryString = questionMarkIndex >= 0 ? urlString.substring(questionMarkIndex + 1) : '';
 
         queryParamsList.innerHTML = '';
 
-        if (questionMarkIndex < 0) {
-            addKeyValueRow(queryParamsList);
-            return;
-        }
-
-        const queryString = urlString.substring(questionMarkIndex + 1);
-
-        if (!queryString) {
-            addKeyValueRow(queryParamsList);
-            return;
-        }
-
-        const pairs = queryString.split('&');
-        let hasParams = false;
-
-        for (const pair of pairs) {
+        for (const pair of queryString.split('&')) {
             if (!pair.trim()) {
                 continue;
             }
@@ -193,24 +285,19 @@ export function updateQueryParamsFromUrl() {
                 const key = pair.substring(0, equalIndex);
                 const value = pair.substring(equalIndex + 1);
 
-                const decodedKey = decodeURIComponent(key);
-                const decodedValue = decodeURIComponent(value);
-
-                addKeyValueRow(queryParamsList, decodedKey, decodedValue);
-                hasParams = true;
+                addKeyValueRow(queryParamsList, decodeURIComponent(key), decodeURIComponent(value));
             } else {
                 addKeyValueRow(queryParamsList, decodeURIComponent(pair), '');
-                hasParams = true;
             }
         }
-
-        if (!hasParams) {
-            addKeyValueRow(queryParamsList);
-        }
     } catch (error) {
-        if (queryParamsList.children.length === 0) {
-            addKeyValueRow(queryParamsList);
-        }
+        void error;
+    }
+
+    restoreDisabledQueryParams(disabledRows);
+
+    if (queryParamsList.children.length === 0) {
+        addKeyValueRow(queryParamsList);
     }
 }
 
@@ -243,6 +330,19 @@ export function initKeyValueListeners() {
         }
     });
 
+    queryParamsList.addEventListener('change', (event) => {
+        if (!event.target.classList.contains('row-enabled-checkbox')) {
+            return;
+        }
+
+        event.target.closest('.key-value-row')?.classList.toggle('row-disabled', !event.target.checked);
+        updateUrlFromQueryParams();
+        debounceAutoSave(() => autoSaveQueryParams());
+        if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+            app.workspaceTabController.markCurrentTabModified();
+        }
+    });
+
     headersList.addEventListener('input', (event) => {
         if (event.target.classList.contains('key-input') ||
             event.target.classList.contains('value-input')) {
@@ -250,6 +350,18 @@ export function initKeyValueListeners() {
             if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
                 app.workspaceTabController.markCurrentTabModified();
             }
+        }
+    });
+
+    headersList.addEventListener('change', (event) => {
+        if (!event.target.classList.contains('row-enabled-checkbox')) {
+            return;
+        }
+
+        event.target.closest('.key-value-row')?.classList.toggle('row-disabled', !event.target.checked);
+        debounceAutoSave(() => autoSaveHeaders());
+        if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
+            app.workspaceTabController.markCurrentTabModified();
         }
     });
 
