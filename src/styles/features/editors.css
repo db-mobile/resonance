@@ -68,9 +68,157 @@
 }
 
 .cm-editor .cm-panels {
-  background-color: var(--window-bg-color);
+  background-color: var(--headerbar-bg-color);
   color: var(--window-fg-color);
   border-color: var(--border-color);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-small);
+}
+
+.cm-editor .cm-panels-bottom {
+  border-top: 1px solid var(--border-color);
+}
+
+.cm-editor .cm-panels-top {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.cm-editor .cm-panel.cm-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  padding-right: calc(var(--space-2) * 2 + var(--control-height-small));
+}
+
+.cm-editor .cm-panel.cm-search br {
+  flex-basis: 100%;
+  height: 0;
+  margin: 0;
+}
+
+.cm-editor .cm-panel.cm-search input,
+.cm-editor .cm-panel.cm-search button,
+.cm-editor .cm-panel.cm-search label {
+  margin: 0;
+}
+
+.cm-editor .cm-panel.cm-search .cm-textfield {
+  flex: 1 1 180px;
+  min-width: 120px;
+  max-width: 280px;
+  min-height: var(--control-height-small);
+  padding: 0 var(--space-3);
+  background-color: var(--view-bg-color);
+  color: var(--view-fg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-small);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+  transition: border-color var(--transition-fast), outline-color var(--transition-fast);
+}
+
+.cm-editor .cm-panel.cm-search .cm-textfield::placeholder {
+  color: currentColor;
+  opacity: 0.4;
+}
+
+.cm-editor .cm-panel.cm-search .cm-textfield:focus {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: -2px;
+  border-color: transparent;
+}
+
+.cm-editor .cm-panel.cm-search .cm-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-height-small);
+  padding: 0 var(--space-3);
+  background-color: var(--shade-color);
+  background-image: none;
+  color: inherit;
+  border: none;
+  border-radius: var(--radius-small);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.cm-editor .cm-panel.cm-search .cm-button:hover {
+  background-color: color-mix(in srgb, currentColor 15%, var(--shade-color));
+  background-image: none;
+}
+
+.cm-editor .cm-panel.cm-search .cm-button:active {
+  background-color: color-mix(in srgb, currentColor 25%, var(--shade-color));
+  background-image: none;
+}
+
+.cm-editor .cm-panel.cm-search .cm-button:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 1px;
+}
+
+.cm-editor .cm-panel.cm-search label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cm-editor .cm-panel.cm-search input[type="checkbox"] {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  background-color: var(--view-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.cm-editor .cm-panel.cm-search input[type="checkbox"]:checked {
+  background-color: var(--accent-bg-color);
+  border-color: var(--accent-bg-color);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23ffffff' d='M6.3 10.6 3.7 8l-1 1 3.6 3.7 7-7.1-1-1z'/%3E%3C/svg%3E");
+  background-size: 12px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.cm-editor .cm-panel.cm-search input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 1px;
+}
+
+.cm-editor .cm-panel.cm-search [name="close"] {
+  top: var(--space-2);
+  right: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height-small);
+  height: var(--control-height-small);
+  background-color: transparent;
+  color: inherit;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-title-4);
+  line-height: 1;
+  opacity: var(--dim-opacity);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.cm-editor .cm-panel.cm-search [name="close"]:hover {
+  background-color: var(--shade-color);
+  opacity: 1;
 }
 
 .cm-editor .cm-searchMatch {
