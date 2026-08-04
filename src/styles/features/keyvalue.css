@@ -54,8 +54,13 @@
   opacity: 0.4;
 }
 
-.form-body-row .row-enabled-checkbox {
+.key-value-row .row-enabled-checkbox {
   flex-shrink: 0;
+}
+
+.key-value-row.row-disabled .key-input,
+.key-value-row.row-disabled .value-input {
+  opacity: 0.5;
 }
 
 .form-body-row .row-type-select {

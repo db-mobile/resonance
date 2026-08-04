@@ -5,6 +5,7 @@
 
 import { app } from '../appContext.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
+import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
 
 /**
  * Handles protocol-specific endpoint mapping and tab restoration for workspace tabs.
@@ -271,8 +272,8 @@ export class WorkspaceTabEndpointLoaderService {
                 url: endpoint.persistedUrl || endpoint.path || '',
                 method: endpoint.method || 'GET',
                 pathParams: {},
-                queryParams: this.arrayEntriesToObject(endpoint.persistedQueryParams),
-                headers: this.arrayEntriesToObject(endpoint.persistedHeaders),
+                queryParams: this.arrayEntriesToRows(endpoint.persistedQueryParams),
+                headers: this.arrayEntriesToRows(endpoint.persistedHeaders),
                 body: {
                     mode,
                     content: endpoint.persistedBody || ''
@@ -384,8 +385,8 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     createWebSocketTabUpdate(endpoint) {
-        const queryParams = this.arrayEntriesToObject(endpoint.persistedQueryParams);
-        const headers = this.arrayEntriesToObject(endpoint.persistedHeaders);
+        const queryParams = this.arrayEntriesToRows(endpoint.persistedQueryParams);
+        const headers = this.arrayEntriesToRows(endpoint.persistedHeaders);
         const tabName = endpoint.name || 'WebSocket Request';
 
         return {
@@ -478,7 +479,7 @@ export class WorkspaceTabEndpointLoaderService {
 
     buildHttpQueryParams(endpoint) {
         if (endpoint.persistedQueryParams && endpoint.persistedQueryParams.length > 0) {
-            return this.arrayEntriesToObject(endpoint.persistedQueryParams);
+            return this.arrayEntriesToRows(endpoint.persistedQueryParams);
         }
 
         const queryParams = {};
@@ -492,7 +493,7 @@ export class WorkspaceTabEndpointLoaderService {
 
     buildHttpHeaders(endpoint) {
         if (endpoint.persistedHeaders && endpoint.persistedHeaders.length > 0) {
-            return this.arrayEntriesToObject(endpoint.persistedHeaders);
+            return this.arrayEntriesToRows(endpoint.persistedHeaders);
         }
 
         const headers = {};
@@ -559,7 +560,7 @@ export class WorkspaceTabEndpointLoaderService {
     resolveBodyContentType(endpoint) {
         if (endpoint.persistedHeaders && endpoint.persistedHeaders.length > 0) {
             const match = endpoint.persistedHeaders.find(
-                entry => entry.key && entry.key.toLowerCase() === 'content-type'
+                entry => entry.key && entry.enabled !== false && entry.key.toLowerCase() === 'content-type'
             );
             if (match) {
                 return match.value || '';
@@ -606,6 +607,15 @@ export class WorkspaceTabEndpointLoaderService {
             authType: 'inherit',
             authConfig: {}
         };
+    }
+
+    /**
+     * Converts persisted entries into rows, keeping the enabled flag
+     * @param {Array<Object>} entries - Persisted {key, value, enabled} entries
+     * @returns {Array<Object>} Normalized rows
+     */
+    arrayEntriesToRows(entries = []) {
+        return normalizeKeyValueRows(entries);
     }
 
     arrayEntriesToObject(entries = []) {

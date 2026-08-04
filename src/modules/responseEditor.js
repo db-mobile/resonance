@@ -51,6 +51,7 @@ export class ResponseEditor {
             doc: '',
             extensions: [
                 lineNumbers(),
+                EditorState.readOnly.of(true),
                 EditorView.editable.of(false),
                 EditorView.contentAttributes.of({ tabindex: '0' }),
                 EditorView.lineWrapping,
@@ -174,6 +175,7 @@ export class ResponseEditor {
     _updateEditorWithLanguage(content, languageType) {
         const extensions = [
             lineNumbers(),
+            EditorState.readOnly.of(true),
             EditorView.editable.of(false),
             EditorView.contentAttributes.of({ tabindex: '0' }),
             EditorView.lineWrapping,

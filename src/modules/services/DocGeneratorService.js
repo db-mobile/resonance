@@ -634,7 +634,7 @@ export class DocGeneratorService {
 
         if (endpoint.parameters?.query) {
             for (const [name, param] of Object.entries(endpoint.parameters.query)) {
-                const persistedParam = persistedData?.queryParams?.find(p => p.key === name);
+                const persistedParam = persistedData?.queryParams?.find(p => p.key === name && p.enabled !== false);
                 params.push({
                     name,
                     type: param.type || param.schema?.type || 'string',
@@ -658,7 +658,7 @@ export class DocGeneratorService {
 
         if (persistedData?.headers) {
             for (const h of persistedData.headers) {
-                if (h.key && !seen.has(h.key.toLowerCase())) {
+                if (h.key && h.enabled !== false && !seen.has(h.key.toLowerCase())) {
                     seen.add(h.key.toLowerCase());
                     headers.push({
                         name: h.key,

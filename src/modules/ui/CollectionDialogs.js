@@ -8,6 +8,7 @@ import { templateLoader } from '../templateLoader.js';
 import { DocGeneratorService } from '../services/DocGeneratorService.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
 import { pushEscapeHandler } from './modalEscape.js';
+import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
 
 /**
  * Collection dialog helper for creating and configuring collection-related modals.
@@ -404,13 +405,13 @@ export class CollectionDialogs {
                         await this.collectionRepository.savePersistedPathParams(targetCollectionId, newEndpoint.id, pathParamsArray);
                     }
 
-                    if (requestData.queryParams && Object.keys(requestData.queryParams).length > 0) {
-                        const queryParamsArray = Object.entries(requestData.queryParams).map(([key, value]) => ({ key, value }));
+                    const queryParamsArray = normalizeKeyValueRows(requestData.queryParams);
+                    if (queryParamsArray.length > 0) {
                         await this.collectionRepository.savePersistedQueryParams(targetCollectionId, newEndpoint.id, queryParamsArray);
                     }
 
-                    if (requestData.headers && Object.keys(requestData.headers).length > 0) {
-                        const headersArray = Object.entries(requestData.headers).map(([key, value]) => ({ key, value }));
+                    const headersArray = normalizeKeyValueRows(requestData.headers);
+                    if (headersArray.length > 0) {
                         await this.collectionRepository.savePersistedHeaders(targetCollectionId, newEndpoint.id, headersArray);
                     }
 

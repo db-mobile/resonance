@@ -67,22 +67,13 @@
   font-weight: 700;
 }
 
-.theme-select-container,
-.http-version-select-container,
-.language-select-container {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
+.settings-tab-content .select-wrap {
   width: max-content;
+  min-width: 160px;
 }
 
-.theme-select-container .select-arrow,
-.http-version-select-container .select-arrow,
-.language-select-container .select-arrow {
-  position: absolute;
-  right: var(--space-2);
-  pointer-events: none;
-  opacity: var(--dim-opacity);
+.settings-tab-content .select-wrap > select {
+  width: 100%;
 }
 
 .accent-color-grid {
@@ -109,6 +100,9 @@
 .settings-number-input {
   width: 88px;
   text-align: right;
+  background-color: var(--shade-color);
+  color: inherit;
+  border-color: transparent;
 }
 
 .settings-tab-content .form-input-container {

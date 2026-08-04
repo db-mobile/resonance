@@ -11,6 +11,7 @@ jest.mock('../../src/modules/state/currentEndpoint.js', () => ({
 jest.mock('../../src/modules/appContext.js', () => ({ app: {} }));
 jest.mock('../../src/modules/keyValueManager.js', () => ({
     parseKeyValuePairs: jest.fn(() => ({})),
+    parseKeyValueRows: jest.fn(() => []),
     populateKeyValueList: jest.fn(),
     clearKeyValueList: jest.fn(),
     addKeyValueRow: jest.fn(),
