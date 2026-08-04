@@ -119,6 +119,17 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.1.8" date="2026-08-04">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Enable and disable individual query parameters and request headers without deleting them</li>
+          <li>Keep the authentication an imported OpenAPI operation declares</li>
+          <li>Give the settings rows one control size and drop their scrollbar</li>
+          <li>Refine the request and response editor controls</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.1.7" date="2026-08-02">
       <description>
         <p>Feature stabilization release</p>
