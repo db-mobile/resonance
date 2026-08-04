@@ -182,10 +182,14 @@
 .modal-dialog--wide,
 .modal-dialog--environment-manager,
 .modal-dialog--variable-manager,
-.modal-dialog--cookie-manager,
-.modal-dialog--settings {
+.modal-dialog--cookie-manager {
   width: 920px;
   height: min(640px, 100%);
+}
+
+.modal-dialog--settings {
+  width: 920px;
+  height: min(680px, 100%);
 }
 
 .modal-dialog--mock-server {
