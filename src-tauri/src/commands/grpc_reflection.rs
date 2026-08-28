@@ -18,6 +18,10 @@ use tonic::{Request, Status};
 
 pub mod reflection {
     #![allow(dead_code)]
+    // tonic-generated streaming clients return `Result<_, tonic::Status>`, and
+    // `Status` is large enough to trip `clippy::result_large_err`; the shape is
+    // fixed by the generated code, so the lint is silenced for this module.
+    #![allow(clippy::result_large_err)]
     tonic::include_proto!("grpc.reflection.v1");
 }
 
@@ -203,7 +207,7 @@ impl ReflectionVersion {
 }
 
 enum ReflectionCallError {
-    Status(Status),
+    Status(Box<Status>),
     Other(String),
 }
 
@@ -300,13 +304,13 @@ impl ReflectionClient {
             .grpc
             .streaming(Request::new(request_stream), path, codec)
             .await
-            .map_err(ReflectionCallError::Status)?;
+            .map_err(|status| ReflectionCallError::Status(Box::new(status)))?;
         let mut stream = response.into_inner();
 
         while let Some(resp) = stream
             .message()
             .await
-            .map_err(ReflectionCallError::Status)?
+            .map_err(|status| ReflectionCallError::Status(Box::new(status)))?
         {
             if let Some(message_response) = resp.message_response {
                 if let reflection::server_reflection_response::MessageResponse::ErrorResponse(err) =

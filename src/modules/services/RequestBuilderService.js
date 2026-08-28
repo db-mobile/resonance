@@ -249,6 +249,10 @@ export class RequestBuilderService {
             delete requestConfig.awsAuth;
             stripped = true;
         }
+        if (requestConfig.ntlm) {
+            delete requestConfig.ntlm;
+            stripped = true;
+        }
 
         return stripped;
     }

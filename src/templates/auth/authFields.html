@@ -192,6 +192,28 @@
     </div>
 </template>
 
+<template id="tpl-auth-ntlm">
+    <div class="u-flex u-flex-col u-gap-4">
+        <div class="auth-field-group u-flex u-flex-col">
+            <label for="ntlm-username" class="form-label">Username</label>
+            <input type="text" id="ntlm-username" class="input-base form-input" placeholder="Enter username" aria-label="NTLM Username">
+        </div>
+        <div class="auth-field-group u-flex u-flex-col">
+            <label for="ntlm-password" class="form-label">Password</label>
+            <input type="password" id="ntlm-password" class="input-base form-input" placeholder="Enter password" aria-label="NTLM Password">
+        </div>
+        <div class="auth-field-group u-flex u-flex-col">
+            <label for="ntlm-domain" class="form-label">Domain (optional)</label>
+            <input type="text" id="ntlm-domain" class="input-base form-input" placeholder="CORP" aria-label="NTLM Domain">
+        </div>
+        <div class="auth-field-group u-flex u-flex-col">
+            <label for="ntlm-workstation" class="form-label">Workstation (optional)</label>
+            <input type="text" id="ntlm-workstation" class="input-base form-input" placeholder="Local machine name" aria-label="NTLM Workstation">
+        </div>
+        <small class="form-input-hint">The NTLMv2 challenge-response handshake is performed automatically at send time</small>
+    </div>
+</template>
+
 <template id="tpl-auth-aws-v4">
     <div class="u-flex u-flex-col u-gap-4">
         <div class="auth-field-group u-flex u-flex-col">

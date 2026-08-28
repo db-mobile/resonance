@@ -41,6 +41,10 @@ pub struct HttpClientOptions {
     /// Evict pooled connections immediately. Streaming callers set this so a
     /// reconnect opens a fresh connection rather than reusing a stale one.
     pub disable_pooling: bool,
+    /// Funnel sequential requests through one pooled connection. NTLM
+    /// authenticates the TCP connection itself, so every handshake leg must
+    /// reuse the same socket rather than a fresh one from the pool.
+    pub single_connection: bool,
     /// Collects DNS and connect timings from the connection this client opens.
     /// Only the request path reports these; the other callers pass `None` and
     /// pay nothing for the instrumentation.
@@ -67,6 +71,10 @@ pub fn build_http_client(
 
     if opts.disable_pooling {
         builder = builder.pool_idle_timeout(Duration::from_secs(0));
+    }
+
+    if opts.single_connection {
+        builder = builder.pool_max_idle_per_host(1);
     }
 
     // The resolver runs inside the connector call, so timing both yields DNS on
@@ -189,6 +197,7 @@ mod tests {
             client_cert: None,
             follow_redirects: true,
             disable_pooling: false,
+            single_connection: false,
             timing_recorder: None,
         }
     }

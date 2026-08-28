@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "3.1.8"
+version = "3.1.9"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -70,6 +70,11 @@ md5 = "0.7"
 sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
+
+# NTLM message encoding and NTLMv2 challenge responses. Pure RustCrypto tree
+# (md4, md-5, hmac, des) on non-Windows targets — no OpenSSL; verify with
+# `cargo tree -i openssl-sys`.
+ntlmclient = "0.2"
 
 # Cryptographic RNG for OAuth PKCE verifiers and CSRF state (OS entropy, OpenSSL-free)
 getrandom = "0.3"

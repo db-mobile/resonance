@@ -363,6 +363,30 @@ describe('RunnerService', () => {
             expect(result.authConfig).toEqual({ username: 'user', password: 'pass' });
         });
 
+        test('should generate ntlm auth config with variable interpolation', () => {
+            const authConfig = {
+                type: 'ntlm',
+                config: {
+                    username: '{{ntlmUser}}',
+                    password: '{{ntlmPass}}',
+                    domain: 'CORP',
+                    workstation: ''
+                }
+            };
+
+            const result = service._generateAuthData(authConfig, {
+                ntlmUser: 'ada',
+                ntlmPass: 'hunter2'
+            });
+
+            expect(result.ntlmAuth).toEqual({
+                username: 'ada',
+                password: 'hunter2',
+                domain: 'CORP',
+                workstation: ''
+            });
+        });
+
         test('should process variables in auth values', () => {
             const authConfig = {
                 type: 'bearer',

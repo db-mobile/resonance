@@ -556,6 +556,7 @@ fn build_sse_client(
             client_cert: request.client_cert.clone(),
             follow_redirects: true,
             disable_pooling: true,
+            single_connection: false,
             timing_recorder: None,
         },
         proxy_action,

@@ -685,6 +685,7 @@ export class RunnerService {
             timeout,
             auth: authData.authConfig,
             awsAuth: authData.awsAuth || null,
+            ntlm: authData.ntlmAuth || null,
             clientCert
         };
     }
@@ -817,6 +818,17 @@ export class RunnerService {
                     authData.authConfig = {
                         username: processValue(config.username),
                         password: processValue(config.password)
+                    };
+                }
+                break;
+
+            case 'ntlm':
+                if (config.username || config.password) {
+                    authData.ntlmAuth = {
+                        username: processValue(config.username),
+                        password: processValue(config.password),
+                        domain: config.domain ? processValue(config.domain) : '',
+                        workstation: config.workstation ? processValue(config.workstation) : ''
                     };
                 }
                 break;

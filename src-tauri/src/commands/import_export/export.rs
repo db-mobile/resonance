@@ -270,6 +270,15 @@ fn auth_to_postman(security: &Value) -> Option<Value> {
                 { "key": "password", "value": get("password").unwrap_or(""), "type": "string" }
             ]
         })),
+        "ntlm" => Some(serde_json::json!({
+            "type": "ntlm",
+            "ntlm": [
+                { "key": "username", "value": get("username").unwrap_or(""), "type": "string" },
+                { "key": "password", "value": get("password").unwrap_or(""), "type": "string" },
+                { "key": "domain", "value": get("domain").unwrap_or(""), "type": "string" },
+                { "key": "workstation", "value": get("workstation").unwrap_or(""), "type": "string" }
+            ]
+        })),
         "api-key" => {
             let key = get("keyName").or_else(|| get("key")).unwrap_or("");
             let value = get("keyValue").or_else(|| get("value")).unwrap_or("");
@@ -695,5 +704,52 @@ mod tests {
             pairs,
             vec![("baseUrl", "https://api.example.com"), ("token", "abc")]
         );
+    }
+
+    #[test]
+    fn ntlm_auth_round_trips_through_postman() {
+        let mut secured = endpoint("Intranet", "GET");
+        secured.security = Some(serde_json::json!({
+            "type": "ntlm",
+            "config": {
+                "username": "ada",
+                "password": "{{ntlmPass}}",
+                "domain": "CORP",
+                "workstation": "DEV-BOX"
+            }
+        }));
+
+        let postman = endpoint_auth_to_postman(&secured).unwrap();
+        assert_eq!(postman["type"], "ntlm");
+        let params = postman["ntlm"].as_array().unwrap();
+        let get = |key: &str| {
+            params
+                .iter()
+                .find(|p| p["key"] == key)
+                .and_then(|p| p["value"].as_str())
+                .unwrap_or("")
+        };
+        assert_eq!(get("username"), "ada");
+        assert_eq!(get("password"), "{{ntlmPass}}");
+        assert_eq!(get("domain"), "CORP");
+        assert_eq!(get("workstation"), "DEV-BOX");
+
+        let fixture = serde_json::json!({
+            "info": { "name": "NTLM" },
+            "item": [{
+                "name": "Intranet",
+                "request": {
+                    "method": "GET",
+                    "url": "https://intranet.example.com/api",
+                    "auth": postman
+                }
+            }]
+        });
+        let imported = parse_postman_collection(fixture).unwrap();
+        let config = &imported.endpoints[0].security.as_ref().unwrap()["config"];
+        assert_eq!(config["username"], "ada");
+        assert_eq!(config["password"], "{{ntlmPass}}");
+        assert_eq!(config["domain"], "CORP");
+        assert_eq!(config["workstation"], "DEV-BOX");
     }
 }

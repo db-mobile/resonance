@@ -11,6 +11,7 @@ pub(crate) fn secret_auth_fields(auth_type: &str) -> &'static [&'static str] {
         "api-key" => &["keyValue"],
         "oauth2" => &["clientSecret", "password", "token", "refreshToken"],
         "digest" => &["password"],
+        "ntlm" => &["password"],
         "aws-v4" => &["secretAccessKey", "sessionToken"],
         _ => &[],
     }
@@ -138,7 +139,9 @@ mod tests {
 
     #[test]
     fn every_auth_type_the_frontend_knows_has_a_field_list() {
-        for auth_type in ["bearer", "basic", "api-key", "oauth2", "digest", "aws-v4"] {
+        for auth_type in [
+            "bearer", "basic", "api-key", "oauth2", "digest", "ntlm", "aws-v4",
+        ] {
             assert!(
                 !secret_auth_fields(auth_type).is_empty(),
                 "{} lost its secret field list",
