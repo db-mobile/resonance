@@ -5,7 +5,7 @@
 # Resonance
 
 **A lightweight, local-first, open-source alternative to Postman and Insomnia.**
-No account. No cloud sync. No telemetry. Your collections are plain JSON files on your disk.
+No account. No cloud sync. No telemetry. Your collections are plain YAML files on your disk.
 
 [![Latest release](https://img.shields.io/github/v/release/db-mobile/resonance?color=1257ab)](https://github.com/db-mobile/resonance/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/db-mobile/resonance/total?color=1257ab)](https://github.com/db-mobile/resonance/releases)
@@ -25,11 +25,11 @@ No account. No cloud sync. No telemetry. Your collections are plain JSON files o
 
 ## Why Resonance?
 
-- **Local-first, zero-account** — everything works offline, forever. Collections, environments, history, and settings live as human-readable JSON files that you can version, diff, and share with git.
+- **Local-first, zero-account** — everything works offline, forever. Collections, environments, history, and settings live as human-readable files that you can version, diff, and share with git.
 - **Genuinely lightweight** — built with Tauri and a Rust backend: ~15 MB bundle size, ~50 MB memory footprint.
 - **Every protocol you need** — REST, GraphQL (incl. subscriptions), gRPC (with server reflection), WebSocket, Server-Sent Events, and MQTT in one client.
 - **Secrets stay secret** — credentials and secret variables are stored in your OS keychain (GNOME Keyring / KWallet, macOS Keychain, Windows Credential Manager), never in the collection files you commit.
-- **Batteries included** — OpenAPI & Postman import, mock server, pre-request/test scripting, collection runner, code generation in 9 languages, mTLS.
+- **Batteries included** — OpenAPI, Postman & cURL import, mock server, pre-request/test scripting, collection runner, code generation in 9 languages, API docs generation, mTLS.
 
 ## Features
 
@@ -37,15 +37,16 @@ No account. No cloud sync. No telemetry. Your collections are plain JSON files o
 
 - **REST/HTTP** — HTTP/1.1 and HTTP/2, all body modes (JSON, form data, URL-encoded, plain text, binary files, multipart file uploads), detailed timing breakdown (DNS, TCP, TLS, TTFB, download), cookie display, configurable timeouts
 - **GraphQL** — dedicated query and variables editors with syntax highlighting, auto-format, and live subscriptions over WebSocket (`graphql-transport-ws`)
-- **gRPC** — server reflection (v1/v1alpha) with automatic service discovery, all four RPC kinds (unary, server-, client-, and bidirectional streaming), TLS/mTLS options, metadata and trailers display
+- **gRPC** — server reflection (v1/v1alpha) with automatic service discovery, local `.proto` file loading, all four RPC kinds (unary, server-, client-, and bidirectional streaming), TLS/mTLS options, metadata and trailers display
 - **WebSocket** — persistent connections per tab, handshake headers, transcript-style message display
 - **Server-Sent Events** — automatic reconnection honoring `retry`, `Last-Event-ID` resumption, live connection lifecycle status
 - **MQTT** — plaintext and TLS brokers, topic subscribe/publish with wildcards, QoS 0/1/2, retain flag, live connection status
 
 ### Import, Export & Mocking
 
-- **OpenAPI 3.0 import** (YAML/JSON) with schema-based example generation, **Postman import** (v2.0/v2.1 collections and environments), **OpenAPI export**
+- **OpenAPI 3.0 import** (YAML/JSON) with schema-based example generation, **Postman import & export** (v2.0/v2.1 collections and environments), **cURL import** (paste a command), **OpenAPI export** (YAML/JSON)
 - **Code generation in 9 languages** — cURL, Python, JavaScript (Fetch/Axios), Node.js, Go, PHP, Ruby, Java
+- **Documentation generation** — Markdown or HTML docs from any collection, with parameter tables, saved examples, and code samples
 - **Built-in mock server** — generates responses from OpenAPI schemas, custom bodies and delays per endpoint, request logging
 
 ### Automation & Testing
@@ -56,7 +57,7 @@ No account. No cloud sync. No telemetry. Your collections are plain JSON files o
 
 ### Security
 
-- **Auth methods** — Bearer, Basic, API Key, OAuth 2.0, Digest, AWS Signature v4 — configurable at request, folder, or collection level
+- **Auth methods** — Bearer, Basic, API Key, OAuth 2.0, Digest, NTLM, AWS Signature v4 — configurable at request, folder, or collection level
 - **Client certificates (mTLS)** — per-host PEM certificates with custom CA trust
 - **Keychain-backed secrets** — literal credentials and secret variables are encrypted at rest in the OS credential store and never written to the git-friendly collection files
 - **Proxy support** — HTTP/HTTPS/SOCKS with authentication and bypass lists
@@ -65,7 +66,7 @@ No account. No cloud sync. No telemetry. Your collections are plain JSON files o
 
 - **Workspace tabs** with independent, persistent state; **request history** with search and replay
 - **Keyboard shortcuts** for everything, platform-aware (`Ctrl`/`⌘`)
-- **4 themes** (light, dark, system, OLED black) with 9 accent colors; **6 languages** (English, German, Spanish, French, Italian, Brazilian Portuguese)
+- **3 themes** (light, dark, system) with 9 accent colors; **6 languages** (English, German, Spanish, French, Italian, Brazilian Portuguese)
 - **Auto-update** for AppImage and direct downloads; package-manager installs defer to their own update mechanism
 
 See the **[documentation site](https://db-mobile.github.io/resonance/)** for detailed guides on every feature.
@@ -168,15 +169,17 @@ User documentation lives on the **[Resonance website](https://db-mobile.github.i
 - [x] Proxy support with authentication (HTTP/HTTPS/SOCKS)
 - [x] Variable templating system with environment support
 - [x] Dynamic variables (UUID, timestamps, random values)
-- [x] Multi-theme support (4 themes with 9 accent colors)
+- [x] Multi-theme support (light/dark/system with 9 accent colors)
 - [x] Internationalization (6 languages)
-- [x] Authentication support (Bearer, Basic, API Key, OAuth2, Digest)
+- [x] Authentication support (Bearer, Basic, API Key, OAuth2, Digest, NTLM)
 - [x] Client certificates / mTLS with per-host configuration and custom CA trust
 - [x] Request history with search and replay
 - [x] Environment management (Dev, Staging, Production, custom)
 - [x] Keyboard shortcuts for all major actions
 - [x] Mock server with custom responses and delays
-- [x] Collection export (OpenAPI format)
+- [x] Collection export (OpenAPI and Postman formats)
+- [x] cURL command import
+- [x] Documentation generation (Markdown/HTML)
 - [x] Pre-request and test scripts with JavaScript execution (Boa Engine)
 - [x] Automated testing framework with rich assertion API
 - [x] Request chaining with environment variable integration

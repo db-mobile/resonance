@@ -228,6 +228,9 @@ export async function fetchGraphQLIntrospection() {
     if (authData.awsAuth) {
         requestConfig.awsAuth = authData.awsAuth;
     }
+    if (authData.ntlmAuth) {
+        requestConfig.ntlm = authData.ntlmAuth;
+    }
     if (app.certificateController) {
         try {
             const clientCert = app.certificateController.getForHost(new URL(resolvedUrl).host);
@@ -1055,6 +1058,10 @@ export async function handleSendRequest() {
 
         if (authData.awsAuth) {
             requestConfig.awsAuth = authData.awsAuth;
+        }
+
+        if (authData.ntlmAuth) {
+            requestConfig.ntlm = authData.ntlmAuth;
         }
 
         if (getCurrentEndpoint() && app.scriptController) {

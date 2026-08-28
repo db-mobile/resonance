@@ -148,6 +148,120 @@ fn build_digest_auth_header(
 }
 
 // ---------------------------------------------------------------------------
+// NTLM authentication
+// ---------------------------------------------------------------------------
+
+/// Negotiate-message flags for the credentials the user actually supplied
+fn ntlm_negotiate_flags(config: &NtlmAuthConfig) -> ntlmclient::Flags {
+    let mut flags = ntlmclient::Flags::NEGOTIATE_UNICODE
+        | ntlmclient::Flags::REQUEST_TARGET
+        | ntlmclient::Flags::NEGOTIATE_NTLM;
+    if !config.domain.is_empty() {
+        flags |= ntlmclient::Flags::NEGOTIATE_DOMAIN_SUPPLIED;
+    }
+    if !config.workstation.is_empty() {
+        flags |= ntlmclient::Flags::NEGOTIATE_WORKSTATION_SUPPLIED;
+    }
+    flags
+}
+
+/// Build the Authorization header carrying the NTLM negotiate (Type 1) message
+fn build_ntlm_negotiate_header(config: &NtlmAuthConfig) -> Result<String, String> {
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+    use base64::Engine;
+
+    let message = ntlmclient::Message::Negotiate(ntlmclient::NegotiateMessage {
+        flags: ntlm_negotiate_flags(config),
+        supplied_domain: config.domain.clone(),
+        supplied_workstation: config.workstation.clone(),
+        os_version: Default::default(),
+    });
+    let bytes = message
+        .to_bytes()
+        .map_err(|e| format!("could not encode the negotiate message: {}", e))?;
+    Ok(format!("NTLM {}", BASE64_STANDARD.encode(bytes)))
+}
+
+/// Iterate the individual challenge entries of every WWW-Authenticate header.
+/// A server can send several headers, or several comma-joined schemes in one
+/// (`Negotiate, NTLM`); NTLM tokens are base64 and never contain a comma.
+fn www_authenticate_entries(headers: &reqwest::header::HeaderMap) -> Vec<String> {
+    headers
+        .get_all("www-authenticate")
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(','))
+        .map(|entry| entry.trim().to_string())
+        .filter(|entry| !entry.is_empty())
+        .collect()
+}
+
+/// Whether any WWW-Authenticate entry on the response offers the NTLM scheme
+fn response_offers_ntlm(headers: &reqwest::header::HeaderMap) -> bool {
+    www_authenticate_entries(headers)
+        .iter()
+        .any(|entry| entry == "NTLM" || entry.starts_with("NTLM "))
+}
+
+/// Extract the base64 challenge token from a response's NTLM WWW-Authenticate entry
+fn extract_ntlm_challenge_token(headers: &reqwest::header::HeaderMap) -> Option<String> {
+    www_authenticate_entries(headers).iter().find_map(|entry| {
+        entry
+            .strip_prefix("NTLM ")
+            .map(|token| token.trim().to_string())
+            .filter(|token| !token.is_empty())
+    })
+}
+
+/// Build the Authorization header answering an NTLM challenge (Type 3) with an
+/// NTLMv2 response computed from the challenge token and the user's credentials
+fn build_ntlm_authenticate_header(
+    config: &NtlmAuthConfig,
+    challenge_token: &str,
+) -> Result<String, String> {
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+    use base64::Engine;
+
+    let challenge_bytes = BASE64_STANDARD
+        .decode(challenge_token)
+        .map_err(|e| format!("could not decode the challenge token: {}", e))?;
+    let challenge = match ntlmclient::Message::try_from(challenge_bytes.as_slice()) {
+        Ok(ntlmclient::Message::Challenge(challenge)) => challenge,
+        Ok(other) => {
+            return Err(format!(
+                "expected a challenge message, got message type {}",
+                other.message_number()
+            ));
+        }
+        Err(e) => return Err(format!("could not parse the challenge message: {}", e)),
+    };
+
+    let target_info: Vec<u8> = challenge
+        .target_information
+        .iter()
+        .flat_map(|entry| entry.to_bytes())
+        .collect();
+    let credentials = ntlmclient::Credentials {
+        username: config.username.clone(),
+        password: config.password.clone(),
+        domain: config.domain.clone(),
+    };
+    let challenge_response = ntlmclient::respond_challenge_ntlm_v2(
+        challenge.challenge,
+        &target_info,
+        ntlmclient::get_ntlm_time(),
+        &credentials,
+    );
+
+    let flags = ntlmclient::Flags::NEGOTIATE_UNICODE | ntlmclient::Flags::NEGOTIATE_NTLM;
+    let message = challenge_response.to_message(&credentials, &config.workstation, flags);
+    let bytes = message
+        .to_bytes()
+        .map_err(|e| format!("could not encode the authenticate message: {}", e))?;
+    Ok(format!("NTLM {}", BASE64_STANDARD.encode(bytes)))
+}
+
+// ---------------------------------------------------------------------------
 // AWS Signature Version 4
 // ---------------------------------------------------------------------------
 
@@ -357,6 +471,9 @@ pub struct RequestOptions {
     /// AWS Signature V4 authentication configuration
     #[serde(default)]
     pub aws_auth: Option<AwsAuthConfig>,
+    /// NTLM authentication configuration
+    #[serde(default)]
+    pub ntlm: Option<NtlmAuthConfig>,
     /// Client certificate (mTLS) and custom CA configuration, resolved by host
     #[serde(default)]
     pub client_cert: Option<ClientCertConfig>,
@@ -447,6 +564,17 @@ fn form_rows_to_pairs(rows: &[serde_json::Value]) -> Vec<(String, String)> {
 pub struct AuthConfig {
     pub username: String,
     pub password: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NtlmAuthConfig {
+    pub username: String,
+    pub password: String,
+    #[serde(default)]
+    pub domain: String,
+    #[serde(default)]
+    pub workstation: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -707,6 +835,7 @@ pub async fn send_api_request(
         client_cert: request_options.client_cert.clone(),
         follow_redirects: request_options.follow_redirects != Some(false),
         disable_pooling: false,
+        single_connection: request_options.ntlm.is_some(),
         timing_recorder: Some(Arc::clone(&recorder)),
     };
 
@@ -900,7 +1029,62 @@ pub async fn send_api_request(
                     // the 401 we return, so the user sees why the credentials were never sent
                     // rather than a bare 401.
                     let mut digest_error: Option<String> = None;
+                    let mut ntlm_error: Option<String> = None;
                     if response.status().as_u16() == 401 {
+                        // NTLM: a three-leg handshake (negotiate -> challenge -> authenticate)
+                        // bound to one TCP connection. Each intermediate 401 body is drained so
+                        // reqwest returns the socket to the pool, and single_connection on the
+                        // client keeps every leg on that socket. Once the first body is consumed
+                        // there is no falling through to the plain-401 path below, so every
+                        // branch past that point returns.
+                        if let Some(ntlm_config) = &request_options.ntlm {
+                            if response_offers_ntlm(response.headers()) {
+                                match build_ntlm_negotiate_header(ntlm_config) {
+                                    Ok(negotiate_header) => {
+                                        let _ = response.bytes().await;
+                                        let negotiate_result =
+                                            build_request(Some(negotiate_header))?.send().await;
+                                        let challenge_response = match negotiate_result {
+                                            Ok(challenge_response) => challenge_response,
+                                            Err(e) => {
+                                                return process_response(Err(e), &mut timings, start_time, &recorder, &state).await;
+                                            }
+                                        };
+                                        match extract_ntlm_challenge_token(challenge_response.headers()) {
+                                            Some(token) => {
+                                                match build_ntlm_authenticate_header(ntlm_config, &token) {
+                                                    Ok(authenticate_header) => {
+                                                        let _ = challenge_response.bytes().await;
+                                                        let final_result =
+                                                            build_request(Some(authenticate_header))?.send().await;
+                                                        return process_response(final_result, &mut timings, start_time, &recorder, &state).await;
+                                                    }
+                                                    Err(e) => {
+                                                        let mut api_response =
+                                                            process_response(Ok(challenge_response), &mut timings, start_time, &recorder, &state).await?;
+                                                        api_response.message =
+                                                            Some(format!("NTLM authentication failed: {}", e));
+                                                        return Ok(api_response);
+                                                    }
+                                                }
+                                            }
+                                            None => {
+                                                let mut api_response =
+                                                    process_response(Ok(challenge_response), &mut timings, start_time, &recorder, &state).await?;
+                                                api_response.message = Some(
+                                                    "NTLM authentication failed: the server did not answer the negotiate message with an NTLM challenge".to_string(),
+                                                );
+                                                return Ok(api_response);
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        ntlm_error = Some(e);
+                                    }
+                                }
+                            }
+                        }
+
                         if let Some(auth_config) = &request_options.auth {
                             if let Some(www_auth) = response.headers().get("www-authenticate") {
                                 if let Ok(www_auth_str) = www_auth.to_str() {
@@ -934,6 +1118,10 @@ pub async fn send_api_request(
                     if let Some(e) = digest_error {
                         api_response.message =
                             Some(format!("Digest authentication failed: {}", e));
+                    }
+                    if let Some(e) = ntlm_error {
+                        api_response.message =
+                            Some(format!("NTLM authentication failed: {}", e));
                     }
                     Ok(api_response)
                 }
@@ -1209,6 +1397,213 @@ mod tests {
 
         assert!(err.contains("Unsupported algorithm"), "got: {}", err);
         assert!(err.contains("SHA-256"), "got: {}", err);
+    }
+
+    fn ntlm_config() -> NtlmAuthConfig {
+        NtlmAuthConfig {
+            username: "ada".to_string(),
+            password: "hunter2".to_string(),
+            domain: "CORP".to_string(),
+            workstation: "DEV-BOX".to_string(),
+        }
+    }
+
+    fn decode_ntlm_header(header: &str) -> ntlmclient::Message {
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+        use base64::Engine;
+
+        let token = header.strip_prefix("NTLM ").expect("NTLM scheme prefix");
+        let bytes = BASE64_STANDARD.decode(token).expect("valid base64");
+        ntlmclient::Message::try_from(bytes.as_slice()).expect("parseable NTLM message")
+    }
+
+    #[test]
+    fn ntlm_negotiate_header_encodes_a_type_1_message() {
+        let header = build_ntlm_negotiate_header(&ntlm_config()).expect("encoding succeeds");
+
+        let message = match decode_ntlm_header(&header) {
+            ntlmclient::Message::Negotiate(message) => message,
+            other => panic!("expected a negotiate message, got {:?}", other),
+        };
+        assert!(message.flags.contains(ntlmclient::Flags::NEGOTIATE_UNICODE));
+        assert!(message.flags.contains(ntlmclient::Flags::NEGOTIATE_NTLM));
+        assert_eq!(message.supplied_domain, "CORP");
+        assert_eq!(message.supplied_workstation, "DEV-BOX");
+    }
+
+    /// The authenticate message carries the NTLMv2 proof computed from the
+    /// challenge, never the password itself.
+    #[test]
+    fn ntlm_authenticate_header_answers_a_challenge() {
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+        use base64::Engine;
+
+        let challenge = ntlmclient::Message::Challenge(ntlmclient::ChallengeMessage {
+            target_name: "CORP".to_string(),
+            flags: ntlmclient::Flags::NEGOTIATE_UNICODE | ntlmclient::Flags::NEGOTIATE_NTLM,
+            challenge: [1, 2, 3, 4, 5, 6, 7, 8],
+            context: (0, 0),
+            target_information: vec![ntlmclient::TargetInfoEntry::from_string(
+                ntlmclient::TargetInfoType::NtDomain,
+                "CORP",
+            )],
+            os_version: Default::default(),
+        });
+        let token = BASE64_STANDARD.encode(challenge.to_bytes().expect("encodes"));
+
+        let header =
+            build_ntlm_authenticate_header(&ntlm_config(), &token).expect("challenge is valid");
+
+        let message = match decode_ntlm_header(&header) {
+            ntlmclient::Message::Authenticate(message) => message,
+            other => panic!("expected an authenticate message, got {:?}", other),
+        };
+        assert_eq!(message.user_name, "ada");
+        assert_eq!(message.domain_name, "CORP");
+        assert_eq!(message.workstation_name, "DEV-BOX");
+        assert!(message.ntlm_response.len() > 16, "NTLMv2 proof present");
+        let response_text = String::from_utf8_lossy(&message.ntlm_response).to_string();
+        assert!(!response_text.contains("hunter2"));
+    }
+
+    #[test]
+    fn ntlm_authenticate_header_rejects_a_garbage_token() {
+        let err = build_ntlm_authenticate_header(&ntlm_config(), "not-base64!")
+            .expect_err("garbage must not authenticate");
+        assert!(err.contains("could not decode"), "got: {}", err);
+    }
+
+    /// Servers commonly offer `Negotiate` and `NTLM` together, either as two
+    /// headers or comma-joined in one; the NTLM entry must be found either way.
+    #[test]
+    fn ntlm_challenge_token_is_found_among_other_schemes() {
+        let mut split_headers = reqwest::header::HeaderMap::new();
+        split_headers.append("www-authenticate", "Negotiate".parse().unwrap());
+        split_headers.append("www-authenticate", "NTLM abc123==".parse().unwrap());
+        assert!(response_offers_ntlm(&split_headers));
+        assert_eq!(
+            extract_ntlm_challenge_token(&split_headers).as_deref(),
+            Some("abc123==")
+        );
+
+        let mut joined_header = reqwest::header::HeaderMap::new();
+        joined_header.append("www-authenticate", "Negotiate, NTLM".parse().unwrap());
+        assert!(response_offers_ntlm(&joined_header));
+        assert_eq!(extract_ntlm_challenge_token(&joined_header), None);
+
+        let mut unrelated = reqwest::header::HeaderMap::new();
+        unrelated.append("www-authenticate", "Basic realm=\"x\"".parse().unwrap());
+        assert!(!response_offers_ntlm(&unrelated));
+    }
+
+    /// Full three-leg NTLM handshake over a real loopback socket against a mock
+    /// server, proving the negotiate/challenge/authenticate helpers interoperate
+    /// with an independent parser and that the flow reaches 200 on one client.
+    #[tokio::test]
+    async fn ntlm_handshake_completes_against_a_mock_server() {
+        use axum::{
+            http::{HeaderMap, StatusCode},
+            response::IntoResponse,
+            routing::get,
+            Router,
+        };
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+        use base64::Engine;
+
+        async fn handler(headers: HeaderMap) -> impl IntoResponse {
+            let auth = headers
+                .get("authorization")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+            let ntlm_token = auth.strip_prefix("NTLM ");
+
+            match ntlm_token {
+                None => (
+                    StatusCode::UNAUTHORIZED,
+                    [("www-authenticate", "NTLM".to_string())],
+                    String::new(),
+                )
+                    .into_response(),
+                Some(token) => {
+                    let bytes = BASE64_STANDARD.decode(token).expect("client sent base64");
+                    match ntlmclient::Message::try_from(bytes.as_slice()).expect("valid NTLM") {
+                        ntlmclient::Message::Negotiate(_) => {
+                            let challenge =
+                                ntlmclient::Message::Challenge(ntlmclient::ChallengeMessage {
+                                    target_name: "CORP".to_string(),
+                                    flags: ntlmclient::Flags::NEGOTIATE_UNICODE
+                                        | ntlmclient::Flags::NEGOTIATE_NTLM,
+                                    challenge: [9, 8, 7, 6, 5, 4, 3, 2],
+                                    context: (0, 0),
+                                    target_information: vec![
+                                        ntlmclient::TargetInfoEntry::from_string(
+                                            ntlmclient::TargetInfoType::NtDomain,
+                                            "CORP",
+                                        ),
+                                    ],
+                                    os_version: Default::default(),
+                                });
+                            let token = BASE64_STANDARD.encode(challenge.to_bytes().unwrap());
+                            (
+                                StatusCode::UNAUTHORIZED,
+                                [("www-authenticate", format!("NTLM {}", token))],
+                                String::new(),
+                            )
+                                .into_response()
+                        }
+                        ntlmclient::Message::Authenticate(auth_msg) => {
+                            if auth_msg.user_name == "ada" && auth_msg.domain_name == "CORP" {
+                                (StatusCode::OK, "welcome").into_response()
+                            } else {
+                                (StatusCode::FORBIDDEN, "no").into_response()
+                            }
+                        }
+                        _ => (StatusCode::BAD_REQUEST, "unexpected").into_response(),
+                    }
+                }
+            }
+        }
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, Router::new().route("/", get(handler)))
+                .await
+                .unwrap();
+        });
+
+        let config = ntlm_config();
+        let client = reqwest::Client::builder()
+            .pool_max_idle_per_host(1)
+            .build()
+            .unwrap();
+        let url = format!("http://{}/", addr);
+
+        let first = client.get(&url).send().await.unwrap();
+        assert_eq!(first.status().as_u16(), 401);
+        assert!(response_offers_ntlm(first.headers()));
+        let _ = first.bytes().await;
+
+        let negotiate_header = build_ntlm_negotiate_header(&config).unwrap();
+        let challenge = client
+            .get(&url)
+            .header("Authorization", negotiate_header)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(challenge.status().as_u16(), 401);
+        let token = extract_ntlm_challenge_token(challenge.headers()).expect("challenge token");
+        let _ = challenge.bytes().await;
+
+        let authenticate_header = build_ntlm_authenticate_header(&config, &token).unwrap();
+        let final_response = client
+            .get(&url)
+            .header("Authorization", authenticate_header)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(final_response.status().as_u16(), 200);
+        assert_eq!(final_response.text().await.unwrap(), "welcome");
     }
 
     fn aws_config() -> AwsAuthConfig {

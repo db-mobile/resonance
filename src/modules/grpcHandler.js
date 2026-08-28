@@ -434,8 +434,8 @@ async function buildGrpcMetadata() {
         getRequestBuilderService().mergeAuthData(metadata, {}, authData);
         sensitiveNames = Object.keys(authData.headers || {}).map(name => name.toLowerCase());
 
-        if (authData.authConfig || authData.awsAuth) {
-            toast.warning('Digest and AWS Signature auth are not supported over gRPC');
+        if (authData.authConfig || authData.awsAuth || authData.ntlmAuth) {
+            toast.warning('Digest, NTLM, and AWS Signature auth are not supported over gRPC');
         }
     } catch (error) {
         toast.error(`gRPC auth error: ${error.message || String(error)}`);

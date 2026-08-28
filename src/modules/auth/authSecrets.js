@@ -16,6 +16,7 @@ export const SECRET_AUTH_FIELDS = {
     'api-key': ['keyValue'],
     oauth2: ['clientSecret', 'password', 'token', 'refreshToken'],
     digest: ['password'],
+    ntlm: ['password'],
     'aws-v4': ['secretAccessKey', 'sessionToken']
 };
 

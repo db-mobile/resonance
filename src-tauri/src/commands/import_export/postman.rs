@@ -439,6 +439,18 @@ fn extract_postman_auth(auth: Option<&Value>) -> Option<Value> {
                 }
             }))
         }
+        "ntlm" => {
+            let params = auth_obj.get("ntlm").and_then(|n| n.as_array());
+            Some(serde_json::json!({
+                "type": "ntlm",
+                "config": {
+                    "username": auth_param(params, "username").unwrap_or_default(),
+                    "password": auth_param(params, "password").unwrap_or_default(),
+                    "domain": auth_param(params, "domain").unwrap_or_default(),
+                    "workstation": auth_param(params, "workstation").unwrap_or_default()
+                }
+            }))
+        }
         "oauth2" => Some(extract_postman_oauth2(
             auth_obj.get("oauth2").and_then(|o| o.as_array()),
         )),

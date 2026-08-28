@@ -148,6 +148,10 @@ export class AuthManager {
                 this.renderDigestAuthFields();
                 break;
 
+            case 'ntlm':
+                this.renderNtlmFields();
+                break;
+
             case 'aws-v4':
                 this.renderAwsV4Fields();
                 break;
@@ -226,6 +230,7 @@ export class AuthManager {
             'api-key': 'API Key',
             oauth2: 'OAuth 2.0',
             digest: 'Digest Auth',
+            ntlm: 'NTLM',
             'aws-v4': 'AWS Signature'
         };
         return labels[type] || type;
@@ -800,6 +805,51 @@ export class AuthManager {
     }
 
     /**
+     * Renders NTLM authentication fields
+     *
+     * @private
+     * @returns {void}
+     */
+    renderNtlmFields() {
+        const fragment = this._cloneAuthTemplate('tpl-auth-ntlm');
+        this.authFieldsContainer.innerHTML = '';
+        this.authFieldsContainer.appendChild(fragment);
+
+        const usernameInput = this._el('ntlm-username');
+        const passwordInput = this._el('ntlm-password');
+        const domainInput = this._el('ntlm-domain');
+        const workstationInput = this._el('ntlm-workstation');
+
+        if (usernameInput) {
+            usernameInput.value = this.currentAuthConfig.config.username || '';
+            usernameInput.addEventListener('input', (e) => {
+                this.currentAuthConfig.config.username = e.target.value;
+            });
+        }
+
+        if (passwordInput) {
+            passwordInput.value = this.currentAuthConfig.config.password || '';
+            passwordInput.addEventListener('input', (e) => {
+                this.currentAuthConfig.config.password = e.target.value;
+            });
+        }
+
+        if (domainInput) {
+            domainInput.value = this.currentAuthConfig.config.domain || '';
+            domainInput.addEventListener('input', (e) => {
+                this.currentAuthConfig.config.domain = e.target.value;
+            });
+        }
+
+        if (workstationInput) {
+            workstationInput.value = this.currentAuthConfig.config.workstation || '';
+            workstationInput.addEventListener('input', (e) => {
+                this.currentAuthConfig.config.workstation = e.target.value;
+            });
+        }
+    }
+
+    /**
      * Renders AWS Signature V4 authentication fields
      *
      * @private
@@ -916,6 +966,17 @@ export class AuthManager {
                     authData.authConfig = {
                         username: config.username || '',
                         password: config.password || ''
+                    };
+                }
+                break;
+
+            case 'ntlm':
+                if (config.username || config.password) {
+                    authData.ntlmAuth = {
+                        username: config.username || '',
+                        password: config.password || '',
+                        domain: config.domain || '',
+                        workstation: config.workstation || ''
                     };
                 }
                 break;
@@ -1064,6 +1125,18 @@ export class AuthManager {
                 if (digestPassword && config.password) {
                     digestPassword.value = config.password;
                 }
+                break;
+            }
+
+            case 'ntlm': {
+                const ntlmUsername = this._el('ntlm-username');
+                const ntlmPassword = this._el('ntlm-password');
+                const ntlmDomain = this._el('ntlm-domain');
+                const ntlmWorkstation = this._el('ntlm-workstation');
+                if (ntlmUsername && config.username) {ntlmUsername.value = config.username;}
+                if (ntlmPassword && config.password) {ntlmPassword.value = config.password;}
+                if (ntlmDomain && config.domain) {ntlmDomain.value = config.domain;}
+                if (ntlmWorkstation && config.workstation) {ntlmWorkstation.value = config.workstation;}
                 break;
             }
 

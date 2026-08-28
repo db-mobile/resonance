@@ -10,6 +10,7 @@ describe('authSecrets', () => {
     describe('getSecretAuthFields', () => {
         test('returns the field list for known types', () => {
             expect(getSecretAuthFields('bearer')).toEqual(['token']);
+            expect(getSecretAuthFields('ntlm')).toEqual(['password']);
             expect(getSecretAuthFields('aws-v4')).toEqual(SECRET_AUTH_FIELDS['aws-v4']);
         });
 
@@ -67,6 +68,22 @@ describe('authSecrets', () => {
 
         test('tolerates null/!object input', () => {
             expect(splitAuthSecrets(null)).toEqual({ redacted: null, secrets: {} });
+        });
+    });
+
+    describe('splitAuthSecrets for ntlm', () => {
+        test('extracts only the password and keeps domain and workstation on disk', () => {
+            const cfg = {
+                type: 'ntlm',
+                config: { username: 'ada', password: 'hunter2', domain: 'CORP', workstation: 'DEV-BOX' }
+            };
+            const { redacted, secrets } = splitAuthSecrets(cfg);
+
+            expect(secrets).toEqual({ password: 'hunter2' });
+            expect(redacted.config.password).toBe('');
+            expect(redacted.config.username).toBe('ada');
+            expect(redacted.config.domain).toBe('CORP');
+            expect(redacted.config.workstation).toBe('DEV-BOX');
         });
     });
 

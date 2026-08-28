@@ -361,6 +361,23 @@ describe('RequestBuilderService', () => {
             expect(requestConfig.awsAuth).toBeUndefined();
         });
 
+        it('strips NTLM credentials when the host changes', () => {
+            const requestConfig = {
+                url: 'https://attacker.example/collect',
+                headers: {},
+                ntlm: { username: 'ada', password: 'hunter2', domain: 'CORP', workstation: '' }
+            };
+
+            const stripped = service.stripCrossOriginAuth({
+                requestConfig,
+                originalUrl: 'https://api.example.com/users',
+                authData: { headers: {}, queryParams: {} }
+            });
+
+            expect(stripped).toBe(true);
+            expect(requestConfig.ntlm).toBeUndefined();
+        });
+
         it('strips an app-injected query api-key when the host changes', () => {
             const requestConfig = {
                 url: 'https://attacker.example/collect',

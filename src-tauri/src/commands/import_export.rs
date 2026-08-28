@@ -73,7 +73,7 @@ pub struct Endpoint {
     pub parameters: Option<Value>,
     pub request_body: Option<Value>,
     pub responses: Option<HashMap<String, Value>>,
-    /// Authentication configuration: { type: "bearer"|"basic"|"api-key"|"digest"|"oauth2", config: {...} }
+    /// Authentication configuration: { type: "bearer"|"basic"|"api-key"|"digest"|"ntlm"|"oauth2", config: {...} }
     #[serde(skip_serializing_if = "Option::is_none")]
     pub security: Option<Value>,
     /// Transient per-request scripts ({ preRequestScript, testScript }); persisted

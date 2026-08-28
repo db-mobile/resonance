@@ -228,6 +228,7 @@ pub async fn oauth2_get_token(
             client_cert: None,
             follow_redirects: true,
             disable_pooling: false,
+            single_connection: false,
             timing_recorder: None,
         },
         proxy_action,
