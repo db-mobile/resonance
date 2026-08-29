@@ -39,8 +39,8 @@ describe('WorkspaceTabController history entries', () => {
         };
 
         controller = new WorkspaceTabController(service, {}, {}, {});
-        controller.createNewTab = jest.fn(() => Promise.resolve({ id: 'tab-new' }));
-        controller.switchTab = jest.fn().mockResolvedValue(undefined);
+        controller._doCreateNewTab = jest.fn(() => Promise.resolve({ id: 'tab-new' }));
+        controller._doSwitchTab = jest.fn().mockResolvedValue(undefined);
     });
 
     test('a gRPC entry opens a new tab seeded with the gRPC protocol', async () => {
@@ -48,15 +48,15 @@ describe('WorkspaceTabController history entries', () => {
 
         await controller.loadHistoryEntry(entry);
 
-        expect(controller.createNewTab).toHaveBeenCalledWith({ protocol: 'grpc' });
+        expect(controller._doCreateNewTab).toHaveBeenCalledWith({ protocol: 'grpc' });
         expect(controller.endpointLoader.loadHistoryEntry).toHaveBeenCalledWith(entry, 'tab-new');
-        expect(controller.switchTab).not.toHaveBeenCalled();
+        expect(controller._doSwitchTab).not.toHaveBeenCalled();
     });
 
     test('an entry without a protocol opens an HTTP tab', async () => {
         await controller.loadHistoryEntry({ id: 'history_2', request: {} });
 
-        expect(controller.createNewTab).toHaveBeenCalledWith({ protocol: 'http' });
+        expect(controller._doCreateNewTab).toHaveBeenCalledWith({ protocol: 'http' });
     });
 
     test('clicking the same entry again focuses its tab instead of opening another', async () => {
@@ -64,8 +64,8 @@ describe('WorkspaceTabController history entries', () => {
 
         await controller.loadHistoryEntry({ id: 'history_1', request: { protocol: 'grpc' } });
 
-        expect(controller.switchTab).toHaveBeenCalledWith('tab-replay');
-        expect(controller.createNewTab).not.toHaveBeenCalled();
+        expect(controller._doSwitchTab).toHaveBeenCalledWith('tab-replay');
+        expect(controller._doCreateNewTab).not.toHaveBeenCalled();
         expect(controller.endpointLoader.loadHistoryEntry).not.toHaveBeenCalled();
     });
 });

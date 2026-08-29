@@ -27,6 +27,22 @@ export class WorkspaceTabRepository {
         this.ACTIVE_TAB_KEY = 'active-tab-id';
         this._tabsCache = null;
         this._activeTabIdCache = undefined;
+        this._writeChain = Promise.resolve();
+    }
+
+    /**
+     * Appends a store write to the ordered write chain so a stale write can never overtake a newer one.
+     * @private
+     * @param {string} key - Store key to write
+     * @param {*} value - Value to persist
+     * @returns {Promise<void>} Settles when this write completes
+     */
+    _queueStoreWrite(key, value) {
+        const write = this._writeChain
+            .catch(() => { })
+            .then(() => this.backendAPI.store.set(key, value));
+        this._writeChain = write;
+        return write;
     }
 
     /**
@@ -63,7 +79,7 @@ export class WorkspaceTabRepository {
             return [...data];
         } catch (error) {
             const defaultTabs = [this._createDefaultTab()];
-            await this.saveTabs(defaultTabs);
+            this._tabsCache = defaultTabs;
             return [...defaultTabs];
         }
     }
@@ -81,7 +97,7 @@ export class WorkspaceTabRepository {
             throw new Error('Tabs must be an array');
         }
         this._tabsCache = tabs;
-        await this.backendAPI.store.set(this.STORE_KEY, tabs);
+        await this._queueStoreWrite(this.STORE_KEY, tabs);
     }
 
     /**
@@ -115,7 +131,7 @@ export class WorkspaceTabRepository {
      */
     async setActiveTabId(tabId) {
         this._activeTabIdCache = tabId;
-        this.backendAPI.store.set(this.ACTIVE_TAB_KEY, tabId).catch(() => { });
+        await this._queueStoreWrite(this.ACTIVE_TAB_KEY, tabId).catch(() => { });
     }
 
     /**
@@ -158,7 +174,7 @@ export class WorkspaceTabRepository {
         };
         tabs.push(newTab);
         this._tabsCache = tabs;
-        this.backendAPI.store.set(this.STORE_KEY, tabs).catch(() => { });
+        this._queueStoreWrite(this.STORE_KEY, tabs).catch(() => { });
         return newTab;
     }
 
@@ -198,10 +214,10 @@ export class WorkspaceTabRepository {
 
         let mergedResponse = updates.response !== undefined ?
             updates.response : existingTab.response;
-        
-        if (mergedResponse?.data) {
-            const dataStr = typeof mergedResponse.data === 'string' 
-                ? mergedResponse.data 
+
+        if (updates.response !== undefined && mergedResponse?.data) {
+            const dataStr = typeof mergedResponse.data === 'string'
+                ? mergedResponse.data
                 : JSON.stringify(mergedResponse.data);
             if (dataStr.length > WorkspaceTabRepository.MAX_RESPONSE_SIZE) {
                 mergedResponse = {
@@ -231,7 +247,7 @@ export class WorkspaceTabRepository {
         tabs[index] = mergedTab;
 
         this._tabsCache = tabs;
-        this.backendAPI.store.set(this.STORE_KEY, tabs).catch(() => { });
+        this._queueStoreWrite(this.STORE_KEY, tabs).catch(() => { });
 
         return tabs[index];
     }
@@ -259,7 +275,7 @@ export class WorkspaceTabRepository {
         }
 
         this._tabsCache = filteredTabs;
-        this.backendAPI.store.set(this.STORE_KEY, filteredTabs).catch(() => { });
+        await this._queueStoreWrite(this.STORE_KEY, filteredTabs).catch(() => { });
         return true;
     }
 

@@ -65,7 +65,7 @@ export class WorkspaceTabService {
                 activeTabId
             };
         } catch (error) {
-            this.statusDisplay?.updateStatus('Error initializing workspace tabs', null);
+            this.statusDisplay?.update('Error initializing workspace tabs', null);
             throw error;
         }
     }
@@ -119,7 +119,7 @@ export class WorkspaceTabService {
             this._notifyListeners('tab-created', newTab);
             return newTab;
         } catch (error) {
-            this.statusDisplay?.updateStatus('Error creating tab', null);
+            this.statusDisplay?.update('Error creating tab', null);
             throw error;
         }
     }
@@ -145,7 +145,7 @@ export class WorkspaceTabService {
             this._notifyListeners('tab-switched', tab);
             return tab;
         } catch (error) {
-            this.statusDisplay?.updateStatus('Error switching tab', null);
+            this.statusDisplay?.update('Error switching tab', null);
             throw error;
         }
     }
@@ -172,7 +172,7 @@ export class WorkspaceTabService {
             }
 
             if (tabs.length === 1) {
-                this.statusDisplay?.updateStatus('Cannot close the last tab', null);
+                this.statusDisplay?.update('Cannot close the last tab', null);
                 return null;
             }
 
@@ -196,7 +196,7 @@ export class WorkspaceTabService {
             this._notifyListeners('tab-closed', result);
             return result;
         } catch (error) {
-            this.statusDisplay?.updateStatus('Error closing tab', null);
+            this.statusDisplay?.update('Error closing tab', null);
             throw error;
         }
     }
@@ -237,7 +237,7 @@ export class WorkspaceTabService {
             }
             return updatedTab;
         } catch (error) {
-            this.statusDisplay?.updateStatus('Error renaming tab', null);
+            this.statusDisplay?.update('Error renaming tab', null);
             throw error;
         }
     }
@@ -272,7 +272,7 @@ export class WorkspaceTabService {
             this._notifyListeners('tab-duplicated', newTab);
             return newTab;
         } catch (error) {
-            this.statusDisplay?.updateStatus('Error duplicating tab', null);
+            this.statusDisplay?.update('Error duplicating tab', null);
             throw error;
         }
     }
