@@ -13,6 +13,7 @@
  */
 import { templateLoader } from './templateLoader.js';
 import { api } from './ipcBridge.js';
+import { textToBase64 } from './utils/encoding.js';
 
 export class AuthManager {
     /**
@@ -939,7 +940,7 @@ export class AuthManager {
 
             case 'basic':
                 if (config.username || config.password) {
-                    const credentials = btoa(`${config.username || ''}:${config.password || ''}`);
+                    const credentials = textToBase64(`${config.username || ''}:${config.password || ''}`);
                     authData.headers['Authorization'] = `Basic ${credentials}`;
                 }
                 break;

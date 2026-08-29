@@ -425,14 +425,16 @@ function lowercaseMetadataKeys(metadata) {
  * Also reports which keys carry the credentials, so history can redact them.
  * @returns {Promise<{metadata: Object<string, string>, sensitiveNames: string[]}>} Metadata and credential keys
  */
-async function buildGrpcMetadata() {
+async function buildGrpcMetadata(substitution = {}) {
     const metadata = getGrpcMetadata();
     let sensitiveNames = [];
+    let unresolvedAuthVariables = [];
 
     try {
-        const authData = await generateEffectiveAuthData();
+        const authData = await generateEffectiveAuthData(substitution);
         getRequestBuilderService().mergeAuthData(metadata, {}, authData);
         sensitiveNames = Object.keys(authData.headers || {}).map(name => name.toLowerCase());
+        unresolvedAuthVariables = authData.unresolvedVariables || [];
 
         if (authData.authConfig || authData.awsAuth || authData.ntlmAuth) {
             toast.warning('Digest, NTLM, and AWS Signature auth are not supported over gRPC');
@@ -441,7 +443,7 @@ async function buildGrpcMetadata() {
         toast.error(`gRPC auth error: ${error.message || String(error)}`);
     }
 
-    return { metadata: lowercaseMetadataKeys(metadata), sensitiveNames };
+    return { metadata: lowercaseMetadataKeys(metadata), sensitiveNames, unresolvedAuthVariables };
 }
 
 /**
@@ -452,11 +454,13 @@ async function buildGrpcMetadata() {
  * @param {string} target - Raw target
  * @param {string} rawBody - Raw request JSON text
  * @param {Object} metadata - Raw metadata map
+ * @param {{variables: Object, processor: Object}|null} [context] - Variable context to reuse; resolved fresh when omitted
+ * @param {string[]} [extraUnresolved] - Unresolved names found elsewhere (e.g. auth config fields)
  * @returns {Promise<{target: string, rawBody: string, metadata: Object}>} Resolved request parts
  */
-async function resolveGrpcRequest(target, rawBody, metadata) {
-    const builder = getRequestBuilderService();
-    const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), {});
+async function resolveGrpcRequest(target, rawBody, metadata, context = null, extraUnresolved = []) {
+    const { variables, processor } = context ||
+        await getRequestBuilderService().resolveVariables(getCurrentEndpoint(), {});
 
     const resolved = {
         target: processor.processTemplate(target, variables),
@@ -468,7 +472,7 @@ async function resolveGrpcRequest(target, rawBody, metadata) {
         url: resolved.target,
         headers: resolved.metadata,
         body: resolved.rawBody
-    });
+    }, extraUnresolved);
 
     return resolved;
 }
@@ -520,11 +524,21 @@ export async function handleGrpcSend() {
     }
 
     const rawBody = (app.grpcBodyEditor ? app.grpcBodyEditor.getContent() : grpcBodyInput?.value || '').trim();
-    const { metadata: uiMetadata, sensitiveNames } = await buildGrpcMetadata();
+
+    let context;
+    try {
+        context = await getRequestBuilderService().resolveVariables(getCurrentEndpoint(), {});
+    } catch (error) {
+        updateStatusDisplay(`Variable processing error: ${error.message || String(error)}`, null);
+        return;
+    }
+
+    const { metadata: uiMetadata, sensitiveNames, unresolvedAuthVariables } =
+        await buildGrpcMetadata(context);
 
     let resolved;
     try {
-        resolved = await resolveGrpcRequest(rawTarget, rawBody, uiMetadata);
+        resolved = await resolveGrpcRequest(rawTarget, rawBody, uiMetadata, context, unresolvedAuthVariables);
     } catch (error) {
         updateStatusDisplay(`Variable processing error: ${error.message || String(error)}`, null);
         return;

@@ -6,6 +6,7 @@
  */
 
 import { app } from './appContext.js';
+import { textToBase64 } from './utils/encoding.js';
 
 /**
  * Per-tab metadata about the last response, used by the Save button.
@@ -92,22 +93,7 @@ export function suggestedFileName(url, contentType) {
     return `${base}.${ext}`;
 }
 
-/**
- * Encodes a UTF-8 string to base64, chunking to avoid call-stack overflow on
- * large bodies.
- *
- * @param {string} text - The text to encode.
- * @returns {string} Base64-encoded UTF-8 bytes.
- */
-export function textToBase64(text) {
-    const bytes = new TextEncoder().encode(text);
-    let binary = '';
-    const chunkSize = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
-    }
-    return btoa(binary);
-}
+export { textToBase64 };
 
 function showSaveFeedback(button, success) {
     if (!button) {

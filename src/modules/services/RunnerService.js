@@ -12,6 +12,7 @@ import { CertificateRepository } from '../storage/CertificateRepository.js';
 import { CertificateService } from './CertificateService.js';
 import { normalizeFormRows } from '../utils/formDataRows.js';
 import { activeKeyValueRows } from '../utils/keyValueRows.js';
+import { textToBase64 } from '../utils/encoding.js';
 import { findRequest } from '../collections/collectionTree.js';
 
 /**
@@ -789,7 +790,7 @@ export class RunnerService {
 
             case 'basic':
                 if (config.username || config.password) {
-                    const credentials = btoa(`${processValue(config.username)}:${processValue(config.password)}`);
+                    const credentials = textToBase64(`${processValue(config.username)}:${processValue(config.password)}`);
                     authData.headers['Authorization'] = `Basic ${credentials}`;
                 }
                 break;

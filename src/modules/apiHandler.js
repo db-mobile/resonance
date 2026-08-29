@@ -58,6 +58,7 @@ import { VariableService } from './services/VariableService.js';
 import { StatusDisplayAdapter } from './interfaces/IStatusDisplay.js';
 import { authManager } from './authManager.js';
 import { resolveEffectiveAuthConfig } from './auth/authInheritance.js';
+import { resolveAuthConfigVariables } from './auth/authVariables.js';
 import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
 import { createLazyEditorProxy } from './editorLoader.js';
 import { extractCookies } from './cookieParser.js';
@@ -145,18 +146,23 @@ export function getRequestBuilderService() {
 
 /**
  * Generates auth data for the current request with 'inherit' resolved to the
- * owning collection's auth config. Used by every interactive send path.
+ * owning collection's auth config and {{variables}} substituted in credential
+ * fields when a variable context is supplied. Used by every interactive send path.
  *
- * @returns {Promise<Object>} Auth data ({headers, queryParams, authConfig, awsAuth?})
+ * @param {{variables?: Object, processor?: Object}} [substitution] - Variable map and VariableProcessor shared with the request pipeline
+ * @returns {Promise<Object>} Auth data ({headers, queryParams, authConfig, awsAuth?, ntlmAuth?, unresolvedVariables})
  */
-export async function generateEffectiveAuthData() {
+export async function generateEffectiveAuthData({ variables, processor } = {}) {
     const current = getCurrentEndpoint();
     const resolved = await resolveEffectiveAuthConfig(authManager.getAuthConfig(), {
         collectionId: current?.collectionId,
         endpointId: current?.endpointId,
         repository: getCollectionRepository()
     });
-    return authManager.generateAuthData(resolved);
+    const { authConfig: effective, unresolved } = resolveAuthConfigVariables(resolved, variables, processor);
+    const authData = authManager.generateAuthData(effective);
+    authData.unresolvedVariables = unresolved;
+    return authData;
 }
 
 /**
@@ -165,17 +171,21 @@ export async function generateEffectiveAuthData() {
  * Scans the final URL, headers, query/path params, and body; never throws.
  * @param {Object} processor - VariableProcessor used for this request
  * @param {Object} requestConfig - Fully built request configuration
+ * @param {string[]} [extraNames] - Unresolved names found elsewhere (e.g. auth config fields)
  * @returns {void}
  */
-export function warnUnresolvedVariables(processor, requestConfig) {
+export function warnUnresolvedVariables(processor, requestConfig, extraNames = []) {
     try {
-        const unresolved = processor.extractUnresolvedVariableNames({
-            url: requestConfig.url,
-            headers: requestConfig.headers,
-            queryParams: requestConfig.queryParams,
-            pathParams: requestConfig.pathParams,
-            body: requestConfig.body
-        });
+        const unresolved = [...new Set([
+            ...processor.extractUnresolvedVariableNames({
+                url: requestConfig.url,
+                headers: requestConfig.headers,
+                queryParams: requestConfig.queryParams,
+                pathParams: requestConfig.pathParams,
+                body: requestConfig.body
+            }),
+            ...extraNames
+        ])];
 
         if (unresolved.length === 0) {
             return;
@@ -208,13 +218,14 @@ export async function fetchGraphQLIntrospection() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    const authData = await generateEffectiveAuthData();
     const builder = getRequestBuilderService();
-    builder.mergeAuthData(headers, queryParams, authData);
 
+    let authData;
     let resolvedUrl;
     try {
         const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
+        authData = await generateEffectiveAuthData({ variables, processor });
+        builder.mergeAuthData(headers, queryParams, authData);
         ({ url: resolvedUrl } = builder.processRequestComponents({
             url, pathParams: {}, headers, queryParams, variables, processor
         }));
@@ -612,9 +623,7 @@ async function handleGraphQLSubscriptionRequest() {
     let url = urlInput?.value?.trim() || urlInput?.getAttribute('value') || '';
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
-    const authData = await generateEffectiveAuthData();
     const builder = getRequestBuilderService();
-    builder.mergeAuthData(headers, queryParams, authData);
 
     let query = graphqlBodyManager.getGraphQLQuery().trim();
     const variablesText = graphqlBodyManager.getGraphQLVariables().trim();
@@ -622,6 +631,8 @@ async function handleGraphQLSubscriptionRequest() {
 
     try {
         const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
+        const authData = await generateEffectiveAuthData({ variables, processor });
+        builder.mergeAuthData(headers, queryParams, authData);
         ({ url } = builder.processRequestComponents({
             url, pathParams: {}, headers, queryParams, variables, processor
         }));
@@ -735,15 +746,15 @@ export async function handleSendRequest() {
 
         const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
         const headers = parseKeyValuePairs(document.getElementById('headers-list'));
-        const authData = await generateEffectiveAuthData();
 
         const builder = getRequestBuilderService();
-        builder.mergeAuthData(headers, queryParams, authData);
 
         try {
             const { variables, processor } = await builder.resolveVariables(
                 getCurrentEndpoint(), headers
             );
+            const authData = await generateEffectiveAuthData({ variables, processor });
+            builder.mergeAuthData(headers, queryParams, authData);
 
             const result = builder.processRequestComponents({
                 url: websocketUrl,
@@ -778,16 +789,19 @@ export async function handleSendRequest() {
 
         const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
         const headers = parseKeyValuePairs(document.getElementById('headers-list'));
-        const authData = await generateEffectiveAuthData();
         const method = methodSelect?.value || 'GET';
 
         const builder = getRequestBuilderService();
-        builder.mergeAuthData(headers, queryParams, authData);
 
         let sseBody;
         let resolved;
         try {
             resolved = await builder.resolveVariables(getCurrentEndpoint(), headers);
+            const authData = await generateEffectiveAuthData({
+                variables: resolved.variables,
+                processor: resolved.processor
+            });
+            builder.mergeAuthData(headers, queryParams, authData);
             const result = builder.processRequestComponents({
                 url: sseUrl,
                 pathParams: {},
@@ -883,16 +897,9 @@ export async function handleSendRequest() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    const authData = await generateEffectiveAuthData();
-
-    const historySensitive = {
-        headerNames: Object.keys(authData.headers || {}),
-        queryNames: Object.keys(authData.queryParams || {})
-    };
-
     const builder = getRequestBuilderService();
-    builder.mergeAuthData(headers, queryParams, authData);
 
+    let authData;
     let processor;
     let _resolvedVariables;
     let queryString;
@@ -901,6 +908,9 @@ export async function handleSendRequest() {
         ({ variables: _resolvedVariables, processor } = await builder.resolveVariables(
             getCurrentEndpoint(), headers
         ));
+
+        authData = await generateEffectiveAuthData({ variables: _resolvedVariables, processor });
+        builder.mergeAuthData(headers, queryParams, authData);
 
         ({ url, queryString, pathParams: processedPathParams } = builder.processRequestComponents({
             url, pathParams, headers, queryParams,
@@ -912,6 +922,11 @@ export async function handleSendRequest() {
         setRequestInProgress(false);
         return;
     }
+
+    const historySensitive = {
+        headerNames: Object.keys(authData.headers || {}),
+        queryNames: Object.keys(authData.queryParams || {})
+    };
 
     let mockRewrite = null;
     if (getCurrentEndpoint()) {
@@ -1145,7 +1160,7 @@ export async function handleSendRequest() {
             }
         }
 
-        warnUnresolvedVariables(processor, requestConfig);
+        warnUnresolvedVariables(processor, requestConfig, authData.unresolvedVariables || []);
 
         const result = await window.backendAPI.sendApiRequest(requestConfig);
 
@@ -1331,10 +1346,7 @@ export async function handleGenerateCurl() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    const authData = await generateEffectiveAuthData();
-
     const builder = getRequestBuilderService();
-    builder.mergeAuthData(headers, queryParams, authData);
 
     let processor;
     let resolvedVariables;
@@ -1342,6 +1354,9 @@ export async function handleGenerateCurl() {
         ({ variables: resolvedVariables, processor } = await builder.resolveVariables(
             getCurrentEndpoint(), headers
         ));
+
+        const authData = await generateEffectiveAuthData({ variables: resolvedVariables, processor });
+        builder.mergeAuthData(headers, queryParams, authData);
 
         ({ url } = builder.processRequestComponents({
             url, pathParams, headers, queryParams,
