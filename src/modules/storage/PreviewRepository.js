@@ -1,8 +1,9 @@
 /**
  * PreviewRepository
  *
- * Manages persistence of preview mode preferences per workspace tab.
- * Follows pattern from WorkspaceTabRepository.js
+ * Manages persistence of preview mode preferences per workspace tab. The store
+ * is hydrated once into an in-memory cache so the accessors stay synchronous
+ * for the render-path consumers; writes flow through an ordered write chain.
  */
 export class PreviewRepository {
     /**
@@ -12,6 +13,43 @@ export class PreviewRepository {
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.storageKey = 'previewModes';
+        this._modes = null;
+        this._writeChain = Promise.resolve();
+    }
+
+    /**
+     * Hydrates the in-memory cache from the store.
+     * @returns {Promise<void>}
+     */
+    async load() {
+        try {
+            const stored = await this.backendAPI.store.get(this.storageKey);
+            const modes = {};
+            if (stored && typeof stored === 'object') {
+                Object.keys(stored).forEach(key => {
+                    if (typeof stored[key] === 'boolean') {
+                        modes[key] = stored[key];
+                    }
+                });
+            }
+            this._modes = modes;
+        } catch (error) {
+            void error;
+            this._modes = {};
+        }
+    }
+
+    /**
+     * Persists the current cache through the ordered write chain.
+     * @private
+     * @returns {void}
+     */
+    _persist() {
+        const snapshot = { ...this._modes };
+        this._writeChain = this._writeChain
+            .catch(() => { })
+            .then(() => this.backendAPI.store.set(this.storageKey, snapshot));
+        this._writeChain.catch(() => { });
     }
 
     /**
@@ -20,16 +58,7 @@ export class PreviewRepository {
      * @returns {boolean}
      */
     getPreviewMode(tabId) {
-        try {
-            const modes = this.backendAPI.store.get(this.storageKey);
-            if (!modes || typeof modes !== 'object') {
-                return false;
-            }
-            return Boolean(modes[tabId]);
-        } catch (error) {
-            void error;
-            return false;
-        }
+        return Boolean((this._modes || {})[tabId]);
     }
 
     /**
@@ -38,24 +67,11 @@ export class PreviewRepository {
      * @param {boolean} isPreviewMode - Preview mode enabled
      */
     setPreviewMode(tabId, isPreviewMode) {
-        try {
-            const existingModes = this.backendAPI.store.get(this.storageKey);
-            const modes = {};
-
-            if (existingModes && typeof existingModes === 'object') {
-                Object.keys(existingModes).forEach(key => {
-                    if (typeof existingModes[key] === 'boolean') {
-                        modes[key] = existingModes[key];
-                    }
-                });
-            }
-
-            modes[tabId] = Boolean(isPreviewMode);
-
-            this.backendAPI.store.set(this.storageKey, modes);
-        } catch (error) {
-            void error;
+        if (!this._modes) {
+            this._modes = {};
         }
+        this._modes[tabId] = Boolean(isPreviewMode);
+        this._persist();
     }
 
     /**
@@ -63,32 +79,18 @@ export class PreviewRepository {
      * @param {string} tabId - Workspace tab ID
      */
     removePreviewMode(tabId) {
-        try {
-            const existingModes = this.backendAPI.store.get(this.storageKey);
-            const modes = {};
-
-            if (existingModes && typeof existingModes === 'object') {
-                Object.keys(existingModes).forEach(key => {
-                    if (key !== tabId && typeof existingModes[key] === 'boolean') {
-                        modes[key] = existingModes[key];
-                    }
-                });
-            }
-
-            this.backendAPI.store.set(this.storageKey, modes);
-        } catch (error) {
-            void error;
+        if (!this._modes) {
+            this._modes = {};
         }
+        delete this._modes[tabId];
+        this._persist();
     }
 
     /**
      * Clear all preview modes
      */
     clearAll() {
-        try {
-            this.backendAPI.store.set(this.storageKey, {});
-        } catch (error) {
-            void error;
-        }
+        this._modes = {};
+        this._persist();
     }
 }

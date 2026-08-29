@@ -226,11 +226,18 @@ export class ScriptService {
                 return;
             }
 
+            const secretKeys = Array.isArray(activeEnv.secretKeys) ? activeEnv.secretKeys : [];
+
             for (const [key, value] of Object.entries(changes)) {
                 if (value === null) {
                     await this.environmentService.deleteVariable(activeEnv.id, key);
                 } else {
-                    await this.environmentService.setVariable(activeEnv.id, key, value);
+                    await this.environmentService.setVariable(
+                        activeEnv.id,
+                        key,
+                        value,
+                        secretKeys.includes(key)
+                    );
                 }
             }
 

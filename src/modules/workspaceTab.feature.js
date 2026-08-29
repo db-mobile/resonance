@@ -40,6 +40,7 @@ export const workspaceTabFeature = {
     name: 'workspaceTab',
     create(ctx) {
         const previewRepository = new PreviewRepository(ctx.backendAPI);
+        previewRepository.load();
         const responseContainerManager = new ResponseContainerManager(previewRepository);
 
         const repository = new WorkspaceTabRepository(ctx.backendAPI);
