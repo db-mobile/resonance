@@ -18,6 +18,7 @@ export class ScriptEditor {
         this.container = containerElement;
         this.view = null;
         this.changeCallback = null;
+        this._suppressChange = false;
         this._themed = null;
         this.init();
     }
@@ -56,7 +57,7 @@ export class ScriptEditor {
             ...this.getSearchExtensions(),
             placeholder('// Write your script here...'),
             EditorView.updateListener.of((update) => {
-                if (update.docChanged && this.changeCallback) {
+                if (update.docChanged && this.changeCallback && !this._suppressChange) {
                     this.changeCallback(this.getContent());
                 }
             }),
@@ -86,15 +87,21 @@ export class ScriptEditor {
     /**
      * Set editor content
      * @param {string} content - JavaScript code to set
+     * @param {{emitChange?: boolean}} [options] - Pass emitChange false to suppress the change callback
      */
-    setContent(content) {
-        this.view.dispatch({
-            changes: {
-                from: 0,
-                to: this.view.state.doc.length,
-                insert: content || ''
-            }
-        });
+    setContent(content, { emitChange = true } = {}) {
+        this._suppressChange = !emitChange;
+        try {
+            this.view.dispatch({
+                changes: {
+                    from: 0,
+                    to: this.view.state.doc.length,
+                    insert: content || ''
+                }
+            });
+        } finally {
+            this._suppressChange = false;
+        }
     }
 
     /**
@@ -107,9 +114,10 @@ export class ScriptEditor {
 
     /**
      * Clear editor content
+     * @param {{emitChange?: boolean}} [options] - Pass emitChange false to suppress the change callback
      */
-    clear() {
-        this.setContent('');
+    clear(options) {
+        this.setContent('', options);
     }
 
     /**

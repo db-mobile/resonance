@@ -655,11 +655,11 @@ export class WorkspaceTabStateManager {
             clearGraphQLErrorsBadge();
 
             if (app.inlineScriptManager) {
-                app.inlineScriptManager.clear();
+                await app.inlineScriptManager.clear();
             }
 
             if (app.schemaController) {
-                app.schemaController.clearContext();
+                await app.schemaController.clearContext();
             }
         }
     }

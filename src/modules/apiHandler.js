@@ -7,8 +7,11 @@ import { parseKeyValuePairs } from './keyValueManager.js';
 import { saveAllRequestModifications } from './collectionManager.js';
 import { debounce } from './utils/debounce.js';
 import { findRequest } from './collections/collectionTree.js';
+import { registerPendingSave } from './state/pendingSaves.js';
 
 const SAVE_DEBOUNCE_MS = 500;
+
+let inFlightRequestSave = null;
 
 /**
  * Debounced, fire-and-forget save of request modifications.
@@ -19,10 +22,34 @@ const SAVE_DEBOUNCE_MS = 500;
  * @param {string} endpointId - Endpoint ID
  */
 const debouncedSaveRequestModifications = debounce((collectionId, endpointId) => {
-    saveAllRequestModifications(collectionId, endpointId).catch(() => {
-        toast.error('Failed to save changes');
-    });
+    inFlightRequestSave = saveAllRequestModifications(collectionId, endpointId)
+        .catch(() => {
+            toast.error('Failed to save changes');
+        })
+        .finally(() => {
+            inFlightRequestSave = null;
+        });
+    return inFlightRequestSave;
 }, SAVE_DEBOUNCE_MS);
+
+/**
+ * Flushes a pending debounced request save and waits for it to settle.
+ * @returns {Promise<void>} Resolves once no request save is pending or in flight
+ */
+export async function flushPendingRequestSave() {
+    await debouncedSaveRequestModifications.flush();
+    await inFlightRequestSave;
+}
+
+/**
+ * Cancels a pending debounced request save without executing it.
+ * @returns {void}
+ */
+export function cancelPendingRequestSave() {
+    debouncedSaveRequestModifications.cancel();
+}
+
+registerPendingSave({ flush: flushPendingRequestSave, cancel: cancelPendingRequestSave });
 import { VariableProcessor } from './variables/VariableProcessor.js';
 import { VariableRepository } from './storage/VariableRepository.js';
 import { EnvironmentRepository } from './storage/EnvironmentRepository.js';

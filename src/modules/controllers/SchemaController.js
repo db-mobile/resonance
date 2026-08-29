@@ -26,7 +26,13 @@ export class SchemaController {
         this.currentCollectionId = null;
         this.currentEndpointId = null;
         this.lastResponseBody = null;
-        this._debouncedSave = debounce(() => this._saveSchema(), 1000);
+        this._inFlightSave = null;
+        this._debouncedSave = debounce((collectionId, endpointId) => {
+            this._inFlightSave = this._saveSchema(collectionId, endpointId).finally(() => {
+                this._inFlightSave = null;
+            });
+            return this._inFlightSave;
+        }, 1000);
         this._initialized = false;
     }
 
@@ -79,29 +85,37 @@ export class SchemaController {
 
         this._updateValidationStatus();
 
-        this._debouncedSave();
+        this._debouncedSave(this.currentCollectionId, this.currentEndpointId);
     }
 
     /**
-     * Saves the current schema to storage
+     * Saves the editor's schema for the given endpoint.
      * @private
+     * @param {string} collectionId - Collection ID captured when the save was scheduled
+     * @param {string} endpointId - Endpoint ID captured when the save was scheduled
+     * @returns {Promise<void>}
      */
-    async _saveSchema() {
-        if (!this.currentCollectionId || !this.currentEndpointId) {
+    async _saveSchema(collectionId, endpointId) {
+        if (!collectionId || !endpointId) {
             return;
         }
 
         const schema = this.editor.getSchema();
-        
+
         try {
-            await this.repository.saveResponseSchema(
-                this.currentCollectionId,
-                this.currentEndpointId,
-                schema
-            );
+            await this.repository.saveResponseSchema(collectionId, endpointId, schema);
         } catch (error) {
             console.error('Failed to save schema:', error);
         }
+    }
+
+    /**
+     * Flushes a pending debounced schema save and waits for it to settle.
+     * @returns {Promise<void>} Resolves once no schema save is pending or in flight
+     */
+    async flushPendingSave() {
+        await this._debouncedSave.flush();
+        await this._inFlightSave;
     }
 
     /**
@@ -138,6 +152,8 @@ export class SchemaController {
      * @param {string} endpointId - Endpoint ID
      */
     async loadSchema(collectionId, endpointId) {
+        await this.flushPendingSave();
+
         this.currentCollectionId = collectionId;
         this.currentEndpointId = endpointId;
         this.lastResponseBody = null;
@@ -148,23 +164,25 @@ export class SchemaController {
 
         try {
             const schema = await this.repository.getResponseSchema(collectionId, endpointId);
-            this.editor.setSchema(schema);
+            this.editor.setSchema(schema, { emitChange: false });
             this._updateValidationStatus();
         } catch (error) {
             console.error('Failed to load schema:', error);
-            this.editor.setSchema(null);
+            this.editor.setSchema(null, { emitChange: false });
         }
     }
 
     /**
      * Clears the current endpoint context (when no endpoint is selected)
      */
-    clearContext() {
+    async clearContext() {
+        await this.flushPendingSave();
+
         this.currentCollectionId = null;
         this.currentEndpointId = null;
         this.lastResponseBody = null;
         if (this.editor) {
-            this.editor.setSchema(null);
+            this.editor.setSchema(null, { emitChange: false });
         }
         this._updateValidationStatus();
     }
@@ -207,7 +225,7 @@ export class SchemaController {
         this._updateValidationStatus();
         this.statusDisplay.update('Schema inferred from response', null);
 
-        this._saveSchema();
+        this._saveSchema(this.currentCollectionId, this.currentEndpointId);
     }
 
     /**
@@ -216,7 +234,7 @@ export class SchemaController {
     clearSchema() {
         this.editor.setSchema(null);
         this._updateValidationStatus();
-        this._saveSchema();
+        this._saveSchema(this.currentCollectionId, this.currentEndpointId);
         this.statusDisplay.update('Schema cleared', null);
     }
 
@@ -261,10 +279,10 @@ export class SchemaController {
         try {
             await this.repository.saveResponseSchema(collectionId, endpointId, schema);
             
-            if (this.currentCollectionId === collectionId && 
-                this.currentEndpointId === endpointId && 
+            if (this.currentCollectionId === collectionId &&
+                this.currentEndpointId === endpointId &&
                 this.editor) {
-                this.editor.setSchema(schema);
+                this.editor.setSchema(schema, { emitChange: false });
                 this._updateValidationStatus();
             }
         } catch (error) {

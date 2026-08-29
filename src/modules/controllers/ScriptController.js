@@ -41,9 +41,10 @@ export class ScriptController {
 
     /**
      * Clear scripts when no endpoint is selected
+     * @returns {Promise<void>}
      */
-    clearScripts() {
-        this.scriptManager.clear();
+    async clearScripts() {
+        await this.scriptManager.clear();
     }
 
     /**

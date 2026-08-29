@@ -13,6 +13,7 @@
  * and form UI, and coordinates with response container visibility.
  */
 import { app } from '../appContext.js';
+import { flushPendingSaves } from '../state/pendingSaves.js';
 import { WorkspaceTabEndpointLoaderService } from '../services/WorkspaceTabEndpointLoaderService.js';
 import { handleGraphQLSubscriptionCancel, isSubscriptionActive, clearGraphQLSubscriptionState } from '../graphqlSubscriptionHandler.js';
 import { clearWebSocketState } from '../websocketHandler.js';
@@ -218,7 +219,7 @@ export class WorkspaceTabController {
             await this._restoreTabStateSafely(newTab);
 
             if (app.scriptController) {
-                app.scriptController.clearScripts();
+                await app.scriptController.clearScripts();
             }
 
             return newTab;
@@ -461,7 +462,7 @@ export class WorkspaceTabController {
                         tab.endpoint.endpointId
                     );
                 } else {
-                    app.scriptController.clearScripts();
+                    await app.scriptController.clearScripts();
                 }
             }
         } catch (error) {
@@ -482,6 +483,8 @@ export class WorkspaceTabController {
      */
     async closeTab(tabId) {
         try {
+            await flushPendingSaves();
+
             const allTabs = await this.service.getAllTabs();
             const tab = allTabs.find(t => t.id === tabId);
             if (tab?.isModified) {
@@ -802,6 +805,8 @@ export class WorkspaceTabController {
      */
     async _saveCurrentTabState() {
         try {
+            await flushPendingSaves();
+
             const activeTabId = await this.service.getActiveTabId();
             if (!activeTabId) {
                 return;

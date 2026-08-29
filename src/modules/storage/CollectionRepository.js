@@ -58,6 +58,7 @@ export class CollectionRepository {
         this.backendAPI = backendAPI;
         this.secretStore = secretStore;
         this._byIdCache = new Map();
+        this._endpointWriteQueues = new Map();
     }
 
     /**
@@ -340,19 +341,56 @@ export class CollectionRepository {
     }
 
     /**
+     * Reads endpoint data for a read-modify-write cycle, propagating read failures.
+     * @private
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @returns {Promise<Object>} Current endpoint data
+     */
+    async _getEndpointDataForUpdate(collectionId, endpointId) {
+        return this.backendAPI.collections.getEndpointData(collectionId, endpointId);
+    }
+
+    /**
+     * Serializes read-modify-write cycles per endpoint so overlapping writers cannot lose updates.
+     * @private
+     * @param {string} collectionId - The collection ID
+     * @param {string} endpointId - The endpoint ID
+     * @param {function(): Promise<*>} write - Write operation to run once earlier writes settle
+     * @returns {Promise<*>} Result of the write operation
+     */
+    async _withEndpointWrite(collectionId, endpointId, write) {
+        const key = `${collectionId}::${endpointId}`;
+        const previous = this._endpointWriteQueues.get(key) || Promise.resolve();
+        const current = previous.catch(() => {}).then(write);
+        this._endpointWriteQueues.set(key, current);
+        try {
+            return await current;
+        } finally {
+            if (this._endpointWriteQueues.get(key) === current) {
+                this._endpointWriteQueues.delete(key);
+            }
+        }
+    }
+
+    /**
      * Helper to update a single field in endpoint data
      * @private
      */
     async _updateEndpointField(collectionId, endpointId, field, value) {
-        const data = await this._getEndpointData(collectionId, endpointId);
-        data[field] = value;
-        await this._saveEndpointData(collectionId, endpointId, data);
+        await this._withEndpointWrite(collectionId, endpointId, async () => {
+            const data = await this._getEndpointDataForUpdate(collectionId, endpointId);
+            data[field] = value;
+            await this._saveEndpointData(collectionId, endpointId, data);
+        });
     }
 
     async _updateEndpointFields(collectionId, endpointId, updates) {
-        const data = await this._getEndpointData(collectionId, endpointId);
-        Object.assign(data, updates);
-        await this._saveEndpointData(collectionId, endpointId, data);
+        await this._withEndpointWrite(collectionId, endpointId, async () => {
+            const data = await this._getEndpointDataForUpdate(collectionId, endpointId);
+            Object.assign(data, updates);
+            await this._saveEndpointData(collectionId, endpointId, data);
+        });
     }
 
     /**
