@@ -336,6 +336,21 @@ describe('DocGeneratorService', () => {
             // Template should only be fetched once due to caching
             expect(global.fetch).toHaveBeenCalledTimes(1);
         });
+
+        test('renders $ replacement patterns in user content literally', async () => {
+            const collection = {
+                ...mockCollection,
+                name: 'Cost $& Report',
+                description: "Fees $' and $` apply"
+            };
+
+            const html = await service.generateHtml(collection);
+
+            expect(html).toContain('<h1>Cost $&amp; Report</h1>');
+            expect(html).toContain('Fees $&#039; and $` apply');
+            expect(html).not.toContain('{{TITLE}}');
+            expect(html.match(/<footer>/g)).toHaveLength(1);
+        });
     });
 
     describe('helper methods', () => {

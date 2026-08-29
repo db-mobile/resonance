@@ -212,12 +212,12 @@ export class DocGeneratorService {
         const date = new Date().toLocaleDateString();
 
         const html = template
-            .replace(/\{\{TITLE\}\}/g, title)
-            .replace('{{DESCRIPTION}}', description)
-            .replace('{{BASE_URL}}', baseUrl)
-            .replace('{{TOC}}', toc)
-            .replace('{{CONTENT}}', content)
-            .replace('{{DATE}}', date);
+            .replace(/\{\{TITLE\}\}/g, () => title)
+            .replace('{{DESCRIPTION}}', () => description)
+            .replace('{{BASE_URL}}', () => baseUrl)
+            .replace('{{TOC}}', () => toc)
+            .replace('{{CONTENT}}', () => content)
+            .replace('{{DATE}}', () => date);
 
         return html;
     }
@@ -742,8 +742,8 @@ export class DocGeneratorService {
             for (const [name, param] of Object.entries(endpoint.parameters.path)) {
                 const persistedParam = persistedData?.pathParams?.find(p => p.key === name);
                 const value = persistedParam?.value || param.example || `{${name}}`;
-                url = url.replace(`{${name}}`, value);
-                url = url.replace(`{{${name}}}`, value);
+                url = url.replace(`{${name}}`, () => value);
+                url = url.replace(`{{${name}}}`, () => value);
             }
         }
 

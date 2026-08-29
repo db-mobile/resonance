@@ -456,7 +456,7 @@ export class WorkspaceTabEndpointLoaderService {
             Object.entries(endpoint.parameters.path).forEach(([key]) => {
                 const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const singleBraceParamRegex = new RegExp(`(?<!\\{)\\{${escapedKey}\\}(?!\\})`, 'g');
-                fullUrl = fullUrl.replace(singleBraceParamRegex, `{{${key}}}`);
+                fullUrl = fullUrl.replace(singleBraceParamRegex, () => `{{${key}}}`);
             });
         }
 

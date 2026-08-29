@@ -236,6 +236,7 @@ export class RequestQueue {
 
             item.addEventListener('dragend', () => {
                 item.classList.remove('is-dragging');
+                this._reorderFromDOM();
             });
 
             item.addEventListener('dragover', (e) => {
@@ -272,6 +273,11 @@ export class RequestQueue {
             const index = parseInt(item.dataset.index, 10);
             newOrder.push(this.requests[index]);
         });
+
+        if (newOrder.length === this.requests.length &&
+            newOrder.every((request, index) => request === this.requests[index])) {
+            return;
+        }
 
         this.requests = newOrder;
         this._render();

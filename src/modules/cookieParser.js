@@ -13,7 +13,9 @@ function parseCookie(cookieString) {
     const parts = cookieString.split(';').map(part => part.trim());
 
     const [nameValue, ...attributes] = parts;
-    const [name, value] = nameValue.split('=').map(s => s.trim());
+    const eqIdx = nameValue.indexOf('=');
+    const name = (eqIdx >= 0 ? nameValue.slice(0, eqIdx) : nameValue).trim();
+    const value = eqIdx >= 0 ? nameValue.slice(eqIdx + 1).trim() : '';
 
     const cookie = {
         name: name || '',
@@ -28,7 +30,9 @@ function parseCookie(cookieString) {
     };
 
     attributes.forEach(attr => {
-        const [key, val] = attr.split('=').map(s => s ? s.trim() : '');
+        const attrEq = attr.indexOf('=');
+        const key = (attrEq >= 0 ? attr.slice(0, attrEq) : attr).trim();
+        const val = attrEq >= 0 ? attr.slice(attrEq + 1).trim() : '';
         const lowerKey = key.toLowerCase();
 
         switch (lowerKey) {

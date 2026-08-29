@@ -154,7 +154,7 @@ export class RequestBuilderService {
             if (mockRewrite) {
                 let mockPath = mockRewrite.pathTemplate;
                 for (const [key, value] of Object.entries(pathParams)) {
-                    mockPath = mockPath.replace(`{${key}}`, value);
+                    mockPath = mockPath.replace(`{${key}}`, () => value);
                 }
                 base = `${mockRewrite.baseUrl}${mockPath}`;
             } else {

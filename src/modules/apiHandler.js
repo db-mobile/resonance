@@ -62,7 +62,7 @@ import { resolveAuthConfigVariables } from './auth/authVariables.js';
 import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
 import { createLazyEditorProxy } from './editorLoader.js';
 import { extractCookies } from './cookieParser.js';
-import { getRequestBodyContent } from './requestBodyHelper.js';
+import { getRequestBodyContent, captureSnippetBody } from './requestBodyHelper.js';
 import { MockServerRepository } from './storage/MockServerRepository.js';
 import { MockServerService } from './services/MockServerService.js';
 import { isGrpcMode, isMqttMode, isSseMode, isWebSocketMode, isGraphQLMode } from './requestModeManager.js';
@@ -943,7 +943,7 @@ export async function handleSendRequest() {
                     if (endpoint && endpoint.path) {
                         let mockPath = endpoint.path;
                         for (const [key, value] of Object.entries(processedPathParams)) {
-                            mockPath = mockPath.replace(`{${key}}`, value);
+                            mockPath = mockPath.replace(`{${key}}`, () => value);
                         }
 
                         mockRewrite = { baseUrl: mockBaseUrl, pathTemplate: endpoint.path };
@@ -1368,33 +1368,33 @@ export async function handleGenerateCurl() {
         return;
     }
 
-    if (['POST', 'PUT', 'PATCH'].includes(method) && getRequestBodyContent().trim()) {
-        try {
-            let bodyText = getRequestBodyContent().trim();
+    const bodyModeSelect = document.getElementById('body-mode-select');
+    const bodyMode = bodyModeSelect?.value || 'json';
+    let bodyType;
 
-            const variableService = getVariableService();
-            let variables = {};
-
-            if (getCurrentEndpoint()) {
-                variables = await variableService.getVariablesForCollection(getCurrentEndpoint().collectionId);
-            } else {
-                variables = await variableService.getVariables();
-            }
-
-            bodyText = processor.processTemplate(bodyText, variables);
-
-            body = JSON.parse(bodyText);
-        } catch (e) {
-            updateStatusDisplay(`Invalid Body JSON: ${e.message}`, null);
+    if (['POST', 'PUT', 'PATCH'].includes(method) ||
+        ['formdata', 'urlencoded', 'binary'].includes(bodyMode)) {
+        const captured = captureSnippetBody({
+            bodyMode,
+            formBodyManager: app.formBodyManager,
+            requestBodyTextEditor: app.requestBodyTextEditor,
+            jsonContent: getRequestBodyContent(),
+            processor,
+            variables: resolvedVariables
+        });
+        if (captured.error) {
+            updateStatusDisplay(`Invalid Body JSON: ${captured.error}`, null);
             return;
         }
+        ({ body, bodyType } = captured);
     }
 
     const requestConfig = {
         method,
         url,
         headers,
-        body
+        body,
+        bodyType
     };
 
     const codeSnippetDialog = new CodeSnippetDialog();
