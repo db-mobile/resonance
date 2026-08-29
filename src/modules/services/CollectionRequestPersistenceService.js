@@ -96,8 +96,10 @@ export class CollectionRequestPersistenceService {
         });
 
         const path = grpcState.fullMethod || endpoint.path;
-        await this.repository.saveOne(updateRequest(collection, endpointId, { path }) ?? collection);
-        await this.refreshCollections();
+        if (path !== endpoint.path) {
+            await this.repository.saveOne(updateRequest(collection, endpointId, { path }) ?? collection);
+            await this.refreshCollections();
+        }
     }
 
     async saveWebSocketRequest(collectionId, endpointId, parseKeyValuePairs, parseKeyValueRows) {
@@ -122,8 +124,6 @@ export class CollectionRequestPersistenceService {
         if (bodyInput) {
             await this.collectionService.saveRequestBodyModification(collectionId, endpointId, bodyInput);
         }
-
-        await this.refreshCollections();
     }
 
     async saveGraphQLRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows) {
@@ -151,8 +151,6 @@ export class CollectionRequestPersistenceService {
                 operationName: graphqlBodyManager.getSelectedOperationName?.() || null
             });
         }
-
-        await this.refreshCollections();
     }
 
     /**
@@ -200,8 +198,6 @@ export class CollectionRequestPersistenceService {
         if (methodSelect && methodSelect.value) {
             await this.patchEndpointRecords(collectionId, endpointId, { httpMethod: methodSelect.value });
         }
-
-        await this.refreshCollections();
     }
 
     /**
@@ -233,8 +229,6 @@ export class CollectionRequestPersistenceService {
         if (bodyInput) {
             await this.collectionService.saveRequestBodyModification(collectionId, endpointId, bodyInput);
         }
-
-        await this.refreshCollections();
     }
 
     /**

@@ -401,6 +401,7 @@ export class WorkspaceTabController {
             runnerContainer.remove();
         }
 
+        this.runnerControllers.get(tabId)?.destroy?.();
         this.runnerControllers.delete(tabId);
     }
 

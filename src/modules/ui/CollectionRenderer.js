@@ -30,6 +30,7 @@ export class CollectionRenderer {
         }
         this.repository = repository;
         this.emptySpaceContextMenuHandler = null;
+        this._lastRenderArgs = null;
     }
 
     /**
@@ -122,6 +123,7 @@ export class CollectionRenderer {
         }
 
         this.container.innerHTML = '';
+        this._lastRenderArgs = { collections, eventHandlers, pinnedRequests };
 
         const pinnedSection = this.createPinnedSection(collections, pinnedRequests, eventHandlers);
         if (pinnedSection) {
@@ -360,6 +362,38 @@ export class CollectionRenderer {
             badge.title = branch;
             badge.querySelector('.collection-git-branch').textContent = branch;
         });
+    }
+
+    /**
+     * Patches a single endpoint's pin state in place and rebuilds only the pinned section.
+     * @param {string} collectionId - Owning collection ID
+     * @param {string} endpointId - Endpoint ID whose pin state changed
+     * @param {boolean} isPinned - New pin state
+     * @param {Object} pinnedRequests - Current pinned-request map
+     * @returns {void}
+     */
+    updatePinnedState(collectionId, endpointId, isPinned, pinnedRequests) {
+        const selector = `.endpoint-item[data-collection-id="${collectionId}"][data-endpoint-id="${endpointId}"] .endpoint-pin-btn`;
+        this.container.querySelectorAll(selector).forEach(pinBtn => {
+            pinBtn.classList.toggle('is-pinned', isPinned);
+            pinBtn.title = isPinned ? 'Unpin request' : 'Pin request';
+        });
+
+        const existingSection = this.container.querySelector('.pinned-section');
+        const { collections, eventHandlers } = this._lastRenderArgs || {};
+        if (!collections) {
+            return;
+        }
+
+        const newSection = this.createPinnedSection(collections, pinnedRequests, eventHandlers || {});
+        if (existingSection && newSection) {
+            existingSection.replaceWith(newSection);
+        } else if (existingSection) {
+            existingSection.remove();
+        } else if (newSection) {
+            this.container.prepend(newSection);
+        }
+        this._lastRenderArgs.pinnedRequests = pinnedRequests;
     }
 
     /**

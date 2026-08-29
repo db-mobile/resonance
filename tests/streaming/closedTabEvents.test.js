@@ -112,6 +112,7 @@ describe('streaming handlers ignore events for tabs with no session', () => {
         await handlers['websocket-event']({
             payload: { tabId: 'tab-1', eventType: 'message', message: 'hello' }
         });
+        await new Promise((resolve) => setTimeout(resolve, 120));
 
         expect(updateStatusDisplay).toHaveBeenCalledWith('WebSocket connected', 101);
         expect(displayResponseWithLineNumbersForTab).toHaveBeenCalled();

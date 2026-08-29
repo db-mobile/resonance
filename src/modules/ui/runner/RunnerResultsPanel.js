@@ -30,11 +30,6 @@ export class RunnerResultsPanel {
         this.data = [];
         this.selectedIndex = -1;
         this.selectedRequests = [];
-
-        this._isResizing = false;
-        this._resizeStartY = 0;
-        this._resizeStartHeight = 0;
-        this._resizeStartMainHeight = 0;
     }
 
     /**
@@ -222,45 +217,44 @@ export class RunnerResultsPanel {
         if (!runnerMain) {return;}
 
         this.resizer.addEventListener('mousedown', (e) => {
-            this._isResizing = true;
-            this._resizeStartY = e.clientY;
-            this._resizeStartHeight = this.panel.offsetHeight;
-            this._resizeStartMainHeight = runnerMain.offsetHeight;
+            const startY = e.clientY;
+            const startHeight = this.panel.offsetHeight;
+            const startMainHeight = runnerMain.offsetHeight;
 
             this.resizer.classList.add('is-dragging');
             document.body.style.userSelect = 'none';
             document.body.style.cursor = 'row-resize';
 
+            const onMove = (moveEvent) => {
+                const deltaY = startY - moveEvent.clientY;
+                const newResultsHeight = startHeight + deltaY;
+                const newMainHeight = startMainHeight - deltaY;
+
+                const minResultsHeight = 150;
+                const maxResultsHeight = window.innerHeight * 0.7;
+                const minMainHeight = 200;
+
+                if (newResultsHeight < minResultsHeight || newResultsHeight > maxResultsHeight) {return;}
+                if (newMainHeight < minMainHeight) {return;}
+
+                this.panel.style.height = `${newResultsHeight}px`;
+                runnerMain.style.flex = `0 0 ${newMainHeight}px`;
+
+                moveEvent.preventDefault();
+            };
+
+            const onUp = () => {
+                this.resizer?.classList.remove('is-dragging');
+                document.body.style.userSelect = '';
+                document.body.style.cursor = '';
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            };
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+
             e.preventDefault();
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!this._isResizing) {return;}
-
-            const deltaY = this._resizeStartY - e.clientY;
-            const newResultsHeight = this._resizeStartHeight + deltaY;
-            const newMainHeight = this._resizeStartMainHeight - deltaY;
-
-            const minResultsHeight = 150;
-            const maxResultsHeight = window.innerHeight * 0.7;
-            const minMainHeight = 200;
-
-            if (newResultsHeight < minResultsHeight || newResultsHeight > maxResultsHeight) {return;}
-            if (newMainHeight < minMainHeight) {return;}
-
-            this.panel.style.height = `${newResultsHeight}px`;
-            runnerMain.style.flex = `0 0 ${newMainHeight}px`;
-
-            e.preventDefault();
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (!this._isResizing) {return;}
-
-            this._isResizing = false;
-            this.resizer?.classList.remove('is-dragging');
-            document.body.style.userSelect = '';
-            document.body.style.cursor = '';
         });
     }
 

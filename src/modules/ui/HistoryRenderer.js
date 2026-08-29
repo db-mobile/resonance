@@ -7,6 +7,7 @@ import { app } from '../appContext.js';
 import { HistoryService } from '../services/HistoryService.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
 import { templateLoader } from '../templateLoader.js';
+import { debounce } from '../utils/debounce.js';
 
 /**
  * History sidebar UI renderer
@@ -32,6 +33,8 @@ export class HistoryRenderer {
         this.searchInput = document.getElementById('history-search-input');
         this.clearAllBtn = document.getElementById('clear-all-history-btn');
         this.confirmDialog = new ConfirmDialog();
+        this._searchSeq = 0;
+        this._debouncedSearch = debounce((term) => this.handleSearch(term), 200);
     }
 
     async init() {
@@ -41,8 +44,8 @@ export class HistoryRenderer {
 
     setupEventListeners() {
         if (this.searchInput) {
-            this.searchInput.addEventListener('input', async (e) => {
-                await this.handleSearch(e.target.value);
+            this.searchInput.addEventListener('input', (e) => {
+                this._debouncedSearch(e.target.value);
             });
         }
 
@@ -54,7 +57,12 @@ export class HistoryRenderer {
     }
 
     async handleSearch(searchTerm) {
+        const seq = ++this._searchSeq;
         const results = await this.service.searchHistory(searchTerm);
+        if (seq !== this._searchSeq) {
+            return;
+        }
+        this.historyItems = results;
         this.renderHistoryList(results);
     }
 

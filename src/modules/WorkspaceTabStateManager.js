@@ -465,7 +465,7 @@ export class WorkspaceTabStateManager {
                 this.graphqlBodyManager.setGraphQLVariables(request.variables || '');
                 this.graphqlBodyManager.selectedOperationName = request.operationName || null;
                 this.graphqlBodyManager.updateOperationPicker();
-                await this.graphqlBodyManager.autoApplySchemaForUrl?.(request.url || '');
+                await this.graphqlBodyManager.autoApplySchemaForUrl?.(request.url || '', { allowNetwork: true });
             }
 
             if (this.dom.headersList) {

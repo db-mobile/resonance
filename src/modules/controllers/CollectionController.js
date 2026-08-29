@@ -55,6 +55,8 @@ export class CollectionController {
         this.statusDisplay = new StatusDisplayAdapter(updateStatusDisplay);
         this._debouncedSaveBody = null;
         this._inFlightBodySave = null;
+        this._pinnedRequests = null;
+        this._debouncedSearch = null;
         
         this.service = new CollectionService(this.repository, this.schemaProcessor, this.statusDisplay);
         this.variableService = new VariableService(this.variableRepository, this.variableProcessor, this.statusDisplay);
@@ -218,7 +220,7 @@ export class CollectionController {
     async renderCollections(collections, preserveExpansionState = false) {
         const filteredCollections = this.filterCollections(collections, this.searchQuery);
         const isSearching = this.searchQuery.length > 0;
-        const pinnedRequests = await this.repository.getPinnedRequests();
+        const pinnedRequests = await this._getPinnedRequestsCached();
         const eventHandlers = {
             onEmptyStateActions: {
                 'new-collection': this.handleNewCollection,
@@ -246,12 +248,25 @@ export class CollectionController {
             return;
         }
 
-        this.collectionsSearchInput.addEventListener('input', this.handleCollectionsSearch);
+        this._debouncedSearch = debounce(() => this.handleCollectionsSearch(), 200);
+        this.collectionsSearchInput.addEventListener('input', () => this._debouncedSearch());
     }
 
     async handleCollectionsSearch() {
         this.searchQuery = this.collectionsSearchInput.value.trim().toLowerCase();
         await this.renderCollections(this.allCollections, true);
+    }
+
+    /**
+     * Returns the pinned-request map, reading the store only on the first call.
+     * @private
+     * @returns {Promise<Object>} Pinned requests keyed `${collectionId}_${endpointId}`
+     */
+    async _getPinnedRequestsCached() {
+        if (!this._pinnedRequests) {
+            this._pinnedRequests = await this.repository.getPinnedRequests();
+        }
+        return this._pinnedRequests;
     }
 
     filterCollections(collections, query) {
@@ -442,7 +457,7 @@ export class CollectionController {
      * @returns {void}
      */
     async handleEndpointContextMenu(event, collection, endpoint) {
-        const pinned = await this.repository.getPinnedRequests();
+        const pinned = await this._getPinnedRequestsCached();
         const isPinned = !!pinned[`${collection.id}_${endpoint.id}`];
         const menuItems = [
             {
@@ -470,8 +485,17 @@ export class CollectionController {
     }
 
     async handleTogglePinned(collection, endpoint) {
-        await this.repository.togglePinnedRequest(collection.id, endpoint.id);
-        await this.loadCollectionsWithExpansionState();
+        const isPinned = await this.repository.togglePinnedRequest(collection.id, endpoint.id);
+
+        const pinned = await this._getPinnedRequestsCached();
+        const key = `${collection.id}_${endpoint.id}`;
+        if (isPinned) {
+            pinned[key] = true;
+        } else {
+            delete pinned[key];
+        }
+
+        this.renderer.updatePinnedState(collection.id, endpoint.id, isPinned, pinned);
     }
 
     /**

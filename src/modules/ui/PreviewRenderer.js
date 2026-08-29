@@ -6,6 +6,13 @@
  */
 import { templateLoader } from '../templateLoader.js';
 
+/**
+ * Building the preview tree costs DOM nodes proportional to the payload, so
+ * oversized responses stay in the code view and wide containers are truncated.
+ */
+const MAX_PREVIEW_CHARS = 512 * 1024;
+const MAX_CHILD_ENTRIES = 200;
+
 export class PreviewRenderer {
     constructor(containerElement) {
         this.container = containerElement;
@@ -21,6 +28,11 @@ export class PreviewRenderer {
 
         if (!content) {
             this._renderEmptyState();
+            return;
+        }
+
+        if (content.length > MAX_PREVIEW_CHARS) {
+            this._renderTooLarge();
             return;
         }
 
@@ -197,9 +209,10 @@ export class PreviewRenderer {
      * @private
      */
     _buildObjectNode(node, obj, level) {
-        const entries = Object.entries(obj);
+        const allEntries = Object.entries(obj);
+        const entries = allEntries.slice(0, MAX_CHILD_ENTRIES);
 
-        if (entries.length === 0) {
+        if (allEntries.length === 0) {
             node.textContent = '{}';
             return;
         }
@@ -238,6 +251,10 @@ export class PreviewRenderer {
             children.appendChild(childLine);
         });
 
+        if (allEntries.length > entries.length) {
+            this._appendTruncationNotice(children, allEntries.length - entries.length);
+        }
+
         node.appendChild(children);
 
         const closeBrace = document.createElement('span');
@@ -275,19 +292,24 @@ export class PreviewRenderer {
         children.className = 'json-tree-children';
         children.style.display = level < 2 ? 'block' : 'none';
 
-        arr.forEach((value, index) => {
+        const visible = arr.slice(0, MAX_CHILD_ENTRIES);
+        visible.forEach((value, index) => {
             const childLine = document.createElement('div');
             childLine.className = 'json-tree-line';
 
             const valueNode = this._buildJSONTree(value, level + 1);
             childLine.appendChild(valueNode);
 
-            if (index < arr.length - 1) {
+            if (index < visible.length - 1) {
                 childLine.appendChild(document.createTextNode(','));
             }
 
             children.appendChild(childLine);
         });
+
+        if (arr.length > visible.length) {
+            this._appendTruncationNotice(children, arr.length - visible.length);
+        }
 
         node.appendChild(children);
 
@@ -428,9 +450,13 @@ export class PreviewRenderer {
             children.className = 'xml-tree-children';
             children.style.display = level < 2 ? 'block' : 'none';
 
-            for (const child of node.children) {
+            const childElements = Array.from(node.children).slice(0, MAX_CHILD_ENTRIES);
+            for (const child of childElements) {
                 const childNode = this._buildXMLTree(child, level + 1);
                 children.appendChild(childNode);
+            }
+            if (node.children.length > childElements.length) {
+                this._appendTruncationNotice(children, node.children.length - childElements.length);
             }
 
             treeNode.appendChild(children);
@@ -536,6 +562,29 @@ export class PreviewRenderer {
         }
         this.container.innerHTML = '';
         this.container.appendChild(el);
+    }
+
+    /**
+     * Shows the too-large notice instead of building a tree for oversized content.
+     * @private
+     * @returns {void}
+     */
+    _renderTooLarge() {
+        this._renderError('Response too large to preview — use the code view');
+    }
+
+    /**
+     * Appends a truncation notice for entries beyond the per-node cap.
+     * @private
+     * @param {HTMLElement} children - Children container to append to
+     * @param {number} hiddenCount - Number of entries not rendered
+     * @returns {void}
+     */
+    _appendTruncationNotice(children, hiddenCount) {
+        const line = document.createElement('div');
+        line.className = 'json-tree-line json-tree-truncated';
+        line.textContent = `… ${hiddenCount} more entries not shown`;
+        children.appendChild(line);
     }
 
     /**

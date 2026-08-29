@@ -455,4 +455,12 @@ export class RunnerController {
         } catch (error) {
         }
     }
+
+    /**
+     * Releases the panel's document-level listeners when the runner tab closes.
+     * @returns {void}
+     */
+    destroy() {
+        this.panel?.destroy?.();
+    }
 }

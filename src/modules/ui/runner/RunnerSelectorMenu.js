@@ -23,6 +23,11 @@ export class RunnerSelectorMenu {
         this.currentRunnerId = null;
         this._onLoadRunners = onLoadRunners || null;
         this._onSelect = onSelect || null;
+        this._onDocumentClick = (e) => {
+            if (!this.dom.selector?.contains(e.target) && !this.dom.dropdown?.contains(e.target)) {
+                this.close();
+            }
+        };
     }
 
     /**
@@ -43,11 +48,17 @@ export class RunnerSelectorMenu {
             this.toggle();
         });
 
-        document.addEventListener('click', (e) => {
-            if (!this.dom.selector?.contains(e.target) && !this.dom.dropdown?.contains(e.target)) {
-                this.close();
-            }
-        });
+        document.removeEventListener('click', this._onDocumentClick);
+        document.addEventListener('click', this._onDocumentClick);
+    }
+
+    /**
+     * Removes the document-level click listener so a closed runner tab leaks nothing.
+     * @returns {void}
+     */
+    destroy() {
+        document.removeEventListener('click', this._onDocumentClick);
+        this.dom = {};
     }
 
     /** Toggles the dropdown open/closed. */

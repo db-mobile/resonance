@@ -18,6 +18,7 @@ export class ResponseContainerManager {
         this.activeTabId = null;
         this.previewRepository = previewRepository;
         this.previewManager = new PreviewManager(previewRepository);
+        this._scrollPinInstalled = false;
     }
 
     /**
@@ -143,7 +144,8 @@ export class ResponseContainerManager {
         headersEditor.setContent('', 'application/json');
 
         const mainContentArea = document.getElementById('main-content-area');
-        if (mainContentArea) {
+        if (mainContentArea && !this._scrollPinInstalled) {
+            this._scrollPinInstalled = true;
             mainContentArea.addEventListener('scroll', () => {
                 if (mainContentArea.scrollTop !== 0) {
                     mainContentArea.scrollTop = 0;
