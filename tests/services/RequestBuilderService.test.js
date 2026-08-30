@@ -33,6 +33,55 @@ describe('RequestBuilderService', () => {
         });
     });
 
+    describe('processRequestComponents with query rows', () => {
+        it('preserves duplicate keys in the query string and URL', () => {
+            const queryParams = { id: '2' };
+            const result = service.processRequestComponents({
+                url: 'https://api.example.com/items',
+                pathParams: {},
+                headers: {},
+                queryParams,
+                queryRows: [
+                    { key: 'id', value: '1' },
+                    { key: 'id', value: '2' }
+                ],
+                variables: {},
+                processor
+            });
+
+            expect(result.queryString).toBe('id=1&id=2');
+            expect(result.url).toBe('https://api.example.com/items?id=1&id=2');
+        });
+
+        it('templates row keys and values with the shared processor', () => {
+            const result = service.processRequestComponents({
+                url: 'https://api.example.com/items',
+                pathParams: {},
+                headers: {},
+                queryParams: {},
+                queryRows: [{ key: 'token', value: '{{apiToken}}' }],
+                variables: { apiToken: 's3cret value' },
+                processor
+            });
+
+            expect(result.queryString).toBe('token=s3cret%20value');
+        });
+
+        it('drops rows whose key resolves empty', () => {
+            const result = service.processRequestComponents({
+                url: 'https://api.example.com/items',
+                pathParams: {},
+                headers: {},
+                queryParams: {},
+                queryRows: [{ key: '', value: 'x' }, { key: 'a', value: '1' }],
+                variables: {},
+                processor
+            });
+
+            expect(result.queryString).toBe('a=1');
+        });
+    });
+
     describe('processRequestComponents', () => {
         it('returns the variable-resolved path parameter map', () => {
             const result = service.processRequestComponents({

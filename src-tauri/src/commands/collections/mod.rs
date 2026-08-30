@@ -909,12 +909,17 @@ pub async fn collection_close(app: AppHandle, collection_id: String) -> Result<(
     Ok(())
 }
 
-#[tauri::command]
-pub async fn collections_list(app: AppHandle) -> Result<Vec<String>, String> {
-    let mut collection_ids = Vec::new();
+/// Loads every collection with a single read per directory and a single index
+/// write, instead of the previous list-then-get shape that parsed each
+/// collection twice and rewrote the index per entry.
+fn load_all_collections(app: &AppHandle) -> Result<Vec<Collection>, String> {
+    let mut collections = Vec::new();
     let mut seen = HashSet::new();
+    let mut index = get_collection_index(app)?;
+    let linked = get_linked_collections(app)?;
+    let mut index_changed = false;
 
-    let default_dir = get_default_collections_dir(&app)?;
+    let default_dir = get_default_collections_dir(app)?;
     if default_dir.exists() {
         let entries = fs::read_dir(&default_dir)
             .map_err(|e| format!("Failed to read collections dir: {}", e))?;
@@ -928,44 +933,56 @@ pub async fn collections_list(app: AppHandle) -> Result<Vec<String>, String> {
                 continue;
             }
 
-            if let Ok(collection) = read_collection_from_dir(&path) {
+            if let Ok(mut collection) = read_collection_from_dir(&path) {
                 if seen.insert(collection.id.clone()) {
-                    register_collection_path(&app, &collection.id, &path)?;
-                    collection_ids.push(collection.id);
+                    let path_str = path.to_string_lossy().to_string();
+                    if index.get(&collection.id) != Some(&path_str) {
+                        index.insert(collection.id.clone(), path_str);
+                        index_changed = true;
+                    }
+                    collection.linked = link::is_linked(&collection.id, &index, &linked);
+                    collections.push(collection);
                 }
             }
         }
     }
 
-    for (collection_id, path_str) in get_collection_index(&app)? {
+    for (collection_id, path_str) in index.clone() {
         if seen.contains(&collection_id) {
             continue;
         }
 
         let path = PathBuf::from(path_str);
-        if is_collection_dir(&path) && seen.insert(collection_id.clone()) {
-            collection_ids.push(collection_id);
+        if !is_collection_dir(&path) {
+            continue;
         }
-    }
 
-    Ok(collection_ids)
-}
-
-#[tauri::command]
-pub async fn collections_get_all(app: AppHandle) -> Result<Vec<Collection>, String> {
-    let collection_ids = collections_list(app.clone()).await?;
-    let mut collections = Vec::new();
-
-    for id in collection_ids {
-        match collection_get(app.clone(), id).await {
-            Ok(collection) => collections.push(collection),
-            Err(e) => {
-                eprintln!("Failed to load collection: {}", e);
+        if let Ok(mut collection) = read_collection_from_dir(&path) {
+            if seen.insert(collection.id.clone()) {
+                collection.linked = link::is_linked(&collection.id, &index, &linked);
+                collections.push(collection);
             }
         }
     }
 
+    if index_changed {
+        save_collection_index(app, &index)?;
+    }
+
     Ok(collections)
+}
+
+#[tauri::command]
+pub async fn collections_list(app: AppHandle) -> Result<Vec<String>, String> {
+    Ok(load_all_collections(&app)?
+        .into_iter()
+        .map(|collection| collection.id)
+        .collect())
+}
+
+#[tauri::command]
+pub async fn collections_get_all(app: AppHandle) -> Result<Vec<Collection>, String> {
+    load_all_collections(&app)
 }
 
 #[tauri::command]

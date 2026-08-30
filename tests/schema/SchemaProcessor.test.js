@@ -292,4 +292,81 @@ describe('SchemaProcessor', () => {
             expect(result).toEqual(schema);
         });
     });
+
+    describe('circular $refs', () => {
+        const circularSpec = {
+            components: {
+                schemas: {
+                    A: {
+                        type: 'object',
+                        properties: {
+                            name: { type: 'string' },
+                            b: { $ref: '#/components/schemas/B' }
+                        }
+                    },
+                    B: {
+                        type: 'object',
+                        properties: {
+                            a: { $ref: '#/components/schemas/A' }
+                        }
+                    },
+                    Node: {
+                        type: 'object',
+                        properties: {
+                            label: { type: 'string' },
+                            children: {
+                                type: 'array',
+                                items: { $ref: '#/components/schemas/Node' }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        beforeEach(() => {
+            processor.setOpenApiSpec(circularSpec);
+        });
+
+        test('mutually recursive refs terminate with non-cyclic fields resolved', () => {
+            const result = processor.resolveSchemaRefs({ $ref: '#/components/schemas/A' });
+
+            expect(result.properties.name.type).toBe('string');
+            expect(result.properties.b.type).toBe('object');
+            expect(result.properties.b.properties.a.$ref).toBe('#/components/schemas/A');
+        });
+
+        test('a self-referential array schema terminates', () => {
+            const result = processor.resolveSchemaRefs({ $ref: '#/components/schemas/Node' });
+
+            expect(result.properties.label.type).toBe('string');
+            expect(result.properties.children.items.$ref).toBe('#/components/schemas/Node');
+        });
+
+        test('example generation produces a finite serializable value for cycles', () => {
+            const resolved = processor.resolveSchemaRefs({ $ref: '#/components/schemas/Node' });
+
+            const example = processor.generateExampleFromSchema(resolved);
+
+            expect(() => JSON.parse(example)).not.toThrow();
+            expect(example.length).toBeLessThan(10000);
+        });
+
+        test('example generation terminates for mutually recursive schemas', () => {
+            const resolved = processor.resolveSchemaRefs({ $ref: '#/components/schemas/A' });
+
+            const example = processor.generateExampleFromSchema(resolved);
+
+            expect(typeof example).toBe('string');
+            expect(() => JSON.parse(example)).not.toThrow();
+        });
+
+        test('does not mutate the input schema when inferring the object type', () => {
+            const schema = { properties: { name: { type: 'string' } } };
+
+            processor.generateExampleFromSchema(schema);
+
+            expect(schema.type).toBeUndefined();
+        });
+    });
 });

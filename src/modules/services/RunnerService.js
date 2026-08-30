@@ -566,7 +566,7 @@ export class RunnerService {
      * @param {Object} collection - Collection object
      * @param {Object} endpoint - Endpoint object
      * @param {Object} variables - Variables for substitution
-     * @param {Object} [overrides] - Per-request overrides (pathParams, queryParams, headers, body)
+     * @param {Object} [overrides] - Per-request overrides; a present-but-empty list or body is honored as cleared, while an absent field (legacy saved runners) falls back to the persisted config; path params always fall back because URL templates need values
      * @returns {Promise<Object>} Request configuration
      */
     async _buildRequestConfig(collection, endpoint, variables, overrides, runContext = null) {
@@ -580,12 +580,13 @@ export class RunnerService {
 
         const effectivePathParams = overrides?.pathParams?.length ? overrides.pathParams : persistedPathParams;
         const effectiveQueryParams = activeKeyValueRows(
-            overrides?.queryParams?.length ? overrides.queryParams : persistedQueryParams
+            Array.isArray(overrides?.queryParams) ? overrides.queryParams : persistedQueryParams
         );
         const effectiveHeaders = activeKeyValueRows(
-            overrides?.headers?.length ? overrides.headers : persistedHeaders
+            Array.isArray(overrides?.headers) ? overrides.headers : persistedHeaders
         );
-        const overrideBody = typeof overrides?.body === 'string' && overrides.body.trim() !== '' ? overrides.body : null;
+        const hasBodyOverride = typeof overrides?.body === 'string';
+        const overrideBody = hasBodyOverride && overrides.body.trim() !== '' ? overrides.body : null;
 
         let effectiveAuthConfig = persistedAuthConfig || endpoint.security || { type: 'inherit', config: {} };
         if (effectiveAuthConfig?.type === 'inherit') {
@@ -692,8 +693,8 @@ export class RunnerService {
                 bodyType = 'binary';
             }
         } else if (overrideBody || ['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-            let bodyContent = overrideBody || persistedBody;
-            if (!bodyContent && endpoint.requestBody) {
+            let bodyContent = overrideBody || (hasBodyOverride ? null : persistedBody);
+            if (!bodyContent && !hasBodyOverride && endpoint.requestBody) {
                 if (endpoint.requestBody.example && endpoint.requestBody.example !== 'null') {
                     bodyContent = endpoint.requestBody.example;
                 } else if (endpoint.requestBody.schema) {

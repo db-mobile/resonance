@@ -1,3 +1,8 @@
+/**
+ * Nested example generation stops here so recursive schemas produce a finite payload.
+ */
+const MAX_EXAMPLE_DEPTH = 6;
+
 export class SchemaProcessor {
     constructor() {
         this.currentOpenApiSpec = null;
@@ -7,15 +12,20 @@ export class SchemaProcessor {
         this.currentOpenApiSpec = spec;
     }
 
-    resolveSchemaRef(schemaOrRef, openApiSpec = null) {
+    resolveSchemaRef(schemaOrRef, openApiSpec = null, seenRefs = new Set()) {
         const spec = openApiSpec || this.currentOpenApiSpec;
         if (!schemaOrRef || !spec) {
             return schemaOrRef;
         }
-        
+
         if (schemaOrRef.$ref) {
+            if (seenRefs.has(schemaOrRef.$ref)) {
+                return schemaOrRef;
+            }
+            seenRefs.add(schemaOrRef.$ref);
+
             const refPath = schemaOrRef.$ref.split('/').slice(1);
-            
+
             let resolved = spec;
             for (const part of refPath) {
                 if (resolved && resolved[part]) {
@@ -24,41 +34,41 @@ export class SchemaProcessor {
                     return schemaOrRef;
                 }
             }
-            
-            return this.resolveSchemaRefs(resolved, spec);
+
+            return this.resolveSchemaRefs(resolved, spec, seenRefs);
         }
-        
+
         return schemaOrRef;
     }
 
-    resolveSchemaRefs(schema, openApiSpec = null) {
+    resolveSchemaRefs(schema, openApiSpec = null, seenRefs = new Set()) {
         if (!schema || typeof schema !== 'object') {
             return schema;
         }
-        
+
         if (schema.$ref) {
-            return this.resolveSchemaRef(schema, openApiSpec);
+            return this.resolveSchemaRef(schema, openApiSpec, seenRefs);
         }
-        
+
         const resolved = { ...schema };
-        
+
         if (resolved.properties) {
             resolved.properties = { ...resolved.properties };
             for (const [key, prop] of Object.entries(resolved.properties)) {
-                resolved.properties[key] = this.resolveSchemaRefs(prop, openApiSpec);
+                resolved.properties[key] = this.resolveSchemaRefs(prop, openApiSpec, seenRefs);
             }
         }
-        
+
         if (resolved.items) {
-            resolved.items = this.resolveSchemaRefs(resolved.items, openApiSpec);
+            resolved.items = this.resolveSchemaRefs(resolved.items, openApiSpec, seenRefs);
         }
-        
+
         ['allOf', 'oneOf', 'anyOf'].forEach(key => {
             if (resolved[key] && Array.isArray(resolved[key])) {
-                resolved[key] = resolved[key].map(item => this.resolveSchemaRefs(item, openApiSpec));
+                resolved[key] = resolved[key].map(item => this.resolveSchemaRefs(item, openApiSpec, seenRefs));
             }
         });
-        
+
         return resolved;
     }
 
@@ -78,11 +88,15 @@ export class SchemaProcessor {
             if (!propSchema) {
                 return 'no-schema';
             }
-            
+
+            if (currentDepth > MAX_EXAMPLE_DEPTH) {
+                return null;
+            }
+
             if (propSchema.$ref) {
                 const resolved = this.resolveSchemaRef(propSchema);
                 if (resolved && resolved !== propSchema) {
-                    return generateValue(resolved, propName, currentDepth);
+                    return generateValue(resolved, propName, currentDepth + 1);
                 }
                 return 'ref-placeholder';
             }
@@ -107,8 +121,7 @@ export class SchemaProcessor {
         if (schema.type === 'object' && schema.properties) {
             example = generateValue(schema, 'root', depth);
         } else if (schema.properties && !schema.type) {
-            schema.type = 'object';
-            example = generateValue(schema, 'root', depth);
+            example = generateValue({ ...schema, type: 'object' }, 'root', depth);
         } else if (schema.type === 'array') {
             example = generateValue(schema, 'root', depth);
         } else if (schema.type) {

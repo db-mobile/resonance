@@ -616,7 +616,20 @@ describe('RunnerService', () => {
             expect(config.body).toEqual({ from: 'override' });
         });
 
-        test('should fall back to persisted config when overrides are empty', async () => {
+        test('honors explicitly cleared overrides instead of resurrecting persisted config', async () => {
+            const config = await service._buildRequestConfig(
+                collection,
+                endpoint,
+                { baseUrl: 'https://api.test' },
+                { pathParams: [], queryParams: [], headers: [], body: '' }
+            );
+
+            expect(config.url).not.toContain('persistedQ');
+            expect(config.headers['X-Persisted']).toBeUndefined();
+            expect(config.body).toBeUndefined();
+        });
+
+        test('empty path params still fall back so URL templates keep their values', async () => {
             const config = await service._buildRequestConfig(
                 collection,
                 endpoint,
@@ -625,9 +638,6 @@ describe('RunnerService', () => {
             );
 
             expect(config.url).toContain('/users/persisted-id');
-            expect(config.url).toContain('persistedQ=pq');
-            expect(config.headers['X-Persisted']).toBe('persisted');
-            expect(config.body).toEqual({ from: 'collection' });
         });
 
         test('should behave as before when no overrides are provided', async () => {

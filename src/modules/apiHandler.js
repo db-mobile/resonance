@@ -3,7 +3,7 @@ import { app } from './appContext.js';
 import { urlInput, methodSelect, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, responseCookiesDisplay, responsePerformanceDisplay, languageSelector } from './domElements.js';
 import { toast } from './ui/Toast.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
-import { parseKeyValuePairs } from './keyValueManager.js';
+import { parseKeyValuePairs, parseKeyValueRows } from './keyValueManager.js';
 import { saveAllRequestModifications } from './collectionManager.js';
 import { debounce } from './utils/debounce.js';
 import { findRequest } from './collections/collectionTree.js';
@@ -896,6 +896,8 @@ export async function handleSendRequest() {
     const pathParams = parseKeyValuePairs(document.getElementById('path-params-list'));
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
+    const queryRows = parseKeyValueRows(document.getElementById('query-params-list'))
+        .filter((row) => row.enabled);
 
     const builder = getRequestBuilderService();
 
@@ -912,8 +914,15 @@ export async function handleSendRequest() {
         authData = await generateEffectiveAuthData({ variables: _resolvedVariables, processor });
         builder.mergeAuthData(headers, queryParams, authData);
 
+        const rowKeys = new Set(queryRows.map((row) => row.key));
+        for (const [key, value] of Object.entries(authData.queryParams || {})) {
+            if (!rowKeys.has(key)) {
+                queryRows.push({ key, value, enabled: true });
+            }
+        }
+
         ({ url, queryString, pathParams: processedPathParams } = builder.processRequestComponents({
-            url, pathParams, headers, queryParams,
+            url, pathParams, headers, queryParams, queryRows,
             variables: _resolvedVariables,
             processor
         }));
