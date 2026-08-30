@@ -3,12 +3,15 @@ import { app } from './appContext.js';
 import { urlInput, methodSelect, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, responseCookiesDisplay, responsePerformanceDisplay, languageSelector } from './domElements.js';
 import { toast } from './ui/Toast.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
-import { parseKeyValuePairs } from './keyValueManager.js';
+import { parseKeyValuePairs, parseKeyValueRows } from './keyValueManager.js';
 import { saveAllRequestModifications } from './collectionManager.js';
 import { debounce } from './utils/debounce.js';
 import { findRequest } from './collections/collectionTree.js';
+import { registerPendingSave } from './state/pendingSaves.js';
 
 const SAVE_DEBOUNCE_MS = 500;
+
+let inFlightRequestSave = null;
 
 /**
  * Debounced, fire-and-forget save of request modifications.
@@ -19,10 +22,34 @@ const SAVE_DEBOUNCE_MS = 500;
  * @param {string} endpointId - Endpoint ID
  */
 const debouncedSaveRequestModifications = debounce((collectionId, endpointId) => {
-    saveAllRequestModifications(collectionId, endpointId).catch(() => {
-        toast.error('Failed to save changes');
-    });
+    inFlightRequestSave = saveAllRequestModifications(collectionId, endpointId)
+        .catch(() => {
+            toast.error('Failed to save changes');
+        })
+        .finally(() => {
+            inFlightRequestSave = null;
+        });
+    return inFlightRequestSave;
 }, SAVE_DEBOUNCE_MS);
+
+/**
+ * Flushes a pending debounced request save and waits for it to settle.
+ * @returns {Promise<void>} Resolves once no request save is pending or in flight
+ */
+export async function flushPendingRequestSave() {
+    await debouncedSaveRequestModifications.flush();
+    await inFlightRequestSave;
+}
+
+/**
+ * Cancels a pending debounced request save without executing it.
+ * @returns {void}
+ */
+export function cancelPendingRequestSave() {
+    debouncedSaveRequestModifications.cancel();
+}
+
+registerPendingSave({ flush: flushPendingRequestSave, cancel: cancelPendingRequestSave });
 import { VariableProcessor } from './variables/VariableProcessor.js';
 import { VariableRepository } from './storage/VariableRepository.js';
 import { EnvironmentRepository } from './storage/EnvironmentRepository.js';
@@ -31,10 +58,11 @@ import { VariableService } from './services/VariableService.js';
 import { StatusDisplayAdapter } from './interfaces/IStatusDisplay.js';
 import { authManager } from './authManager.js';
 import { resolveEffectiveAuthConfig } from './auth/authInheritance.js';
+import { resolveAuthConfigVariables } from './auth/authVariables.js';
 import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
 import { createLazyEditorProxy } from './editorLoader.js';
 import { extractCookies } from './cookieParser.js';
-import { getRequestBodyContent } from './requestBodyHelper.js';
+import { getRequestBodyContent, captureSnippetBody } from './requestBodyHelper.js';
 import { MockServerRepository } from './storage/MockServerRepository.js';
 import { MockServerService } from './services/MockServerService.js';
 import { isGrpcMode, isMqttMode, isSseMode, isWebSocketMode, isGraphQLMode } from './requestModeManager.js';
@@ -118,18 +146,23 @@ export function getRequestBuilderService() {
 
 /**
  * Generates auth data for the current request with 'inherit' resolved to the
- * owning collection's auth config. Used by every interactive send path.
+ * owning collection's auth config and {{variables}} substituted in credential
+ * fields when a variable context is supplied. Used by every interactive send path.
  *
- * @returns {Promise<Object>} Auth data ({headers, queryParams, authConfig, awsAuth?})
+ * @param {{variables?: Object, processor?: Object}} [substitution] - Variable map and VariableProcessor shared with the request pipeline
+ * @returns {Promise<Object>} Auth data ({headers, queryParams, authConfig, awsAuth?, ntlmAuth?, unresolvedVariables})
  */
-export async function generateEffectiveAuthData() {
+export async function generateEffectiveAuthData({ variables, processor } = {}) {
     const current = getCurrentEndpoint();
     const resolved = await resolveEffectiveAuthConfig(authManager.getAuthConfig(), {
         collectionId: current?.collectionId,
         endpointId: current?.endpointId,
         repository: getCollectionRepository()
     });
-    return authManager.generateAuthData(resolved);
+    const { authConfig: effective, unresolved } = resolveAuthConfigVariables(resolved, variables, processor);
+    const authData = authManager.generateAuthData(effective);
+    authData.unresolvedVariables = unresolved;
+    return authData;
 }
 
 /**
@@ -138,17 +171,21 @@ export async function generateEffectiveAuthData() {
  * Scans the final URL, headers, query/path params, and body; never throws.
  * @param {Object} processor - VariableProcessor used for this request
  * @param {Object} requestConfig - Fully built request configuration
+ * @param {string[]} [extraNames] - Unresolved names found elsewhere (e.g. auth config fields)
  * @returns {void}
  */
-export function warnUnresolvedVariables(processor, requestConfig) {
+export function warnUnresolvedVariables(processor, requestConfig, extraNames = []) {
     try {
-        const unresolved = processor.extractUnresolvedVariableNames({
-            url: requestConfig.url,
-            headers: requestConfig.headers,
-            queryParams: requestConfig.queryParams,
-            pathParams: requestConfig.pathParams,
-            body: requestConfig.body
-        });
+        const unresolved = [...new Set([
+            ...processor.extractUnresolvedVariableNames({
+                url: requestConfig.url,
+                headers: requestConfig.headers,
+                queryParams: requestConfig.queryParams,
+                pathParams: requestConfig.pathParams,
+                body: requestConfig.body
+            }),
+            ...extraNames
+        ])];
 
         if (unresolved.length === 0) {
             return;
@@ -181,13 +218,14 @@ export async function fetchGraphQLIntrospection() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    const authData = await generateEffectiveAuthData();
     const builder = getRequestBuilderService();
-    builder.mergeAuthData(headers, queryParams, authData);
 
+    let authData;
     let resolvedUrl;
     try {
         const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
+        authData = await generateEffectiveAuthData({ variables, processor });
+        builder.mergeAuthData(headers, queryParams, authData);
         ({ url: resolvedUrl } = builder.processRequestComponents({
             url, pathParams: {}, headers, queryParams, variables, processor
         }));
@@ -585,9 +623,7 @@ async function handleGraphQLSubscriptionRequest() {
     let url = urlInput?.value?.trim() || urlInput?.getAttribute('value') || '';
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
-    const authData = await generateEffectiveAuthData();
     const builder = getRequestBuilderService();
-    builder.mergeAuthData(headers, queryParams, authData);
 
     let query = graphqlBodyManager.getGraphQLQuery().trim();
     const variablesText = graphqlBodyManager.getGraphQLVariables().trim();
@@ -595,6 +631,8 @@ async function handleGraphQLSubscriptionRequest() {
 
     try {
         const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
+        const authData = await generateEffectiveAuthData({ variables, processor });
+        builder.mergeAuthData(headers, queryParams, authData);
         ({ url } = builder.processRequestComponents({
             url, pathParams: {}, headers, queryParams, variables, processor
         }));
@@ -708,15 +746,15 @@ export async function handleSendRequest() {
 
         const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
         const headers = parseKeyValuePairs(document.getElementById('headers-list'));
-        const authData = await generateEffectiveAuthData();
 
         const builder = getRequestBuilderService();
-        builder.mergeAuthData(headers, queryParams, authData);
 
         try {
             const { variables, processor } = await builder.resolveVariables(
                 getCurrentEndpoint(), headers
             );
+            const authData = await generateEffectiveAuthData({ variables, processor });
+            builder.mergeAuthData(headers, queryParams, authData);
 
             const result = builder.processRequestComponents({
                 url: websocketUrl,
@@ -751,16 +789,19 @@ export async function handleSendRequest() {
 
         const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
         const headers = parseKeyValuePairs(document.getElementById('headers-list'));
-        const authData = await generateEffectiveAuthData();
         const method = methodSelect?.value || 'GET';
 
         const builder = getRequestBuilderService();
-        builder.mergeAuthData(headers, queryParams, authData);
 
         let sseBody;
         let resolved;
         try {
             resolved = await builder.resolveVariables(getCurrentEndpoint(), headers);
+            const authData = await generateEffectiveAuthData({
+                variables: resolved.variables,
+                processor: resolved.processor
+            });
+            builder.mergeAuthData(headers, queryParams, authData);
             const result = builder.processRequestComponents({
                 url: sseUrl,
                 pathParams: {},
@@ -855,17 +896,12 @@ export async function handleSendRequest() {
     const pathParams = parseKeyValuePairs(document.getElementById('path-params-list'));
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
-
-    const authData = await generateEffectiveAuthData();
-
-    const historySensitive = {
-        headerNames: Object.keys(authData.headers || {}),
-        queryNames: Object.keys(authData.queryParams || {})
-    };
+    const queryRows = parseKeyValueRows(document.getElementById('query-params-list'))
+        .filter((row) => row.enabled);
 
     const builder = getRequestBuilderService();
-    builder.mergeAuthData(headers, queryParams, authData);
 
+    let authData;
     let processor;
     let _resolvedVariables;
     let queryString;
@@ -875,8 +911,18 @@ export async function handleSendRequest() {
             getCurrentEndpoint(), headers
         ));
 
+        authData = await generateEffectiveAuthData({ variables: _resolvedVariables, processor });
+        builder.mergeAuthData(headers, queryParams, authData);
+
+        const rowKeys = new Set(queryRows.map((row) => row.key));
+        for (const [key, value] of Object.entries(authData.queryParams || {})) {
+            if (!rowKeys.has(key)) {
+                queryRows.push({ key, value, enabled: true });
+            }
+        }
+
         ({ url, queryString, pathParams: processedPathParams } = builder.processRequestComponents({
-            url, pathParams, headers, queryParams,
+            url, pathParams, headers, queryParams, queryRows,
             variables: _resolvedVariables,
             processor
         }));
@@ -885,6 +931,11 @@ export async function handleSendRequest() {
         setRequestInProgress(false);
         return;
     }
+
+    const historySensitive = {
+        headerNames: Object.keys(authData.headers || {}),
+        queryNames: Object.keys(authData.queryParams || {})
+    };
 
     let mockRewrite = null;
     if (getCurrentEndpoint()) {
@@ -901,7 +952,7 @@ export async function handleSendRequest() {
                     if (endpoint && endpoint.path) {
                         let mockPath = endpoint.path;
                         for (const [key, value] of Object.entries(processedPathParams)) {
-                            mockPath = mockPath.replace(`{${key}}`, value);
+                            mockPath = mockPath.replace(`{${key}}`, () => value);
                         }
 
                         mockRewrite = { baseUrl: mockBaseUrl, pathTemplate: endpoint.path };
@@ -1118,7 +1169,7 @@ export async function handleSendRequest() {
             }
         }
 
-        warnUnresolvedVariables(processor, requestConfig);
+        warnUnresolvedVariables(processor, requestConfig, authData.unresolvedVariables || []);
 
         const result = await window.backendAPI.sendApiRequest(requestConfig);
 
@@ -1304,10 +1355,7 @@ export async function handleGenerateCurl() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    const authData = await generateEffectiveAuthData();
-
     const builder = getRequestBuilderService();
-    builder.mergeAuthData(headers, queryParams, authData);
 
     let processor;
     let resolvedVariables;
@@ -1315,6 +1363,9 @@ export async function handleGenerateCurl() {
         ({ variables: resolvedVariables, processor } = await builder.resolveVariables(
             getCurrentEndpoint(), headers
         ));
+
+        const authData = await generateEffectiveAuthData({ variables: resolvedVariables, processor });
+        builder.mergeAuthData(headers, queryParams, authData);
 
         ({ url } = builder.processRequestComponents({
             url, pathParams, headers, queryParams,
@@ -1326,33 +1377,33 @@ export async function handleGenerateCurl() {
         return;
     }
 
-    if (['POST', 'PUT', 'PATCH'].includes(method) && getRequestBodyContent().trim()) {
-        try {
-            let bodyText = getRequestBodyContent().trim();
+    const bodyModeSelect = document.getElementById('body-mode-select');
+    const bodyMode = bodyModeSelect?.value || 'json';
+    let bodyType;
 
-            const variableService = getVariableService();
-            let variables = {};
-
-            if (getCurrentEndpoint()) {
-                variables = await variableService.getVariablesForCollection(getCurrentEndpoint().collectionId);
-            } else {
-                variables = await variableService.getVariables();
-            }
-
-            bodyText = processor.processTemplate(bodyText, variables);
-
-            body = JSON.parse(bodyText);
-        } catch (e) {
-            updateStatusDisplay(`Invalid Body JSON: ${e.message}`, null);
+    if (['POST', 'PUT', 'PATCH'].includes(method) ||
+        ['formdata', 'urlencoded', 'binary'].includes(bodyMode)) {
+        const captured = captureSnippetBody({
+            bodyMode,
+            formBodyManager: app.formBodyManager,
+            requestBodyTextEditor: app.requestBodyTextEditor,
+            jsonContent: getRequestBodyContent(),
+            processor,
+            variables: resolvedVariables
+        });
+        if (captured.error) {
+            updateStatusDisplay(`Invalid Body JSON: ${captured.error}`, null);
             return;
         }
+        ({ body, bodyType } = captured);
     }
 
     const requestConfig = {
         method,
         url,
         headers,
-        body
+        body,
+        bodyType
     };
 
     const codeSnippetDialog = new CodeSnippetDialog();

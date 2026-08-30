@@ -465,7 +465,7 @@ export class WorkspaceTabStateManager {
                 this.graphqlBodyManager.setGraphQLVariables(request.variables || '');
                 this.graphqlBodyManager.selectedOperationName = request.operationName || null;
                 this.graphqlBodyManager.updateOperationPicker();
-                await this.graphqlBodyManager.autoApplySchemaForUrl?.(request.url || '');
+                await this.graphqlBodyManager.autoApplySchemaForUrl?.(request.url || '', { allowNetwork: true });
             }
 
             if (this.dom.headersList) {
@@ -655,11 +655,11 @@ export class WorkspaceTabStateManager {
             clearGraphQLErrorsBadge();
 
             if (app.inlineScriptManager) {
-                app.inlineScriptManager.clear();
+                await app.inlineScriptManager.clear();
             }
 
             if (app.schemaController) {
-                app.schemaController.clearContext();
+                await app.schemaController.clearContext();
             }
         }
     }

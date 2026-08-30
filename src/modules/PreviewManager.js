@@ -153,8 +153,9 @@ export class PreviewManager {
     }
 
     /**
-     * Refresh preview content regardless of current view mode
-     * This ensures preview is always up-to-date when user switches to it
+     * Refresh preview content while the preview pane is showing; a hidden pane
+     * re-renders from the editor when it is next opened, so building it eagerly
+     * would only burn main-thread time on large responses.
      * @param {string} tabId - Workspace tab ID
      * @param {string} content - Response content
      * @param {string} contentType - Content type or language
@@ -162,6 +163,10 @@ export class PreviewManager {
     refreshPreviewContent(tabId, content, contentType) {
         const container = this.containers.get(tabId);
         if (!container) {
+            return;
+        }
+
+        if (!this.isPreviewMode(tabId)) {
             return;
         }
 

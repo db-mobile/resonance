@@ -26,6 +26,7 @@ export class GraphQLBodyManager {
         this.currentSchema = null;
         this.isFetchingSchema = false;
         this._autoFetchedUrls = new Set();
+        this._schemaStorePromise = null;
         this._debouncedApplySchema = debounce(() => this.autoApplySchemaForUrl(), 500);
 
         this.selectedOperationName = null;
@@ -106,6 +107,18 @@ export class GraphQLBodyManager {
                 return;
             }
             this._debouncedApplySchema();
+        });
+
+        document.addEventListener('change', (e) => {
+            const id = e.target?.id;
+            if (id !== 'url-input' && id !== 'graphql-url-input') {
+                return;
+            }
+            if (!this.isGraphQLMode()) {
+                return;
+            }
+            this._debouncedApplySchema.cancel();
+            this.autoApplySchemaForUrl(undefined, { allowNetwork: true });
         });
     }
 
@@ -317,6 +330,9 @@ export class GraphQLBodyManager {
                 toast.error(error);
                 return;
             }
+            if (cacheKey && this._getCurrentUrl() !== cacheKey) {
+                return;
+            }
             this.currentSchema = schema;
             if (cacheKey) {
                 this.schemaCache.set(cacheKey, schema);
@@ -371,12 +387,18 @@ export class GraphQLBodyManager {
      * @returns {Promise<Object>} A `{ [url]: introspectionJson }` map (possibly empty).
      */
     async _loadSchemaStore() {
-        try {
-            const store = await window.backendAPI?.store?.get(SCHEMA_STORE_KEY);
-            return store && typeof store === 'object' ? store : {};
-        } catch (_e) {
-            return {};
+        if (this._schemaStorePromise) {
+            return this._schemaStorePromise;
         }
+        this._schemaStorePromise = (async () => {
+            try {
+                const store = await window.backendAPI?.store?.get(SCHEMA_STORE_KEY);
+                return store && typeof store === 'object' ? store : {};
+            } catch (_e) {
+                return {};
+            }
+        })();
+        return this._schemaStorePromise;
     }
 
     /**
@@ -402,6 +424,7 @@ export class GraphQLBodyManager {
                 });
             }
             await window.backendAPI.store.set(SCHEMA_STORE_KEY, toSave);
+            this._schemaStorePromise = Promise.resolve(toSave);
         } catch (_e) {
             void _e;
         }
@@ -409,11 +432,12 @@ export class GraphQLBodyManager {
 
     /**
      * Apply the best available schema for the given (or current) URL to the editor:
-     * in-memory cache → persisted store → silent background introspection.
-     * Keeps autocomplete current without forcing the user to click Schema.
+     * in-memory cache → persisted store → optional silent background introspection.
+     * Network introspection is opt-in so typing never POSTs to half-typed hosts.
      * @param {string} [url] - Defaults to the current endpoint URL.
+     * @param {{allowNetwork?: boolean}} [options] - Pass allowNetwork true once the URL has settled
      */
-    async autoApplySchemaForUrl(url) {
+    async autoApplySchemaForUrl(url, { allowNetwork = false } = {}) {
         const targetUrl = (url || this._getCurrentUrl()).trim();
         if (!targetUrl) {
             this._refreshExplorerIfOpen();
@@ -441,7 +465,9 @@ export class GraphQLBodyManager {
         this.currentSchema = null;
         this.graphqlEditor?.clearSchema?.();
         this._refreshExplorerIfOpen();
-        this._backgroundIntrospect(targetUrl);
+        if (allowNetwork) {
+            this._backgroundIntrospect(targetUrl);
+        }
     }
 
     /**
@@ -471,11 +497,11 @@ export class GraphQLBodyManager {
                 this._saveSchemaToStore(targetUrl, introspection);
             }
             this.applySchemaToEditor();
+            this._autoFetchedUrls.add(targetUrl);
         } catch (_e) {
             void _e;
         } finally {
             this.isFetchingSchema = false;
-            this._autoFetchedUrls.add(targetUrl);
         }
     }
 
@@ -513,7 +539,7 @@ export class GraphQLBodyManager {
         this.setWorkbenchActive(mode === 'graphql');
 
         if (mode === 'graphql') {
-            this.autoApplySchemaForUrl();
+            this.autoApplySchemaForUrl(undefined, { allowNetwork: true });
         }
     }
 

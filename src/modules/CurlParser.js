@@ -69,7 +69,7 @@ export class CurlParser {
             if (token === '-d' || token === '--data' || token === '--data-raw' || token === '--data-binary') {
                 i++;
                 if (i < tokens.length) {
-                    result.body = tokens[i];
+                    result.body = result.body ? `${result.body}&${tokens[i]}` : tokens[i];
                     if (result.method === 'GET') {
                         result.method = 'POST';
                     }
@@ -81,13 +81,8 @@ export class CurlParser {
             if (token === '--data-urlencode') {
                 i++;
                 if (i < tokens.length) {
-                    if (!result.body) {
-                        result.body = '';
-                    }
-                    if (result.body) {
-                        result.body += '&';
-                    }
-                    result.body += encodeURIComponent(tokens[i]);
+                    const encoded = this.encodeDataUrlencodeToken(tokens[i]);
+                    result.body = result.body ? `${result.body}&${encoded}` : encoded;
                     if (result.method === 'GET') {
                         result.method = 'POST';
                     }
@@ -209,6 +204,30 @@ export class CurlParser {
         result.name = this.generateRequestName(result.url, result.method);
 
         return result;
+    }
+
+    /**
+     * Encodes one --data-urlencode token following curl's forms; @file forms pass through unchanged because the importer cannot read files.
+     *
+     * @private
+     * @param {string} token - The raw --data-urlencode argument
+     * @returns {string} Encoded body fragment
+     */
+    static encodeDataUrlencodeToken(token) {
+        const eq = token.indexOf('=');
+        const at = token.indexOf('@');
+
+        if (eq >= 0 && (at < 0 || eq < at)) {
+            const name = token.slice(0, eq);
+            const content = token.slice(eq + 1);
+            return name ? `${name}=${encodeURIComponent(content)}` : encodeURIComponent(content);
+        }
+
+        if (at >= 0) {
+            return token;
+        }
+
+        return encodeURIComponent(token);
     }
 
     /**

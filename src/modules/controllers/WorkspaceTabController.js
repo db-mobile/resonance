@@ -13,6 +13,8 @@
  * and form UI, and coordinates with response container visibility.
  */
 import { app } from '../appContext.js';
+import { flushPendingSaves, registerPendingSave } from '../state/pendingSaves.js';
+import { debounce } from '../utils/debounce.js';
 import { WorkspaceTabEndpointLoaderService } from '../services/WorkspaceTabEndpointLoaderService.js';
 import { handleGraphQLSubscriptionCancel, isSubscriptionActive, clearGraphQLSubscriptionState } from '../graphqlSubscriptionHandler.js';
 import { clearWebSocketState } from '../websocketHandler.js';
@@ -58,6 +60,20 @@ export class WorkspaceTabController {
         this.stateManager = stateManager;
         this.responseContainerManager = responseContainerManager;
         this.isRestoringState = false;
+        this._tabLock = Promise.resolve();
+        this._latestSwitchTarget = null;
+        this._modifiedTabIds = new Set();
+        this._inFlightStatePersist = null;
+        this._debouncedPersistState = debounce((tabId) => {
+            this._inFlightStatePersist = this._persistActiveTabState(tabId).finally(() => {
+                this._inFlightStatePersist = null;
+            });
+            return this._inFlightStatePersist;
+        }, 1500);
+        registerPendingSave({
+            flush: () => this._flushPendingStatePersist(),
+            cancel: () => this._debouncedPersistState.cancel()
+        });
 
         this.runnerControllers = new Map();
         this.endpointLoader = new WorkspaceTabEndpointLoaderService({
@@ -82,6 +98,47 @@ export class WorkspaceTabController {
     }
 
     /**
+     * Serializes tab lifecycle operations on a single promise chain.
+     * @private
+     * @param {function(): Promise<*>} operation - Lifecycle operation to run once earlier ones settle
+     * @returns {Promise<*>} Result of the operation
+     */
+    async _withTabLock(operation) {
+        const previous = this._tabLock;
+        const current = previous.catch(() => {}).then(operation);
+        this._tabLock = current;
+        return current;
+    }
+
+    /**
+     * Persists the captured form state under the given tab unless a restore is in progress.
+     * @private
+     * @param {string} tabId - Tab ID captured when the persist was scheduled
+     * @returns {Promise<void>}
+     */
+    async _persistActiveTabState(tabId) {
+        if (this.isRestoringState || !tabId) {
+            return;
+        }
+        try {
+            const currentState = await this.stateManager.captureCurrentState();
+            await this.service.updateTab(tabId, currentState);
+        } catch (error) {
+            void error;
+        }
+    }
+
+    /**
+     * Flushes a pending debounced tab-state persist and waits for it to settle.
+     * @private
+     * @returns {Promise<void>}
+     */
+    async _flushPendingStatePersist() {
+        await this._debouncedPersistState.flush();
+        await this._inFlightStatePersist;
+    }
+
+    /**
      * Initializes the controller and loads existing tabs
      *
      * Loads tabs from service, renders tab bar, shows response container for active tab,
@@ -91,6 +148,15 @@ export class WorkspaceTabController {
      * @returns {Promise<void>}
      */
     async initialize() {
+        return this._withTabLock(() => this._doInitialize());
+    }
+
+    /**
+     * Runs the startup tab restore.
+     * @private
+     * @returns {Promise<void>}
+     */
+    async _doInitialize() {
         try {
             const { tabs, activeTabId } = await this.service.initialize();
 
@@ -127,6 +193,16 @@ export class WorkspaceTabController {
      * @throws {Error} If tab creation fails
      */
     async createNewTab(options = {}) {
+        return this._withTabLock(() => this._doCreateNewTab(options));
+    }
+
+    /**
+     * Creates a new tab; must run inside the tab lock.
+     * @private
+     * @param {Object} [options={}] - Tab creation options
+     * @returns {Promise<Object>} The newly created tab object
+     */
+    async _doCreateNewTab(options = {}) {
         try {
             await this._saveCurrentTabState();
 
@@ -218,7 +294,7 @@ export class WorkspaceTabController {
             await this._restoreTabStateSafely(newTab);
 
             if (app.scriptController) {
-                app.scriptController.clearScripts();
+                await app.scriptController.clearScripts();
             }
 
             return newTab;
@@ -325,6 +401,7 @@ export class WorkspaceTabController {
             runnerContainer.remove();
         }
 
+        this.runnerControllers.get(tabId)?.destroy?.();
         this.runnerControllers.delete(tabId);
     }
 
@@ -336,6 +413,7 @@ export class WorkspaceTabController {
      * @returns {void}
      */
     _cleanupClosedTabUI(tabId) {
+        this._modifiedTabIds.delete(tabId);
         if (this.runnerControllers.has(tabId)) {
             this._cleanupRunnerTab(tabId);
         }
@@ -419,7 +497,22 @@ export class WorkspaceTabController {
      * @returns {Promise<void>}
      */
     async switchTab(tabId) {
+        this._latestSwitchTarget = tabId;
+        return this._withTabLock(() => this._doSwitchTab(tabId));
+    }
+
+    /**
+     * Switches to a tab; must run inside the tab lock.
+     * @private
+     * @param {string} tabId - Tab ID to switch to
+     * @returns {Promise<void>}
+     */
+    async _doSwitchTab(tabId) {
         try {
+            if (this._latestSwitchTarget !== tabId) {
+                return;
+            }
+
             const currentTabId = await this.service.getActiveTabId();
 
             if (currentTabId === tabId) {
@@ -461,7 +554,7 @@ export class WorkspaceTabController {
                         tab.endpoint.endpointId
                     );
                 } else {
-                    app.scriptController.clearScripts();
+                    await app.scriptController.clearScripts();
                 }
             }
         } catch (error) {
@@ -481,7 +574,20 @@ export class WorkspaceTabController {
      * @returns {Promise<void>}
      */
     async closeTab(tabId) {
+        return this._withTabLock(() => this._doCloseTab(tabId));
+    }
+
+    /**
+     * Closes a tab; must run inside the tab lock.
+     * @private
+     * @param {string} tabId - Tab ID to close
+     * @returns {Promise<void>}
+     */
+    async _doCloseTab(tabId) {
         try {
+            await flushPendingSaves();
+
+            const previousActiveTabId = await this.service.getActiveTabId();
             const allTabs = await this.service.getAllTabs();
             const tab = allTabs.find(t => t.id === tabId);
             if (tab?.isModified) {
@@ -503,7 +609,7 @@ export class WorkspaceTabController {
 
             if (allTabs.length === 1) {
                 this._cleanupClosedTabUI(tabId);
-                await this.createNewTab();
+                await this._doCreateNewTab();
                 await this.service.closeTab(tabId);
                 const remainingTabs = await this.service.getAllTabs();
                 const activeTabId = await this.service.getActiveTabId();
@@ -521,7 +627,7 @@ export class WorkspaceTabController {
             const remainingTabs = allTabs.filter(t => t.id !== tabId);
             this.tabBar.render(remainingTabs, result.newActiveTabId);
 
-            if (result.newActiveTabId !== tabId) {
+            if (result.newActiveTabId !== previousActiveTabId) {
                 const newActiveTab = remainingTabs.find(t => t.id === result.newActiveTabId);
                 if (newActiveTab) {
                     await this._activateTab(newActiveTab);
@@ -579,11 +685,25 @@ export class WorkspaceTabController {
      * @returns {Promise<void>}
      */
     async duplicateTab(tabId) {
+        return this._withTabLock(() => this._doDuplicateTab(tabId));
+    }
+
+    /**
+     * Duplicates a tab; must run inside the tab lock.
+     * @private
+     * @param {string} tabId - Tab ID to duplicate
+     * @returns {Promise<void>}
+     */
+    async _doDuplicateTab(tabId) {
         try {
+            const activeTabId = await this.service.getActiveTabId();
+            if (tabId === activeTabId) {
+                await this._saveCurrentTabState();
+            }
+
             const newTab = await this.service.duplicateTab(tabId);
             if (newTab) {
                 const tabs = await this.service.getAllTabs();
-                const activeTabId = await this.service.getActiveTabId();
                 this.tabBar.render(tabs, activeTabId);
             }
         } catch (error) {
@@ -599,7 +719,20 @@ export class WorkspaceTabController {
      * @returns {Promise<void>}
      */
     async closeOtherTabs(tabId) {
+        return this._withTabLock(() => this._doCloseOtherTabs(tabId));
+    }
+
+    /**
+     * Closes every tab except the given one; must run inside the tab lock.
+     * @private
+     * @param {string} tabId - Tab ID to keep open
+     * @returns {Promise<void>}
+     */
+    async _doCloseOtherTabs(tabId) {
         try {
+            await flushPendingSaves();
+
+            const previousActiveTabId = await this.service.getActiveTabId();
             const tabs = await this.service.getAllTabs();
             const tabsToClose = tabs.filter(t => t.id !== tabId);
 
@@ -633,9 +766,11 @@ export class WorkspaceTabController {
             const remainingTabs = await this.service.getAllTabs();
             this.tabBar.render(remainingTabs, tabId);
 
-            const activeTab = remainingTabs.find(t => t.id === tabId);
-            if (activeTab) {
-                await this._activateTab(activeTab);
+            if (tabId !== previousActiveTabId) {
+                const activeTab = remainingTabs.find(t => t.id === tabId);
+                if (activeTab) {
+                    await this._activateTab(activeTab);
+                }
             }
         } catch (error) {
             void error;
@@ -653,10 +788,19 @@ export class WorkspaceTabController {
     async markCurrentTabModified() {
         try {
             const activeTabId = await this.service.getActiveTabId();
-            if (activeTabId) {
-                await this.service.setTabModified(activeTabId, true);
-                this.tabBar.updateTab(activeTabId, { isModified: true });
+            if (!activeTabId) {
+                return;
             }
+
+            this._debouncedPersistState(activeTabId);
+
+            if (this._modifiedTabIds.has(activeTabId)) {
+                return;
+            }
+            this._modifiedTabIds.add(activeTabId);
+
+            await this.service.setTabModified(activeTabId, true);
+            this.tabBar.updateTab(activeTabId, { isModified: true });
         } catch (error) {
             void error;
         }
@@ -674,6 +818,7 @@ export class WorkspaceTabController {
         try {
             const activeTabId = await this.service.getActiveTabId();
             if (activeTabId) {
+                this._modifiedTabIds.delete(activeTabId);
                 await this.service.setTabModified(activeTabId, false);
                 this.tabBar.updateTab(activeTabId, { isModified: false });
             }
@@ -737,11 +882,22 @@ export class WorkspaceTabController {
      * @returns {Promise<void>}
      */
     async loadEndpoint(endpoint, inNewTab = false) {
+        return this._withTabLock(() => this._doLoadEndpoint(endpoint, inNewTab));
+    }
+
+    /**
+     * Loads an endpoint into a tab; must run inside the tab lock.
+     * @private
+     * @param {Object} endpoint - Endpoint data to load
+     * @param {boolean} [inNewTab=false] - Whether to open a new tab for it
+     * @returns {Promise<void>}
+     */
+    async _doLoadEndpoint(endpoint, inNewTab = false) {
         try {
             let targetTabId;
 
             if (inNewTab) {
-                const newTab = await this.createNewTab({ protocol: endpoint.protocol });
+                const newTab = await this._doCreateNewTab({ protocol: endpoint.protocol });
                 targetTabId = newTab.id;
             } else {
                 await this._saveCurrentTabState();
@@ -768,6 +924,16 @@ export class WorkspaceTabController {
      * @returns {Promise<void>}
      */
     async loadHistoryEntry(historyEntry) {
+        return this._withTabLock(() => this._doLoadHistoryEntry(historyEntry));
+    }
+
+    /**
+     * Opens a history entry; must run inside the tab lock.
+     * @private
+     * @param {Object} historyEntry - The history entry to open
+     * @returns {Promise<void>}
+     */
+    async _doLoadHistoryEntry(historyEntry) {
         try {
             if (!historyEntry) {
                 return;
@@ -777,13 +943,14 @@ export class WorkspaceTabController {
                 const tabs = await this.service.getAllTabs();
                 const existingTab = tabs.find(tab => tab.historyEntryId === historyEntry.id);
                 if (existingTab) {
-                    await this.switchTab(existingTab.id);
+                    this._latestSwitchTarget = existingTab.id;
+                    await this._doSwitchTab(existingTab.id);
                     return;
                 }
             }
 
             const protocol = historyEntry.request?.protocol || 'http';
-            const newTab = await this.createNewTab({ protocol });
+            const newTab = await this._doCreateNewTab({ protocol });
 
             await this.endpointLoader.loadHistoryEntry(historyEntry, newTab.id);
         } catch (error) {
@@ -802,6 +969,8 @@ export class WorkspaceTabController {
      */
     async _saveCurrentTabState() {
         try {
+            await flushPendingSaves();
+
             const activeTabId = await this.service.getActiveTabId();
             if (!activeTabId) {
                 return;

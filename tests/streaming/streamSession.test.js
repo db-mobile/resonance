@@ -50,6 +50,7 @@ describe('StreamSession transcript', () => {
     test('appends timestamped entries separated by a blank line', async () => {
         await session.append(TAB, 'CONNECTED https://x/events');
         await session.append(TAB, 'EVENT', 'data: hello');
+        await jest.advanceTimersByTimeAsync(100);
 
         const { transcript } = session.get(TAB);
         expect(transcript).toMatch(/CONNECTED https:\/\/x\/events/);

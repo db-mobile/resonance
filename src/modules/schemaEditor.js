@@ -23,6 +23,7 @@ export class SchemaEditor {
                 this.changeCallback(this.getContent());
             }
         }, 500);
+        this._suppressChange = false;
         this._themed = null;
         this.init();
     }
@@ -84,7 +85,7 @@ export class SchemaEditor {
             json(),
             placeholder('{\n  "type": "object",\n  "properties": {}\n}'),
             EditorView.updateListener.of((update) => {
-                if (update.docChanged) {
+                if (update.docChanged && !this._suppressChange) {
                     this._handleChange();
                 }
             }),
@@ -122,38 +123,45 @@ export class SchemaEditor {
     /**
      * Set editor content
      * @param {string} content - JSON string to set
+     * @param {{emitChange?: boolean}} [options] - Pass emitChange false to suppress the change callback
      */
-    setContent(content) {
+    setContent(content, { emitChange = true } = {}) {
         if (!this.view) {
             return;
         }
-        
+
         const currentContent = this.getContent();
         if (currentContent === content) {
             return;
         }
 
-        this.view.dispatch({
-            changes: {
-                from: 0,
-                to: this.view.state.doc.length,
-                insert: content || ''
-            }
-        });
+        this._suppressChange = !emitChange;
+        try {
+            this.view.dispatch({
+                changes: {
+                    from: 0,
+                    to: this.view.state.doc.length,
+                    insert: content || ''
+                }
+            });
+        } finally {
+            this._suppressChange = false;
+        }
     }
 
     /**
      * Sets the schema as a formatted JSON object
      * @param {Object|null} schema - Schema object to set
+     * @param {{emitChange?: boolean}} [options] - Pass emitChange false to suppress the change callback
      */
-    setSchema(schema) {
+    setSchema(schema, options) {
         if (schema === null || schema === undefined) {
-            this.setContent('');
+            this.setContent('', options);
         } else {
             try {
-                this.setContent(JSON.stringify(schema, null, 2));
+                this.setContent(JSON.stringify(schema, null, 2), options);
             } catch {
-                this.setContent('');
+                this.setContent('', options);
             }
         }
     }

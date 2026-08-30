@@ -195,7 +195,7 @@ function encodeValuePreservingPlaceholders(value) {
 
 export function updateUrlFromQueryParams() {
     try {
-        const queryParams = parseKeyValuePairs(queryParamsList);
+        const queryRows = parseKeyValueRows(queryParamsList).filter((row) => row.enabled);
         const urlString = urlInput.value.trim();
 
         if (!urlString) {
@@ -206,7 +206,7 @@ export function updateUrlFromQueryParams() {
         const baseUrl = questionMarkIndex >= 0 ? urlString.substring(0, questionMarkIndex) : urlString;
 
         const queryPairs = [];
-        Object.entries(queryParams).forEach(([key, value]) => {
+        queryRows.forEach(({ key, value }) => {
             if (key) {
                 const encodedKey = encodeValuePreservingPlaceholders(key);
                 const encodedValue = encodeValuePreservingPlaceholders(value);
@@ -224,6 +224,20 @@ export function updateUrlFromQueryParams() {
         }, 0);
     } catch (error) {
         isUpdatingUrlFromQueryParams = false;
+    }
+}
+
+/**
+ * Decodes a URI component, keeping the raw text when it is not valid percent-encoding.
+ * @param {string} component - Raw query-string fragment
+ * @returns {string} Decoded or original text
+ */
+function safeDecodeURIComponent(component) {
+    try {
+        return decodeURIComponent(component);
+    } catch (error) {
+        void error;
+        return component;
     }
 }
 
@@ -285,9 +299,9 @@ export function updateQueryParamsFromUrl() {
                 const key = pair.substring(0, equalIndex);
                 const value = pair.substring(equalIndex + 1);
 
-                addKeyValueRow(queryParamsList, decodeURIComponent(key), decodeURIComponent(value));
+                addKeyValueRow(queryParamsList, safeDecodeURIComponent(key), safeDecodeURIComponent(value));
             } else {
-                addKeyValueRow(queryParamsList, decodeURIComponent(pair), '');
+                addKeyValueRow(queryParamsList, safeDecodeURIComponent(pair), '');
             }
         }
     } catch (error) {

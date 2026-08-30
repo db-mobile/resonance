@@ -78,6 +78,12 @@ const MAX_TRANSCRIPT_CHARS = 256 * 1024;
  */
 const PERSIST_DEBOUNCE_MS = 400;
 
+/**
+ * Rendering rebuilds the entire editor state, so a fast stream renders at most
+ * once per interval: immediately when idle, then trailing for the burst.
+ */
+const RENDER_COALESCE_MS = 80;
+
 const ENTRY_SEPARATOR = '\n\n';
 
 function timestamp() {
@@ -106,6 +112,7 @@ export class StreamSession {
         this._entries = new Map();
         this._buffers = new Map();
         this._persisters = new Map();
+        this._renderStates = new Map();
         this._buildResponseMeta = buildResponseMeta;
     }
 
@@ -123,6 +130,11 @@ export class StreamSession {
         // The tab is gone; a queued write would target a tab that no longer exists.
         this._persisters.get(tabId)?.cancel();
         this._persisters.delete(tabId);
+        const renderState = this._renderStates.get(tabId);
+        if (renderState?.timer) {
+            clearTimeout(renderState.timer);
+        }
+        this._renderStates.delete(tabId);
     }
 
     /**
@@ -154,8 +166,58 @@ export class StreamSession {
 
         const transcript = this._compose(buffer);
         this.set(tabId, { ...current, transcript });
-        displayResponseWithLineNumbersForTab(transcript, 'text/plain', tabId);
+        this._scheduleRender(tabId);
         this._schedulePersist(tabId);
+    }
+
+    /**
+     * Renders the tab's latest transcript at most once per coalesce interval, skipping hidden tabs entirely.
+     * @private
+     * @param {string} tabId - Tab whose transcript changed
+     * @returns {void}
+     */
+    _scheduleRender(tabId) {
+        const activeTabId = app.responseContainerManager?.activeTabId;
+        if (activeTabId && activeTabId !== tabId) {
+            return;
+        }
+
+        let state = this._renderStates.get(tabId);
+        if (!state) {
+            state = { timer: null, lastRenderedAt: 0 };
+            this._renderStates.set(tabId, state);
+        }
+
+        if (state.timer) {
+            return;
+        }
+
+        const elapsed = Date.now() - state.lastRenderedAt;
+        if (elapsed >= RENDER_COALESCE_MS) {
+            this._renderNow(tabId, state);
+            return;
+        }
+
+        state.timer = setTimeout(() => {
+            state.timer = null;
+            this._renderNow(tabId, state);
+        }, RENDER_COALESCE_MS - elapsed);
+    }
+
+    /**
+     * Renders the tab's current transcript into the response view.
+     * @private
+     * @param {string} tabId - Tab to render
+     * @param {{timer: (number|null), lastRenderedAt: number}} state - Render state to stamp
+     * @returns {void}
+     */
+    _renderNow(tabId, state) {
+        const entry = this.get(tabId);
+        if (!entry) {
+            return;
+        }
+        state.lastRenderedAt = Date.now();
+        displayResponseWithLineNumbersForTab(entry.transcript || '', 'text/plain', tabId);
     }
 
     /**

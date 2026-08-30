@@ -10,9 +10,9 @@ import { BaseModal } from './BaseModal.js';
  *
  * @class
  * @classdesc Provides a customizable confirmation dialog with promise-based API.
- * Supports keyboard navigation (Enter confirms, Tab cycles buttons; Escape and
- * click-outside cancel via {@link BaseModal}), dangerous action styling, and focus
- * management for accessibility.
+ * Supports keyboard navigation (Enter activates the focused button, Tab cycles
+ * buttons; Escape and click-outside cancel via {@link BaseModal}), dangerous
+ * action styling, and focus management for accessibility.
  * @augments BaseModal
  */
 export class ConfirmDialog extends BaseModal {
@@ -99,7 +99,12 @@ export class ConfirmDialog extends BaseModal {
 
         const handleKeyDown = (e) => {
             if (e.key === 'Enter') {
-                this.confirm();
+                e.preventDefault();
+                if (document.activeElement === cancelBtn) {
+                    this.cancel();
+                } else {
+                    this.confirm();
+                }
             } else if (e.key === 'Tab') {
                 e.preventDefault();
                 if (document.activeElement === cancelBtn) {

@@ -7,7 +7,8 @@ export class UrlAutocomplete {
         this.dropdown = null;
         this.suggestions = [];
         this.activeIndex = -1;
-        this._debouncedShow = debounce(() => this._showSuggestions(this.urlInput.value), 150);
+        this._searchSeq = 0;
+        this._debouncedShow = debounce((query) => this._showSuggestions(query), 150);
     }
 
     init() {
@@ -35,12 +36,13 @@ export class UrlAutocomplete {
     _attachListeners() {
         this.urlInput.addEventListener('focus', async () => {
             if (!this.urlInput.value.trim()) {
+                this._debouncedShow.cancel();
                 await this._showSuggestions('');
             }
         });
 
         this.urlInput.addEventListener('input', () => {
-            this._debouncedShow();
+            this._debouncedShow(this.urlInput.value);
         });
 
         this.urlInput.addEventListener('keydown', (e) => {
@@ -66,19 +68,24 @@ export class UrlAutocomplete {
     }
 
     async _showSuggestions(query) {
+        const seq = ++this._searchSeq;
         const entries = await this.historyController.service.searchHistory(query);
+        if (seq !== this._searchSeq) {
+            return;
+        }
 
         const seen = new Set();
-        this.suggestions = [];
+        const suggestions = [];
         for (const entry of entries) {
             const url = entry.request?.rawUrl || entry.request?.url;
             if (url && !seen.has(url)) {
                 seen.add(url);
-                this.suggestions.push(entry);
-                if (this.suggestions.length >= 8) { break; }
+                suggestions.push(entry);
+                if (suggestions.length >= 8) { break; }
             }
         }
 
+        this.suggestions = suggestions;
         this._render();
     }
 

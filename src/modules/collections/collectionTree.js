@@ -123,7 +123,7 @@ function* walkRequests(collection) {
  * @param {Object|null|undefined} collection - Collection to walk
  * @yields {Object} Each folder
  */
-function* walkFolders(collection) {
+export function* walkFolders(collection) {
     if (!collection) {
         return;
     }

@@ -5,6 +5,7 @@
 
 import { getCurrentEndpoint, setCurrentEndpoint } from '../state/currentEndpoint.js';
 import { debounce } from '../utils/debounce.js';
+import { registerPendingSave, cancelPendingSaves } from '../state/pendingSaves.js';
 import { app } from '../appContext.js';
 import { CollectionRepository } from '../storage/CollectionRepository.js';
 import { VariableRepository } from '../storage/VariableRepository.js';
@@ -52,6 +53,10 @@ export class CollectionController {
         this.schemaProcessor = new SchemaProcessor();
         this.variableProcessor = new VariableProcessor();
         this.statusDisplay = new StatusDisplayAdapter(updateStatusDisplay);
+        this._debouncedSaveBody = null;
+        this._inFlightBodySave = null;
+        this._pinnedRequests = null;
+        this._debouncedSearch = null;
         
         this.service = new CollectionService(this.repository, this.schemaProcessor, this.statusDisplay);
         this.variableService = new VariableService(this.variableRepository, this.variableProcessor, this.statusDisplay);
@@ -215,7 +220,7 @@ export class CollectionController {
     async renderCollections(collections, preserveExpansionState = false) {
         const filteredCollections = this.filterCollections(collections, this.searchQuery);
         const isSearching = this.searchQuery.length > 0;
-        const pinnedRequests = await this.repository.getPinnedRequests();
+        const pinnedRequests = await this._getPinnedRequestsCached();
         const eventHandlers = {
             onEmptyStateActions: {
                 'new-collection': this.handleNewCollection,
@@ -243,12 +248,25 @@ export class CollectionController {
             return;
         }
 
-        this.collectionsSearchInput.addEventListener('input', this.handleCollectionsSearch);
+        this._debouncedSearch = debounce(() => this.handleCollectionsSearch(), 200);
+        this.collectionsSearchInput.addEventListener('input', () => this._debouncedSearch());
     }
 
     async handleCollectionsSearch() {
         this.searchQuery = this.collectionsSearchInput.value.trim().toLowerCase();
         await this.renderCollections(this.allCollections, true);
+    }
+
+    /**
+     * Returns the pinned-request map, reading the store only on the first call.
+     * @private
+     * @returns {Promise<Object>} Pinned requests keyed `${collectionId}_${endpointId}`
+     */
+    async _getPinnedRequestsCached() {
+        if (!this._pinnedRequests) {
+            this._pinnedRequests = await this.repository.getPinnedRequests();
+        }
+        return this._pinnedRequests;
     }
 
     filterCollections(collections, query) {
@@ -439,7 +457,7 @@ export class CollectionController {
      * @returns {void}
      */
     async handleEndpointContextMenu(event, collection, endpoint) {
-        const pinned = await this.repository.getPinnedRequests();
+        const pinned = await this._getPinnedRequestsCached();
         const isPinned = !!pinned[`${collection.id}_${endpoint.id}`];
         const menuItems = [
             {
@@ -467,8 +485,17 @@ export class CollectionController {
     }
 
     async handleTogglePinned(collection, endpoint) {
-        await this.repository.togglePinnedRequest(collection.id, endpoint.id);
-        await this.loadCollectionsWithExpansionState();
+        const isPinned = await this.repository.togglePinnedRequest(collection.id, endpoint.id);
+
+        const pinned = await this._getPinnedRequestsCached();
+        const key = `${collection.id}_${endpoint.id}`;
+        if (isPinned) {
+            pinned[key] = true;
+        } else {
+            delete pinned[key];
+        }
+
+        this.renderer.updatePinnedState(collection.id, endpoint.id, isPinned, pinned);
     }
 
     /**
@@ -1016,6 +1043,7 @@ export class CollectionController {
                 if (getCurrentEndpoint() &&
                     getCurrentEndpoint().collectionId === collection.id &&
                     getCurrentEndpoint().endpointId === endpoint.id) {
+                    cancelPendingSaves();
                     const formElements = this.getFormElements();
                     formElements.urlInput.value = '';
                     formElements.methodSelect.value = 'GET';
@@ -1128,23 +1156,47 @@ export class CollectionController {
         if (bodyInput) {
             bodyInput.addEventListener('blur', async () => {
                 if (getCurrentEndpoint()) {
+                    this._debouncedSaveBody.cancel();
                     await this.saveRequestBodyModification(
-                        getCurrentEndpoint().collectionId, 
+                        getCurrentEndpoint().collectionId,
                         getCurrentEndpoint().endpointId
                     );
                 }
             });
 
-            const debouncedSaveBody = debounce(() => {
+            this._debouncedSaveBody = debounce((collectionId, endpointId) => {
+                this._inFlightBodySave = this.saveRequestBodyModification(collectionId, endpointId)
+                    .catch(() => {})
+                    .finally(() => {
+                        this._inFlightBodySave = null;
+                    });
+                return this._inFlightBodySave;
+            }, 2000);
+            bodyInput.addEventListener('input', () => {
                 if (getCurrentEndpoint()) {
-                    this.saveRequestBodyModification(
+                    this._debouncedSaveBody(
                         getCurrentEndpoint().collectionId,
                         getCurrentEndpoint().endpointId
                     );
                 }
-            }, 2000);
-            bodyInput.addEventListener('input', () => debouncedSaveBody());
+            });
+
+            registerPendingSave({
+                flush: () => this.flushPendingBodySave(),
+                cancel: () => this._debouncedSaveBody.cancel()
+            });
         }
+    }
+
+    /**
+     * Flushes a pending debounced body save and waits for it to settle.
+     * @returns {Promise<void>} Resolves once no body save is pending or in flight
+     */
+    async flushPendingBodySave() {
+        if (this._debouncedSaveBody) {
+            await this._debouncedSaveBody.flush();
+        }
+        await this._inFlightBodySave;
     }
 
     /**

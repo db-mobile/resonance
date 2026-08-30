@@ -23,7 +23,13 @@ export class InlineScriptManager {
         this.testScriptEditor = null;
         this.currentCollectionId = null;
         this.currentEndpointId = null;
-        this._scheduleSave = debounce(() => this.saveScripts(), 1000);
+        this._inFlightSave = null;
+        this._scheduleSave = debounce((collectionId, endpointId) => {
+            this._inFlightSave = this._saveScriptsFor(collectionId, endpointId).finally(() => {
+                this._inFlightSave = null;
+            });
+            return this._inFlightSave;
+        }, 1000);
         this.initialized = false;
     }
 
@@ -59,6 +65,8 @@ export class InlineScriptManager {
      * @async
      */
     async loadScripts(collectionId, endpointId) {
+        await this.flushPendingSave();
+
         this.currentCollectionId = collectionId;
         this.currentEndpointId = endpointId;
 
@@ -66,11 +74,11 @@ export class InlineScriptManager {
             const scripts = await window.backendAPI.scripts.get(collectionId, endpointId);
 
             if (this.preRequestEditor) {
-                this.preRequestEditor.setContent(scripts.preRequestScript || '');
+                this.preRequestEditor.setContent(scripts.preRequestScript || '', { emitChange: false });
             }
 
             if (this.testScriptEditor) {
-                this.testScriptEditor.setContent(scripts.testScript || '');
+                this.testScriptEditor.setContent(scripts.testScript || '', { emitChange: false });
             }
         } catch (error) {
             void error;
@@ -80,16 +88,18 @@ export class InlineScriptManager {
     /**
      * Clear script editors
      */
-    clear() {
+    async clear() {
+        await this.flushPendingSave();
+
         this.currentCollectionId = null;
         this.currentEndpointId = null;
 
         if (this.preRequestEditor) {
-            this.preRequestEditor.clear();
+            this.preRequestEditor.clear({ emitChange: false });
         }
 
         if (this.testScriptEditor) {
-            this.testScriptEditor.clear();
+            this.testScriptEditor.clear({ emitChange: false });
         }
     }
 
@@ -98,20 +108,37 @@ export class InlineScriptManager {
      * @private
      */
     scheduleAutoSave() {
-        this._scheduleSave();
+        if (this.currentCollectionId && this.currentEndpointId) {
+            this._scheduleSave(this.currentCollectionId, this.currentEndpointId);
+        }
     }
 
+    /**
+     * Flushes a pending debounced script save and waits for it to settle.
+     * @returns {Promise<void>} Resolves once no script save is pending or in flight
+     */
     async flushPendingSave() {
         await this._scheduleSave.flush();
+        await this._inFlightSave;
     }
 
     /**
      * Save current scripts
      * @async
-     * @private
      */
     async saveScripts() {
-        if (!this.currentCollectionId || !this.currentEndpointId) {
+        await this._saveScriptsFor(this.currentCollectionId, this.currentEndpointId);
+    }
+
+    /**
+     * Saves the editors' scripts for the given endpoint.
+     * @private
+     * @param {string} collectionId - Collection ID captured when the save was scheduled
+     * @param {string} endpointId - Endpoint ID captured when the save was scheduled
+     * @returns {Promise<void>}
+     */
+    async _saveScriptsFor(collectionId, endpointId) {
+        if (!collectionId || !endpointId) {
             return;
         }
 
@@ -121,11 +148,7 @@ export class InlineScriptManager {
         };
 
         try {
-            await window.backendAPI.scripts.save(
-                this.currentCollectionId,
-                this.currentEndpointId,
-                scripts
-            );
+            await window.backendAPI.scripts.save(collectionId, endpointId, scripts);
         } catch (error) {
             void error;
         }

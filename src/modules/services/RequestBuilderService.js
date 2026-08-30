@@ -76,13 +76,14 @@ export class RequestBuilderService {
      * @param {Object}           opts.pathParams  - Path parameter key-value pairs
      * @param {Object}           opts.headers     - Header key-value pairs (mutated in-place)
      * @param {Object}           opts.queryParams - Query parameter key-value pairs (mutated in-place)
+     * @param {Array<{key: string, value: string}>} [opts.queryRows] - Ordered query rows; when given, the wire query string is built from them so duplicate keys survive
      * @param {Object}           opts.variables   - Resolved variable map
      * @param {VariableProcessor} opts.processor  - VariableProcessor instance
      * @returns {{ url: string, queryString: string, pathParams: Object }} The
      *          resolved URL, the encoded query string, and the
      *          variable-resolved path parameter map
      */
-    processRequestComponents({ url, pathParams, headers, queryParams, variables, processor }) {
+    processRequestComponents({ url, pathParams, headers, queryParams, queryRows, variables, processor }) {
         const processedPathParams = {};
         for (const [key, value] of Object.entries(pathParams)) {
             processedPathParams[key] = processor.processTemplate(value, variables);
@@ -99,13 +100,38 @@ export class RequestBuilderService {
 
         this._processKeyValuePairs(queryParams, variables, processor);
 
-        const queryString = this.buildQueryString(queryParams);
+        const queryString = Array.isArray(queryRows)
+            ? this._buildQueryStringFromRows(queryRows, variables, processor)
+            : this.buildQueryString(queryParams);
         const urlWithoutQuery = resolvedUrl.split('?')[0];
         resolvedUrl = queryString
             ? `${urlWithoutQuery}?${queryString}`
             : urlWithoutQuery;
 
         return { url: resolvedUrl, queryString, pathParams: processedPathParams };
+    }
+
+    /**
+     * Builds the query string from ordered rows, preserving duplicate keys.
+     * @private
+     * @param {Array<{key: string, value: string}>} rows - Ordered query rows
+     * @param {Object} variables - Resolved variable map
+     * @param {VariableProcessor} processor - VariableProcessor instance
+     * @returns {string} Encoded query string
+     */
+    _buildQueryStringFromRows(rows, variables, processor) {
+        const queryPairs = [];
+        for (const row of rows) {
+            const key = processor.processTemplate(row.key || '', variables);
+            if (!key) {
+                continue;
+            }
+            const value = processor.processTemplate(row.value || '', variables);
+            const encodedKey = key.includes('%') ? key : encodeURIComponent(key);
+            const encodedValue = value.includes('%') ? value : encodeURIComponent(value);
+            queryPairs.push(`${encodedKey}=${encodedValue}`);
+        }
+        return queryPairs.join('&');
     }
 
     /**
@@ -154,7 +180,7 @@ export class RequestBuilderService {
             if (mockRewrite) {
                 let mockPath = mockRewrite.pathTemplate;
                 for (const [key, value] of Object.entries(pathParams)) {
-                    mockPath = mockPath.replace(`{${key}}`, value);
+                    mockPath = mockPath.replace(`{${key}}`, () => value);
                 }
                 base = `${mockRewrite.baseUrl}${mockPath}`;
             } else {

@@ -12,6 +12,7 @@ import { CertificateRepository } from '../storage/CertificateRepository.js';
 import { CertificateService } from './CertificateService.js';
 import { normalizeFormRows } from '../utils/formDataRows.js';
 import { activeKeyValueRows } from '../utils/keyValueRows.js';
+import { textToBase64 } from '../utils/encoding.js';
 import { findRequest } from '../collections/collectionTree.js';
 
 /**
@@ -231,6 +232,8 @@ export class RunnerService {
         this._notifyListeners('run-started', { runnerId, total: runner.requests.length });
 
         try {
+            const runContext = await this._buildRunContext();
+
             for (let i = 0; i < runner.requests.length; i++) {
                 if (this.shouldStop) {
                     this._markRemainingAsSkipped(runner.requests, results, i, 'Execution stopped by user');
@@ -238,7 +241,7 @@ export class RunnerService {
                 }
 
                 const request = runner.requests[i];
-                const requestResult = await this._executeRequest(request, runtimeVariables, i);
+                const requestResult = await this._executeRequest(request, runtimeVariables, i, runContext);
 
                 results.requests.push(requestResult);
 
@@ -334,7 +337,8 @@ export class RunnerService {
      * @param {number} index - Request index
      * @returns {Promise<Object>} Request result
      */
-    async _executeRequest(request, runtimeVariables, index) {
+    async _executeRequest(request, runtimeVariables, index, runContext = null) {
+        this.variableProcessor.clearDynamicCache();
         const startTime = Date.now();
         const result = {
             index,
@@ -352,9 +356,9 @@ export class RunnerService {
         };
 
         try {
-            const variables = await this._buildVariables(request.collectionId, runtimeVariables);
+            const variables = await this._buildVariables(request.collectionId, runtimeVariables, runContext);
 
-            const collection = await this.collectionRepository.getById(request.collectionId);
+            const collection = await this._getCollectionForRun(request.collectionId, runContext);
             if (!collection) {
                 throw new Error(`Collection not found: ${request.collectionId}`);
             }
@@ -364,7 +368,7 @@ export class RunnerService {
                 throw new Error(`Endpoint not found: ${request.endpointId}`);
             }
 
-            const requestConfig = await this._buildRequestConfig(collection, endpoint, variables, request.overrides);
+            const requestConfig = await this._buildRequestConfig(collection, endpoint, variables, request.overrides, runContext);
 
             const response = await this.backendAPI.sendApiRequest(requestConfig);
 
@@ -464,17 +468,23 @@ export class RunnerService {
      * @param {Object} runtimeVariables - Variables set during execution
      * @returns {Promise<Object>} Merged variables
      */
-    async _buildVariables(collectionId, runtimeVariables) {
+    async _buildVariables(collectionId, runtimeVariables, runContext = null) {
         let variables = {};
 
         try {
-            const collectionVars = await this.variableRepository.getVariablesForCollection(collectionId);
+            let collectionVars = runContext?.collectionVars.get(collectionId);
+            if (!collectionVars) {
+                collectionVars = await this.variableRepository.getVariablesForCollection(collectionId);
+                runContext?.collectionVars.set(collectionId, collectionVars);
+            }
             variables = { ...variables, ...collectionVars };
         } catch (e) {
         }
 
         try {
-            const envVars = await this.environmentRepository.getActiveEnvironmentVariables();
+            const envVars = runContext
+                ? runContext.envVars
+                : await this.environmentRepository.getActiveEnvironmentVariables();
             variables = { ...variables, ...envVars };
         } catch (e) {
         }
@@ -482,6 +492,58 @@ export class RunnerService {
         variables = { ...variables, ...runtimeVariables };
 
         return variables;
+    }
+
+    /**
+     * Builds the reads that stay constant for a whole run so the loop never repeats them.
+     * @private
+     * @returns {Promise<Object>} Run context with settings, env vars, and per-collection memo maps
+     */
+    async _buildRunContext() {
+        const context = {
+            settings: null,
+            envVars: {},
+            collections: new Map(),
+            collectionVars: new Map(),
+            certificatesLoaded: false
+        };
+
+        try {
+            context.settings = await this.backendAPI.settings.get();
+        } catch (e) {
+            void e;
+        }
+
+        try {
+            context.envVars = await this.environmentRepository.getActiveEnvironmentVariables();
+        } catch (e) {
+            void e;
+        }
+
+        try {
+            await this.certificateService.getItems();
+            context.certificatesLoaded = true;
+        } catch (e) {
+            void e;
+        }
+
+        return context;
+    }
+
+    /**
+     * Resolves a collection, memoized per run so repeated requests share one read.
+     * @private
+     * @param {string} collectionId - Collection ID
+     * @param {Object|null} runContext - Run context holding the memo map
+     * @returns {Promise<Object|null>} Collection or null
+     */
+    async _getCollectionForRun(collectionId, runContext) {
+        if (runContext?.collections.has(collectionId)) {
+            return runContext.collections.get(collectionId);
+        }
+        const collection = await this.collectionRepository.getById(collectionId);
+        runContext?.collections.set(collectionId, collection);
+        return collection;
     }
 
     /**
@@ -504,25 +566,27 @@ export class RunnerService {
      * @param {Object} collection - Collection object
      * @param {Object} endpoint - Endpoint object
      * @param {Object} variables - Variables for substitution
-     * @param {Object} [overrides] - Per-request overrides (pathParams, queryParams, headers, body)
+     * @param {Object} [overrides] - Per-request overrides; a present-but-empty list or body is honored as cleared, while an absent field (legacy saved runners) falls back to the persisted config; path params always fall back because URL templates need values
      * @returns {Promise<Object>} Request configuration
      */
-    async _buildRequestConfig(collection, endpoint, variables, overrides) {
-        const persistedHeaders = await this.collectionRepository.getPersistedHeaders(collection.id, endpoint.id) || [];
-        const persistedBody = await this.collectionRepository.getModifiedRequestBody(collection.id, endpoint.id);
-        const persistedFormBodyData = await this.collectionRepository.getFormBodyData(collection.id, endpoint.id);
-        const persistedQueryParams = await this.collectionRepository.getPersistedQueryParams(collection.id, endpoint.id) || [];
-        const persistedPathParams = await this.collectionRepository.getPersistedPathParams(collection.id, endpoint.id) || [];
+    async _buildRequestConfig(collection, endpoint, variables, overrides, runContext = null) {
+        const persisted = await this.collectionRepository.getAllPersistedEndpointData(collection.id, endpoint.id);
+        const persistedHeaders = persisted.headers || [];
+        const persistedBody = persisted.modifiedBody;
+        const persistedFormBodyData = persisted.formBodyData;
+        const persistedQueryParams = persisted.queryParams || [];
+        const persistedPathParams = persisted.pathParams || [];
         const persistedAuthConfig = await this.collectionRepository.getPersistedAuthConfig(collection.id, endpoint.id);
 
         const effectivePathParams = overrides?.pathParams?.length ? overrides.pathParams : persistedPathParams;
         const effectiveQueryParams = activeKeyValueRows(
-            overrides?.queryParams?.length ? overrides.queryParams : persistedQueryParams
+            Array.isArray(overrides?.queryParams) ? overrides.queryParams : persistedQueryParams
         );
         const effectiveHeaders = activeKeyValueRows(
-            overrides?.headers?.length ? overrides.headers : persistedHeaders
+            Array.isArray(overrides?.headers) ? overrides.headers : persistedHeaders
         );
-        const overrideBody = typeof overrides?.body === 'string' && overrides.body.trim() !== '' ? overrides.body : null;
+        const hasBodyOverride = typeof overrides?.body === 'string';
+        const overrideBody = hasBodyOverride && overrides.body.trim() !== '' ? overrides.body : null;
 
         let effectiveAuthConfig = persistedAuthConfig || endpoint.security || { type: 'inherit', config: {} };
         if (effectiveAuthConfig?.type === 'inherit') {
@@ -629,8 +693,8 @@ export class RunnerService {
                 bodyType = 'binary';
             }
         } else if (overrideBody || ['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-            let bodyContent = overrideBody || persistedBody;
-            if (!bodyContent && endpoint.requestBody) {
+            let bodyContent = overrideBody || (hasBodyOverride ? null : persistedBody);
+            if (!bodyContent && !hasBodyOverride && endpoint.requestBody) {
                 if (endpoint.requestBody.example && endpoint.requestBody.example !== 'null') {
                     bodyContent = endpoint.requestBody.example;
                 } else if (endpoint.requestBody.schema) {
@@ -660,7 +724,7 @@ export class RunnerService {
         let httpVersion = 'auto';
         let timeout = 30000;
         try {
-            const settings = await this.backendAPI.settings.get();
+            const settings = runContext?.settings || await this.backendAPI.settings.get();
             httpVersion = settings.httpVersion || 'auto';
             const savedTimeout = settings.requestTimeout ?? settings.timeout;
             timeout = savedTimeout === 0 ? null : (savedTimeout ?? 30000);
@@ -669,7 +733,9 @@ export class RunnerService {
 
         let clientCert = null;
         try {
-            await this.certificateService.getItems();
+            if (!runContext?.certificatesLoaded) {
+                await this.certificateService.getItems();
+            }
             clientCert = this.certificateService.getForHost(new URL(url).host);
         } catch (e) {
             void e;
@@ -789,7 +855,7 @@ export class RunnerService {
 
             case 'basic':
                 if (config.username || config.password) {
-                    const credentials = btoa(`${processValue(config.username)}:${processValue(config.password)}`);
+                    const credentials = textToBase64(`${processValue(config.username)}:${processValue(config.password)}`);
                     authData.headers['Authorization'] = `Basic ${credentials}`;
                 }
                 break;

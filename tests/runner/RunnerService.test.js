@@ -580,19 +580,13 @@ describe('RunnerService', () => {
 
         beforeEach(() => {
             // Persisted (collection-level) config that overrides should win against
-            service.collectionRepository.getPersistedHeaders = jest
-                .fn()
-                .mockResolvedValue([{ key: 'X-Persisted', value: 'persisted' }]);
-            service.collectionRepository.getModifiedRequestBody = jest
-                .fn()
-                .mockResolvedValue('{"from":"collection"}');
-            service.collectionRepository.getFormBodyData = jest.fn().mockResolvedValue(null);
-            service.collectionRepository.getPersistedQueryParams = jest
-                .fn()
-                .mockResolvedValue([{ key: 'persistedQ', value: 'pq' }]);
-            service.collectionRepository.getPersistedPathParams = jest
-                .fn()
-                .mockResolvedValue([{ key: 'userId', value: 'persisted-id' }]);
+            service.collectionRepository.getAllPersistedEndpointData = jest.fn().mockResolvedValue({
+                headers: [{ key: 'X-Persisted', value: 'persisted' }],
+                modifiedBody: '{"from":"collection"}',
+                formBodyData: null,
+                queryParams: [{ key: 'persistedQ', value: 'pq' }],
+                pathParams: [{ key: 'userId', value: 'persisted-id' }]
+            });
             service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
 
             collection = { id: 'c1', baseUrl: '', defaultHeaders: {} };
@@ -622,7 +616,20 @@ describe('RunnerService', () => {
             expect(config.body).toEqual({ from: 'override' });
         });
 
-        test('should fall back to persisted config when overrides are empty', async () => {
+        test('honors explicitly cleared overrides instead of resurrecting persisted config', async () => {
+            const config = await service._buildRequestConfig(
+                collection,
+                endpoint,
+                { baseUrl: 'https://api.test' },
+                { pathParams: [], queryParams: [], headers: [], body: '' }
+            );
+
+            expect(config.url).not.toContain('persistedQ');
+            expect(config.headers['X-Persisted']).toBeUndefined();
+            expect(config.body).toBeUndefined();
+        });
+
+        test('empty path params still fall back so URL templates keep their values', async () => {
             const config = await service._buildRequestConfig(
                 collection,
                 endpoint,
@@ -631,9 +638,6 @@ describe('RunnerService', () => {
             );
 
             expect(config.url).toContain('/users/persisted-id');
-            expect(config.url).toContain('persistedQ=pq');
-            expect(config.headers['X-Persisted']).toBe('persisted');
-            expect(config.body).toEqual({ from: 'collection' });
         });
 
         test('should behave as before when no overrides are provided', async () => {
@@ -651,11 +655,18 @@ describe('RunnerService', () => {
         let endpoint;
         let collection;
 
+        const stubPersisted = (formBodyData) => {
+            service.collectionRepository.getAllPersistedEndpointData = jest.fn().mockResolvedValue({
+                headers: [],
+                modifiedBody: null,
+                formBodyData,
+                queryParams: [],
+                pathParams: []
+            });
+        };
+
         beforeEach(() => {
-            service.collectionRepository.getPersistedHeaders = jest.fn().mockResolvedValue([]);
-            service.collectionRepository.getModifiedRequestBody = jest.fn().mockResolvedValue(null);
-            service.collectionRepository.getPersistedQueryParams = jest.fn().mockResolvedValue([]);
-            service.collectionRepository.getPersistedPathParams = jest.fn().mockResolvedValue([]);
+            stubPersisted(null);
             service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
 
             collection = { id: 'c1', baseUrl: '', defaultHeaders: {} };
@@ -663,7 +674,7 @@ describe('RunnerService', () => {
         });
 
         test('should assemble form-data rows, filter disabled rows, and substitute variables', async () => {
-            service.collectionRepository.getFormBodyData = jest.fn().mockResolvedValue({
+            stubPersisted({
                 mode: 'formdata',
                 fields: [
                     { key: 'title', value: '{{val}}', type: 'text', enabled: true },
@@ -685,7 +696,7 @@ describe('RunnerService', () => {
         });
 
         test('should convert legacy flat-object fields to rows', async () => {
-            service.collectionRepository.getFormBodyData = jest.fn().mockResolvedValue({
+            stubPersisted({
                 mode: 'urlencoded',
                 fields: { a: '1', b: '2' }
             });
@@ -700,7 +711,7 @@ describe('RunnerService', () => {
         });
 
         test('should assemble binary bodies with variable substitution', async () => {
-            service.collectionRepository.getFormBodyData = jest.fn().mockResolvedValue({
+            stubPersisted({
                 mode: 'binary',
                 filePath: '{{dir}}/payload.bin',
                 contentType: 'application/pdf'
@@ -716,7 +727,7 @@ describe('RunnerService', () => {
         });
 
         test('should skip binary bodies with no file path', async () => {
-            service.collectionRepository.getFormBodyData = jest.fn().mockResolvedValue({
+            stubPersisted({
                 mode: 'binary',
                 filePath: ''
             });
@@ -733,11 +744,13 @@ describe('RunnerService', () => {
         let collection;
 
         beforeEach(() => {
-            service.collectionRepository.getPersistedHeaders = jest.fn().mockResolvedValue([]);
-            service.collectionRepository.getModifiedRequestBody = jest.fn().mockResolvedValue(null);
-            service.collectionRepository.getFormBodyData = jest.fn().mockResolvedValue(null);
-            service.collectionRepository.getPersistedQueryParams = jest.fn().mockResolvedValue([]);
-            service.collectionRepository.getPersistedPathParams = jest.fn().mockResolvedValue([]);
+            service.collectionRepository.getAllPersistedEndpointData = jest.fn().mockResolvedValue({
+                headers: [],
+                modifiedBody: null,
+                formBodyData: null,
+                queryParams: [],
+                pathParams: []
+            });
             service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
             service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue(null);
 
@@ -1024,6 +1037,34 @@ describe('RunnerService', () => {
             expect(results.failed).toBe(1);
             expect(results.skipped).toBe(2);
             expect(service._executeRequest).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('dynamic variables per request', () => {
+        test('two requests in one run resolve {{$uuid}} independently', async () => {
+            const collection = {
+                id: 'c1',
+                baseUrl: '',
+                defaultHeaders: {},
+                endpoints: [{ id: 'e1', method: 'GET', path: 'https://api.test/items/{{$uuid}}' }]
+            };
+            service.collectionRepository.getById = jest.fn().mockResolvedValue(collection);
+            service.collectionRepository.getAllPersistedEndpointData = jest.fn().mockResolvedValue({
+                headers: [], modifiedBody: null, formBodyData: null, queryParams: [], pathParams: []
+            });
+            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
+            service.variableRepository.getVariablesForCollection = jest.fn().mockResolvedValue({});
+            service.environmentRepository.getActiveEnvironmentVariables = jest.fn().mockResolvedValue({});
+            service.certificateService.getItems = jest.fn().mockResolvedValue([]);
+            mockBackendAPI.sendApiRequest.mockResolvedValue({ success: true, status: 200, data: {}, headers: {} });
+
+            const request = { collectionId: 'c1', endpointId: 'e1', name: 'r', method: 'GET', path: '/items' };
+            await service._executeRequest(request, {}, 0);
+            await service._executeRequest(request, {}, 1);
+
+            const urls = mockBackendAPI.sendApiRequest.mock.calls.map(([config]) => config.url);
+            expect(urls[0]).toMatch(/items\/[0-9a-f-]{36}$/);
+            expect(urls[0]).not.toBe(urls[1]);
         });
     });
 });

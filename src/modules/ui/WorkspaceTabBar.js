@@ -166,6 +166,7 @@ export class WorkspaceTabBar {
         tabEl.addEventListener('dragend', () => {
             tabEl.classList.remove('is-dragging');
             this._removeDragPreview();
+            this._commitDragOrder(tabEl);
         });
 
         tabEl.addEventListener('dragover', (e) => {
@@ -185,23 +186,41 @@ export class WorkspaceTabBar {
 
         tabEl.addEventListener('drop', (e) => {
             e.preventDefault();
-            const container = tabEl.closest('.workspace-tabs-container');
-            if (container) {
-                const tabEls = container.querySelectorAll('.workspace-tab');
-                const newOrder = Array.from(tabEls).map(el => el.dataset.tabId);
-
-                if (this.tabs) {
-                    const tabMap = new Map(this.tabs.map(t => [t.id, t]));
-                    this.tabs = newOrder.map(id => tabMap.get(id)).filter(Boolean);
-                }
-
-                if (this.onTabReorder) {
-                    this.onTabReorder(newOrder);
-                }
-            }
+            this._commitDragOrder(tabEl);
         });
 
         return tabEl;
+    }
+
+    /**
+     * Commits the DOM tab order to the model and reorder callback; a no-op when the order is unchanged.
+     * @private
+     * @param {HTMLElement} tabEl - Any tab element inside the tabs container
+     * @returns {void}
+     */
+    _commitDragOrder(tabEl) {
+        const container = tabEl.closest('.workspace-tabs-container');
+        if (!container) {
+            return;
+        }
+
+        const tabEls = container.querySelectorAll('.workspace-tab');
+        const newOrder = Array.from(tabEls).map(el => el.dataset.tabId);
+
+        const currentOrder = (this.tabs || []).map(t => t.id);
+        if (newOrder.length === currentOrder.length &&
+            newOrder.every((id, index) => id === currentOrder[index])) {
+            return;
+        }
+
+        if (this.tabs) {
+            const tabMap = new Map(this.tabs.map(t => [t.id, t]));
+            this.tabs = newOrder.map(id => tabMap.get(id)).filter(Boolean);
+        }
+
+        if (this.onTabReorder) {
+            this.onTabReorder(newOrder);
+        }
     }
 
     /**

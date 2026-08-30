@@ -425,4 +425,13 @@ export class RunnerPanel {
             this.onRequestsChange(this.queue.getRequests());
         }
     }
+
+    /**
+     * Releases document-level listeners owned by the panel's children.
+     * @returns {void}
+     */
+    destroy() {
+        this.menu.destroy();
+        this.resultsView.hide();
+    }
 }

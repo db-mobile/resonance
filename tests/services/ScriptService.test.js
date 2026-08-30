@@ -118,3 +118,57 @@ describe('SCRIPT_MUTABLE_REQUEST_FIELDS', () => {
         expect(Object.isFrozen(SCRIPT_MUTABLE_REQUEST_FIELDS)).toBe(true);
     });
 });
+
+describe('ScriptService._applyEnvironmentChanges', () => {
+    let service;
+    let environmentService;
+
+    beforeEach(() => {
+        environmentService = {
+            getActiveEnvironment: jest.fn().mockResolvedValue({
+                id: 'env_1',
+                variables: { token: '', host: 'example.com' },
+                secretKeys: ['token']
+            }),
+            setVariable: jest.fn().mockResolvedValue(true),
+            deleteVariable: jest.fn().mockResolvedValue(true)
+        };
+        service = new ScriptService(null, environmentService, null);
+    });
+
+    it('keeps a secret variable secret when a script updates it', async () => {
+        await service._applyEnvironmentChanges({ token: 'fresh-jwt' });
+
+        expect(environmentService.setVariable).toHaveBeenCalledWith('env_1', 'token', 'fresh-jwt', true);
+    });
+
+    it('stores non-secret variables as plaintext', async () => {
+        await service._applyEnvironmentChanges({ host: 'staging.example.com' });
+
+        expect(environmentService.setVariable).toHaveBeenCalledWith('env_1', 'host', 'staging.example.com', false);
+    });
+
+    it('deletes variables set to null', async () => {
+        await service._applyEnvironmentChanges({ host: null });
+
+        expect(environmentService.deleteVariable).toHaveBeenCalledWith('env_1', 'host');
+        expect(environmentService.setVariable).not.toHaveBeenCalled();
+    });
+
+    it('treats missing secretKeys as no secrets', async () => {
+        environmentService.getActiveEnvironment.mockResolvedValue({ id: 'env_2', variables: {} });
+
+        await service._applyEnvironmentChanges({ token: 'value' });
+
+        expect(environmentService.setVariable).toHaveBeenCalledWith('env_2', 'token', 'value', false);
+    });
+
+    it('does nothing without an active environment', async () => {
+        environmentService.getActiveEnvironment.mockResolvedValue(null);
+
+        await service._applyEnvironmentChanges({ token: 'value' });
+
+        expect(environmentService.setVariable).not.toHaveBeenCalled();
+        expect(environmentService.deleteVariable).not.toHaveBeenCalled();
+    });
+});

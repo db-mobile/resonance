@@ -4,7 +4,7 @@
  */
 
 import { app } from '../appContext.js';
-import { flattenRequests, topLevelFolders, findRequest, updateRequest, removeRequest } from '../collections/collectionTree.js';
+import { flattenRequests, topLevelFolders, walkFolders, findRequest, updateRequest, removeRequest } from '../collections/collectionTree.js';
 import {
     getProtocol,
     derivePath,
@@ -342,7 +342,7 @@ export class CollectionService {
 
                 if (!targetFolder) {
                     targetFolder = {
-                        id: `folder_${basePath}`.replace(/[^a-zA-Z0-9]/g, '_'),
+                        id: this._uniqueFolderId(basePath, collection),
                         name: basePath,
                         endpoints: []
                     };
@@ -458,6 +458,31 @@ export class CollectionService {
         const segments = cleanPath.split('/');
 
         return segments[0] || 'custom';
+    }
+
+    /**
+     * Builds a folder id unique within the collection, mirroring the backend's unique_folder_id suffix scheme.
+     * @private
+     * @param {string} name - Folder name to derive the id from
+     * @param {Object} collection - Collection whose existing folder ids must not collide
+     * @returns {string} Unused folder id
+     */
+    _uniqueFolderId(name, collection) {
+        const usedIds = new Set();
+        for (const folder of walkFolders(collection)) {
+            if (folder.id) {
+                usedIds.add(folder.id);
+            }
+        }
+
+        const base = `folder_${name}`.replace(/[^\p{L}\p{N}]/gu, '_');
+        let candidate = base;
+        let counter = 2;
+        while (usedIds.has(candidate)) {
+            candidate = `${base}_${counter}`;
+            counter += 1;
+        }
+        return candidate;
     }
 
     /**

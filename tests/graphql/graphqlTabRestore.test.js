@@ -99,7 +99,7 @@ describe('GraphQL tab restore', () => {
 
     test('re-applies the schema for the restored endpoint', async () => {
         await manager.restoreTabState(tab);
-        expect(graphqlBodyManager.autoApplySchemaForUrl).toHaveBeenCalledWith('https://api.example/graphql');
+        expect(graphqlBodyManager.autoApplySchemaForUrl).toHaveBeenCalledWith('https://api.example/graphql', { allowNetwork: true });
         const applyIndex = mockCalls.findIndex(c => c[0] === 'autoApplySchemaForUrl');
         expect(applyIndex).toBeGreaterThan(-1);
         expect(graphqlBodyManager.setGraphQLQuery).toHaveBeenCalledWith('{ me { id } }');

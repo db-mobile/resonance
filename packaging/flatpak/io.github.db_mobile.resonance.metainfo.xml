@@ -119,6 +119,22 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.1.10" date="2026-08-30">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Fix edits landing in the wrong request, schema, or script on fast endpoint and tab switches</li>
+          <li>Resolve variables in Basic, Digest, NTLM, and AWS credentials, and support non-Latin Basic auth passwords</li>
+          <li>Keep secret variables in the keychain when a script updates them</li>
+          <li>Make Enter on the focused Cancel button cancel instead of confirm</li>
+          <li>Send duplicate query keys and survive literal percent signs in the URL</li>
+          <li>Honor cleared overrides in the collection runner and resolve dynamic variables freshly per request</li>
+          <li>Fix cURL --data-urlencode import, snippets for non-JSON bodies, and drag-and-drop reordering</li>
+          <li>Fix hang on recursive OpenAPI schemas</li>
+          <li>Speed up collection loading, the runner, streaming, and large response previews</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.1.9" date="2026-08-28">
       <description>
         <p>Feature stabilization release</p>
