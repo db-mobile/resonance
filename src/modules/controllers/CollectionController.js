@@ -224,8 +224,7 @@ export class CollectionController {
         const eventHandlers = {
             onEmptyStateActions: {
                 'new-collection': this.handleNewCollection,
-                'import-openapi': () => this.importOpenApiFile(),
-                'import-postman': () => this.importPostmanCollection(),
+                'import-collection': () => this.importCollectionFile(),
                 'import-curl': () => this.handleImportCurl(null),
                 'open-existing': () => this.handleOpenExisting()
             },
@@ -1066,30 +1065,17 @@ export class CollectionController {
     }
 
     /**
-     * Imports an OpenAPI specification file and creates a collection
+     * Imports a collection file of any supported format and creates a collection
      *
-     * Triggers file picker dialog via IPC and processes the selected file.
-     *
-     * @async
-     * @returns {Promise<Object|null>} Created collection object or null if cancelled
-     * @throws {Error} If import fails
-     */
-    async importOpenApiFile() {
-        return this.importExportService.importOpenApiFile();
-    }
-
-    /**
-     * Imports a Postman collection file and creates a collection
-     *
-     * Triggers file picker dialog via IPC and processes the selected Postman collection file.
-     * Also imports any collection variables extracted from the Postman collection.
+     * Triggers file picker dialog via IPC; the backend detects the format
+     * (OpenAPI/Swagger, Postman, Insomnia, HAR) from the file's markers.
      *
      * @async
      * @returns {Promise<Object|null>} Created collection object or null if cancelled
      * @throws {Error} If import fails
      */
-    async importPostmanCollection() {
-        return this.importExportService.importPostmanCollection();
+    async importCollectionFile() {
+        return this.importExportService.importCollectionFile();
     }
 
     /**

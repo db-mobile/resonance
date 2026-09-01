@@ -118,6 +118,18 @@ if (isProduction) {
         console.error('CSS build failed:', error);
         process.exit(1);
     });
+
+    const localeDir = 'dist/src/i18n/locales';
+    if (fs.existsSync(localeDir)) {
+        let localeCount = 0;
+        for (const file of fs.readdirSync(localeDir)) {
+            if (!file.endsWith('.json')) continue;
+            const full = path.join(localeDir, file);
+            fs.writeFileSync(full, JSON.stringify(JSON.parse(fs.readFileSync(full, 'utf8'))));
+            localeCount++;
+        }
+        console.log(`✓ Minified ${localeCount} locale JSON file(s)`);
+    }
 }
 
 // Update index.html in dist to reference the bundled renderer

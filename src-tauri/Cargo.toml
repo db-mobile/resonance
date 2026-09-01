@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "3.1.10"
+version = "3.1.11"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -21,13 +21,19 @@ tauri-plugin-shell = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-updater = "2"
 
-# HTTP client
-reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "http2", "gzip", "brotli", "socks"] }
-tokio = { version = "1", features = ["full"] }
+# HTTP client. rustls-no-provider instead of plain rustls: the latter would
+# statically link the aws-lc-rs crypto provider; ring is installed as the
+# process default in main(). Root verification uses the OS trust store via
+# rustls-platform-verifier (0.12's rustls-tls bundled webpki-roots instead).
+reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "form", "rustls-no-provider", "http2", "gzip", "brotli", "socks"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util"] }
 tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
 futures-util = "0.3"
-# MQTT client (async, rustls to match project TLS stack — no OpenSSL)
-rumqttc = { version = "0.25", default-features = false, features = ["use-rustls"] }
+# MQTT client (async, rustls to match project TLS stack — no OpenSSL).
+# use-rustls-no-provider instead of use-rustls: the latter enables
+# tokio-rustls default features, which statically link the aws-lc-rs crypto
+# provider alongside ring (megabytes of duplicate crypto in the binary).
+rumqttc = { version = "0.25", default-features = false, features = ["use-rustls-no-provider"] }
 
 # gRPC client (rustls-only TLS via tls-ring; keep the tree OpenSSL-free)
 tonic = { version = "0.13", default-features = false, features = ["codegen", "prost", "channel", "tls-ring", "tls-native-roots"] }
@@ -60,10 +66,15 @@ uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 # Legacy charset decoding for response bodies (WHATWG labels, pure Rust)
 encoding_rs = "0.8"
-thiserror = "1"
+thiserror = "2"
 tracing = "0.1"
 regex = "1"
 url = "2"
+# Pin the idna→ICU4X bridge to the ICU4X 1.5 generation so url/idna share the
+# icu_normalizer/icu_properties data tables boa_engine 0.19 already embeds
+# (idna_adapter 1.2.1+ pulls a second, ICU4X 2.x copy of the Unicode data).
+# Remove when boa_engine moves to ICU4X 2.x.
+idna_adapter = "=1.2.0"
 
 # Digest auth + AWS Signature V4
 md5 = "0.7"
@@ -81,7 +92,6 @@ getrandom = "0.3"
 
 # Proto file parsing
 which = "6"
-protoc-bin-vendored = "3"
 
 # JavaScript engine for script execution
 boa_engine = "0.19"
@@ -114,7 +124,7 @@ default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 
 [profile.release]
-opt-level = "s"    # Optimize for binary size
+opt-level = "z"    # Optimize for binary size
 lto = true         # Link-time optimization
 codegen-units = 1  # Maximize cross-module optimization (slower compile)
 strip = true       # Strip symbols from the binary

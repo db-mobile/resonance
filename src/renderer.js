@@ -27,7 +27,7 @@ import { initGraphQLSubscriptionHandler } from './modules/graphqlSubscriptionHan
 import { initSseHandler } from './modules/sseHandler.js';
 import { initMqttHandler, handleMqttCancel } from './modules/mqttHandler.js';
 import { initGrpcStreamHandler } from './modules/grpcStreamHandler.js';
-import { loadCollections, importOpenApiFile, importPostmanCollection, importPostmanEnvironment, importCurl, openExistingCollection, initializeBodyTracking } from './modules/collectionManager.js';
+import { loadCollections, importCollectionFile, importPostmanEnvironment, importCurl, openExistingCollection, initializeBodyTracking } from './modules/collectionManager.js';
 import { ThemeManager } from './modules/themeManager.js';
 import { SettingsModal } from './modules/ui/SettingsModal.js';
 import { HttpVersionManager } from './modules/httpVersionManager.js';
@@ -315,10 +315,10 @@ function initKeyboardShortcuts() {
         ctrl: true,
         handler: () => {
             if (importCollectionBtn) {
-                importOpenApiFile();
+                importCollectionFile();
             }
         },
-        description: 'Import OpenAPI collection',
+        description: 'Import collection file',
         category: 'Actions'
     });
 
@@ -532,16 +532,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         event.preventDefault();
         importMenu.show(event, [
             {
-                label: 'OpenAPI Collection',
-                translationKey: 'import.openapi',
+                label: 'Collection File',
+                translationKey: 'import.collection',
                 icon: '<path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path><path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14 3v6h6"></path>',
-                onClick: importOpenApiFile
-            },
-            {
-                label: 'Postman Collection',
-                translationKey: 'import.postman_collection',
-                icon: '<path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>',
-                onClick: importPostmanCollection
+                onClick: importCollectionFile
             },
             {
                 label: 'Postman Environment',

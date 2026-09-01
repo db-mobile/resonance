@@ -1573,6 +1573,7 @@ mod tests {
         });
 
         let config = ntlm_config();
+        crate::commands::tls::ensure_crypto_provider();
         let client = reqwest::Client::builder()
             .pool_max_idle_per_host(1)
             .build()

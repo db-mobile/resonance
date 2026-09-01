@@ -59,6 +59,7 @@ pub fn build_http_client(
     opts: HttpClientOptions,
     proxy_action: ProxyAction,
 ) -> Result<Client, String> {
+    super::tls::ensure_crypto_provider();
     let mut builder = Client::builder().user_agent(opts.user_agent);
 
     if let Some(timeout) = opts.timeout {
@@ -136,6 +137,11 @@ pub fn apply_client_cert(
     mut builder: reqwest::ClientBuilder,
     cert: &ClientCertConfig,
 ) -> Result<reqwest::ClientBuilder, String> {
+    // Identity/certificate parsing needs the rustls provider just like
+    // Client::build does, and tests call this without going through
+    // build_http_client.
+    super::tls::ensure_crypto_provider();
+
     // Client identity (mTLS): requires both a cert chain and a private key.
     let cert_path = cert.cert_path.as_deref().filter(|p| !p.is_empty());
     let key_path = cert.key_path.as_deref().filter(|p| !p.is_empty());

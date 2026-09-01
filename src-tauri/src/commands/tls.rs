@@ -12,6 +12,19 @@ use super::api_request::ClientCertConfig;
 /// PEM bytes of a client identity: (certificate chain, private key).
 pub(crate) type IdentityPems = (Vec<u8>, Vec<u8>);
 
+/// Installs ring as the process-wide rustls crypto provider, once.
+///
+/// reqwest's `rustls-no-provider` feature (chosen so the aws-lc-rs provider
+/// never links in alongside ring) panics on `Client::build` unless a provider
+/// is installed first, so every path that constructs a reqwest client calls
+/// this — including tests, which never run `main`.
+pub(crate) fn ensure_crypto_provider() {
+    static INSTALL: std::sync::Once = std::sync::Once::new();
+    INSTALL.call_once(|| {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
+
 /// Certificate verifier that accepts any server certificate. Only used when
 /// the user has explicitly disabled SSL verification.
 #[derive(Debug)]

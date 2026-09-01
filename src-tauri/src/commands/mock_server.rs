@@ -432,14 +432,22 @@ async fn handle_mock_request(
 }
 
 fn generate_mock_response(endpoint: &Value) -> Value {
-    // Try to find response schema and generate example
+    // Try to find response schema and generate example. The media-type key
+    // contains a slash, so the JSON pointer needs the ~1 escape; the unescaped
+    // variant is kept for responses stored as nested objects.
     if let Some(responses) = endpoint.get("responses") {
         for code in ["200", "201", "202", "204"] {
             if let Some(response) = responses.get(code) {
-                if let Some(example) = response.pointer("/content/application/json/example") {
+                if let Some(example) = response
+                    .pointer("/content/application~1json/example")
+                    .or_else(|| response.pointer("/content/application/json/example"))
+                {
                     return example.clone();
                 }
-                if let Some(schema) = response.pointer("/content/application/json/schema") {
+                if let Some(schema) = response
+                    .pointer("/content/application~1json/schema")
+                    .or_else(|| response.pointer("/content/application/json/schema"))
+                {
                     return generate_from_schema(schema);
                 }
             }
@@ -455,7 +463,10 @@ fn generate_mock_response(endpoint: &Value) -> Value {
 }
 
 fn generate_from_schema(schema: &Value) -> Value {
-    match schema.get("type").and_then(|t| t.as_str()) {
+    if let Some(example) = crate::commands::import_export::schema_example(schema) {
+        return example;
+    }
+    match crate::commands::import_export::primary_type(schema) {
         Some("object") => {
             let mut obj = serde_json::Map::new();
             if let Some(properties) = schema.get("properties").and_then(|p| p.as_object()) {
@@ -472,24 +483,9 @@ fn generate_from_schema(schema: &Value) -> Value {
                 .unwrap_or(Value::Null);
             Value::Array(vec![item])
         }
-        Some("string") => {
-            if let Some(example) = schema.get("example") {
-                return example.clone();
-            }
-            Value::String("string".to_string())
-        }
-        Some("integer") | Some("number") => {
-            if let Some(example) = schema.get("example") {
-                return example.clone();
-            }
-            Value::Number(serde_json::Number::from(0))
-        }
-        Some("boolean") => {
-            if let Some(example) = schema.get("example") {
-                return example.clone();
-            }
-            Value::Bool(true)
-        }
+        Some("string") => Value::String("string".to_string()),
+        Some("integer") | Some("number") => Value::Number(serde_json::Number::from(0)),
+        Some("boolean") => Value::Bool(true),
         _ => Value::Null,
     }
 }
@@ -561,5 +557,45 @@ mod tests {
             .headers()
             .get("access-control-allow-methods")
             .is_none());
+    }
+
+    #[test]
+    fn schema_derived_body_reaches_the_escaped_media_type_key() {
+        let endpoint = serde_json::json!({
+            "responses": {
+                "200": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": { "id": { "type": "integer" } }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        assert_eq!(
+            generate_mock_response(&endpoint),
+            serde_json::json!({ "id": 0 })
+        );
+    }
+
+    #[test]
+    fn schema_generation_handles_type_arrays_and_const() {
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "name": { "type": ["string", "null"] },
+                "kind": { "const": "widget" },
+                "count": { "type": ["integer", "null"], "examples": [7] }
+            }
+        });
+
+        assert_eq!(
+            generate_from_schema(&schema),
+            serde_json::json!({ "name": "string", "kind": "widget", "count": 7 })
+        );
     }
 }

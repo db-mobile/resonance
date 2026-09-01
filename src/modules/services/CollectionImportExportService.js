@@ -116,61 +116,65 @@ export class CollectionImportExportService {
         }
     }
 
-    async importOpenApiFile() {
+    /**
+     * Imports a collection file of any supported format (OpenAPI/Swagger,
+     * Postman, Insomnia, HAR); the backend detects the format from the file's
+     * markers. Insomnia sub-environments are created through the environment
+     * manager, and format-specific counts land in the success toast.
+     *
+     * @async
+     * @returns {Promise<Object|null>} Created collection object or null if cancelled
+     * @throws {Error} If import fails
+     */
+    async importCollectionFile() {
         try {
             const importOptions = await this.collectionDialogs.showCollectionImportDialog({
-                importKind: 'openapi'
+                importKind: 'collection'
             });
             if (!importOptions) {
                 this.statusDisplay.update('Import cancelled', null);
                 return null;
             }
 
-            const collection = await this.backendAPI.collections.importOpenApiFile(
+            const result = await this.backendAPI.collections.importCollectionFile(
                 importOptions.filePath,
                 importOptions.storageParentPath
             );
 
-            if (!collection) {
+            if (!result) {
                 this.statusDisplay.update('Import cancelled', null);
                 return null;
             }
 
+            const {
+                collection,
+                environments = [],
+                skippedRequests = 0,
+                skippedAssets = 0,
+                deduped = 0
+            } = result;
             await this.refreshCollections(false);
             await this.saveResponseSchemasFromImport(collection);
             await this.storeImportedCollectionAuth(collection);
-            toast.success(`Imported "${collection.name}"`);
-            return collection;
-        } catch (error) {
-            const errorMessage = typeof error === 'string' ? error : (error.message || 'Unknown error');
-            toast.error(`Import failed: ${errorMessage}`);
-            throw error;
-        }
-    }
-
-    async importPostmanCollection() {
-        try {
-            const importOptions = await this.collectionDialogs.showCollectionImportDialog({
-                importKind: 'postman'
-            });
-            if (!importOptions) {
-                this.statusDisplay.update('Import cancelled', null);
-                return null;
+            for (const environment of environments) {
+                await app.environmentController?.handleImportEnvironment(environment);
             }
 
-            const collection = await this.backendAPI.collections.importPostmanCollection(
-                importOptions.filePath,
-                importOptions.storageParentPath
-            );
-
-            if (!collection) {
-                this.statusDisplay.update('Import cancelled', null);
-                return null;
+            const suffixes = [];
+            if (environments.length > 0) {
+                suffixes.push(`+${environments.length} environment(s)`);
             }
-
-            await this.refreshCollections(false);
-            await this.storeImportedCollectionAuth(collection);
-            toast.success(`Imported "${collection.name}"`);
+            if (skippedRequests > 0) {
+                suffixes.push(`${skippedRequests} non-HTTP request(s) skipped`);
+            }
+            if (skippedAssets > 0) {
+                suffixes.push(`${skippedAssets} asset(s) skipped`);
+            }
+            if (deduped > 0) {
+                suffixes.push(`${deduped} duplicate(s) merged`);
+            }
+            const suffix = suffixes.length > 0 ? ` (${suffixes.join(', ')})` : '';
+            toast.success(`Imported "${collection.name}"${suffix}`);
             return collection;
         } catch (error) {
             const errorMessage = typeof error === 'string' ? error : (error.message || 'Unknown error');

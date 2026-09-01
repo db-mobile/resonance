@@ -11,13 +11,20 @@ use tauri::AppHandle;
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use tokio::sync::oneshot;
 
+mod common;
 mod export;
+mod har;
+mod insomnia;
 mod openapi;
 mod postman;
 mod storage;
+mod swagger2;
 
 use export::{collection_to_openapi, collection_to_postman, load_collection_for_export};
+use har::parse_har;
+use insomnia::parse_insomnia_export;
 use openapi::parse_openapi_spec;
+pub(crate) use openapi::{primary_type, schema_example};
 use postman::parse_postman_collection;
 use storage::{
     get_last_import_directory, pick_import_file_with_kind, save_collection_to_files,
@@ -86,50 +93,91 @@ pub struct Endpoint {
     pub graphql_data: Option<Value>,
 }
 
-#[tauri::command]
-pub async fn import_openapi_file(
-    app: AppHandle,
-    file_path: Option<String>,
-    storage_parent_path: Option<String>,
-) -> Result<Option<Collection>, String> {
-    let resolved_file_path = if let Some(file_path) = file_path {
-        let path = PathBuf::from(file_path);
-        save_last_import_directory(&app, &path);
-        path
-    } else {
-        let Some(path) = pick_import_file_with_kind(&app, "openapi").await? else {
-            return Ok(None);
-        };
-        path
-    };
-    let content = std::fs::read_to_string(&resolved_file_path)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+/// An environment carried inside an Insomnia export, returned to the frontend
+/// for creation through the environment manager (environment storage is
+/// frontend-owned).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportedEnvironmentResult {
+    pub name: String,
+    pub variables: Value,
+}
 
-    // Parse as YAML (also handles JSON)
-    let spec: Value = serde_yaml_ng::from_str(&content)
-        .map_err(|e| format!("Failed to parse OpenAPI spec: {}", e))?;
+/// Result of the consolidated collection import: the created collection tagged
+/// with the detected source format, plus the format-specific extras the
+/// frontend surfaces in the success toast.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CollectionImportResult {
+    pub format: String,
+    pub collection: Collection,
+    pub environments: Vec<ImportedEnvironmentResult>,
+    pub skipped_requests: usize,
+    pub skipped_assets: usize,
+    pub deduped: usize,
+}
 
-    // Convert OpenAPI spec to Collection
-    let collection = parse_openapi_spec(spec)?;
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ImportFormat {
+    OpenApi,
+    Postman,
+    Insomnia,
+    Har,
+    PostmanEnvironment,
+    InsomniaEnvironment,
+}
 
-    // Save to file-based storage
-    save_collection_to_files(&app, &collection, storage_parent_path)?;
-
-    Ok(Some(collection))
+/// Detect the import format from the document's distinguishing markers. The
+/// markers are mutually exclusive across the supported formats, so detection
+/// never needs heuristics.
+fn detect_import_format(doc: &Value) -> Result<ImportFormat, String> {
+    if doc.get("openapi").is_some() || doc.get("swagger").is_some() {
+        return Ok(ImportFormat::OpenApi);
+    }
+    if doc
+        .pointer("/info/schema")
+        .and_then(|s| s.as_str())
+        .is_some_and(|s| s.contains("getpostman.com"))
+    {
+        return Ok(ImportFormat::Postman);
+    }
+    if doc.get("_type").and_then(|t| t.as_str()) == Some("export")
+        || doc
+            .get("__export_format")
+            .and_then(|f| f.as_i64())
+            .is_some()
+    {
+        return Ok(ImportFormat::Insomnia);
+    }
+    if let Some(doc_type) = doc.get("type").and_then(|t| t.as_str()) {
+        if doc_type.starts_with("collection.insomnia.rest/5") {
+            return Ok(ImportFormat::Insomnia);
+        }
+        if doc_type.starts_with("environment.insomnia.rest/5") {
+            return Ok(ImportFormat::InsomniaEnvironment);
+        }
+    }
+    if doc.pointer("/log/entries").is_some() {
+        return Ok(ImportFormat::Har);
+    }
+    if doc.get("values").is_some() && doc.get("name").is_some() && doc.get("info").is_none() {
+        return Ok(ImportFormat::PostmanEnvironment);
+    }
+    Err("Unrecognized import format. Supported: OpenAPI/Swagger, Postman collection, Insomnia export (v4 JSON or v5 YAML), HAR.".to_string())
 }
 
 #[tauri::command]
-pub async fn import_postman_collection(
+pub async fn import_collection_file(
     app: AppHandle,
     file_path: Option<String>,
     storage_parent_path: Option<String>,
-) -> Result<Option<Collection>, String> {
+) -> Result<Option<CollectionImportResult>, String> {
     let resolved_file_path = if let Some(file_path) = file_path {
         let path = PathBuf::from(file_path);
         save_last_import_directory(&app, &path);
         path
     } else {
-        let Some(path) = pick_import_file_with_kind(&app, "postman").await? else {
+        let Some(path) = pick_import_file_with_kind(&app, "collection").await? else {
             return Ok(None);
         };
         path
@@ -138,16 +186,78 @@ pub async fn import_postman_collection(
     let content = std::fs::read_to_string(&resolved_file_path)
         .map_err(|e| format!("Failed to read file: {}", e))?;
 
-    let postman: Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse Postman collection: {}", e))?;
+    // Some captures (Chrome, Fiddler) prepend a UTF-8 BOM.
+    let content = content.trim_start_matches('\u{feff}');
 
-    // Convert Postman format to Collection
-    let collection = parse_postman_collection(postman)?;
+    // YAML parsing also handles JSON, so one parse covers every format.
+    let doc: Value = serde_yaml_ng::from_str(content)
+        .map_err(|e| format!("Failed to parse import file: {}", e))?;
 
-    // Save to file-based storage
-    save_collection_to_files(&app, &collection, storage_parent_path)?;
+    let result = match detect_import_format(&doc)? {
+        ImportFormat::OpenApi => CollectionImportResult {
+            format: "openapi".to_string(),
+            collection: parse_openapi_spec(doc)?,
+            environments: Vec::new(),
+            skipped_requests: 0,
+            skipped_assets: 0,
+            deduped: 0,
+        },
+        ImportFormat::Postman => CollectionImportResult {
+            format: "postman".to_string(),
+            collection: parse_postman_collection(doc)?,
+            environments: Vec::new(),
+            skipped_requests: 0,
+            skipped_assets: 0,
+            deduped: 0,
+        },
+        ImportFormat::Insomnia => {
+            let import = parse_insomnia_export(doc)?;
+            CollectionImportResult {
+                format: "insomnia".to_string(),
+                collection: import.collection,
+                environments: import
+                    .environments
+                    .into_iter()
+                    .map(|env| ImportedEnvironmentResult {
+                        name: env.name,
+                        variables: Value::Object(env.variables),
+                    })
+                    .collect(),
+                skipped_requests: import.skipped_requests,
+                skipped_assets: 0,
+                deduped: 0,
+            }
+        }
+        ImportFormat::Har => {
+            let source_name = resolved_file_path
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let import = parse_har(doc, &source_name)?;
+            CollectionImportResult {
+                format: "har".to_string(),
+                collection: import.collection,
+                environments: Vec::new(),
+                skipped_requests: 0,
+                skipped_assets: import.skipped_assets,
+                deduped: import.deduped,
+            }
+        }
+        ImportFormat::PostmanEnvironment => {
+            return Err(
+                "This is a Postman environment file, not a collection. Use Import → Postman Environment instead.".to_string(),
+            );
+        }
+        ImportFormat::InsomniaEnvironment => {
+            return Err(
+                "This is an Insomnia environment export, not a collection. Import the collection export instead; its environments come along automatically.".to_string(),
+            );
+        }
+    };
 
-    Ok(Some(collection))
+    save_collection_to_files(&app, &result.collection, storage_parent_path)?;
+
+    Ok(Some(result))
 }
 
 #[tauri::command]
@@ -352,4 +462,52 @@ pub async fn save_documentation(
         "success": true,
         "filePath": file_path
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn detection_routes_every_supported_format() {
+        let detect = |doc: Value| detect_import_format(&doc).unwrap();
+
+        assert_eq!(detect(json!({ "openapi": "3.0.3" })), ImportFormat::OpenApi);
+        assert_eq!(detect(json!({ "swagger": "2.0" })), ImportFormat::OpenApi);
+        assert_eq!(
+            detect(
+                json!({ "info": { "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" } })
+            ),
+            ImportFormat::Postman
+        );
+        assert_eq!(detect(json!({ "_type": "export" })), ImportFormat::Insomnia);
+        assert_eq!(
+            detect(json!({ "__export_format": 4 })),
+            ImportFormat::Insomnia
+        );
+        assert_eq!(
+            detect(json!({ "type": "collection.insomnia.rest/5.0" })),
+            ImportFormat::Insomnia
+        );
+        assert_eq!(
+            detect(json!({ "type": "environment.insomnia.rest/5.0" })),
+            ImportFormat::InsomniaEnvironment
+        );
+        assert_eq!(
+            detect(json!({ "log": { "entries": [] } })),
+            ImportFormat::Har
+        );
+        assert_eq!(
+            detect(json!({ "name": "Prod", "values": [] })),
+            ImportFormat::PostmanEnvironment
+        );
+    }
+
+    #[test]
+    fn unrecognized_documents_error_with_the_supported_list() {
+        let err = detect_import_format(&json!({ "foo": 1 })).unwrap_err();
+        assert!(err.contains("OpenAPI/Swagger"));
+        assert!(err.contains("HAR"));
+    }
 }

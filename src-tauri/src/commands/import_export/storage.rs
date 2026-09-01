@@ -137,11 +137,11 @@ pub(crate) async fn pick_import_file_with_kind(
 
     let mut dialog = app.dialog().file();
     match import_kind {
-        "openapi" => {
-            dialog = dialog.add_filter("OpenAPI Files", &["yml", "yaml", "json"]);
-        }
-        "postman" => {
-            dialog = dialog.add_filter("Postman Collection", &["json"]);
+        "collection" => {
+            dialog = dialog.add_filter(
+                "Collection Files (OpenAPI, Postman, Insomnia, HAR)",
+                &["json", "yaml", "yml", "har"],
+            );
         }
         "postman_environment" => {
             dialog = dialog.add_filter("Postman Environment", &["json"]);
