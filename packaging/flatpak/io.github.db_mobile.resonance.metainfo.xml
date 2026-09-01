@@ -119,6 +119,14 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.1.11" date="2026-09-01">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Optimize package size</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.1.10" date="2026-08-30">
       <description>
         <p>Feature stabilization release</p>
