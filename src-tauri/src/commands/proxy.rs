@@ -394,6 +394,7 @@ pub async fn proxy_test(state: State<'_, ProxyState>) -> Result<serde_json::Valu
         }));
     }
 
+    super::tls::ensure_crypto_provider();
     let mut client_builder =
         reqwest::Client::builder().timeout(Duration::from_millis(settings.timeout));
 

@@ -53,6 +53,11 @@ use commands::{
 };
 
 fn main() {
+    // Install ring as the process-wide rustls provider before anything builds
+    // a TLS client (rumqttc's TLS config, tauri-plugin-updater's reqwest, and
+    // the app's own reqwest clients all resolve the process default).
+    commands::tls::ensure_crypto_provider();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())

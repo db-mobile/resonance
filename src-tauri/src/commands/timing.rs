@@ -294,6 +294,7 @@ mod tests {
     }
 
     fn instrumented_client(recorder: &Arc<TimingRecorder>) -> reqwest::Client {
+        crate::commands::tls::ensure_crypto_provider();
         reqwest::Client::builder()
             .dns_resolver(TimingResolver::new(Arc::clone(recorder)))
             .connector_layer(TimingLayer::new(Arc::clone(recorder)))
