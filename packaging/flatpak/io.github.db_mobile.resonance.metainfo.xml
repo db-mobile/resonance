@@ -124,6 +124,7 @@
         <p>Feature stabilization release</p>
         <ul>
           <li>Optimize package size</li>
+          <li>Add Insomnia, HAR, Swagger 2.0, and OpenAPI 3.1 import</li>
         </ul>
       </description>
     </release>

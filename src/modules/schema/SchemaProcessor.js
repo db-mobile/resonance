@@ -83,7 +83,14 @@ export class SchemaProcessor {
             }
             return schema.example;
         }
-        
+
+        if (schema.const !== undefined) {
+            if (depth === 0) {
+                return JSON.stringify(schema.const, null, 2);
+            }
+            return schema.const;
+        }
+
         const generateValue = (propSchema, propName = '', currentDepth = 0) => {
             if (!propSchema) {
                 return 'no-schema';
@@ -100,25 +107,36 @@ export class SchemaProcessor {
                 }
                 return 'ref-placeholder';
             }
-            
+
+            if (Array.isArray(propSchema.type)) {
+                const primary = propSchema.type.find((t) => t !== 'null') ?? propSchema.type[0];
+                propSchema = { ...propSchema, type: primary };
+            }
+
             if (propSchema.properties && !propSchema.type) {
                 propSchema = { ...propSchema, type: 'object' };
             }
-            
+
             if (propSchema.example !== undefined && propSchema.example !== null) {
                 return propSchema.example;
             }
-            
+
+            if (propSchema.const !== undefined) {
+                return propSchema.const;
+            }
+
             if (propSchema.default !== undefined) {
                 return propSchema.default;
             }
-            
+
             return this._generateValueByType(propSchema, propName, currentDepth, generateValue);
         };
-        
+
         let example;
-        
-        if (schema.type === 'object' && schema.properties) {
+
+        if (Array.isArray(schema.type)) {
+            example = generateValue(schema, 'root', depth);
+        } else if (schema.type === 'object' && schema.properties) {
             example = generateValue(schema, 'root', depth);
         } else if (schema.properties && !schema.type) {
             example = generateValue({ ...schema, type: 'object' }, 'root', depth);

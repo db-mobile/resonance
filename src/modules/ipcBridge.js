@@ -95,8 +95,7 @@ if (isTauri) {
             getPath: () => invoke('collections_get_path'),
             pickDirectory: (remember = true) => invoke('collections_pick_directory', { remember }),
             pickImportFile: (importKind) => invoke('collections_pick_import_file', { importKind }),
-            importOpenApiFile: (filePath = null, storageParentPath = null) => invoke('import_openapi_file', { filePath, storageParentPath }),
-            importPostmanCollection: (filePath = null, storageParentPath = null) => invoke('import_postman_collection', { filePath, storageParentPath }),
+            importCollectionFile: (filePath = null, storageParentPath = null) => invoke('import_collection_file', { filePath, storageParentPath }),
             importPostmanEnvironment: () => invoke('import_postman_environment'),
             exportOpenApi: (collectionId, format) => invoke('export_openapi', { collectionId, format }),
             exportPostman: (collectionId) => invoke('export_postman', { collectionId })

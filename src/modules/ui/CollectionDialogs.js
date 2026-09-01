@@ -581,12 +581,9 @@ export class CollectionDialogs {
             }
 
             const t = (key, fallback) => (app.i18n && app.i18n.t) ? app.i18n.t(key) : fallback;
-            if (importKind === 'openapi') {
-                titleElement.textContent = t('import_dialog.title_openapi', 'Import OpenAPI Collection');
-                subtitleElement.textContent = t('import_dialog.subtitle_openapi', 'Choose an OpenAPI file and where the collection should be stored.');
-            } else if (importKind === 'postman') {
-                titleElement.textContent = t('import_dialog.title_postman', 'Import Postman Collection');
-                subtitleElement.textContent = t('import_dialog.subtitle_postman', 'Choose a Postman file and where the collection should be stored.');
+            if (importKind === 'collection') {
+                titleElement.textContent = t('import_dialog.title_collection', 'Import Collection');
+                subtitleElement.textContent = t('import_dialog.subtitle_collection', 'Choose an OpenAPI/Swagger, Postman, Insomnia, or HAR file — the format is detected automatically.');
             }
 
             const setError = (message = '') => {

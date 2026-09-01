@@ -369,4 +369,48 @@ describe('SchemaProcessor', () => {
             expect(schema.type).toBeUndefined();
         });
     });
+
+    describe('OpenAPI 3.1 schemas', () => {
+        test('type arrays resolve to their first non-null entry', () => {
+            const schema = {
+                type: 'object',
+                properties: {
+                    name: { type: ['string', 'null'] },
+                    count: { type: ['null', 'integer'] }
+                }
+            };
+
+            const parsed = JSON.parse(processor.generateExampleFromSchema(schema));
+
+            expect(typeof parsed.name).toBe('string');
+            expect(typeof parsed.count).toBe('number');
+        });
+
+        test('a root-level type array generates a value', () => {
+            const schema = { type: ['string', 'null'] };
+
+            const result = processor.generateExampleFromSchema(schema);
+
+            expect(typeof result).toBe('string');
+        });
+
+        test('const is used like an example', () => {
+            const schema = {
+                type: 'object',
+                properties: {
+                    kind: { const: 'widget' }
+                }
+            };
+
+            const parsed = JSON.parse(processor.generateExampleFromSchema(schema));
+
+            expect(parsed.kind).toBe('widget');
+        });
+
+        test('a root-level const wins over generation', () => {
+            const result = processor.generateExampleFromSchema({ const: { fixed: true } });
+
+            expect(JSON.parse(result)).toEqual({ fixed: true });
+        });
+    });
 });

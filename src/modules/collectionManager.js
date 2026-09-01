@@ -61,25 +61,14 @@ export async function getCollections() {
 }
 
 /**
- * Opens file dialog and imports OpenAPI specification file
+ * Opens file dialog and imports a collection file of any supported format
  *
  * @async
  * @returns {Promise<Object|null>} Imported collection or null if cancelled
  */
-export function importOpenApiFile() {
+export function importCollectionFile() {
     const controller = initializeController();
-    return controller.importOpenApiFile();
-}
-
-/**
- * Opens file dialog and imports Postman collection file
- *
- * @async
- * @returns {Promise<Object|null>} Imported collection or null if cancelled
- */
-export function importPostmanCollection() {
-    const controller = initializeController();
-    return controller.importPostmanCollection();
+    return controller.importCollectionFile();
 }
 
 /**

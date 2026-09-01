@@ -1,5 +1,6 @@
 //! Postman collection parsing: converts a Postman export `Value` into a `Collection`.
 
+use super::common::{derive_base_url, param_map_entry, unique_folder_id, ParsedBody};
 use super::{Collection, Endpoint, Folder, VariableEntry};
 use crate::commands::scripts::ScriptData;
 use serde_json::Value;
@@ -32,14 +33,6 @@ impl InheritedScripts {
             ));
         }
     }
-}
-
-/// Result of parsing a Postman request body: either a regular request body
-/// value, a GraphQL payload destined for the endpoint's `graphql_data`, or nothing.
-enum ParsedBody {
-    Empty,
-    RequestBody(Value),
-    GraphQL(Value),
 }
 
 pub(crate) fn parse_postman_collection(postman: Value) -> Result<Collection, String> {
@@ -159,23 +152,6 @@ fn collect_items(
     }
 }
 
-/// Folder ids follow the frontend convention (`folder_<sanitized name>`,
-/// see CollectionService.js). Distinct composite names can sanitize to the
-/// same id ("A - B" vs "A / B"), so collisions get a numeric suffix.
-fn unique_folder_id(name: &str, used: &mut HashSet<String>) -> String {
-    let base = format!(
-        "folder_{}",
-        name.replace(|c: char| !c.is_alphanumeric(), "_")
-    );
-    let mut candidate = base.clone();
-    let mut counter = 2;
-    while !used.insert(candidate.clone()) {
-        candidate = format!("{}_{}", base, counter);
-        counter += 1;
-    }
-    candidate
-}
-
 /// Extract base URL from Postman collection
 /// Checks collection variables first, then derives from first request URL
 fn extract_postman_base_url(postman: &Value, endpoints: &[Endpoint]) -> Option<String> {
@@ -192,20 +168,7 @@ fn extract_postman_base_url(postman: &Value, endpoints: &[Endpoint]) -> Option<S
         }
     }
 
-    if let Some(first_endpoint) = endpoints.first() {
-        let path = &first_endpoint.path;
-        if path.starts_with("http://") || path.starts_with("https://") {
-            if let Ok(url) = url::Url::parse(path) {
-                let base = format!("{}://{}", url.scheme(), url.host_str().unwrap_or(""));
-                if let Some(port) = url.port() {
-                    return Some(format!("{}:{}", base, port));
-                }
-                return Some(base);
-            }
-        }
-    }
-
-    None
+    derive_base_url(endpoints)
 }
 
 /// Import the full Postman `variable[]` list, skipping disabled and empty-key
@@ -658,19 +621,12 @@ fn extract_postman_parameters(url: Option<&Value>, request: &Value) -> Option<Va
                 if key.is_empty() {
                     continue;
                 }
-
-                let mut param_obj = serde_json::Map::new();
                 let value = var
                     .get("value")
                     .and_then(|v| v.as_str())
                     .unwrap_or_default();
-                param_obj.insert("example".to_string(), Value::String(value.to_string()));
-
-                if let Some(desc) = var.get("description").and_then(|d| d.as_str()) {
-                    param_obj.insert("description".to_string(), Value::String(desc.to_string()));
-                }
-
-                path_params.insert(key.to_string(), Value::Object(param_obj));
+                let desc = var.get("description").and_then(|d| d.as_str());
+                path_params.insert(key.to_string(), param_map_entry(value, desc));
             }
         }
 
@@ -684,19 +640,12 @@ fn extract_postman_parameters(url: Option<&Value>, request: &Value) -> Option<Va
                 if key.is_empty() {
                     continue;
                 }
-
-                let mut param_obj = serde_json::Map::new();
                 let value = q_param
                     .get("value")
                     .and_then(|v| v.as_str())
                     .unwrap_or_default();
-                param_obj.insert("example".to_string(), Value::String(value.to_string()));
-
-                if let Some(desc) = q_param.get("description").and_then(|d| d.as_str()) {
-                    param_obj.insert("description".to_string(), Value::String(desc.to_string()));
-                }
-
-                query_params.insert(key.to_string(), Value::Object(param_obj));
+                let desc = q_param.get("description").and_then(|d| d.as_str());
+                query_params.insert(key.to_string(), param_map_entry(value, desc));
             }
         }
     }
@@ -711,26 +660,15 @@ fn extract_postman_parameters(url: Option<&Value>, request: &Value) -> Option<Va
             if key.is_empty() {
                 continue;
             }
-
-            let mut param_obj = serde_json::Map::new();
+            if header.get("disabled").and_then(|d| d.as_bool()) == Some(true) {
+                continue;
+            }
             let value = header
                 .get("value")
                 .and_then(|v| v.as_str())
                 .unwrap_or_default();
-            param_obj.insert("example".to_string(), Value::String(value.to_string()));
-
-            if let Some(desc) = header.get("description").and_then(|d| d.as_str()) {
-                param_obj.insert("description".to_string(), Value::String(desc.to_string()));
-            }
-
-            // Check if header is disabled
-            if let Some(disabled) = header.get("disabled").and_then(|d| d.as_bool()) {
-                if disabled {
-                    continue; // Skip disabled headers
-                }
-            }
-
-            header_params.insert(key.to_string(), Value::Object(param_obj));
+            let desc = header.get("description").and_then(|d| d.as_str());
+            header_params.insert(key.to_string(), param_map_entry(value, desc));
         }
     }
 
