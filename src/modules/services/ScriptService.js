@@ -3,6 +3,8 @@
  * @module services/ScriptService
  */
 
+import { app } from '../appContext.js';
+
 /**
  * Request fields a pre-request script may mutate: the exact set seeded into the
  * script's `request` object and the only keys copied back from the result.
@@ -96,7 +98,8 @@ export class ScriptService {
                     queryParams: requestConfig.queryParams || {},
                     pathParams: requestConfig.pathParams || {}
                 },
-                environment: environmentVariables || {}
+                environment: environmentVariables || {},
+                cookies: await this._readCookieJar()
             };
 
             const result = await window.backendAPI.scripts.executePreRequest(scriptData);
@@ -104,6 +107,7 @@ export class ScriptService {
             if (result.modifiedEnvironment && Object.keys(result.modifiedEnvironment).length > 0) {
                 await this._applyEnvironmentChanges(result.modifiedEnvironment);
             }
+            await this._applyCookieChanges(result.cookieChanges);
 
             return {
                 modifiedRequest: this._mergeModifiedRequest(requestConfig, result.modifiedRequest),
@@ -168,7 +172,8 @@ export class ScriptService {
                     timings,
                     cookies
                 },
-                environment: environmentVariables || {}
+                environment: environmentVariables || {},
+                cookies: await this._readCookieJar()
             };
 
             const result = await window.backendAPI.scripts.executeTest(scriptData);
@@ -176,6 +181,7 @@ export class ScriptService {
             if (result.modifiedEnvironment && Object.keys(result.modifiedEnvironment).length > 0) {
                 await this._applyEnvironmentChanges(result.modifiedEnvironment);
             }
+            await this._applyCookieChanges(result.cookieChanges);
 
             return result;
 
@@ -211,6 +217,67 @@ export class ScriptService {
             }
         }
         return merged;
+    }
+
+    /**
+     * The cookie jar controller, when the cookie feature is wired and enabled.
+     * Returns null when cookies are switched off so scripts see an empty jar
+     * and their writes are discarded, matching header-injection behavior.
+     * @private
+     * @returns {Promise<Object|null>} The cookie controller, or null
+     */
+    async _cookieController() {
+        const controller = app.cookieController;
+        if (!controller) {
+            return null;
+        }
+        try {
+            const settings = app.getApiHandlerSettingsCache?.() ?? await window.backendAPI.settings.get();
+            if (settings?.cookieJarEnabled === false) {
+                return null;
+            }
+        } catch (_e) {
+            return null;
+        }
+        return controller;
+    }
+
+    /**
+     * Read the active environment's cookies to seed the script sandbox.
+     * @private
+     * @returns {Promise<Array<Object>>} Stored cookies, or an empty list
+     */
+    async _readCookieJar() {
+        try {
+            const controller = await this._cookieController();
+            if (!controller) {
+                return [];
+            }
+            return await controller.getCookiesForScripts();
+        } catch (_e) {
+            return [];
+        }
+    }
+
+    /**
+     * Apply the cookie operations a script recorded. Runs before the request is
+     * sent for pre-request scripts, so writes are picked up by cookie injection.
+     * @private
+     * @param {Array<Object>|undefined} changes - Recorded cookie operations
+     * @returns {Promise<void>}
+     */
+    async _applyCookieChanges(changes) {
+        if (!Array.isArray(changes) || changes.length === 0) {
+            return;
+        }
+        try {
+            const controller = await this._cookieController();
+            if (!controller) {
+                return;
+            }
+            await controller.applyScriptCookieChanges(changes);
+        } catch (_e) {
+        }
     }
 
     /**

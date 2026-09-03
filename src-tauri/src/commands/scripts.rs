@@ -31,6 +31,10 @@ pub struct ScriptExecutionData {
     #[serde(default)]
     pub response: Option<Value>,
     pub environment: HashMap<String, String>,
+    /// Cookies from the active environment's jar, readable and writable through
+    /// the in-script `cookies` / `pm.cookies` API.
+    #[serde(default)]
+    pub cookies: Vec<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,6 +46,10 @@ pub struct ScriptResult {
     pub test_results: Vec<TestResult>,
     pub modified_request: Option<Value>,
     pub modified_environment: HashMap<String, Option<String>>,
+    /// Ordered cookie operations recorded by the script:
+    /// { op: "set", cookie } | { op: "delete", name, domain?, path? } | { op: "clear" }.
+    #[serde(default)]
+    pub cookie_changes: Vec<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -202,6 +210,8 @@ struct ScriptContext {
     request: Value,
     response: Option<Value>,
     environment: HashMap<String, String>,
+    cookies: Vec<Value>,
+    cookie_changes: Vec<Value>,
 }
 
 /// Execute a JavaScript script in a sandboxed environment.
@@ -226,6 +236,10 @@ fn execute_script(
     // Setup pm (Postman-like) object for backward compatibility
     let pm_ctx = ctx.clone();
     setup_pm(&mut context, pm_ctx)?;
+
+    // Setup the cookie jar API (must come after pm so the glue can attach pm.cookies)
+    let cookies_ctx = ctx.clone();
+    setup_cookies(&mut context, cookies_ctx)?;
 
     // Setup sendRequest (must come after pm so the glue can attach pm.sendRequest)
     setup_send_request(&mut context, proxy_settings)?;
@@ -924,6 +938,273 @@ fn perform_send_request(
     }
 }
 
+/// Cookie identity: cookies match on name + domain + path, mirroring the jar's
+/// composite key on the frontend.
+fn cookie_matches(cookie: &Value, name: &str, domain: Option<&str>, path: Option<&str>) -> bool {
+    if cookie.get("name").and_then(|v| v.as_str()) != Some(name) {
+        return false;
+    }
+    if let Some(domain) = domain {
+        let stored = cookie.get("domain").and_then(|v| v.as_str()).unwrap_or("");
+        if !stored.eq_ignore_ascii_case(domain) {
+            return false;
+        }
+    }
+    if let Some(path) = path {
+        let stored = cookie.get("path").and_then(|v| v.as_str()).unwrap_or("/");
+        if stored != path {
+            return false;
+        }
+    }
+    true
+}
+
+/// The host of the request under execution, used as the default cookie domain
+/// so `cookies.set('k', 'v')` targets the request's own host.
+fn request_host(ctx: &Rc<RefCell<ScriptContext>>) -> Option<String> {
+    let url = ctx
+        .borrow()
+        .request
+        .get("url")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())?;
+    url::Url::parse(&url)
+        .ok()
+        .and_then(|parsed| parsed.host_str().map(|h| h.to_ascii_lowercase()))
+}
+
+/// Native backend for the in-script cookie API. Applies one operation to the
+/// in-context cookie list and records it for the frontend to persist.
+fn cookie_op_native(args: &[JsValue], ctx: &Rc<RefCell<ScriptContext>>) -> JsResult<JsValue> {
+    let op_json = args
+        .first()
+        .and_then(|v| v.as_string())
+        .map(|s| s.to_std_string_escaped())
+        .ok_or_else(|| {
+            JsNativeError::typ().with_message("cookies: expected an operation JSON string")
+        })?;
+
+    let op: Value = serde_json::from_str(&op_json)
+        .map_err(|e| JsNativeError::typ().with_message(format!("cookies: invalid op: {}", e)))?;
+
+    match op.get("op").and_then(|v| v.as_str()) {
+        Some("set") => {
+            let mut cookie = op
+                .get("cookie")
+                .and_then(|c| c.as_object())
+                .cloned()
+                .ok_or_else(|| {
+                    JsNativeError::typ().with_message("cookies.set: expected a cookie object")
+                })?;
+
+            let name = cookie
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            if name.is_empty() {
+                return Err(JsNativeError::typ()
+                    .with_message("cookies.set: a cookie name is required")
+                    .into());
+            }
+
+            let domain = match cookie.get("domain").and_then(|v| v.as_str()) {
+                Some(domain) if !domain.is_empty() => domain.to_ascii_lowercase(),
+                _ => request_host(ctx).ok_or_else(|| {
+                    JsNativeError::typ().with_message(
+                        "cookies.set: no domain given and the request URL has no host",
+                    )
+                })?,
+            };
+            cookie.insert("domain".to_string(), Value::String(domain.clone()));
+
+            let path = cookie
+                .get("path")
+                .and_then(|v| v.as_str())
+                .filter(|p| !p.is_empty())
+                .unwrap_or("/")
+                .to_string();
+            cookie.insert("path".to_string(), Value::String(path.clone()));
+
+            let cookie = Value::Object(cookie);
+            let mut borrowed = ctx.borrow_mut();
+            if let Some(existing) = borrowed
+                .cookies
+                .iter_mut()
+                .find(|c| cookie_matches(c, &name, Some(&domain), Some(&path)))
+            {
+                *existing = cookie.clone();
+            } else {
+                borrowed.cookies.push(cookie.clone());
+            }
+            borrowed
+                .cookie_changes
+                .push(serde_json::json!({ "op": "set", "cookie": cookie }));
+        }
+        Some("delete") => {
+            let name = op
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            if name.is_empty() {
+                return Err(JsNativeError::typ()
+                    .with_message("cookies.unset: a cookie name is required")
+                    .into());
+            }
+            let domain = op
+                .get("domain")
+                .and_then(|v| v.as_str())
+                .filter(|d| !d.is_empty())
+                .map(|d| d.to_ascii_lowercase());
+            let path = op
+                .get("path")
+                .and_then(|v| v.as_str())
+                .filter(|p| !p.is_empty())
+                .map(|p| p.to_string());
+
+            let mut borrowed = ctx.borrow_mut();
+            borrowed
+                .cookies
+                .retain(|c| !cookie_matches(c, &name, domain.as_deref(), path.as_deref()));
+            let mut change = serde_json::Map::new();
+            change.insert("op".to_string(), Value::String("delete".to_string()));
+            change.insert("name".to_string(), Value::String(name));
+            if let Some(domain) = domain {
+                change.insert("domain".to_string(), Value::String(domain));
+            }
+            if let Some(path) = path {
+                change.insert("path".to_string(), Value::String(path));
+            }
+            borrowed.cookie_changes.push(Value::Object(change));
+        }
+        Some("clear") => {
+            let mut borrowed = ctx.borrow_mut();
+            borrowed.cookies.clear();
+            borrowed
+                .cookie_changes
+                .push(serde_json::json!({ "op": "clear" }));
+        }
+        other => {
+            return Err(JsNativeError::typ()
+                .with_message(format!("cookies: unknown operation {:?}", other))
+                .into());
+        }
+    }
+
+    let json = serde_json::to_string(&ctx.borrow().cookies).unwrap_or_else(|_| "[]".to_string());
+    Ok(JsValue::from(js_string!(json)))
+}
+
+/// Register the cookie jar bridge plus the `cookies` / `pm.cookies` JS wrapper.
+/// The jar itself lives on the frontend; recorded operations are applied there
+/// after the script finishes.
+fn setup_cookies(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<(), String> {
+    let read_ctx = ctx.clone();
+    let read_fn = unsafe {
+        NativeFunction::from_closure(move |_, _args, _| {
+            let json = serde_json::to_string(&read_ctx.borrow().cookies)
+                .unwrap_or_else(|_| "[]".to_string());
+            Ok(JsValue::from(js_string!(json)))
+        })
+    };
+    context
+        .register_global_callable(js_string!("__cookiesRead__"), 0, read_fn)
+        .map_err(|e| e.to_string())?;
+
+    let op_ctx = ctx.clone();
+    let op_fn =
+        unsafe { NativeFunction::from_closure(move |_, args, _| cookie_op_native(args, &op_ctx)) };
+    context
+        .register_global_callable(js_string!("__cookieOp__"), 1, op_fn)
+        .map_err(|e| e.to_string())?;
+
+    let glue_code = r#"
+        (function() {
+            function readAll() {
+                return JSON.parse(__cookiesRead__());
+            }
+            function matches(cookie, name, domain) {
+                if (cookie.name !== name) { return false; }
+                if (domain === undefined || domain === null || domain === '') { return true; }
+                return String(cookie.domain || '').toLowerCase() === String(domain).toLowerCase();
+            }
+            function normalizeSet(nameOrCookie, value, options) {
+                var cookie;
+                if (nameOrCookie !== null && typeof nameOrCookie === 'object') {
+                    cookie = {};
+                    for (var key in nameOrCookie) { cookie[key] = nameOrCookie[key]; }
+                } else {
+                    cookie = { name: String(nameOrCookie), value: value === undefined || value === null ? '' : String(value) };
+                    if (options !== null && typeof options === 'object') {
+                        for (var opt in options) { cookie[opt] = options[opt]; }
+                    }
+                }
+                if (typeof cookie.name !== 'string' || cookie.name === '') {
+                    throw new TypeError('cookies.set requires a cookie name');
+                }
+                cookie.value = cookie.value === undefined || cookie.value === null ? '' : String(cookie.value);
+                if (cookie.expires instanceof Date) { cookie.expires = cookie.expires.getTime(); }
+                if (typeof cookie.expires === 'string') {
+                    var parsed = Date.parse(cookie.expires);
+                    cookie.expires = isNaN(parsed) ? null : parsed;
+                }
+                if (cookie.expires === undefined) { cookie.expires = null; }
+                cookie.secure = Boolean(cookie.secure);
+                cookie.httpOnly = Boolean(cookie.httpOnly);
+                return cookie;
+            }
+            var cookies = {
+                getAll: function() {
+                    return readAll();
+                },
+                get: function(name, domain) {
+                    var all = readAll();
+                    for (var i = 0; i < all.length; i++) {
+                        if (matches(all[i], name, domain)) { return all[i].value; }
+                    }
+                    return null;
+                },
+                has: function(name, domain) {
+                    return cookies.get(name, domain) !== null;
+                },
+                set: function(nameOrCookie, value, options) {
+                    var cookie = normalizeSet(nameOrCookie, value, options);
+                    __cookieOp__(JSON.stringify({ op: 'set', cookie: cookie }));
+                    return undefined;
+                },
+                unset: function(name, domain, path) {
+                    if (typeof name !== 'string' || name === '') {
+                        throw new TypeError('cookies.unset requires a cookie name');
+                    }
+                    __cookieOp__(JSON.stringify({ op: 'delete', name: name, domain: domain, path: path }));
+                    return undefined;
+                },
+                clear: function() {
+                    __cookieOp__(JSON.stringify({ op: 'clear' }));
+                    return undefined;
+                }
+            };
+            cookies.toObject = function() {
+                var out = {};
+                var all = readAll();
+                for (var i = 0; i < all.length; i++) { out[all[i].name] = all[i].value; }
+                return out;
+            };
+            if (typeof pm === 'object' && pm !== null) { pm.cookies = cookies; }
+            return cookies;
+        })()
+    "#;
+
+    let source = Source::from_bytes(glue_code.as_bytes());
+    let cookies_obj = context.eval(source).map_err(|e| e.to_string())?;
+    context
+        .register_global_property(js_string!("cookies"), cookies_obj, Attribute::all())
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 /// Native backend for the JS `sendRequest` global. Takes an options JSON
 /// string and returns a response JSON string; failures become catchable JS
 /// errors so scripts can try/catch them.
@@ -1046,6 +1327,8 @@ fn run_script_sync(
         request: script_data.request,
         response: script_data.response,
         environment: script_data.environment,
+        cookies: script_data.cookies,
+        cookie_changes: Vec::new(),
     }));
 
     let result = execute_script(
@@ -1069,6 +1352,7 @@ fn run_script_sync(
         test_results: ctx_ref.test_results.clone(),
         modified_request,
         modified_environment: ctx_ref.environment_changes.clone(),
+        cookie_changes: ctx_ref.cookie_changes.clone(),
     }
 }
 
@@ -1085,6 +1369,7 @@ pub async fn script_execute_pre_request(
             test_results: Vec::new(),
             modified_request: Some(script_data.request),
             modified_environment: HashMap::new(),
+            cookie_changes: Vec::new(),
         });
     }
 
@@ -1107,6 +1392,7 @@ pub async fn script_execute_test(
             test_results: Vec::new(),
             modified_request: None,
             modified_environment: HashMap::new(),
+            cookie_changes: Vec::new(),
         });
     }
 
@@ -1263,6 +1549,227 @@ mod tests {
         let result = execute_script(script, ctx.clone(), false, ProxySettings::default());
         let env = ctx.borrow().environment_changes.clone();
         (result, env)
+    }
+
+    /// Run a script with a seeded cookie jar, returning the recorded operations
+    /// and the resulting in-context cookie list.
+    fn run_script_cookies(
+        script: &str,
+        cookies: Vec<Value>,
+    ) -> (Result<(), String>, Vec<Value>, Vec<Value>) {
+        let ctx = Rc::new(RefCell::new(ScriptContext {
+            request: default_request(),
+            cookies,
+            ..Default::default()
+        }));
+        let result = execute_script(script, ctx.clone(), false, ProxySettings::default());
+        let borrowed = ctx.borrow();
+        (
+            result,
+            borrowed.cookie_changes.clone(),
+            borrowed.cookies.clone(),
+        )
+    }
+
+    fn seeded_cookie(name: &str, value: &str, domain: &str) -> Value {
+        json!({
+            "id": format!("default|{}|/|{}", domain, name),
+            "environmentId": "default",
+            "name": name,
+            "value": value,
+            "domain": domain,
+            "path": "/",
+            "expires": Value::Null,
+            "httpOnly": false,
+            "secure": false,
+            "sameSite": Value::Null,
+            "hostOnly": true
+        })
+    }
+
+    #[test]
+    fn cookies_get_reads_the_seeded_jar() {
+        let (result, changes, _) = run_script_cookies(
+            r#"
+            if (cookies.get('session') !== 'abc') { throw new Error('wrong value'); }
+            if (cookies.get('missing') !== null) { throw new Error('expected null'); }
+            if (cookies.getAll().length !== 1) { throw new Error('wrong length'); }
+            if (cookies.toObject().session !== 'abc') { throw new Error('toObject failed'); }
+        "#,
+            vec![seeded_cookie("session", "abc", "example.com")],
+        );
+        result.expect("script should execute");
+        assert!(changes.is_empty(), "reads must not record changes");
+    }
+
+    #[test]
+    fn cookies_set_defaults_the_domain_to_the_request_host() {
+        let (result, changes, cookies) =
+            run_script_cookies(r#"cookies.set('token', 'xyz');"#, Vec::new());
+        result.expect("script should execute");
+
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0]["op"], json!("set"));
+        assert_eq!(changes[0]["cookie"]["name"], json!("token"));
+        assert_eq!(changes[0]["cookie"]["value"], json!("xyz"));
+        assert_eq!(changes[0]["cookie"]["domain"], json!("example.com"));
+        assert_eq!(changes[0]["cookie"]["path"], json!("/"));
+        assert_eq!(cookies.len(), 1);
+    }
+
+    #[test]
+    fn cookies_set_is_visible_to_a_later_get() {
+        let (result, _, _) = run_script_cookies(
+            r#"
+            cookies.set('token', 'first');
+            if (cookies.get('token') !== 'first') { throw new Error('set not observable'); }
+            cookies.set('token', 'second');
+            if (cookies.get('token') !== 'second') { throw new Error('overwrite not observable'); }
+        "#,
+            Vec::new(),
+        );
+        result.expect("script should execute");
+    }
+
+    #[test]
+    fn cookies_set_overwrites_rather_than_duplicating() {
+        let (result, changes, cookies) = run_script_cookies(
+            r#"cookies.set('session', 'rotated');"#,
+            vec![seeded_cookie("session", "abc", "example.com")],
+        );
+        result.expect("script should execute");
+        assert_eq!(cookies.len(), 1);
+        assert_eq!(cookies[0]["value"], json!("rotated"));
+        assert_eq!(changes.len(), 1);
+    }
+
+    #[test]
+    fn cookies_set_accepts_an_object_with_attributes() {
+        let (result, changes, _) = run_script_cookies(
+            r#"
+            cookies.set({
+                name: 'a',
+                value: 'b',
+                domain: 'API.Example.com',
+                path: '/v1',
+                secure: true,
+                httpOnly: true,
+                sameSite: 'Lax',
+                expires: '2030-01-01T00:00:00Z'
+            });
+        "#,
+            Vec::new(),
+        );
+        result.expect("script should execute");
+
+        let cookie = &changes[0]["cookie"];
+        assert_eq!(cookie["domain"], json!("api.example.com"));
+        assert_eq!(cookie["path"], json!("/v1"));
+        assert_eq!(cookie["secure"], json!(true));
+        assert_eq!(cookie["httpOnly"], json!(true));
+        assert_eq!(cookie["sameSite"], json!("Lax"));
+        assert!(cookie["expires"].is_number(), "expires should be epoch ms");
+    }
+
+    #[test]
+    fn cookies_set_with_options_object_form() {
+        let (result, changes, _) = run_script_cookies(
+            r#"cookies.set('a', 'b', { domain: 'other.example.com', secure: true });"#,
+            Vec::new(),
+        );
+        result.expect("script should execute");
+        assert_eq!(changes[0]["cookie"]["domain"], json!("other.example.com"));
+        assert_eq!(changes[0]["cookie"]["secure"], json!(true));
+    }
+
+    #[test]
+    fn cookies_unset_records_a_delete_and_drops_the_entry() {
+        let (result, changes, cookies) = run_script_cookies(
+            r#"cookies.unset('session');"#,
+            vec![seeded_cookie("session", "abc", "example.com")],
+        );
+        result.expect("script should execute");
+
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0]["op"], json!("delete"));
+        assert_eq!(changes[0]["name"], json!("session"));
+        assert!(changes[0].get("domain").is_none(), "no domain filter given");
+        assert!(cookies.is_empty());
+    }
+
+    #[test]
+    fn cookies_unset_can_target_one_domain() {
+        let (result, changes, cookies) = run_script_cookies(
+            r#"cookies.unset('session', 'other.example.com');"#,
+            vec![
+                seeded_cookie("session", "a", "example.com"),
+                seeded_cookie("session", "b", "other.example.com"),
+            ],
+        );
+        result.expect("script should execute");
+        assert_eq!(changes[0]["domain"], json!("other.example.com"));
+        assert_eq!(cookies.len(), 1);
+        assert_eq!(cookies[0]["domain"], json!("example.com"));
+    }
+
+    #[test]
+    fn cookies_clear_empties_the_jar() {
+        let (result, changes, cookies) = run_script_cookies(
+            r#"cookies.clear();"#,
+            vec![
+                seeded_cookie("a", "1", "example.com"),
+                seeded_cookie("b", "2", "example.com"),
+            ],
+        );
+        result.expect("script should execute");
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0]["op"], json!("clear"));
+        assert!(cookies.is_empty());
+    }
+
+    #[test]
+    fn pm_cookies_is_the_same_api() {
+        let (result, changes, _) = run_script_cookies(
+            r#"
+            if (pm.cookies.get('session') !== 'abc') { throw new Error('pm.cookies.get failed'); }
+            pm.cookies.set('via_pm', '1');
+        "#,
+            vec![seeded_cookie("session", "abc", "example.com")],
+        );
+        result.expect("script should execute");
+        assert_eq!(changes[0]["cookie"]["name"], json!("via_pm"));
+    }
+
+    #[test]
+    fn cookies_operations_are_recorded_in_order() {
+        let (result, changes, _) = run_script_cookies(
+            r#"
+            cookies.set('a', '1');
+            cookies.unset('b');
+            cookies.clear();
+        "#,
+            Vec::new(),
+        );
+        result.expect("script should execute");
+        let ops: Vec<&str> = changes
+            .iter()
+            .map(|c| c["op"].as_str().unwrap_or_default())
+            .collect();
+        assert_eq!(ops, vec!["set", "delete", "clear"]);
+    }
+
+    #[test]
+    fn a_nameless_cookie_set_throws_a_catchable_error() {
+        let (result, changes, _) = run_script_cookies(
+            r#"
+            var threw = false;
+            try { cookies.set('', 'v'); } catch (e) { threw = true; }
+            if (!threw) { throw new Error('expected a TypeError'); }
+        "#,
+            Vec::new(),
+        );
+        result.expect("script should execute");
+        assert!(changes.is_empty());
     }
 
     fn env_value(env: &HashMap<String, Option<String>>, key: &str) -> String {
@@ -1525,6 +2032,7 @@ mod tests {
             request: default_request(),
             response: None,
             environment: HashMap::new(),
+            cookies: Vec::new(),
         };
         let result = tokio::task::spawn_blocking(move || {
             run_script_sync(script_data, false, ProxySettings::default())

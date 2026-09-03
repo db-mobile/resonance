@@ -1259,7 +1259,10 @@ export async function handleSendRequest() {
                         getCurrentEndpoint().collectionId,
                         getCurrentEndpoint().endpointId,
                         requestConfig,
-                        result
+                        // The backend reports raw Set-Cookie strings as
+                        // `setCookies`; scripts read `response.cookies`, so the
+                        // parsed form is attached here.
+                        { ...result, cookies: extractCookies(result.headers) }
                     );
                 } catch (error) {
                 }

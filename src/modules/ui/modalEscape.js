@@ -13,6 +13,22 @@
 const handlers = [];
 
 /**
+ * Input types that open a native picker widget owning its own Escape.
+ * @type {ReadonlySet<string>}
+ */
+const PICKER_INPUT_TYPES = new Set(['date', 'datetime-local', 'month', 'time', 'week']);
+
+/**
+ * Whether a keydown came from an input that may have a native picker open.
+ *
+ * @param {EventTarget|null} target - The keydown target
+ * @returns {boolean}
+ */
+function isPickerInput(target) {
+    return Boolean(target) && target.tagName === 'INPUT' && PICKER_INPUT_TYPES.has(target.type);
+}
+
+/**
  * Dispatches Escape to the topmost registered dialog only, and stops the event
  * so neither the dialogs beneath it nor the app-level shortcuts also react.
  *
@@ -24,6 +40,16 @@ function onKeydown(e) {
         return;
     }
     e.stopPropagation();
+
+    // Capturing on the document means the event never reaches a date/time
+    // input, so the browser cannot dismiss its picker itself. Those widgets are
+    // tied to focus, so blurring closes the picker and leaves the dialog open;
+    // the next Escape dismisses the dialog as usual.
+    if (isPickerInput(e.target)) {
+        e.target.blur();
+        return;
+    }
+
     handlers[handlers.length - 1]();
 }
 

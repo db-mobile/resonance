@@ -260,6 +260,24 @@ pub async fn import_collection_file(
     Ok(Some(result))
 }
 
+/// Pick and parse a cookie-jar export. Shape validation happens on the
+/// frontend, which owns the jar; this command only reads and parses.
+#[tauri::command]
+pub async fn import_cookie_file(app: AppHandle) -> Result<Option<Value>, String> {
+    let Some(file_path) = pick_import_file_with_kind(&app, "cookie_jar").await? else {
+        return Ok(None);
+    };
+
+    let content =
+        std::fs::read_to_string(file_path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let content = content.trim_start_matches('\u{feff}');
+
+    let doc: Value =
+        serde_json::from_str(content).map_err(|e| format!("Failed to parse cookie file: {}", e))?;
+
+    Ok(Some(doc))
+}
+
 #[tauri::command]
 pub async fn import_postman_environment(app: AppHandle) -> Result<Option<Value>, String> {
     let Some(file_path) = pick_import_file_with_kind(&app, "postman_environment").await? else {

@@ -146,6 +146,9 @@ pub(crate) async fn pick_import_file_with_kind(
         "postman_environment" => {
             dialog = dialog.add_filter("Postman Environment", &["json"]);
         }
+        "cookie_jar" => {
+            dialog = dialog.add_filter("Cookie Export", &["json"]);
+        }
         _ => {}
     }
 
