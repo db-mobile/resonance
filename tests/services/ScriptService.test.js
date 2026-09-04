@@ -172,3 +172,78 @@ describe('ScriptService._applyEnvironmentChanges', () => {
         expect(environmentService.deleteVariable).not.toHaveBeenCalled();
     });
 });
+
+describe('ScriptService cookie jar bridge', () => {
+    let service;
+    let cookieController;
+
+    beforeEach(async () => {
+        service = new ScriptService(null, null, null);
+        cookieController = {
+            getCookiesForScripts: jest.fn().mockResolvedValue([
+                { id: 'env|api.example.com|/|session', name: 'session', value: 'abc', domain: 'api.example.com' }
+            ]),
+            applyScriptCookieChanges: jest.fn().mockResolvedValue(undefined)
+        };
+        const { app } = await import('../../src/modules/appContext.js');
+        app.cookieController = cookieController;
+        app.getApiHandlerSettingsCache = () => ({ cookieJarEnabled: true });
+    });
+
+    afterEach(async () => {
+        const { app } = await import('../../src/modules/appContext.js');
+        delete app.cookieController;
+        delete app.getApiHandlerSettingsCache;
+    });
+
+    it('seeds the sandbox with the active environment cookies', async () => {
+        const cookies = await service._readCookieJar();
+
+        expect(cookies).toHaveLength(1);
+        expect(cookies[0].name).toBe('session');
+    });
+
+    it('reads an empty jar when cookies are disabled', async () => {
+        const { app } = await import('../../src/modules/appContext.js');
+        app.getApiHandlerSettingsCache = () => ({ cookieJarEnabled: false });
+
+        expect(await service._readCookieJar()).toEqual([]);
+    });
+
+    it('reads an empty jar when the cookie feature is absent', async () => {
+        const { app } = await import('../../src/modules/appContext.js');
+        delete app.cookieController;
+
+        expect(await service._readCookieJar()).toEqual([]);
+    });
+
+    it('forwards recorded cookie operations to the controller', async () => {
+        const changes = [{ op: 'set', cookie: { name: 'a', value: '1', domain: 'api.example.com' } }];
+
+        await service._applyCookieChanges(changes);
+
+        expect(cookieController.applyScriptCookieChanges).toHaveBeenCalledWith(changes);
+    });
+
+    it('ignores an empty or missing change list', async () => {
+        await service._applyCookieChanges(undefined);
+        await service._applyCookieChanges([]);
+
+        expect(cookieController.applyScriptCookieChanges).not.toHaveBeenCalled();
+    });
+
+    it('discards cookie writes when cookies are disabled', async () => {
+        const { app } = await import('../../src/modules/appContext.js');
+        app.getApiHandlerSettingsCache = () => ({ cookieJarEnabled: false });
+
+        await service._applyCookieChanges([{ op: 'clear' }]);
+
+        expect(cookieController.applyScriptCookieChanges).not.toHaveBeenCalled();
+    });
+
+    it('swallows controller failures so a script cannot break the request', async () => {
+        cookieController.applyScriptCookieChanges.mockRejectedValue(new Error('store down'));
+
+        await expect(service._applyCookieChanges([{ op: 'clear' }])).resolves.toBeUndefined();
+    });
+});

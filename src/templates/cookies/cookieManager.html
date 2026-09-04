@@ -1,7 +1,7 @@
 <template id="tpl-cookie-manager">
     <div class="dialog-header">
-        <h2 class="dialog-title">Cookie Jar</h2>
-        <button class="dialog-close-btn" id="cookie-manager-close-btn" aria-label="Close Cookie Manager">
+        <h2 class="dialog-title" data-i18n="cookies.title">Cookie Jar</h2>
+        <button class="dialog-close-btn" id="cookie-manager-close-btn" aria-label="Close Cookie Manager" data-i18n-aria="cookies.close_aria">
             <span class="icon icon-16 icon-x"></span>
         </button>
     </div>
@@ -10,10 +10,10 @@
         <label class="toggle-switch">
             <input type="checkbox" id="cookie-manager-enabled-toggle">
             <span class="toggle-track"></span>
-            <span>Automatically store and send cookies</span>
+            <span data-i18n="cookies.auto_toggle">Automatically store and send cookies</span>
         </label>
         <div class="cookie-manager-env-selector environment-selector">
-            <button type="button" class="env-selector-button cookie-manager-env-button" id="cookie-manager-env-btn" aria-label="Select environment" aria-haspopup="true">
+            <button type="button" class="env-selector-button cookie-manager-env-button" id="cookie-manager-env-btn" aria-label="Select environment" data-i18n-aria="cookies.select_env_aria" aria-haspopup="true">
                 <span class="env-active-indicator is-hidden" data-role="active-indicator"></span>
                 <span class="env-icon icon icon-16 icon-globe" aria-hidden="true"></span>
                 <span class="env-name" id="cookie-manager-env-name">Environment</span>
@@ -31,8 +31,66 @@
                 class="input-base form-input compact search-input"
                 id="cookie-manager-search"
                 placeholder="Search cookies..."
+                data-i18n="cookies.search_placeholder"
                 aria-label="Search cookies"
+                data-i18n-aria="cookies.search_aria"
             />
+        </div>
+    </div>
+
+    <div class="cookie-editor is-hidden" id="cookie-editor">
+        <div class="cookie-editor-title" id="cookie-editor-title" data-i18n="cookies.editor_title_add">Add Cookie</div>
+        <div class="cookie-editor-grid">
+            <div class="form-group">
+                <label class="form-label" for="cookie-editor-name" data-i18n="cookies.editor_name">Name</label>
+                <input type="text" class="input-base" id="cookie-editor-name" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="cookie-editor-value" data-i18n="cookies.editor_value">Value</label>
+                <input type="text" class="input-base" id="cookie-editor-value" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="cookie-editor-domain" data-i18n="cookies.editor_domain">Domain</label>
+                <input type="text" class="input-base" id="cookie-editor-domain" placeholder="api.example.com" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="cookie-editor-path" data-i18n="cookies.editor_path">Path</label>
+                <input type="text" class="input-base" id="cookie-editor-path" placeholder="/" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="cookie-editor-expires" data-i18n="cookies.editor_expires">Expires (empty = session)</label>
+                <input type="text" class="input-base" id="cookie-editor-expires"
+                       placeholder="YYYY-MM-DD HH:mm"
+                       data-i18n="cookies.editor_expires_placeholder" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="cookie-editor-samesite" data-i18n="cookies.editor_samesite">SameSite</label>
+                <div class="select-wrapper">
+                    <select class="select-base" id="cookie-editor-samesite">
+                        <option value="">—</option>
+                        <option value="Lax">Lax</option>
+                        <option value="Strict">Strict</option>
+                        <option value="None">None</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="cookie-editor-flags">
+            <label class="toggle-switch">
+                <input type="checkbox" id="cookie-editor-secure">
+                <span class="toggle-track"></span>
+                <span data-i18n="cookies.editor_secure">Secure</span>
+            </label>
+            <label class="toggle-switch">
+                <input type="checkbox" id="cookie-editor-httponly">
+                <span class="toggle-track"></span>
+                <span data-i18n="cookies.editor_httponly">HttpOnly</span>
+            </label>
+        </div>
+        <div class="cookie-editor-error is-hidden" id="cookie-editor-error"></div>
+        <div class="cookie-editor-actions">
+            <button class="btn btn-sm btn-outline" id="cookie-editor-cancel-btn" data-i18n="cookies.editor_cancel">Cancel</button>
+            <button class="btn btn-sm btn-primary" id="cookie-editor-save-btn" data-i18n="cookies.editor_save">Save Cookie</button>
         </div>
     </div>
 
@@ -40,25 +98,30 @@
         <table class="cookies-table cookie-manager-table">
             <thead>
                 <tr>
-                    <th>Domain</th>
-                    <th>Name</th>
-                    <th>Value</th>
-                    <th>Path</th>
-                    <th>Expires</th>
-                    <th>Flags</th>
+                    <th data-i18n="cookies.col_domain">Domain</th>
+                    <th data-i18n="cookies.col_name">Name</th>
+                    <th data-i18n="cookies.col_value">Value</th>
+                    <th data-i18n="cookies.col_path">Path</th>
+                    <th data-i18n="cookies.col_expires">Expires</th>
+                    <th data-i18n="cookies.col_flags">Flags</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody id="cookie-manager-tbody">
             </tbody>
         </table>
-        <div class="empty-state-base cookies-empty is-hidden" id="cookie-manager-empty">
+        <div class="empty-state-base cookies-empty is-hidden" id="cookie-manager-empty" data-i18n="cookies.empty">
             No cookies stored for this environment.
         </div>
     </div>
 
     <div class="dialog-footer dialog-footer--divided">
-        <button class="btn btn-sm btn-outline" id="cookie-manager-clear-session-btn">Clear Session</button>
-        <button class="btn btn-sm btn-outline" id="cookie-manager-clear-all-btn">Clear All</button>
+        <div class="cookie-manager-footer-group">
+            <button class="btn btn-sm btn-outline" id="cookie-manager-add-btn" data-i18n="cookies.add">Add Cookie</button>
+            <button class="btn btn-sm btn-outline" id="cookie-manager-import-btn" data-i18n="cookies.import">Import</button>
+            <button class="btn btn-sm btn-outline" id="cookie-manager-export-btn" data-i18n="cookies.export">Export</button>
+        </div>
+        <button class="btn btn-sm btn-outline" id="cookie-manager-clear-session-btn" data-i18n="cookies.clear_session">Clear Session</button>
+        <button class="btn btn-sm btn-outline" id="cookie-manager-clear-all-btn" data-i18n="cookies.clear_all">Clear All</button>
     </div>
 </template>

@@ -103,6 +103,9 @@ if (isTauri) {
         environments: {
             saveJsonExport: (defaultFileName, content) => invoke('save_json_export', { defaultFileName, content })
         },
+        cookies: {
+            importCookieFile: () => invoke('import_cookie_file')
+        },
         docs: {
             save: (defaultFileName, content, mimeType) => invoke('save_documentation', { defaultFileName, content, mimeType })
         },

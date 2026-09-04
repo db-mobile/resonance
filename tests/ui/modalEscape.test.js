@@ -135,4 +135,86 @@ describe('modalEscape', () => {
         expect(appShortcut).toHaveBeenCalledTimes(1);
         document.removeEventListener('keydown', appShortcut);
     });
+
+    /**
+     * Capturing on the document means a date/time input never sees Escape, so the
+     * browser cannot dismiss its native picker. The first press has to close the
+     * picker (by dropping focus) rather than the dialog behind it.
+     */
+    describe('native date/time pickers', () => {
+        const pressEscapeFrom = (element) => element.dispatchEvent(
+            new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+        );
+
+        afterEach(() => {
+            document.body.innerHTML = '';
+        });
+
+        test.each(['date', 'datetime-local', 'month', 'time', 'week'])(
+            'Escape in a %s input blurs it instead of closing the dialog',
+            (type) => {
+                const onEscape = jest.fn();
+                const release = pushEscapeHandler(onEscape);
+                const input = document.createElement('input');
+                input.type = type;
+                document.body.appendChild(input);
+                input.focus();
+
+                pressEscapeFrom(input);
+
+                expect(onEscape).not.toHaveBeenCalled();
+                expect(document.activeElement).not.toBe(input);
+
+                release();
+            }
+        );
+
+        test('the next Escape closes the dialog once focus has left the input', () => {
+            const onEscape = jest.fn();
+            const release = pushEscapeHandler(onEscape);
+            const input = document.createElement('input');
+            input.type = 'datetime-local';
+            document.body.appendChild(input);
+            input.focus();
+
+            pressEscapeFrom(input);
+            pressEscape();
+
+            expect(onEscape).toHaveBeenCalledTimes(1);
+
+            release();
+        });
+
+        test('a text input is not treated as a picker', () => {
+            const onEscape = jest.fn();
+            const release = pushEscapeHandler(onEscape);
+            const input = document.createElement('input');
+            input.type = 'text';
+            document.body.appendChild(input);
+            input.focus();
+
+            pressEscapeFrom(input);
+
+            expect(onEscape).toHaveBeenCalledTimes(1);
+
+            release();
+        });
+
+        test('app shortcuts stay quiet while a picker absorbs Escape', () => {
+            const appShortcut = jest.fn();
+            document.addEventListener('keydown', appShortcut);
+            const release = pushEscapeHandler(() => {});
+            const input = document.createElement('input');
+            input.type = 'datetime-local';
+            document.body.appendChild(input);
+            input.focus();
+
+            pressEscapeFrom(input);
+
+            expect(appShortcut).not.toHaveBeenCalled();
+
+            release();
+            document.removeEventListener('keydown', appShortcut);
+        });
+    });
 });

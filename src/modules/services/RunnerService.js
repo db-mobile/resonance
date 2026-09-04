@@ -14,6 +14,7 @@ import { normalizeFormRows } from '../utils/formDataRows.js';
 import { activeKeyValueRows } from '../utils/keyValueRows.js';
 import { textToBase64 } from '../utils/encoding.js';
 import { findRequest } from '../collections/collectionTree.js';
+import { extractCookies } from '../cookieParser.js';
 
 /**
  * Service for managing collection runner operations and execution
@@ -380,7 +381,7 @@ export class RunnerService {
                 result.httpSuccess = true;
                 result.body = response.data;
                 result.headers = response.headers || {};
-                result.cookies = response.cookies || [];
+                result.cookies = extractCookies(response.headers);
                 result.time = Date.now() - startTime;
                 result.response = {
                     status: response.status,

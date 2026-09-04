@@ -56,6 +56,43 @@ export class CookieController {
         }
     }
 
+    /**
+     * The active environment's cookies, for seeding a script's cookie API.
+     * @returns {Promise<Array<Object>>} Stored cookies
+     */
+    async getCookiesForScripts() {
+        return this.service.getAll(this._activeEnvironmentId);
+    }
+
+    /**
+     * Apply the cookie operations recorded by a script, in order.
+     *
+     * A `delete` without a domain removes every cookie of that name in the
+     * active environment, matching the script API's optional-domain semantics.
+     * @param {Array<Object>} changes - Recorded operations ({ op, cookie|name, domain?, path? })
+     * @returns {Promise<void>}
+     */
+    async applyScriptCookieChanges(changes) {
+        for (const change of changes) {
+            if (change?.op === 'set' && change.cookie) {
+                await this.service.putCookie(change.cookie, this._activeEnvironmentId);
+            } else if (change?.op === 'delete' && change.name) {
+                const stored = await this.service.getAll(this._activeEnvironmentId);
+                const matches = stored.filter((cookie) => {
+                    if (cookie.name !== change.name) { return false; }
+                    if (change.domain && cookie.domain?.toLowerCase() !== change.domain.toLowerCase()) { return false; }
+                    if (change.path && (cookie.path || '/') !== change.path) { return false; }
+                    return true;
+                });
+                for (const cookie of matches) {
+                    await this.service.delete(cookie.id);
+                }
+            } else if (change?.op === 'clear') {
+                await this.service.deleteAll(this._activeEnvironmentId);
+            }
+        }
+    }
+
     openCookieManager() {
         this.dialog.show(this._activeEnvironmentId, this._activeEnvironmentName);
     }

@@ -71,7 +71,7 @@ Notes:
 | `headers`    | object | Response header map                                           |
 | `body`       | any    | Parsed object when the response was JSON, otherwise a string  |
 | `timings`    | object | Timing breakdown in ms (e.g. `timings.total`)                 |
-| `cookies`    | array  | Parsed `Set-Cookie` entries                                   |
+| `cookies`    | array  | Parsed `Set-Cookie` entries of this response                  |
 
 ```javascript
 expect(response.status).toBe(200);
@@ -96,6 +96,41 @@ Changes are persisted after the script finishes — a token stored with
 `environment.set` is available to every subsequent request (and survives app
 restarts). In the collection runner, changes carry over to the following
 requests of the run.
+
+## `cookies`
+
+Read and write the cookie jar of the **active environment**. Also available as
+`pm.cookies`.
+
+| Method                              | Description                                                              |
+| ----------------------------------- | ------------------------------------------------------------------------ |
+| `cookies.get(name[, domain])`       | Value of the first matching cookie, or `null`                             |
+| `cookies.has(name[, domain])`       | Whether a matching cookie exists                                          |
+| `cookies.getAll()`                  | Array of every cookie in the environment's jar                            |
+| `cookies.toObject()`                | Plain `{ name: value }` map                                               |
+| `cookies.set(name, value[, opts])`  | Store a cookie; `opts` accepts `domain`, `path`, `expires`, `secure`, `httpOnly`, `sameSite` |
+| `cookies.set(cookie)`               | Same, as a single object with a `name`                                    |
+| `cookies.unset(name[, domain, path])` | Remove matching cookies (all domains when none is given)                |
+| `cookies.clear()`                   | Remove every cookie of the active environment                             |
+
+```javascript
+const session = cookies.get("session");
+cookies.set("token", "abc123");
+cookies.set("scoped", "1", { domain: "api.example.com", path: "/v1", secure: true });
+cookies.unset("stale");
+```
+
+Notes:
+
+- `domain` defaults to the host of the request being sent, and `path` to `/`.
+- `expires` accepts epoch milliseconds, a `Date`, or a parseable date string;
+  omitting it creates a session cookie.
+- Writes from a **pre-request script** are stored before the request goes out,
+  so they are included in that request's `Cookie` header.
+- Changes are discarded when "Automatically store and send cookies" is off in
+  the Cookie Jar dialog.
+- The **collection runner** does not use the cookie jar, so cookie changes made
+  in a runner script do not affect the requests of that run.
 
 ## `console`
 
@@ -227,9 +262,11 @@ For scripts ported from Postman, a `pm` object provides:
 - `pm.request` / `pm.response`
 - `pm.test(name, fn)`
 - `pm.sendRequest(urlOrOptions[, callback])` — synchronous, unlike Postman
+- `pm.cookies` — the same object as the `cookies` global
 
-The bare globals (`environment`, `request`, `response`, `test`, `expect`,
-`sendRequest`) are the recommended API; `pm.*` exists for easier migration.
+The bare globals (`environment`, `request`, `response`, `cookies`, `test`,
+`expect`, `sendRequest`) are the recommended API; `pm.*` exists for easier
+migration.
 
 ## Sandbox limitations
 

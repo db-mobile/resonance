@@ -201,6 +201,92 @@ export class CookieJarService {
         return matching.map(c => `${c.name}=${c.value}`).join('; ');
     }
 
+    /**
+     * Validate a manually entered cookie before it is persisted.
+     * @param {Object} cookie - Cookie fields ({ name, value, domain, path, expires })
+     * @returns {string|null} An error code (name_required, name_invalid, value_invalid, domain_invalid, path_invalid, expires_invalid), or null when valid
+     */
+    validateCookie(cookie) {
+        const name = cookie?.name ?? '';
+        if (!name.trim()) {
+            return 'name_required';
+        }
+        // eslint-disable-next-line no-control-regex -- control chars are what RFC 6265 forbids here
+        if (/[;=\s]/.test(name) || /[\u0000-\u001f\u007f]/.test(name)) {
+            return 'name_invalid';
+        }
+        const value = cookie?.value ?? '';
+        // eslint-disable-next-line no-control-regex -- control chars are what RFC 6265 forbids here
+        if (/[;\n\r]/.test(value) || /[\u0000-\u001f\u007f]/.test(value)) {
+            return 'value_invalid';
+        }
+        const domain = this._canonicalizeDomain(cookie?.domain ?? '');
+        if (!domain || !/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/.test(domain)) {
+            return 'domain_invalid';
+        }
+        const path = cookie?.path || '/';
+        if (!path.startsWith('/')) {
+            return 'path_invalid';
+        }
+        if (cookie?.expires !== null && cookie?.expires !== undefined) {
+            const ts = typeof cookie.expires === 'number' ? cookie.expires : Date.parse(cookie.expires);
+            if (isNaN(ts)) {
+                return 'expires_invalid';
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Persist a manually created or edited cookie. When `originalId` names a
+     * different stored cookie (rename or domain/path move), the old entry is
+     * removed so the composite id stays the only key.
+     * @param {Object} cookie - Cookie fields ({ name, value, domain, path, expires, secure, httpOnly, sameSite })
+     * @param {string} environmentId - Environment the cookie belongs to
+     * @param {string|null} [originalId] - Stored id of the cookie being edited, if any
+     * @returns {Promise<Object>} The persisted cookie
+     */
+    async putCookie(cookie, environmentId, originalId = null) {
+        const validationError = this.validateCookie(cookie);
+        if (validationError) {
+            throw new Error(validationError);
+        }
+
+        const envId = environmentId || 'default';
+        const domain = this._canonicalizeDomain(cookie.domain);
+        const path = cookie.path || '/';
+        const name = cookie.name.trim();
+        const id = `${envId}|${domain}|${path}|${name}`;
+
+        let expires = null;
+        if (cookie.expires !== null && cookie.expires !== undefined) {
+            expires = typeof cookie.expires === 'number' ? cookie.expires : Date.parse(cookie.expires);
+        }
+
+        if (originalId && originalId !== id) {
+            await this.repository.delete(originalId);
+        }
+
+        const stored = {
+            id,
+            environmentId: envId,
+            name,
+            value: cookie.value ?? '',
+            domain,
+            path,
+            expires,
+            httpOnly: Boolean(cookie.httpOnly),
+            secure: Boolean(cookie.secure),
+            sameSite: cookie.sameSite || null,
+            hostOnly: Boolean(cookie.hostOnly),
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+        };
+        await this.repository.upsert(stored);
+        this._notify({ type: 'cookies-updated', environmentId: envId });
+        return stored;
+    }
+
     async getAll(environmentId) {
         return this.repository.getAll(environmentId || 'default');
     }
