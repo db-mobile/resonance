@@ -4,11 +4,6 @@ import { pushEscapeHandler, escapeHandlerCount } from '../../src/modules/ui/moda
 const pressEscape = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 const pressKey = (key) => document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
 
-/**
- * A dialog that removed its Escape listener only inside the `if (e.key === 'Escape')`
- * branch leaked it on every other close path, and a dialog opened on top of another
- * let one keypress dismiss both. Both failures are properties of this stack.
- */
 describe('modalEscape', () => {
     afterEach(() => {
         expect(escapeHandlerCount()).toBe(0);
@@ -136,11 +131,6 @@ describe('modalEscape', () => {
         document.removeEventListener('keydown', appShortcut);
     });
 
-    /**
-     * Capturing on the document means a date/time input never sees Escape, so the
-     * browser cannot dismiss its native picker. The first press has to close the
-     * picker (by dropping focus) rather than the dialog behind it.
-     */
     describe('native date/time pickers', () => {
         const pressEscapeFrom = (element) => element.dispatchEvent(
             new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })

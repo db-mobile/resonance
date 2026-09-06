@@ -1,11 +1,5 @@
 import { WorkspaceTabEndpointLoaderService } from '../../src/modules/services/WorkspaceTabEndpointLoaderService.js';
 
-/**
- * Keys WorkspaceTabStateManager captures for an SSE request.
- *
- * A tab update that does not produce exactly these keys restores as a blank or
- * mis-moded tab, so the shape is pinned rather than merely spot-checked.
- */
 const SSE_REQUEST_KEYS = [
     'protocol',
     'url',

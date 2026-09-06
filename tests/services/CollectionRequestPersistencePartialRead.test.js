@@ -1,15 +1,6 @@
 import { CollectionRequestPersistenceService } from '../../src/modules/services/CollectionRequestPersistenceService.js';
 import { CollectionRepository } from '../../src/modules/storage/CollectionRepository.js';
 
-/**
- * Editing one request must never delete a different collection.
- *
- * `collections_get_all` skips collections it cannot load, so a momentarily
- * unreadable file (mid-checkout, conflict marker, partial write) makes the
- * renderer's view of storage incomplete. A single-endpoint edit must write only
- * the collection it touched, never reconcile the full set against that
- * incomplete view.
- */
 describe('CollectionRequestPersistenceService with an unreadable collection on disk', () => {
     let backendAPI;
     let repository;

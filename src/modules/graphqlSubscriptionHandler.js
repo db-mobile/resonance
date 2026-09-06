@@ -1,8 +1,5 @@
 /**
  * @fileoverview GraphQL subscriptions over WebSocket using the graphql-transport-ws
- * protocol. The Rust backend (`graphql_subscription_*`) is a thin relay that sets the
- * `graphql-transport-ws` subprotocol; this module owns the client state machine and
- * renders the streamed events into the shared transcript view.
  * @module graphqlSubscriptionHandler
  */
 
@@ -39,7 +36,6 @@ const session = new StreamSession({
 });
 
 /**
- * Safely parse an incoming protocol frame.
  * @param {string} raw
  * @returns {object|null}
  */
@@ -54,12 +50,6 @@ function parseMessage(raw) {
     }
 }
 
-/**
- * Send one protocol frame. The TLS options ride on every frame because the
- * backend keys its socket reuse on them: they are resolved once when the
- * subscription starts and carried on the session entry, so every frame of a
- * subscription presents the same material and never forces a reconnect.
- */
 async function sendFrame(tabId, entry, messageObj) {
     await window.backendAPI.graphqlSubscription.send({
         tabId,
@@ -73,11 +63,9 @@ async function sendFrame(tabId, entry, messageObj) {
 const ORIGINAL_LABELS = new WeakMap();
 
 /**
- * Toggle a button between its original label and a "Stop" label, remembering the
- * original markup/title on first use so it can be restored.
  * @param {HTMLElement|null} btn
  * @param {boolean} active
- * @param {string} stopHtml - innerHTML to show while a subscription is active.
+ * @param {string} stopHtml
  */
 function setButtonStop(btn, active, stopHtml) {
     if (!btn) {
@@ -200,11 +188,7 @@ export const initGraphQLSubscriptionHandler = createBackendEventListener(
     handleBackendEvent
 );
 
-/**
- * Open a subscription: connect (sending connection_init) and let the ack drive the
- * subscribe message. Variables/query are expected pre-resolved by the caller.
- * @param {{url: string, headers?: object, query: string, variables?: object, operationName?: string|null}} opts
- */
+/** @param {{url: string, headers?: object, query: string, variables?: object, operationName?: string|null}} opts */
 export async function handleGraphQLSubscriptionStart({ url, headers = {}, query, variables = {}, operationName = null }) {
     await initGraphQLSubscriptionHandler();
 
@@ -250,11 +234,7 @@ export async function handleGraphQLSubscriptionStart({ url, headers = {}, query,
     }
 }
 
-/**
- * Stop the active subscription on the current tab: send a `complete` frame then
- * close the socket.
- * @returns {Promise<boolean>} true when a subscription was active and stopped.
- */
+/** @returns {Promise<boolean>} */
 export async function handleGraphQLSubscriptionCancel() {
     const tabId = await getActiveTabId();
     const entry = session.get(tabId);
@@ -280,7 +260,6 @@ export async function handleGraphQLSubscriptionCancel() {
 }
 
 /**
- * Whether a non-closed subscription connection exists for the given tab.
  * @param {string} tabId
  * @returns {boolean}
  */
@@ -289,10 +268,7 @@ export function isSubscriptionActive(tabId) {
     return !!entry && entry.state !== 'closed';
 }
 
-/**
- * Tear down and forget any subscription state for a tab (e.g. on tab close).
- * @param {string} tabId
- */
+/** @param {string} tabId */
 export async function clearGraphQLSubscriptionState(tabId) {
     if (window.backendAPI?.graphqlSubscription && tabId) {
         try {

@@ -1,48 +1,9 @@
 /**
  * @fileoverview Single source of truth for what each request protocol is and how
- * it is persisted.
- *
- * Every protocol-dependent decision in the collection save/load path used to be
- * re-derived from a hardcoded `if (isGrpc) ... else if (isWebSocket) ...` chain
- * that fell through to HTTP. Protocols added after those chains were written -
- * SSE and MQTT - matched no branch and were silently stored as HTTP. The
- * descriptors below replace those chains, so adding a protocol is one entry here
- * rather than a new branch at every call site.
- *
- * Two descriptor values are easy to misread:
- *
- * - `preservesHttpMethod` is true only for SSE. An SSE request is an HTTP
- *   request whose response is a stream, so the user still picks GET or POST
- *   (see `setRequestMode` in requestModeManager). The verb therefore cannot be
- *   collapsed into the `SSE` tree badge; it is stored alongside it in
- *   `endpoint.httpMethod`.
- * - `rewritePathFromUrl` is true only for HTTP. Every other protocol's endpoint
- *   is identified by an absolute URL, and rewriting `path` to that URL's bare
- *   pathname would destroy it.
- *
- * The `persisted` map's keys are deliberately the keys returned by
- * `CollectionRepository.getAllPersistedEndpointData()`, which is what lets the
- * loader project stored data through a loop instead of one boolean expression
- * per field. It gates what is *read back*, and is intentionally separate from
- * `createSidecars`, which lists what is written when an endpoint is first
- * created. HTTP reads a persisted URL but must not be given one on creation:
- * its stored path is collection-relative, and a persisted URL would take
- * precedence over `{{baseUrl}}` resolution.
- *
- * This module imports nothing, so it is safe to use from services, UI, and
- * jsdom tests alike.
- *
  * @module protocols/protocolRegistry
  */
 
-/**
- * Request protocol modes.
- *
- * Re-exported by requestModeManager, which is where most callers import it
- * from.
- *
- * @enum {string}
- */
+/** @enum {string} */
 export const RequestMode = {
     HTTP: 'http',
     WEBSOCKET: 'websocket',
@@ -53,8 +14,6 @@ export const RequestMode = {
 };
 
 /**
- * Which kinds of persisted endpoint data a protocol reads and writes.
- *
  * @typedef {Object} PersistedDataCapabilities
  * @property {boolean} url
  * @property {boolean} authConfig
@@ -69,36 +28,27 @@ export const RequestMode = {
  */
 
 /**
- * Everything the collection layer needs to know about one protocol.
- *
  * @typedef {Object} ProtocolDescriptor
- * @property {string} id - Protocol id, matching a RequestMode value.
- * @property {string} label - Human-readable name, used in menus and dialogs.
- * @property {?string} methodLabel - Collection-tree badge text, or null to pass
- *     the request's own method through unchanged.
- * @property {boolean} preservesHttpMethod - Whether an HTTP verb must be stored
- *     separately from `methodLabel`.
- * @property {string} defaultMethod - Verb assumed when none was captured.
- * @property {'path'|'url'|'fullMethod'} pathSource - Which request field becomes
- *     `endpoint.path`.
- * @property {?string} folderBucket - Fixed folder name, or null to derive one
- *     from the request path.
- * @property {?string} urlInputId - Id of the DOM input owning this protocol's
- *     URL, or null when it has none.
- * @property {boolean} rewritePathFromUrl - Whether `endpoint.path` may be
- *     rewritten from the URL's pathname on re-save.
- * @property {string} builder - Key selecting the tab-update builder.
- * @property {boolean} urlBased - Whether the endpoint is addressed by absolute
- *     URL rather than a collection-relative path.
- * @property {boolean} needsMethod - Whether the user picks an HTTP verb.
- * @property {boolean} needsTarget - Whether the endpoint needs a host target
- *     instead of a URL.
- * @property {string} pathPlaceholder - Placeholder for the dialog's URL/path
- *     field.
- * @property {PersistedDataCapabilities} persisted - Which stored data kinds are
- *     read back when the endpoint is loaded.
- * @property {string[]} createSidecars - Which sidecar records are written when
- *     the endpoint is first created.
+ * @property {string} id
+ * @property {string} label
+ * @property {?string} methodLabel
+ * @property {boolean} preservesHttpMethod
+ * @property {string} defaultMethod
+ * @property {'path'|'url'|'fullMethod'} pathSource
+ * @property {?string} folderBucket
+ * @property {?string} urlInputId
+ * @property {boolean} rewritePathFromUrl
+ * @property {string} builder
+ * @property {boolean} urlBased
+ * @property {boolean} needsMethod
+ * @property {boolean} needsTarget
+ * @property {string} pathPlaceholder
+ * @property {string[]} requestTabs
+ * @property {string} defaultTab
+ * @property {?string[]} bodyModes
+ * @property {'http'|'grpc'|'none'} responseTabSet
+ * @property {PersistedDataCapabilities} persisted
+ * @property {string[]} createSidecars
  */
 
 /**
@@ -121,18 +71,10 @@ function capabilities(overrides) {
     };
 }
 
-/**
- * Persisted data kinds whose empty value is an array rather than null.
- *
- * @type {string[]}
- */
+/** @type {string[]} */
 const ARRAY_PERSISTED_KINDS = ['pathParams', 'queryParams', 'headers'];
 
-/**
- * All known protocols, keyed by id.
- *
- * @type {Object<string, ProtocolDescriptor>}
- */
+/** @type {Object<string, ProtocolDescriptor>} */
 export const PROTOCOLS = Object.freeze({
     [RequestMode.HTTP]: Object.freeze({
         id: RequestMode.HTTP,
@@ -149,6 +91,12 @@ export const PROTOCOLS = Object.freeze({
         needsMethod: true,
         needsTarget: false,
         pathPlaceholder: '/api/endpoint',
+        requestTabs: Object.freeze([
+            'path-params', 'query-params', 'headers', 'body', 'scripts', 'authorization', 'schema'
+        ]),
+        defaultTab: 'path-params',
+        bodyModes: null,
+        responseTabSet: 'http',
         persisted: Object.freeze(capabilities({
             url: true,
             authConfig: true,
@@ -176,6 +124,10 @@ export const PROTOCOLS = Object.freeze({
         needsMethod: true,
         needsTarget: false,
         pathPlaceholder: 'https://api.example.com/events',
+        requestTabs: Object.freeze(['query-params', 'headers', 'body', 'authorization']),
+        defaultTab: 'headers',
+        bodyModes: Object.freeze(['json', 'text']),
+        responseTabSet: 'none',
         persisted: Object.freeze(capabilities({
             url: true,
             authConfig: true,
@@ -200,6 +152,10 @@ export const PROTOCOLS = Object.freeze({
         needsMethod: false,
         needsTarget: false,
         pathPlaceholder: 'wss://echo.websocket.events',
+        requestTabs: Object.freeze(['query-params', 'headers', 'body']),
+        defaultTab: 'body',
+        bodyModes: null,
+        responseTabSet: 'none',
         persisted: Object.freeze(capabilities({
             url: true,
             queryParams: true,
@@ -223,6 +179,10 @@ export const PROTOCOLS = Object.freeze({
         needsMethod: false,
         needsTarget: false,
         pathPlaceholder: 'https://api.example.com/graphql',
+        requestTabs: Object.freeze(['body', 'headers', 'authorization', 'scripts']),
+        defaultTab: 'body',
+        bodyModes: null,
+        responseTabSet: 'http',
         persisted: Object.freeze(capabilities({
             url: true,
             authConfig: true,
@@ -248,6 +208,10 @@ export const PROTOCOLS = Object.freeze({
         needsMethod: false,
         needsTarget: true,
         pathPlaceholder: 'package.Service/Method',
+        requestTabs: Object.freeze(['grpc', 'grpc-message', 'grpc-metadata', 'authorization']),
+        defaultTab: 'grpc',
+        bodyModes: null,
+        responseTabSet: 'grpc',
         persisted: Object.freeze(capabilities({
             grpcData: true
         })),
@@ -268,6 +232,10 @@ export const PROTOCOLS = Object.freeze({
         needsMethod: false,
         needsTarget: false,
         pathPlaceholder: 'mqtt://broker.example.com:1883',
+        requestTabs: Object.freeze(['mqtt', 'body']),
+        defaultTab: 'mqtt',
+        bodyModes: null,
+        responseTabSet: 'none',
         persisted: Object.freeze(capabilities({
             url: true,
             modifiedBody: true,
@@ -278,11 +246,6 @@ export const PROTOCOLS = Object.freeze({
 });
 
 /**
- * Normalizes any stored or captured value to a known protocol id.
- *
- * Falls back to HTTP so a corrupt or future id still opens something rather
- * than throwing.
- *
  * @param {*} protocol
  * @returns {string}
  */
@@ -293,8 +256,6 @@ export function resolveProtocolId(protocol) {
 }
 
 /**
- * Looks up a protocol descriptor, never returning undefined.
- *
  * @param {*} protocol
  * @returns {ProtocolDescriptor}
  */
@@ -303,11 +264,6 @@ export function getProtocol(protocol) {
 }
 
 /**
- * Reverse-maps a stored tree badge to a protocol id.
- *
- * Lets an endpoint whose `method` was written correctly recover its protocol
- * even if `protocol` was stored as `http`.
- *
  * @param {*} methodLabel
  * @returns {?string}
  */
@@ -323,16 +279,12 @@ export function protocolIdFromMethodLabel(methodLabel) {
     return match ? match.id : null;
 }
 
-/**
- * @returns {string[]} All known protocol ids.
- */
+/** @returns {string[]} */
 export function listProtocolIds() {
     return Object.keys(PROTOCOLS);
 }
 
 /**
- * Derives the value stored as `endpoint.path` for a protocol.
- *
  * @param {ProtocolDescriptor} descriptor
  * @param {Object} requestData
  * @returns {string}
@@ -350,8 +302,6 @@ export function derivePath(descriptor, requestData) {
 }
 
 /**
- * Derives the method stored on a collection endpoint.
- *
  * @param {ProtocolDescriptor} descriptor
  * @param {Object} requestData
  * @returns {string|undefined}
@@ -361,8 +311,6 @@ export function deriveMethod(descriptor, requestData) {
 }
 
 /**
- * Derives the HTTP verb to store alongside a protocol badge, if any.
- *
  * @param {ProtocolDescriptor} descriptor
  * @param {Object} requestData
  * @returns {?string}
@@ -376,8 +324,6 @@ export function deriveHttpMethod(descriptor, requestData) {
 }
 
 /**
- * Reads back the verb a request should be sent with.
- *
  * @param {Object} endpoint
  * @returns {string}
  */
@@ -392,13 +338,8 @@ export function endpointHttpMethod(endpoint) {
 }
 
 /**
- * Masks stored endpoint data down to the kinds a protocol actually uses.
- *
- * Suppressed kinds come back as the type-correct empty value, so callers can
- * spread the result without per-protocol conditionals.
- *
  * @param {ProtocolDescriptor} descriptor
- * @param {Object} persistedData - Result of getAllPersistedEndpointData().
+ * @param {Object} persistedData
  * @returns {Object}
  */
 export function projectPersistedData(descriptor, persistedData) {

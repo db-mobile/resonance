@@ -1,8 +1,3 @@
-/**
- * Query parameters and headers can be disabled without being deleted: a disabled
- * row stays in the table and in persistence, but is left out of the URL and the
- * request. Path params keep their plain, non-toggleable rows.
- */
 jest.mock('../src/modules/state/currentEndpoint.js', () => ({
     getCurrentEndpoint: jest.fn(() => null),
     setCurrentEndpoint: jest.fn()

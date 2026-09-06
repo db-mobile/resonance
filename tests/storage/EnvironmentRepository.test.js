@@ -327,7 +327,6 @@ describe('EnvironmentRepository', () => {
 
             await repository.deleteEnvironment('env_1');
 
-            // Verify store.set was called with env_2 as active
             const setCall = mockBackendAPI.store.set.mock.calls[0];
             expect(setCall[1].activeEnvironmentId).toBe('env_2');
         });
@@ -446,7 +445,7 @@ describe('EnvironmentRepository', () => {
             const setCall = mockBackendAPI.store.set.mock.calls[0];
             expect(setCall[1].items).toHaveLength(1);
             expect(setCall[1].items[0].name).toBe('Imported');
-            expect(setCall[1].items[0].id).not.toBe('old_id'); // New ID generated
+            expect(setCall[1].items[0].id).not.toBe('old_id');
         });
 
         test('should import environments (merge mode)', async () => {
@@ -485,7 +484,7 @@ describe('EnvironmentRepository', () => {
             await repository.importEnvironments(importData, true);
 
             const setCall = mockBackendAPI.store.set.mock.calls[0];
-            expect(setCall[1].items).toHaveLength(1); // Not added due to duplicate name
+            expect(setCall[1].items).toHaveLength(1);
         });
 
         test('should throw error for invalid data format', async () => {

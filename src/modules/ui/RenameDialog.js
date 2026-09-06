@@ -5,35 +5,21 @@
 
 import { BaseModal } from './BaseModal.js';
 
-/**
- * Modal rename dialog with text input validation
- *
- * @class
- * @classdesc Provides a modal dialog for renaming items with keyboard support,
- * input validation, and auto-focus. Enter confirms; Escape and click-outside
- * (handled by {@link BaseModal}) cancel. Preserves special characters like
- * template variables.
- * @augments BaseModal
- */
+/** @augments */
 export class RenameDialog extends BaseModal {
-    /**
-     * Creates a RenameDialog instance
-     */
     constructor() {
         super();
-        /** @type {Function|null} Pending promise resolver. */
+        /** @type {Function|null} */
         this.resolve = null;
     }
 
     /**
-     * Shows the rename dialog and waits for user input.
-     *
-     * @param {string} currentName - The current name to pre-fill.
-     * @param {Object} [options={}] - Dialog configuration options.
-     * @param {string} [options.title='Rename Collection'] - Dialog title.
-     * @param {string} [options.label='Collection Name:'] - Input field label.
-     * @param {string} [options.confirmText='Rename'] - Confirm button label.
-     * @returns {Promise<string|null>} Resolves to the new name (trimmed) or null if cancelled.
+     * @param {string} currentName
+     * @param {Object} [options={}]
+     * @param {string} [options.title='Rename Collection']
+     * @param {string} [options.label='Collection Name:']
+     * @param {string} [options.confirmText='Rename']
+     * @returns {Promise<string|null>}
      */
     show(currentName, options = {}) {
         return new Promise((resolve) => {
@@ -43,11 +29,8 @@ export class RenameDialog extends BaseModal {
     }
 
     /**
-     * Builds and displays the rename dialog.
-     *
-     * @private
-     * @param {string} currentName - Current name to pre-fill.
-     * @param {Object} options - Dialog options.
+     * @param {string} currentName
+     * @param {Object} options
      * @returns {void}
      */
     createDialog(currentName, options) {
@@ -74,10 +57,7 @@ export class RenameDialog extends BaseModal {
     }
 
     /**
-     * Attaches button and keyboard listeners specific to the rename flow.
-     *
-     * @private
-     * @param {HTMLElement} dialog - Dialog element.
+     * @param {HTMLElement} dialog
      * @returns {void}
      */
     setupEventListeners(dialog) {
@@ -96,10 +76,7 @@ export class RenameDialog extends BaseModal {
     }
 
     /**
-     * Focuses and selects text in the rename input.
-     *
-     * @private
-     * @param {HTMLElement} dialog - Dialog element.
+     * @param {HTMLElement} dialog
      * @returns {void}
      */
     focusInput(dialog) {
@@ -109,10 +86,7 @@ export class RenameDialog extends BaseModal {
     }
 
     /**
-     * Validates and resolves with the new name. No-op for empty names.
-     *
-     * @private
-     * @param {string} newName - The entered name.
+     * @param {string} newName
      * @returns {void}
      */
     confirm(newName) {
@@ -122,21 +96,13 @@ export class RenameDialog extends BaseModal {
         }
     }
 
-    /**
-     * Cancels the dialog (Escape / backdrop / cancel button), resolving with null.
-     *
-     * @protected
-     * @returns {void}
-     */
+    /** @returns {void} */
     onDismiss() {
         this._settle(null);
     }
 
     /**
-     * Resolves the pending promise once and tears the dialog down.
-     *
-     * @private
-     * @param {string|null} value - Value to resolve with.
+     * @param {string|null} value
      * @returns {void}
      */
     _settle(value) {

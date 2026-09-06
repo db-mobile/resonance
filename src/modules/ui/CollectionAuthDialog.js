@@ -1,42 +1,26 @@
 /**
  * @fileoverview Modal dialog for editing a collection's auth configuration,
- * inherited by endpoints whose auth type is "Inherit from Parent".
  * @module ui/CollectionAuthDialog
  */
 
 import { BaseModal } from './BaseModal.js';
 
-/**
- * Collection-scoped auth editor.
- *
- * Mounts a second, ID-prefixed AuthManager instance inside the dialog, so the
- * full auth field set (including interactive OAuth2 token fetching) works
- * without colliding with the request Authorization tab. AuthManager is loaded
- * dynamically at open time to keep ipcBridge out of this module's import
- * graph (collectionManager's boot-time auto-init depends on that ordering).
- *
- * @class
- * @augments BaseModal
- */
+/** @augments */
 export class CollectionAuthDialog extends BaseModal {
     constructor() {
         super();
-        /** @type {Function|null} Pending promise resolver. */
+        /** @type {Function|null} */
         this.resolve = null;
-        /** @type {AuthManager|null} Dialog-scoped auth manager instance. */
+        /** @type {AuthManager|null} */
         this.dialogAuth = null;
     }
 
     /**
-     * Shows the dialog for a collection, or for a folder when
-     * `options.folder` is set (folder scope adds an "Inherit from Collection"
-     * type that removes the folder override).
-     *
-     * @param {Object} collection - The collection ({id, name, ...})
-     * @param {Object} repository - CollectionRepository for load/merge of secrets
-     * @param {Object} [options] - Scope options
-     * @param {Object} [options.folder] - Folder ({id, name}) to edit instead of the collection
-     * @returns {Promise<Object|null>} The edited `{type, config}`, or null on cancel
+     * @param {Object} collection
+     * @param {Object} repository
+     * @param {Object} [options]
+     * @param {Object} [options.folder]
+     * @returns {Promise<Object|null>}
      */
     show(collection, repository, options = {}) {
         return new Promise((resolve) => {
@@ -46,10 +30,6 @@ export class CollectionAuthDialog extends BaseModal {
     }
 
     /**
-     * Builds the dialog, mounts the scoped AuthManager, and loads the
-     * current auth config for the chosen scope.
-     *
-     * @private
      * @param {Object} collection
      * @param {Object} repository
      * @param {Object|null} folder
@@ -113,9 +93,6 @@ export class CollectionAuthDialog extends BaseModal {
     }
 
     /**
-     * Resolves the pending promise and tears down.
-     *
-     * @private
      * @param {Object|null} result
      * @returns {void}
      */
@@ -129,12 +106,7 @@ export class CollectionAuthDialog extends BaseModal {
         }
     }
 
-    /**
-     * Escape / backdrop click cancels the dialog.
-     *
-     * @protected
-     * @returns {void}
-     */
+    /** @returns {void} */
     onDismiss() {
         this._settle(null);
     }

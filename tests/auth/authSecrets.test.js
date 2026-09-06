@@ -27,7 +27,6 @@ describe('authSecrets', () => {
 
             expect(secrets).toEqual({ token: 'sk-live-123' });
             expect(redacted.config.token).toBe('');
-            // original is not mutated
             expect(cfg.config.token).toBe('sk-live-123');
         });
 

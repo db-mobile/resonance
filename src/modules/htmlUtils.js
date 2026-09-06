@@ -12,14 +12,8 @@ const HTML_ESCAPE_MAP = {
 };
 
 /**
- * Escapes HTML special characters for safe interpolation into markup.
- *
- * Null and undefined collapse to an empty string. Quotes are escaped too, so the
- * result is safe in both text and attribute contexts. Pure string transform with
- * no DOM dependency, so it works in services as well as UI code.
- *
- * @param {*} value - Value to escape.
- * @returns {string} HTML-escaped string.
+ * @param {*} value
+ * @returns {string}
  */
 export function escapeHtml(value) {
     if (value === null || value === undefined) {

@@ -11,19 +11,8 @@ import { CollectionPalette } from './runner/CollectionPalette.js';
 import { RequestQueue } from './runner/RequestQueue.js';
 import { RunnerSelectorMenu } from './runner/RunnerSelectorMenu.js';
 
-/**
- * UI component for the Collection Runner panel
- *
- * @class
- * @classdesc Renders and manages the runner panel UI including collection tree,
- * request selection, drag-and-drop reordering, script editing, and results display.
- */
 export class RunnerPanel {
-    /**
-     * Creates a RunnerPanel instance
-     *
-     * @param {HTMLElement} container - Container element for the panel
-     */
+    /** @param {HTMLElement} container */
     constructor(container) {
         this.container = container;
 
@@ -59,12 +48,7 @@ export class RunnerPanel {
         this.dom = {};
     }
 
-    /**
-     * The id of the currently loaded saved runner (null when unsaved/new).
-     * Backed by the selector menu, which uses it to highlight the active entry.
-     *
-     * @type {string|null}
-     */
+    /** @type {string|null} */
     get currentRunnerId() {
         return this.menu.currentRunnerId;
     }
@@ -73,11 +57,7 @@ export class RunnerPanel {
         this.menu.currentRunnerId = runnerId;
     }
 
-    /**
-     * Renders the runner panel
-     *
-     * @param {Array<Object>} collections - Available collections
-     */
+    /** @param {Array<Object>} collections */
     render(collections) {
         try {
             const fragment = templateLoader.cloneSync(
@@ -102,11 +82,6 @@ export class RunnerPanel {
         }
     }
 
-    /**
-     * Caches DOM element references
-     *
-     * @private
-     */
     _cacheElements() {
         this.dom = {
             nameInput: this.container.querySelector('[data-role="runner-name"]'),
@@ -120,11 +95,6 @@ export class RunnerPanel {
         };
     }
 
-    /**
-     * Attaches event listeners
-     *
-     * @private
-     */
     _attachEventListeners() {
         this.container.querySelector('[data-action="new-runner"]')?.addEventListener('click', () => {
             this.startNewRunner();
@@ -153,12 +123,6 @@ export class RunnerPanel {
         this._attachMainResizer();
     }
 
-    /**
-     * Wires the draggable divider between the Available and Selected panels,
-     * adjusting the Selected panel width via a CSS custom property.
-     *
-     * @private
-     */
     _attachMainResizer() {
         const resizer = this.container.querySelector('[data-role="main-resizer"]');
         const main = this.container.querySelector('.runner-main');
@@ -196,13 +160,7 @@ export class RunnerPanel {
         resizer.addEventListener('mousedown', onMouseDown);
     }
 
-    /**
-     * Opens the per-request editor modal (params, headers, body, script) for the
-     * request at the given index, persisting edits back onto it on save.
-     *
-     * @private
-     * @param {number} index - Request index
-     */
+    /** @param {number} index */
     _openScriptModal(index) {
         const requests = this.queue.getRequests();
         if (index < 0 || index >= requests.length) {
@@ -220,11 +178,6 @@ export class RunnerPanel {
         });
     }
 
-    /**
-     * Updates the request count display from the queue.
-     *
-     * @private
-     */
     _updateRequestCount() {
         if (this.dom.requestCount) {
             const { count } = this.queue;
@@ -232,11 +185,6 @@ export class RunnerPanel {
         }
     }
 
-    /**
-     * Handles save button click
-     *
-     * @private
-     */
     _handleSave() {
         const runnerData = this.getRunnerData();
 
@@ -245,10 +193,6 @@ export class RunnerPanel {
         }
     }
 
-    /**
-     * Resets the panel for a brand-new (unsaved) runner. Public so the host can
-     * invoke it after deleting the active runner.
-     */
     startNewRunner() {
         this.currentRunnerId = null;
         this.queue.reset();
@@ -262,11 +206,6 @@ export class RunnerPanel {
         }
     }
 
-    /**
-     * Handles delete runner button click
-     *
-     * @private
-     */
     _handleDelete() {
         if (!this.currentRunnerId) {
             return;
@@ -277,11 +216,6 @@ export class RunnerPanel {
         }
     }
 
-    /**
-     * Handles run button click
-     *
-     * @private
-     */
     _handleRun() {
         if (this.queue.count === 0) {
             return;
@@ -296,22 +230,13 @@ export class RunnerPanel {
         }
     }
 
-    /**
-     * Handles stop button click
-     *
-     * @private
-     */
     _handleStop() {
         if (this.onStop) {
             this.onStop();
         }
     }
 
-    /**
-     * Sets the running state UI
-     *
-     * @param {boolean} isRunning - Whether runner is executing
-     */
+    /** @param {boolean} isRunning */
     _setRunningState(isRunning) {
         if (isRunning) {
             this.dom.runButton?.classList.add('is-hidden');
@@ -322,11 +247,7 @@ export class RunnerPanel {
         }
     }
 
-    /**
-     * Gets the current runner configuration
-     *
-     * @returns {Object} Runner data
-     */
+    /** @returns {Object} */
     getRunnerData() {
         return {
             name: this.dom.nameInput?.value || 'Untitled Runner',
@@ -338,11 +259,7 @@ export class RunnerPanel {
         };
     }
 
-    /**
-     * Loads runner data into the panel
-     *
-     * @param {Object} runner - Runner object
-     */
+    /** @param {Object} runner */
     loadRunner(runner) {
         if (this.dom.nameInput) {
             this.dom.nameInput.value = runner.name || 'Untitled Runner';
@@ -358,52 +275,33 @@ export class RunnerPanel {
         this.queue.setRequests(runner.requests);
     }
 
-    /**
-     * Shows execution results and restores the idle (not-running) button state.
-     *
-     * @param {Object} results - Execution results
-     */
+    /** @param {Object} results */
     showResults(results) {
         this._setRunningState(false);
         this.resultsView.show(results);
     }
 
-    /**
-     * Opens the results panel at the bottom, seeded from the queued requests.
-     */
     showResultsPanel() {
         this.resultsView.open(this.queue.getRequests());
     }
 
-    /**
-     * Hides the results panel.
-     */
     hideResultsPanel() {
         this.resultsView.hide();
     }
 
-    /**
-     * Marks a request as running in the results panel.
-     *
-     * @param {number} index - Request index
-     */
+    /** @param {number} index */
     markRequestRunning(index) {
         this.resultsView.markRequestRunning(index);
     }
 
     /**
-     * Updates a request result in the results panel.
-     *
-     * @param {number} index - Request index
-     * @param {Object} result - Result data including body, headers, cookies
+     * @param {number} index
+     * @param {Object} result
      */
     updateResultWithResponse(index, result) {
         this.resultsView.updateResultWithResponse(index, result);
     }
 
-    /**
-     * Resets the panel to initial state
-     */
     reset() {
         this.queue.reset();
 
@@ -415,21 +313,13 @@ export class RunnerPanel {
         this.hideResultsPanel();
     }
 
-    /**
-     * Notifies about requests change
-     *
-     * @private
-     */
     _notifyRequestsChange() {
         if (this.onRequestsChange) {
             this.onRequestsChange(this.queue.getRequests());
         }
     }
 
-    /**
-     * Releases document-level listeners owned by the panel's children.
-     * @returns {void}
-     */
+    /** @returns {void} */
     destroy() {
         this.menu.destroy();
         this.resultsView.hide();

@@ -8,10 +8,8 @@ import { statusCategory } from '../../utils/statusCategory.js';
 export { escapeHtml } from '../../htmlUtils.js';
 
 /**
- * Maps an HTTP status code to a CSS class suffix used for colouring.
- *
- * @param {number} statusCode - HTTP status code
- * @returns {string} CSS class suffix
+ * @param {number} statusCode
+ * @returns {string}
  */
 export function getStatusCodeClass(statusCode) {
     const category = statusCategory(statusCode);
@@ -39,10 +37,8 @@ const STATUS_TEXTS = {
 };
 
 /**
- * Gets the reason phrase for a common HTTP status code.
- *
- * @param {number} statusCode - HTTP status code
- * @returns {string} Status text, or '' when unknown
+ * @param {number} statusCode
+ * @returns {string}
  */
 export function getStatusText(statusCode) {
     return STATUS_TEXTS[statusCode] || '';

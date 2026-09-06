@@ -3,28 +3,17 @@
  * @module storage/ScriptRepository
  */
 
-/**
- * Repository for managing script persistence using the persistent store
- * Follows the established {collectionId}_{endpointId} key pattern
- *
- * @class
- * @classdesc Handles CRUD operations for pre-request and test scripts
- */
 export class ScriptRepository {
-    /**
-     * Creates a ScriptRepository instance
-     * @param {Object} backendAPI - The backend IPC API bridge
-     */
+    /** @param {Object} backendAPI */
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.SCRIPTS_KEY = 'persistedScripts';
     }
 
     /**
-     * Get scripts for a specific endpoint
-     * @param {string} collectionId - The collection ID
-     * @param {string} endpointId - The endpoint ID
-     * @returns {Promise<{preRequestScript: string, testScript: string}>} The scripts
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<{preRequestScript: string, testScript: string}>}
      */
     async getScripts(collectionId, endpointId) {
         const scripts = await this._getObjectFromStore(this.SCRIPTS_KEY);
@@ -37,12 +26,11 @@ export class ScriptRepository {
     }
 
     /**
-     * Save scripts for a specific endpoint
-     * @param {string} collectionId - The collection ID
-     * @param {string} endpointId - The endpoint ID
-     * @param {Object} scriptData - The script data
-     * @param {string} scriptData.preRequestScript - Pre-request script code
-     * @param {string} scriptData.testScript - Test script code
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} scriptData
+     * @param {string} scriptData.preRequestScript
+     * @param {string} scriptData.testScript
      * @returns {Promise<void>}
      */
     async saveScripts(collectionId, endpointId, scriptData) {
@@ -58,9 +46,8 @@ export class ScriptRepository {
     }
 
     /**
-     * Delete scripts for a specific endpoint
-     * @param {string} collectionId - The collection ID
-     * @param {string} endpointId - The endpoint ID
+     * @param {string} collectionId
+     * @param {string} endpointId
      * @returns {Promise<void>}
      */
     async deleteScripts(collectionId, endpointId) {
@@ -73,12 +60,9 @@ export class ScriptRepository {
     }
 
     /**
-     * Helper to safely get object from store with fallback
-     * Handles packaged app environments where store may return undefined
-     * @private
-     * @param {string} key - The store key
-     * @param {Object} defaultValue - Default value if undefined
-     * @returns {Promise<Object>} The store value or default
+     * @param {string} key
+     * @param {Object} defaultValue
+     * @returns {Promise<Object>}
      */
     async _getObjectFromStore(key, defaultValue = {}) {
         const value = await this.backendAPI.store.get(key);
@@ -91,11 +75,9 @@ export class ScriptRepository {
     }
 
     /**
-     * Build composite key for endpoint
-     * @private
-     * @param {string} collectionId - The collection ID
-     * @param {string} endpointId - The endpoint ID
-     * @returns {string} The composite key
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {string}
      */
     _buildKey(collectionId, endpointId) {
         return `${collectionId}_${endpointId}`;

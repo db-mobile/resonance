@@ -1,29 +1,20 @@
 /**
  * @fileoverview Generates request code snippets for various languages and clients (cURL,
- * Python, JavaScript, Node.js, Go, PHP, Ruby, Java) from a request configuration.
  * @module codeGenerator
  */
 
 /**
- * A request to generate code for.
- *
  * @typedef {Object} RequestConfig
- * @property {string} [method] - HTTP method; defaults to `GET`.
- * @property {string} url - Target request URL.
- * @property {Object<string, string>} [headers] - Header name/value pairs.
- * @property {string|Object|Array} [body] - Request body. For `bodyType`
- *   `formdata`/`urlencoded` this is an array of row objects
- *   (`{ key, value, type, filePath, contentType }`); for `binary` it is
- *   `{ filePath, contentType }`; otherwise a string or JSON object.
- * @property {string} [bodyType] - `formdata` | `urlencoded` | `text` | `binary`;
- *   absent for JSON bodies.
+ * @property {string} [method]
+ * @property {string} url
+ * @property {Object<string, string>} [headers]
+ * @property {string|Object|Array} [body]
+ * @property {string} [bodyType]
  */
 
 /**
- * Escapes a string for safe use as a single-quoted POSIX shell argument.
- *
- * @param {string} str - The raw value.
- * @returns {string} The quoted, shell-safe argument.
+ * @param {string} str
+ * @returns {string}
  */
 function escapeShellArg(str) {
     if (!str) {
@@ -33,10 +24,8 @@ function escapeShellArg(str) {
 }
 
 /**
- * Escapes a string for use inside a double-quoted Python/PHP/Ruby string literal.
- *
- * @param {string} str - The raw value.
- * @returns {string} The escaped value.
+ * @param {string} str
+ * @returns {string}
  */
 function escapePythonString(str) {
     if (!str) {
@@ -46,10 +35,8 @@ function escapePythonString(str) {
 }
 
 /**
- * Escapes a string for use inside a JavaScript template literal.
- *
- * @param {string} str - The raw value.
- * @returns {string} The escaped value.
+ * @param {string} str
+ * @returns {string}
  */
 function escapeJavaScriptString(str) {
     if (!str) {
@@ -59,10 +46,8 @@ function escapeJavaScriptString(str) {
 }
 
 /**
- * Escapes a string for use inside a double-quoted Go/Java string literal.
- *
- * @param {string} str - The raw value.
- * @returns {string} The escaped value.
+ * @param {string} str
+ * @returns {string}
  */
 function escapeGoString(str) {
     if (!str) {
@@ -77,10 +62,8 @@ function escapeGoString(str) {
 }
 
 /**
- * Escapes a string for use inside a single-quoted JavaScript string literal.
- *
- * @param {string} str - The raw value.
- * @returns {string} The escaped value.
+ * @param {string} str
+ * @returns {string}
  */
 function escapeJsSingleQuoted(str) {
     if (!str) {
@@ -94,11 +77,8 @@ function escapeJsSingleQuoted(str) {
 }
 
 /**
- * Escapes a string for use inside a double-quoted PHP string literal, including
- * the `$` variable and `{$...}` interpolation sigils.
- *
- * @param {string} str - The raw value.
- * @returns {string} The escaped value.
+ * @param {string} str
+ * @returns {string}
  */
 function escapePhpDoubleQuoted(str) {
     if (!str) {
@@ -113,11 +93,8 @@ function escapePhpDoubleQuoted(str) {
 }
 
 /**
- * Escapes a string for use inside a double-quoted Ruby string literal,
- * neutralizing `#{...}`, `#@...`, and `#$...` interpolation.
- *
- * @param {string} str - The raw value.
- * @returns {string} The escaped value.
+ * @param {string} str
+ * @returns {string}
  */
 function escapeRubyDoubleQuoted(str) {
     if (!str) {
@@ -132,12 +109,8 @@ function escapeRubyDoubleQuoted(str) {
 }
 
 /**
- * Whether the request carries a body, normalizing the method so a lowercase
- * method (e.g. `"post"`) is treated the same as its uppercase form. Form and
- * binary bodies count regardless of method, matching how requests are sent.
- *
- * @param {RequestConfig} config - The request configuration.
- * @returns {boolean} True when a body should be emitted.
+ * @param {RequestConfig} config
+ * @returns {boolean}
  */
 function hasBody(config) {
     if (isFormDataBody(config) || isUrlencodedBody(config) || isBinaryBody(config)) {
@@ -147,9 +120,7 @@ function hasBody(config) {
 }
 
 /**
- * Whether the config carries a multipart form-data body.
- *
- * @param {RequestConfig} config - The request configuration.
+ * @param {RequestConfig} config
  * @returns {boolean}
  */
 function isFormDataBody(config) {
@@ -157,9 +128,7 @@ function isFormDataBody(config) {
 }
 
 /**
- * Whether the config carries a URL-encoded form body.
- *
- * @param {RequestConfig} config - The request configuration.
+ * @param {RequestConfig} config
  * @returns {boolean}
  */
 function isUrlencodedBody(config) {
@@ -167,9 +136,7 @@ function isUrlencodedBody(config) {
 }
 
 /**
- * Whether the config carries a binary file body.
- *
- * @param {RequestConfig} config - The request configuration.
+ * @param {RequestConfig} config
  * @returns {boolean}
  */
 function isBinaryBody(config) {
@@ -177,10 +144,7 @@ function isBinaryBody(config) {
 }
 
 /**
- * Returns form body rows in the canonical array shape, converting the legacy
- * flat `{key: value}` object shape to text rows.
- *
- * @param {string|Object|Array} body - The form body.
+ * @param {string|Object|Array} body
  * @returns {Array<{key: string, value?: string, type?: string, filePath?: string, contentType?: string}>}
  */
 function bodyRows(body) {
@@ -194,9 +158,7 @@ function bodyRows(body) {
 }
 
 /**
- * Extracts the file name from a path for snippet display.
- *
- * @param {string} filePath - Absolute or relative file path.
+ * @param {string} filePath
  * @returns {string}
  */
 function baseName(filePath) {
@@ -205,12 +167,8 @@ function baseName(filePath) {
 }
 
 /**
- * Resolves the body for generators that emit a single string payload.
- * URL-encoded row arrays become an encoded string; form-data and binary
- * bodies cannot be represented portably and yield a comment instead.
- *
- * @param {RequestConfig} config - The request configuration.
- * @param {boolean} [pretty=false] - Pretty-print JSON object bodies.
+ * @param {RequestConfig} config
+ * @param {boolean} [pretty=false]
  * @returns {{text: (string|null), comment: (string|null)}}
  */
 function resolveSnippetBody(config, pretty = false) {
@@ -230,31 +188,25 @@ function resolveSnippetBody(config, pretty = false) {
 }
 
 /**
- * Serializes a request body to a string. Objects are JSON-encoded.
- *
- * @param {string|Object} body - The request body.
- * @param {boolean} [pretty=false] - Pretty-print JSON objects with 2-space indentation.
- * @returns {string} The serialized body.
+ * @param {string|Object} body
+ * @param {boolean} [pretty=false]
+ * @returns {string}
  */
 function stringifyBody(body, pretty = false) {
     return typeof body === 'string' ? body : JSON.stringify(body, null, pretty ? 2 : undefined);
 }
 
 /**
- * Returns the non-empty header entries (both key and value truthy) of a config.
- *
- * @param {Object<string, string>} [headers] - Header name/value pairs.
- * @returns {Array<[string, string]>} The retained header entries.
+ * @param {Object<string, string>} [headers]
+ * @returns {Array<[string, string]>}
  */
 function validHeaders(headers) {
     return Object.entries(headers || {}).filter(([key, value]) => key && value);
 }
 
 /**
- * Generates a cURL command for the given request.
- *
- * @param {RequestConfig} config - The request configuration.
- * @returns {string} The generated cURL command.
+ * @param {RequestConfig} config
+ * @returns {string}
  */
 function generateCurl(config) {
     const { method, url, headers, body } = config;
@@ -299,10 +251,8 @@ function generateCurl(config) {
 }
 
 /**
- * Generates Python code using the `requests` library.
- *
- * @param {RequestConfig} config - The request configuration.
- * @returns {string} The generated Python code.
+ * @param {RequestConfig} config
+ * @returns {string}
  */
 function generatePythonRequests(config) {
     const { method, url, headers, body } = config;
@@ -377,10 +327,8 @@ function generatePythonRequests(config) {
 }
 
 /**
- * Generates JavaScript code using the Fetch API.
- *
- * @param {RequestConfig} config - The request configuration.
- * @returns {string} The generated JavaScript code.
+ * @param {RequestConfig} config
+ * @returns {string}
  */
 function generateJavaScriptFetch(config) {
     const { method, url, headers } = config;
@@ -412,10 +360,8 @@ function generateJavaScriptFetch(config) {
 }
 
 /**
- * Generates JavaScript code using the Axios library.
- *
- * @param {RequestConfig} config - The request configuration.
- * @returns {string} The generated JavaScript code.
+ * @param {RequestConfig} config
+ * @returns {string}
  */
 function generateJavaScriptAxios(config) {
     const { method, url, headers } = config;
@@ -452,10 +398,8 @@ function generateJavaScriptAxios(config) {
 }
 
 /**
- * Generates Go code using the `net/http` package.
- *
- * @param {RequestConfig} config - The request configuration.
- * @returns {string} The generated Go code.
+ * @param {RequestConfig} config
+ * @returns {string}
  */
 function generateGo(config) {
     const { method, url, headers } = config;
@@ -521,10 +465,8 @@ function generateGo(config) {
 }
 
 /**
- * Generates Node.js code using the built-in `http`/`https` module.
- *
- * @param {RequestConfig} config - The request configuration.
- * @returns {string} The generated Node.js code.
+ * @param {RequestConfig} config
+ * @returns {string}
  */
 function generateNodeJs(config) {
     const { method, url, headers } = config;
@@ -585,10 +527,8 @@ function generateNodeJs(config) {
 }
 
 /**
- * Generates PHP code using the cURL extension.
- *
- * @param {RequestConfig} config - The request configuration.
- * @returns {string} The generated PHP code.
+ * @param {RequestConfig} config
+ * @returns {string}
  */
 function generatePhp(config) {
     const { method, url, headers } = config;
@@ -639,10 +579,8 @@ function generatePhp(config) {
 }
 
 /**
- * Generates Ruby code using the `net/http` library.
- *
- * @param {RequestConfig} config - The request configuration.
- * @returns {string} The generated Ruby code.
+ * @param {RequestConfig} config
+ * @returns {string}
  */
 function generateRuby(config) {
     const { method, url, headers } = config;
@@ -685,14 +623,9 @@ function generateRuby(config) {
 }
 
 /**
- * Builds the `HttpRequest.Builder` method-setter call for a Java snippet, using
- * the correct idiom per method: `.GET()`/`.DELETE()` take no argument,
- * `.POST()`/`.PUT()` take a body publisher, and any other method goes through
- * `.method(name, publisher)`. `.GET(...)` with an argument does not compile.
- *
- * @param {string} method - Uppercased HTTP method.
- * @param {string|null} bodyText - Serialized body, or null when there is none.
- * @returns {string} The builder method-setter call (without leading dot indent).
+ * @param {string} method
+ * @param {string|null} bodyText
+ * @returns {string}
  */
 function javaMethodCall(method, bodyText) {
     const hasBodyText = bodyText !== null;
@@ -710,10 +643,8 @@ function javaMethodCall(method, bodyText) {
 }
 
 /**
- * Generates Java code using the `java.net.http.HttpClient` API.
- *
- * @param {RequestConfig} config - The request configuration.
- * @returns {string} The generated Java code.
+ * @param {RequestConfig} config
+ * @returns {string}
  */
 function generateJava(config) {
     const { method, url, headers } = config;
@@ -756,13 +687,7 @@ function generateJava(config) {
     return lines.join('\n');
 }
 
-/**
- * Registered code generators — the single source of truth for both dispatch
- * ({@link generateCode}) and the UI list ({@link SUPPORTED_LANGUAGES}). Add a language by
- * appending one entry here; nothing else needs to change.
- *
- * @type {Array<{ id: string, name: string, description: string, generate: (config: RequestConfig) => string }>}
- */
+/** @type {Array<{ id: string, name: string, description: string, generate: (config: RequestConfig) => string }>} */
 const GENERATORS = [
     { id: 'curl', name: 'cURL', description: 'Command line', generate: generateCurl },
     { id: 'python', name: 'Python', description: 'requests library', generate: generatePythonRequests },
@@ -776,12 +701,9 @@ const GENERATORS = [
 ];
 
 /**
- * Generates request code for the given language.
- *
- * @param {string} language - One of the {@link SUPPORTED_LANGUAGES} ids.
- * @param {RequestConfig} config - The request configuration.
- * @returns {string} The generated code snippet.
- * @throws {Error} If the language is not supported.
+ * @param {string} language
+ * @param {RequestConfig} config
+ * @returns {string}
  */
 export function generateCode(language, config) {
     const entry = GENERATORS.find((g) => g.id === language);
@@ -791,9 +713,5 @@ export function generateCode(language, config) {
     return entry.generate(config);
 }
 
-/**
- * Languages and clients supported by {@link generateCode}, for populating UI selectors.
- *
- * @type {Array<{ id: string, name: string, description: string }>}
- */
+/** @type {Array<{ id: string, name: string, description: string }>} */
 export const SUPPORTED_LANGUAGES = GENERATORS.map(({ id, name, description }) => ({ id, name, description }));

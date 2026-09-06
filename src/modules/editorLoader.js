@@ -1,12 +1,6 @@
 /**
  * @fileoverview Lazy loader for the CodeMirror-based editor bundles.
  * @module editorLoader
- *
- * The editor bundles share a single large CodeMirror chunk (~640 KB). Importing
- * any of them statically pulls that chunk onto the startup parse path even though
- * editors are only instantiated on demand. This module loads each bundle via a
- * cached dynamic `import()` so the CodeMirror chunk stays off the boot critical
- * path, and {@link warmEditors} pre-fetches the common ones during idle time.
  */
 
 /** @type {Record<string, () => Promise<Function>>} */
@@ -23,11 +17,8 @@ const importers = {
 const cache = {};
 
 /**
- * Dynamically import an editor class, caching the in-flight/resolved promise so
- * each bundle is fetched at most once.
- *
- * @param {'requestBody'|'response'|'json'|'graphql'} kind - Which editor to load.
- * @returns {Promise<Function>} Resolves with the editor constructor.
+ * @param {'requestBody'|'response'|'json'|'graphql'} kind
+ * @returns {Promise<Function>}
  */
 export function loadEditor(kind) {
     if (!importers[kind]) {
@@ -39,40 +30,20 @@ export function loadEditor(kind) {
     return cache[kind];
 }
 
-/**
- * Pre-fetch the editors most likely to be needed first (request body + response)
- * so the first user interaction doesn't pay the bundle download/parse cost.
- * Safe to call multiple times; loads are cached.
- *
- * @returns {void}
- */
+/** @returns {void} */
 export function warmEditors() {
     loadEditor('requestBody');
     loadEditor('response');
 }
 
-/**
- * Non-function properties that callers read directly off an editor instance.
- * Before the real editor exists the proxy must return `undefined` for these
- * (rather than a method-recording stub), so reads like `editor.currentLanguage`
- * behave sanely.
- * @type {Set<string>}
- */
+/** @type {Set<string>} */
 const PASSTHROUGH_PROPS = new Set(['currentLanguage', 'view', 'changeCallback', 'then']);
 
 /**
- * Create a stand-in for an editor whose bundle is still loading.
- *
- * The returned object exposes the editor's full API synchronously: method calls
- * made before the real editor exists are recorded and replayed (in order) once
- * the bundle resolves and the instance is constructed. `getContent()` returns the
- * last content handed to `setContent`/`clear` so reads work pre-load too.
- *
- * @param {'requestBody'|'response'|'json'|'graphql'} kind - Editor bundle to load.
- * @param {HTMLElement} container - Mount point passed to the editor constructor.
- * @param {Array<*>} [ctorArgs=[]] - Extra constructor arguments after `container`.
- * @returns {object} A proxy exposing the editor API; `__ready` resolves with the
- *   real instance (or null if destroyed before load).
+ * @param {'requestBody'|'response'|'json'|'graphql'} kind
+ * @param {HTMLElement} container
+ * @param {Array<*>} [ctorArgs=[]]
+ * @returns {object}
  */
 export function createLazyEditorProxy(kind, container, ctorArgs = []) {
     /** @type {object|null} */

@@ -1,8 +1,3 @@
-/**
- * Duplicate query keys are legal (`?tag=a&tag=b`) and must survive the
- * URL ↔ table round trip, and a literal `%` in the URL must not destroy
- * the parameter rows mid-rebuild.
- */
 jest.mock('../src/modules/state/currentEndpoint.js', () => ({
     getCurrentEndpoint: jest.fn(() => null),
     setCurrentEndpoint: jest.fn()

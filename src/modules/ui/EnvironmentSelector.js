@@ -1,7 +1,3 @@
-/**
- * Environment selector dropdown component
- * Displays active environment and allows quick switching
- */
 import { templateLoader } from '../templateLoader.js';
 import { pushEscapeHandler } from './modalEscape.js';
 
@@ -17,9 +13,6 @@ export class EnvironmentSelector {
         this.activeEnvironment = null;
     }
 
-    /**
-     * Initialize selector with container element
-     */
     initialize(containerId) {
         this.container = document.getElementById(containerId);
         if (!this.container) {
@@ -30,9 +23,6 @@ export class EnvironmentSelector {
         this.setupEventListeners();
     }
 
-    /**
-     * Render the selector
-     */
     render() {
         const fragment = templateLoader.cloneSync(
             './src/templates/environment/environmentSelector.html',
@@ -44,9 +34,6 @@ export class EnvironmentSelector {
         this.dropdown = this.container.querySelector('#env-selector-dropdown');
     }
 
-    /**
-     * Build button styles for the active environment.
-     */
     _applyActiveEnvironmentStyle(environment) {
         const button = document.getElementById('env-selector-btn');
         const indicator = this.container?.querySelector('[data-role="active-indicator"]');
@@ -67,9 +54,6 @@ export class EnvironmentSelector {
         }
     }
 
-    /**
-     * Setup event listeners
-     */
     setupEventListeners() {
         const button = document.getElementById('env-selector-btn');
 
@@ -85,9 +69,6 @@ export class EnvironmentSelector {
         });
     }
 
-    /**
-     * Toggle dropdown
-     */
     async toggleDropdown() {
         if (this.isOpen) {
             this.closeDropdown();
@@ -96,9 +77,6 @@ export class EnvironmentSelector {
         }
     }
 
-    /**
-     * Open dropdown
-     */
     async openDropdown() {
         try {
             const environments = await this.service.getAllEnvironments();
@@ -173,9 +151,6 @@ export class EnvironmentSelector {
         }
     }
 
-    /**
-     * Close dropdown
-     */
     closeDropdown() {
         if (this.releaseEscape) {
             this.releaseEscape();
@@ -187,9 +162,6 @@ export class EnvironmentSelector {
         this.isOpen = false;
     }
 
-    /**
-     * Position dropdown relative to button
-     */
     positionDropdown() {
         const button = document.getElementById('env-selector-btn');
         if (!button) {return;}
@@ -200,9 +172,6 @@ export class EnvironmentSelector {
         this.dropdown.style.setProperty('--env-dropdown-min-width', `${rect.width}px`);
     }
 
-    /**
-     * Select environment
-     */
     async selectEnvironment(environmentId) {
         try {
             if (this.onEnvironmentSwitch) {
@@ -213,9 +182,6 @@ export class EnvironmentSelector {
         }
     }
 
-    /**
-     * Set active environment display
-     */
     setActiveEnvironment(environment) {
         this.activeEnvironment = environment;
         const nameSpan = document.getElementById('env-selector-name');
@@ -225,9 +191,6 @@ export class EnvironmentSelector {
         this._applyActiveEnvironmentStyle(environment);
     }
 
-    /**
-     * Refresh dropdown content
-     */
     async refresh() {
         if (this.isOpen) {
             await this.openDropdown();

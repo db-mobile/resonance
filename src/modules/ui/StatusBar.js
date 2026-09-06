@@ -56,10 +56,7 @@ export class StatusBar {
         this._envDotEl.style.background = color ?? '';
     }
 
-    /**
-     * Show or hide the in-flight request indicator with a live elapsed timer.
-     * @param {boolean} running - Whether a request is currently in progress
-     */
+    /** @param {boolean} running */
     setRequestRunning(running) {
         if (this._requestTimer) {
             clearInterval(this._requestTimer);

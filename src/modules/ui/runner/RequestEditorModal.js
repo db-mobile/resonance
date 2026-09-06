@@ -1,8 +1,5 @@
 /**
  * @fileoverview Per-request editor modal for the Collection Runner: edits the
- * override path params, query params, headers, body, and post-response script
- * for a single queued request. Extracted from RunnerPanel so the modal owns its
- * own DOM and CodeMirror editor lifecycle.
  * @module ui/runner/RequestEditorModal
  */
 
@@ -12,11 +9,6 @@ import { ScriptEditor } from '../../scriptEditor.bundle.js';
 import { JSONEditor } from '../../jsonEditor.bundle.js';
 import { pushEscapeHandler } from '../modalEscape.js';
 
-/**
- * Modal dialog for editing a single runner request's overrides and script.
- *
- * @class
- */
 export class RequestEditorModal {
     constructor() {
         this.modal = null;
@@ -29,13 +21,9 @@ export class RequestEditorModal {
     }
 
     /**
-     * Opens the modal for a request. The request object is mutated in place when
-     * the user saves; `onSave` is then invoked so the host can react (persist,
-     * notify listeners, etc.).
-     *
-     * @param {Object} request - Request to edit (mutated on save)
+     * @param {Object} request
      * @param {Object} [callbacks]
-     * @param {() => void} [callbacks.onSave] - Called after a successful save
+     * @param {() => void} [callbacks.onSave]
      */
     open(request, { onSave } = {}) {
         this.request = request;
@@ -83,12 +71,7 @@ export class RequestEditorModal {
         }
     }
 
-    /**
-     * Closes the modal, optionally persisting the edited overrides and script
-     * back onto the request and notifying the host.
-     *
-     * @param {boolean} save - Whether to save the edited content
-     */
+    /** @param {boolean} save */
     close(save) {
         if (save && this.request) {
             const { request } = this;
@@ -136,11 +119,8 @@ export class RequestEditorModal {
     }
 
     /**
-     * Ensures a request has a complete overrides object (back-compat for older runners).
-     *
-     * @private
-     * @param {Object} request - Request object
-     * @returns {Object} The request's overrides object
+     * @param {Object} request
+     * @returns {Object}
      */
     _ensureOverrides(request) {
         if (!request.overrides) {
@@ -155,11 +135,8 @@ export class RequestEditorModal {
     }
 
     /**
-     * Renders editable key-value rows into a container.
-     *
-     * @private
-     * @param {HTMLElement} container - Target container
-     * @param {Array<Object>} rows - Array of {key, value} objects
+     * @param {HTMLElement} container
+     * @param {Array<Object>} rows
      */
     _renderKvList(container, rows) {
         if (!container) {return;}
@@ -168,12 +145,9 @@ export class RequestEditorModal {
     }
 
     /**
-     * Appends a single editable key-value row to a container.
-     *
-     * @private
-     * @param {HTMLElement} container - Target container
-     * @param {string} [key] - Initial key
-     * @param {string} [value] - Initial value
+     * @param {HTMLElement} container
+     * @param {string} [key]
+     * @param {string} [value]
      */
     _addKvRow(container, key = '', value = '') {
         if (!container) {return;}
@@ -203,11 +177,8 @@ export class RequestEditorModal {
     }
 
     /**
-     * Collects {key, value} rows from a key-value list, skipping rows with empty keys.
-     *
-     * @private
-     * @param {HTMLElement} container - Source container
-     * @returns {Array<Object>} Array of {key, value}
+     * @param {HTMLElement} container
+     * @returns {Array<Object>}
      */
     _collectKvList(container) {
         if (!container) {return [];}
@@ -222,12 +193,7 @@ export class RequestEditorModal {
         return rows;
     }
 
-    /**
-     * Switches the active tab in the editor modal.
-     *
-     * @private
-     * @param {string} tabName - Tab name (params, headers, body, script)
-     */
+    /** @param {string} tabName */
     _switchTab(tabName) {
         if (!this.modal) {return;}
 
@@ -239,11 +205,6 @@ export class RequestEditorModal {
         });
     }
 
-    /**
-     * Attaches event listeners to the modal.
-     *
-     * @private
-     */
     _attachEventListeners() {
         if (!this.modal) {return;}
 

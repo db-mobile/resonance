@@ -1,15 +1,5 @@
-/**
- * PreviewRenderer
- *
- * Renders response content in preview format based on content type.
- * Handles HTML (iframe), JSON (tree view), and XML (formatted tree).
- */
 import { templateLoader } from '../templateLoader.js';
 
-/**
- * Building the preview tree costs DOM nodes proportional to the payload, so
- * oversized responses stay in the code view and wide containers are truncated.
- */
 const MAX_PREVIEW_CHARS = 512 * 1024;
 const MAX_CHILD_ENTRIES = 200;
 
@@ -19,9 +9,8 @@ export class PreviewRenderer {
     }
 
     /**
-     * Render content based on type
-     * @param {string} content - Response content
-     * @param {string} contentType - Content type (json, html, xml)
+     * @param {string} content
+     * @param {string} contentType
      */
     render(content, contentType) {
         this.clear();
@@ -51,10 +40,6 @@ export class PreviewRenderer {
         }
     }
 
-    /**
-     * Render JSON as collapsible tree
-     * @private
-     */
     _renderJSON(content) {
         try {
             const data = JSON.parse(content);
@@ -67,10 +52,8 @@ export class PreviewRenderer {
     }
 
     /**
-     * Build interactive JSON tree
-     * @private
-     * @param {*} data - JSON data
-     * @param {number} level - Nesting level
+     * @param {*} data
+     * @param {number} level
      * @returns {HTMLElement}
      */
     _buildJSONTree(data, level = 0) {
@@ -105,9 +88,7 @@ export class PreviewRenderer {
     }
 
     /**
-     * Check if object/array should be rendered inline
-     * @private
-     * @param {Object|Array} data - Data to check
+     * @param {Object|Array} data
      * @returns {boolean}
      */
     _shouldRenderInline(data) {
@@ -130,10 +111,6 @@ export class PreviewRenderer {
         return false;
     }
 
-    /**
-     * Build inline object representation
-     * @private
-     */
     _buildInlineObject(node, obj) {
         node.className = 'json-tree-node json-tree-inline';
 
@@ -171,10 +148,6 @@ export class PreviewRenderer {
         node.appendChild(document.createTextNode(' }'));
     }
 
-    /**
-     * Build inline array representation
-     * @private
-     */
     _buildInlineArray(node, arr) {
         node.className = 'json-tree-node json-tree-inline';
 
@@ -204,10 +177,6 @@ export class PreviewRenderer {
         node.appendChild(document.createTextNode(' ]'));
     }
 
-    /**
-     * Build object node in JSON tree
-     * @private
-     */
     _buildObjectNode(node, obj, level) {
         const allEntries = Object.entries(obj);
         const entries = allEntries.slice(0, MAX_CHILD_ENTRIES);
@@ -269,10 +238,6 @@ export class PreviewRenderer {
         });
     }
 
-    /**
-     * Build array node in JSON tree
-     * @private
-     */
     _buildArrayNode(node, arr, level) {
         if (arr.length === 0) {
             node.textContent = '[]';
@@ -325,10 +290,6 @@ export class PreviewRenderer {
         });
     }
 
-    /**
-     * Render HTML in sandboxed iframe
-     * @private
-     */
     _renderHTML(content) {
         const iframe = document.createElement('iframe');
         iframe.className = 'response-preview-iframe';
@@ -344,11 +305,8 @@ export class PreviewRenderer {
     }
 
     /**
-     * Remove script tags so the sandboxed iframe never attempts to execute
-     * them (avoids the browser's "Blocked script execution" console warning).
-     * @private
-     * @param {string} content - Original HTML content
-     * @returns {string} HTML content with script elements removed
+     * @param {string} content
+     * @returns {string}
      */
     _stripScripts(content) {
         return content
@@ -357,11 +315,9 @@ export class PreviewRenderer {
     }
 
     /**
-     * Inject CSP meta tag into HTML content
-     * @private
-     * @param {string} content - Original HTML content
-     * @param {string} cspMeta - CSP meta tag to inject
-     * @returns {string} Modified HTML content with CSP
+     * @param {string} content
+     * @param {string} cspMeta
+     * @returns {string}
      */
     _injectCSP(content, cspMeta) {
         const headMatch = content.match(/<head[^>]*>/i);
@@ -377,10 +333,6 @@ export class PreviewRenderer {
         return `<!DOCTYPE html><html><head>${cspMeta}</head><body>${content}</body></html>`;
     }
 
-    /**
-     * Render XML as formatted tree
-     * @private
-     */
     _renderXML(content) {
         try {
             const parser = new DOMParser();
@@ -401,10 +353,8 @@ export class PreviewRenderer {
     }
 
     /**
-     * Build interactive XML tree
-     * @private
-     * @param {Element} node - XML element
-     * @param {number} level - Nesting level
+     * @param {Element} node
+     * @param {number} level
      * @returns {HTMLElement}
      */
     _buildXMLTree(node, level = 0) {
@@ -533,10 +483,6 @@ export class PreviewRenderer {
         return treeNode;
     }
 
-    /**
-     * Render empty state
-     * @private
-     */
     _renderEmptyState() {
         const fragment = templateLoader.cloneSync(
             './src/templates/preview/previewRenderer.html',
@@ -546,10 +492,6 @@ export class PreviewRenderer {
         this.container.appendChild(fragment);
     }
 
-    /**
-     * Render error message
-     * @private
-     */
     _renderError(message) {
         const fragment = templateLoader.cloneSync(
             './src/templates/preview/previewRenderer.html',
@@ -564,20 +506,14 @@ export class PreviewRenderer {
         this.container.appendChild(el);
     }
 
-    /**
-     * Shows the too-large notice instead of building a tree for oversized content.
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     _renderTooLarge() {
         this._renderError('Response too large to preview — use the code view');
     }
 
     /**
-     * Appends a truncation notice for entries beyond the per-node cap.
-     * @private
-     * @param {HTMLElement} children - Children container to append to
-     * @param {number} hiddenCount - Number of entries not rendered
+     * @param {HTMLElement} children
+     * @param {number} hiddenCount
      * @returns {void}
      */
     _appendTruncationNotice(children, hiddenCount) {
@@ -587,9 +523,6 @@ export class PreviewRenderer {
         children.appendChild(line);
     }
 
-    /**
-     * Clear preview container
-     */
     clear() {
         this.container.innerHTML = '';
     }

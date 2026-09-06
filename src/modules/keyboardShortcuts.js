@@ -1,10 +1,3 @@
-/**
- * KeyboardShortcutsManager
- *
- * Manages keyboard shortcuts for the application.
- * Provides platform-aware shortcuts (Cmd on macOS, Ctrl on Windows/Linux)
- * and a help dialog to display available shortcuts.
- */
 
 import { app } from './appContext.js';
 import { templateLoader } from './templateLoader.js';
@@ -20,16 +13,15 @@ class KeyboardShortcutsManager {
     }
 
     /**
-     * Register a keyboard shortcut
-     * @param {string} key - The key combination (e.g., 'Enter', 'KeyS')
-     * @param {Object} options - Options object
-     * @param {Function} options.handler - The function to execute
-     * @param {string} options.description - Description for help dialog
-     * @param {boolean} options.ctrl - Require Ctrl/Cmd key
-     * @param {boolean} options.shift - Require Shift key
-     * @param {boolean} options.alt - Require Alt key
-     * @param {string} options.category - Category for grouping in help dialog
-     * @param {boolean} options.preventDefault - Whether to prevent default behavior (default: true)
+     * @param {string} key
+     * @param {Object} options
+     * @param {Function} options.handler
+     * @param {string} options.description
+     * @param {boolean} options.ctrl
+     * @param {boolean} options.shift
+     * @param {boolean} options.alt
+     * @param {string} options.category
+     * @param {boolean} options.preventDefault
      */
     register(key, options) {
         const {
@@ -58,9 +50,6 @@ class KeyboardShortcutsManager {
         this.categories.get(category).push(shortcutKey);
     }
 
-    /**
-     * Create a unique key for the shortcut
-     */
     _createShortcutKey(key, ctrl, shift, alt) {
         const parts = [];
         if (ctrl) {parts.push('ctrl');}
@@ -70,9 +59,6 @@ class KeyboardShortcutsManager {
         return parts.join('+');
     }
 
-    /**
-     * Get display string for the shortcut
-     */
     _getDisplayKey(key, ctrl, shift, alt) {
         const parts = [];
         if (ctrl) {parts.push(this.modifierDisplayKey);}
@@ -98,9 +84,6 @@ class KeyboardShortcutsManager {
         return parts.join(this.isMac ? '' : '+');
     }
 
-    /**
-     * Handle keyboard events
-     */
     handleKeydown(event) {
         const ctrl = this.isMac ? event.metaKey : event.ctrlKey;
         const shift = event.shiftKey;
@@ -134,18 +117,12 @@ class KeyboardShortcutsManager {
         return false;
     }
 
-    /**
-     * Initialize the keyboard shortcuts manager
-     */
     init() {
         document.addEventListener('keydown', (event) => {
             this.handleKeydown(event);
         });
     }
 
-    /**
-     * Create and show the help dialog
-     */
     showHelp() {
         if (this.helpDialogVisible) {return;}
 
@@ -189,9 +166,6 @@ class KeyboardShortcutsManager {
         document.addEventListener('keydown', escHandler);
     }
 
-    /**
-     * Generate HTML content for help dialog
-     */
     _renderHelpContent(containerEl) {
         containerEl.innerHTML = '';
 
@@ -240,12 +214,11 @@ class KeyboardShortcutsManager {
     }
 
     /**
-     * Look up the display string for a registered shortcut
-     * @param {string} key - Key code (e.g., 'Enter', 'KeyS')
-     * @param {boolean} ctrl - Requires Ctrl/Cmd
-     * @param {boolean} shift - Requires Shift
-     * @param {boolean} alt - Requires Alt
-     * @returns {string|null} Display string (e.g., 'Ctrl+Enter') or null if not found
+     * @param {string} key
+     * @param {boolean} ctrl
+     * @param {boolean} shift
+     * @param {boolean} alt
+     * @returns {string|null}
      */
     lookupDisplayKey(key, ctrl = false, shift = false, alt = false) {
         const shortcutKey = this._createShortcutKey(key, ctrl, shift, alt);
@@ -253,9 +226,6 @@ class KeyboardShortcutsManager {
         return shortcut ? shortcut.displayKey : null;
     }
 
-    /**
-     * Get registered shortcuts (for debugging)
-     */
     getShortcuts() {
         return Array.from(this.shortcuts.entries()).map(([key, value]) => ({
             key,

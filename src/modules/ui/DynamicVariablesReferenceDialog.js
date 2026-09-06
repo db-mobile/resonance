@@ -5,22 +5,10 @@
 
 import { BaseModal } from './BaseModal.js';
 
-/**
- * Read-only reference dialog for the `{{$...}}` dynamic variable syntax.
- *
- * @class
- * @classdesc Shows the grouped cheat sheet of dynamic variables on top of the
- * variable/environment manager dialogs. Escape closes only this dialog, because
- * the shared stack in {@link module:ui/modalEscape} dispatches to the topmost.
- * @augments BaseModal
- */
+/** @augments */
 export class DynamicVariablesReferenceDialog extends BaseModal {
 
-    /**
-     * Builds and displays the reference dialog.
-     *
-     * @returns {void}
-     */
+    /** @returns {void} */
     show() {
         const dialog = this.mount({
             overlayClass: 'var-reference-overlay',

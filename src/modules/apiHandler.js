@@ -14,12 +14,8 @@ const SAVE_DEBOUNCE_MS = 500;
 let inFlightRequestSave = null;
 
 /**
- * Debounced, fire-and-forget save of request modifications.
- * Does not block the caller - saves happen asynchronously after a delay.
- * Multiple rapid calls will be coalesced into a single save.
- *
- * @param {string} collectionId - Collection ID
- * @param {string} endpointId - Endpoint ID
+ * @param {string} collectionId
+ * @param {string} endpointId
  */
 const debouncedSaveRequestModifications = debounce((collectionId, endpointId) => {
     inFlightRequestSave = saveAllRequestModifications(collectionId, endpointId)
@@ -32,19 +28,13 @@ const debouncedSaveRequestModifications = debounce((collectionId, endpointId) =>
     return inFlightRequestSave;
 }, SAVE_DEBOUNCE_MS);
 
-/**
- * Flushes a pending debounced request save and waits for it to settle.
- * @returns {Promise<void>} Resolves once no request save is pending or in flight
- */
+/** @returns {Promise<void>} */
 export async function flushPendingRequestSave() {
     await debouncedSaveRequestModifications.flush();
     await inFlightRequestSave;
 }
 
-/**
- * Cancels a pending debounced request save without executing it.
- * @returns {void}
- */
+/** @returns {void} */
 export function cancelPendingRequestSave() {
     debouncedSaveRequestModifications.cancel();
 }
@@ -65,7 +55,8 @@ import { extractCookies } from './cookieParser.js';
 import { getRequestBodyContent, captureSnippetBody } from './requestBodyHelper.js';
 import { MockServerRepository } from './storage/MockServerRepository.js';
 import { MockServerService } from './services/MockServerService.js';
-import { isGrpcMode, isMqttMode, isSseMode, isWebSocketMode, isGraphQLMode } from './requestModeManager.js';
+import { isGrpcMode, isGraphQLMode, getCurrentMode, RequestMode } from './requestModeManager.js';
+import { getProtocol } from './protocols/protocolRegistry.js';
 import { handleGrpcSend } from './grpcHandler.js';
 import { handleWebSocketCancel, handleWebSocketSend } from './websocketHandler.js';
 import { handleSseCancel, handleSseConnect } from './sseHandler.js';
@@ -145,12 +136,8 @@ export function getRequestBuilderService() {
 }
 
 /**
- * Generates auth data for the current request with 'inherit' resolved to the
- * owning collection's auth config and {{variables}} substituted in credential
- * fields when a variable context is supplied. Used by every interactive send path.
- *
- * @param {{variables?: Object, processor?: Object}} [substitution] - Variable map and VariableProcessor shared with the request pipeline
- * @returns {Promise<Object>} Auth data ({headers, queryParams, authConfig, awsAuth?, ntlmAuth?, unresolvedVariables})
+ * @param {{variables?: Object, processor?: Object}} [substitution]
+ * @returns {Promise<Object>}
  */
 export async function generateEffectiveAuthData({ variables, processor } = {}) {
     const current = getCurrentEndpoint();
@@ -166,12 +153,9 @@ export async function generateEffectiveAuthData({ variables, processor } = {}) {
 }
 
 /**
- * Warns (non-blocking) when the outgoing request still contains unresolved
- * variable references after variable processing and pre-request scripts.
- * Scans the final URL, headers, query/path params, and body; never throws.
- * @param {Object} processor - VariableProcessor used for this request
- * @param {Object} requestConfig - Fully built request configuration
- * @param {string[]} [extraNames] - Unresolved names found elsewhere (e.g. auth config fields)
+ * @param {Object} processor
+ * @param {Object} requestConfig
+ * @param {string[]} [extraNames]
  * @returns {void}
  */
 export function warnUnresolvedVariables(processor, requestConfig, extraNames = []) {
@@ -199,16 +183,7 @@ export function warnUnresolvedVariables(processor, requestConfig, extraNames = [
     }
 }
 
-/**
- * Fetches the GraphQL schema for the current endpoint by POSTing the standard
- * introspection query. Reuses the same URL/header/auth/variable resolution as the
- * main send path so it honours the user's configured auth, headers and variables.
- *
- * Does not mutate any shared send state and never throws — failures are returned
- * as { error }.
- *
- * @returns {Promise<{schema?: import('graphql').GraphQLSchema, url?: string, error?: string}>}
- */
+/** @returns {Promise<{schema?: import('graphql').GraphQLSchema, url?: string, error?: string}>} */
 export async function fetchGraphQLIntrospection() {
     const url = urlInput?.value?.trim() || urlInput?.getAttribute('value') || '';
     if (!url) {
@@ -230,7 +205,7 @@ export async function fetchGraphQLIntrospection() {
             url, pathParams: {}, headers, queryParams, variables, processor
         }));
     } catch (error) {
-        return { error: `Variable processing error: ${error.message}` };
+        return { error: variableProcessingError(error) };
     }
 
     let timeout = 30000;
@@ -310,11 +285,8 @@ export async function fetchGraphQLIntrospection() {
 }
 
 /**
- * Rebuild a GraphQLSchema from a previously fetched (and persisted) raw
- * introspection result. Used by the autocomplete cache load path.
- *
- * @param {object} introspection - The `data` payload of an introspection query.
- * @returns {import('graphql').GraphQLSchema|null} The schema, or null if invalid.
+ * @param {object} introspection
+ * @returns {import('graphql').GraphQLSchema|null}
  */
 export function buildSchemaFromIntrospection(introspection) {
     if (!introspection || !introspection.__schema) {
@@ -327,10 +299,6 @@ export function buildSchemaFromIntrospection(introspection) {
     }
 }
 
-/**
- * Returns the global DOM element references used as fallbacks
- * when per-tab response containers are not available.
- */
 function globalResponseElements() {
     return {
         headersDisplay: responseHeadersDisplay,
@@ -366,10 +334,7 @@ async function isTabCurrentlyActive(tabId) {
     return activeTabId === tabId;
 }
 
-/**
- * Clears the schema validation badge from the response area
- * @param {string|null} tabId - Workspace tab ID
- */
+/** @param {string|null} tabId */
 export function clearSchemaValidationBadge(tabId = null) {
     const containerElements = tabId
         ? app.responseContainerManager?.getOrCreateContainer(tabId)
@@ -387,9 +352,8 @@ export function clearSchemaValidationBadge(tabId = null) {
 }
 
 /**
- * Displays schema validation result in the response area
- * @param {Object} validationResult - { valid: boolean, errors: Array, hasSchema: boolean }
- * @param {string|null} tabId - Workspace tab ID
+ * @param {Object} validationResult
+ * @param {string|null} tabId
  */
 function displaySchemaValidationResult(validationResult, tabId = null) {
     clearSchemaValidationBadge(tabId);
@@ -418,10 +382,7 @@ function displaySchemaValidationResult(validationResult, tabId = null) {
     statusContainer.appendChild(badge);
 }
 
-/**
- * Removes the GraphQL errors badge from the response status area.
- * @param {string|null} tabId - Workspace tab ID
- */
+/** @param {string|null} tabId */
 export function clearGraphQLErrorsBadge(tabId = null) {
     const containerElements = tabId
         ? app.responseContainerManager?.getOrCreateContainer(tabId)
@@ -435,12 +396,8 @@ export function clearGraphQLErrorsBadge(tabId = null) {
 }
 
 /**
- * Surfaces top-level GraphQL `errors` from a response. GraphQL servers return
- * HTTP 200 even when a query fails, so without this a failed query looks like a
- * successful request. Only acts when the request was sent in GraphQL mode.
- *
- * @param {Object} result - The backend ApiResponse (result.data is the parsed body)
- * @param {string|null} tabId - Workspace tab ID
+ * @param {Object} result
+ * @param {string|null} tabId
  */
 function displayGraphQLErrorsBadge(result, tabId = null) {
     clearGraphQLErrorsBadge(tabId);
@@ -533,21 +490,17 @@ export function setRequestInProgress(inProgress) {
     app.statusBar?.setRequestRunning(inProgress);
 }
 
+/** @type {Object<string, function(): Promise<*>>} */
+const STREAMING_CANCELS = Object.freeze({
+    [RequestMode.WEBSOCKET]: handleWebSocketCancel,
+    [RequestMode.SSE]: handleSseCancel,
+    [RequestMode.MQTT]: handleMqttCancel
+});
+
 export async function handleCancelRequest() {
-    if (isWebSocketMode()) {
-        await handleWebSocketCancel();
-        setRequestInProgress(false);
-        return;
-    }
-
-    if (isSseMode()) {
-        await handleSseCancel();
-        setRequestInProgress(false);
-        return;
-    }
-
-    if (isMqttMode()) {
-        await handleMqttCancel();
+    const cancelStreaming = STREAMING_CANCELS[getCurrentMode()];
+    if (cancelStreaming) {
+        await cancelStreaming();
         setRequestInProgress(false);
         return;
     }
@@ -588,11 +541,7 @@ export async function handleCancelRequest() {
     }
 }
 
-/**
- * Determine the operation type the Run button should execute in GraphQL mode,
- * based on the editor's parsed operations and the operation picker selection.
- * @returns {string|null} 'query' | 'mutation' | 'subscription' | null
- */
+/** @returns {string|null} */
 function getActiveGraphQLOperationType() {
     if (!graphqlBodyManager) {
         return null;
@@ -602,10 +551,6 @@ function getActiveGraphQLOperationType() {
     return selectActiveOperationType(operations, selected);
 }
 
-/**
- * Open (or toggle off) a GraphQL subscription over WebSocket. Resolves variables,
- * headers, auth and the query exactly like the HTTP send path before connecting.
- */
 async function handleGraphQLSubscriptionRequest() {
     const tabId = app.workspaceTabController
         ? await app.workspaceTabController.service.getActiveTabId()
@@ -616,9 +561,7 @@ async function handleGraphQLSubscriptionRequest() {
         return;
     }
 
-    if (getCurrentEndpoint()) {
-        debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
-    }
+    scheduleEndpointSave();
 
     let url = urlInput?.value?.trim() || urlInput?.getAttribute('value') || '';
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
@@ -653,13 +596,11 @@ async function handleGraphQLSubscriptionRequest() {
             url, headers, query, variables: parsedVariables, operationName
         });
     } catch (error) {
-        updateStatusDisplay(`Variable processing error: ${error.message}`, null);
+        updateStatusDisplay(variableProcessingError(error), null);
     }
 }
 
 /**
- * Set a header only when the user has not supplied it themselves, matching
- * however they capitalised it.
  * @param {Object<string, string>} headers
  * @param {string} name
  * @param {string} value
@@ -674,19 +615,11 @@ function setDefaultHeader(headers, name, value) {
 }
 
 /**
- * Build the request body for an SSE stream. Returns the raw string the backend
- * should send, or null for a method that carries no body. Adds a Content-Type
- * when the user has not set one.
- *
- * SSE offers only the JSON and text body modes (see `SSE_BODY_MODES`), so a
- * stream sends one document — there is no multipart or binary variant.
- *
  * @param {string} method
- * @param {Object<string, string>} headers - mutated with a default Content-Type.
+ * @param {Object<string, string>} headers
  * @param {Object} variables
  * @param {Object} processor
  * @returns {string|null}
- * @throws {Error} when the JSON body does not parse.
  */
 function buildSseBody(method, headers, variables, processor) {
     if (method === 'GET' || method === 'HEAD') {
@@ -719,6 +652,145 @@ function buildSseBody(method, headers, variables, processor) {
     return resolved;
 }
 
+/**
+ * @param {Error} error
+ * @returns {string}
+ */
+function variableProcessingError(error) {
+    return `Variable processing error: ${error.message}`;
+}
+
+/** @returns {void} */
+function scheduleEndpointSave() {
+    const current = getCurrentEndpoint();
+    if (current) {
+        debouncedSaveRequestModifications(current.collectionId, current.endpointId);
+    }
+}
+
+/**
+ * @param {function(): Promise<*>} send
+ * @returns {Promise<*>}
+ */
+async function withRequestInProgress(send) {
+    setRequestInProgress(true);
+    try {
+        return await send();
+    } finally {
+        setRequestInProgress(false);
+    }
+}
+
+/**
+ * @param {string} protocolId
+ * @returns {string}
+ */
+function readSendUrl(protocolId) {
+    const mirrorId = getProtocol(protocolId).urlInputId;
+    const mirror = mirrorId ? document.getElementById(mirrorId) : null;
+
+    return mirror?.value?.trim()
+        || urlInput?.value?.trim()
+        || urlInput?.getAttribute('value')
+        || '';
+}
+
+/**
+ * @param {string} protocolId
+ * @param {boolean} useAuth
+ * @returns {Promise<Object>}
+ */
+async function prepareStreamingSend(protocolId, useAuth) {
+    const headers = useAuth ? parseKeyValuePairs(document.getElementById('headers-list')) : {};
+    const queryParams = useAuth ? parseKeyValuePairs(document.getElementById('query-params-list')) : {};
+    const builder = getRequestBuilderService();
+
+    try {
+        const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
+
+        if (useAuth) {
+            const authData = await generateEffectiveAuthData({ variables, processor });
+            builder.mergeAuthData(headers, queryParams, authData);
+        }
+
+        const { url } = builder.processRequestComponents({
+            url: readSendUrl(protocolId),
+            pathParams: {},
+            headers,
+            queryParams,
+            variables,
+            processor
+        });
+
+        return { ok: true, url, headers, queryParams, variables, processor };
+    } catch (error) {
+        return { ok: false, error: variableProcessingError(error) };
+    }
+}
+
+/** @returns {Object} */
+function readMqttOptions() {
+    const fieldValue = (id) => document.getElementById(id)?.value?.trim() || '';
+
+    return {
+        clientId: fieldValue('mqtt-client-id-input'),
+        username: document.getElementById('mqtt-username-input')?.value || '',
+        password: document.getElementById('mqtt-password-input')?.value || '',
+        subscribeTopic: fieldValue('mqtt-subscribe-input'),
+        publishTopic: fieldValue('mqtt-topic-input'),
+        qos: Number(document.getElementById('mqtt-qos-select')?.value) || 0,
+        payload: getRequestBodyContent() || ''
+    };
+}
+
+/** @type {Object<string, {useAuth: boolean, send: function(Object): Promise<*>}>} */
+const STREAMING_SENDS = Object.freeze({
+    [RequestMode.WEBSOCKET]: Object.freeze({
+        useAuth: true,
+        send: ({ url, headers }) => handleWebSocketSend(url, headers)
+    }),
+    [RequestMode.SSE]: Object.freeze({
+        useAuth: true,
+        buildPayload: ({ headers, variables, processor }) => {
+            const method = methodSelect?.value || 'GET';
+            return { method, body: buildSseBody(method, headers, variables, processor) };
+        },
+        send: ({ url, headers }, payload) => handleSseConnect(url, headers, payload)
+    }),
+    [RequestMode.MQTT]: Object.freeze({
+        useAuth: false,
+        send: ({ url }) => handleMqttSend(url, readMqttOptions())
+    })
+});
+
+/**
+ * @param {string} protocolId
+ * @param {{useAuth: boolean, buildPayload?: function(Object): *, send: function(Object, *): Promise<*>}} config
+ * @returns {Promise<void>}
+ */
+async function runStreamingSend(protocolId, { useAuth, buildPayload, send }) {
+    scheduleEndpointSave();
+
+    const prepared = await prepareStreamingSend(protocolId, useAuth);
+    if (!prepared.ok) {
+        updateStatusDisplay(prepared.error, null);
+        return;
+    }
+
+    let payload = null;
+    if (buildPayload) {
+        try {
+            payload = buildPayload(prepared);
+        } catch (error) {
+            toast.error(error.message);
+            updateStatusDisplay(error.message, null);
+            return;
+        }
+    }
+
+    await withRequestInProgress(() => send(prepared, payload));
+}
+
 export async function handleSendRequest() {
     if (isGrpcMode()) {
         return handleGrpcSend();
@@ -734,154 +806,14 @@ export async function handleSendRequest() {
         }
     }
 
-    if (isWebSocketMode()) {
-        if (getCurrentEndpoint()) {
-            debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
-        }
-
-        let websocketUrl = urlInput?.value?.trim() || '';
-        if (!websocketUrl && urlInput) {
-            websocketUrl = urlInput.getAttribute('value') || '';
-        }
-
-        const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
-        const headers = parseKeyValuePairs(document.getElementById('headers-list'));
-
-        const builder = getRequestBuilderService();
-
-        try {
-            const { variables, processor } = await builder.resolveVariables(
-                getCurrentEndpoint(), headers
-            );
-            const authData = await generateEffectiveAuthData({ variables, processor });
-            builder.mergeAuthData(headers, queryParams, authData);
-
-            const result = builder.processRequestComponents({
-                url: websocketUrl,
-                pathParams: {},
-                headers,
-                queryParams,
-                variables,
-                processor
-            });
-            websocketUrl = result.url;
-        } catch (error) {
-            updateStatusDisplay(`Variable processing error: ${error.message}`, null);
-            return;
-        }
-
-        setRequestInProgress(true);
-        try {
-            await handleWebSocketSend(websocketUrl, headers);
-        } finally {
-            setRequestInProgress(false);
-        }
-        return;
-    }
-
-    if (isSseMode()) {
-        if (getCurrentEndpoint()) {
-            debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
-        }
-
-        const sseInput = document.getElementById('sse-url-input');
-        let sseUrl = sseInput?.value?.trim() || urlInput?.value?.trim() || '';
-
-        const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
-        const headers = parseKeyValuePairs(document.getElementById('headers-list'));
-        const method = methodSelect?.value || 'GET';
-
-        const builder = getRequestBuilderService();
-
-        let sseBody;
-        let resolved;
-        try {
-            resolved = await builder.resolveVariables(getCurrentEndpoint(), headers);
-            const authData = await generateEffectiveAuthData({
-                variables: resolved.variables,
-                processor: resolved.processor
-            });
-            builder.mergeAuthData(headers, queryParams, authData);
-            const result = builder.processRequestComponents({
-                url: sseUrl,
-                pathParams: {},
-                headers,
-                queryParams,
-                variables: resolved.variables,
-                processor: resolved.processor
-            });
-            sseUrl = result.url;
-        } catch (error) {
-            updateStatusDisplay(`Variable processing error: ${error.message}`, null);
-            return;
-        }
-
-        try {
-            sseBody = buildSseBody(method, headers, resolved.variables, resolved.processor);
-        } catch (error) {
-            toast.error(error.message);
-            updateStatusDisplay(error.message, null);
-            return;
-        }
-
-        setRequestInProgress(true);
-        try {
-            await handleSseConnect(sseUrl, headers, { method, body: sseBody });
-        } finally {
-            setRequestInProgress(false);
-        }
-        return;
-    }
-
-    if (isMqttMode()) {
-        if (getCurrentEndpoint()) {
-            debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
-        }
-
-        const brokerInput = document.getElementById('mqtt-broker-input');
-        let broker = brokerInput?.value?.trim() || urlInput?.value?.trim() || '';
-
-        const builder = getRequestBuilderService();
-        try {
-            const { variables, processor } = await builder.resolveVariables(
-                getCurrentEndpoint(), {}
-            );
-            const result = builder.processRequestComponents({
-                url: broker,
-                pathParams: {},
-                headers: {},
-                queryParams: {},
-                variables,
-                processor
-            });
-            broker = result.url;
-        } catch (error) {
-            updateStatusDisplay(`Variable processing error: ${error.message}`, null);
-            return;
-        }
-
-        setRequestInProgress(true);
-        try {
-            await handleMqttSend(broker, {
-                clientId: document.getElementById('mqtt-client-id-input')?.value?.trim() || '',
-                username: document.getElementById('mqtt-username-input')?.value || '',
-                password: document.getElementById('mqtt-password-input')?.value || '',
-                subscribeTopic: document.getElementById('mqtt-subscribe-input')?.value?.trim() || '',
-                publishTopic: document.getElementById('mqtt-topic-input')?.value?.trim() || '',
-                qos: Number(document.getElementById('mqtt-qos-select')?.value) || 0,
-                payload: getRequestBodyContent() || ''
-            });
-        } finally {
-            setRequestInProgress(false);
-        }
-        return;
+    const streaming = STREAMING_SENDS[getCurrentMode()];
+    if (streaming) {
+        return runStreamingSend(getCurrentMode(), streaming);
     }
 
     setRequestInProgress(true);
 
-    if (getCurrentEndpoint()) {
-        debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
-    }
+    scheduleEndpointSave();
 
     let url = urlInput?.value?.trim() || '';
     if (!url && urlInput) {
@@ -927,7 +859,7 @@ export async function handleSendRequest() {
             processor
         }));
     } catch (error) {
-        updateStatusDisplay(`Variable processing error: ${error.message}`, null);
+        updateStatusDisplay(variableProcessingError(error), null);
         setRequestInProgress(false);
         return;
     }
@@ -961,6 +893,7 @@ export async function handleSendRequest() {
                 }
             }
         } catch (error) {
+            console.warn('Mock server check failed, sending to the real URL:', error);
         }
     }
 
@@ -1259,9 +1192,6 @@ export async function handleSendRequest() {
                         getCurrentEndpoint().collectionId,
                         getCurrentEndpoint().endpointId,
                         requestConfig,
-                        // The backend reports raw Set-Cookie strings as
-                        // `setCookies`; scripts read `response.cookies`, so the
-                        // parsed form is attached here.
                         { ...result, cookies: extractCookies(result.headers) }
                     );
                 } catch (error) {
@@ -1345,9 +1275,7 @@ export async function handleSendRequest() {
 }
 
 export async function handleGenerateCurl() {
-    if (getCurrentEndpoint()) {
-        debouncedSaveRequestModifications(getCurrentEndpoint().collectionId, getCurrentEndpoint().endpointId);
-    }
+    scheduleEndpointSave();
 
     let url = urlInput.value.trim();
 
@@ -1376,7 +1304,7 @@ export async function handleGenerateCurl() {
             processor
         }));
     } catch (error) {
-        updateStatusDisplay(`Variable processing error: ${error.message}`, null);
+        updateStatusDisplay(variableProcessingError(error), null);
         return;
     }
 

@@ -1,7 +1,3 @@
-/**
- * UI Dialog for managing environments
- * Allows creating, editing, deleting, and duplicating environments
- */
 import { templateLoader } from '../templateLoader.js';
 import { DynamicVariablesReferenceDialog } from './DynamicVariablesReferenceDialog.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
@@ -16,9 +12,6 @@ export class EnvironmentManager {
         this.releaseEscape = null;
     }
 
-    /**
-     * Show environment manager dialog
-     */
     show() {
         return new Promise((resolve) => {
             this.resolve = resolve;
@@ -26,9 +19,6 @@ export class EnvironmentManager {
         });
     }
 
-    /**
-     * Create and display dialog
-     */
     async createDialog() {
         this.currentEnvironmentId = null;
 
@@ -57,9 +47,6 @@ export class EnvironmentManager {
         await this.loadEnvironments();
     }
 
-    /**
-     * Setup event listeners
-     */
     setupEventListeners() {
         const createBtn = this.dialog.querySelector('#env-create-btn');
         const closeBtn = this.dialog.querySelector('#env-close-btn');
@@ -80,9 +67,6 @@ export class EnvironmentManager {
         this.releaseEscape = pushEscapeHandler(() => this.close(true));
     }
 
-    /**
-     * Load and display environments
-     */
     async loadEnvironments() {
         try {
             const environments = await this.service.getAllEnvironments();
@@ -105,9 +89,6 @@ export class EnvironmentManager {
         }
     }
 
-    /**
-     * Create environment list item
-     */
     createEnvironmentListItem(environment, isActive) {
         const item = document.createElement('div');
         item.className = 'env-list-item';
@@ -142,9 +123,6 @@ export class EnvironmentManager {
         return item;
     }
 
-    /**
-     * Select environment and show details
-     */
     async selectEnvironment(environmentId) {
         this.currentEnvironmentId = environmentId;
 
@@ -156,9 +134,6 @@ export class EnvironmentManager {
         await this.loadEnvironmentDetails(environmentId);
     }
 
-    /**
-     * Load environment details
-     */
     async loadEnvironmentDetails(environmentId) {
         try {
             const environment = await this.service.getAllEnvironments().then(envs =>
@@ -213,9 +188,6 @@ export class EnvironmentManager {
         }
     }
 
-    /**
-     * Setup event listeners for details panel
-     */
     setupDetailEventListeners(environment) {
         const nameInput = this.dialog.querySelector('#env-name-input');
         const setActiveBtn = this.dialog.querySelector('#env-set-active-btn');
@@ -376,11 +348,7 @@ export class EnvironmentManager {
         }
     }
 
-    /**
-     * Load variables for environment
-     *
-     * @param {Object} environment - The environment whose variables to render
-     */
+    /** @param {Object} environment */
     async loadVariables(environment) {
         const container = this.dialog.querySelector('#env-variables-container');
         container.innerHTML = '';
@@ -399,9 +367,6 @@ export class EnvironmentManager {
         this.addVariableRow({}, container);
     }
 
-    /**
-     * Add variable input row
-     */
     addVariableRow({ name = '', value = '', isSecret = false }, container = null) {
         if (!container) {
             container = this.dialog.querySelector('#env-variables-container');
@@ -428,9 +393,6 @@ export class EnvironmentManager {
     }
 
     /**
-     * Reflects a row's secret state in the DOM: masks the value, shows the reveal
-     * toggle, and highlights the lock button.
-     *
      * @param {HTMLElement} row
      * @param {boolean} isSecret
      */
@@ -455,9 +417,6 @@ export class EnvironmentManager {
         }
     }
 
-    /**
-     * Setup event listeners for variable row
-     */
     setupVariableRowListeners(row, originalName) {
         const nameInput = row.querySelector('.var-name-input');
         const valueInput = row.querySelector('.var-value-input');
@@ -529,8 +488,6 @@ export class EnvironmentManager {
     }
 
     /**
-     * Set variable in current environment
-     *
      * @param {string} name
      * @param {string} value
      * @param {boolean} [isSecret=false]
@@ -544,9 +501,6 @@ export class EnvironmentManager {
         }
     }
 
-    /**
-     * Delete variable from current environment
-     */
     async deleteVariable(name) {
         try {
             if (!this.currentEnvironmentId) {return;}
@@ -556,9 +510,6 @@ export class EnvironmentManager {
         }
     }
 
-    /**
-     * Handle create environment
-     */
     async handleCreateEnvironment() {
         const name = await this.showInputDialog('Create Environment', 'Enter environment name:', 'New Environment');
         if (!name) {return;}
@@ -572,9 +523,6 @@ export class EnvironmentManager {
         }
     }
 
-    /**
-     * Show input dialog (replaces prompt)
-     */
     showInputDialog(title, message, defaultValue = '') {
         return new Promise((resolve) => {
             const overlay = document.createElement('div');
@@ -633,9 +581,6 @@ export class EnvironmentManager {
         });
     }
 
-    /**
-     * Show alert dialog (replaces alert)
-     */
     showAlert(message) {
         const overlay = document.createElement('div');
         overlay.className = 'modal-overlay';
@@ -688,9 +633,6 @@ export class EnvironmentManager {
             });
     }
 
-    /**
-     * Handle import environments
-     */
     async handleImport() {
         const merge = await new ConfirmDialog().show(
             'Merge with existing environments? (Cancel to replace all)',
@@ -719,9 +661,6 @@ export class EnvironmentManager {
         input.click();
     }
 
-    /**
-     * Handle export all environments
-     */
     async handleExportAll() {
         try {
             const data = await this.service.exportAllEnvironments();
@@ -735,9 +674,6 @@ export class EnvironmentManager {
         }
     }
 
-    /**
-     * Save JSON through the native backend when available.
-     */
     async saveJsonExport(filename, json) {
         if (window.backendAPI?.environments?.saveJsonExport) {
             const result = await window.backendAPI.environments.saveJsonExport(filename, json);
@@ -750,9 +686,6 @@ export class EnvironmentManager {
         throw new Error('Native export is not available in this runtime');
     }
 
-    /**
-     * Close dialog
-     */
     close(changed = false) {
         if (this.releaseEscape) {
             this.releaseEscape();

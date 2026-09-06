@@ -1,6 +1,5 @@
 /**
  * @fileoverview Feature descriptor wiring the pre-request/test script stack (Repository →
- * Service → Controller, plus inline editor + console panel) for the FeatureRegistry.
  * @module script.feature
  */
 

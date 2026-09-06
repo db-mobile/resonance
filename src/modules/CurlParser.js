@@ -3,20 +3,10 @@
  * @module CurlParser
  */
 
-/**
- * Parser for cURL commands
- *
- * @class
- * @classdesc Parses cURL command strings and extracts HTTP request components
- * including method, URL, headers, body, and authentication.
- */
 export class CurlParser {
     /**
-     * Parses a cURL command string into request components
-     *
-     * @param {string} curlCommand - The cURL command to parse
-     * @returns {Object} Parsed request object with method, url, headers, body, auth
-     * @throws {Error} If the cURL command is invalid
+     * @param {string} curlCommand
+     * @returns {Object}
      */
     static parse(curlCommand) {
         if (!curlCommand || typeof curlCommand !== 'string') {
@@ -207,11 +197,8 @@ export class CurlParser {
     }
 
     /**
-     * Encodes one --data-urlencode token following curl's forms; @file forms pass through unchanged because the importer cannot read files.
-     *
-     * @private
-     * @param {string} token - The raw --data-urlencode argument
-     * @returns {string} Encoded body fragment
+     * @param {string} token
+     * @returns {string}
      */
     static encodeDataUrlencodeToken(token) {
         const eq = token.indexOf('=');
@@ -231,11 +218,8 @@ export class CurlParser {
     }
 
     /**
-     * Normalizes a cURL command by handling line continuations and whitespace
-     *
-     * @private
-     * @param {string} command - The raw cURL command
-     * @returns {string} Normalized command string
+     * @param {string} command
+     * @returns {string}
      */
     static normalizeCommand(command) {
         return command
@@ -246,11 +230,8 @@ export class CurlParser {
     }
 
     /**
-     * Tokenizes a cURL command string, handling quoted strings
-     *
-     * @private
-     * @param {string} command - The normalized command string
-     * @returns {Array<string>} Array of tokens
+     * @param {string} command
+     * @returns {Array<string>}
      */
     static tokenize(command) {
         const tokens = [];
@@ -302,11 +283,8 @@ export class CurlParser {
     }
 
     /**
-     * Parses a header string into key-value pair
-     *
-     * @private
-     * @param {string} headerStr - Header string in "Key: Value" format
-     * @returns {Object|null} Object with key and value, or null if invalid
+     * @param {string} headerStr
+     * @returns {Object|null}
      */
     static parseHeader(headerStr) {
         const colonIndex = headerStr.indexOf(':');
@@ -321,11 +299,8 @@ export class CurlParser {
     }
 
     /**
-     * Parses a URL and extracts query parameters
-     *
-     * @private
-     * @param {string} url - The URL to parse
-     * @returns {Object} Object with baseUrl and queryParams
+     * @param {string} url
+     * @returns {Object}
      */
     static parseUrl(url) {
         const questionIndex = url.indexOf('?');
@@ -348,11 +323,8 @@ export class CurlParser {
     }
 
     /**
-     * Checks if a string looks like a URL
-     *
-     * @private
-     * @param {string} str - String to check
-     * @returns {boolean} True if string appears to be a URL
+     * @param {string} str
+     * @returns {boolean}
      */
     static isUrl(str) {
         return str.startsWith('http://') || 
@@ -362,12 +334,9 @@ export class CurlParser {
     }
 
     /**
-     * Generates a request name from URL and method
-     *
-     * @private
-     * @param {string} url - The request URL
-     * @param {string} method - The HTTP method
-     * @returns {string} Generated request name
+     * @param {string} url
+     * @param {string} method
+     * @returns {string}
      */
     static generateRequestName(url, method) {
         try {
@@ -401,10 +370,8 @@ export class CurlParser {
     }
 
     /**
-     * Converts parsed request data to endpoint format for collection
-     *
-     * @param {Object} parsed - Parsed cURL data
-     * @returns {Object} Endpoint object compatible with collection format
+     * @param {Object} parsed
+     * @returns {Object}
      */
     static toEndpoint(parsed) {
         const endpoint = {

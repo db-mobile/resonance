@@ -6,10 +6,6 @@ import { html } from '@codemirror/lang-html';
 import { searchKeymap, highlightSelectionMatches, search, openSearchPanel } from '@codemirror/search';
 import { createThemedHighlighting } from './editorTheme.js';
 
-/**
- * ResponseEditor - Manages CodeMirror editor for response display
- * Provides syntax highlighting for JSON, XML, and HTML with line numbers
- */
 export class ResponseEditor {
     constructor(containerElement) {
         this.container = containerElement;
@@ -22,21 +18,12 @@ export class ResponseEditor {
         this.init();
     }
 
-    /**
-     * Get theme extensions based on current color scheme
-     * @returns {Array} Array of theme extensions
-     */
+    /** @returns {Array} */
     getThemeExtensions() {
         return [this._themed.extension];
     }
 
-    /**
-     * Initialize the CodeMirror editor
-     */
-    /**
-     * Get search extensions for Ctrl+F functionality
-     * @returns {Array} Array of search extensions
-     */
+    /** @returns {Array} */
     getSearchExtensions() {
         return [
             search(),
@@ -68,9 +55,8 @@ export class ResponseEditor {
     }
 
     /**
-     * Detect language from Content-Type header
-     * @param {string} contentType - The Content-Type header value
-     * @returns {object|null} - Language extension or null
+     * @param {string} contentType
+     * @returns {object|null}
      */
     detectLanguageFromContentType(contentType) {
         if (!contentType) {return null;}
@@ -103,9 +89,8 @@ export class ResponseEditor {
     }
 
     /**
-     * Detect content type and return appropriate language extension
-     * @param {string} content - The response content
-     * @returns {object|null} - Language extension or null
+     * @param {string} content
+     * @returns {object|null}
      */
     detectLanguage(content) {
         const trimmed = content.trim();
@@ -130,8 +115,7 @@ export class ResponseEditor {
     }
 
     /**
-     * Get language extension by type name
-     * @param {string} languageType - Language type ('json', 'xml', 'html', 'text')
+     * @param {string} languageType
      * @returns {object|null}
      */
     getLanguageExtension(languageType) {
@@ -148,18 +132,12 @@ export class ResponseEditor {
         }
     }
 
-    /**
-     * Set a callback to be called when language changes
-     * @param {function} callback - Function to call with language type
-     */
+    /** @param {function} callback */
     onLanguageChange(callback) {
         this.languageChangeCallback = callback;
     }
 
-    /**
-     * Manually set the language for syntax highlighting
-     * @param {string} languageType - Language type ('json', 'xml', 'html', 'text')
-     */
+    /** @param {string} languageType */
     setLanguage(languageType) {
         this.manualLanguageOverride = languageType;
         const content = this.getContent();
@@ -167,10 +145,8 @@ export class ResponseEditor {
     }
 
     /**
-     * Internal method to update editor with specific language
-     * @param {string} content - The content to display
-     * @param {string|null} languageType - Language type to use
-     * @private
+     * @param {string} content
+     * @param {string|null} languageType
      */
     _updateEditorWithLanguage(content, languageType) {
         const extensions = [
@@ -203,12 +179,9 @@ export class ResponseEditor {
     }
 
     /**
-     * Update editor content with syntax highlighting
-     * @param {string} content - The content to display
-     * @param {string|null} contentType - Optional Content-Type header
-     * @param {string} [languageHint] - Known language ('json'/'xml'/'html'/'text').
-     *   When provided, detection is skipped — this avoids re-parsing the body to
-     *   discover a type the caller already knows (e.g. a structured JSON response).
+     * @param {string} content
+     * @param {string|null} contentType
+     * @param {string} [languageHint]
      */
     setContent(content, contentType = null, languageHint = undefined) {
         this.currentContentType = contentType;
@@ -236,33 +209,21 @@ export class ResponseEditor {
         this._updateEditorWithLanguage(content, languageType);
     }
 
-    /**
-     * Clear manual language override and redetect from content
-     */
     clearLanguageOverride() {
         this.manualLanguageOverride = null;
         const content = this.getContent();
         this.setContent(content, this.currentContentType);
     }
 
-    /**
-     * Clear the editor content
-     */
     clear() {
         this.setContent('');
     }
 
-    /**
-     * Get the current editor content
-     * @returns {string}
-     */
+    /** @returns {string} */
     getContent() {
         return this.view.state.doc.toString();
     }
 
-    /**
-     * Destroy the editor instance
-     */
     destroy() {
         this._themed?.dispose();
         this._themed = null;
@@ -272,9 +233,6 @@ export class ResponseEditor {
         }
     }
 
-    /**
-     * Open the search panel (Ctrl+F functionality)
-     */
     openSearch() {
         if (this.view) {
             this.view.focus();

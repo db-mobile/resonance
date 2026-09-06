@@ -7,50 +7,24 @@ import { generateCode, SUPPORTED_LANGUAGES } from '../codeGenerator.js';
 import { escapeHtml } from '../htmlUtils.js';
 import { flattenRequests, rootRequests, topLevelFolders } from '../collections/collectionTree.js';
 
-/**
- * Service for generating API documentation from collections
- *
- * @class
- * @classdesc Generates human-readable API documentation in Markdown and HTML formats.
- * Supports code samples in multiple languages, optional inclusion of persisted data,
- * and organized output by folders/endpoints.
- */
 export class DocGeneratorService {
-    /**
-     * Creates a DocGeneratorService instance
-     *
-     * @param {CollectionRepository} collectionRepository - Repository for accessing collection data
-     */
+    /** @param {CollectionRepository} collectionRepository */
     constructor(collectionRepository) {
         this.collectionRepository = collectionRepository;
     }
 
-    /**
-     * Default languages for code samples
-     * @static
-     */
     static DEFAULT_LANGUAGES = ['curl', 'python', 'javascript-fetch'];
 
-    /**
-     * Get available languages for code samples
-     * @returns {Array<Object>} Array of language objects with id, name, description
-     */
+    /** @returns {Array<Object>} */
     static getAvailableLanguages() {
         return SUPPORTED_LANGUAGES;
     }
 
-    /**
-     * HTTP methods supported for documentation
-     * @static
-     * @private
-     */
     static HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
     /**
-     * Checks if an endpoint is an HTTP request
-     * @param {Object} endpoint - The endpoint to check
-     * @returns {boolean} True if HTTP request
-     * @private
+     * @param {Object} endpoint
+     * @returns {boolean}
      */
     _isHttpEndpoint(endpoint) {
         if (!endpoint || !endpoint.method) {return false;}
@@ -58,10 +32,8 @@ export class DocGeneratorService {
     }
 
     /**
-     * Filters endpoints to only include HTTP requests
-     * @param {Array} endpoints - Array of endpoints
-     * @returns {Array} Filtered array of HTTP endpoints
-     * @private
+     * @param {Array} endpoints
+     * @returns {Array}
      */
     _filterHttpEndpoints(endpoints) {
         if (!endpoints) {return [];}
@@ -69,23 +41,16 @@ export class DocGeneratorService {
     }
 
     /**
-     * Checks if a collection has any HTTP endpoints
-     * @param {Object} collection - The collection to check
-     * @returns {boolean} True if collection has HTTP endpoints
+     * @param {Object} collection
+     * @returns {boolean}
      */
     hasHttpEndpoints(collection) {
         return this._filterHttpEndpoints(flattenRequests(collection)).length > 0;
     }
 
     /**
-     * Groups a collection's HTTP requests by the folder they sit in.
-     *
-     * Root-level requests come first under an unnamed group, then each folder
-     * in tree order, so a collection holding both is fully documented.
-     *
-     * @private
-     * @param {Object} collection - The collection to group
-     * @returns {Array<{name: (string|null), endpoints: Array<Object>}>} Non-empty groups
+     * @param {Object} collection
+     * @returns {Array<{name: (string|null), endpoints: Array<Object>}>}
      */
     _groupByFolder(collection) {
         const groups = [];
@@ -111,14 +76,11 @@ export class DocGeneratorService {
     }
 
     /**
-     * Generates Markdown documentation for a collection
-     *
-     * @async
-     * @param {Object} collection - The collection to document
-     * @param {Object} options - Generation options
-     * @param {boolean} [options.includePersistedData=false] - Include user's saved data
-     * @param {Array<string>} [options.languages=[]] - Language IDs for code samples
-     * @returns {Promise<string>} Markdown documentation string
+     * @param {Object} collection
+     * @param {Object} options
+     * @param {boolean} [options.includePersistedData=false]
+     * @param {Array<string>} [options.languages=[]]
+     * @returns {Promise<string>}
      */
     async generateMarkdown(collection, options = {}) {
         const {
@@ -181,14 +143,11 @@ export class DocGeneratorService {
     }
 
     /**
-     * Generates HTML documentation for a collection
-     *
-     * @async
-     * @param {Object} collection - The collection to document
-     * @param {Object} options - Generation options
-     * @param {boolean} [options.includePersistedData=false] - Include user's saved data
-     * @param {Array<string>} [options.languages=[]] - Language IDs for code samples
-     * @returns {Promise<string>} HTML documentation string
+     * @param {Object} collection
+     * @param {Object} options
+     * @param {boolean} [options.includePersistedData=false]
+     * @param {Array<string>} [options.languages=[]]
+     * @returns {Promise<string>}
      */
     async generateHtml(collection, options = {}) {
         const {
@@ -222,11 +181,6 @@ export class DocGeneratorService {
         return html;
     }
 
-    /**
-     * Loads a template file
-     * @private
-     * @async
-     */
     async _loadTemplate(path) {
         const cacheKey = `_cached_${path}`;
         if (DocGeneratorService[cacheKey]) {
@@ -246,10 +200,6 @@ export class DocGeneratorService {
         return '';
     }
 
-    /**
-     * Generates Markdown documentation for a single endpoint
-     * @private
-     */
     async _generateEndpointMarkdown(collection, endpoint, includePersistedData, languages) {
         const lines = [];
         const displayName = endpoint.name || endpoint.path;
@@ -373,10 +323,6 @@ export class DocGeneratorService {
         return lines.join('\n');
     }
 
-    /**
-     * Gets all endpoints with their persisted data
-     * @private
-     */
     async _getAllEndpointsWithData(collection, includePersistedData) {
         const endpoints = [];
 
@@ -406,10 +352,6 @@ export class DocGeneratorService {
         return endpoints;
     }
 
-    /**
-     * Generates HTML table of contents
-     * @private
-     */
     _generateHtmlToc(collection) {
         const items = [];
 
@@ -433,10 +375,6 @@ export class DocGeneratorService {
         return `<ul>${items.join('')}</ul>`;
     }
 
-    /**
-     * Generates HTML content for all endpoints
-     * @private
-     */
     async _generateHtmlContent(collection, endpoints, languages) {
         const sections = [];
         let currentFolder = null;
@@ -462,10 +400,6 @@ export class DocGeneratorService {
         return sections.join('\n');
     }
 
-    /**
-     * Generates HTML for a single endpoint
-     * @private
-     */
     async _generateEndpointHtml(collection, endpoint, languages) {
         const displayName = endpoint.name || endpoint.path;
         const endpointId = this._slugify(`${endpoint.method}-${displayName}`);
@@ -578,10 +512,6 @@ export class DocGeneratorService {
         return html.join('\n');
     }
 
-    /**
-     * Generates HTML parameters table
-     * @private
-     */
     _generateParamsTable(params) {
         const rows = params.map(p => 
             `<tr><td><code>${escapeHtml(p.name)}</code></td><td>${escapeHtml(p.type)}</td><td>${p.required ? 'Yes' : 'No'}</td><td>${escapeHtml(p.description || '-')}</td></tr>`
@@ -590,10 +520,6 @@ export class DocGeneratorService {
         return `<table><thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
-    /**
-     * Generates HTML headers table
-     * @private
-     */
     _generateHeadersTable(headers) {
         const rows = headers.map(h => 
             `<tr><td><code>${escapeHtml(h.name)}</code></td><td>${escapeHtml(h.value || '-')}</td><td>${escapeHtml(h.description || '-')}</td></tr>`
@@ -602,10 +528,6 @@ export class DocGeneratorService {
         return `<table><thead><tr><th>Name</th><th>Value</th><th>Description</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
-    /**
-     * Extracts path parameters from endpoint
-     * @private
-     */
     _getPathParams(endpoint, persistedData) {
         const params = [];
 
@@ -625,10 +547,6 @@ export class DocGeneratorService {
         return params;
     }
 
-    /**
-     * Extracts query parameters from endpoint
-     * @private
-     */
     _getQueryParams(endpoint, persistedData) {
         const params = [];
 
@@ -648,10 +566,6 @@ export class DocGeneratorService {
         return params;
     }
 
-    /**
-     * Extracts headers from endpoint
-     * @private
-     */
     _getHeaders(endpoint, persistedData, collection) {
         const headers = [];
         const seen = new Set();
@@ -698,10 +612,6 @@ export class DocGeneratorService {
         return headers;
     }
 
-    /**
-     * Extracts request body from endpoint
-     * @private
-     */
     _getRequestBody(endpoint, persistedData) {
         if (!['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
             return null;
@@ -728,10 +638,6 @@ export class DocGeneratorService {
         };
     }
 
-    /**
-     * Builds request config for code generation
-     * @private
-     */
     _buildRequestConfig(collection, endpoint, persistedData) {
         let url = endpoint.path;
         if (collection.baseUrl) {
@@ -773,10 +679,6 @@ export class DocGeneratorService {
         };
     }
 
-    /**
-     * Gets code block language identifier
-     * @private
-     */
     _getCodeBlockLang(langId) {
         const mapping = {
             'curl': 'bash',
@@ -792,10 +694,6 @@ export class DocGeneratorService {
         return mapping[langId] || 'text';
     }
 
-    /**
-     * Creates URL-friendly slug from text
-     * @private
-     */
     _slugify(text) {
         return text
             .toLowerCase()

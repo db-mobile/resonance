@@ -7,20 +7,17 @@ import { app } from '../appContext.js';
 import { toast } from '../ui/Toast.js';
 import { flattenRequests } from '../collections/collectionTree.js';
 
-/**
- * Handles collection import/export flows and documentation generation.
- */
 export class CollectionImportExportService {
     /**
-     * @param {Object} options - Workflow dependencies
-     * @param {Object} options.backendAPI - Backend IPC API
-     * @param {CollectionRepository} options.repository - Collection repository
-     * @param {CollectionService} options.collectionService - Collection service
-     * @param {DocGeneratorService} options.docGeneratorService - Documentation generator
-     * @param {IStatusDisplay} options.statusDisplay - Status display adapter
-     * @param {CollectionDialogs} options.collectionDialogs - Collection dialogs helper
-     * @param {CurlImportDialog} options.curlImportDialog - cURL import dialog
-     * @param {Function} options.refreshCollections - Callback to reload collections
+     * @param {Object} options
+     * @param {Object} options.backendAPI
+     * @param {CollectionRepository} options.repository
+     * @param {CollectionService} options.collectionService
+     * @param {DocGeneratorService} options.docGeneratorService
+     * @param {IStatusDisplay} options.statusDisplay
+     * @param {CollectionDialogs} options.collectionDialogs
+     * @param {CurlImportDialog} options.curlImportDialog
+     * @param {Function} options.refreshCollections
      */
     constructor({
         backendAPI,
@@ -116,16 +113,7 @@ export class CollectionImportExportService {
         }
     }
 
-    /**
-     * Imports a collection file of any supported format (OpenAPI/Swagger,
-     * Postman, Insomnia, HAR); the backend detects the format from the file's
-     * markers. Insomnia sub-environments are created through the environment
-     * manager, and format-specific counts land in the success toast.
-     *
-     * @async
-     * @returns {Promise<Object|null>} Created collection object or null if cancelled
-     * @throws {Error} If import fails
-     */
+    /** @returns {Promise<Object|null>} */
     async importCollectionFile() {
         try {
             const importOptions = await this.collectionDialogs.showCollectionImportDialog({
@@ -184,12 +172,7 @@ export class CollectionImportExportService {
     }
 
     /**
-     * Re-persists imported collection- and folder-level auth configs through
-     * the repository so literal credentials move into the SecretStore and
-     * collection.json keeps only redacted copies.
-     *
-     * @async
-     * @param {Object} collection - The imported collection as returned by the backend
+     * @param {Object} collection
      * @returns {Promise<void>}
      */
     async storeImportedCollectionAuth(collection) {

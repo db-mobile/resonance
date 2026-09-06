@@ -3,32 +3,16 @@
  * @module modules/authManager
  */
 
-/**
- * Manages authentication configuration for API requests
- *
- * @class
- * @classdesc Handles multiple authentication types including Bearer, Basic Auth,
- * API Key, OAuth2, and Digest authentication. Provides UI for configuring and
- * managing authentication credentials.
- */
 import { templateLoader } from './templateLoader.js';
 import { api } from './ipcBridge.js';
 import { textToBase64 } from './utils/encoding.js';
 
 export class AuthManager {
     /**
-     * Creates an AuthManager instance.
-     *
-     * Without options this binds to the request Authorization tab (the
-     * app-wide singleton). A second instance can be mounted elsewhere (e.g.
-     * the collection auth dialog) by passing its own elements plus an
-     * `idPrefix`, which scopes every field lookup and rewrites template IDs
-     * so both instances can live in the DOM at once.
-     *
      * @param {Object} [options]
-     * @param {HTMLSelectElement} [options.typeSelect] - Auth type select element
-     * @param {HTMLElement} [options.fieldsContainer] - Container for auth fields
-     * @param {string} [options.idPrefix] - Prefix applied to all field element IDs
+     * @param {HTMLSelectElement} [options.typeSelect]
+     * @param {HTMLElement} [options.fieldsContainer]
+     * @param {string} [options.idPrefix]
      */
     constructor(options = {}) {
         this.idPrefix = options.idPrefix || '';
@@ -44,12 +28,7 @@ export class AuthManager {
     }
 
     /**
-     * Looks up an auth field element. Unprefixed instances use the document
-     * (original singleton behavior); prefixed instances resolve within their
-     * own fields container against the rewritten IDs.
-     *
-     * @private
-     * @param {string} id - Unprefixed element ID
+     * @param {string} id
      * @returns {HTMLElement|null}
      */
     _el(id) {
@@ -60,12 +39,7 @@ export class AuthManager {
     }
 
     /**
-     * Clones an auth field template, rewriting element IDs and label targets
-     * with this instance's prefix so the fragment can coexist with the
-     * singleton's unprefixed fields.
-     *
-     * @private
-     * @param {string} templateId - Template ID within authFields.html
+     * @param {string} templateId
      * @returns {DocumentFragment}
      */
     _cloneAuthTemplate(templateId) {
@@ -84,12 +58,7 @@ export class AuthManager {
         return fragment;
     }
 
-    /**
-     * Initializes event listeners for authentication controls
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     initializeEventListeners() {
         if (this.authTypeSelect) {
             this.authTypeSelect.addEventListener('change', (e) => {
@@ -99,9 +68,7 @@ export class AuthManager {
     }
 
     /**
-     * Handles authentication type change
-     *
-     * @param {string} authType - The selected authentication type
+     * @param {string} authType
      * @returns {void}
      */
     handleAuthTypeChange(authType) {
@@ -111,9 +78,7 @@ export class AuthManager {
     }
 
     /**
-     * Renders authentication fields based on selected type
-     *
-     * @param {string} authType - The authentication type ('none', 'bearer', 'basic', 'api-key', 'oauth2', 'digest')
+     * @param {string} authType
      * @returns {void}
      */
     renderAuthFields(authType) {
@@ -162,17 +127,7 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Renders the read-only "Inherit from Parent" panel: a summary of the
-     * folder or collection auth this request resolves to, plus a shortcut to
-     * edit it.
-     * The data accessors are injected at the composition root via
-     * {@link getInheritedAuthInfo} and {@link onOpenCollectionAuth}; without
-     * them (or outside a collection endpoint) generic text is shown.
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     renderInheritFields() {
         const fragment = this._cloneAuthTemplate('tpl-auth-inherit');
         this.authFieldsContainer.innerHTML = '';
@@ -217,8 +172,6 @@ export class AuthManager {
     }
 
     /**
-     * Human-readable label for an auth type value.
-     *
      * @param {string} type
      * @returns {string}
      */
@@ -237,12 +190,7 @@ export class AuthManager {
         return labels[type] || type;
     }
 
-    /**
-     * Renders Bearer token authentication fields
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     renderBearerTokenFields() {
         const defaultToken = this.currentAuthConfig.config.token || '{{bearerToken}}';
 
@@ -261,12 +209,7 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Renders Basic authentication fields
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     renderBasicAuthFields() {
         const fragment = this._cloneAuthTemplate('tpl-auth-basic');
         this.authFieldsContainer.innerHTML = '';
@@ -288,12 +231,7 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Renders API Key authentication fields
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     renderApiKeyFields() {
         const fragment = this._cloneAuthTemplate('tpl-auth-api-key');
         this.authFieldsContainer.innerHTML = '';
@@ -325,12 +263,7 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Renders OAuth2 authentication fields
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     renderOAuth2Fields() {
         const fragment = this._cloneAuthTemplate('tpl-auth-oauth2');
         this.authFieldsContainer.innerHTML = '';
@@ -518,12 +451,8 @@ export class AuthManager {
     }
 
     /**
-     * Handles the "Get New Access Token" button click
-     *
-     * @private
-     * @async
-     * @param {HTMLElement} errorGroup - Error display group element
-     * @param {HTMLElement} errorMessage - Error message element
+     * @param {HTMLElement} errorGroup
+     * @param {HTMLElement} errorMessage
      * @returns {Promise<void>}
      */
     async _handleGetToken(errorGroup, errorMessage) {
@@ -567,13 +496,7 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Handles the Authorization Code flow
-     *
-     * @private
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async _handleAuthorizationCodeFlow() {
         const {config} = this.currentAuthConfig;
 
@@ -609,12 +532,7 @@ export class AuthManager {
         this._showAuthCodeInstructions();
     }
 
-    /**
-     * Shows instructions for completing authorization code flow
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     _showAuthCodeInstructions() {
         const errorGroup = this._el('oauth2-error-group');
         const errorMessage = this._el('oauth2-error-message');
@@ -643,11 +561,7 @@ export class AuthManager {
     }
 
     /**
-     * Exchanges authorization code for tokens
-     *
-     * @private
-     * @async
-     * @param {string} code - The authorization code
+     * @param {string} code
      * @returns {Promise<void>}
      */
     async _exchangeAuthorizationCode(code) {
@@ -683,12 +597,8 @@ export class AuthManager {
     }
 
     /**
-     * Handles the refresh token flow
-     *
-     * @private
-     * @async
-     * @param {HTMLElement} errorGroup - Error display group element
-     * @param {HTMLElement} errorMessage - Error message element
+     * @param {HTMLElement} errorGroup
+     * @param {HTMLElement} errorMessage
      * @returns {Promise<void>}
      */
     async _handleRefreshToken(errorGroup, errorMessage) {
@@ -717,12 +627,9 @@ export class AuthManager {
     }
 
     /**
-     * Handles the token response from OAuth 2.0 server
-     *
-     * @private
-     * @param {Object} result - Token response
-     * @param {HTMLElement} errorGroup - Error display group element
-     * @param {HTMLElement} errorMessage - Error message element
+     * @param {Object} result
+     * @param {HTMLElement} errorGroup
+     * @param {HTMLElement} errorMessage
      * @returns {void}
      */
     _handleTokenResponse(result, errorGroup, errorMessage) {
@@ -762,12 +669,9 @@ export class AuthManager {
     }
 
     /**
-     * Shows an error message in the OAuth 2.0 UI
-     *
-     * @private
-     * @param {HTMLElement} errorGroup - Error display group element
-     * @param {HTMLElement} errorMessage - Error message element
-     * @param {string} message - Error message to display
+     * @param {HTMLElement} errorGroup
+     * @param {HTMLElement} errorMessage
+     * @param {string} message
      * @returns {void}
      */
     _showError(errorGroup, errorMessage, message) {
@@ -778,12 +682,7 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Renders Digest authentication fields
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     renderDigestAuthFields() {
         const fragment = this._cloneAuthTemplate('tpl-auth-digest');
         this.authFieldsContainer.innerHTML = '';
@@ -805,12 +704,7 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Renders NTLM authentication fields
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     renderNtlmFields() {
         const fragment = this._cloneAuthTemplate('tpl-auth-ntlm');
         this.authFieldsContainer.innerHTML = '';
@@ -850,12 +744,7 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Renders AWS Signature V4 authentication fields
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     renderAwsV4Fields() {
         const fragment = this._cloneAuthTemplate('tpl-auth-aws-v4');
         this.authFieldsContainer.innerHTML = '';
@@ -904,18 +793,8 @@ export class AuthManager {
     }
 
     /**
-     * Generates authentication data for API requests
-     *
-     * Converts an authentication configuration into headers, query parameters,
-     * and auth config that can be used in HTTP requests. Callers that support
-     * inheritance pass a pre-resolved config (see auth/authInheritance.js);
-     * an unresolved 'inherit' type safely yields empty auth data.
-     *
-     * @param {Object} [authConfig] - `{ type, config }`; defaults to the current config
-     * @returns {Object} Authentication data
-     * @returns {Object} return.headers - Headers to include in request
-     * @returns {Object} return.queryParams - Query parameters to include in request
-     * @returns {Object|null} return.authConfig - Auth configuration for digest auth
+     * @param {Object} [authConfig]
+     * @returns {Object}
      */
     generateAuthData(authConfig = this.currentAuthConfig) {
         const authData = {
@@ -1002,11 +881,9 @@ export class AuthManager {
     }
 
     /**
-     * Loads authentication configuration into the UI
-     *
-     * @param {Object} authConfig - Authentication configuration
-     * @param {string} authConfig.type - Authentication type
-     * @param {Object} authConfig.config - Authentication configuration details
+     * @param {Object} authConfig
+     * @param {string} authConfig.type
+     * @param {Object} authConfig.config
      * @returns {void}
      */
     loadAuthConfig(authConfig) {
@@ -1026,10 +903,7 @@ export class AuthManager {
     }
 
     /**
-     * Populates authentication fields with configuration values
-     *
-     * @private
-     * @param {Object} authConfig - Authentication configuration
+     * @param {Object} authConfig
      * @returns {void}
      */
     populateAuthFields(authConfig) {
@@ -1160,22 +1034,11 @@ export class AuthManager {
         }
     }
 
-    /**
-     * Gets current authentication configuration
-     *
-     * @returns {Object} Current authentication configuration
-     * @returns {string} return.type - Authentication type
-     * @returns {Object} return.config - Authentication configuration details
-     */
+    /** @returns {Object} */
     getAuthConfig() {
         return this.currentAuthConfig;
     }
 
 }
 
-/**
- * Singleton instance of AuthManager
- *
- * @const {AuthManager}
- */
 export const authManager = new AuthManager();

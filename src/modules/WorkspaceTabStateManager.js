@@ -1,9 +1,3 @@
-/**
- * WorkspaceTabStateManager
- *
- * Manages capturing and restoring tab state from/to UI elements.
- * Bridges workspace tabs with the existing UI.
- */
 import { getCurrentEndpoint, setCurrentEndpoint } from './state/currentEndpoint.js';
 import { app } from './appContext.js';
 import { parseKeyValuePairs, parseKeyValueRows, populateKeyValueList, clearKeyValueList, addKeyValueRow, updateUrlFromQueryParams } from './keyValueManager.js';
@@ -15,7 +9,43 @@ import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanc
 import { formatCookiesAsHtml } from './cookieParser.js';
 import { activateTab } from './tabManager.js';
 import { setRequestBodyContent, getRequestBodyContent } from './requestBodyHelper.js';
-import { setRequestMode, RequestMode } from './requestModeManager.js';
+import { setRequestMode, RequestMode, getCurrentMode } from './requestModeManager.js';
+import { getProtocol, resolveProtocolId } from './protocols/protocolRegistry.js';
+
+/** @type {Object<string, string>} */
+const CAPTURE_BY_PROTOCOL = Object.freeze({
+    http: '_captureHttp',
+    sse: '_captureSse',
+    websocket: '_captureWebSocket',
+    graphql: '_captureGraphQL',
+    grpc: '_captureGrpc',
+    mqtt: '_captureMqtt'
+});
+
+/** @type {Object<string, string>} */
+const RESTORE_BY_PROTOCOL = Object.freeze({
+    http: '_restoreHttp',
+    sse: '_restoreSse',
+    websocket: '_restoreWebSocket',
+    graphql: '_restoreGraphQL',
+    grpc: '_restoreGrpc',
+    mqtt: '_restoreMqtt'
+});
+
+/** @returns {Object} */
+function defaultHttpRequest() {
+    return {
+        protocol: 'http',
+        url: '',
+        method: 'GET',
+        pathParams: {},
+        queryParams: {},
+        headers: { 'Content-Type': 'application/json' },
+        body: '',
+        authType: 'none',
+        authConfig: {}
+    };
+}
 
 export class WorkspaceTabStateManager {
     constructor(domElements) {
@@ -23,224 +53,199 @@ export class WorkspaceTabStateManager {
         this.graphqlBodyManager = domElements.graphqlBodyManager || null;
     }
 
-    /**
-     * Capture current state from UI elements
-     * @returns {Promise<Object>}
-     */
+    /** @returns {Promise<Object>} */
     async captureCurrentState() {
-        const { isGrpcMode, isWebSocketMode, isSseMode, isMqttMode, isGraphQLMode } = await import('./requestModeManager.js');
-        
-        if (isGrpcMode()) {
-            return {
-                request: {
-                    protocol: 'grpc',
-                    grpc: app.captureGrpcState ? app.captureGrpcState() : {}
-                },
-                endpoint: getCurrentEndpoint()
-                    ? {
-                          collectionId: getCurrentEndpoint().collectionId,
-                          endpointId: getCurrentEndpoint().endpointId,
-                          protocol: 'grpc'
-                      }
-                    : null
-            };
+        return this[CAPTURE_BY_PROTOCOL[resolveProtocolId(getCurrentMode())]]();
+    }
+
+    /**
+     * @param {Object|function(Object): Object} extra
+     * @returns {?Object}
+     */
+    _endpointRef(extra) {
+        const current = getCurrentEndpoint();
+        if (!current) {
+            return null;
         }
+        return {
+            collectionId: current.collectionId,
+            endpointId: current.endpointId,
+            ...(typeof extra === 'function' ? extra(current) : extra)
+        };
+    }
 
-        if (isSseMode()) {
-            const sseUrlInput = document.getElementById('sse-url-input');
-            const sseBodyMode = document.getElementById('body-mode-select')?.value === 'text'
-                ? 'text'
-                : 'json';
-            const authConfig = authManager.getAuthConfig();
-            return {
-                request: {
-                    protocol: 'sse',
-                    url: sseUrlInput?.value || this.dom.urlInput?.value || '',
-                    method: this.dom.methodSelect?.value || 'GET',
-                    pathParams: {},
-                    queryParams: parseKeyValueRows(this.dom.queryParamsList),
-                    headers: parseKeyValueRows(this.dom.headersList),
-                    body: {
-                        mode: sseBodyMode,
-                        content: sseBodyMode === 'text'
-                            ? (app.requestBodyTextEditor?.getContent() || '')
-                            : (getRequestBodyContent() || '')
-                    },
-                    authType: authConfig?.type || 'none',
-                    authConfig: authConfig?.config || {}
-                },
-                endpoint: getCurrentEndpoint()
-                    ? {
-                          collectionId: getCurrentEndpoint().collectionId,
-                          endpointId: getCurrentEndpoint().endpointId,
-                          protocol: 'sse'
-                      }
-                    : null,
-                activeResponseTab: this._getActiveResponseTab()
-            };
-        }
+    /** @returns {{pathParams: Object, queryParams: Object[], headers: Object[]}} */
+    _captureStreamKeyValues() {
+        return {
+            pathParams: {},
+            queryParams: parseKeyValueRows(this.dom.queryParamsList),
+            headers: parseKeyValueRows(this.dom.headersList)
+        };
+    }
 
-        if (isWebSocketMode()) {
-            const websocketUrlInput = document.getElementById('websocket-url-input');
+    /** @returns {Object} */
+    _captureGrpc() {
+        return {
+            request: {
+                protocol: 'grpc',
+                grpc: app.captureGrpcState ? app.captureGrpcState() : {}
+            },
+            endpoint: this._endpointRef({ protocol: 'grpc' })
+        };
+    }
 
-            return {
-                request: {
-                    protocol: 'websocket',
-                    url: websocketUrlInput?.value || this.dom.urlInput?.value || '',
-                    method: 'WS',
-                    pathParams: {},
-                    queryParams: parseKeyValueRows(this.dom.queryParamsList),
-                    headers: parseKeyValueRows(this.dom.headersList),
-                    body: {
-                        mode: 'json',
-                        content: getRequestBodyContent() || ''
-                    },
-                    authType: 'none',
-                    authConfig: {}
-                },
-                endpoint: getCurrentEndpoint()
-                    ? {
-                          collectionId: getCurrentEndpoint().collectionId,
-                          endpointId: getCurrentEndpoint().endpointId,
-                          protocol: 'websocket'
-                      }
-                    : null,
-                activeResponseTab: this._getActiveResponseTab()
-            };
-        }
-
-        if (isMqttMode()) {
-            const mqttBrokerInput = document.getElementById('mqtt-broker-input');
-
-            return {
-                request: {
-                    protocol: 'mqtt',
-                    broker: mqttBrokerInput?.value || this.dom.urlInput?.value || '',
-                    method: 'MQTT',
-                    clientId: document.getElementById('mqtt-client-id-input')?.value || '',
-                    username: document.getElementById('mqtt-username-input')?.value || '',
-                    password: document.getElementById('mqtt-password-input')?.value || '',
-                    subscribeTopic: document.getElementById('mqtt-subscribe-input')?.value || '',
-                    publishTopic: document.getElementById('mqtt-topic-input')?.value || '',
-                    qos: Number(document.getElementById('mqtt-qos-select')?.value) || 0,
-                    body: {
-                        mode: 'json',
-                        content: getRequestBodyContent() || ''
-                    },
-                    authType: 'none',
-                    authConfig: {}
-                },
-                endpoint: getCurrentEndpoint()
-                    ? {
-                          collectionId: getCurrentEndpoint().collectionId,
-                          endpointId: getCurrentEndpoint().endpointId,
-                          protocol: 'mqtt'
-                      }
-                    : null,
-                activeResponseTab: this._getActiveResponseTab()
-            };
-        }
-
-        if (isGraphQLMode()) {
-            const graphqlUrlInput = document.getElementById('graphql-url-input');
-            const authConfig = authManager.getAuthConfig();
-
-            return {
-                request: {
-                    protocol: 'graphql',
-                    url: graphqlUrlInput?.value || this.dom.urlInput?.value || '',
-                    method: 'POST',
-                    query: this.graphqlBodyManager ? this.graphqlBodyManager.getGraphQLQuery() : '',
-                    variables: this.graphqlBodyManager ? this.graphqlBodyManager.getGraphQLVariables() : '',
-                    operationName: this.graphqlBodyManager ? this.graphqlBodyManager.getSelectedOperationName() : null,
-                    headers: parseKeyValueRows(this.dom.headersList),
-                    authType: authConfig.type || 'none',
-                    authConfig: authConfig.config || {}
-                },
-                endpoint: getCurrentEndpoint()
-                    ? {
-                          collectionId: getCurrentEndpoint().collectionId,
-                          endpointId: getCurrentEndpoint().endpointId,
-                          protocol: 'graphql'
-                      }
-                    : null,
-                activeResponseTab: this._getActiveResponseTab()
-            };
-        }
-
-        const pathParams = parseKeyValuePairs(this.dom.pathParamsList);
-        const queryParams = parseKeyValueRows(this.dom.queryParamsList);
-        const headers = parseKeyValueRows(this.dom.headersList);
-
+    /** @returns {Object} */
+    _captureSse() {
+        const sseUrlInput = document.getElementById('sse-url-input');
+        const sseBodyMode = document.getElementById('body-mode-select')?.value === 'text'
+            ? 'text'
+            : 'json';
         const authConfig = authManager.getAuthConfig();
 
-        const activeResponseTab = this._getActiveResponseTab();
+        return {
+            request: {
+                protocol: 'sse',
+                url: sseUrlInput?.value || this.dom.urlInput?.value || '',
+                method: this.dom.methodSelect?.value || 'GET',
+                ...this._captureStreamKeyValues(),
+                body: {
+                    mode: sseBodyMode,
+                    content: sseBodyMode === 'text'
+                        ? (app.requestBodyTextEditor?.getContent() || '')
+                        : (getRequestBodyContent() || '')
+                },
+                authType: authConfig?.type || 'none',
+                authConfig: authConfig?.config || {}
+            },
+            endpoint: this._endpointRef({ protocol: 'sse' }),
+            activeResponseTab: this._getActiveResponseTab()
+        };
+    }
 
-        const bodyModeSelect = document.getElementById('body-mode-select');
-        const currentBodyMode = bodyModeSelect?.value || 'json';
-        let bodyData;
+    /** @returns {Object} */
+    _captureWebSocket() {
+        const websocketUrlInput = document.getElementById('websocket-url-input');
+
+        return {
+            request: {
+                protocol: 'websocket',
+                url: websocketUrlInput?.value || this.dom.urlInput?.value || '',
+                method: 'WS',
+                ...this._captureStreamKeyValues(),
+                body: {
+                    mode: 'json',
+                    content: getRequestBodyContent() || ''
+                },
+                authType: 'none',
+                authConfig: {}
+            },
+            endpoint: this._endpointRef({ protocol: 'websocket' }),
+            activeResponseTab: this._getActiveResponseTab()
+        };
+    }
+
+    /** @returns {Object} */
+    _captureMqtt() {
+        const fieldValue = (id) => document.getElementById(id)?.value || '';
+
+        return {
+            request: {
+                protocol: 'mqtt',
+                broker: document.getElementById('mqtt-broker-input')?.value
+                    || this.dom.urlInput?.value
+                    || '',
+                method: 'MQTT',
+                clientId: fieldValue('mqtt-client-id-input'),
+                username: fieldValue('mqtt-username-input'),
+                password: fieldValue('mqtt-password-input'),
+                subscribeTopic: fieldValue('mqtt-subscribe-input'),
+                publishTopic: fieldValue('mqtt-topic-input'),
+                qos: Number(document.getElementById('mqtt-qos-select')?.value) || 0,
+                body: {
+                    mode: 'json',
+                    content: getRequestBodyContent() || ''
+                },
+                authType: 'none',
+                authConfig: {}
+            },
+            endpoint: this._endpointRef({ protocol: 'mqtt' }),
+            activeResponseTab: this._getActiveResponseTab()
+        };
+    }
+
+    /** @returns {Object} */
+    _captureGraphQL() {
+        const graphqlUrlInput = document.getElementById('graphql-url-input');
+        const authConfig = authManager.getAuthConfig();
+
+        return {
+            request: {
+                protocol: 'graphql',
+                url: graphqlUrlInput?.value || this.dom.urlInput?.value || '',
+                method: 'POST',
+                query: this.graphqlBodyManager ? this.graphqlBodyManager.getGraphQLQuery() : '',
+                variables: this.graphqlBodyManager ? this.graphqlBodyManager.getGraphQLVariables() : '',
+                operationName: this.graphqlBodyManager ? this.graphqlBodyManager.getSelectedOperationName() : null,
+                headers: parseKeyValueRows(this.dom.headersList),
+                authType: authConfig.type || 'none',
+                authConfig: authConfig.config || {}
+            },
+            endpoint: this._endpointRef({ protocol: 'graphql' }),
+            activeResponseTab: this._getActiveResponseTab()
+        };
+    }
+
+    /** @returns {Object} */
+    _captureHttpBody() {
+        const currentBodyMode = document.getElementById('body-mode-select')?.value || 'json';
+
         if (currentBodyMode === 'formdata' && app.formBodyManager) {
-            bodyData = {
-                mode: 'formdata',
-                fields: app.formBodyManager.getFormDataRows()
-            };
-        } else if (currentBodyMode === 'urlencoded' && app.formBodyManager) {
-            bodyData = {
-                mode: 'urlencoded',
-                fields: app.formBodyManager.getUrlencodedRows()
-            };
-        } else if (currentBodyMode === 'binary' && app.formBodyManager) {
-            bodyData = {
-                mode: 'binary',
-                ...app.formBodyManager.getBinaryBody()
-            };
-        } else if (currentBodyMode === 'text') {
-            bodyData = {
+            return { mode: 'formdata', fields: app.formBodyManager.getFormDataRows() };
+        }
+        if (currentBodyMode === 'urlencoded' && app.formBodyManager) {
+            return { mode: 'urlencoded', fields: app.formBodyManager.getUrlencodedRows() };
+        }
+        if (currentBodyMode === 'binary' && app.formBodyManager) {
+            return { mode: 'binary', ...app.formBodyManager.getBinaryBody() };
+        }
+        if (currentBodyMode === 'text') {
+            return {
                 mode: 'text',
-                content: app.requestBodyTextEditor
-                    ? app.requestBodyTextEditor.getContent()
-                    : ''
-            };
-        } else {
-            bodyData = {
-                mode: 'json',
-                content: getRequestBodyContent() || ''
+                content: app.requestBodyTextEditor ? app.requestBodyTextEditor.getContent() : ''
             };
         }
+        return { mode: 'json', content: getRequestBodyContent() || '' };
+    }
 
+    /** @returns {Object} */
+    _captureHttp() {
+        const authConfig = authManager.getAuthConfig();
         const containerElements = app.responseContainerManager?.getActiveElements();
-        const previewMode = containerElements?.previewManager
-            ? containerElements.previewManager.isPreviewMode(containerElements.tabId)
-            : false;
 
         return {
             request: {
                 protocol: 'http',
                 url: this.dom.urlInput?.value || '',
                 method: this.dom.methodSelect?.value || 'GET',
-                pathParams,
-                queryParams,
-                headers,
-                body: bodyData,
+                pathParams: parseKeyValuePairs(this.dom.pathParamsList),
+                queryParams: parseKeyValueRows(this.dom.queryParamsList),
+                headers: parseKeyValueRows(this.dom.headersList),
+                body: this._captureHttpBody(),
                 authType: authConfig.type || 'none',
                 authConfig: authConfig.config || {}
             },
-            endpoint: getCurrentEndpoint() ? {
-                collectionId: getCurrentEndpoint().collectionId,
-                endpointId: getCurrentEndpoint().endpointId,
-                path: getCurrentEndpoint().path,
-                method: getCurrentEndpoint().method
-            } : null,
-            activeResponseTab: activeResponseTab,
-            previewMode: previewMode
+            endpoint: this._endpointRef(current => ({
+                path: current.path,
+                method: current.method
+            })),
+            activeResponseTab: this._getActiveResponseTab(),
+            previewMode: containerElements?.previewManager
+                ? containerElements.previewManager.isPreviewMode(containerElements.tabId)
+                : false
         };
     }
 
-    /**
-     * Get the currently active response tab ID
-     * @private
-     * @returns {string}
-     */
+    /** @returns {string} */
     _getActiveResponseTab() {
         const activeResponseTab = document.querySelector('.response-tabs .tab-button.active');
         if (activeResponseTab) {
@@ -250,21 +255,8 @@ export class WorkspaceTabStateManager {
     }
 
     /**
-     * Point the shared "current endpoint" at the tab being restored, clearing it
-     * when the tab is not backed by a collection endpoint.
-     *
-     * The non-HTTP protocol branches return early and so never reach the HTTP
-     * path's set-or-clear logic. Without the clear, switching to an unsaved tab
-     * left the previous tab's endpoint in place, and everything keyed off it —
-     * Ctrl+S, send-time auto-save, collection variable scope, history
-     * attribution — silently addressed the wrong request.
-     *
-     * A tab record with no `endpoint` key at all is left alone, matching the
-     * HTTP path's guard.
-     *
-     * @private
-     * @param {Object} tab - The tab being restored
-     * @param {Object|null} endpoint - The tab's endpoint, if any
+     * @param {Object} tab
+     * @param {Object|null} endpoint
      * @returns {void}
      */
     _applyTabEndpoint(tab, endpoint) {
@@ -278,7 +270,6 @@ export class WorkspaceTabStateManager {
     }
 
     /**
-     * Restore tab state to UI elements
      * @param {Object} tab
      * @returns {Promise<void>}
      */
@@ -288,352 +279,284 @@ export class WorkspaceTabStateManager {
         }
 
         if (!tab.request) {
-            tab.request = {
-                protocol: 'http',
-                url: '',
-                method: 'GET',
-                pathParams: {},
-                queryParams: {},
-                headers: { 'Content-Type': 'application/json' },
-                body: '',
-                authType: 'none',
-                authConfig: {}
-            };
+            tab.request = defaultHttpRequest();
         }
 
-        const {request} = tab;
-        const {response} = tab;
-        const {endpoint} = tab;
+        await this[RESTORE_BY_PROTOCOL[resolveProtocolId(tab.request.protocol)]](tab);
+    }
 
-        if (request.protocol === 'grpc') {
-            setRequestMode(RequestMode.GRPC);
-            activateTab('request', 'grpc');
-
-            const ensureGrpcTabActive = () => {
-                const activeBtn = document.querySelector('.request-config .tab-nav .tab-button.active');
-                const isActiveVisible = activeBtn && activeBtn.style.display !== 'none';
-                if (!isActiveVisible) {
-                    activateTab('request', 'grpc');
-                }
-            };
-
-            if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-                window.requestAnimationFrame(ensureGrpcTabActive);
-            } else {
-                setTimeout(ensureGrpcTabActive, 0);
-            }
-            
-            if (app.applyGrpcState) {
-                app.applyGrpcState(request.grpc || {});
-            }
-
-
-            this._applyTabEndpoint(tab, endpoint);
+    /**
+     * @param {?HTMLElement} listEl
+     * @param {Object} data
+     * @param {Object} [options]
+     * @param {string[]|false} [options.emptyRow]
+     * @param {?function(): void} [options.onPopulated]
+     * @returns {void}
+     */
+    _restoreKeyValueList(listEl, data, { emptyRow = [], onPopulated = null } = {}) {
+        if (!listEl) {
             return;
         }
 
-        if (request.protocol === 'sse') {
-            setRequestMode(RequestMode.SSE);
+        clearKeyValueList(listEl);
 
-            if (this.dom.urlInput) {
-                this.dom.urlInput.value = request.url || '';
-            }
-            const sseUrlInput = document.getElementById('sse-url-input');
-            if (sseUrlInput) {
-                sseUrlInput.value = request.url || '';
-            }
-
-            if (this.dom.methodSelect) {
-                this.dom.methodSelect.value = request.method || 'GET';
-            }
-
-            if (request.body?.mode === 'text') {
-                this.graphqlBodyManager?.switchMode('text');
-                app.requestBodyTextEditor?.setContent(request.body.content || '');
-            } else {
-                this.graphqlBodyManager?.switchMode('json');
-                setRequestBodyContent(request.body?.content || '');
-            }
-
-            if (this.dom.queryParamsList) {
-                clearKeyValueList(this.dom.queryParamsList);
-                if (request.queryParams && Object.keys(request.queryParams).length > 0) {
-                    populateKeyValueList(this.dom.queryParamsList, request.queryParams);
-                    updateUrlFromQueryParams();
-                } else {
-                    addKeyValueRow(this.dom.queryParamsList);
-                }
-            }
-
-            if (this.dom.headersList) {
-                clearKeyValueList(this.dom.headersList);
-                if (request.headers && Object.keys(request.headers).length > 0) {
-                    populateKeyValueList(this.dom.headersList, request.headers);
-                } else {
-                    addKeyValueRow(this.dom.headersList);
-                }
-            }
-
-            if (authManager) {
-                authManager.loadAuthConfig({
-                    type: request.authType || 'none',
-                    config: request.authConfig || {}
-                });
-            }
-
-            const activeResponseTab = tab.activeResponseTab || 'response-body';
-            activateTab('response', activeResponseTab);
-
-            if (response) {
-                await this._restoreResponse(response, tab.id);
-            } else {
-                this._clearResponse(tab.id);
-            }
-
-            this._applyTabEndpoint(tab, endpoint);
+        if (data && Object.keys(data).length > 0) {
+            populateKeyValueList(listEl, data);
+            onPopulated?.();
             return;
         }
 
-        if (request.protocol === 'websocket') {
-            setRequestMode(RequestMode.WEBSOCKET);
-
-            if (this.dom.urlInput) {
-                this.dom.urlInput.value = request.url || '';
-            }
-            const websocketUrlInput = document.getElementById('websocket-url-input');
-            if (websocketUrlInput) {
-                websocketUrlInput.value = request.url || '';
-            }
-
-            if (this.graphqlBodyManager) {
-                this.graphqlBodyManager.setGraphQLModeEnabled(false);
-            }
-            setRequestBodyContent(request.body?.content || '');
-
-            if (this.dom.queryParamsList) {
-                clearKeyValueList(this.dom.queryParamsList);
-                if (request.queryParams && Object.keys(request.queryParams).length > 0) {
-                    populateKeyValueList(this.dom.queryParamsList, request.queryParams);
-                    updateUrlFromQueryParams();
-                } else {
-                    addKeyValueRow(this.dom.queryParamsList);
-                }
-            }
-
-            if (this.dom.headersList) {
-                clearKeyValueList(this.dom.headersList);
-                if (request.headers && Object.keys(request.headers).length > 0) {
-                    populateKeyValueList(this.dom.headersList, request.headers);
-                } else {
-                    addKeyValueRow(this.dom.headersList);
-                }
-            }
-
-            const activeResponseTab = tab.activeResponseTab || 'response-body';
-            activateTab('response', activeResponseTab);
-
-            if (response) {
-                await this._restoreResponse(response, tab.id);
-            } else {
-                this._clearResponse(tab.id);
-            }
-
-            this._applyTabEndpoint(tab, endpoint);
-            return;
+        if (emptyRow !== false) {
+            addKeyValueRow(listEl, ...emptyRow);
         }
+    }
 
-        if (request.protocol === 'graphql') {
-            if (this.dom.urlInput) {
-                this.dom.urlInput.value = request.url || '';
-            }
-            const graphqlUrlInput = document.getElementById('graphql-url-input');
-            if (graphqlUrlInput) {
-                graphqlUrlInput.value = request.url || '';
-            }
-
-            setRequestMode(RequestMode.GRAPHQL);
-
-            if (this.dom.pathParamsList) {
-                clearKeyValueList(this.dom.pathParamsList);
-            }
-            if (this.dom.queryParamsList) {
-                clearKeyValueList(this.dom.queryParamsList);
-            }
-
-            if (this.graphqlBodyManager) {
-                this.graphqlBodyManager.setGraphQLQuery(request.query || '');
-                this.graphqlBodyManager.setGraphQLVariables(request.variables || '');
-                this.graphqlBodyManager.selectedOperationName = request.operationName || null;
-                this.graphqlBodyManager.updateOperationPicker();
-                await this.graphqlBodyManager.autoApplySchemaForUrl?.(request.url || '', { allowNetwork: true });
-            }
-
-            if (this.dom.headersList) {
-                clearKeyValueList(this.dom.headersList);
-                if (request.headers && Object.keys(request.headers).length > 0) {
-                    populateKeyValueList(this.dom.headersList, request.headers);
-                } else {
-                    addKeyValueRow(this.dom.headersList);
-                }
-            }
-
-            if (authManager) {
-                authManager.loadAuthConfig({
-                    type: request.authType || 'none',
-                    config: request.authConfig || {}
-                });
-            }
-
-            const activeResponseTab = tab.activeResponseTab || 'response-body';
-            activateTab('response', activeResponseTab);
-
-            if (response) {
-                await this._restoreResponse(response, tab.id);
-            } else {
-                this._clearResponse(tab.id);
-            }
-
-            this._applyTabEndpoint(tab, endpoint);
-            return;
-        }
-
-        if (request.protocol === 'mqtt') {
-            setRequestMode(RequestMode.MQTT);
-
-            if (this.dom.urlInput) {
-                this.dom.urlInput.value = request.broker || '';
-            }
-            const mqttBrokerInput = document.getElementById('mqtt-broker-input');
-            if (mqttBrokerInput) {
-                mqttBrokerInput.value = request.broker || '';
-            }
-
-            const setFieldValue = (id, value) => {
-                const el = document.getElementById(id);
-                if (el) {
-                    el.value = value;
-                }
-            };
-            setFieldValue('mqtt-client-id-input', request.clientId || '');
-            setFieldValue('mqtt-username-input', request.username || '');
-            setFieldValue('mqtt-password-input', request.password || '');
-            setFieldValue('mqtt-subscribe-input', request.subscribeTopic || '');
-            setFieldValue('mqtt-topic-input', request.publishTopic || '');
-            setFieldValue('mqtt-qos-select', String(request.qos ?? 0));
-
-            if (this.graphqlBodyManager) {
-                this.graphqlBodyManager.setGraphQLModeEnabled(false);
-            }
-            setRequestBodyContent(request.body?.content || '');
-
-            const activeResponseTab = tab.activeResponseTab || 'response-body';
-            activateTab('response', activeResponseTab);
-
-            if (response) {
-                await this._restoreResponse(response, tab.id);
-            } else {
-                this._clearResponse(tab.id);
-            }
-
-            import('./mqttHandler.js').then(m => m.refreshMqttConnectionUi(tab.id));
-
-            this._applyTabEndpoint(tab, endpoint);
-            return;
-        }
-
-        setRequestMode(RequestMode.HTTP);
+    /**
+     * @param {string} protocolId
+     * @param {string} value
+     * @returns {void}
+     */
+    _restoreUrlInputs(protocolId, value) {
+        const url = value || '';
 
         if (this.dom.urlInput) {
-            this.dom.urlInput.value = request.url || '';
+            this.dom.urlInput.value = url;
         }
+
+        const mirrorId = getProtocol(protocolId).urlInputId;
+        const mirror = mirrorId ? document.getElementById(mirrorId) : null;
+        if (mirror && mirror !== this.dom.urlInput) {
+            mirror.value = url;
+        }
+    }
+
+    /**
+     * @param {Object} request
+     * @returns {void}
+     */
+    _restoreAuth(request) {
+        if (!authManager) {
+            return;
+        }
+
+        authManager.loadAuthConfig({
+            type: request.authType || 'none',
+            config: request.authConfig || {}
+        });
+    }
+
+    /**
+     * @param {Object} tab
+     * @returns {Promise<void>}
+     */
+    async _restoreResponseState(tab) {
+        activateTab('response', tab.activeResponseTab || 'response-body');
+
+        if (tab.response) {
+            await this._restoreResponse(tab.response, tab.id);
+        } else {
+            this._clearResponse(tab.id);
+        }
+    }
+
+    /**
+     * @param {Object} request
+     * @returns {void}
+     */
+    _restorePlainJsonBody(request) {
+        if (this.graphqlBodyManager) {
+            this.graphqlBodyManager.setGraphQLModeEnabled(false);
+        }
+        setRequestBodyContent(request.body?.content || '');
+    }
+
+    /**
+     * @param {Object} tab
+     * @returns {Promise<void>}
+     */
+    async _restoreGrpc(tab) {
+        setRequestMode(RequestMode.GRPC);
+        activateTab('request', 'grpc');
+
+        const ensureGrpcTabActive = () => {
+            const activeBtn = document.querySelector('.request-config .tab-nav .tab-button.active');
+            const isActiveVisible = activeBtn && activeBtn.style.display !== 'none';
+            if (!isActiveVisible) {
+                activateTab('request', 'grpc');
+            }
+        };
+
+        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+            window.requestAnimationFrame(ensureGrpcTabActive);
+        } else {
+            setTimeout(ensureGrpcTabActive, 0);
+        }
+
+        if (app.applyGrpcState) {
+            app.applyGrpcState(tab.request.grpc || {});
+        }
+
+        this._applyTabEndpoint(tab, tab.endpoint);
+    }
+
+    /**
+     * @param {Object} tab
+     * @returns {Promise<void>}
+     */
+    async _restoreSse(tab) {
+        const { request } = tab;
+        setRequestMode(RequestMode.SSE);
+
+        this._restoreUrlInputs('sse', request.url);
 
         if (this.dom.methodSelect) {
             this.dom.methodSelect.value = request.method || 'GET';
         }
 
-        if (request.body && typeof request.body === 'object' && request.body.mode) {
-            const { mode } = request.body;
-            if (mode === 'formdata' && app.formBodyManager) {
-                this.graphqlBodyManager?.switchMode('formdata');
-                app.formBodyManager.setFormDataRows(request.body.fields);
-            } else if (mode === 'urlencoded' && app.formBodyManager) {
-                this.graphqlBodyManager?.switchMode('urlencoded');
-                app.formBodyManager.setUrlencodedRows(request.body.fields);
-            } else if (mode === 'binary' && app.formBodyManager) {
-                this.graphqlBodyManager?.switchMode('binary');
-                app.formBodyManager.setBinaryBody(request.body);
-            } else if (mode === 'text') {
-                this.graphqlBodyManager?.switchMode('text');
-                if (app.requestBodyTextEditor) {
-                    app.requestBodyTextEditor.setContent(request.body.content || '');
-                }
-            } else {
-                if (this.graphqlBodyManager) {
-                    this.graphqlBodyManager.setGraphQLModeEnabled(false);
-                }
-                setRequestBodyContent(request.body.content || '');
+        if (request.body?.mode === 'text') {
+            this.graphqlBodyManager?.switchMode('text');
+            app.requestBodyTextEditor?.setContent(request.body.content || '');
+        } else {
+            this.graphqlBodyManager?.switchMode('json');
+            setRequestBodyContent(request.body?.content || '');
+        }
+
+        this._restoreKeyValueList(this.dom.queryParamsList, request.queryParams, {
+            onPopulated: updateUrlFromQueryParams
+        });
+        this._restoreKeyValueList(this.dom.headersList, request.headers);
+
+        this._restoreAuth(request);
+
+        await this._restoreResponseState(tab);
+        this._applyTabEndpoint(tab, tab.endpoint);
+    }
+
+    /**
+     * @param {Object} tab
+     * @returns {Promise<void>}
+     */
+    async _restoreWebSocket(tab) {
+        const { request } = tab;
+        setRequestMode(RequestMode.WEBSOCKET);
+
+        this._restoreUrlInputs('websocket', request.url);
+        this._restorePlainJsonBody(request);
+
+        this._restoreKeyValueList(this.dom.queryParamsList, request.queryParams, {
+            onPopulated: updateUrlFromQueryParams
+        });
+        this._restoreKeyValueList(this.dom.headersList, request.headers);
+
+        await this._restoreResponseState(tab);
+        this._applyTabEndpoint(tab, tab.endpoint);
+    }
+
+    /**
+     * @param {Object} tab
+     * @returns {Promise<void>}
+     */
+    async _restoreGraphQL(tab) {
+        const { request } = tab;
+
+        this._restoreUrlInputs('graphql', request.url);
+
+        setRequestMode(RequestMode.GRAPHQL);
+
+        this._restoreKeyValueList(this.dom.pathParamsList, null, { emptyRow: false });
+        this._restoreKeyValueList(this.dom.queryParamsList, null, { emptyRow: false });
+
+        if (this.graphqlBodyManager) {
+            this.graphqlBodyManager.setGraphQLQuery(request.query || '');
+            this.graphqlBodyManager.setGraphQLVariables(request.variables || '');
+            this.graphqlBodyManager.selectedOperationName = request.operationName || null;
+            this.graphqlBodyManager.updateOperationPicker();
+            await this.graphqlBodyManager.autoApplySchemaForUrl?.(request.url || '', { allowNetwork: true });
+        }
+
+        this._restoreKeyValueList(this.dom.headersList, request.headers);
+
+        this._restoreAuth(request);
+
+        await this._restoreResponseState(tab);
+        this._applyTabEndpoint(tab, tab.endpoint);
+    }
+
+    /**
+     * @param {Object} tab
+     * @returns {Promise<void>}
+     */
+    async _restoreMqtt(tab) {
+        const { request } = tab;
+        setRequestMode(RequestMode.MQTT);
+
+        this._restoreUrlInputs('mqtt', request.broker);
+
+        const setFieldValue = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.value = value;
+            }
+        };
+        setFieldValue('mqtt-client-id-input', request.clientId || '');
+        setFieldValue('mqtt-username-input', request.username || '');
+        setFieldValue('mqtt-password-input', request.password || '');
+        setFieldValue('mqtt-subscribe-input', request.subscribeTopic || '');
+        setFieldValue('mqtt-topic-input', request.publishTopic || '');
+        setFieldValue('mqtt-qos-select', String(request.qos ?? 0));
+
+        this._restorePlainJsonBody(request);
+
+        await this._restoreResponseState(tab);
+
+        import('./mqttHandler.js').then(m => m.refreshMqttConnectionUi(tab.id));
+
+        this._applyTabEndpoint(tab, tab.endpoint);
+    }
+
+    /**
+     * @param {Object} request
+     * @returns {void}
+     */
+    _restoreHttpBody(request) {
+        if (!(request.body && typeof request.body === 'object' && request.body.mode)) {
+            if (this.graphqlBodyManager) {
+                this.graphqlBodyManager.setGraphQLModeEnabled(false);
+            }
+            setRequestBodyContent(typeof request.body === 'string' ? request.body : '');
+            return;
+        }
+
+        const { mode } = request.body;
+
+        if (mode === 'formdata' && app.formBodyManager) {
+            this.graphqlBodyManager?.switchMode('formdata');
+            app.formBodyManager.setFormDataRows(request.body.fields);
+        } else if (mode === 'urlencoded' && app.formBodyManager) {
+            this.graphqlBodyManager?.switchMode('urlencoded');
+            app.formBodyManager.setUrlencodedRows(request.body.fields);
+        } else if (mode === 'binary' && app.formBodyManager) {
+            this.graphqlBodyManager?.switchMode('binary');
+            app.formBodyManager.setBinaryBody(request.body);
+        } else if (mode === 'text') {
+            this.graphqlBodyManager?.switchMode('text');
+            if (app.requestBodyTextEditor) {
+                app.requestBodyTextEditor.setContent(request.body.content || '');
             }
         } else {
             if (this.graphqlBodyManager) {
                 this.graphqlBodyManager.setGraphQLModeEnabled(false);
             }
-            setRequestBodyContent(typeof request.body === 'string' ? request.body : '');
+            setRequestBodyContent(request.body.content || '');
         }
+    }
 
-        if (this.dom.pathParamsList) {
-            clearKeyValueList(this.dom.pathParamsList);
-            if (request.pathParams && Object.keys(request.pathParams).length > 0) {
-                populateKeyValueList(this.dom.pathParamsList, request.pathParams);
-            } else {
-                addKeyValueRow(this.dom.pathParamsList);
-            }
-        }
-
-        if (this.dom.queryParamsList) {
-            clearKeyValueList(this.dom.queryParamsList);
-            if (request.queryParams && Object.keys(request.queryParams).length > 0) {
-                populateKeyValueList(this.dom.queryParamsList, request.queryParams);
-                updateUrlFromQueryParams();
-            } else {
-                addKeyValueRow(this.dom.queryParamsList);
-            }
-        }
-
-        if (this.dom.headersList) {
-            clearKeyValueList(this.dom.headersList);
-            if (request.headers && Object.keys(request.headers).length > 0) {
-                populateKeyValueList(this.dom.headersList, request.headers);
-            } else {
-                addKeyValueRow(this.dom.headersList, 'Content-Type', 'application/json');
-            }
-        }
-
-        if (authManager) {
-            const authType = request.authType || 'none';
-            const authConfig = {
-                type: authType,
-                config: request.authConfig || {}
-            };
-            authManager.loadAuthConfig(authConfig);
-        }
-
-        const activeResponseTab = tab.activeResponseTab || 'response-body';
-        activateTab('response', activeResponseTab);
-
-        if (response) {
-            await this._restoreResponse(response, tab.id);
-        } else {
-            this._clearResponse(tab.id);
-        }
-
-        if (tab.previewMode) {
-            const containerElements = app.responseContainerManager?.getOrCreateContainer(tab.id);
-            if (containerElements?.previewManager) {
-                if (!containerElements.previewManager.isPreviewMode(tab.id)) {
-                    containerElements.previewManager.togglePreview(tab.id);
-                }
-            }
-        }
+    /**
+     * @param {Object} tab
+     * @returns {Promise<void>}
+     */
+    async _restoreHttpEndpointContext(tab) {
+        const { endpoint } = tab;
 
         if (endpoint) {
             setCurrentEndpoint(endpoint);
@@ -648,7 +571,10 @@ export class WorkspaceTabStateManager {
             if (app.schemaController && endpoint.collectionId && endpoint.endpointId) {
                 await app.schemaController.loadSchema(endpoint.collectionId, endpoint.endpointId);
             }
-        } else if (Object.prototype.hasOwnProperty.call(tab, 'endpoint')) {
+            return;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(tab, 'endpoint')) {
             setCurrentEndpoint(null);
 
             clearSchemaValidationBadge();
@@ -665,9 +591,43 @@ export class WorkspaceTabStateManager {
     }
 
     /**
-     * Restore response to UI (private)
-     * @private
+     * @param {Object} tab
+     * @returns {Promise<void>}
      */
+    async _restoreHttp(tab) {
+        const { request } = tab;
+        setRequestMode(RequestMode.HTTP);
+
+        this._restoreUrlInputs('http', request.url);
+
+        if (this.dom.methodSelect) {
+            this.dom.methodSelect.value = request.method || 'GET';
+        }
+
+        this._restoreHttpBody(request);
+
+        this._restoreKeyValueList(this.dom.pathParamsList, request.pathParams);
+        this._restoreKeyValueList(this.dom.queryParamsList, request.queryParams, {
+            onPopulated: updateUrlFromQueryParams
+        });
+        this._restoreKeyValueList(this.dom.headersList, request.headers, {
+            emptyRow: ['Content-Type', 'application/json']
+        });
+
+        this._restoreAuth(request);
+
+        await this._restoreResponseState(tab);
+
+        if (tab.previewMode) {
+            const containerElements = app.responseContainerManager?.getOrCreateContainer(tab.id);
+            if (containerElements?.previewManager && !containerElements.previewManager.isPreviewMode(tab.id)) {
+                containerElements.previewManager.togglePreview(tab.id);
+            }
+        }
+
+        await this._restoreHttpEndpointContext(tab);
+    }
+
     async _restoreResponse(response, tabId) {
         if (!response) {
             this._clearResponse(tabId);
@@ -729,10 +689,6 @@ export class WorkspaceTabStateManager {
         updateResponseSize(response.size);
     }
 
-    /**
-     * Clear response display
-     * @private
-     */
     _clearResponse(tabId) {
         clearResponseDisplayForTab(tabId);
 

@@ -4,11 +4,8 @@
  */
 
 /**
- * Categorises an HTTP status code into a coarse response bucket.
- *
- * @param {number|null|undefined} statusCode - HTTP status code.
- * @returns {'success'|'redirect'|'client-error'|'server-error'|'info'} The bucket;
- *   falsy or out-of-range codes map to `'info'`.
+ * @param {number|null|undefined} statusCode
+ * @returns {'success'|'redirect'|'client-error'|'server-error'|'info'}
  */
 export function statusCategory(statusCode) {
     if (!statusCode) {

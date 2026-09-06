@@ -6,16 +6,7 @@
 import { createLazyEditorProxy } from '../editorLoader.js';
 import { debounce } from '../utils/debounce.js';
 
-/**
- * Manages inline script editing with auto-save functionality
- *
- * @class
- * @classdesc Handles loading, saving, and managing scripts in the Scripts tab using CodeMirror
- */
 export class InlineScriptManager {
-    /**
-     * Creates an InlineScriptManager instance
-     */
     constructor() {
         this.preRequestContainer = document.getElementById('pre-request-script-container');
         this.testScriptContainer = document.getElementById('test-script-container');
@@ -33,9 +24,6 @@ export class InlineScriptManager {
         this.initialized = false;
     }
 
-    /**
-     * Initialize CodeMirror editors and event listeners for auto-save
-     */
     initialize() {
         if (this.initialized) {
             return;
@@ -59,10 +47,8 @@ export class InlineScriptManager {
     }
 
     /**
-     * Load scripts for a specific endpoint
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @async
+     * @param {string} collectionId
+     * @param {string} endpointId
      */
     async loadScripts(collectionId, endpointId) {
         await this.flushPendingSave();
@@ -85,9 +71,6 @@ export class InlineScriptManager {
         }
     }
 
-    /**
-     * Clear script editors
-     */
     async clear() {
         await this.flushPendingSave();
 
@@ -103,38 +86,25 @@ export class InlineScriptManager {
         }
     }
 
-    /**
-     * Schedule auto-save with debouncing
-     * @private
-     */
     scheduleAutoSave() {
         if (this.currentCollectionId && this.currentEndpointId) {
             this._scheduleSave(this.currentCollectionId, this.currentEndpointId);
         }
     }
 
-    /**
-     * Flushes a pending debounced script save and waits for it to settle.
-     * @returns {Promise<void>} Resolves once no script save is pending or in flight
-     */
+    /** @returns {Promise<void>} */
     async flushPendingSave() {
         await this._scheduleSave.flush();
         await this._inFlightSave;
     }
 
-    /**
-     * Save current scripts
-     * @async
-     */
     async saveScripts() {
         await this._saveScriptsFor(this.currentCollectionId, this.currentEndpointId);
     }
 
     /**
-     * Saves the editors' scripts for the given endpoint.
-     * @private
-     * @param {string} collectionId - Collection ID captured when the save was scheduled
-     * @param {string} endpointId - Endpoint ID captured when the save was scheduled
+     * @param {string} collectionId
+     * @param {string} endpointId
      * @returns {Promise<void>}
      */
     async _saveScriptsFor(collectionId, endpointId) {
@@ -154,10 +124,7 @@ export class InlineScriptManager {
         }
     }
 
-    /**
-     * Get current script values
-     * @returns {Object} Current scripts
-     */
+    /** @returns {Object} */
     getCurrentScripts() {
         return {
             preRequestScript: this.preRequestEditor?.getContent() || '',

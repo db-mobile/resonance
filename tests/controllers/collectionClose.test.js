@@ -1,11 +1,6 @@
 /* global document */
 import { CollectionController } from '../../src/modules/controllers/CollectionController.js';
 
-/**
- * A collection opened in place lives in a directory the app does not own —
- * usually a git checkout. Closing it must be reversible: nothing on disk may
- * change, and the credentials that live outside the directory must survive.
- */
 describe('CollectionController close vs delete', () => {
     let controller;
     let service;
@@ -68,11 +63,6 @@ describe('CollectionController close vs delete', () => {
     });
 
     describe('handleClose', () => {
-        /**
-         * cleanupCollectionVariables routes to collection_save_variables, which
-         * rewrites the collection on disk — blanking variables.yaml in the
-         * user's working copy. Close must never reach it.
-         */
         test('does not touch the collection variables on disk', async () => {
             await controller.handleClose(collection(true));
 

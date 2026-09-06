@@ -1,15 +1,5 @@
-/**
- * PreviewRepository
- *
- * Manages persistence of preview mode preferences per workspace tab. The store
- * is hydrated once into an in-memory cache so the accessors stay synchronous
- * for the render-path consumers; writes flow through an ordered write chain.
- */
 export class PreviewRepository {
-    /**
-     * Creates a PreviewRepository instance
-     * @param {Object} backendAPI - The backend IPC API bridge
-     */
+    /** @param {Object} backendAPI */
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.storageKey = 'previewModes';
@@ -17,10 +7,7 @@ export class PreviewRepository {
         this._writeChain = Promise.resolve();
     }
 
-    /**
-     * Hydrates the in-memory cache from the store.
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async load() {
         try {
             const stored = await this.backendAPI.store.get(this.storageKey);
@@ -39,11 +26,7 @@ export class PreviewRepository {
         }
     }
 
-    /**
-     * Persists the current cache through the ordered write chain.
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     _persist() {
         const snapshot = { ...this._modes };
         this._writeChain = this._writeChain
@@ -53,8 +36,7 @@ export class PreviewRepository {
     }
 
     /**
-     * Get preview mode state for a tab
-     * @param {string} tabId - Workspace tab ID
+     * @param {string} tabId
      * @returns {boolean}
      */
     getPreviewMode(tabId) {
@@ -62,9 +44,8 @@ export class PreviewRepository {
     }
 
     /**
-     * Set preview mode state for a tab
-     * @param {string} tabId - Workspace tab ID
-     * @param {boolean} isPreviewMode - Preview mode enabled
+     * @param {string} tabId
+     * @param {boolean} isPreviewMode
      */
     setPreviewMode(tabId, isPreviewMode) {
         if (!this._modes) {
@@ -74,10 +55,7 @@ export class PreviewRepository {
         this._persist();
     }
 
-    /**
-     * Remove preview mode state for a tab
-     * @param {string} tabId - Workspace tab ID
-     */
+    /** @param {string} tabId */
     removePreviewMode(tabId) {
         if (!this._modes) {
             this._modes = {};
@@ -86,9 +64,6 @@ export class PreviewRepository {
         this._persist();
     }
 
-    /**
-     * Clear all preview modes
-     */
     clearAll() {
         this._modes = {};
         this._persist();

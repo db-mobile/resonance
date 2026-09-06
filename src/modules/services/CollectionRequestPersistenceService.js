@@ -9,11 +9,10 @@ import { getProtocol } from '../protocols/protocolRegistry.js';
 import { findRequest, updateRequest } from '../collections/collectionTree.js';
 
 /**
- * Read key-value rows for persistence, keeping the enabled flag when available
- * @param {HTMLElement} list - The key-value list element
- * @param {Function} parseKeyValuePairs - Flat map parser used as fallback
- * @param {Function} [parseKeyValueRows] - Row parser that preserves disabled rows
- * @returns {Array<Object>} Rows as {key, value, enabled}
+ * @param {HTMLElement} list
+ * @param {Function} parseKeyValuePairs
+ * @param {Function} [parseKeyValueRows]
+ * @returns {Array<Object>}
  */
 function readPersistedRows(list, parseKeyValuePairs, parseKeyValueRows) {
     if (parseKeyValueRows) {
@@ -23,16 +22,13 @@ function readPersistedRows(list, parseKeyValuePairs, parseKeyValueRows) {
     return Object.entries(parseKeyValuePairs(list)).map(([key, value]) => ({ key, value }));
 }
 
-/**
- * Handles saving request edits for HTTP, WebSocket, and gRPC collection endpoints.
- */
 export class CollectionRequestPersistenceService {
     /**
-     * @param {Object} options - Persistence dependencies
-     * @param {CollectionRepository} options.repository - Collection repository
-     * @param {CollectionService} options.collectionService - Collection service
-     * @param {IStatusDisplay} options.statusDisplay - Status display adapter
-     * @param {Function} options.refreshCollections - Callback to refresh the collection tree
+     * @param {Object} options
+     * @param {CollectionRepository} options.repository
+     * @param {CollectionService} options.collectionService
+     * @param {IStatusDisplay} options.statusDisplay
+     * @param {Function} options.refreshCollections
      */
     constructor({ repository, collectionService, statusDisplay, refreshCollections }) {
         this.repository = repository;
@@ -78,13 +74,10 @@ export class CollectionRequestPersistenceService {
     }
 
     /**
-     * Persists a gRPC endpoint's captured state and mirrors the resolved method
-     * onto every stored copy of the endpoint.
-     *
-     * @param {string} collectionId - The collection identifier
-     * @param {string} endpointId - The endpoint identifier
-     * @param {Object} endpoint - The endpoint record being saved
-     * @param {Object} collection - The owning collection, already read for update
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} endpoint
+     * @param {Object} collection
      * @returns {Promise<void>}
      */
     async saveGrpcRequest(collectionId, endpointId, endpoint, collection) {
@@ -154,17 +147,10 @@ export class CollectionRequestPersistenceService {
     }
 
     /**
-     * Persists edits to an SSE endpoint.
-     *
-     * Unlike the HTTP saver this never rewrites `endpoint.path`: an SSE endpoint
-     * is identified by its absolute URL, which `normalizePath` would truncate to
-     * a bare pathname. The chosen HTTP verb is written back to the endpoint
-     * records, since the tree badge holds the protocol label instead.
-     *
-     * @param {string} collectionId - The collection identifier
-     * @param {string} endpointId - The endpoint identifier
-     * @param {Function} parseKeyValuePairs - Key-value list parser
-     * @param {Object} authManager - Authentication manager
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Function} parseKeyValuePairs
+     * @param {Object} authManager
      * @returns {Promise<void>}
      */
     async saveSseRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows) {
@@ -201,13 +187,8 @@ export class CollectionRequestPersistenceService {
     }
 
     /**
-     * Persists edits to an MQTT endpoint.
-     *
-     * The broker password is deliberately not stored: it is a credential, and
-     * the MQTT sidecar record is plain stored data with no secret splitting.
-     *
-     * @param {string} collectionId - The collection identifier
-     * @param {string} endpointId - The endpoint identifier
+     * @param {string} collectionId
+     * @param {string} endpointId
      * @returns {Promise<void>}
      */
     async saveMqttRequest(collectionId, endpointId) {
@@ -232,14 +213,9 @@ export class CollectionRequestPersistenceService {
     }
 
     /**
-     * Applies a patch to every stored copy of an endpoint.
-     *
-     * An endpoint can appear both at the collection root and inside a folder, so
-     * all locations found are updated together.
-     *
-     * @param {string} collectionId - The collection identifier
-     * @param {string} endpointId - The endpoint identifier
-     * @param {Object} patch - Fields to merge into the endpoint records
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} patch
      * @returns {Promise<void>}
      */
     async patchEndpointRecords(collectionId, endpointId, patch) {
@@ -440,14 +416,8 @@ export class CollectionRequestPersistenceService {
     }
 
     /**
-     * Resolves the request form inputs for a protocol.
-     *
-     * Each protocol owns its own URL field, so the descriptor decides which one
-     * is read. The shared `url-input` is the fallback for when a protocol's own
-     * bar has not been rendered.
-     *
-     * @param {Object} [descriptor] - The protocol descriptor
-     * @returns {Object} Form element references
+     * @param {Object} [descriptor]
+     * @returns {Object}
      */
     getRequestFormElements(descriptor = getProtocol('http')) {
         const ownUrlInput = descriptor.urlInputId

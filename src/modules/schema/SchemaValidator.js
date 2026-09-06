@@ -3,16 +3,11 @@
  * @module schema/SchemaValidator
  */
 
-/**
- * Validates JSON data against JSON Schema and infers schemas from data
- */
 export class SchemaValidator {
     /**
-     * Validates data against a JSON Schema
-     * 
-     * @param {*} data - The data to validate
-     * @param {Object} schema - JSON Schema to validate against
-     * @returns {Object} Validation result { valid: boolean, errors: Array }
+     * @param {*} data
+     * @param {Object} schema
+     * @returns {Object}
      */
     validate(data, schema) {
         if (!schema || typeof schema !== 'object') {
@@ -28,10 +23,6 @@ export class SchemaValidator {
         };
     }
 
-    /**
-     * Recursively validates a node against its schema
-     * @private
-     */
     _validateNode(data, schema, path, errors) {
         if (data === null) {
             if (schema.nullable === true || (Array.isArray(schema.type) && schema.type.includes('null'))) {
@@ -86,10 +77,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validates an object against schema properties
-     * @private
-     */
     _validateObject(data, schema, path, errors) {
         if (schema.required && Array.isArray(schema.required)) {
             for (const prop of schema.required) {
@@ -125,10 +112,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validates an array against schema items
-     * @private
-     */
     _validateArray(data, schema, path, errors) {
         if (schema.minItems !== undefined && data.length < schema.minItems) {
             errors.push({
@@ -153,10 +136,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validates a string against schema constraints
-     * @private
-     */
     _validateString(data, schema, path, errors) {
         if (schema.minLength !== undefined && data.length < schema.minLength) {
             errors.push({
@@ -200,10 +179,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validates a number against schema constraints
-     * @private
-     */
     _validateNumber(data, schema, path, errors) {
         if (schema.minimum !== undefined && data < schema.minimum) {
             errors.push({
@@ -246,10 +221,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validates string format
-     * @private
-     */
     _validateFormat(data, format) {
         const formats = {
             'email': /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -270,10 +241,6 @@ export class SchemaValidator {
         return null;
     }
 
-    /**
-     * Gets the JSON Schema type of a value
-     * @private
-     */
     _getType(value) {
         if (value === null) {
             return 'null';
@@ -288,19 +255,13 @@ export class SchemaValidator {
     }
 
     /**
-     * Infers a JSON Schema from sample data
-     * 
-     * @param {*} data - Sample data to infer schema from
-     * @returns {Object} Inferred JSON Schema
+     * @param {*} data
+     * @returns {Object}
      */
     inferSchema(data) {
         return this._inferNode(data);
     }
 
-    /**
-     * Recursively infers schema for a node
-     * @private
-     */
     _inferNode(data) {
         if (data === null) {
             return { type: 'null' };
@@ -329,10 +290,6 @@ export class SchemaValidator {
         return {};
     }
 
-    /**
-     * Infers schema for an object
-     * @private
-     */
     _inferObject(data) {
         const schema = {
             type: 'object',
@@ -352,10 +309,6 @@ export class SchemaValidator {
         return schema;
     }
 
-    /**
-     * Infers schema for an array
-     * @private
-     */
     _inferArray(data) {
         const schema = {
             type: 'array'
@@ -368,10 +321,6 @@ export class SchemaValidator {
         return schema;
     }
 
-    /**
-     * Infers schema for a string, detecting common formats
-     * @private
-     */
     _inferString(data) {
         const schema = { type: 'string' };
 
@@ -391,10 +340,8 @@ export class SchemaValidator {
     }
 
     /**
-     * Formats validation errors for display
-     * 
-     * @param {Array} errors - Array of validation errors
-     * @returns {string} Formatted error message
+     * @param {Array} errors
+     * @returns {string}
      */
     formatErrors(errors) {
         if (!errors || errors.length === 0) {

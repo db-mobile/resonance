@@ -1,17 +1,12 @@
 /**
- * @fileoverview Save-response-to-file support. Preserves binary responses (which
- * the backend returns base64-encoded) and lets the user write any response body
- * to a file via a native save dialog.
+ * @fileoverview Save-response-to-file support.
  * @module responseSaver
  */
 
 import { app } from './appContext.js';
 import { textToBase64 } from './utils/encoding.js';
 
-/**
- * Per-tab metadata about the last response, used by the Save button.
- * @type {Map<string, {isBinary: boolean, base64: (string|null), suggestedName: string}>}
- */
+/** @type {Map<string, {isBinary: boolean, base64: (string|null), suggestedName: string}>} */
 const responseMeta = new Map();
 
 const CONTENT_TYPE_EXTENSIONS = {
@@ -33,10 +28,8 @@ const CONTENT_TYPE_EXTENSIONS = {
 };
 
 /**
- * Records metadata for the tab's most recent response.
- *
- * @param {string} tabId - Workspace tab ID.
- * @param {{isBinary: boolean, base64?: (string|null), suggestedName: string}} meta - Response metadata.
+ * @param {string} tabId
+ * @param {{isBinary: boolean, base64?: (string|null), suggestedName: string}} meta
  * @returns {void}
  */
 export function setResponseMeta(tabId, meta) {
@@ -48,7 +41,7 @@ export function setResponseMeta(tabId, meta) {
 }
 
 /**
- * @param {string} tabId - Workspace tab ID.
+ * @param {string} tabId
  * @returns {{isBinary: boolean, base64: (string|null), suggestedName: string}|null}
  */
 export function getResponseMeta(tabId) {
@@ -56,7 +49,7 @@ export function getResponseMeta(tabId) {
 }
 
 /**
- * @param {string} tabId - Workspace tab ID.
+ * @param {string} tabId
  * @returns {void}
  */
 export function clearResponseMeta(tabId) {
@@ -64,13 +57,9 @@ export function clearResponseMeta(tabId) {
 }
 
 /**
- * Derives a sensible default download filename from the request URL and the
- * response content type. Keeps an existing extension on the URL's last path
- * segment; otherwise appends one inferred from the content type.
- *
- * @param {string} url - The request URL.
- * @param {string} [contentType] - The response `Content-Type` header.
- * @returns {string} A suggested filename.
+ * @param {string} url
+ * @param {string} [contentType]
+ * @returns {string}
  */
 export function suggestedFileName(url, contentType) {
     let base = 'response';
@@ -109,11 +98,8 @@ function showSaveFeedback(button, success) {
 }
 
 /**
- * Resolves the base64 payload and filename to save for a tab: the stored bytes
- * for a binary response, or the current editor text encoded to base64 otherwise.
- *
- * @param {string} tabId - Workspace tab ID.
- * @returns {{base64: string, defaultName: string}|null} Save payload, or null when there is nothing to save.
+ * @param {string} tabId
+ * @returns {{base64: string, defaultName: string}|null}
  */
 export function resolveSavePayload(tabId) {
     const meta = getResponseMeta(tabId);
@@ -138,10 +124,8 @@ export function resolveSavePayload(tabId) {
 }
 
 /**
- * Handles a Save-response button click for a tab.
- *
- * @param {HTMLElement} button - The save button.
- * @param {string} tabId - Workspace tab ID.
+ * @param {HTMLElement} button
+ * @param {string} tabId
  * @returns {Promise<void>}
  */
 export async function handleSaveResponse(button, tabId) {
@@ -164,10 +148,8 @@ export async function handleSaveResponse(button, tabId) {
 }
 
 /**
- * Attaches the save handler to a response Save button.
- *
- * @param {HTMLElement} button - The save button.
- * @param {string} tabId - Workspace tab ID.
+ * @param {HTMLElement} button
+ * @param {string} tabId
  * @returns {void}
  */
 export function attachSaveResponseHandler(button, tabId) {

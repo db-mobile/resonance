@@ -3,25 +3,14 @@
  * @module controllers/EnvironmentController
  */
 
-/**
- * Controller for coordinating environment operations between UI and services
- *
- * @class
- * @classdesc Mediates between UI components (EnvironmentManager and EnvironmentSelector)
- * and the EnvironmentService, handling user interactions for environment management,
- * switching, import/export, and change notifications. Listens for service events
- * and synchronizes UI state accordingly.
- */
 import { app } from '../appContext.js';
 import { toast } from '../ui/Toast.js';
 
 export class EnvironmentController {
     /**
-     * Creates an EnvironmentController instance
-     *
-     * @param {EnvironmentService} environmentService - The environment service for business logic
-     * @param {EnvironmentManager} environmentManager - The environment management dialog UI component
-     * @param {EnvironmentSelector} environmentSelector - The environment selector dropdown UI component
+     * @param {EnvironmentService} environmentService
+     * @param {EnvironmentManager} environmentManager
+     * @param {EnvironmentSelector} environmentSelector
      */
     constructor(environmentService, environmentManager, environmentSelector) {
         this.service = environmentService;
@@ -29,14 +18,7 @@ export class EnvironmentController {
         this.selector = environmentSelector;
     }
 
-    /**
-     * Initializes the controller and sets up event listeners
-     *
-     * Registers change listener for service events and loads initial active environment.
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async initialize() {
         this.service.addChangeListener((event) => {
             this.handleEnvironmentChange(event);
@@ -45,12 +27,7 @@ export class EnvironmentController {
         await this.loadActiveEnvironment();
     }
 
-    /**
-     * Loads and displays the active environment in the UI
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async loadActiveEnvironment() {
         try {
             const activeEnvironment = await this.service.getActiveEnvironment();
@@ -63,12 +40,8 @@ export class EnvironmentController {
     }
 
     /**
-     * Handles environment change events from the service
-     *
-     * Routes events to appropriate handlers based on event type.
-     *
-     * @param {Object} event - The environment change event
-     * @param {string} event.type - Event type (environment-switched, environment-created, etc.)
+     * @param {Object} event
+     * @param {string} event.type
      * @returns {void}
      */
     handleEnvironmentChange(event) {
@@ -86,12 +59,8 @@ export class EnvironmentController {
     }
 
     /**
-     * Handles environment switch event and updates UI
-     *
-     * @async
-     * @param {Object} _event - The environment switch event (unused but kept for consistency)
+     * @param {Object} _event
      * @returns {Promise<void>}
-     * @private
      */
     async onEnvironmentSwitched(_event) {
         try {
@@ -105,15 +74,7 @@ export class EnvironmentController {
         }
     }
 
-    /**
-     * Handles changes to the environments list and refreshes UI
-     *
-     * Updates active environment display and refreshes selector dropdown.
-     *
-     * @async
-     * @returns {Promise<void>}
-     * @private
-     */
+    /** @returns {Promise<void>} */
     async onEnvironmentsChanged() {
         try {
             app.invalidateApiHandlerEnvironmentCache?.();
@@ -128,11 +89,8 @@ export class EnvironmentController {
     }
 
     /**
-     * Switches to a different environment
-     *
-     * @async
-     * @param {string} environmentId - The ID of the environment to activate
-     * @returns {Promise<boolean>} True if successful, false on error
+     * @param {string} environmentId
+     * @returns {Promise<boolean>}
      */
     async switchEnvironment(environmentId) {
         try {
@@ -143,14 +101,7 @@ export class EnvironmentController {
         }
     }
 
-    /**
-     * Opens the environment manager dialog
-     *
-     * Shows the environment management UI and refreshes on close if changes were made.
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async openEnvironmentManager() {
         try {
             const result = await this.manager.show();
@@ -163,13 +114,9 @@ export class EnvironmentController {
     }
 
     /**
-     * Creates a new environment
-     *
-     * @async
-     * @param {string} name - The environment name
-     * @param {Object} [variables={}] - Initial variables for the environment
-     * @returns {Promise<Object>} The created environment object
-     * @throws {Error} If creation fails
+     * @param {string} name
+     * @param {Object} [variables={}]
+     * @returns {Promise<Object>}
      */
     async createEnvironment(name, variables = {}) {
         const environment = await this.service.createEnvironment(name, variables);
@@ -177,50 +124,31 @@ export class EnvironmentController {
     }
 
     /**
-     * Updates an existing environment
-     *
-     * @async
-     * @param {string} environmentId - The environment ID to update
-     * @param {Object} updates - Object containing fields to update (name, variables, etc.)
-     * @returns {Promise<Object>} The updated environment object
-     * @throws {Error} If update fails
+     * @param {string} environmentId
+     * @param {Object} updates
+     * @returns {Promise<Object>}
      */
     async updateEnvironment(environmentId, updates) {
         return this.service.updateEnvironment(environmentId, updates);
     }
 
     /**
-     * Deletes an environment
-     *
-     * @async
-     * @param {string} environmentId - The environment ID to delete
-     * @returns {Promise<boolean>} True if deletion was successful
-     * @throws {Error} If deletion fails
+     * @param {string} environmentId
+     * @returns {Promise<boolean>}
      */
     async deleteEnvironment(environmentId) {
         return this.service.deleteEnvironment(environmentId);
     }
 
     /**
-     * Duplicates an existing environment
-     *
-     * Creates a copy of the environment with " (Copy)" appended to the name.
-     *
-     * @async
-     * @param {string} environmentId - The environment ID to duplicate
-     * @returns {Promise<Object>} The newly created duplicate environment
-     * @throws {Error} If duplication fails
+     * @param {string} environmentId
+     * @returns {Promise<Object>}
      */
     async duplicateEnvironment(environmentId) {
         return this.service.duplicateEnvironment(environmentId);
     }
 
-    /**
-     * Gets all environments
-     *
-     * @async
-     * @returns {Promise<Array<Object>>} Array of all environment objects, or empty array on error
-     */
+    /** @returns {Promise<Array<Object>>} */
     async getAllEnvironments() {
         try {
             return await this.service.getAllEnvironments();
@@ -229,12 +157,7 @@ export class EnvironmentController {
         }
     }
 
-    /**
-     * Gets the currently active environment
-     *
-     * @async
-     * @returns {Promise<Object|null>} The active environment object, or null if none active or on error
-     */
+    /** @returns {Promise<Object|null>} */
     async getActiveEnvironment() {
         try {
             return await this.service.getActiveEnvironment();
@@ -243,12 +166,7 @@ export class EnvironmentController {
         }
     }
 
-    /**
-     * Gets variables from the active environment
-     *
-     * @async
-     * @returns {Promise<Object>} Variables object from active environment, or empty object if none active or on error
-     */
+    /** @returns {Promise<Object>} */
     async getActiveEnvironmentVariables() {
         try {
             return await this.service.getActiveEnvironmentVariables();
@@ -258,12 +176,8 @@ export class EnvironmentController {
     }
 
     /**
-     * Exports an environment as a JSON file download
-     *
-     * @async
-     * @param {string} environmentId - The environment ID to export
-     * @returns {Promise<boolean>} True if export was successful
-     * @throws {Error} If export fails
+     * @param {string} environmentId
+     * @returns {Promise<boolean>}
      */
     async exportEnvironment(environmentId) {
         const data = await this.service.exportEnvironment(environmentId);
@@ -276,13 +190,7 @@ export class EnvironmentController {
         return true;
     }
 
-    /**
-     * Exports all environments as a JSON file download
-     *
-     * @async
-     * @returns {Promise<boolean>} True if export was successful
-     * @throws {Error} If export fails
-     */
+    /** @returns {Promise<boolean>} */
     async exportAllEnvironments() {
         const data = await this.service.exportAllEnvironments();
         const json = JSON.stringify(data, null, 2);
@@ -295,9 +203,6 @@ export class EnvironmentController {
     }
 
     /**
-     * Save JSON through the native backend when available.
-     *
-     * @private
      * @param {string} filename
      * @param {string} json
      */
@@ -315,16 +220,10 @@ export class EnvironmentController {
     }
 
     /**
-     * Handles importing a Postman environment
-     *
-     * Creates a new environment from the imported Postman environment data.
-     *
-     * @async
-     * @param {Object} environment - The imported environment data
-     * @param {string} environment.name - Environment name
-     * @param {Object} environment.variables - Environment variables
-     * @returns {Promise<Object>} The created environment object
-     * @throws {Error} If import fails
+     * @param {Object} environment
+     * @param {string} environment.name
+     * @param {Object} environment.variables
+     * @returns {Promise<Object>}
      */
     async handleImportEnvironment(environment) {
         const created = await this.service.createEnvironment(
@@ -336,14 +235,8 @@ export class EnvironmentController {
     }
 
     /**
-     * Imports environments from a JSON file
-     *
-     * Shows file picker dialog and imports environments with optional merge.
-     *
-     * @async
-     * @param {boolean} [merge=false] - If true, merges with existing environments; if false, replaces all
-     * @returns {Promise<boolean>} True if import was successful, false if cancelled or failed
-     * @throws {Error} If import fails
+     * @param {boolean} [merge=false]
+     * @returns {Promise<boolean>}
      */
     async importEnvironments(merge = false) {
         const input = document.createElement('input');

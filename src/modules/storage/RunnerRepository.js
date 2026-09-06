@@ -3,32 +3,15 @@
  * @module storage/RunnerRepository
  */
 
-/**
- * Repository for managing collection runner data persistence
- *
- * @class
- * @classdesc Handles all CRUD operations for collection runners in the persistent store.
- * Runners define sequences of requests to execute with post-response scripts for
- * variable chaining between requests.
- */
 export class RunnerRepository {
-    /**
-     * Creates a RunnerRepository instance
-     *
-     * @param {Object} backendAPI - The backend IPC API bridge
-     */
+    /** @param {Object} backendAPI */
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.RUNNERS_KEY = 'collectionRunners';
         this._cache = null;
     }
 
-    /**
-     * Retrieves all runners from storage
-     *
-     * @async
-     * @returns {Promise<Array<Object>>} Array of runner objects
-     */
+    /** @returns {Promise<Array<Object>>} */
     async getAll() {
         if (this._cache !== null) {
             return this._cache;
@@ -51,12 +34,8 @@ export class RunnerRepository {
     }
 
     /**
-     * Saves runners array to storage
-     *
-     * @async
-     * @param {Array<Object>} runners - Array of runner objects to save
+     * @param {Array<Object>} runners
      * @returns {Promise<void>}
-     * @throws {Error} If storage write fails
      */
     async save(runners) {
         try {
@@ -68,11 +47,8 @@ export class RunnerRepository {
     }
 
     /**
-     * Retrieves a runner by its ID
-     *
-     * @async
-     * @param {string} id - The runner ID
-     * @returns {Promise<Object|undefined>} The runner object or undefined if not found
+     * @param {string} id
+     * @returns {Promise<Object|undefined>}
      */
     async getById(id) {
         const runners = await this.getAll();
@@ -80,14 +56,11 @@ export class RunnerRepository {
     }
 
     /**
-     * Adds a new runner to storage
-     *
-     * @async
-     * @param {Object} runner - The runner object to add
-     * @param {string} runner.name - Runner name
-     * @param {string} runner.collectionId - Source collection ID
-     * @param {Array<Object>} runner.requests - Array of request configurations
-     * @returns {Promise<Object>} The added runner object with generated ID
+     * @param {Object} runner
+     * @param {string} runner.name
+     * @param {string} runner.collectionId
+     * @param {Array<Object>} runner.requests
+     * @returns {Promise<Object>}
      */
     async add(runner) {
         const runners = await this.getAll();
@@ -113,12 +86,9 @@ export class RunnerRepository {
     }
 
     /**
-     * Updates an existing runner
-     *
-     * @async
-     * @param {string} id - The runner ID to update
-     * @param {Object} updates - Object with properties to update
-     * @returns {Promise<Object|null>} The updated runner object or null if not found
+     * @param {string} id
+     * @param {Object} updates
+     * @returns {Promise<Object|null>}
      */
     async update(id, updates) {
         const runners = await this.getAll();
@@ -139,11 +109,8 @@ export class RunnerRepository {
     }
 
     /**
-     * Deletes a runner by ID
-     *
-     * @async
-     * @param {string} id - The runner ID to delete
-     * @returns {Promise<boolean>} True if deletion succeeded
+     * @param {string} id
+     * @returns {Promise<boolean>}
      */
     async delete(id) {
         const runners = await this.getAll();
@@ -158,11 +125,8 @@ export class RunnerRepository {
     }
 
     /**
-     * Gets all runners for a specific collection
-     *
-     * @async
-     * @param {string} collectionId - The collection ID
-     * @returns {Promise<Array<Object>>} Array of runner objects for the collection
+     * @param {string} collectionId
+     * @returns {Promise<Array<Object>>}
      */
     async getByCollectionId(collectionId) {
         const runners = await this.getAll();
@@ -170,22 +134,16 @@ export class RunnerRepository {
     }
 
     /**
-     * Updates the last run timestamp for a runner
-     *
-     * @async
-     * @param {string} id - The runner ID
-     * @returns {Promise<Object|null>} The updated runner or null if not found
+     * @param {string} id
+     * @returns {Promise<Object|null>}
      */
     async updateLastRun(id) {
         return this.update(id, { lastRunAt: Date.now() });
     }
 
     /**
-     * Duplicates an existing runner
-     *
-     * @async
-     * @param {string} id - The runner ID to duplicate
-     * @returns {Promise<Object|null>} The duplicated runner or null if source not found
+     * @param {string} id
+     * @returns {Promise<Object|null>}
      */
     async duplicate(id) {
         const runner = await this.getById(id);
@@ -205,45 +163,37 @@ export class RunnerRepository {
         return this.add(duplicatedRunner);
     }
 
-    /**
-     * Generates a unique runner ID
-     *
-     * @private
-     * @returns {string} A unique runner identifier
-     */
+    /** @returns {string} */
     _generateId() {
         return `runner_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     }
 }
 
 /**
- * Runner request configuration schema
  * @typedef {Object} RunnerRequest
- * @property {string} collectionId - The collection containing the endpoint
- * @property {string} endpointId - The endpoint ID to execute
- * @property {string} name - Display name for the request
- * @property {string} method - HTTP method
- * @property {string} path - Request path
- * @property {string} postResponseScript - Script to execute after response
- * @property {Object} [overrides] - Per-request overrides applied at execution, taking
- *   precedence over the collection's saved config (the collection request is never mutated)
- * @property {Array<{key: string, value: string}>} [overrides.pathParams] - Path parameter overrides
- * @property {Array<{key: string, value: string}>} [overrides.queryParams] - Query parameter overrides
- * @property {Array<{key: string, value: string}>} [overrides.headers] - Header overrides
- * @property {string} [overrides.body] - Raw/JSON request body override
+ * @property {string} collectionId
+ * @property {string} endpointId
+ * @property {string} name
+ * @property {string} method
+ * @property {string} path
+ * @property {string} postResponseScript
+ * @property {Object} [overrides]
+ * @property {Array<{key: string, value: string}>} [overrides.pathParams]
+ * @property {Array<{key: string, value: string}>} [overrides.queryParams]
+ * @property {Array<{key: string, value: string}>} [overrides.headers]
+ * @property {string} [overrides.body]
  */
 
 /**
- * Runner configuration schema
  * @typedef {Object} Runner
- * @property {string} id - Unique runner identifier
- * @property {string} name - User-defined runner name
- * @property {string|null} collectionId - Primary collection ID (for display)
- * @property {Array<RunnerRequest>} requests - Ordered list of requests to execute
- * @property {Object} options - Runner options
- * @property {boolean} options.stopOnError - Stop execution on first error
- * @property {number} options.delayMs - Delay between requests in milliseconds
- * @property {number} createdAt - Creation timestamp
- * @property {number} lastModifiedAt - Last modification timestamp
- * @property {number|null} lastRunAt - Last execution timestamp
+ * @property {string} id
+ * @property {string} name
+ * @property {string|null} collectionId
+ * @property {Array<RunnerRequest>} requests
+ * @property {Object} options
+ * @property {boolean} options.stopOnError
+ * @property {number} options.delayMs
+ * @property {number} createdAt
+ * @property {number} lastModifiedAt
+ * @property {number|null} lastRunAt
  */

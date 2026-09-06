@@ -1,9 +1,3 @@
-/**
- * ResponseContainerManager
- *
- * Manages separate response display areas for each workspace tab.
- * Each workspace tab gets its own complete response display (Body, Headers, Cookies, Performance).
- */
 
 import { createLazyEditorProxy } from './editorLoader.js';
 import { templateLoader } from './templateLoader.js';
@@ -22,9 +16,8 @@ export class ResponseContainerManager {
     }
 
     /**
-     * Get or create response container for a workspace tab
-     * @param {string} tabId - Workspace tab ID
-     * @returns {Object} Container elements
+     * @param {string} tabId
+     * @returns {Object}
      */
     getOrCreateContainer(tabId) {
         if (this.containers.has(tabId)) {
@@ -37,10 +30,7 @@ export class ResponseContainerManager {
         return container;
     }
 
-    /**
-     * Show container for specific workspace tab, hide others
-     * @param {string} tabId - Workspace tab ID to show
-     */
+    /** @param {string} tabId */
     showContainer(tabId) {
         this.activeTabId = tabId;
 
@@ -55,10 +45,7 @@ export class ResponseContainerManager {
         });
     }
 
-    /**
-     * Get DOM elements for currently active workspace tab
-     * @returns {Object|null} DOM elements
-     */
+    /** @returns {Object|null} */
     getActiveElements() {
         if (!this.activeTabId) {
             return null;
@@ -66,10 +53,7 @@ export class ResponseContainerManager {
         return this.getOrCreateContainer(this.activeTabId);
     }
 
-    /**
-     * Remove container for a workspace tab
-     * @param {string} tabId - Workspace tab ID
-     */
+    /** @param {string} tabId */
     removeContainer(tabId) {
         const container = this.containers.get(tabId);
         if (container) {
@@ -91,10 +75,6 @@ export class ResponseContainerManager {
         }
     }
 
-    /**
-     * Create a new response container for a workspace tab
-     * @private
-     */
     _createContainer(tabId) {
         const fragment = templateLoader.cloneSync(
             './src/templates/response/responseContainer.html',

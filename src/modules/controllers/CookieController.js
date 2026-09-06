@@ -16,22 +16,15 @@ export class CookieController {
     initialize() {
     }
 
-    /**
-     * Called by renderer when the active environment changes.
-     */
     setActiveEnvironment(environmentId, environmentName) {
         this._activeEnvironmentId = environmentId || 'default';
         this._activeEnvironmentName = environmentName || null;
     }
 
-    /** @deprecated Use setActiveEnvironment */
     setActiveEnvironmentId(environmentId) {
         this._activeEnvironmentId = environmentId || 'default';
     }
 
-    /**
-     * Returns the Cookie header string to inject into the request, or null.
-     */
     async getCookieHeader(requestUrl) {
         try {
             const settings = app.getApiHandlerSettingsCache?.() ?? await window.backendAPI?.settings?.get();
@@ -43,7 +36,6 @@ export class CookieController {
     }
 
     /**
-     * Persists cookies from a response into the jar.
      * @param {string[]} setCookieHeaders
      * @param {string} requestUrl
      */
@@ -56,20 +48,13 @@ export class CookieController {
         }
     }
 
-    /**
-     * The active environment's cookies, for seeding a script's cookie API.
-     * @returns {Promise<Array<Object>>} Stored cookies
-     */
+    /** @returns {Promise<Array<Object>>} */
     async getCookiesForScripts() {
         return this.service.getAll(this._activeEnvironmentId);
     }
 
     /**
-     * Apply the cookie operations recorded by a script, in order.
-     *
-     * A `delete` without a domain removes every cookie of that name in the
-     * active environment, matching the script API's optional-domain semantics.
-     * @param {Array<Object>} changes - Recorded operations ({ op, cookie|name, domain?, path? })
+     * @param {Array<Object>} changes
      * @returns {Promise<void>}
      */
     async applyScriptCookieChanges(changes) {

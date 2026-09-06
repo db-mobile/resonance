@@ -1,14 +1,6 @@
 /* global document */
 import { CollectionRequestPersistenceService } from '../../src/modules/services/CollectionRequestPersistenceService.js';
 
-/**
- * Re-saving an existing endpoint.
- *
- * The HTTP saver rewrites `endpoint.path` to the entered URL's pathname, which
- * is right for a collection-relative HTTP request and destructive for every
- * protocol whose endpoint *is* an absolute URL. It also read the shared
- * `#url-input` rather than the protocol's own field.
- */
 describe('CollectionRequestPersistenceService protocol routing', () => {
     let repository;
     let service;

@@ -8,14 +8,11 @@ import { extractCookies, renderCookies } from './cookieParser.js';
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
 
 /**
- * Resolves the correct response-container elements for a given tab,
- * falling back to the provided global DOM references.
- *
- * @param {string|null} tabId - Workspace tab ID (null for global fallback)
- * @param {Object}      globalElements - Global DOM fallback references
- * @param {HTMLElement}  [globalElements.headersDisplay]
- * @param {HTMLElement}  [globalElements.cookiesDisplay]
- * @param {HTMLElement}  [globalElements.performanceDisplay]
+ * @param {string|null} tabId
+ * @param {Object} globalElements
+ * @param {HTMLElement} [globalElements.headersDisplay]
+ * @param {HTMLElement} [globalElements.cookiesDisplay]
+ * @param {HTMLElement} [globalElements.performanceDisplay]
  * @returns {{ headersEditor: Object|null, cookiesDisplay: HTMLElement|null, performanceDisplay: HTMLElement|null, isPerTab: boolean }}
  */
 export function getResponseElements(tabId, globalElements = {}) {
@@ -32,7 +29,6 @@ export function getResponseElements(tabId, globalElements = {}) {
         };
     }
 
-    // Global fallback
     return {
         headersEditor: null,
         cookiesDisplay: globalElements.cookiesDisplay || null,
@@ -43,10 +39,8 @@ export function getResponseElements(tabId, globalElements = {}) {
 }
 
 /**
- * Clears the headers, cookies, and performance panes for a response container.
- *
- * @param {string|null} tabId          - Workspace tab ID (null for global)
- * @param {Object}      globalElements - Global DOM fallback references
+ * @param {string|null} tabId
+ * @param {Object} globalElements
  */
 export function clearResponsePanes(tabId, globalElements = {}) {
     const els = getResponseElements(tabId, globalElements);
@@ -63,14 +57,12 @@ export function clearResponsePanes(tabId, globalElements = {}) {
 }
 
 /**
- * Writes response headers, cookies, and performance metrics to the correct pane.
- *
- * @param {string|null} tabId          - Workspace tab ID (null for global)
- * @param {Object}      globalElements - Global DOM fallback references
- * @param {Object}      opts
- * @param {Object|null} opts.headers   - Response headers object
- * @param {Object|null} opts.timings   - Performance timings
- * @param {number|null} opts.size      - Response size in bytes
+ * @param {string|null} tabId
+ * @param {Object} globalElements
+ * @param {Object} opts
+ * @param {Object|null} opts.headers
+ * @param {Object|null} opts.timings
+ * @param {number|null} opts.size
  */
 export function displayResponsePanes(tabId, globalElements, { headers, timings, size }) {
     const els = getResponseElements(tabId, globalElements);
@@ -102,14 +94,12 @@ export function displayResponsePanes(tabId, globalElements, { headers, timings, 
 }
 
 /**
- * Writes error-specific headers, cookies, and performance metrics to the correct pane.
- *
- * @param {string|null} tabId          - Workspace tab ID (null for global)
- * @param {Object}      globalElements - Global DOM fallback references
- * @param {Object}      error          - The error/result object
- * @param {Object}      [error.headers]
- * @param {Object}      [error.timings]
- * @param {number}      [error.size]
+ * @param {string|null} tabId
+ * @param {Object} globalElements
+ * @param {Object} error
+ * @param {Object} [error.headers]
+ * @param {Object} [error.timings]
+ * @param {number} [error.size]
  */
 export function displayErrorResponsePanes(tabId, globalElements, error) {
     const els = getResponseElements(tabId, globalElements);

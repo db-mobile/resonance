@@ -14,23 +14,11 @@ import {
 import { getRequestBodyContent } from '../requestBodyHelper.js';
 import { toast } from '../ui/Toast.js';
 
-/**
- * Service for managing API collection business logic
- *
- * @class
- * @classdesc Provides high-level collection operations including CRUD operations,
- * endpoint management, request body generation, and form population. Handles
- * OpenAPI schema processing and coordinates with repository layer for persistence.
- * Manages request state including path parameters, query parameters, headers, and
- * authentication configuration.
- */
 export class CollectionService {
     /**
-     * Creates a CollectionService instance
-     *
-     * @param {CollectionRepository} repository - Data access layer for collections
-     * @param {SchemaProcessor} schemaProcessor - OpenAPI schema processor
-     * @param {IStatusDisplay} statusDisplay - Status display interface
+     * @param {CollectionRepository} repository
+     * @param {SchemaProcessor} schemaProcessor
+     * @param {IStatusDisplay} statusDisplay
      */
     constructor(repository, schemaProcessor, statusDisplay) {
         this.repository = repository;
@@ -38,13 +26,7 @@ export class CollectionService {
         this.statusDisplay = statusDisplay;
     }
 
-    /**
-     * Loads all collections from storage
-     *
-     * @async
-     * @returns {Promise<Array<Object>>} Array of collection objects
-     * @throws {Error} If storage access fails
-     */
+    /** @returns {Promise<Array<Object>>} */
     async loadCollections() {
         try {
             const collections = await this.repository.getAll();
@@ -56,17 +38,11 @@ export class CollectionService {
     }
 
     /**
-     * Imports a collection into storage
-     *
-     * Updates status display with progress and completion status.
-     *
-     * @async
-     * @param {Object} collection - The collection object to import
-     * @param {string} collection.name - Collection name
-     * @param {string} [collection.baseUrl] - Base URL for the collection
-     * @param {Array<Object>} [collection.endpoints] - Collection endpoints
-     * @returns {Promise<Object>} The imported collection with generated ID
-     * @throws {Error} If import or storage operation fails
+     * @param {Object} collection
+     * @param {string} collection.name
+     * @param {string} [collection.baseUrl]
+     * @param {Array<Object>} [collection.endpoints]
+     * @returns {Promise<Object>}
      */
     async importCollection(collection) {
         try {
@@ -83,13 +59,9 @@ export class CollectionService {
     }
 
     /**
-     * Renames an existing collection
-     *
-     * @async
-     * @param {string} collectionId - The ID of the collection to rename
-     * @param {string} newName - The new name for the collection
-     * @returns {Promise<Object>} The updated collection object
-     * @throws {Error} If collection is not found or update fails
+     * @param {string} collectionId
+     * @param {string} newName
+     * @returns {Promise<Object>}
      */
     async renameCollection(collectionId, newName) {
         try {
@@ -106,12 +78,8 @@ export class CollectionService {
     }
 
     /**
-     * Deletes a collection from storage
-     *
-     * @async
-     * @param {string} collectionId - The ID of the collection to delete
-     * @returns {Promise<boolean>} True if deletion was successful
-     * @throws {Error} If collection is not found or deletion fails
+     * @param {string} collectionId
+     * @returns {Promise<boolean>}
      */
     async deleteCollection(collectionId) {
         await this.repository.delete(collectionId);
@@ -119,15 +87,8 @@ export class CollectionService {
     }
 
     /**
-     * Opens a collection directory that already exists on disk, in place.
-     *
-     * Nothing is copied. The directory is registered where it is, so the app
-     * treats it as the user's own and never renames or deletes it.
-     *
-     * @async
-     * @param {string} path - The directory the user picked
-     * @returns {Promise<Object>} `{ opened, alreadyOpen, failed }`
-     * @throws {Error} If nothing there can be opened
+     * @param {string} path
+     * @returns {Promise<Object>}
      */
     async openExistingCollection(path) {
         try {
@@ -149,11 +110,8 @@ export class CollectionService {
     }
 
     /**
-     * Removes a collection from the list, leaving every file on disk.
-     *
-     * @async
-     * @param {string} collectionId - The collection to close
-     * @returns {Promise<boolean>} True when it is no longer listed
+     * @param {string} collectionId
+     * @returns {Promise<boolean>}
      */
     async closeCollection(collectionId) {
         await this.repository.close(collectionId);
@@ -161,16 +119,9 @@ export class CollectionService {
     }
 
     /**
-     * Exports a collection as OpenAPI specification
-     *
-     * Triggers the export process via IPC to the main process, which handles
-     * file dialog and file writing. Updates status display with progress.
-     *
-     * @async
-     * @param {string} collectionId - The ID of the collection to export
-     * @param {string} format - Export format ('json' or 'yaml')
-     * @returns {Promise<Object>} Result object with success status and file path
-     * @throws {Error} If collection is not found or export fails
+     * @param {string} collectionId
+     * @param {string} format
+     * @returns {Promise<Object>}
      */
     async exportCollectionAsOpenApi(collectionId, format) {
         try {
@@ -227,14 +178,8 @@ export class CollectionService {
     }
 
     /**
-     * Creates a new empty collection
-     *
-     * Generates a unique collection ID and initializes default structure.
-     *
-     * @async
-     * @param {string} name - The name for the new collection
-     * @returns {Promise<Object>} The newly created collection object
-     * @throws {Error} If creation or storage operation fails
+     * @param {string} name
+     * @returns {Promise<Object>}
      */
     async createCollection(nameOrOptions) {
         try {
@@ -271,29 +216,18 @@ export class CollectionService {
         }
     }
 
-    /**
-     * Generates a unique collection ID
-     *
-     * @private
-     * @returns {string} A unique collection identifier
-     */
+    /** @returns {string} */
     generateCollectionId() {
         return `collection_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     }
 
     /**
-     * Adds a new request to an existing collection
-     *
-     * Automatically organizes the request into folders based on path structure.
-     *
-     * @async
-     * @param {string} collectionId - The ID of the target collection
-     * @param {Object} requestData - The request data
-     * @param {string} requestData.name - Request name
-     * @param {string} requestData.method - HTTP method (GET, POST, etc.)
-     * @param {string} requestData.path - Request path/URL
-     * @returns {Promise<Object>} The created endpoint object
-     * @throws {Error} If collection is not found or request cannot be added
+     * @param {string} collectionId
+     * @param {Object} requestData
+     * @param {string} requestData.name
+     * @param {string} requestData.method
+     * @param {string} requestData.path
+     * @returns {Promise<Object>}
      */
     async addRequestToCollection(collectionId, requestData) {
         try {
@@ -330,9 +264,6 @@ export class CollectionService {
             collection.endpoints = collection.endpoints || [];
             collection.endpoints.push(newEndpoint);
 
-            // Auto-foldering only kicks in for a collection that already uses
-            // folders, so a flat collection stays flat. Preserved from the
-            // original behaviour deliberately.
             if (collection.folders && collection.folders.length > 0) {
                 const basePath = this.extractBasePath(
                     descriptor.folderBucket ?? requestData.path
@@ -366,17 +297,10 @@ export class CollectionService {
     }
 
     /**
-     * Writes the per-protocol sidecar data a freshly created endpoint needs.
-     *
-     * Which writes happen is decided by the protocol descriptor rather than by
-     * the protocol id, so a protocol that stores a URL gets one without needing
-     * a branch here.
-     *
-     * @private
-     * @param {string} collectionId - The collection identifier
-     * @param {string} endpointId - The new endpoint's identifier
-     * @param {Object} descriptor - The protocol descriptor
-     * @param {Object} requestData - The captured request data
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} descriptor
+     * @param {Object} requestData
      * @returns {Promise<void>}
      */
     async persistNewEndpointSidecars(collectionId, endpointId, descriptor, requestData) {
@@ -419,19 +343,8 @@ export class CollectionService {
     }
 
     /**
-     * Generates a unique endpoint ID within a collection
-     *
-     * Ids are timestamp-and-random rather than a counter over the existing
-     * ones. A counter reuses the id of a deleted request, which would let the
-     * new request inherit the old one's keychain credentials, pinned state,
-     * scripts and mock overrides, all of which are keyed by endpoint id
-     * outside the collection file. It is also a pure function of collection
-     * contents, so two people branching from the same commit would mint the
-     * same id and their merge would carry two requests claiming it.
-     *
-     * @private
-     * @param {Object} collection - The collection object
-     * @returns {string} A unique endpoint identifier
+     * @param {Object} collection
+     * @returns {string}
      */
     generateEndpointId(collection) {
         const existingIds = new Set(flattenRequests(collection).map(endpoint => endpoint.id));
@@ -445,13 +358,8 @@ export class CollectionService {
     }
 
     /**
-     * Extracts the base path segment from a URL path
-     *
-     * Used for automatic folder organization.
-     *
-     * @private
-     * @param {string} pathKey - The full URL path
-     * @returns {string} The first path segment or 'custom'
+     * @param {string} pathKey
+     * @returns {string}
      */
     extractBasePath(pathKey) {
         const cleanPath = pathKey.replace(/^\//, '');
@@ -461,11 +369,9 @@ export class CollectionService {
     }
 
     /**
-     * Builds a folder id unique within the collection, mirroring the backend's unique_folder_id suffix scheme.
-     * @private
-     * @param {string} name - Folder name to derive the id from
-     * @param {Object} collection - Collection whose existing folder ids must not collide
-     * @returns {string} Unused folder id
+     * @param {string} name
+     * @param {Object} collection
+     * @returns {string}
      */
     _uniqueFolderId(name, collection) {
         const usedIds = new Set();
@@ -486,17 +392,10 @@ export class CollectionService {
     }
 
     /**
-     * Renames a request in a collection
-     *
-     * Updates the endpoint name in both the collection's endpoints array
-     * and any folders containing the endpoint.
-     *
-     * @async
-     * @param {string} collectionId - The collection ID
-     * @param {string} endpointId - The endpoint ID to rename
-     * @param {string} newName - The new name for the request
-     * @returns {Promise<Object>} The updated endpoint object
-     * @throws {Error} If collection or endpoint is not found or update fails
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {string} newName
+     * @returns {Promise<Object>}
      */
     async renameRequest(collectionId, endpointId, newName) {
         try {
@@ -525,16 +424,9 @@ export class CollectionService {
     }
 
     /**
-     * Deletes a request from a collection
-     *
-     * Removes the endpoint from the collection and all folders, and cleans up
-     * persisted endpoint data (headers, params, body, auth).
-     *
-     * @async
-     * @param {string} collectionId - The collection ID
-     * @param {string} endpointId - The endpoint ID to delete
-     * @returns {Promise<boolean>} True if deletion was successful
-     * @throws {Error} If collection is not found or deletion fails
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<boolean>}
      */
     async deleteRequestFromCollection(collectionId, endpointId) {
         try {
@@ -545,9 +437,6 @@ export class CollectionService {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }
 
-            // An emptied folder is kept: it is a real directory on disk now, and
-            // one a user made deliberately should not vanish when its last
-            // request is deleted.
             const reduced = removeRequest(collection, endpointId) ?? collection;
 
             await this.repository.saveOne(reduced);
@@ -567,10 +456,8 @@ export class CollectionService {
     }
 
     /**
-     * Generates request body from OpenAPI schema or examples
-     *
-     * @param {Object} requestBody - The request body spec from OpenAPI
-     * @returns {string} Generated JSON request body
+     * @param {Object} requestBody
+     * @returns {string}
      */
     generateRequestBody(requestBody) {
         if (requestBody.example && requestBody.example !== null && requestBody.example !== 'null') {
@@ -648,13 +535,10 @@ export class CollectionService {
     }
 
     /**
-     * Saves GraphQL mode and content for an endpoint
-     *
-     * @async
-     * @param {string} collectionId - The collection ID
-     * @param {string} endpointId - The endpoint ID
-     * @param {string} query - GraphQL query
-     * @param {string} variables - GraphQL variables JSON
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {string} query
+     * @param {string} variables
      * @returns {Promise<void>}
      */
     async saveGraphQLData(collectionId, endpointId, query, variables) {
@@ -670,12 +554,9 @@ export class CollectionService {
     }
 
     /**
-     * Gets saved GraphQL data for an endpoint
-     *
-     * @async
-     * @param {string} collectionId - The collection ID
-     * @param {string} endpointId - The endpoint ID
-     * @returns {Promise<Object|null>} GraphQL data or null if not found
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<Object|null>}
      */
     async getGraphQLData(collectionId, endpointId) {
         try {
@@ -686,13 +567,9 @@ export class CollectionService {
     }
 
     /**
-     * Saves current path parameters to persistence layer
-     *
-     * @async
-     * @private
-     * @param {string} collectionId - The collection ID
-     * @param {string} endpointId - The endpoint ID
-     * @param {Object} formElements - Form element references
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} formElements
      * @returns {Promise<void>}
      */
     async saveCurrentPathParams(collectionId, endpointId, formElements) {
@@ -705,13 +582,9 @@ export class CollectionService {
     }
 
     /**
-     * Saves current query parameters to persistence layer
-     *
-     * @async
-     * @private
-     * @param {string} collectionId - The collection ID
-     * @param {string} endpointId - The endpoint ID
-     * @param {Object} formElements - Form element references
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} formElements
      * @returns {Promise<void>}
      */
     async saveCurrentQueryParams(collectionId, endpointId, formElements) {
@@ -724,13 +597,9 @@ export class CollectionService {
     }
 
     /**
-     * Saves current headers to persistence layer
-     *
-     * @async
-     * @private
-     * @param {string} collectionId - The collection ID
-     * @param {string} endpointId - The endpoint ID
-     * @param {Object} formElements - Form element references
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} formElements
      * @returns {Promise<void>}
      */
     async saveCurrentHeaders(collectionId, endpointId, formElements) {
@@ -743,11 +612,8 @@ export class CollectionService {
     }
 
     /**
-     * Parses key-value pairs from a container element
-     *
-     * @private
-     * @param {HTMLElement} container - Container with key-value rows
-     * @returns {Array<Object>} Array of {key, value} objects, with `enabled` for toggleable rows
+     * @param {HTMLElement} container
+     * @returns {Array<Object>}
      */
     parseKeyValuePairs(container) {
         const pairs = [];
@@ -776,10 +642,7 @@ export class CollectionService {
     }
 
     /**
-     * Clears all child elements from a container
-     *
-     * @private
-     * @param {HTMLElement} container - Container to clear
+     * @param {HTMLElement} container
      * @returns {void}
      */
     clearKeyValueList(container) {

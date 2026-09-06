@@ -3,23 +3,10 @@
  * @module storage/VariableRepository
  */
 
-/**
- * Repository for managing collection variable persistence
- *
- * @class
- * @classdesc Handles CRUD operations for collection-scoped variables using file-based storage.
- * Variables are stored per collection in a variables.json file within the collection directory.
- * This enables Git-friendly storage with clean diffs.
- *
- */
 export class VariableRepository {
     /**
-     * Creates a VariableRepository instance
-     *
-     * @param {Object} backendAPI - The backend IPC API bridge
-     * @param {import('./SecretStore.js').SecretStore} [secretStore] - Optional secret
-     *   backend; when provided, variables flagged secret keep an empty placeholder in the
-     *   git-friendly variables.json and store their value out of band.
+     * @param {Object} backendAPI
+     * @param {import('./SecretStore.js').SecretStore} [secretStore]
      */
     constructor(backendAPI, secretStore = null) {
         this.backendAPI = backendAPI;
@@ -28,8 +15,6 @@ export class VariableRepository {
     }
 
     /**
-     * Builds the SecretStore scope string for a collection's variables.
-     *
      * @param {string} collectionId
      * @returns {string}
      */
@@ -38,9 +23,6 @@ export class VariableRepository {
     }
 
     /**
-     * Reads the raw on-disk variable entries (array of `{ key, value, secret? }`).
-     *
-     * @private
      * @param {string} collectionId
      * @returns {Promise<Array<Object>>}
      */
@@ -50,9 +32,6 @@ export class VariableRepository {
     }
 
     /**
-     * Returns the names of variables currently flagged secret for a collection.
-     *
-     * @private
      * @param {string} collectionId
      * @returns {Promise<string[]>}
      */
@@ -61,11 +40,7 @@ export class VariableRepository {
         return raw.filter(e => e && e.secret && e.key).map(e => e.key);
     }
 
-    /**
-     * Invalidates the cache for a specific collection or all collections
-     *
-     * @param {string} [collectionId] - Optional collection ID to invalidate. If not provided, clears entire cache.
-     */
+    /** @param {string} [collectionId] */
     invalidateCache(collectionId = null) {
         if (collectionId) {
             this._cache.delete(collectionId);
@@ -74,10 +49,6 @@ export class VariableRepository {
         }
     }
 
-    /**
-     * Converts array format to object format for backward compatibility
-     * @private
-     */
     _arrayToObject(variables) {
         if (Array.isArray(variables)) {
             const obj = {};
@@ -91,10 +62,6 @@ export class VariableRepository {
         return variables || {};
     }
 
-    /**
-     * Converts object format to array format for storage
-     * @private
-     */
     _objectToArray(variables) {
         if (Array.isArray(variables)) {
             return variables;
@@ -102,16 +69,7 @@ export class VariableRepository {
         return Object.entries(variables || {}).map(([key, value]) => ({ key, value }));
     }
 
-    /**
-     * Retrieves all variables for all collections
-     *
-     * Note: This method is less efficient with file-based storage as it needs to
-     * read each collection's variables file. Prefer getVariablesForCollection when possible.
-     *
-     * @async
-     * @returns {Promise<Object>} Object mapping collection IDs to variable objects
-     * @throws {Error} If storage access fails
-     */
+    /** @returns {Promise<Object>} */
     async getAllVariables() {
         try {
             const collectionIds = await this.backendAPI.collections.list();
@@ -131,12 +89,8 @@ export class VariableRepository {
     }
 
     /**
-     * Retrieves variables for a specific collection
-     *
-     * @async
-     * @param {string} collectionId - The collection ID
-     * @returns {Promise<Object>} Object mapping variable names to values
-     * @throws {Error} If retrieval fails
+     * @param {string} collectionId
+     * @returns {Promise<Object>}
      */
     async getVariablesForCollection(collectionId) {
         if (this._cache.has(collectionId)) {
@@ -162,10 +116,6 @@ export class VariableRepository {
     }
 
     /**
-     * Returns the collection's variables as editor entries with their secret flag and
-     * resolved (unmasked) values, for the variable manager UI.
-     *
-     * @async
      * @param {string} collectionId
      * @returns {Promise<Array<{name: string, value: string, secret: boolean}>>}
      */
@@ -190,15 +140,9 @@ export class VariableRepository {
     }
 
     /**
-     * Sets all variables for a specific collection
-     *
-     * Replaces existing variables for the collection.
-     *
-     * @async
-     * @param {string} collectionId - The collection ID
-     * @param {Object} variables - Object mapping variable names to values
+     * @param {string} collectionId
+     * @param {Object} variables
      * @returns {Promise<void>}
-     * @throws {Error} If save operation fails
      */
     async setVariablesForCollection(collectionId, variables, secretKeys = []) {
         try {
@@ -235,14 +179,10 @@ export class VariableRepository {
     }
 
     /**
-     * Sets a single variable for a collection
-     *
-     * @async
-     * @param {string} collectionId - The collection ID
-     * @param {string} name - The variable name
-     * @param {*} value - The variable value
+     * @param {string} collectionId
+     * @param {string} name
+     * @param {*} value
      * @returns {Promise<void>}
-     * @throws {Error} If save operation fails
      */
     async setVariable(collectionId, name, value) {
         try {
@@ -256,13 +196,9 @@ export class VariableRepository {
     }
 
     /**
-     * Deletes a single variable from a collection
-     *
-     * @async
-     * @param {string} collectionId - The collection ID
-     * @param {string} name - The variable name to delete
+     * @param {string} collectionId
+     * @param {string} name
      * @returns {Promise<void>}
-     * @throws {Error} If delete operation fails
      */
     async deleteVariable(collectionId, name) {
         try {
@@ -276,14 +212,8 @@ export class VariableRepository {
     }
 
     /**
-     * Deletes all variables for a collection
-     *
-     * Used when deleting a collection to clean up orphaned data.
-     *
-     * @async
-     * @param {string} collectionId - The collection ID
+     * @param {string} collectionId
      * @returns {Promise<void>}
-     * @throws {Error} If delete operation fails
      */
     async deleteAllVariablesForCollection(collectionId) {
         try {
@@ -297,12 +227,9 @@ export class VariableRepository {
     }
 
     /**
-     * Retrieves a single variable value for a collection
-     *
-     * @async
-     * @param {string} collectionId - The collection ID
-     * @param {string} name - The variable name
-     * @returns {Promise<*>} The variable value or undefined if not found
+     * @param {string} collectionId
+     * @param {string} name
+     * @returns {Promise<*>}
      */
     async getVariable(collectionId, name) {
         try {

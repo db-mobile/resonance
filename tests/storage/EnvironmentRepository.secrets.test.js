@@ -46,7 +46,6 @@ describe('EnvironmentRepository secret handling', () => {
 
         const env = await repository.getEnvironmentById('env_1');
         expect(env.secretKeys).toContain('apiKey');
-        // Placeholder kept in the (plaintext) variables map; real value lives in SecretStore
         expect(env.variables.apiKey).toBe('');
         expect(await secretStore.get('env:env_1', 'apiKey')).toBe('super-secret');
     });

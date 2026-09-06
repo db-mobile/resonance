@@ -9,20 +9,8 @@ import { SchemaProcessor } from '../schema/SchemaProcessor.js';
 import { pushEscapeHandler } from './modalEscape.js';
 import { flattenRequests } from '../collections/collectionTree.js';
 
-/**
- * UI Dialog for managing mock server
- *
- * @class
- * @classdesc Provides comprehensive interface for mock server management including
- * start/stop controls, port configuration, collection selection, endpoint delay
- * configuration, and request log viewing. Follows EnvironmentManager dialog pattern.
- */
 export class MockServerDialog {
-    /**
-     * Creates a MockServerDialog instance
-     *
-     * @param {MockServerController} controller - Controller for mock server operations
-     */
+    /** @param {MockServerController} controller */
     constructor(controller) {
         this.controller = controller;
         this.dialog = null;
@@ -32,11 +20,7 @@ export class MockServerDialog {
         this.releaseEscape = null;
     }
 
-    /**
-     * Shows the mock server dialog
-     *
-     * @returns {Promise<boolean>} Resolves when dialog is closed
-     */
+    /** @returns {Promise<boolean>} */
     show() {
         return new Promise((resolve) => {
             this.resolve = resolve;
@@ -44,11 +28,6 @@ export class MockServerDialog {
         });
     }
 
-    /**
-     * Creates and displays the dialog
-     *
-     * @async
-     */
     async createDialog() {
         this.dialog = document.createElement('div');
         this.dialog.className = 'mock-server-overlay modal-overlay';
@@ -120,9 +99,6 @@ export class MockServerDialog {
         this.startLogsPolling();
     }
 
-    /**
-     * Sets up event listeners for the dialog
-     */
     setupEventListeners() {
         const toggleBtn = this.dialog.querySelector('#mock-server-toggle-btn');
         const portInput = this.dialog.querySelector('#mock-server-port-input');
@@ -148,11 +124,6 @@ export class MockServerDialog {
         this.releaseEscape = pushEscapeHandler(() => this.close());
     }
 
-    /**
-     * Loads initial state of settings and collections
-     *
-     * @async
-     */
     async loadInitialState() {
         try {
             const [settings, collections, status] = await Promise.all([
@@ -173,11 +144,8 @@ export class MockServerDialog {
     }
 
     /**
-     * Renders collections with checkboxes and endpoint lists
-     *
-     * @async
-     * @param {Array} collections - Array of collection objects
-     * @param {Object} settings - Mock server settings
+     * @param {Array} collections
+     * @param {Object} settings
      */
     async renderCollections(collections, settings) {
         const container = this.dialog.querySelector('#mock-server-collections');
@@ -335,11 +303,6 @@ export class MockServerDialog {
         }
     }
 
-    /**
-     * Handles server start/stop toggle
-     *
-     * @async
-     */
     async handleToggleServer() {
         try {
             const toggleBtn = this.dialog.querySelector('#mock-server-toggle-btn');
@@ -367,12 +330,7 @@ export class MockServerDialog {
         }
     }
 
-    /**
-     * Handles port change
-     *
-     * @async
-     * @param {string} port - New port value
-     */
+    /** @param {string} port */
     async handlePortChange(port) {
         try {
             const result = await this.controller.handleUpdatePort(port);
@@ -387,12 +345,7 @@ export class MockServerDialog {
         }
     }
 
-    /**
-     * Handles collection enable/disable toggle
-     *
-     * @async
-     * @param {string} collectionId - Collection ID to toggle
-     */
+    /** @param {string} collectionId */
     async handleToggleCollection(collectionId) {
         try {
             const result = await this.controller.handleToggleCollection(collectionId);
@@ -409,11 +362,6 @@ export class MockServerDialog {
         }
     }
 
-    /**
-     * Handles clear logs action
-     *
-     * @async
-     */
     async handleClearLogs() {
         try {
             await this.controller.clearRequestLogs();
@@ -423,9 +371,6 @@ export class MockServerDialog {
         }
     }
 
-    /**
-     * Starts status polling
-     */
     startStatusPolling() {
         this.updateStatus();
         this.statusPoller = setInterval(() => {
@@ -433,9 +378,6 @@ export class MockServerDialog {
         }, 1000);
     }
 
-    /**
-     * Starts logs polling
-     */
     startLogsPolling() {
         this.updateLogs();
         this.logsPoller = setInterval(() => {
@@ -443,11 +385,6 @@ export class MockServerDialog {
         }, 2000);
     }
 
-    /**
-     * Updates server status display
-     *
-     * @async
-     */
     async updateStatus() {
         try {
             const status = await this.controller.getStatus();
@@ -457,11 +394,7 @@ export class MockServerDialog {
         }
     }
 
-    /**
-     * Updates status display elements
-     *
-     * @param {Object} status - Status object
-     */
+    /** @param {Object} status */
     async updateStatusDisplay(status) {
         const indicator = this.dialog.querySelector('#mock-server-status-indicator');
         const statusText = this.dialog.querySelector('#mock-server-status-text');
@@ -491,11 +424,6 @@ export class MockServerDialog {
         }
     }
 
-    /**
-     * Updates request logs display
-     *
-     * @async
-     */
     async updateLogs() {
         try {
             const logs = await this.controller.getRequestLogs(20);
@@ -580,11 +508,7 @@ export class MockServerDialog {
         }
     }
 
-    /**
-     * Shows alert dialog
-     *
-     * @param {string} message - Alert message
-     */
+    /** @param {string} message */
     showAlert(message) {
         const t = (key, fallback) => app.i18n ? app.i18n.t(key) || fallback : fallback;
         const overlay = document.createElement('div');
@@ -624,11 +548,8 @@ export class MockServerDialog {
     }
 
     /**
-     * Shows response editor dialog
-     *
-     * @async
-     * @param {Object} collection - Collection object
-     * @param {Object} endpoint - Endpoint object
+     * @param {Object} collection
+     * @param {Object} endpoint
      */
     async showResponseEditor(collection, endpoint) {
         const t = (key, fallback) => app.i18n ? app.i18n.t(key) || fallback : fallback;
@@ -815,10 +736,8 @@ export class MockServerDialog {
     }
 
     /**
-     * Generates default response from endpoint schema
-     *
-     * @param {Object} endpoint - Endpoint object
-     * @returns {Object} Default response object
+     * @param {Object} endpoint
+     * @returns {Object}
      */
     generateDefaultResponse(endpoint) {
         const method = endpoint.method?.toUpperCase();
@@ -852,10 +771,8 @@ export class MockServerDialog {
     }
 
     /**
-     * Gets default status code based on endpoint method
-     *
-     * @param {Object} endpoint - Endpoint object
-     * @returns {number} Default status code
+     * @param {Object} endpoint
+     * @returns {number}
      */
     getDefaultStatusCode(endpoint) {
         const method = endpoint.method.toUpperCase();
@@ -875,9 +792,6 @@ export class MockServerDialog {
         }
     }
 
-    /**
-     * Closes the dialog
-     */
     close() {
         if (this.statusPoller) {
             clearInterval(this.statusPoller);

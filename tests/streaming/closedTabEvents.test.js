@@ -28,20 +28,9 @@ import { app } from '../../src/modules/appContext.js';
 import { initWebSocketHandler, handleWebSocketSend } from '../../src/modules/websocketHandler.js';
 import { initMqttHandler } from '../../src/modules/mqttHandler.js';
 
-/**
- * A closed tab drops its stream session while the backend is still unwinding,
- * so its terminal event arrives afterwards. Acting on it rebuilds the tab's
- * response container — the tab visibly comes back from the dead. SSE and the
- * GraphQL subscription handler already ignore sessionless events; WebSocket and
- * MQTT did not.
- */
 describe('streaming handlers ignore events for tabs with no session', () => {
     const handlers = {};
 
-    /**
-     * The listener bootstrap memoizes its registration, so it can only be
-     * captured once per module instance.
-     */
     beforeAll(async () => {
         window.__TAURI_INTERNALS__ = {
             invoke: jest.fn(async (command, args) => {

@@ -10,9 +10,6 @@ import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { createThemedHighlighting } from './editorTheme.js';
 import { debounce } from './utils/debounce.js';
 
-/**
- * SchemaEditor - CodeMirror editor for JSON Schema content
- */
 export class SchemaEditor {
     constructor(containerElement, options = {}) {
         this.container = containerElement;
@@ -28,10 +25,7 @@ export class SchemaEditor {
         this.init();
     }
 
-    /**
-     * Get theme extensions based on current color scheme
-     * @returns {Array} Array of theme extensions
-     */
+    /** @returns {Array} */
     getThemeExtensions() {
         const baseTheme = EditorView.theme({
             '&': {
@@ -72,9 +66,6 @@ export class SchemaEditor {
         return [this._themed.extension, baseTheme];
     }
 
-    /**
-     * Initialize the CodeMirror editor
-     */
     init() {
         this._themed = createThemedHighlighting();
         const extensions = [
@@ -104,26 +95,18 @@ export class SchemaEditor {
         this._themed.attach(this.view);
     }
 
-    /**
-     * Handle content changes with debouncing
-     * @private
-     */
     _handleChange() {
         this._debouncedChange();
     }
 
-    /**
-     * Register a callback for content changes
-     * @param {Function} callback - Called when content changes
-     */
+    /** @param {Function} callback */
     onChange(callback) {
         this.changeCallback = callback;
     }
 
     /**
-     * Set editor content
-     * @param {string} content - JSON string to set
-     * @param {{emitChange?: boolean}} [options] - Pass emitChange false to suppress the change callback
+     * @param {string} content
+     * @param {{emitChange?: boolean}} [options]
      */
     setContent(content, { emitChange = true } = {}) {
         if (!this.view) {
@@ -150,9 +133,8 @@ export class SchemaEditor {
     }
 
     /**
-     * Sets the schema as a formatted JSON object
-     * @param {Object|null} schema - Schema object to set
-     * @param {{emitChange?: boolean}} [options] - Pass emitChange false to suppress the change callback
+     * @param {Object|null} schema
+     * @param {{emitChange?: boolean}} [options]
      */
     setSchema(schema, options) {
         if (schema === null || schema === undefined) {
@@ -166,10 +148,7 @@ export class SchemaEditor {
         }
     }
 
-    /**
-     * Gets the schema as a parsed JSON object
-     * @returns {Object|null} Parsed schema or null if invalid
-     */
+    /** @returns {Object|null} */
     getSchema() {
         const value = this.getContent().trim();
         if (!value) {
@@ -183,10 +162,7 @@ export class SchemaEditor {
         }
     }
 
-    /**
-     * Checks if the current content is valid JSON
-     * @returns {boolean} True if valid JSON
-     */
+    /** @returns {boolean} */
     isValidJson() {
         const value = this.getContent().trim();
         if (!value) {
@@ -201,33 +177,21 @@ export class SchemaEditor {
         }
     }
 
-    /**
-     * Get current editor content
-     * @returns {string}
-     */
+    /** @returns {string} */
     getContent() {
         return this.view ? this.view.state.doc.toString() : '';
     }
 
-    /**
-     * Clear editor content
-     */
     clear() {
         this.setContent('');
     }
 
-    /**
-     * Focus the editor
-     */
     focus() {
         if (this.view) {
             this.view.focus();
         }
     }
 
-    /**
-     * Destroy the editor instance
-     */
     destroy() {
         this._debouncedChange.cancel();
         this._themed?.dispose();

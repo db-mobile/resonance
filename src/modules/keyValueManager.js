@@ -9,20 +9,12 @@ const debounceAutoSave = debounce((callback) => callback(), 500);
 let isUpdatingUrlFromQueryParams = false;
 
 /**
- * Set the flag to prevent circular updates - call before programmatically updating URL
- */
-export function setUrlUpdating(value) {
-    isUpdatingUrlFromQueryParams = value;
-}
-
-/**
- * Build a key-value row, optionally with an enable/disable checkbox
- * @param {string} key - Initial key
- * @param {string} value - Initial value
- * @param {Object} [options] - Row options
- * @param {boolean} [options.toggleable] - Whether the row gets an enabled checkbox
- * @param {boolean} [options.enabled] - Initial checkbox state
- * @returns {HTMLElement} The row element
+ * @param {string} key
+ * @param {string} value
+ * @param {Object} [options]
+ * @param {boolean} [options.toggleable]
+ * @param {boolean} [options.enabled]
+ * @returns {HTMLElement}
  */
 export function createKeyValueRow(key = '', value = '', options = {}) {
     const row = document.createElement('div');
@@ -68,20 +60,18 @@ export function createKeyValueRow(key = '', value = '', options = {}) {
 }
 
 /**
- * Whether rows of a list carry an enable/disable checkbox
- * @param {HTMLElement} listContainer - The list element
- * @returns {boolean} True when the list opts into toggleable rows
+ * @param {HTMLElement} listContainer
+ * @returns {boolean}
  */
 function isToggleableList(listContainer) {
     return listContainer?.dataset?.toggleableRows === 'true';
 }
 
 /**
- * Append a key-value row to a list
- * @param {HTMLElement} listContainer - The list element
- * @param {string} key - Initial key
- * @param {string} value - Initial value
- * @param {boolean} [enabled] - Initial enabled state for toggleable lists
+ * @param {HTMLElement} listContainer
+ * @param {string} key
+ * @param {string} value
+ * @param {boolean} [enabled]
  * @returns {void}
  */
 export function addKeyValueRow(listContainer, key = '', value = '', enabled = true) {
@@ -93,9 +83,8 @@ export function addKeyValueRow(listContainer, key = '', value = '', enabled = tr
 }
 
 /**
- * Read the enabled state of a row
- * @param {HTMLElement} row - The row element
- * @returns {boolean} False only when a present checkbox is unchecked
+ * @param {HTMLElement} row
+ * @returns {boolean}
  */
 export function isRowEnabled(row) {
     return row.querySelector('.row-enabled-checkbox')?.checked !== false;
@@ -118,9 +107,8 @@ export function parseKeyValuePairs(listContainer) {
 }
 
 /**
- * Read every row of a list, disabled ones included
- * @param {HTMLElement} listContainer - The list element
- * @returns {Array<Object>} Rows as {key, value, enabled}
+ * @param {HTMLElement} listContainer
+ * @returns {Array<Object>}
  */
 export function parseKeyValueRows(listContainer) {
     if (!listContainer) {return [];}
@@ -138,9 +126,8 @@ export function parseKeyValueRows(listContainer) {
 }
 
 /**
- * Populate a key-value list with data
  * @param {HTMLElement} listContainer
- * @param {Object|Array<Object>} data - Key-value map or array of {key, value, enabled} rows
+ * @param {Object|Array<Object>} data
  */
 export function populateKeyValueList(listContainer, data) {
     if (!listContainer || !data) {return;}
@@ -159,19 +146,12 @@ export function populateKeyValueList(listContainer, data) {
     });
 }
 
-/**
- * Clear all rows from a key-value list
- * @param {HTMLElement} listContainer
- */
+/** @param {HTMLElement} listContainer */
 export function clearKeyValueList(listContainer) {
     if (!listContainer) {return;}
     listContainer.innerHTML = '';
 }
 
-/**
- * URL encode a value while preserving variable placeholders like {{variableName}}
- * This allows users to see their variables in the URL preview without encoding
- */
 function encodeValuePreservingPlaceholders(value) {
     const placeholders = [];
     let index = 0;
@@ -228,9 +208,8 @@ export function updateUrlFromQueryParams() {
 }
 
 /**
- * Decodes a URI component, keeping the raw text when it is not valid percent-encoding.
- * @param {string} component - Raw query-string fragment
- * @returns {string} Decoded or original text
+ * @param {string} component
+ * @returns {string}
  */
 function safeDecodeURIComponent(component) {
     try {
@@ -241,10 +220,7 @@ function safeDecodeURIComponent(component) {
     }
 }
 
-/**
- * Snapshot the disabled query param rows so a URL round trip cannot destroy them
- * @returns {Array<Object>} Rows as {index, key, value}
- */
+/** @returns {Array<Object>} */
 function captureDisabledQueryParams() {
     const disabledRows = [];
     queryParamsList.querySelectorAll('.key-value-row').forEach((row, index) => {
@@ -260,8 +236,7 @@ function captureDisabledQueryParams() {
 }
 
 /**
- * Re-insert disabled query param rows at the positions they were captured from
- * @param {Array<Object>} disabledRows - Rows from captureDisabledQueryParams
+ * @param {Array<Object>} disabledRows
  * @returns {void}
  */
 function restoreDisabledQueryParams(disabledRows) {

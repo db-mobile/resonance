@@ -22,12 +22,6 @@ export class CookieRepository {
         }
     }
 
-    /**
-     * Rewrites cookie ids from the legacy `domain|path|name` format to the
-     * environment-scoped `environmentId|domain|path|name` format, deduplicating
-     * by keeping the most recently updated entry, and persists the result if
-     * anything changed.
-     */
     async _migrateLegacyIds(cookies) {
         let changed = false;
         const byId = new Map();
@@ -58,9 +52,6 @@ export class CookieRepository {
         await this.backendAPI.store.set(this.COOKIE_JAR_KEY, cookies);
     }
 
-    /**
-     * Returns all cookies for an environment (or all if environmentId is omitted).
-     */
     async getAll(environmentId) {
         const cookies = await this._getArrayFromStore();
         if (environmentId === undefined) {
@@ -69,9 +60,6 @@ export class CookieRepository {
         return cookies.filter(c => c.environmentId === environmentId);
     }
 
-    /**
-     * Insert or update a cookie. ID is `${domain}|${path}|${name}`.
-     */
     async upsert(cookie) {
         const cookies = await this._getArrayFromStore();
         const idx = cookies.findIndex(c => c.id === cookie.id);
@@ -98,9 +86,6 @@ export class CookieRepository {
         await this._save(cookies.filter(c => !(c.domain === domain && c.environmentId === environmentId)));
     }
 
-    /**
-     * Remove cookies whose absolute expiry has passed.
-     */
     async deleteExpired() {
         const now = Date.now();
         const cookies = await this._getArrayFromStore();

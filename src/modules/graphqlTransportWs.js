@@ -1,13 +1,9 @@
 /**
  * @fileoverview Pure helpers for the graphql-transport-ws protocol: client message
- * builders, endpoint URL normalization, and operation-type selection. Kept free of
- * DOM/IPC dependencies so they are trivially unit-testable.
  * @module graphqlTransportWs
  */
 
 /**
- * Convert an http(s) endpoint URL to its ws(s) equivalent. URLs already using a
- * ws scheme are returned unchanged; scheme-less inputs default to `ws://`.
  * @param {string} url
  * @returns {string}
  */
@@ -25,7 +21,6 @@ export function normalizeSubscriptionUrl(url) {
 }
 
 /**
- * Build a `connection_init` frame, attaching a payload only when non-empty.
  * @param {object} [payload]
  * @returns {{type: 'connection_init', payload?: object}}
  */
@@ -38,7 +33,6 @@ export function buildConnectionInit(payload) {
 }
 
 /**
- * Build a `subscribe` frame. Variables/operationName are omitted when absent.
  * @param {string} id
  * @param {{query: string, variables?: object, operationName?: string|null}} op
  */
@@ -53,24 +47,16 @@ export function buildSubscribe(id, { query, variables, operationName }) {
     return { id, type: 'subscribe', payload };
 }
 
-/**
- * Build a client `complete` frame (unsubscribe).
- * @param {string} id
- */
+/** @param {string} id */
 export function buildComplete(id) {
     return { id, type: 'complete' };
 }
 
-/**
- * Build a `pong` frame (reply to a server `ping`).
- */
 export function buildPong() {
     return { type: 'pong' };
 }
 
 /**
- * Resolve the operation type ('query' | 'mutation' | 'subscription') that the next
- * Run should execute, given the parsed operations and the picker's selection.
  * @param {Array<{name: string|null, type: string}>|null} operations
  * @param {string|null} [selectedName]
  * @returns {string|null}

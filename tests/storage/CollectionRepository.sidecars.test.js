@@ -1,13 +1,5 @@
 import { CollectionRepository } from '../../src/modules/storage/CollectionRepository.js';
 
-/**
- * Characterization of the per-field endpoint sidecar accessors.
- *
- * Each field is read out of the endpoint data file with its own empty-value
- * default and written back through a single-field update, and each setter wraps
- * a write failure in its own message. Pinning all of it here so the generated
- * accessors have to reproduce it field for field.
- */
 describe('CollectionRepository endpoint sidecar accessors', () => {
     let repository;
     let backendAPI;

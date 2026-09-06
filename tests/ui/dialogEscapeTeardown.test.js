@@ -2,12 +2,6 @@
 import { SettingsModal } from '../../src/modules/ui/SettingsModal.js';
 import { MockServerDialog } from '../../src/modules/ui/MockServerDialog.js';
 
-/**
- * Both dialogs used to unregister Escape only inside the `if (e.key === 'Escape')`
- * branch, so closing by button, backdrop or Cancel left a listener holding a
- * detached overlay. Their single teardown must release the registration whichever
- * route closed the dialog.
- */
 describe('dialog Escape teardown runs on every close path', () => {
     afterEach(() => {
         document.body.innerHTML = '';

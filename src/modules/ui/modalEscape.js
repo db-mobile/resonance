@@ -1,27 +1,15 @@
 /**
  * @fileoverview Shared Escape-to-dismiss stack for overlay dialogs.
  * @module ui/modalEscape
- *
- * Dialogs used to each register their own `keydown` listener on the document.
- * That gave two recurring defects: a listener removed only inside the
- * `if (e.key === 'Escape')` branch outlived every other close path, and a dialog
- * opened on top of another let one keypress dismiss both. Registering here
- * instead means only the topmost dialog sees Escape, and the returned release
- * function is the single teardown every close path can call.
  */
 
 const handlers = [];
 
-/**
- * Input types that open a native picker widget owning its own Escape.
- * @type {ReadonlySet<string>}
- */
+/** @type {ReadonlySet<string>} */
 const PICKER_INPUT_TYPES = new Set(['date', 'datetime-local', 'month', 'time', 'week']);
 
 /**
- * Whether a keydown came from an input that may have a native picker open.
- *
- * @param {EventTarget|null} target - The keydown target
+ * @param {EventTarget|null} target
  * @returns {boolean}
  */
 function isPickerInput(target) {
@@ -29,10 +17,7 @@ function isPickerInput(target) {
 }
 
 /**
- * Dispatches Escape to the topmost registered dialog only, and stops the event
- * so neither the dialogs beneath it nor the app-level shortcuts also react.
- *
- * @param {KeyboardEvent} e - The captured keydown event
+ * @param {KeyboardEvent} e
  * @returns {void}
  */
 function onKeydown(e) {
@@ -41,10 +26,6 @@ function onKeydown(e) {
     }
     e.stopPropagation();
 
-    // Capturing on the document means the event never reaches a date/time
-    // input, so the browser cannot dismiss its picker itself. Those widgets are
-    // tied to focus, so blurring closes the picker and leaves the dialog open;
-    // the next Escape dismisses the dialog as usual.
     if (isPickerInput(e.target)) {
         e.target.blur();
         return;
@@ -54,10 +35,8 @@ function onKeydown(e) {
 }
 
 /**
- * Registers a dismiss handler as the topmost Escape target.
- *
- * @param {Function} handler - Called when Escape is pressed while this is topmost
- * @returns {Function} Idempotent release; call it from every close path
+ * @param {Function} handler
+ * @returns {Function}
  */
 export function pushEscapeHandler(handler) {
     if (handlers.length === 0) {
@@ -82,11 +61,7 @@ export function pushEscapeHandler(handler) {
     };
 }
 
-/**
- * Number of dialogs currently registered; for tests asserting no leaks.
- *
- * @returns {number}
- */
+/** @returns {number} */
 export function escapeHandlerCount() {
     return handlers.length;
 }

@@ -1,7 +1,5 @@
 /**
  * @fileoverview Feature descriptor wiring the OpenAPI schema validation controller for the
- * FeatureRegistry. This feature has no service/repository of its own — it reads the shared
- * collection repository directly.
  * @module schema.feature
  */
 

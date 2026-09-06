@@ -1,6 +1,3 @@
-/**
- * Nested example generation stops here so recursive schemas produce a finite payload.
- */
 const MAX_EXAMPLE_DEPTH = 6;
 
 export class SchemaProcessor {

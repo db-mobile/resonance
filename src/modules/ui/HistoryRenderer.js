@@ -9,20 +9,10 @@ import { ConfirmDialog } from './ConfirmDialog.js';
 import { templateLoader } from '../templateLoader.js';
 import { debounce } from '../utils/debounce.js';
 
-/**
- * History sidebar UI renderer
- *
- * @class
- * @classdesc Renders the request history list with search, filtering, and replay functionality.
- * Displays timestamps, HTTP methods, URLs, and status codes with color coding.
- * Provides delete and clear-all operations with confirmation dialogs.
- */
 export class HistoryRenderer {
     /**
-     * Creates a HistoryRenderer instance
-     *
-     * @param {Object} backendAPI - Backend IPC API bridge
-     * @param {Function} onHistorySelect - Callback when history item is selected for replay
+     * @param {Object} backendAPI
+     * @param {Function} onHistorySelect
      */
     constructor(backendAPI, onHistorySelect) {
         this.service = new HistoryService(backendAPI);

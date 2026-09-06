@@ -1,7 +1,5 @@
 /**
  * @fileoverview Feature descriptor wiring the environment stack (Repository → Service →
- * Manager/Selector → Controller) for the FeatureRegistry. Publishes `environmentService`
- * onto the shared bus, since other features (cookie, script) and the status bar depend on it.
  * @module environment.feature
  */
 

@@ -6,41 +6,25 @@
 import { templateLoader } from '../templateLoader.js';
 import { pushEscapeHandler } from './modalEscape.js';
 
-/**
- * Shared scaffolding for overlay modal dialogs.
- *
- * Owns overlay/dialog element creation, template cloning, mounting to the
- * document, dismiss-on-overlay-click, dismiss-on-Escape, and teardown (including
- * removal of the global keydown listener, so closing via a button never leaks it).
- * Subclasses provide their template + element wiring and override
- * {@link BaseModal#onDismiss} to define what dismissing means (e.g. resolving a
- * promise with a cancel value).
- *
- * @class
- */
 export class BaseModal {
     constructor() {
-        /** @type {HTMLElement|null} The overlay backdrop element. */
+        /** @type {HTMLElement|null} */
         this.overlay = null;
-        /** @type {HTMLElement|null} The dialog element hosting the template. */
+        /** @type {HTMLElement|null} */
         this.dialog = null;
-        /** @type {(() => void)|null} Releases this modal's Escape registration, if any. */
+        /** @type {(() => void)|null} */
         this._releaseEscape = null;
     }
 
     /**
-     * Builds the overlay + dialog, clones the template into it, mounts to the body,
-     * and wires the shared dismiss interactions.
-     *
-     * @protected
-     * @param {Object} config - Mount configuration.
-     * @param {string} config.overlayClass - Class for the overlay; `modal-overlay` is appended.
-     * @param {string} config.dialogClass - Class for the dialog element.
-     * @param {string} config.templatePath - Template file path passed to templateLoader.
-     * @param {string} config.templateId - Template element id within the file.
-     * @param {boolean} [config.closeOnEscape=true] - Dismiss when Escape is pressed.
-     * @param {boolean} [config.closeOnOverlayClick=true] - Dismiss when the backdrop is clicked.
-     * @returns {HTMLElement} The dialog element, for subclass wiring.
+     * @param {Object} config
+     * @param {string} config.overlayClass
+     * @param {string} config.dialogClass
+     * @param {string} config.templatePath
+     * @param {string} config.templateId
+     * @param {boolean} [config.closeOnEscape=true]
+     * @param {boolean} [config.closeOnOverlayClick=true]
+     * @returns {HTMLElement}
      */
     mount({
         overlayClass,
@@ -75,23 +59,12 @@ export class BaseModal {
         return this.dialog;
     }
 
-    /**
-     * Invoked when the user dismisses the modal via Escape or backdrop click.
-     * Subclasses override to add cancel semantics; the default just tears down.
-     *
-     * @protected
-     * @returns {void}
-     */
+    /** @returns {void} */
     onDismiss() {
         this.destroy();
     }
 
-    /**
-     * Removes the overlay from the DOM and detaches the global keydown listener.
-     *
-     * @protected
-     * @returns {void}
-     */
+    /** @returns {void} */
     destroy() {
         if (this._releaseEscape) {
             this._releaseEscape();

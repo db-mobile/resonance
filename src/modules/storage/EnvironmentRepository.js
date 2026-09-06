@@ -3,24 +3,10 @@
  * @module storage/EnvironmentRepository
  */
 
-/**
- * Repository for managing environment data persistence
- *
- * @class
- * @classdesc Handles CRUD operations for environments and active environment tracking
- * in the persistent store. Environments provide variable scoping for different contexts
- * (Development, Staging, Production, etc.). Implements defensive programming with
- * validation, auto-initialization, and duplicate name detection. Ensures at least
- * one environment always exists and is active.
- */
 export class EnvironmentRepository {
     /**
-     * Creates an EnvironmentRepository instance
-     *
-     * @param {Object} backendAPI - The backend IPC API bridge
-     * @param {import('./SecretStore.js').SecretStore} [secretStore] - Optional secret
-     *   backend; when provided, variables flagged in `secretKeys` are stored out of band
-     *   and hydrated at resolution time instead of living in the plaintext store.
+     * @param {Object} backendAPI
+     * @param {import('./SecretStore.js').SecretStore} [secretStore]
      */
     constructor(backendAPI, secretStore = null) {
         this.backendAPI = backendAPI;
@@ -30,8 +16,6 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Builds the SecretStore scope string for an environment.
-     *
      * @param {string} environmentId
      * @returns {string}
      */
@@ -40,9 +24,6 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Normalize environment shape for backward compatibility.
-     *
-     * @private
      * @param {Object} environment
      * @returns {Object}
      */
@@ -58,12 +39,6 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Normalize the list of variable names flagged as secret.
-     *
-     * Keeps only names that still correspond to a defined variable and removes
-     * duplicates, so the secret flag can never reference a deleted variable.
-     *
-     * @private
      * @param {Array<string>|undefined} secretKeys
      * @param {Object} variables
      * @returns {Array<string>}
@@ -77,9 +52,6 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Normalize stored color values.
-     *
-     * @private
      * @param {string|null|undefined} color
      * @returns {string|null}
      */
@@ -92,18 +64,7 @@ export class EnvironmentRepository {
         return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed.toUpperCase() : null;
     }
 
-    /**
-     * Retrieves all environments with validation and initialization
-     *
-     * Automatically initializes storage with default environment if undefined
-     * (packaged app first run). Validates structure and ensures items array exists.
-     *
-     * @async
-     * @returns {Promise<Object>} Object containing items array and activeEnvironmentId
-     * @returns {Promise<Object>} return.items - Array of environment objects
-     * @returns {Promise<string|null>} return.activeEnvironmentId - ID of active environment
-     * @throws {Error} If storage access fails
-     */
+    /** @returns {Promise<Object>} */
     async getAllEnvironments() {
         if (this._cache !== null) {
             return this._cache;
@@ -143,14 +104,7 @@ export class EnvironmentRepository {
         }
     }
 
-    /**
-     * Retrieves the active environment ID
-     *
-     * Falls back to first environment ID if no active environment is set.
-     *
-     * @async
-     * @returns {Promise<string|null>} The active environment ID or null
-     */
+    /** @returns {Promise<string|null>} */
     async getActiveEnvironmentId() {
         try {
             const data = await this.getAllEnvironments();
@@ -161,14 +115,8 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Sets the active environment
-     *
-     * Validates that the environment exists before setting it as active.
-     *
-     * @async
-     * @param {string} environmentId - The environment ID to activate
-     * @returns {Promise<boolean>} True if activation succeeded
-     * @throws {Error} If environment not found or save fails
+     * @param {string} environmentId
+     * @returns {Promise<boolean>}
      */
     async setActiveEnvironment(environmentId) {
         try {
@@ -188,11 +136,8 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Retrieves an environment by ID
-     *
-     * @async
-     * @param {string} environmentId - The environment ID
-     * @returns {Promise<Object|undefined>} The environment object or undefined if not found
+     * @param {string} environmentId
+     * @returns {Promise<Object|undefined>}
      */
     async getEnvironmentById(environmentId) {
         try {
@@ -203,12 +148,7 @@ export class EnvironmentRepository {
         }
     }
 
-    /**
-     * Retrieves the active environment
-     *
-     * @async
-     * @returns {Promise<Object|null>} The active environment object or null
-     */
+    /** @returns {Promise<Object|null>} */
     async getActiveEnvironment() {
         try {
             const activeId = await this.getActiveEnvironmentId();
@@ -220,15 +160,9 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Creates a new environment
-     *
-     * Validates that environment name is unique before creating.
-     *
-     * @async
-     * @param {string} name - The environment name
-     * @param {Object} [variables={}] - Initial variables object
-     * @returns {Promise<Object>} The created environment object
-     * @throws {Error} If name already exists or save fails
+     * @param {string} name
+     * @param {Object} [variables={}]
+     * @returns {Promise<Object>}
      */
     async createEnvironment(name, variables = {}, color = null) {
         try {
@@ -256,17 +190,11 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Updates an existing environment
-     *
-     * Validates name uniqueness if name is being updated. Preserves environment ID.
-     *
-     * @async
-     * @param {string} environmentId - The environment ID to update
-     * @param {Object} updates - Object with properties to update
-     * @param {string} [updates.name] - New environment name
-     * @param {Object} [updates.variables] - Updated variables object
-     * @returns {Promise<Object>} The updated environment object
-     * @throws {Error} If environment not found, name conflict, or save fails
+     * @param {string} environmentId
+     * @param {Object} updates
+     * @param {string} [updates.name]
+     * @param {Object} [updates.variables]
+     * @returns {Promise<Object>}
      */
     async updateEnvironment(environmentId, updates) {
         try {
@@ -298,15 +226,8 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Deletes an environment
-     *
-     * Prevents deletion of the last environment. If deleting active environment,
-     * automatically sets first remaining environment as active.
-     *
-     * @async
-     * @param {string} environmentId - The environment ID to delete
-     * @returns {Promise<boolean>} True if deletion succeeded
-     * @throws {Error} If last environment, not found, or save fails
+     * @param {string} environmentId
+     * @returns {Promise<boolean>}
      */
     async deleteEnvironment(environmentId) {
         try {
@@ -339,15 +260,9 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Duplicates an environment with a new name
-     *
-     * Creates a copy of the environment with all its variables.
-     *
-     * @async
-     * @param {string} environmentId - The environment ID to duplicate
-     * @param {string} [newName] - Name for the duplicated environment (defaults to "Name (Copy)")
-     * @returns {Promise<Object>} The created duplicate environment object
-     * @throws {Error} If source environment not found or creation fails
+     * @param {string} environmentId
+     * @param {string} [newName]
+     * @returns {Promise<Object>}
      */
     async duplicateEnvironment(environmentId, newName) {
         try {
@@ -376,20 +291,11 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Creates or updates a single variable, honoring its secret flag.
-     *
-     * Secret variables keep an empty placeholder in the persisted `variables` map and
-     * store their real value in the SecretStore, so the value never lands in the
-     * plaintext store, exports, or git-friendly collection files. Non-secret variables
-     * store their value inline and drop any prior secret copy.
-     *
-     * @async
      * @param {string} environmentId
      * @param {string} name
      * @param {string} value
      * @param {boolean} [isSecret=false]
-     * @returns {Promise<Object>} The updated environment
-     * @throws {Error} If the environment is not found
+     * @returns {Promise<Object>}
      */
     async setEnvironmentVariable(environmentId, name, value, isSecret = false) {
         const env = await this.getEnvironmentById(environmentId);
@@ -420,12 +326,9 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Deletes a single variable and any secret value behind it.
-     *
-     * @async
      * @param {string} environmentId
      * @param {string} name
-     * @returns {Promise<Object|undefined>} The updated environment, or undefined if not found
+     * @returns {Promise<Object|undefined>}
      */
     async deleteEnvironmentVariable(environmentId, name) {
         const env = await this.getEnvironmentById(environmentId);
@@ -445,12 +348,9 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Retrieves the stored secret value for a variable, for in-editor display.
-     *
-     * @async
      * @param {string} environmentId
      * @param {string} name
-     * @returns {Promise<string>} The secret value, or '' if none/unavailable
+     * @returns {Promise<string>}
      */
     async getEnvironmentSecretValue(environmentId, name) {
         if (!this.secretStore) {
@@ -461,9 +361,6 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Copies secret values from one environment scope to another.
-     *
-     * @private
      * @param {string} fromId
      * @param {string} toId
      * @param {Array<string>} secretKeys
@@ -481,14 +378,7 @@ export class EnvironmentRepository {
         }
     }
 
-    /**
-     * Retrieves variables for the active environment
-     *
-     * Convenience method for accessing current environment variables.
-     *
-     * @async
-     * @returns {Promise<Object>} Object mapping variable names to values, or empty object
-     */
+    /** @returns {Promise<Object>} */
     async getActiveEnvironmentVariables() {
         try {
             const activeEnv = await this.getActiveEnvironment();
@@ -502,16 +392,8 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Returns an environment's variable map with secret values merged back in from
-     * the SecretStore. The stored `variables` map holds empty placeholders for secret
-     * keys; this resolves them for request building, the runner, and scripts.
-     *
-     * Used only on resolution paths — never on the editor read paths
-     * (`getAllEnvironments`/`getEnvironmentById`) which must stay masked.
-     *
-     * @private
      * @param {Object} environment
-     * @returns {Promise<Object>} Variable map with secrets resolved
+     * @returns {Promise<Object>}
      */
     async _hydrateSecrets(environment) {
         const variables = { ...(environment.variables || {}) };
@@ -529,22 +411,12 @@ export class EnvironmentRepository {
         return variables;
     }
 
-    /**
-     * Generates a unique environment ID
-     *
-     * @private
-     * @returns {string} Unique environment ID
-     */
+    /** @returns {string} */
     _generateId() {
         return `env_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 
-    /**
-     * Creates the default environments structure
-     *
-     * @private
-     * @returns {Object} Default environments object with one environment
-     */
+    /** @returns {Object} */
     _getDefaultEnvironments() {
         const defaultEnvId = this._generateId();
         return {
@@ -560,13 +432,7 @@ export class EnvironmentRepository {
         };
     }
 
-    /**
-     * Exports all environments for backup or sharing
-     *
-     * @async
-     * @returns {Promise<Object>} Complete environments data structure
-     * @throws {Error} If export fails
-     */
+    /** @returns {Promise<Object>} */
     async exportEnvironments() {
         try {
             return await this.getAllEnvironments();
@@ -576,18 +442,10 @@ export class EnvironmentRepository {
     }
 
     /**
-     * Imports environments from backup or shared data
-     *
-     * Supports both merge and replace modes. In merge mode, adds new environments
-     * without duplicating names. In replace mode, completely replaces all environments.
-     * New IDs are generated for all imported environments.
-     *
-     * @async
-     * @param {Object} environmentsData - Environments data to import
-     * @param {Array<Object>} environmentsData.items - Array of environment objects
-     * @param {boolean} [merge=false] - If true, merge with existing; if false, replace all
-     * @returns {Promise<boolean>} True if import succeeded
-     * @throws {Error} If data format invalid or save fails
+     * @param {Object} environmentsData
+     * @param {Array<Object>} environmentsData.items
+     * @param {boolean} [merge=false]
+     * @returns {Promise<boolean>}
      */
     async importEnvironments(environmentsData, merge = false) {
         try {

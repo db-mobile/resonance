@@ -1,7 +1,3 @@
-/**
- * Restoring a GraphQL tab must re-resolve the schema for that tab's endpoint,
- * so the explorer tree survives switching away and back.
- */
 const mockCalls = [];
 
 jest.mock('../../src/modules/state/currentEndpoint.js', () => ({

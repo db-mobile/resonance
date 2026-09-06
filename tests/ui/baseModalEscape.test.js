@@ -35,10 +35,6 @@ class TestModal extends BaseModal {
     }
 }
 
-/**
- * Closing a modal by any route must detach its Escape registration, and a modal
- * opened on top of another must absorb Escape rather than dismissing both.
- */
 describe('BaseModal Escape handling', () => {
     beforeAll(() => {
         templateLoader.cache.set(

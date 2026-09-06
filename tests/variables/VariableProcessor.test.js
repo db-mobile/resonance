@@ -5,7 +5,7 @@ describe('VariableProcessor', () => {
 
     beforeEach(() => {
         processor = new VariableProcessor();
-        processor.clearDynamicCache(); // Ensure fresh cache for each test
+        processor.clearDynamicCache();
     });
 
     describe('processTemplate', () => {
@@ -586,13 +586,10 @@ describe('VariableProcessor', () => {
         test('should clear the dynamic variable cache', () => {
             const template = '{{$uuid}}';
 
-            // Generate first value
             const result1 = processor.processTemplate(template, {});
 
-            // Clear cache
             processor.clearDynamicCache();
 
-            // Generate second value - should be different
             const result2 = processor.processTemplate(template, {});
 
             expect(result1).not.toBe(result2);

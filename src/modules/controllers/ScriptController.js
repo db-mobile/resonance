@@ -3,21 +3,13 @@
  * @module controllers/ScriptController
  */
 
-/**
- * Controller for managing script editing and execution
- * Coordinates between UI, service layer, and script console
- *
- * @class
- * @classdesc Handles inline script editing, execution, and result display
- */
 import { toast } from '../ui/Toast.js';
 
 export class ScriptController {
     /**
-     * Creates a ScriptController instance
-     * @param {Object} scriptService - ScriptService instance
-     * @param {Object} inlineScriptManager - InlineScriptManager instance
-     * @param {Object} scriptConsolePanel - ScriptConsolePanel instance
+     * @param {Object} scriptService
+     * @param {Object} inlineScriptManager
+     * @param {Object} scriptConsolePanel
      */
     constructor(scriptService, inlineScriptManager, scriptConsolePanel) {
         this.service = scriptService;
@@ -26,9 +18,8 @@ export class ScriptController {
     }
 
     /**
-     * Load scripts for an endpoint
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
+     * @param {string} collectionId
+     * @param {string} endpointId
      * @returns {Promise<void>}
      */
     async loadScriptsForEndpoint(collectionId, endpointId) {
@@ -39,20 +30,16 @@ export class ScriptController {
         }
     }
 
-    /**
-     * Clear scripts when no endpoint is selected
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async clearScripts() {
         await this.scriptManager.clear();
     }
 
     /**
-     * Execute pre-request script for an endpoint
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {Object} requestConfig - Request configuration
-     * @returns {Promise<Object>} Modified request config
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} requestConfig
+     * @returns {Promise<Object>}
      */
     async executePreRequest(collectionId, endpointId, requestConfig) {
         try {
@@ -97,12 +84,11 @@ export class ScriptController {
     }
 
     /**
-     * Execute test script for an endpoint
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {Object} requestConfig - Request configuration
-     * @param {Object} response - Response data
-     * @returns {Promise<Object>} Test result
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} requestConfig
+     * @param {Object} response
+     * @returns {Promise<Object>}
      */
     async executeTest(collectionId, endpointId, requestConfig, response) {
         try {
@@ -144,10 +130,8 @@ export class ScriptController {
     }
 
     /**
-     * Show script error to user
-     * @private
-     * @param {string} title - Error title
-     * @param {Array<string>|string} errors - Error messages
+     * @param {string} title
+     * @param {Array<string>|string} errors
      */
     _showScriptError(title, errors) {
         const errorMessage = Array.isArray(errors) ? errors.join('\n') : errors;
@@ -155,10 +139,8 @@ export class ScriptController {
     }
 
     /**
-     * Show generic error to user
-     * @private
-     * @param {string} title - Error title
-     * @param {string} message - Error message
+     * @param {string} title
+     * @param {string} message
      */
     _showError(title, message) {
         toast.error(`${title}: ${message}`);

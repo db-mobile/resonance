@@ -1,13 +1,5 @@
 import { fromWire, toWire, listFromWire } from '../../src/modules/storage/collectionMapper.js';
 
-/**
- * Characterization of the collection storage format.
- *
- * The two fixtures below ARE the format documentation: `wireFixture` is exactly
- * what the backend stores and returns, `domainFixture` is exactly what the rest
- * of the renderer sees. Any change to either shape should show up here as a
- * deliberate edit, not as a surprise elsewhere.
- */
 const wireFixture = () => ({
     id: 'collection_1',
     name: 'Petstore',

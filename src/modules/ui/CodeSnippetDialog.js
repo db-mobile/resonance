@@ -8,19 +8,8 @@ import { templateLoader } from '../templateLoader.js';
 import { toast } from './Toast.js';
 import { BaseModal } from './BaseModal.js';
 
-/**
- * Multi-language code snippet generator dialog
- *
- * @class
- * @classdesc Displays generated code snippets for API requests in multiple languages
- * (cURL, JavaScript, Python, etc.). Provides language selector, syntax highlighting,
- * and copy-to-clipboard. Escape and click-outside-to-close are handled by {@link BaseModal}.
- * @augments BaseModal
- */
+/** @augments */
 export class CodeSnippetDialog extends BaseModal {
-    /**
-     * Creates a CodeSnippetDialog instance
-     */
     constructor() {
         super();
         this.currentLanguage = 'curl';

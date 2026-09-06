@@ -7,10 +7,6 @@ jest.mock('../../src/modules/appContext.js', () => ({
     }
 }));
 
-/**
- * Sidecar-only saves used to reload every collection and rebuild the sidebar on
- * each send. Only path-changing saves may refresh the tree.
- */
 describe('protocol savers skip the sidebar refresh', () => {
     let service;
     let refreshCollections;

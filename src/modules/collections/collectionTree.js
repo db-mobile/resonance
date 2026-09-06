@@ -1,10 +1,5 @@
 /**
  * @fileoverview Shape-agnostic traversal and editing of a collection's request
- * tree. Every operation accepts both the wire shape (a flat `endpoints` array
- * plus nested `folders`, each with its own `endpoints`, with foldered requests
- * duplicated into the flat array) and the `items` tree, so callers never branch
- * on which one they hold. Requests are yielded exactly once regardless of shape,
- * at any nesting depth.
  * @module collections/collectionTree
  */
 
@@ -12,20 +7,17 @@ const FOLDER = 'folder';
 const REQUEST = 'request';
 
 /**
- * Reports whether a collection carries the nested `items` tree.
- * @param {Object|null|undefined} collection - Collection to inspect
- * @returns {boolean} True when the collection has an `items` array
+ * @param {Object|null|undefined} collection
+ * @returns {boolean}
  */
 function usesItemsTree(collection) {
     return Array.isArray(collection?.items);
 }
 
 /**
- * Collects the ids of every request a legacy collection files inside a folder,
- * at any nesting depth.
- * @param {Array|null|undefined} folders - Folders to scan
- * @param {Set<string>} ids - Accumulator
- * @returns {Set<string>} Ids present in any folder
+ * @param {Array|null|undefined} folders
+ * @param {Set<string>} ids
+ * @returns {Set<string>}
  */
 function foldedRequestIds(folders, ids = new Set()) {
     for (const folder of folders ?? []) {
@@ -40,11 +32,10 @@ function foldedRequestIds(folders, ids = new Set()) {
 }
 
 /**
- * Walks a legacy collection's folders, descending into nested ones.
- * @param {Array|null|undefined} folders - Folders to walk
- * @param {Object[]} chain - Folder chain accumulated so far, root first
- * @param {Set<string>} seen - Ids already yielded
- * @yields {{request: Object, chain: Object[]}} Each request with its folder chain
+ * @param {Array|null|undefined} folders
+ * @param {Object[]} chain
+ * @param {Set<string>} seen
+ * @yields {{request: Object, chain: Object[]}}
  */
 function* walkLegacyFolders(folders, chain, seen) {
     for (const folder of folders ?? []) {
@@ -64,9 +55,8 @@ function* walkLegacyFolders(folders, chain, seen) {
 }
 
 /**
- * Walks a legacy collection, yielding root-level requests before foldered ones.
- * @param {Object} collection - Legacy-shaped collection
- * @yields {{request: Object, chain: Object[]}} Each request with its folder chain
+ * @param {Object} collection
+ * @yields {{request: Object, chain: Object[]}}
  */
 function* walkLegacy(collection) {
     const foldered = foldedRequestIds(collection.folders);
@@ -84,10 +74,9 @@ function* walkLegacy(collection) {
 }
 
 /**
- * Walks an `items` array depth-first, descending into folders.
- * @param {Array|null|undefined} items - Items to walk
- * @param {Object[]} chain - Folder chain accumulated so far, root first
- * @yields {{request: Object, chain: Object[]}} Each request with its folder chain
+ * @param {Array|null|undefined} items
+ * @param {Object[]} chain
+ * @yields {{request: Object, chain: Object[]}}
  */
 function* walkItems(items, chain = []) {
     for (const item of items ?? []) {
@@ -103,9 +92,8 @@ function* walkItems(items, chain = []) {
 }
 
 /**
- * Walks every request in a collection, whichever shape it uses.
- * @param {Object|null|undefined} collection - Collection to walk
- * @yields {{request: Object, chain: Object[]}} Each request with its folder chain
+ * @param {Object|null|undefined} collection
+ * @yields {{request: Object, chain: Object[]}}
  */
 function* walkRequests(collection) {
     if (!collection) {
@@ -119,9 +107,8 @@ function* walkRequests(collection) {
 }
 
 /**
- * Walks every folder in a collection, parents before their children.
- * @param {Object|null|undefined} collection - Collection to walk
- * @yields {Object} Each folder
+ * @param {Object|null|undefined} collection
+ * @yields {Object}
  */
 export function* walkFolders(collection) {
     if (!collection) {
@@ -135,9 +122,8 @@ export function* walkFolders(collection) {
 }
 
 /**
- * Walks legacy folders depth-first, yielding each before its children.
- * @param {Array|null|undefined} folders - Folders to walk
- * @yields {Object} Each folder
+ * @param {Array|null|undefined} folders
+ * @yields {Object}
  */
 function* walkLegacyFolderTree(folders) {
     for (const folder of folders ?? []) {
@@ -150,9 +136,8 @@ function* walkLegacyFolderTree(folders) {
 }
 
 /**
- * Walks folder items depth-first, yielding each folder before its children.
- * @param {Array|null|undefined} items - Items to walk
- * @yields {Object} Each folder
+ * @param {Array|null|undefined} items
+ * @yields {Object}
  */
 function* walkFolderItems(items) {
     for (const item of items ?? []) {
@@ -164,18 +149,16 @@ function* walkFolderItems(items) {
 }
 
 /**
- * Lists every request in a collection in tree order, each exactly once.
- * @param {Object|null|undefined} collection - Collection to flatten
- * @returns {Object[]} Requests by reference, root-level ones first
+ * @param {Object|null|undefined} collection
+ * @returns {Object[]}
  */
 export function flattenRequests(collection) {
     return Array.from(walkRequests(collection), entry => entry.request);
 }
 
 /**
- * Lists the requests sitting directly at a collection's root, outside any folder.
- * @param {Object|null|undefined} collection - Collection to inspect
- * @returns {Object[]} Root-level requests by reference, in tree order
+ * @param {Object|null|undefined} collection
+ * @returns {Object[]}
  */
 export function rootRequests(collection) {
     const roots = [];
@@ -188,9 +171,8 @@ export function rootRequests(collection) {
 }
 
 /**
- * Lists a collection's top-level folders.
- * @param {Object|null|undefined} collection - Collection to inspect
- * @returns {Object[]} Top-level folders by reference, in tree order
+ * @param {Object|null|undefined} collection
+ * @returns {Object[]}
  */
 export function topLevelFolders(collection) {
     if (!collection) {
@@ -203,10 +185,9 @@ export function topLevelFolders(collection) {
 }
 
 /**
- * Finds a request by id anywhere in a collection.
- * @param {Object|null|undefined} collection - Collection to search
- * @param {string} requestId - Request id to look for
- * @returns {Object|null} The request by reference, or null when absent
+ * @param {Object|null|undefined} collection
+ * @param {string} requestId
+ * @returns {Object|null}
  */
 export function findRequest(collection, requestId) {
     for (const entry of walkRequests(collection)) {
@@ -218,10 +199,9 @@ export function findRequest(collection, requestId) {
 }
 
 /**
- * Finds a folder by id anywhere in a collection.
- * @param {Object|null|undefined} collection - Collection to search
- * @param {string} folderId - Folder id to look for
- * @returns {Object|null} The folder by reference, or null when absent
+ * @param {Object|null|undefined} collection
+ * @param {string} folderId
+ * @returns {Object|null}
  */
 export function findFolder(collection, folderId) {
     for (const folder of walkFolders(collection)) {
@@ -233,10 +213,9 @@ export function findFolder(collection, folderId) {
 }
 
 /**
- * Lists the folders enclosing a request, outermost first.
- * @param {Object|null|undefined} collection - Collection to search
- * @param {string} requestId - Request id to locate
- * @returns {Object[]} Folder chain root to leaf, empty for a root-level request
+ * @param {Object|null|undefined} collection
+ * @param {string} requestId
+ * @returns {Object[]}
  */
 export function folderChainForRequest(collection, requestId) {
     for (const entry of walkRequests(collection)) {
@@ -248,11 +227,10 @@ export function folderChainForRequest(collection, requestId) {
 }
 
 /**
- * Applies a patch to the request matching an id, leaving other entries as-is.
- * @param {Array|null|undefined} list - Requests to map over
- * @param {string} requestId - Request id to patch
- * @param {Object} patch - Fields to merge into the matching request
- * @returns {Array} A new list with the matching request replaced
+ * @param {Array|null|undefined} list
+ * @param {string} requestId
+ * @param {Object} patch
+ * @returns {Array}
  */
 function patchList(list, requestId, patch) {
     return (list ?? []).map(entry =>
@@ -261,11 +239,10 @@ function patchList(list, requestId, patch) {
 }
 
 /**
- * Applies a patch to the matching request inside an `items` tree.
- * @param {Array|null|undefined} items - Items to map over
- * @param {string} requestId - Request id to patch
- * @param {Object} patch - Fields to merge into the matching request
- * @returns {Array} A new items array with the matching request replaced
+ * @param {Array|null|undefined} items
+ * @param {string} requestId
+ * @param {Object} patch
+ * @returns {Array}
  */
 function patchItems(items, requestId, patch) {
     return (items ?? []).map(item => {
@@ -277,11 +254,10 @@ function patchItems(items, requestId, patch) {
 }
 
 /**
- * Merges fields into a request, patching every copy the shape holds.
- * @param {Object} collection - Collection to update
- * @param {string} requestId - Request id to patch
- * @param {Object} patch - Fields to merge into the request
- * @returns {Object|null} A new collection, or null when the request is absent
+ * @param {Object} collection
+ * @param {string} requestId
+ * @param {Object} patch
+ * @returns {Object|null}
  */
 export function updateRequest(collection, requestId, patch) {
     if (!findRequest(collection, requestId)) {
@@ -300,11 +276,10 @@ export function updateRequest(collection, requestId, patch) {
 }
 
 /**
- * Applies a patch to a request inside a legacy folder array, at any depth.
- * @param {Array|null|undefined} folders - Folders to map over
- * @param {string} requestId - Request id to patch
- * @param {Object} patch - Fields to merge into the request
- * @returns {Array} A new folders array
+ * @param {Array|null|undefined} folders
+ * @param {string} requestId
+ * @param {Object} patch
+ * @returns {Array}
  */
 function patchLegacyFolderRequests(folders, requestId, patch) {
     return (folders ?? []).map(folder => {
@@ -317,11 +292,10 @@ function patchLegacyFolderRequests(folders, requestId, patch) {
 }
 
 /**
- * Applies a patch to the matching folder inside an `items` tree.
- * @param {Array|null|undefined} items - Items to map over
- * @param {string} folderId - Folder id to patch
- * @param {Object} patch - Fields to merge into the matching folder
- * @returns {Array} A new items array with the matching folder replaced
+ * @param {Array|null|undefined} items
+ * @param {string} folderId
+ * @param {Object} patch
+ * @returns {Array}
  */
 function patchFolderItems(items, folderId, patch) {
     return (items ?? []).map(item => {
@@ -336,11 +310,10 @@ function patchFolderItems(items, folderId, patch) {
 }
 
 /**
- * Merges fields into a folder, at any nesting depth.
- * @param {Object} collection - Collection to update
- * @param {string} folderId - Folder id to patch
- * @param {Object} patch - Fields to merge into the folder
- * @returns {Object|null} A new collection, or null when the folder is absent
+ * @param {Object} collection
+ * @param {string} folderId
+ * @param {Object} patch
+ * @returns {Object|null}
  */
 export function updateFolder(collection, folderId, patch) {
     if (!findFolder(collection, folderId)) {
@@ -358,11 +331,10 @@ export function updateFolder(collection, folderId, patch) {
 }
 
 /**
- * Applies a patch to the matching folder inside a legacy folder array.
- * @param {Array|null|undefined} folders - Folders to map over
- * @param {string} folderId - Folder id to patch
- * @param {Object} patch - Fields to merge into the matching folder
- * @returns {Array} A new folders array with the matching folder replaced
+ * @param {Array|null|undefined} folders
+ * @param {string} folderId
+ * @param {Object} patch
+ * @returns {Array}
  */
 function patchLegacyFolders(folders, folderId, patch) {
     return (folders ?? []).map(folder => {
@@ -377,10 +349,9 @@ function patchLegacyFolders(folders, folderId, patch) {
 }
 
 /**
- * Drops requests matching an id from an `items` tree.
- * @param {Array|null|undefined} items - Items to filter
- * @param {string} requestId - Request id to remove
- * @returns {Array} A new items array without the request
+ * @param {Array|null|undefined} items
+ * @param {string} requestId
+ * @returns {Array}
  */
 function removeFromItems(items, requestId) {
     const result = [];
@@ -395,10 +366,9 @@ function removeFromItems(items, requestId) {
 }
 
 /**
- * Removes a request from a collection without pruning emptied folders.
- * @param {Object} collection - Collection to update
- * @param {string} requestId - Request id to remove
- * @returns {Object|null} A new collection, or null when the request is absent
+ * @param {Object} collection
+ * @param {string} requestId
+ * @returns {Object|null}
  */
 export function removeRequest(collection, requestId) {
     if (!findRequest(collection, requestId)) {
@@ -417,10 +387,9 @@ export function removeRequest(collection, requestId) {
 }
 
 /**
- * Drops a request from a legacy folder array, at any depth.
- * @param {Array|null|undefined} folders - Folders to map over
- * @param {string} requestId - Request id to remove
- * @returns {Array} A new folders array
+ * @param {Array|null|undefined} folders
+ * @param {string} requestId
+ * @returns {Array}
  */
 function removeFromLegacyFolders(folders, requestId) {
     return (folders ?? []).map(folder => {
@@ -436,12 +405,10 @@ function removeFromLegacyFolders(folders, requestId) {
 }
 
 /**
- * Appends a request into a folder, or at the root when no folder is given.
- * @param {Object} collection - Collection to update
- * @param {string|null} folderId - Target folder id, or null for the root
- * @param {Object} request - Request to append
- * @returns {Object} A new collection containing the request
- * @throws {Error} If folderId is given but no such folder exists
+ * @param {Object} collection
+ * @param {string|null} folderId
+ * @param {Object} request
+ * @returns {Object}
  */
 export function insertRequest(collection, folderId, request) {
     if (folderId && !findFolder(collection, folderId)) {
@@ -473,11 +440,10 @@ export function insertRequest(collection, folderId, request) {
 }
 
 /**
- * Appends an item into the matching folder inside an `items` tree.
- * @param {Array|null|undefined} items - Items to map over
- * @param {string} folderId - Target folder id
- * @param {Object} node - Item to append
- * @returns {Array} A new items array with the node appended
+ * @param {Array|null|undefined} items
+ * @param {string} folderId
+ * @param {Object} node
+ * @returns {Array}
  */
 function insertIntoFolderItems(items, folderId, node) {
     return (items ?? []).map(item => {

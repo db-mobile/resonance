@@ -16,26 +16,11 @@ import { textToBase64 } from '../utils/encoding.js';
 import { findRequest } from '../collections/collectionTree.js';
 import { extractCookies } from '../cookieParser.js';
 
-/**
- * Service for managing collection runner operations and execution
- *
- * @class
- * @classdesc Provides high-level runner operations including CRUD, sequential
- * request execution, variable chaining with precedence rules, and post-response
- * script execution. Coordinates between repository and execution layers.
- *
- * Variable Precedence (highest to lowest):
- * 1. Post-response script variables (set during execution)
- * 2. Environment variables
- * 3. Collection variables
- */
 export class RunnerService {
     /**
-     * Creates a RunnerService instance
-     *
-     * @param {RunnerRepository} repository - Data access layer for runners
-     * @param {Object} backendAPI - Backend API for HTTP requests and scripts
-     * @param {IStatusDisplay} statusDisplay - Status display interface
+     * @param {RunnerRepository} repository
+     * @param {Object} backendAPI
+     * @param {IStatusDisplay} statusDisplay
      */
     constructor(repository, backendAPI, statusDisplay) {
         this.repository = repository;
@@ -53,33 +38,22 @@ export class RunnerService {
         this.listeners = [];
     }
 
-    /**
-     * Gets all runners
-     *
-     * @async
-     * @returns {Promise<Array<Object>>} Array of runner objects
-     */
+    /** @returns {Promise<Array<Object>>} */
     async getAllRunners() {
         return this.repository.getAll();
     }
 
     /**
-     * Gets a runner by ID
-     *
-     * @async
-     * @param {string} id - Runner ID
-     * @returns {Promise<Object|undefined>} Runner object or undefined
+     * @param {string} id
+     * @returns {Promise<Object|undefined>}
      */
     async getRunner(id) {
         return this.repository.getById(id);
     }
 
     /**
-     * Creates a new runner
-     *
-     * @async
-     * @param {Object} runnerData - Runner configuration
-     * @returns {Promise<Object>} Created runner object
+     * @param {Object} runnerData
+     * @returns {Promise<Object>}
      */
     async createRunner(runnerData) {
         const runner = await this.repository.add(runnerData);
@@ -88,12 +62,9 @@ export class RunnerService {
     }
 
     /**
-     * Updates an existing runner
-     *
-     * @async
-     * @param {string} id - Runner ID
-     * @param {Object} updates - Updates to apply
-     * @returns {Promise<Object|null>} Updated runner or null
+     * @param {string} id
+     * @param {Object} updates
+     * @returns {Promise<Object|null>}
      */
     async updateRunner(id, updates) {
         const runner = await this.repository.update(id, updates);
@@ -104,11 +75,8 @@ export class RunnerService {
     }
 
     /**
-     * Deletes a runner
-     *
-     * @async
-     * @param {string} id - Runner ID
-     * @returns {Promise<boolean>} True if deleted
+     * @param {string} id
+     * @returns {Promise<boolean>}
      */
     async deleteRunner(id) {
         const success = await this.repository.delete(id);
@@ -119,13 +87,9 @@ export class RunnerService {
     }
 
     /**
-     * Resolves an endpoint's saved request config, used to seed per-request
-     * runner overrides when a request is added to a runner.
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @returns {Promise<Object>} { pathParams, queryParams, headers, body }
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<Object>}
      */
     async getEndpointRequestConfig(collectionId, endpointId) {
         const [pathParams, queryParams, headers, body] = await Promise.all([
@@ -144,15 +108,9 @@ export class RunnerService {
     }
 
     /**
-     * Executes a runner's request sequence
-     *
-     * Runs requests sequentially, executing post-response scripts after each
-     * request to chain variables. Respects stopOnError and delay options.
-     *
-     * @async
-     * @param {string} runnerId - Runner ID to execute
-     * @param {Function} [onProgress] - Progress callback (requestIndex, total, result)
-     * @returns {Promise<Object>} Execution results
+     * @param {string} runnerId
+     * @param {Function} [onProgress]
+     * @returns {Promise<Object>}
      */
     async executeRunner(runnerId, onProgress) {
         if (this.isRunning) {
@@ -173,12 +131,9 @@ export class RunnerService {
     }
 
     /**
-     * Executes runner data directly without requiring a saved runner
-     *
-     * @async
-     * @param {Object} runnerData - Runner configuration with requests array
-     * @param {Function} [onProgress] - Progress callback (requestIndex, total, result)
-     * @returns {Promise<Object>} Execution results
+     * @param {Object} runnerData
+     * @param {Function} [onProgress]
+     * @returns {Promise<Object>}
      */
     async executeRunnerData(runnerData, onProgress) {
         if (this.isRunning) {
@@ -193,18 +148,13 @@ export class RunnerService {
     }
 
     /**
-     * Runs a request sequence, chaining variables between requests.
-     *
-     * @private
-     * @async
-     * @param {Object} runner - Runner-shaped object supplying `requests` and `options`
-     * @param {Object} identity - Run identity and hooks
-     * @param {string|null} identity.runnerId - Saved runner ID, or null for an unsaved run
-     * @param {string} identity.runnerName - Name to report in the results
-     * @param {Function} [identity.onProgress] - Progress callback (requestIndex, total, result)
-     * @param {Function} [identity.onFinish] - Awaited in the `finally`, before run-completed
-     * @returns {Promise<Object>} Execution results
-     * @throws {Error} If the runner has no requests
+     * @param {Object} runner
+     * @param {Object} identity
+     * @param {string|null} identity.runnerId
+     * @param {string} identity.runnerName
+     * @param {Function} [identity.onProgress]
+     * @param {Function} [identity.onFinish]
+     * @returns {Promise<Object>}
      */
     async _execute(runner, { runnerId, runnerName, onProgress, onFinish = null }) {
         if (!runner.requests || runner.requests.length === 0) {
@@ -288,9 +238,6 @@ export class RunnerService {
         return results;
     }
 
-    /**
-     * Stops the currently running execution
-     */
     stopExecution() {
         if (this.isRunning) {
             this.shouldStop = true;
@@ -298,23 +245,16 @@ export class RunnerService {
         }
     }
 
-    /**
-     * Checks if a runner is currently executing
-     *
-     * @returns {boolean} True if running
-     */
+    /** @returns {boolean} */
     isExecuting() {
         return this.isRunning;
     }
 
     /**
-     * Marks remaining requests as skipped
-     *
-     * @private
-     * @param {Array} requests - All requests
-     * @param {Object} results - Results object to update
-     * @param {number} startIndex - Index to start marking from
-     * @param {string} reason - Reason for skipping
+     * @param {Array} requests
+     * @param {Object} results
+     * @param {number} startIndex
+     * @param {string} reason
      */
     _markRemainingAsSkipped(requests, results, startIndex, reason) {
         for (let j = startIndex; j < requests.length; j++) {
@@ -329,14 +269,10 @@ export class RunnerService {
     }
 
     /**
-     * Executes a single request with variable substitution
-     *
-     * @private
-     * @async
-     * @param {Object} request - Request configuration
-     * @param {Object} runtimeVariables - Variables set during execution
-     * @param {number} index - Request index
-     * @returns {Promise<Object>} Request result
+     * @param {Object} request
+     * @param {Object} runtimeVariables
+     * @param {number} index
+     * @returns {Promise<Object>}
      */
     async _executeRequest(request, runtimeVariables, index, runContext = null) {
         this.variableProcessor.clearDynamicCache();
@@ -434,13 +370,9 @@ export class RunnerService {
     }
 
     /**
-     * Summarizes a post-response script outcome into a failure message, or null
-     * when every assertion passed and the script did not error.
-     *
-     * @private
-     * @param {Array<{passed: boolean, message: string}>} testResults - Assertion results
-     * @param {string|null} scriptError - Script execution error, if any
-     * @returns {string|null} Failure summary, or null when the request passed
+     * @param {Array<{passed: boolean, message: string}>} testResults
+     * @param {string|null} scriptError
+     * @returns {string|null}
      */
     _summarizePostScriptFailure(testResults, scriptError) {
         const failedTests = (testResults || []).filter(test => !test.passed);
@@ -461,13 +393,9 @@ export class RunnerService {
     }
 
     /**
-     * Builds merged variables with precedence
-     *
-     * @private
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {Object} runtimeVariables - Variables set during execution
-     * @returns {Promise<Object>} Merged variables
+     * @param {string} collectionId
+     * @param {Object} runtimeVariables
+     * @returns {Promise<Object>}
      */
     async _buildVariables(collectionId, runtimeVariables, runContext = null) {
         let variables = {};
@@ -495,11 +423,7 @@ export class RunnerService {
         return variables;
     }
 
-    /**
-     * Builds the reads that stay constant for a whole run so the loop never repeats them.
-     * @private
-     * @returns {Promise<Object>} Run context with settings, env vars, and per-collection memo maps
-     */
+    /** @returns {Promise<Object>} */
     async _buildRunContext() {
         const context = {
             settings: null,
@@ -532,11 +456,9 @@ export class RunnerService {
     }
 
     /**
-     * Resolves a collection, memoized per run so repeated requests share one read.
-     * @private
-     * @param {string} collectionId - Collection ID
-     * @param {Object|null} runContext - Run context holding the memo map
-     * @returns {Promise<Object|null>} Collection or null
+     * @param {string} collectionId
+     * @param {Object|null} runContext
+     * @returns {Promise<Object|null>}
      */
     async _getCollectionForRun(collectionId, runContext) {
         if (runContext?.collections.has(collectionId)) {
@@ -548,27 +470,20 @@ export class RunnerService {
     }
 
     /**
-     * Finds an endpoint in a collection (including folders)
-     *
-     * @private
-     * @param {Object} collection - Collection object
-     * @param {string} endpointId - Endpoint ID
-     * @returns {Object|null} Endpoint or null
+     * @param {Object} collection
+     * @param {string} endpointId
+     * @returns {Object|null}
      */
     _findEndpoint(collection, endpointId) {
         return findRequest(collection, endpointId);
     }
 
     /**
-     * Builds request configuration from endpoint
-     *
-     * @private
-     * @async
-     * @param {Object} collection - Collection object
-     * @param {Object} endpoint - Endpoint object
-     * @param {Object} variables - Variables for substitution
-     * @param {Object} [overrides] - Per-request overrides; a present-but-empty list or body is honored as cleared, while an absent field (legacy saved runners) falls back to the persisted config; path params always fall back because URL templates need values
-     * @returns {Promise<Object>} Request configuration
+     * @param {Object} collection
+     * @param {Object} endpoint
+     * @param {Object} variables
+     * @param {Object} [overrides]
+     * @returns {Promise<Object>}
      */
     async _buildRequestConfig(collection, endpoint, variables, overrides, runContext = null) {
         const persisted = await this.collectionRepository.getAllPersistedEndpointData(collection.id, endpoint.id);
@@ -758,15 +673,11 @@ export class RunnerService {
     }
 
     /**
-     * Executes post-response script
-     *
-     * @private
-     * @async
-     * @param {string} script - Script code
-     * @param {Object} request - Request configuration
-     * @param {Object} response - Response data
-     * @param {Object} currentVariables - Current variables
-     * @returns {Promise<Object>} Script result with variablesSet and logs
+     * @param {string} script
+     * @param {Object} request
+     * @param {Object} response
+     * @param {Object} currentVariables
+     * @returns {Promise<Object>}
      */
     async _executePostResponseScript(script, request, response, currentVariables) {
         if (!script || script.trim() === '') {
@@ -818,12 +729,9 @@ export class RunnerService {
     }
 
     /**
-     * Generates authentication data from stored auth config
-     *
-     * @private
-     * @param {Object|null} authConfig - Stored authentication configuration
-     * @param {Object} variables - Variables for substitution
-     * @returns {Object} Auth data with headers, queryParams, and authConfig
+     * @param {Object|null} authConfig
+     * @param {Object} variables
+     * @returns {Object}
      */
     _generateAuthData(authConfig, variables) {
         const authData = {
@@ -920,40 +828,26 @@ export class RunnerService {
     }
 
     /**
-     * Delays execution
-     *
-     * @private
-     * @param {number} ms - Milliseconds to delay
+     * @param {number} ms
      * @returns {Promise<void>}
      */
     _delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    /**
-     * Adds a listener for runner events
-     *
-     * @param {Function} listener - Callback function
-     */
+    /** @param {Function} listener */
     addListener(listener) {
         this.listeners.push(listener);
     }
 
-    /**
-     * Removes a listener
-     *
-     * @param {Function} listener - Callback to remove
-     */
+    /** @param {Function} listener */
     removeListener(listener) {
         this.listeners = this.listeners.filter(l => l !== listener);
     }
 
     /**
-     * Notifies all listeners of an event
-     *
-     * @private
-     * @param {string} event - Event type
-     * @param {*} data - Event data
+     * @param {string} event
+     * @param {*} data
      */
     _notifyListeners(event, data) {
         this.listeners.forEach(listener => {

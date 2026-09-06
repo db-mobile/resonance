@@ -1,7 +1,5 @@
 /**
  * @fileoverview Results panel for the Collection Runner: the per-request results
- * list, the detail view (body/headers/cookies tabs), the summary, and the
- * draggable resizer. Extracted from RunnerPanel to keep each component focused.
  * @module ui/runner/RunnerResultsPanel
  */
 
@@ -9,17 +7,8 @@ import { app } from '../../appContext.js';
 import { templateLoader } from '../../templateLoader.js';
 import { escapeHtml, getStatusCodeClass, getStatusText } from './runnerDomUtils.js';
 
-/**
- * Renders and manages the runner results panel docked at the bottom of the
- * runner. It is created lazily on the first run and torn down on reset.
- *
- * @class
- */
 export class RunnerResultsPanel {
-    /**
-     * @param {HTMLElement} container - The runner tab container; the panel is
-     *   appended into its `.runner-panel` element and resizes `.runner-main`.
-     */
+    /** @param {HTMLElement} container */
     constructor(container) {
         this.container = container;
 
@@ -32,12 +21,7 @@ export class RunnerResultsPanel {
         this.selectedRequests = [];
     }
 
-    /**
-     * Opens the results panel, seeding a pending list from the requests about to
-     * run. Reuses the existing panel (clearing it) on subsequent runs.
-     *
-     * @param {Array<Object>} selectedRequests - Requests queued for this run
-     */
+    /** @param {Array<Object>} selectedRequests */
     open(selectedRequests) {
         this.selectedRequests = selectedRequests || [];
 
@@ -71,11 +55,7 @@ export class RunnerResultsPanel {
         }
     }
 
-    /**
-     * Shows final execution results: updates each result item and the summary.
-     *
-     * @param {Object} results - Execution results
-     */
+    /** @param {Object} results */
     show(results) {
         if (results.requests) {
             this.data = results.requests;
@@ -87,9 +67,6 @@ export class RunnerResultsPanel {
         this._updateSummary(results);
     }
 
-    /**
-     * Removes the results panel and resets its state.
-     */
     hide() {
         if (this.resizer) {
             this.resizer.remove();
@@ -104,20 +81,14 @@ export class RunnerResultsPanel {
         }
     }
 
-    /**
-     * Marks a request as running in the results panel.
-     *
-     * @param {number} index - Request index
-     */
+    /** @param {number} index */
     markRequestRunning(index) {
         this._updateResultItem(index, { status: 'running' });
     }
 
     /**
-     * Updates a request result, refreshing the detail view if it is selected.
-     *
-     * @param {number} index - Request index
-     * @param {Object} result - Result data including body, headers, cookies
+     * @param {number} index
+     * @param {Object} result
      */
     updateResultWithResponse(index, result) {
         if (this.data[index]) {
@@ -130,11 +101,6 @@ export class RunnerResultsPanel {
         }
     }
 
-    /**
-     * Clears the results panel for a new run.
-     *
-     * @private
-     */
     _clear() {
         this.data = [];
         this.selectedIndex = -1;
@@ -163,11 +129,6 @@ export class RunnerResultsPanel {
         }
     }
 
-    /**
-     * Caches DOM references for the results panel.
-     *
-     * @private
-     */
     _cacheElements() {
         if (!this.panel) {return;}
 
@@ -190,11 +151,6 @@ export class RunnerResultsPanel {
         };
     }
 
-    /**
-     * Attaches event listeners for the results panel (tab switching).
-     *
-     * @private
-     */
     _attachEventListeners() {
         if (!this.panel) {return;}
 
@@ -205,11 +161,6 @@ export class RunnerResultsPanel {
         });
     }
 
-    /**
-     * Attaches event listeners for the results panel resizer.
-     *
-     * @private
-     */
     _attachResizerListeners() {
         if (!this.resizer || !this.panel) {return;}
 
@@ -258,11 +209,6 @@ export class RunnerResultsPanel {
         });
     }
 
-    /**
-     * Initializes the results list with pending items.
-     *
-     * @private
-     */
     _initializeResultsList() {
         if (!this.dom.resultsList) {return;}
 
@@ -289,12 +235,9 @@ export class RunnerResultsPanel {
     }
 
     /**
-     * Creates a result item element.
-     *
-     * @private
-     * @param {Object} result - Result data
-     * @param {number} index - Result index
-     * @returns {HTMLElement} Result item element
+     * @param {Object} result
+     * @param {number} index
+     * @returns {HTMLElement}
      */
     _createResultItemElement(result, index) {
         const fragment = templateLoader.cloneSync(
@@ -339,11 +282,8 @@ export class RunnerResultsPanel {
     }
 
     /**
-     * Updates a result item in the results panel.
-     *
-     * @private
-     * @param {number} index - Result index
-     * @param {Object} result - Result data
+     * @param {number} index
+     * @param {Object} result
      */
     _updateResultItem(index, result) {
         if (!this.dom.resultsList) {return;}
@@ -383,12 +323,7 @@ export class RunnerResultsPanel {
         }
     }
 
-    /**
-     * Selects a result item and shows its details.
-     *
-     * @private
-     * @param {number} index - Result index
-     */
+    /** @param {number} index */
     _selectResultItem(index) {
         if (index < 0 || index >= this.data.length) {return;}
 
@@ -403,12 +338,7 @@ export class RunnerResultsPanel {
         this._populateResultDetail(this.data[index]);
     }
 
-    /**
-     * Populates the result detail panel.
-     *
-     * @private
-     * @param {Object} result - Result data
-     */
+    /** @param {Object} result */
     _populateResultDetail(result) {
         if (!result) {return;}
 
@@ -492,12 +422,7 @@ export class RunnerResultsPanel {
         }
     }
 
-    /**
-     * Switches the active tab in the results detail panel.
-     *
-     * @private
-     * @param {string} tabName - Tab name (body, headers, cookies)
-     */
+    /** @param {string} tabName */
     _switchTab(tabName) {
         if (!this.panel) {return;}
 
@@ -510,12 +435,7 @@ export class RunnerResultsPanel {
         });
     }
 
-    /**
-     * Updates the results summary.
-     *
-     * @private
-     * @param {Object} results - Results object
-     */
+    /** @param {Object} results */
     _updateSummary(results) {
         if (this.dom.passed) {
             this.dom.passed.textContent = `${results.passed || 0}`;

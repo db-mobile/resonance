@@ -1,11 +1,6 @@
 /* global document */
 import { CollectionRenderer } from '../../src/modules/ui/CollectionRenderer.js';
 
-/**
- * A collection opened in place usually lives in a git checkout, so the sidebar
- * row shows the branch. The badge is patched in place on refresh rather than
- * re-rendered: a branch switched in a terminal must not collapse the tree.
- */
 describe('collection git branch badge', () => {
     let renderer;
 

@@ -7,21 +7,10 @@ import { app } from './appContext.js';
 import { CollectionController } from './controllers/CollectionController.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 
-/**
- * Singleton instance of CollectionController
- *
- * @private
- * @type {CollectionController|null}
- */
+/** @type {CollectionController|null} */
 let collectionController = null;
 
-/**
- * Initializes the collection controller singleton
- *
- * @private
- * @returns {CollectionController} The initialized controller
- * @throws {Error} If backendAPI is not available
- */
+/** @returns {CollectionController} */
 function initializeController() {
     if (!collectionController) {
         if (!window.backendAPI) {
@@ -34,24 +23,13 @@ function initializeController() {
     return collectionController;
 }
 
-/**
- * Loads all collections from storage
- *
- * @async
- * @returns {Promise<Array<Object>>} Array of collection objects
- */
+/** @returns {Promise<Array<Object>>} */
 export function loadCollections() {
     const controller = initializeController();
     return controller.loadCollections();
 }
 
-/**
- * Returns the already-loaded collections from memory, falling back to a full
- * load only if collections haven't been fetched yet.
- *
- * @async
- * @returns {Promise<Array<Object>>} Array of collection objects
- */
+/** @returns {Promise<Array<Object>>} */
 export async function getCollections() {
     const controller = initializeController();
     if (controller.allCollections && controller.allCollections.length > 0) {
@@ -60,56 +38,33 @@ export async function getCollections() {
     return controller.loadCollections();
 }
 
-/**
- * Opens file dialog and imports a collection file of any supported format
- *
- * @async
- * @returns {Promise<Object|null>} Imported collection or null if cancelled
- */
+/** @returns {Promise<Object|null>} */
 export function importCollectionFile() {
     const controller = initializeController();
     return controller.importCollectionFile();
 }
 
-/**
- * Opens file dialog and imports Postman environment file
- *
- * @async
- * @returns {Promise<Object|null>} Environment object with name and variables, or null if cancelled
- */
+/** @returns {Promise<Object|null>} */
 export function importPostmanEnvironment() {
     const controller = initializeController();
     return controller.importPostmanEnvironment();
 }
 
-/**
- * Opens a folder dialog and adds an existing collection directory in place
- *
- * @async
- * @returns {Promise<void>}
- */
+/** @returns {Promise<void>} */
 export function openExistingCollection() {
     const controller = initializeController();
     return controller.handleOpenExisting();
 }
 
-/**
- * Opens cURL import dialog
- *
- * @async
- * @returns {Promise<void>}
- */
+/** @returns {Promise<void>} */
 export function importCurl() {
     const controller = initializeController();
     return controller.handleImportCurl(null);
 }
 
 /**
- * Saves all request modifications for an endpoint (params, headers, body, auth)
- *
- * @async
- * @param {string} collectionId - Collection ID
- * @param {string} endpointId - Endpoint ID
+ * @param {string} collectionId
+ * @param {string} endpointId
  * @returns {Promise<void>}
  */
 export async function saveAllRequestModifications(collectionId, endpointId) {
@@ -117,22 +72,15 @@ export async function saveAllRequestModifications(collectionId, endpointId) {
     await controller.saveAllRequestModifications(collectionId, endpointId);
 }
 
-/**
- * Initializes body input change tracking
- *
- * @returns {void}
- */
+/** @returns {void} */
 export function initializeBodyTracking() {
     const controller = initializeController();
     controller.initializeBodyTracking();
 }
 
 /**
- * Shows dialog to save current request to a collection
- *
- * @async
- * @param {Object} requestData - Current request data from the active tab
- * @returns {Promise<{collectionId: string, endpointId: string}|null>} Collection and endpoint IDs if saved, null if cancelled
+ * @param {Object} requestData
+ * @returns {Promise<{collectionId: string, endpointId: string}|null>}
  */
 export async function saveRequestToCollection(requestData) {
     const controller = initializeController();

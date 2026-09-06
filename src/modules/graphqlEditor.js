@@ -12,12 +12,7 @@ import { autocompletion, completionKeymap } from '@codemirror/autocomplete';
 import { createThemedHighlighting } from './editorTheme.js';
 
 /**
- * Build a placeholder element for a multi-line example query. CodeMirror renders a
- * multi-line string placeholder inside the (single) empty first line, which inflates
- * that line's height and makes the caret span the whole example. Rendering it as a
- * zero-height, overflow-visible block keeps the example visible while leaving the
- * caret at the normal single-line height.
- * @param {string} text - Multi-line placeholder text
+ * @param {string} text
  * @returns {HTMLElement}
  */
 function createPlaceholderElement(text) {
@@ -27,9 +22,6 @@ function createPlaceholderElement(text) {
     return el;
 }
 
-/**
- * GraphQLEditor - CodeMirror editor for GraphQL queries
- */
 export class GraphQLEditor {
     constructor(containerElement) {
         this.container = containerElement;
@@ -39,10 +31,7 @@ export class GraphQLEditor {
         this.init();
     }
 
-    /**
-     * Get theme extensions based on current color scheme
-     * @returns {Array} Array of theme extensions
-     */
+    /** @returns {Array} */
     getThemeExtensions() {
         const baseTheme = EditorView.theme({
             '&': {
@@ -83,9 +72,6 @@ export class GraphQLEditor {
         return [this._themed.extension, baseTheme];
     }
 
-    /**
-     * Initialize the CodeMirror editor
-     */
     init() {
         this._themed = createThemedHighlighting();
         const extensions = [
@@ -116,9 +102,6 @@ export class GraphQLEditor {
         this._themed.attach(this.view);
     }
 
-    /**
-     * Tear down theme listeners. Call when the editor is no longer used.
-     */
     destroy() {
         this._themed?.dispose();
         this._themed = null;
@@ -128,18 +111,12 @@ export class GraphQLEditor {
         }
     }
 
-    /**
-     * Register a callback for content changes
-     * @param {Function} callback - Called when content changes
-     */
+    /** @param {Function} callback */
     onChange(callback) {
         this.changeCallback = callback;
     }
 
-    /**
-     * Set editor content
-     * @param {string} content - GraphQL query to set
-     */
+    /** @param {string} content */
     setContent(content) {
         this.view.dispatch({
             changes: {
@@ -150,20 +127,12 @@ export class GraphQLEditor {
         });
     }
 
-    /**
-     * Get current editor content
-     * @returns {string}
-     */
+    /** @returns {string} */
     getContent() {
         return this.view.state.doc.toString();
     }
 
-    /**
-     * Parse the document and return its operation definitions.
-     * @returns {Array<{name: string|null, type: string}>|null}
-     *   One entry per operation (in document order); `null` if the document
-     *   cannot be parsed, `[]` if it is empty.
-     */
+    /** @returns {Array<{name: string|null, type: string}>|null} */
     getOperations() {
         const content = this.getContent().trim();
         if (!content) {
@@ -178,45 +147,28 @@ export class GraphQLEditor {
         }
     }
 
-    /**
-     * Clear editor content
-     */
     clear() {
         this.setContent('');
     }
 
-    /**
-     * Focus the editor
-     */
     focus() {
         this.view.focus();
     }
 
-    /**
-     * Apply a GraphQL schema to the editor for autocomplete, validation and hover docs.
-     * @param {import('graphql').GraphQLSchema} schema - Schema built via buildClientSchema()
-     */
+    /** @param {import('graphql').GraphQLSchema} schema */
     setSchema(schema) {
         if (this.view) {
             updateSchema(this.view, schema);
         }
     }
 
-    /**
-     * Remove any schema previously applied to the editor.
-     */
     clearSchema() {
         if (this.view) {
             updateSchema(this.view, undefined);
         }
     }
 
-    /**
-     * Format the GraphQL query by parsing it into an AST and pretty-printing.
-     * Returns the parse error (if any) so callers can surface invalid syntax;
-     * the document is left untouched when it cannot be parsed.
-     * @returns {Error|null} The parse error, or null if formatting succeeded.
-     */
+    /** @returns {Error|null} */
     formatQuery() {
         const content = this.getContent().trim();
         if (!content) {

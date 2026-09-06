@@ -3,11 +3,7 @@
  * @module modules/utils/grpcStatus
  */
 
-/**
- * Canonical gRPC status codes, by numeric value.
- * @type {Readonly<Object<number, string>>}
- * @see https://grpc.io/docs/guides/status-codes/
- */
+/** @type {Readonly<Object<number, string>>} */
 export const GRPC_STATUS_NAMES = Object.freeze({
     0: 'OK',
     1: 'CANCELLED',
@@ -29,11 +25,8 @@ export const GRPC_STATUS_NAMES = Object.freeze({
 });
 
 /**
- * Names a gRPC status code. Unknown codes fall back to `CODE_<n>` so an entry
- * never renders a bare number that could be mistaken for an HTTP status.
- *
- * @param {number|null|undefined} code - Numeric gRPC status code
- * @returns {string} Status name, or '' when no code was reported
+ * @param {number|null|undefined} code
+ * @returns {string}
  */
 export function grpcStatusName(code) {
     if (code === null || code === undefined || Number.isNaN(Number(code))) {
@@ -43,11 +36,8 @@ export function grpcStatusName(code) {
 }
 
 /**
- * Whether a gRPC call succeeded. Only code 0 (OK) is success — note that 0 is
- * falsy, so callers must test against null/undefined rather than truthiness.
- *
- * @param {number|null|undefined} code - Numeric gRPC status code
- * @returns {boolean} True when the code is 0
+ * @param {number|null|undefined} code
+ * @returns {boolean}
  */
 export function isGrpcStatusOk(code) {
     if (code === null || code === undefined || code === '') {

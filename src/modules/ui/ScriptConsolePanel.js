@@ -3,32 +3,18 @@
  * @module ui/ScriptConsolePanel
  */
 
-/**
- * Script console panel for showing logs and test results
- * Displays in the Scripts tab of the response section
- *
- * @class
- * @classdesc Manages console output and test result display
- */
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 
 export class ScriptConsolePanel {
-    /**
-     * Creates a ScriptConsolePanel instance
-     * @param {HTMLElement} container - Container element for the panel
-     */
+    /** @param {HTMLElement} container */
     constructor(container) {
         this.container = container;
         this.isVisible = false;
         this.initialize();
     }
 
-    /**
-     * Get the active script console container
-     * @private
-     * @returns {HTMLElement|null} The active container
-     */
+    /** @returns {HTMLElement|null} */
     _getActiveContainer() {
         if (this.container) {
             return this.container;
@@ -43,10 +29,6 @@ export class ScriptConsolePanel {
         return document.querySelector('.script-console-container');
     }
 
-    /**
-     * Initialize the panel structure
-     * @private
-     */
     initialize() {
         const container = this._getActiveContainer();
         if (!container) {
@@ -75,9 +57,8 @@ export class ScriptConsolePanel {
     }
 
     /**
-     * Show console logs and errors
-     * @param {Array} logs - Array of log entries {level, message, timestamp}
-     * @param {Array} errors - Array of error messages
+     * @param {Array} logs
+     * @param {Array} errors
      */
     show(logs, errors) {
         const container = this._getActiveContainer();
@@ -111,10 +92,7 @@ export class ScriptConsolePanel {
         }
     }
 
-    /**
-     * Show test results with pass/fail indicators
-     * @param {Object} result - Test execution result
-     */
+    /** @param {Object} result */
     showTestResults(result) {
         const container = this._getActiveContainer();
         if (!container) {
@@ -233,12 +211,10 @@ export class ScriptConsolePanel {
     }
 
     /**
-     * Append a log entry to the content
-     * @private
-     * @param {HTMLElement} content - Content container
-     * @param {string} level - Log level (info, warn, error)
-     * @param {string} message - Log message
-     * @param {number} timestamp - Timestamp
+     * @param {HTMLElement} content
+     * @param {string} level
+     * @param {string} message
+     * @param {number} timestamp
      */
     appendEntry(content, level, message, timestamp) {
         const fragment = templateLoader.cloneSync(
@@ -280,10 +256,6 @@ export class ScriptConsolePanel {
         content.appendChild(entry);
     }
 
-    /**
-     * Show empty state message
-     * @private
-     */
     showEmptyState() {
         const container = this._getActiveContainer();
         if (!container) {
@@ -292,11 +264,7 @@ export class ScriptConsolePanel {
         this._showEmptyStateInContainer(container);
     }
 
-    /**
-     * Show empty state in a specific container
-     * @private
-     * @param {HTMLElement} container - The container element
-     */
+    /** @param {HTMLElement} container */
     _showEmptyStateInContainer(container) {
         const content = container.querySelector('.script-console-content');
         if (!content) {
@@ -316,16 +284,10 @@ export class ScriptConsolePanel {
         content.appendChild(emptyEl);
     }
 
-    /**
-     * Clear console output
-     */
     clear() {
         this.showEmptyState();
     }
 
-    /**
-     * Toggle panel visibility
-     */
     toggle() {
         this.isVisible = !this.isVisible;
         this.container.classList.toggle('is-hidden', !this.isVisible);

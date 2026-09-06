@@ -3,44 +3,14 @@
  * @module storage/ProxyRepository
  */
 
-/**
- * Repository for managing proxy configuration persistence
- *
- * @class
- * @classdesc Handles CRUD operations for proxy settings with comprehensive validation
- * in the persistent store. Supports HTTP, HTTPS, SOCKS4, and SOCKS5 proxies with optional
- * authentication, bypass lists, and timeout configuration. Implements defensive
- * programming with auto-initialization and sanitization for packaged app compatibility.
- */
 export class ProxyRepository {
-    /**
-     * Creates a ProxyRepository instance
-     *
-     * @param {Object} backendAPI - The backend IPC API bridge
-     */
+    /** @param {Object} backendAPI */
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.PROXY_KEY = 'proxySettings';
     }
 
-    /**
-     * Retrieves proxy settings with validation and initialization
-     *
-     * Automatically initializes storage with default settings if undefined (packaged
-     * app first run). Validates structure and provides defaults for missing fields.
-     *
-     * @async
-     * @returns {Promise<Object>} Complete proxy settings object
-     * @returns {Promise<boolean>} return.enabled - Whether proxy is enabled
-     * @returns {Promise<boolean>} return.useSystemProxy - Whether to use system proxy
-     * @returns {Promise<string>} return.type - Proxy type (http, https, socks4, socks5)
-     * @returns {Promise<string>} return.host - Proxy host
-     * @returns {Promise<number>} return.port - Proxy port (1-65535)
-     * @returns {Promise<Object>} return.auth - Authentication settings
-     * @returns {Promise<Array<string>>} return.bypassList - Domains to bypass proxy
-     * @returns {Promise<number>} return.timeout - Request timeout in milliseconds
-     * @throws {Error} If storage access fails
-     */
+    /** @returns {Promise<Object>} */
     async getProxySettings() {
         try {
             const data = await this.backendAPI.store.get(this.PROXY_KEY);
@@ -74,14 +44,8 @@ export class ProxyRepository {
     }
 
     /**
-     * Saves proxy settings with validation
-     *
-     * Validates and sanitizes all settings before saving.
-     *
-     * @async
-     * @param {Object} settings - Proxy settings object to save
-     * @returns {Promise<Object>} The validated and saved settings
-     * @throws {Error} If settings format invalid or save fails
+     * @param {Object} settings
+     * @returns {Promise<Object>}
      */
     async saveProxySettings(settings) {
         try {
@@ -91,9 +55,6 @@ export class ProxyRepository {
 
             const validatedSettings = this._validateSettings(settings);
 
-            // `proxy_set` persists to the same store key *and* updates the
-            // backend's live ProxyState. Writing to the store directly would
-            // leave requests using the previous settings until the next launch.
             await this.backendAPI.proxySettings.set(validatedSettings);
             return validatedSettings;
         } catch (error) {
@@ -102,15 +63,8 @@ export class ProxyRepository {
     }
 
     /**
-     * Updates specific proxy setting fields
-     *
-     * Merges updates with existing settings. Auth object is deep merged to preserve
-     * sub-properties.
-     *
-     * @async
-     * @param {Object} updates - Object with fields to update
-     * @returns {Promise<Object>} The updated settings object
-     * @throws {Error} If update or save fails
+     * @param {Object} updates
+     * @returns {Promise<Object>}
      */
     async updateProxySettings(updates) {
         try {
@@ -133,13 +87,7 @@ export class ProxyRepository {
         }
     }
 
-    /**
-     * Resets proxy settings to defaults
-     *
-     * @async
-     * @returns {Promise<Object>} The default settings object
-     * @throws {Error} If reset fails
-     */
+    /** @returns {Promise<Object>} */
     async resetToDefaults() {
         try {
             return await this.saveProxySettings(this._getDefaultProxySettings());
@@ -148,12 +96,7 @@ export class ProxyRepository {
         }
     }
 
-    /**
-     * Checks if proxy is currently enabled
-     *
-     * @async
-     * @returns {Promise<boolean>} True if proxy is enabled
-     */
+    /** @returns {Promise<boolean>} */
     async isProxyEnabled() {
         try {
             const settings = await this.getProxySettings();
@@ -164,31 +107,8 @@ export class ProxyRepository {
     }
 
     /**
-     * Toggles proxy enabled state
-     *
-     * @async
-     * @returns {Promise<boolean>} The new enabled state (true/false)
-     * @throws {Error} If toggle operation fails
-     */
-    async toggleProxyEnabled() {
-        try {
-            const settings = await this.getProxySettings();
-            settings.enabled = !settings.enabled;
-            await this.saveProxySettings(settings);
-            return settings.enabled;
-        } catch (error) {
-            throw new Error(`Failed to toggle proxy: ${error.message}`, { cause: error });
-        }
-    }
-
-    /**
-     * Validates and sanitizes proxy settings
-     *
-     * Ensures all fields have valid values, falling back to defaults for invalid data.
-     *
-     * @private
-     * @param {Object} settings - Settings object to validate
-     * @returns {Object} Validated and sanitized settings object
+     * @param {Object} settings
+     * @returns {Object}
      */
     _validateSettings(settings) {
         const defaults = this._getDefaultProxySettings();
@@ -215,8 +135,6 @@ export class ProxyRepository {
             bypassList: Array.isArray(settings.bypassList)
                 ? settings.bypassList.filter(item => typeof item === 'string' && item.trim())
                 : defaults.bypassList,
-            // Coerced to numbers: `proxy_set` deserializes these into u16/u64
-            // and rejects the whole payload if they arrive as strings.
             timeout: this._validateTimeout(settings.timeout)
                 ? Number.parseInt(settings.timeout, 10)
                 : defaults.timeout
@@ -224,11 +142,8 @@ export class ProxyRepository {
     }
 
     /**
-     * Validates proxy type
-     *
-     * @private
-     * @param {string} type - Proxy type to validate
-     * @returns {boolean} True if type is valid
+     * @param {string} type
+     * @returns {boolean}
      */
     _validateProxyType(type) {
         const validTypes = ['http', 'https', 'socks4', 'socks5'];
@@ -236,11 +151,8 @@ export class ProxyRepository {
     }
 
     /**
-     * Validates port number
-     *
-     * @private
-     * @param {number|string} port - Port number to validate
-     * @returns {boolean} True if port is valid (1-65535)
+     * @param {number|string} port
+     * @returns {boolean}
      */
     _validatePort(port) {
         const portNum = parseInt(port, 10);
@@ -248,11 +160,8 @@ export class ProxyRepository {
     }
 
     /**
-     * Validates timeout value
-     *
-     * @private
-     * @param {number|string} timeout - Timeout in milliseconds to validate
-     * @returns {boolean} True if timeout is valid (0-300000ms)
+     * @param {number|string} timeout
+     * @returns {boolean}
      */
     _validateTimeout(timeout) {
         const timeoutNum = parseInt(timeout, 10);
@@ -260,25 +169,15 @@ export class ProxyRepository {
     }
 
     /**
-     * Sanitizes host string
-     *
-     * Removes protocol prefixes if present.
-     *
-     * @private
-     * @param {string} host - Host string to sanitize
-     * @returns {string} Sanitized host string
+     * @param {string} host
+     * @returns {string}
      */
     _sanitizeHost(host) {
         if (typeof host !== 'string') {return '';}
         return host.replace(/^(https?|socks[45]?):\/\//, '').trim();
     }
 
-    /**
-     * Creates the default proxy settings structure
-     *
-     * @private
-     * @returns {Object} Default proxy settings object
-     */
+    /** @returns {Object} */
     _getDefaultProxySettings() {
         return {
             enabled: false,

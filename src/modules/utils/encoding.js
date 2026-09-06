@@ -4,11 +4,8 @@
  */
 
 /**
- * Encodes a UTF-8 string to base64, chunking to avoid call-stack overflow on
- * large bodies.
- *
- * @param {string} text - The text to encode.
- * @returns {string} Base64-encoded UTF-8 bytes.
+ * @param {string} text
+ * @returns {string}
  */
 export function textToBase64(text) {
     const bytes = new TextEncoder().encode(text);
