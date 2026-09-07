@@ -1,6 +1,21 @@
+const TEMPLATE_PATH_PATTERN = /^\.\/src\/templates\/[A-Za-z0-9._/-]+\.html$/;
+
 export class TemplateLoader {
     constructor() {
         this.cache = new Map();
+    }
+
+    #resolveTemplateUrl(templateFilePath) {
+        if (!TEMPLATE_PATH_PATTERN.test(templateFilePath) || templateFilePath.includes('..')) {
+            throw new Error(`Invalid template file path: ${templateFilePath}`);
+        }
+
+        const url = new URL(templateFilePath, window.location.href);
+        if (url.origin !== window.location.origin) {
+            throw new Error(`Invalid template file path: ${templateFilePath}`);
+        }
+
+        return url;
     }
 
     loadTemplateFileSync(templateFilePath) {
@@ -8,7 +23,7 @@ export class TemplateLoader {
             return this.cache.get(templateFilePath);
         }
 
-        const url = new URL(templateFilePath, window.location.href);
+        const url = this.#resolveTemplateUrl(templateFilePath);
         const xhr = new XMLHttpRequest();
         xhr.open('GET', url.toString(), false);
         xhr.send(null);
@@ -28,7 +43,7 @@ export class TemplateLoader {
             return this.cache.get(templateFilePath);
         }
 
-        const url = new URL(templateFilePath, window.location.href);
+        const url = this.#resolveTemplateUrl(templateFilePath);
         const response = await fetch(url);
         if (!response.ok) {
             throw new Error(`Failed to load template file: ${templateFilePath}`);
