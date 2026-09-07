@@ -5,23 +5,10 @@
 
 import { VariableProcessor } from '../variables/VariableProcessor.js';
 
-/**
- * Service for building resolved request configurations
- *
- * @class
- * @classdesc Extracts the shared request-building logic used by both
- * handleSendRequest and handleGenerateCurl (and the WebSocket path).
- * Handles variable resolution, URL construction, query-string encoding,
- * auth merging, and default-header injection.  Stateless per invocation —
- * call {@link build} for each new request to get a fresh VariableProcessor
- * (which guarantees fresh dynamic-variable values such as {{$uuid}}).
- */
 export class RequestBuilderService {
     /**
-     * Creates a RequestBuilderService instance
-     *
-     * @param {Function} getVariableService - Getter for the VariableService singleton
-     * @param {Function} getCollectionRepository - Getter for the CollectionRepository singleton
+     * @param {Function} getVariableService
+     * @param {Function} getCollectionRepository
      */
     constructor(getVariableService, getCollectionRepository) {
         this._getVariableService = getVariableService;
@@ -29,13 +16,8 @@ export class RequestBuilderService {
     }
 
     /**
-     * Resolves variables for the current context (collection + environment or
-     * environment-only) and returns a fresh VariableProcessor.
-     *
-     * @async
-     * @param {Object|null} currentEndpoint - { collectionId, endpointId } or null
-     * @param {Object}      headers         - Mutable header map — collection
-     *                                        defaultHeaders will be merged in-place
+     * @param {Object|null} currentEndpoint
+     * @param {Object} headers
      * @returns {Promise<{variables: Object, processor: VariableProcessor}>}
      */
     async resolveVariables(currentEndpoint, headers) {
@@ -65,23 +47,15 @@ export class RequestBuilderService {
     }
 
     /**
-     * Applies variable substitution to all request components and builds the
-     * final URL with encoded query-string.
-     *
-     * Mutates `headers` and `queryParams` in place (clears then re-populates
-     * with processed values) so callers see the resolved values.
-     *
      * @param {Object} opts
-     * @param {string}           opts.url         - Raw URL (may contain {{vars}})
-     * @param {Object}           opts.pathParams  - Path parameter key-value pairs
-     * @param {Object}           opts.headers     - Header key-value pairs (mutated in-place)
-     * @param {Object}           opts.queryParams - Query parameter key-value pairs (mutated in-place)
-     * @param {Array<{key: string, value: string}>} [opts.queryRows] - Ordered query rows; when given, the wire query string is built from them so duplicate keys survive
-     * @param {Object}           opts.variables   - Resolved variable map
-     * @param {VariableProcessor} opts.processor  - VariableProcessor instance
-     * @returns {{ url: string, queryString: string, pathParams: Object }} The
-     *          resolved URL, the encoded query string, and the
-     *          variable-resolved path parameter map
+     * @param {string} opts.url
+     * @param {Object} opts.pathParams
+     * @param {Object} opts.headers
+     * @param {Object} opts.queryParams
+     * @param {Array<{key: string, value: string}>} [opts.queryRows]
+     * @param {Object} opts.variables
+     * @param {VariableProcessor} opts.processor
+     * @returns {{ url: string, queryString: string, pathParams: Object }}
      */
     processRequestComponents({ url, pathParams, headers, queryParams, queryRows, variables, processor }) {
         const processedPathParams = {};
@@ -112,12 +86,10 @@ export class RequestBuilderService {
     }
 
     /**
-     * Builds the query string from ordered rows, preserving duplicate keys.
-     * @private
-     * @param {Array<{key: string, value: string}>} rows - Ordered query rows
-     * @param {Object} variables - Resolved variable map
-     * @param {VariableProcessor} processor - VariableProcessor instance
-     * @returns {string} Encoded query string
+     * @param {Array<{key: string, value: string}>} rows
+     * @param {Object} variables
+     * @param {VariableProcessor} processor
+     * @returns {string}
      */
     _buildQueryStringFromRows(rows, variables, processor) {
         const queryPairs = [];
@@ -135,31 +107,14 @@ export class RequestBuilderService {
     }
 
     /**
-     * Applies query/path parameter mutations made by a pre-request script to
-     * the request URL and returns the final URL to send.
-     *
-     * Rules:
-     * - When `queryParams` changed, the query string is rebuilt from the
-     *   mutated map onto the current URL base — an explicit `request.url`
-     *   edit supplies scheme/host/path, the map supplies the query.
-     * - When `pathParams` changed and the script did not edit `request.url`,
-     *   the URL base is re-baked from the raw URL template (or from the
-     *   mock-server rewrite when one is active) using the same processor and
-     *   variables as the original bake, so dynamic variables keep their
-     *   per-request values.
-     * - An explicit `request.url` edit wins over `pathParams` changes.
-     *
-     * Also normalizes `requestConfig.queryParams`/`pathParams` in place to
-     * flat string maps, since scripts may leave arbitrary JSON there.
-     *
      * @param {Object} opts
-     * @param {Object} opts.requestConfig - Post-script request config (param maps are normalized in place)
-     * @param {Object} opts.snapshot      - Pre-script { url, queryParams, pathParams }
-     * @param {string} opts.rawUrl        - Unresolved URL template (may contain {{vars}} and {params})
-     * @param {Object} opts.variables     - Resolved variable map from the original bake
-     * @param {VariableProcessor} opts.processor - Processor instance from the original bake
-     * @param {{baseUrl: string, pathTemplate: string}|null} opts.mockRewrite - Active mock-server rewrite, if any
-     * @returns {string} The final request URL
+     * @param {Object} opts.requestConfig
+     * @param {Object} opts.snapshot
+     * @param {string} opts.rawUrl
+     * @param {Object} opts.variables
+     * @param {VariableProcessor} opts.processor
+     * @param {{baseUrl: string, pathTemplate: string}|null} opts.mockRewrite
+     * @returns {string}
      */
     applyScriptParamMutations({ requestConfig, snapshot, rawUrl, variables, processor, mockRewrite }) {
         const queryParams = this._normalizeParamMap(requestConfig.queryParams);
@@ -206,15 +161,11 @@ export class RequestBuilderService {
     }
 
     /**
-     * Merges auth data (headers and query params) into the existing maps.
-     *
-     * Auth headers always overwrite; auth query params only fill in missing keys.
-     *
-     * @param {Object} headers     - Header map (mutated in-place)
-     * @param {Object} queryParams - Query param map (mutated in-place)
-     * @param {Object} authData    - Result of authManager.generateAuthData()
-     * @param {Object} authData.headers     - Auth headers
-     * @param {Object} authData.queryParams - Auth query params
+     * @param {Object} headers
+     * @param {Object} queryParams
+     * @param {Object} authData
+     * @param {Object} authData.headers
+     * @param {Object} authData.queryParams
      */
     mergeAuthData(headers, queryParams, authData) {
         Object.keys(authData.headers).forEach(key => {
@@ -229,17 +180,11 @@ export class RequestBuilderService {
     }
 
     /**
-     * Removes app-injected credentials when a pre-request script moved the
-     * request to a different origin than the one it was built for, so a script
-     * cannot redirect a bearer/Basic/API-key header, digest response, or AWS
-     * signature to an attacker-controlled host. Credentials the script set
-     * itself (values that no longer match `authData`) are left untouched.
-     *
      * @param {Object} opts
-     * @param {Object} opts.requestConfig - Post-script config (mutated in place)
-     * @param {string} opts.originalUrl   - Request URL before the script ran
-     * @param {Object} opts.authData      - Result of authManager.generateAuthData()
-     * @returns {boolean} True when any credential was stripped
+     * @param {Object} opts.requestConfig
+     * @param {string} opts.originalUrl
+     * @param {Object} opts.authData
+     * @returns {boolean}
      */
     stripCrossOriginAuth({ requestConfig, originalUrl, authData }) {
         if (this._sameOrigin(originalUrl, requestConfig.url)) {
@@ -284,13 +229,9 @@ export class RequestBuilderService {
     }
 
     /**
-     * Compares two URLs by web origin (protocol + hostname + effective port).
-     * Unparseable input is treated as a different origin so callers fail safe.
-     *
-     * @private
-     * @param {string} a - First URL
-     * @param {string} b - Second URL
-     * @returns {boolean} True when both URLs share the same origin
+     * @param {string} a
+     * @param {string} b
+     * @returns {boolean}
      */
     _sameOrigin(a, b) {
         try {
@@ -302,9 +243,8 @@ export class RequestBuilderService {
     }
 
     /**
-     * @private
-     * @param {string} url - URL to derive an origin key from
-     * @returns {string} `protocol//hostname:port` with the scheme default port applied
+     * @param {string} url
+     * @returns {string}
      */
     _originKey(url) {
         const parsed = new URL(url);
@@ -314,10 +254,8 @@ export class RequestBuilderService {
     }
 
     /**
-     * Builds a query string from a key-value map, preserving already-encoded values.
-     *
-     * @param {Object} queryParams - Processed query parameter key-value pairs
-     * @returns {string} Encoded query string (without leading '?')
+     * @param {Object} queryParams
+     * @returns {string}
      */
     buildQueryString(queryParams) {
         const queryPairs = [];
@@ -334,15 +272,8 @@ export class RequestBuilderService {
     }
 
     /**
-     * Coerces an arbitrary script-supplied parameter map into a flat map of
-     * string keys to string values. Non-object shapes (null, arrays,
-     * primitives) become an empty map; null/undefined entries are dropped
-     * (a script deletes a parameter by setting it to null); object values
-     * are JSON-stringified, all other values stringified.
-     *
-     * @private
-     * @param {*} map - Value a script left in queryParams/pathParams
-     * @returns {Object} Flat string-to-string map
+     * @param {*} map
+     * @returns {Object}
      */
     _normalizeParamMap(map) {
         if (!map || typeof map !== 'object' || Array.isArray(map)) {
@@ -359,12 +290,9 @@ export class RequestBuilderService {
     }
 
     /**
-     * Shallow equality check for two flat string maps.
-     *
-     * @private
-     * @param {Object} a - First map
-     * @param {Object} b - Second map
-     * @returns {boolean} True when both maps hold the same key/value pairs
+     * @param {Object} a
+     * @param {Object} b
+     * @returns {boolean}
      */
     _paramMapsEqual(a, b) {
         const aKeys = Object.keys(a);
@@ -377,12 +305,9 @@ export class RequestBuilderService {
     }
 
     /**
-     * Substitutes variables in a key-value map in-place (clears then re-populates).
-     *
-     * @private
-     * @param {Object}            map       - The mutable key-value map
-     * @param {Object}            variables - Resolved variable map
-     * @param {VariableProcessor} processor - VariableProcessor instance
+     * @param {Object} map
+     * @param {Object} variables
+     * @param {VariableProcessor} processor
      */
     _processKeyValuePairs(map, variables, processor) {
         const processed = {};

@@ -30,21 +30,10 @@ import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { setRequestBodyContent } from '../requestBodyHelper.js';
 import { DocGeneratorService } from '../services/DocGeneratorService.js';
 
-/**
- * Controller for coordinating collection operations between UI and services
- *
- * @class
- * @classdesc Mediates between UI components and collection/variable services,
- * handling user interactions such as loading collections, managing endpoints,
- * context menus, and variable operations. Coordinates with workspace tabs
- * for endpoint loading and state management.
- */
 export class CollectionController {
     /**
-     * Creates a CollectionController instance
-     *
-     * @param {Object} backendAPI - The backend IPC API bridge for storage operations
-     * @param {Function} updateStatusDisplay - Callback function to update status display UI
+     * @param {Object} backendAPI
+     * @param {Function} updateStatusDisplay
      */
     constructor(backendAPI, updateStatusDisplay) {
         this.backendAPI = backendAPI;
@@ -136,28 +125,12 @@ export class CollectionController {
         this.initializeGitBranchRefresh();
     }
 
-    /**
-     * Re-reads Git branches whenever the window regains focus.
-     *
-     * A `git checkout` happens in a terminal, so the app only ever learns about
-     * it on the way back in. Focus is the cheapest signal for that, and avoids
-     * keeping a filesystem watcher alive per collection.
-     *
-     * @returns {void}
-     */
+    /** @returns {void} */
     initializeGitBranchRefresh() {
         window.addEventListener('focus', this.refreshGitBranches);
     }
 
-    /**
-     * Updates the branch shown for every collection.
-     *
-     * Failures are swallowed: the badge is decoration, and a collection whose
-     * directory has gone missing must not put an error in front of the user.
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async refreshGitBranches() {
         if (this.gitRefreshInFlight) {
             return;
@@ -177,12 +150,7 @@ export class CollectionController {
         }
     }
 
-    /**
-     * Loads all collections from storage and renders them in the UI
-     *
-     * @async
-     * @returns {Promise<Array<Object>>} Array of collection objects, or empty array on error
-     */
+    /** @returns {Promise<Array<Object>>} */
     async loadCollections() {
         try {
             this.allCollections = await this.service.loadCollections();
@@ -193,12 +161,7 @@ export class CollectionController {
         }
     }
 
-    /**
-     * Loads all collections from storage and renders them preserving folder expansion state
-     *
-     * @async
-     * @returns {Promise<Array<Object>>} Array of collection objects, or empty array on error
-     */
+    /** @returns {Promise<Array<Object>>} */
     async loadCollectionsWithExpansionState() {
         try {
             this.allCollections = await this.service.loadCollections();
@@ -210,11 +173,8 @@ export class CollectionController {
     }
 
     /**
-     * Renders collections in the UI with optional expansion state preservation
-     *
-     * @async
-     * @param {Array<Object>} collections - Array of collection objects to render
-     * @param {boolean} [preserveExpansionState=false] - Whether to preserve folder expansion state
+     * @param {Array<Object>} collections
+     * @param {boolean} [preserveExpansionState=false]
      * @returns {Promise<void>}
      */
     async renderCollections(collections, preserveExpansionState = false) {
@@ -256,11 +216,7 @@ export class CollectionController {
         await this.renderCollections(this.allCollections, true);
     }
 
-    /**
-     * Returns the pinned-request map, reading the store only on the first call.
-     * @private
-     * @returns {Promise<Object>} Pinned requests keyed `${collectionId}_${endpointId}`
-     */
+    /** @returns {Promise<Object>} */
     async _getPinnedRequestsCached() {
         if (!this._pinnedRequests) {
             this._pinnedRequests = await this.repository.getPinnedRequests();
@@ -300,14 +256,9 @@ export class CollectionController {
     }
 
     /**
-     * Filters a folder tree to the branches that match, at any depth.
-     *
-     * A folder is kept when its own name matches (with all its contents) or
-     * when something inside it matches (narrowed to the matches).
-     *
-     * @param {Array} folders - Folders to filter
-     * @param {string} query - The search query
-     * @returns {Array} The matching folders, marked for auto-expansion
+     * @param {Array} folders
+     * @param {string} query
+     * @returns {Array}
      */
     filterFolders(folders, query) {
         return (folders || []).reduce((kept, folder) => {
@@ -348,14 +299,8 @@ export class CollectionController {
     }
 
     /**
-     * Handles user click on an endpoint in the collection tree
-     *
-     * Loads endpoint data into the current workspace tab or fallback form.
-     * Persists the selection and updates UI state.
-     *
-     * @async
-     * @param {Object} collection - The parent collection object
-     * @param {Object} endpoint - The endpoint object to load
+     * @param {Object} collection
+     * @param {Object} endpoint
      * @returns {Promise<void>}
      */
     async handleEndpointClick(collection, endpoint) {
@@ -363,13 +308,8 @@ export class CollectionController {
     }
 
     /**
-     * Handles right-click context menu on a collection
-     *
-     * Displays context menu with options: New Request, Manage Variables,
-     * Export options, Rename Collection, and Delete Collection.
-     *
-     * @param {Event} event - The context menu event
-     * @param {Object} collection - The collection object
+     * @param {Event} event
+     * @param {Object} collection
      * @returns {void}
      */
     handleContextMenu(event, collection) {
@@ -422,10 +362,6 @@ export class CollectionController {
                 iconClass: ContextMenu.createRenameIcon(),
                 onClick: () => this.handleRename(collection)
             },
-            // A collection opened in place lives in a directory the app does
-            // not own, so it is closed rather than deleted. The backend
-            // refuses to delete one either way; omitting the item here just
-            // keeps the destructive option off a user's git checkout.
             collection.linked
                 ? {
                     label: 'Close Collection',
@@ -446,13 +382,9 @@ export class CollectionController {
     }
 
     /**
-     * Handles right-click context menu on an endpoint
-     *
-     * Displays context menu with delete option.
-     *
-     * @param {Event} event - The context menu event
-     * @param {Object} collection - The parent collection object
-     * @param {Object} endpoint - The endpoint object
+     * @param {Event} event
+     * @param {Object} collection
+     * @param {Object} endpoint
      * @returns {void}
      */
     async handleEndpointContextMenu(event, collection, endpoint) {
@@ -498,11 +430,7 @@ export class CollectionController {
     }
 
     /**
-     * Handles right-click context menu on empty space in collections panel
-     *
-     * Displays context menu with options: New Collection and New Request.
-     *
-     * @param {Event} event - The context menu event
+     * @param {Event} event
      * @returns {void}
      */
     handleEmptySpaceContextMenu(event) {
@@ -525,12 +453,7 @@ export class CollectionController {
     }
 
     /**
-     * Handles collection rename operation
-     *
-     * Shows rename dialog and updates collection name if confirmed.
-     *
-     * @async
-     * @param {Object} collection - The collection to rename
+     * @param {Object} collection
      * @returns {Promise<void>}
      */
     async handleRename(collection) {
@@ -546,13 +469,7 @@ export class CollectionController {
     }
 
     /**
-     * Handles variable management for a collection
-     *
-     * Opens variable manager dialog and saves changes if confirmed.
-     * Variable substitution occurs at request time, not in the form.
-     *
-     * @async
-     * @param {Object} collection - The collection whose variables to manage
+     * @param {Object} collection
      * @returns {Promise<void>}
      */
     async handleVariables(collection) {
@@ -569,12 +486,7 @@ export class CollectionController {
     }
 
     /**
-     * Opens the collection auth dialog and persists the edited config.
-     * Endpoints whose auth type is "Inherit from Parent" pick the new
-     * value up at send time; the open Authorization tab hint is re-rendered.
-     *
-     * @async
-     * @param {Object} collection - The collection whose auth to edit
+     * @param {Object} collection
      * @returns {Promise<void>}
      */
     async handleCollectionAuth(collection) {
@@ -590,11 +502,9 @@ export class CollectionController {
     }
 
     /**
-     * Handles right-click context menu on a folder header.
-     *
-     * @param {Event} event - The contextmenu event
-     * @param {Object} collection - The parent collection
-     * @param {Object} folder - The folder that was right-clicked
+     * @param {Event} event
+     * @param {Object} collection
+     * @param {Object} folder
      * @returns {void}
      */
     handleFolderContextMenu(event, collection, folder) {
@@ -609,13 +519,8 @@ export class CollectionController {
     }
 
     /**
-     * Opens the folder auth dialog and persists the edited config. Folder
-     * auth overrides collection auth for the folder's inheriting endpoints;
-     * "Inherit from Collection" removes the override.
-     *
-     * @async
-     * @param {Object} collection - The parent collection
-     * @param {Object} folder - The folder whose auth to edit
+     * @param {Object} collection
+     * @param {Object} folder
      * @returns {Promise<void>}
      */
     async handleFolderAuth(collection, folder) {
@@ -630,13 +535,7 @@ export class CollectionController {
         }
     }
 
-    /**
-     * Re-renders the request tab's inherit hint after collection/folder auth
-     * changes so the displayed source stays accurate.
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     refreshInheritHint() {
         if (app.authManager?.getAuthConfig()?.type === 'inherit') {
             app.authManager.renderAuthFields('inherit');
@@ -644,12 +543,7 @@ export class CollectionController {
     }
 
     /**
-     * Handles creation of a new request in an existing collection
-     *
-     * Shows new request dialog and adds request to collection if confirmed.
-     *
-     * @async
-     * @param {Object} collection - The collection to add the request to
+     * @param {Object} collection
      * @returns {Promise<void>}
      */
     async handleNewRequest(collection) {
@@ -664,14 +558,7 @@ export class CollectionController {
         }
     }
 
-    /**
-     * Handles creation of a new empty collection
-     *
-     * Shows new collection dialog and creates collection if confirmed.
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async handleNewCollection() {
         try {
             const collectionOptions = await this.showNewCollectionDialog();
@@ -684,14 +571,7 @@ export class CollectionController {
         }
     }
 
-    /**
-     * Handles creation of a new request with a new collection
-     *
-     * Shows both request and collection dialogs, creates both if confirmed.
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async handleNewRequestInEmptySpace() {
         try {
             const requestData = await this.showNewRequestDialog();
@@ -708,34 +588,19 @@ export class CollectionController {
         }
     }
 
-    /**
-     * Shows dialog for creating a new collection
-     *
-     * @async
-     * @returns {Promise<string|null>} Collection name if confirmed, null if cancelled
-     */
+    /** @returns {Promise<string|null>} */
     async showNewCollectionDialog(initialName = '') {
         return this.collectionDialogs.showNewCollectionDialog(initialName);
     }
 
-    /**
-     * Shows dialog for creating a new request
-     *
-     * @async
-     * @returns {Promise<Object|null>} Request data object with name, method, and path if confirmed, null if cancelled
-     */
+    /** @returns {Promise<Object|null>} */
     async showNewRequestDialog() {
         return this.collectionDialogs.showNewRequestDialog();
     }
 
     /**
-     * Shows dialog for saving current request to a collection
-     *
-     * Allows saving to an existing collection or creating a new one.
-     *
-     * @async
-     * @param {Object} requestData - Current request data from the active tab
-     * @returns {Promise<{collectionId: string, endpointId: string}|null>} Collection and endpoint IDs if saved, null if cancelled
+     * @param {Object} requestData
+     * @returns {Promise<{collectionId: string, endpointId: string}|null>}
      */
     async showSaveToCollectionDialog(requestData) {
         const result = await this.collectionDialogs.showSaveToCollectionDialog(requestData);
@@ -746,13 +611,7 @@ export class CollectionController {
     }
 
     /**
-     * Removes a collection from the list, leaving its files alone.
-     *
-     * The counterpart to opening a collection in place: its directory belongs
-     * to the user, usually a git checkout, so closing must be reversible.
-     *
-     * @async
-     * @param {Object} collection - The collection to close
+     * @param {Object} collection
      * @returns {Promise<void>}
      */
     async handleClose(collection) {
@@ -783,9 +642,6 @@ export class CollectionController {
         }
 
         try {
-            // Deliberately not cleanupCollectionVariables: it routes to
-            // collection_save_variables, which rewrites the collection on disk
-            // and would blank variables.yaml in the user's working copy.
             await this.service.closeCollection(collection.id);
             await this.closeTabsForCollection(collection.id);
             await this.loadCollections();
@@ -796,12 +652,7 @@ export class CollectionController {
     }
 
     /**
-     * Closes any workspace tabs belonging to a collection.
-     *
-     * Without this the app restores a tab whose collection no longer resolves.
-     *
-     * @async
-     * @param {string} collectionId - The collection whose tabs should close
+     * @param {string} collectionId
      * @returns {Promise<void>}
      */
     async closeTabsForCollection(collectionId) {
@@ -818,15 +669,8 @@ export class CollectionController {
         }
     }
 
-    /**
-     * Opens a collection directory that already exists on disk, in place.
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async handleOpenExisting() {
-        // `false` keeps this pick out of the "last used" default: it is a
-        // collection, not a parent to create new collections inside.
         const path = await this.backendAPI.collections.pickDirectory(false).catch(() => null);
         if (!path) {
             return;
@@ -858,12 +702,7 @@ export class CollectionController {
     }
 
     /**
-     * Handles collection deletion with confirmation
-     *
-     * Shows confirmation dialog and deletes collection and its variables if confirmed.
-     *
-     * @async
-     * @param {Object} collection - The collection to delete
+     * @param {Object} collection
      * @returns {Promise<void>}
      */
     async handleDelete(collection) {
@@ -903,12 +742,7 @@ export class CollectionController {
     }
 
     /**
-     * Handles export of collection as OpenAPI JSON
-     *
-     * Triggers export process via service layer.
-     *
-     * @async
-     * @param {Object} collection - The collection to export
+     * @param {Object} collection
      * @returns {Promise<void>}
      */
     async handleExportOpenApiJson(collection) {
@@ -916,12 +750,7 @@ export class CollectionController {
     }
 
     /**
-     * Handles export of collection as OpenAPI YAML
-     *
-     * Triggers export process via service layer.
-     *
-     * @async
-     * @param {Object} collection - The collection to export
+     * @param {Object} collection
      * @returns {Promise<void>}
      */
     async handleExportOpenApiYaml(collection) {
@@ -933,12 +762,7 @@ export class CollectionController {
     }
 
     /**
-     * Handles documentation generation for a collection
-     *
-     * Shows options dialog and generates documentation in selected format.
-     *
-     * @async
-     * @param {Object} collection - The collection to generate documentation for
+     * @param {Object} collection
      * @returns {Promise<void>}
      */
     async handleGenerateDocumentation(collection) {
@@ -946,13 +770,8 @@ export class CollectionController {
     }
 
     /**
-     * Handles request rename operation
-     *
-     * Shows rename dialog and updates request name if confirmed.
-     *
-     * @async
-     * @param {Object} collection - The parent collection
-     * @param {Object} endpoint - The request/endpoint to rename
+     * @param {Object} collection
+     * @param {Object} endpoint
      * @returns {Promise<void>}
      */
     async handleRenameRequest(collection, endpoint) {
@@ -1001,14 +820,8 @@ export class CollectionController {
     }
 
     /**
-     * Handles request deletion with confirmation
-     *
-     * Shows confirmation dialog and deletes request from collection if confirmed.
-     * Clears form UI if the deleted request is currently active.
-     *
-     * @async
-     * @param {Object} collection - The parent collection
-     * @param {Object} endpoint - The request/endpoint to delete
+     * @param {Object} collection
+     * @param {Object} endpoint
      * @returns {Promise<void>}
      */
     async handleDeleteRequest(collection, endpoint) {
@@ -1064,42 +877,18 @@ export class CollectionController {
         }
     }
 
-    /**
-     * Imports a collection file of any supported format and creates a collection
-     *
-     * Triggers file picker dialog via IPC; the backend detects the format
-     * (OpenAPI/Swagger, Postman, Insomnia, HAR) from the file's markers.
-     *
-     * @async
-     * @returns {Promise<Object|null>} Created collection object or null if cancelled
-     * @throws {Error} If import fails
-     */
+    /** @returns {Promise<Object|null>} */
     async importCollectionFile() {
         return this.importExportService.importCollectionFile();
     }
 
-    /**
-     * Imports a Postman environment file and creates/updates an environment
-     *
-     * Triggers file picker dialog via IPC and processes the selected Postman environment file.
-     * Creates a new environment with the imported variables or allows user to merge with existing.
-     *
-     * @async
-     * @returns {Promise<Object|null>} Environment object with name and variables, or null if cancelled
-     * @throws {Error} If import fails
-     */
+    /** @returns {Promise<Object|null>} */
     async importPostmanEnvironment() {
         return this.importExportService.importPostmanEnvironment();
     }
 
     /**
-     * Handles cURL import from context menu
-     *
-     * Shows cURL import dialog and creates a new request in the specified collection.
-     * If no collection is specified, allows user to create a new collection.
-     *
-     * @async
-     * @param {Object|null} collection - Target collection or null to show collection picker
+     * @param {Object|null} collection
      * @returns {Promise<void>}
      */
     async handleImportCurl(collection) {
@@ -1107,11 +896,8 @@ export class CollectionController {
     }
 
     /**
-     * Saves user modifications to a request body
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
+     * @param {string} collectionId
+     * @param {string} endpointId
      * @returns {Promise<void>}
      */
     async saveRequestBodyModification(collectionId, endpointId) {
@@ -1119,24 +905,15 @@ export class CollectionController {
     }
 
     /**
-     * Saves all request modifications (path params, query params, headers, body, auth)
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
+     * @param {string} collectionId
+     * @param {string} endpointId
      * @returns {Promise<void>}
      */
     async saveAllRequestModifications(collectionId, endpointId) {
         await this.requestPersistenceService.saveAllRequestModifications(collectionId, endpointId);
     }
 
-    /**
-     * Initializes automatic tracking of request body changes
-     *
-     * Sets up event listeners to save body modifications on blur and after debounced input.
-     *
-     * @returns {void}
-     */
+    /** @returns {void} */
     initializeBodyTracking() {
         const bodyInput = document.getElementById('body-input');
         if (bodyInput) {
@@ -1174,10 +951,7 @@ export class CollectionController {
         }
     }
 
-    /**
-     * Flushes a pending debounced body save and waits for it to settle.
-     * @returns {Promise<void>} Resolves once no body save is pending or in flight
-     */
+    /** @returns {Promise<void>} */
     async flushPendingBodySave() {
         if (this._debouncedSaveBody) {
             await this._debouncedSaveBody.flush();
@@ -1186,13 +960,8 @@ export class CollectionController {
     }
 
     /**
-     * Processes and substitutes variables in all form elements
-     *
-     * Substitutes template variables in URL, body, headers, and query params.
-     *
-     * @async
-     * @param {string} collectionId - Collection ID for variable lookup
-     * @param {Object} formElements - Object containing form element references
+     * @param {string} collectionId
+     * @param {Object} formElements
      * @returns {Promise<void>}
      */
     async processFormVariables(collectionId, formElements) {
@@ -1201,17 +970,7 @@ export class CollectionController {
         });
     }
 
-    /**
-     * Gets references to form elements in the UI
-     *
-     * @returns {Object} Object containing references to form input elements
-     * @returns {HTMLInputElement} return.urlInput - URL input element
-     * @returns {HTMLSelectElement} return.methodSelect - HTTP method select element
-     * @returns {HTMLTextAreaElement} return.bodyInput - Request body textarea element
-     * @returns {HTMLElement} return.pathParamsList - Path parameters list container
-     * @returns {HTMLElement} return.headersList - Headers list container
-     * @returns {HTMLElement} return.queryParamsList - Query parameters list container
-     */
+    /** @returns {Object} */
     getFormElements() {
         return {
             urlInput: document.getElementById('url-input'),

@@ -3,15 +3,6 @@
  * @module controllers/WorkspaceTabController
  */
 
-/**
- * Controller for coordinating workspace tab operations between UI and services
- *
- * @class
- * @classdesc Mediates between workspace tab UI components (TabBar), service layer,
- * and state management. Handles tab lifecycle operations including creation, switching,
- * closing, renaming, and duplication. Manages synchronization between tab state
- * and form UI, and coordinates with response container visibility.
- */
 import { app } from '../appContext.js';
 import { flushPendingSaves, registerPendingSave } from '../state/pendingSaves.js';
 import { debounce } from '../utils/debounce.js';
@@ -21,11 +12,8 @@ import { clearWebSocketState } from '../websocketHandler.js';
 import { clearSseState } from '../sseHandler.js';
 import { clearMqttState } from '../mqttHandler.js';
 import { clearStreamState } from '../grpcStreamHandler.js';
+import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 
-/**
- * Default endpoint and query seeded into a freshly created GraphQL tab so users
- * have a runnable example. Points at the public Countries API (no auth, CORS-friendly).
- */
 const DEFAULT_GRAPHQL_URL = 'https://countries.trevorblades.com/';
 const DEFAULT_GRAPHQL_QUERY = `query GetCountry($code: ID!) {
   country(code: $code) {
@@ -47,12 +35,10 @@ const DEFAULT_GRAPHQL_VARIABLES = `{
 
 export class WorkspaceTabController {
     /**
-     * Creates a WorkspaceTabController instance
-     *
-     * @param {WorkspaceTabService} service - The workspace tab service for business logic
-     * @param {WorkspaceTabBar} tabBar - The tab bar UI component
-     * @param {WorkspaceTabStateManager} stateManager - State manager for capturing and restoring tab state
-     * @param {ResponseContainerManager} responseContainerManager - Manager for response container visibility
+     * @param {WorkspaceTabService} service
+     * @param {WorkspaceTabBar} tabBar
+     * @param {WorkspaceTabStateManager} stateManager
+     * @param {ResponseContainerManager} responseContainerManager
      */
     constructor(service, tabBar, stateManager, responseContainerManager) {
         this.service = service;
@@ -98,10 +84,8 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Serializes tab lifecycle operations on a single promise chain.
-     * @private
-     * @param {function(): Promise<*>} operation - Lifecycle operation to run once earlier ones settle
-     * @returns {Promise<*>} Result of the operation
+     * @param {function(): Promise<*>} operation
+     * @returns {Promise<*>}
      */
     async _withTabLock(operation) {
         const previous = this._tabLock;
@@ -111,9 +95,7 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Persists the captured form state under the given tab unless a restore is in progress.
-     * @private
-     * @param {string} tabId - Tab ID captured when the persist was scheduled
+     * @param {string} tabId
      * @returns {Promise<void>}
      */
     async _persistActiveTabState(tabId) {
@@ -128,34 +110,18 @@ export class WorkspaceTabController {
         }
     }
 
-    /**
-     * Flushes a pending debounced tab-state persist and waits for it to settle.
-     * @private
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async _flushPendingStatePersist() {
         await this._debouncedPersistState.flush();
         await this._inFlightStatePersist;
     }
 
-    /**
-     * Initializes the controller and loads existing tabs
-     *
-     * Loads tabs from service, renders tab bar, shows response container for active tab,
-     * and restores active tab state to the UI.
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async initialize() {
         return this._withTabLock(() => this._doInitialize());
     }
 
-    /**
-     * Runs the startup tab restore.
-     * @private
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async _doInitialize() {
         try {
             const { tabs, activeTabId } = await this.service.initialize();
@@ -181,26 +147,17 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Creates a new tab
-     *
-     * Saves current tab state before creating new one, creates tab via service,
-     * switches to the new tab, and updates UI.
-     *
-     * @async
-     * @param {Object} [options={}] - Tab creation options
-     * @param {string} [options.name] - Initial tab name
-     * @returns {Promise<Object>} The newly created tab object
-     * @throws {Error} If tab creation fails
+     * @param {Object} [options={}]
+     * @param {string} [options.name]
+     * @returns {Promise<Object>}
      */
     async createNewTab(options = {}) {
         return this._withTabLock(() => this._doCreateNewTab(options));
     }
 
     /**
-     * Creates a new tab; must run inside the tab lock.
-     * @private
-     * @param {Object} [options={}] - Tab creation options
-     * @returns {Promise<Object>} The newly created tab object
+     * @param {Object} [options={}]
+     * @returns {Promise<Object>}
      */
     async _doCreateNewTab(options = {}) {
         try {
@@ -304,15 +261,7 @@ export class WorkspaceTabController {
         }
     }
 
-    /**
-     * Creates a new runner tab
-     *
-     * Creates a special tab type for the Collection Runner feature.
-     * Runner tabs have their own UI and don't use the standard request form.
-     *
-     * @async
-     * @returns {Promise<Object>} The newly created runner tab object
-     */
+    /** @returns {Promise<Object>} */
     async createRunnerTab() {
         try {
             await this._saveCurrentTabState();
@@ -338,13 +287,7 @@ export class WorkspaceTabController {
         }
     }
 
-    /**
-     * Initializes the runner tab UI
-     *
-     * @private
-     * @async
-     * @param {string} tabId - The runner tab ID
-     */
+    /** @param {string} tabId */
     async _initializeRunnerTab(tabId) {
         const { RunnerController } = await import('./RunnerController.js');
         const { getCollections } = await import('../collectionManager.js');
@@ -389,12 +332,7 @@ export class WorkspaceTabController {
         this.runnerControllers.set(tabId, runnerController);
     }
 
-    /**
-     * Cleans up runner tab resources
-     *
-     * @private
-     * @param {string} tabId - The runner tab ID
-     */
+    /** @param {string} tabId */
     _cleanupRunnerTab(tabId) {
         const runnerContainer = document.getElementById(`runner-container-${tabId}`);
         if (runnerContainer) {
@@ -406,10 +344,7 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Cleans up controller-managed UI resources for a closed tab.
-     *
-     * @private
-     * @param {string} tabId - The closed tab ID
+     * @param {string} tabId
      * @returns {void}
      */
     _cleanupClosedTabUI(tabId) {
@@ -422,16 +357,7 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Best-effort teardown of any streaming connection a closed tab may hold.
-     *
-     * Each protocol clearer closes its backend connection (a no-op for a tab
-     * that never used that protocol) and drops the tab's frontend session
-     * state, preventing both orphaned background streams and session-map growth.
-     * Every protocol is cleared because a tab may still hold a connection opened
-     * under a previously selected protocol.
-     *
-     * @private
-     * @param {string} tabId - The id of the closed tab.
+     * @param {string} tabId
      * @returns {void}
      */
     _teardownTabConnections(tabId) {
@@ -450,12 +376,7 @@ export class WorkspaceTabController {
         }
     }
 
-    /**
-     * Shows or hides runner/request UI based on tab type
-     *
-     * @private
-     * @param {Object} tab - The tab object
-     */
+    /** @param {Object} tab */
     _updateUIForTabType(tab) {
         const mainContentArea = document.getElementById('main-content-area');
         if (!mainContentArea) {return;}
@@ -487,13 +408,7 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Switches to a different tab
-     *
-     * Saves current tab state before switching, switches via service,
-     * shows response container for new tab, and restores new tab state to UI.
-     *
-     * @async
-     * @param {string} tabId - The ID of the tab to switch to
+     * @param {string} tabId
      * @returns {Promise<void>}
      */
     async switchTab(tabId) {
@@ -502,9 +417,7 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Switches to a tab; must run inside the tab lock.
-     * @private
-     * @param {string} tabId - Tab ID to switch to
+     * @param {string} tabId
      * @returns {Promise<void>}
      */
     async _doSwitchTab(tabId) {
@@ -563,14 +476,7 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Closes a tab
-     *
-     * Closes tab via service, removes response container, re-renders tab bar,
-     * and restores state of newly active tab if different.
-     * Cannot close the last remaining tab.
-     *
-     * @async
-     * @param {string} tabId - The ID of the tab to close
+     * @param {string} tabId
      * @returns {Promise<void>}
      */
     async closeTab(tabId) {
@@ -578,9 +484,7 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Closes a tab; must run inside the tab lock.
-     * @private
-     * @param {string} tabId - Tab ID to close
+     * @param {string} tabId
      * @returns {Promise<void>}
      */
     async _doCloseTab(tabId) {
@@ -591,7 +495,6 @@ export class WorkspaceTabController {
             const allTabs = await this.service.getAllTabs();
             const tab = allTabs.find(t => t.id === tabId);
             if (tab?.isModified) {
-                const { ConfirmDialog } = await import('../ui/ConfirmDialog.js');
                 const dialog = new ConfirmDialog();
                 const confirmed = await dialog.show(
                     `"${tab.name}" has unsaved changes. Close anyway?`,
@@ -638,13 +541,7 @@ export class WorkspaceTabController {
         }
     }
 
-    /**
-     * Activates a tab and restores its state
-     *
-     * @private
-     * @async
-     * @param {Object} tab - The tab to activate
-     */
+    /** @param {Object} tab */
     async _activateTab(tab) {
         this._updateUIForTabType(tab);
 
@@ -659,11 +556,8 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Renames a tab
-     *
-     * @async
-     * @param {string} tabId - The ID of the tab to rename
-     * @param {string} newName - The new name for the tab
+     * @param {string} tabId
+     * @param {string} newName
      * @returns {Promise<void>}
      */
     async renameTab(tabId, newName) {
@@ -676,12 +570,7 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Duplicates a tab
-     *
-     * Creates a copy of the tab with all its state and content.
-     *
-     * @async
-     * @param {string} tabId - The ID of the tab to duplicate
+     * @param {string} tabId
      * @returns {Promise<void>}
      */
     async duplicateTab(tabId) {
@@ -689,9 +578,7 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Duplicates a tab; must run inside the tab lock.
-     * @private
-     * @param {string} tabId - Tab ID to duplicate
+     * @param {string} tabId
      * @returns {Promise<void>}
      */
     async _doDuplicateTab(tabId) {
@@ -712,10 +599,7 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Closes all tabs except the specified one
-     *
-     * @async
-     * @param {string} tabId - The ID of the tab to keep open
+     * @param {string} tabId
      * @returns {Promise<void>}
      */
     async closeOtherTabs(tabId) {
@@ -723,9 +607,7 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Closes every tab except the given one; must run inside the tab lock.
-     * @private
-     * @param {string} tabId - Tab ID to keep open
+     * @param {string} tabId
      * @returns {Promise<void>}
      */
     async _doCloseOtherTabs(tabId) {
@@ -738,7 +620,6 @@ export class WorkspaceTabController {
 
             const modifiedCount = tabsToClose.filter(t => t.isModified).length;
             if (modifiedCount > 0) {
-                const { ConfirmDialog } = await import('../ui/ConfirmDialog.js');
                 const dialog = new ConfirmDialog();
                 const confirmed = await dialog.show(
                     modifiedCount === 1
@@ -777,14 +658,7 @@ export class WorkspaceTabController {
         }
     }
 
-    /**
-     * Marks the current tab as modified
-     *
-     * Indicates unsaved changes in the tab with a visual indicator.
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async markCurrentTabModified() {
         try {
             const activeTabId = await this.service.getActiveTabId();
@@ -806,14 +680,7 @@ export class WorkspaceTabController {
         }
     }
 
-    /**
-     * Marks the current tab as unmodified
-     *
-     * Removes the unsaved changes indicator from the tab.
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async markCurrentTabUnmodified() {
         try {
             const activeTabId = await this.service.getActiveTabId();
@@ -828,14 +695,8 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Updates the current tab's name based on request method and URL
-     *
-     * Automatically generates a meaningful tab name unless user has customized it.
-     * Only updates if current name is default or follows standard method pattern.
-     *
-     * @async
-     * @param {string} method - HTTP method (GET, POST, etc.)
-     * @param {string} url - Request URL
+     * @param {string} method
+     * @param {string} url
      * @returns {Promise<void>}
      */
     async updateCurrentTabName(method, url) {
@@ -859,26 +720,19 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Loads an endpoint from a collection into current or new tab
-     *
-     * Processes endpoint data including URL construction with baseUrl, path parameters,
-     * query parameters, headers, body, and authentication configuration.
-     * Prioritizes persisted data over OpenAPI spec defaults.
-     *
-     * @async
-     * @param {Object} endpoint - The endpoint object to load
-     * @param {string} endpoint.path - Endpoint path
-     * @param {string} endpoint.method - HTTP method
-     * @param {string} [endpoint.collectionBaseUrl] - Collection base URL
-     * @param {Object} [endpoint.parameters] - OpenAPI parameters (path, query, header)
-     * @param {Object} [endpoint.requestBody] - OpenAPI request body schema
-     * @param {Object} [endpoint.security] - OpenAPI security configuration
-     * @param {Object} [endpoint.persistedPathParams] - Previously saved path params
-     * @param {Object} [endpoint.persistedQueryParams] - Previously saved query params
-     * @param {Object} [endpoint.persistedHeaders] - Previously saved headers
-     * @param {string} [endpoint.persistedBody] - Previously saved request body
-     * @param {Object} [endpoint.persistedAuthConfig] - Previously saved auth config
-     * @param {boolean} [inNewTab=false] - Whether to load in a new tab instead of current
+     * @param {Object} endpoint
+     * @param {string} endpoint.path
+     * @param {string} endpoint.method
+     * @param {string} [endpoint.collectionBaseUrl]
+     * @param {Object} [endpoint.parameters]
+     * @param {Object} [endpoint.requestBody]
+     * @param {Object} [endpoint.security]
+     * @param {Object} [endpoint.persistedPathParams]
+     * @param {Object} [endpoint.persistedQueryParams]
+     * @param {Object} [endpoint.persistedHeaders]
+     * @param {string} [endpoint.persistedBody]
+     * @param {Object} [endpoint.persistedAuthConfig]
+     * @param {boolean} [inNewTab=false]
      * @returns {Promise<void>}
      */
     async loadEndpoint(endpoint, inNewTab = false) {
@@ -886,10 +740,8 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Loads an endpoint into a tab; must run inside the tab lock.
-     * @private
-     * @param {Object} endpoint - Endpoint data to load
-     * @param {boolean} [inNewTab=false] - Whether to open a new tab for it
+     * @param {Object} endpoint
+     * @param {boolean} [inNewTab=false]
      * @returns {Promise<void>}
      */
     async _doLoadEndpoint(endpoint, inNewTab = false) {
@@ -911,16 +763,7 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Opens a request history entry.
-     *
-     * History replay always gets its own tab, because the entry's protocol is
-     * independent of whatever the active tab holds and the shared request form
-     * only shows the fields of the current protocol. A repeat click on the same
-     * entry focuses the tab it already opened rather than stacking duplicates;
-     * that tab keeps any edits made since, so it is not reloaded.
-     *
-     * @async
-     * @param {Object} historyEntry - The history entry to open
+     * @param {Object} historyEntry
      * @returns {Promise<void>}
      */
     async loadHistoryEntry(historyEntry) {
@@ -928,9 +771,7 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Opens a history entry; must run inside the tab lock.
-     * @private
-     * @param {Object} historyEntry - The history entry to open
+     * @param {Object} historyEntry
      * @returns {Promise<void>}
      */
     async _doLoadHistoryEntry(historyEntry) {
@@ -958,15 +799,7 @@ export class WorkspaceTabController {
         }
     }
 
-    /**
-     * Saves current tab state from UI
-     *
-     * Captures form state via state manager and persists to service.
-     *
-     * @async
-     * @private
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async _saveCurrentTabState() {
         try {
             await flushPendingSaves();
@@ -1001,24 +834,15 @@ export class WorkspaceTabController {
     }
 
     /**
-     * Handles service events
-     *
-     * Can be extended to handle various service events.
-     * Currently most updates are handled directly in methods.
-     *
-     * @param {string} _event - Event name (unused)
-     * @param {*} _data - Event data (unused)
-     * @private
+     * @param {string} _event
+     * @param {*} _data
      * @returns {void}
      */
     _handleServiceEvent(_event, _data) {
     }
 
     /**
-     * Reorders tabs based on an ordered list of tab IDs
-     *
-     * @async
-     * @param {Array<string>} orderedTabIds - Tab IDs in the desired order
+     * @param {Array<string>} orderedTabIds
      * @returns {Promise<void>}
      */
     async reorderTabs(orderedTabIds) {
@@ -1029,12 +853,7 @@ export class WorkspaceTabController {
         }
     }
 
-    /**
-     * Gets the currently active tab
-     *
-     * @async
-     * @returns {Promise<Object|null>} The active tab object, or null if none
-     */
+    /** @returns {Promise<Object|null>} */
     async getActiveTab() {
         return this.service.getActiveTab();
     }

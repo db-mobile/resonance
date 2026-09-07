@@ -1,19 +1,13 @@
 /**
  * @fileoverview Writes gRPC calls into request history.
  * @module modules/grpcHistory
- *
- * Lives apart from grpcHandler so both the unary path and the streaming handler
- * (which grpcHandler imports) can use it without an import cycle.
  */
 
 import { app } from './appContext.js';
 import { getCurrentEndpoint } from './state/currentEndpoint.js';
 import { grpcStatusName } from './utils/grpcStatus.js';
 
-/**
- * Resolve the active environment name for the entry, best-effort.
- * @returns {Promise<string|null>} Environment name, or null
- */
+/** @returns {Promise<string|null>} */
 async function getActiveEnvironmentName() {
     try {
         const environment = await app.environmentController?.service?.getActiveEnvironment();
@@ -25,10 +19,8 @@ async function getActiveEnvironmentName() {
 }
 
 /**
- * Approximate the response size in bytes for display, since the gRPC commands
- * report no transfer size of their own.
- * @param {*} data - Response payload
- * @returns {number|null} Byte length, or null when there is nothing to measure
+ * @param {*} data
+ * @returns {number|null}
  */
 function approximateSize(data) {
     if (data === null || data === undefined) {
@@ -42,25 +34,18 @@ function approximateSize(data) {
 }
 
 /**
- * Record one completed gRPC call in history. Never throws — a history failure
- * must not surface as a request failure.
- *
- * Credentials are redacted by HistoryService via `request.headers`, so the
- * `request.grpc` block deliberately carries only non-secret replay context;
- * replay reads the metadata back out of the (redacted) headers.
- *
- * @param {Object} call - The call to record
- * @param {string} call.rawTarget - Target as typed, before variable resolution
- * @param {string} call.target - Resolved target
- * @param {string} call.fullMethod - Full method path, e.g. /pkg.Svc/Method
- * @param {Object} call.metadata - Resolved request metadata
- * @param {*} call.requestJson - Request message (or transcript-opening message)
- * @param {boolean} [call.useTls] - Whether the call used TLS
- * @param {string|null} [call.protoPath] - Proto file backing the call, if any
- * @param {boolean} [call.clientStreaming] - Method streams from the client
- * @param {boolean} [call.serverStreaming] - Method streams from the server
- * @param {string[]} [call.sensitiveNames] - Metadata keys holding credentials
- * @param {Object} call.result - {success, status, statusMessage, data, headers, trailers, ttfb}
+ * @param {Object} call
+ * @param {string} call.rawTarget
+ * @param {string} call.target
+ * @param {string} call.fullMethod
+ * @param {Object} call.metadata
+ * @param {*} call.requestJson
+ * @param {boolean} [call.useTls]
+ * @param {string|null} [call.protoPath]
+ * @param {boolean} [call.clientStreaming]
+ * @param {boolean} [call.serverStreaming]
+ * @param {string[]} [call.sensitiveNames]
+ * @param {Object} call.result
  * @returns {Promise<void>}
  */
 export async function recordGrpcHistory(call) {

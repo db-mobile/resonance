@@ -11,17 +11,14 @@ import {
     endpointHttpMethod
 } from '../protocols/protocolRegistry.js';
 
-/**
- * Coordinates endpoint hydration for selection and restore flows.
- */
 export class CollectionEndpointLoaderService {
     /**
-     * @param {Object} options - Loader dependencies
-     * @param {CollectionRepository} options.repository - Collection repository
-     * @param {CollectionService} options.collectionService - Collection service
-     * @param {SchemaProcessor} options.schemaProcessor - Schema processor
-     * @param {Function} options.getFormElements - Returns legacy form element references
-     * @param {Function} options.setActiveEndpoint - Marks the active endpoint in the renderer
+     * @param {Object} options
+     * @param {CollectionRepository} options.repository
+     * @param {CollectionService} options.collectionService
+     * @param {SchemaProcessor} options.schemaProcessor
+     * @param {Function} options.getFormElements
+     * @param {Function} options.setActiveEndpoint
      */
     constructor({ repository, collectionService, schemaProcessor, getFormElements, setActiveEndpoint }) {
         this.repository = repository;
@@ -79,10 +76,9 @@ export class CollectionEndpointLoaderService {
     }
 
     /**
-     * Finds an endpoint by id anywhere in a collection.
-     * @param {Object} collection - The collection to search
-     * @param {string} endpointId - The endpoint id to look for
-     * @returns {Object|null} The endpoint, or null when absent
+     * @param {Object} collection
+     * @param {string} endpointId
+     * @returns {Object|null}
      */
     findEndpointInCollection(collection, endpointId) {
         return findRequest(collection, endpointId);

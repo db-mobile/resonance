@@ -7,12 +7,13 @@ import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { toast } from './Toast.js';
 import { pushEscapeHandler } from './modalEscape.js';
+import { BaseModal } from './BaseModal.js';
 
-export class CookieManagerDialog {
+export class CookieManagerDialog extends BaseModal {
     constructor(cookieJarService, environmentService) {
+        super();
         this.service = cookieJarService;
         this.environmentService = environmentService;
-        this.dialog = null;
         this.resolve = null;
         this.releaseEscape = null;
         this._allCookies = [];
@@ -25,10 +26,9 @@ export class CookieManagerDialog {
     }
 
     /**
-     * Translate a key with an English fallback.
-     * @param {string} key - Dot-path i18n key
-     * @param {string} fallback - Text used when no translation is available
-     * @returns {string} The translated string
+     * @param {string} key
+     * @param {string} fallback
+     * @returns {string}
      */
     _t(key, fallback) {
         const translated = app.i18n?.t?.(key);
@@ -45,19 +45,14 @@ export class CookieManagerDialog {
     }
 
     async _createDialog() {
-        this.dialog = document.createElement('div');
-        this.dialog.className = 'cookie-manager-overlay modal-overlay';
-
-        const content = document.createElement('div');
-        content.className = 'cookie-manager-dialog modal-dialog modal-dialog--cookie-manager';
-
-        const fragment = templateLoader.cloneSync(
-            './src/templates/cookies/cookieManager.html',
-            'tpl-cookie-manager'
-        );
-        content.appendChild(fragment);
-        this.dialog.appendChild(content);
-        document.body.appendChild(this.dialog);
+        const content = this.mount({
+            overlayClass: 'cookie-manager-overlay',
+            dialogClass: 'cookie-manager-dialog modal-dialog modal-dialog--cookie-manager',
+            templatePath: './src/templates/cookies/cookieManager.html',
+            templateId: 'tpl-cookie-manager',
+            closeOnEscape: false,
+            closeOnOverlayClick: false
+        });
 
         app.i18n?.updateUI?.(content);
 
@@ -67,11 +62,6 @@ export class CookieManagerDialog {
         this._setupListeners(content);
     }
 
-    /**
-     * Loads the available environments and resolves the initial selection:
-     * the active environment, falling back to one named "Default", then to the
-     * first available environment.
-     */
     async _populateEnvironments(content) {
         const button = content.querySelector('#cookie-manager-env-btn');
         if (!button) { return; }
@@ -97,9 +87,6 @@ export class CookieManagerDialog {
         this._updateEnvButton(content, selected.name, selected.color || null);
     }
 
-    /**
-     * Update the selector button label and color highlighting.
-     */
     _updateEnvButton(content, name, color) {
         const button = content.querySelector('#cookie-manager-env-btn');
         const nameEl = content.querySelector('#cookie-manager-env-name');
@@ -119,9 +106,6 @@ export class CookieManagerDialog {
         }
     }
 
-    /**
-     * Build and open the environment dropdown.
-     */
     _openEnvDropdown(content) {
         const dropdown = content.querySelector('#cookie-manager-env-dropdown');
         const button = content.querySelector('#cookie-manager-env-btn');
@@ -181,9 +165,6 @@ export class CookieManagerDialog {
         dropdown.style.setProperty('--env-dropdown-min-width', `${rect.width}px`);
     }
 
-    /**
-     * Switch the displayed environment and reload its cookies.
-     */
     async _selectEnvironment(content, env) {
         this._environmentId = env.id;
         this._environmentName = env.name;
@@ -210,7 +191,7 @@ export class CookieManagerDialog {
     }
 
     _render(cookies) {
-        const content = this.dialog.querySelector('.cookie-manager-dialog');
+        const content = this.dialog;
         const tbody = content.querySelector('#cookie-manager-tbody');
         const empty = content.querySelector('#cookie-manager-empty');
 
@@ -300,9 +281,8 @@ export class CookieManagerDialog {
     }
 
     /**
-     * Format an epoch-ms timestamp for the expires field, in local time.
-     * @param {number} ms - Epoch milliseconds
-     * @returns {string} The value in YYYY-MM-DD HH:mm form
+     * @param {number} ms
+     * @returns {string}
      */
     _formatExpires(ms) {
         const date = new Date(ms);
@@ -312,11 +292,8 @@ export class CookieManagerDialog {
     }
 
     /**
-     * Parse what the user typed into the expires field. A bare date or a
-     * space-separated time is completed into the ISO local form so it is read
-     * as local time rather than UTC; other formats fall back to Date.parse.
-     * @param {string} raw - The field's text
-     * @returns {number|null} Epoch milliseconds, null for a session cookie, or NaN when unparseable
+     * @param {string} raw
+     * @returns {number|null}
      */
     _parseExpires(raw) {
         const text = (raw || '').trim();
@@ -332,9 +309,8 @@ export class CookieManagerDialog {
     }
 
     /**
-     * Open the inline editor, prefilled from `cookie` when editing.
-     * @param {Element} content - The dialog content root
-     * @param {Object|null} cookie - Cookie being edited, or null to add
+     * @param {Element} content
+     * @param {Object|null} cookie
      */
     _openEditor(content, cookie = null) {
         const editor = content.querySelector('#cookie-editor');
@@ -364,8 +340,6 @@ export class CookieManagerDialog {
     }
 
     _closeEditor(content) {
-        // Focus must not stay on a field inside a section that is about to be
-        // hidden.
         content.querySelector('#cookie-editor-expires')?.blur();
         const editor = content.querySelector('#cookie-editor');
         if (editor) { editor.classList.add('is-hidden'); }
@@ -374,9 +348,8 @@ export class CookieManagerDialog {
     }
 
     /**
-     * Map a validateCookie error code to its localized message.
-     * @param {string} code - Validation error code from the service
-     * @returns {string} The localized message
+     * @param {string} code
+     * @returns {string}
      */
     _validationMessage(code) {
         const fallbacks = {
@@ -518,8 +491,8 @@ export class CookieManagerDialog {
 
         closeBtn.addEventListener('click', close);
 
-        this.dialog.addEventListener('click', (e) => {
-            if (e.target === this.dialog) { close(); return; }
+        this.overlay.addEventListener('click', (e) => {
+            if (e.target === this.overlay) { close(); return; }
             const selector = content.querySelector('.cookie-manager-env-selector');
             if (this._envDropdownOpen && selector && !selector.contains(e.target)) {
                 this._closeEnvDropdown(content);
@@ -584,10 +557,9 @@ export class CookieManagerDialog {
             this.releaseEscape();
             this.releaseEscape = null;
         }
-        if (this.dialog) {
-            this.dialog.remove();
-            this.dialog = null;
-        }
+
+        this.destroy();
+
         if (this.resolve) {
             this.resolve(true);
             this.resolve = null;

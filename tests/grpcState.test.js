@@ -21,12 +21,6 @@ const GRPC_MARKUP = `
     <span id="status-display"></span>
 `;
 
-/**
- * The gRPC panel elements are resolved at module import time, so the markup has to
- * exist before the module graph is (re)loaded. apiHandler is stubbed because
- * importing it auto-initialises the collection controller, which needs the whole
- * app shell in the DOM.
- */
 async function loadGrpcHandler(markup = GRPC_MARKUP) {
     document.body.innerHTML = markup;
     jest.resetModules();
@@ -41,10 +35,8 @@ async function loadGrpcHandler(markup = GRPC_MARKUP) {
 }
 
 /**
- * Load the handler with a real RequestBuilderService (so variable resolution and
- * auth merging behave exactly as in the app) and a stubbed gRPC backend.
- * @param {Object} options - {variables, authData}
- * @returns {Promise<Object>} {module, invokeUnary}
+ * @param {Object} options
+ * @returns {Promise<Object>}
  */
 async function loadGrpcHandlerForSend({ variables = {}, authData = { headers: {}, queryParams: {} } } = {}) {
     document.body.innerHTML = GRPC_MARKUP;

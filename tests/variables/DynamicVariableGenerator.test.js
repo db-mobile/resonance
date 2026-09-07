@@ -38,7 +38,6 @@ describe('DynamicVariableGenerator', () => {
             expect(typeof result).toBe('string');
             expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
 
-            // Should be parseable as a valid date
             const date = new Date(result);
             expect(date.toISOString()).toBe(result);
         });
@@ -49,7 +48,6 @@ describe('DynamicVariableGenerator', () => {
             const result = generator.generate('uuid');
 
             expect(typeof result).toBe('string');
-            // UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
             expect(result).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
         });
 
@@ -140,14 +138,14 @@ describe('DynamicVariableGenerator', () => {
             generator.clearCache();
             const result = generator.generate('randomString', 'invalid');
 
-            expect(result.length).toBe(8); // Falls back to default
+            expect(result.length).toBe(8);
         });
 
         test('should handle zero or negative length', () => {
             generator.clearCache();
             const result = generator.generate('randomString', '0');
 
-            expect(result.length).toBe(8); // Falls back to default
+            expect(result.length).toBe(8);
         });
     });
 
@@ -375,7 +373,6 @@ describe('DynamicVariableGenerator', () => {
             const int1 = generator.generate('randomInt', '1:10');
             const int2 = generator.generate('randomInt', '100:200');
 
-            // Different params should be cached separately
             const int1Again = generator.generate('randomInt', '1:10');
             const int2Again = generator.generate('randomInt', '100:200');
 

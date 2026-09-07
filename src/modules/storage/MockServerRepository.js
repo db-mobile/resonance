@@ -3,40 +3,14 @@
  * @module storage/MockServerRepository
  */
 
-/**
- * Repository for managing mock server configuration persistence
- *
- * @class
- * @classdesc Handles CRUD operations for mock server settings with comprehensive validation
- * in the persistent store. Supports port configuration, enabled collections, and per-endpoint delays.
- * Implements defensive programming with auto-initialization for packaged app compatibility.
- */
 export class MockServerRepository {
-    /**
-     * Creates a MockServerRepository instance
-     *
-     * @param {Object} backendAPI - The backend IPC API bridge
-     */
+    /** @param {Object} backendAPI */
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.SETTINGS_KEY = 'mockServer';
     }
 
-    /**
-     * Retrieves mock server settings with validation and initialization
-     *
-     * Automatically initializes storage with default settings if undefined (packaged
-     * app first run). Validates structure and provides defaults for missing fields.
-     *
-     * @async
-     * @returns {Promise<Object>} Complete mock server settings object
-     * @returns {Promise<number>} return.port - Server port (1024-65535)
-     * @returns {Promise<Array<string>>} return.enabledCollections - Array of enabled collection IDs
-     * @returns {Promise<Object>} return.endpointDelays - Per-endpoint delays in milliseconds
-     * @returns {Promise<Object>} return.customResponses - Per-endpoint custom response bodies
-     * @returns {Promise<Object>} return.customStatusCodes - Per-endpoint custom status codes
-     * @throws {Error} If storage access fails
-     */
+    /** @returns {Promise<Object>} */
     async getSettings() {
         try {
             const data = await this.backendAPI.store.get(this.SETTINGS_KEY);
@@ -75,14 +49,8 @@ export class MockServerRepository {
     }
 
     /**
-     * Saves mock server settings with validation
-     *
-     * Validates and sanitizes all settings before saving.
-     *
-     * @async
-     * @param {Object} settings - Mock server settings object to save
-     * @returns {Promise<Object>} The validated and saved settings
-     * @throws {Error} If settings format invalid or save fails
+     * @param {Object} settings
+     * @returns {Promise<Object>}
      */
     async saveSettings(settings) {
         try {
@@ -100,15 +68,8 @@ export class MockServerRepository {
     }
 
     /**
-     * Updates specific mock server setting fields
-     *
-     * Merges updates with existing settings. EndpointDelays object is merged to preserve
-     * existing delays.
-     *
-     * @async
-     * @param {Object} updates - Object with fields to update
-     * @returns {Promise<Object>} The updated settings object
-     * @throws {Error} If update or save fails
+     * @param {Object} updates
+     * @returns {Promise<Object>}
      */
     async updateSettings(updates) {
         try {
@@ -146,14 +107,10 @@ export class MockServerRepository {
     }
 
     /**
-     * Sets delay for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {number} delayMs - Delay in milliseconds (0-30000)
-     * @returns {Promise<Object>} The updated settings object
-     * @throws {Error} If delay is invalid or save fails
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {number} delayMs
+     * @returns {Promise<Object>}
      */
     async setEndpointDelay(collectionId, endpointId, delayMs) {
         try {
@@ -177,12 +134,9 @@ export class MockServerRepository {
     }
 
     /**
-     * Gets delay for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @returns {Promise<number>} Delay in milliseconds (0 if not set)
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<number>}
      */
     async getEndpointDelay(collectionId, endpointId) {
         try {
@@ -195,14 +149,10 @@ export class MockServerRepository {
     }
 
     /**
-     * Sets custom response for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {Object|null} response - Custom response body (null to reset to default)
-     * @returns {Promise<Object>} The updated settings object
-     * @throws {Error} If save fails
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object|null} response
+     * @returns {Promise<Object>}
      */
     async setCustomResponse(collectionId, endpointId, response) {
         try {
@@ -222,12 +172,9 @@ export class MockServerRepository {
     }
 
     /**
-     * Gets custom response for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @returns {Promise<Object|null>} Custom response body or null if using default
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<Object|null>}
      */
     async getCustomResponse(collectionId, endpointId) {
         try {
@@ -240,14 +187,10 @@ export class MockServerRepository {
     }
 
     /**
-     * Sets custom status code for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {number|null} statusCode - Custom status code (null to reset to default)
-     * @returns {Promise<Object>} The updated settings object
-     * @throws {Error} If save fails
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {number|null} statusCode
+     * @returns {Promise<Object>}
      */
     async setCustomStatusCode(collectionId, endpointId, statusCode) {
         try {
@@ -267,12 +210,9 @@ export class MockServerRepository {
     }
 
     /**
-     * Gets custom status code for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @returns {Promise<number|null>} Custom status code or null if using default
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<number|null>}
      */
     async getCustomStatusCode(collectionId, endpointId) {
         try {
@@ -285,12 +225,8 @@ export class MockServerRepository {
     }
 
     /**
-     * Toggles collection enabled state
-     *
-     * @async
-     * @param {string} collectionId - Collection ID to toggle
-     * @returns {Promise<Object>} Updated settings with new enabled state
-     * @throws {Error} If toggle operation fails
+     * @param {string} collectionId
+     * @returns {Promise<Object>}
      */
     async toggleCollectionEnabled(collectionId) {
         try {
@@ -310,11 +246,8 @@ export class MockServerRepository {
     }
 
     /**
-     * Checks if a collection is enabled
-     *
-     * @async
-     * @param {string} collectionId - Collection ID to check
-     * @returns {Promise<boolean>} True if collection is enabled
+     * @param {string} collectionId
+     * @returns {Promise<boolean>}
      */
     async isCollectionEnabled(collectionId) {
         try {
@@ -325,13 +258,7 @@ export class MockServerRepository {
         }
     }
 
-    /**
-     * Resets mock server settings to defaults
-     *
-     * @async
-     * @returns {Promise<Object>} The default settings object
-     * @throws {Error} If reset fails
-     */
+    /** @returns {Promise<Object>} */
     async resetToDefaults() {
         try {
             const defaultSettings = this._getDefaultSettings();
@@ -343,13 +270,8 @@ export class MockServerRepository {
     }
 
     /**
-     * Validates and sanitizes mock server settings
-     *
-     * Ensures all fields have valid values, falling back to defaults for invalid data.
-     *
-     * @private
-     * @param {Object} settings - Settings object to validate
-     * @returns {Object} Validated and sanitized settings object
+     * @param {Object} settings
+     * @returns {Object}
      */
     _validateSettings(settings) {
         const defaults = this._getDefaultSettings();
@@ -366,11 +288,8 @@ export class MockServerRepository {
     }
 
     /**
-     * Validates port number
-     *
-     * @private
-     * @param {number|string} port - Port number to validate
-     * @returns {boolean} True if port is valid (1024-65535, avoiding system ports)
+     * @param {number|string} port
+     * @returns {boolean}
      */
     _validatePort(port) {
         const portNum = parseInt(port, 10);
@@ -378,11 +297,8 @@ export class MockServerRepository {
     }
 
     /**
-     * Validates delay value
-     *
-     * @private
-     * @param {number|string} delay - Delay in milliseconds to validate
-     * @returns {boolean} True if delay is valid (0-30000ms)
+     * @param {number|string} delay
+     * @returns {boolean}
      */
     _validateDelay(delay) {
         const delayNum = parseInt(delay, 10);
@@ -390,11 +306,8 @@ export class MockServerRepository {
     }
 
     /**
-     * Validates and sanitizes endpoint delays object
-     *
-     * @private
-     * @param {Object} delays - Endpoint delays object to validate
-     * @returns {Object} Validated endpoint delays object
+     * @param {Object} delays
+     * @returns {Object}
      */
     _validateEndpointDelays(delays) {
         if (!delays || typeof delays !== 'object') {
@@ -412,11 +325,8 @@ export class MockServerRepository {
     }
 
     /**
-     * Validates and sanitizes custom responses object
-     *
-     * @private
-     * @param {Object} responses - Custom responses object to validate
-     * @returns {Object} Validated custom responses object
+     * @param {Object} responses
+     * @returns {Object}
      */
     _validateCustomResponses(responses) {
         if (!responses || typeof responses !== 'object') {
@@ -434,11 +344,8 @@ export class MockServerRepository {
     }
 
     /**
-     * Validates and sanitizes custom status codes object
-     *
-     * @private
-     * @param {Object} statusCodes - Custom status codes object to validate
-     * @returns {Object} Validated custom status codes object
+     * @param {Object} statusCodes
+     * @returns {Object}
      */
     _validateCustomStatusCodes(statusCodes) {
         if (!statusCodes || typeof statusCodes !== 'object') {
@@ -456,23 +363,15 @@ export class MockServerRepository {
     }
 
     /**
-     * Validates status code
-     *
-     * @private
-     * @param {number|string} statusCode - Status code to validate
-     * @returns {boolean} True if status code is valid (100-599)
+     * @param {number|string} statusCode
+     * @returns {boolean}
      */
     _validateStatusCode(statusCode) {
         const code = parseInt(statusCode, 10);
         return !isNaN(code) && code >= 100 && code <= 599;
     }
 
-    /**
-     * Creates the default mock server settings structure
-     *
-     * @private
-     * @returns {Object} Default mock server settings object
-     */
+    /** @returns {Object} */
     _getDefaultSettings() {
         return {
             port: 3000,

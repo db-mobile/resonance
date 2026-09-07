@@ -9,11 +9,6 @@ const APP_MARKUP = `
     <span id="response-size-display"></span>
 `;
 
-/**
- * The manager's dependencies resolve their elements at import time, so the markup
- * has to exist before the module graph loads. apiHandler is stubbed because
- * importing it auto-initialises the collection controller.
- */
 async function loadStateManager() {
     document.body.innerHTML = APP_MARKUP;
     jest.resetModules();
@@ -61,10 +56,7 @@ describe('_applyTabEndpoint', () => {
 });
 
 describe('restoreTabState endpoint handling per protocol', () => {
-    /**
-     * Restore a tab of the given protocol through the real restoreTabState.
-     * @returns {Promise<Object|null>} The current endpoint afterwards
-     */
+    /** @returns {Promise<Object|null>} */
     async function restoreAndReadEndpoint(protocol, tabEndpoint, priorEndpoint) {
         const { WorkspaceTabStateManager, getCurrentEndpoint, setCurrentEndpoint } = await loadStateManager();
         setCurrentEndpoint(priorEndpoint);

@@ -1,10 +1,4 @@
 /* global document */
-/**
- * The performance tab reports phases measured on the connection the request
- * actually used. The phases are disjoint, so they must share one scale and add
- * up to the total, and an unmeasured phase must stay distinguishable from a
- * measured zero.
- */
 import { displayPerformanceMetrics, clearPerformanceMetrics } from '../src/modules/performanceMetrics.js';
 
 const fullTimings = {

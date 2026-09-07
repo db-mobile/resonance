@@ -177,7 +177,6 @@ describe('CollectionRepository', () => {
             await repository.getById('col_1');
             await repository.getById('col_1');
 
-            // Should only call backend once due to caching
             expect(mockBackendAPI.collections.get).toHaveBeenCalledTimes(1);
         });
 
@@ -278,11 +277,9 @@ describe('CollectionRepository', () => {
 
             expect(mockBackendAPI.collections.save).toHaveBeenCalledWith(collection);
 
-            // Verify cache is updated
             mockBackendAPI.collections.get.mockResolvedValue(collection);
             const cached = await repository.getById('col_1');
             expect(cached).toEqual(collection);
-            // Should not call backend since it's cached
             expect(mockBackendAPI.collections.get).not.toHaveBeenCalled();
         });
 
@@ -334,16 +331,13 @@ describe('CollectionRepository', () => {
             mockBackendAPI.collections.get.mockResolvedValue(collection);
             mockBackendAPI.collections.delete.mockResolvedValue();
 
-            // Populate cache
             await repository.getById('col_1');
 
-            // Delete
             const result = await repository.delete('col_1');
 
             expect(result).toBe(true);
             expect(mockBackendAPI.collections.delete).toHaveBeenCalledWith('col_1');
 
-            // Cache should be cleared, so next fetch should call backend
             await repository.getById('col_1');
             expect(mockBackendAPI.collections.get).toHaveBeenCalledTimes(2);
         });

@@ -1,22 +1,15 @@
 /**
  * @fileoverview Saved-runner selector dropdown for the Collection Runner: the
- * header toggle, the dropdown list of saved runners, and selection. Tracks which
- * runner is currently active (for highlighting and the delete affordance).
  * @module ui/runner/RunnerSelectorMenu
  */
 
 import { escapeHtml } from './runnerDomUtils.js';
 
-/**
- * Dropdown menu listing saved runners.
- *
- * @class
- */
 export class RunnerSelectorMenu {
     /**
      * @param {Object} [callbacks]
-     * @param {() => Promise<Array>} [callbacks.onLoadRunners] - Fetches saved runners.
-     * @param {(runnerId: string) => void} [callbacks.onSelect] - A runner was chosen.
+     * @param {() => Promise<Array>} [callbacks.onLoadRunners]
+     * @param {(runnerId: string) => void} [callbacks.onSelect]
      */
     constructor({ onLoadRunners, onSelect } = {}) {
         this.dom = {};
@@ -30,12 +23,7 @@ export class RunnerSelectorMenu {
         };
     }
 
-    /**
-     * Caches the selector elements from the panel container and wires the toggle
-     * button and click-outside-to-close behaviour.
-     *
-     * @param {HTMLElement} container - The runner panel container
-     */
+    /** @param {HTMLElement} container */
     mount(container) {
         this.dom = {
             selector: container.querySelector('[data-role="runner-selector"]'),
@@ -52,16 +40,12 @@ export class RunnerSelectorMenu {
         document.addEventListener('click', this._onDocumentClick);
     }
 
-    /**
-     * Removes the document-level click listener so a closed runner tab leaks nothing.
-     * @returns {void}
-     */
+    /** @returns {void} */
     destroy() {
         document.removeEventListener('click', this._onDocumentClick);
         this.dom = {};
     }
 
-    /** Toggles the dropdown open/closed. */
     toggle() {
         if (this.dom.dropdown?.classList.contains('is-hidden')) {
             this.open();
@@ -70,7 +54,6 @@ export class RunnerSelectorMenu {
         }
     }
 
-    /** Opens the dropdown, (re)loading the saved-runner list. */
     async open() {
         if (!this.dom.dropdown || !this.dom.list) {return;}
 
@@ -82,17 +65,11 @@ export class RunnerSelectorMenu {
         this.dom.dropdown.classList.remove('is-hidden');
     }
 
-    /** Closes the dropdown. */
     close() {
         this.dom.dropdown?.classList.add('is-hidden');
     }
 
-    /**
-     * Renders the dropdown list of saved runners.
-     *
-     * @private
-     * @param {Array} runners - List of saved runners
-     */
+    /** @param {Array} runners */
     _renderList(runners) {
         if (!this.dom.list) {return;}
 
@@ -121,12 +98,7 @@ export class RunnerSelectorMenu {
         });
     }
 
-    /**
-     * Selects a runner from the dropdown.
-     *
-     * @private
-     * @param {string} runnerId - Runner ID to select
-     */
+    /** @param {string} runnerId */
     _select(runnerId) {
         this.currentRunnerId = runnerId;
         this._onSelect?.(runnerId);

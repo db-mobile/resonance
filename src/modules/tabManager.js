@@ -3,18 +3,7 @@
  * @module modules/tabManager
  */
 
-/**
- * Initializes tab switching event listeners for request and response tabs
- *
- * Sets up click handlers for request configuration tabs (Query Params, Headers, Body, Auth)
- * and response display tabs (Body, Headers, Cookies, Performance). Handles workspace
- * tab integration for per-tab response displays.
- *
- * @returns {void}
- *
- * @example
- * initTabListeners();
- */
+/** @returns {void} */
 export function initTabListeners() {
     const requestTabButtons = document.querySelectorAll('.request-config .tab-button');
     const requestTabContents = document.querySelectorAll('.request-config .tab-content');
@@ -76,22 +65,12 @@ export function initTabListeners() {
 }
 
 /**
- * Programmatically activates a tab
- *
- * @param {string} tabType - Tab type ('request' or 'response')
- * @param {string} tabId - Tab ID to activate
+ * @param {string} tabType
+ * @param {string} tabId
  * @returns {void}
- *
- * @example
- * activateTab('response', 'response-body');
- * activateTab('request', 'headers');
  */
 /**
- * Switch response tabs visibility based on protocol (HTTP vs gRPC)
- * Shows HTTP tabs (Headers, Cookies, Performance, Scripts) for HTTP requests
- * Shows gRPC tabs (Metadata, Trailers) for gRPC requests
- *
- * @param {string} protocol - 'http', 'websocket', or 'grpc'
+ * @param {string} protocol
  * @returns {void}
  */
 export function setResponseTabsForProtocol(protocol) {

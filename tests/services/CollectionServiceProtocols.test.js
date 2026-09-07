@@ -1,13 +1,5 @@
 import { CollectionService } from '../../src/modules/services/CollectionService.js';
 
-/**
- * Guards the protocol of a saved endpoint.
- *
- * SSE and MQTT endpoints used to be persisted as `http` because the save path
- * re-derived the protocol from a chain that only knew about gRPC, WebSocket and
- * GraphQL. These tests pin every protocol's stored shape so a protocol added
- * later cannot quietly degrade the same way.
- */
 describe('CollectionService.addRequestToCollection protocol handling', () => {
     let repository;
     let service;

@@ -1,12 +1,3 @@
-/**
- * Performance Metrics Display Module
- * Visualizes the timing breakdown of the connection a request actually used.
- *
- * Phases are disjoint and sum to the total, so the bars and the waterfall share
- * one scale. A phase of `null` was not measured — a reused connection performs
- * no connect, and a proxy may resolve the name remotely — which is rendered
- * distinctly from a measured zero.
- */
 
 const NOT_MEASURED = 'n/a';
 
@@ -17,9 +8,6 @@ const PHASE_COLORS = {
     download: '#c061cb'
 };
 
-/**
- * Ordered phase descriptors driving the summary, the bars, the waterfall and the legend.
- */
 const PHASES = [
     {
         key: 'dns',
@@ -48,9 +36,8 @@ const PHASES = [
 ];
 
 /**
- * Format milliseconds to human-readable string
- * @param {number|null|undefined} ms - Time in fractional milliseconds
- * @returns {string} - Formatted time string
+ * @param {number|null|undefined} ms
+ * @returns {string}
  */
 function formatTime(ms) {
     if (ms === null || ms === undefined || Number.isNaN(ms)) {
@@ -66,10 +53,9 @@ function formatTime(ms) {
 }
 
 /**
- * Calculate percentage for progress bar
- * @param {number} value - Current value
- * @param {number} total - Total value
- * @returns {number} - Percentage
+ * @param {number} value
+ * @param {number} total
+ * @returns {number}
  */
 function calculatePercentage(value, total) {
     if (!value || !total || total === 0) {return 0;}
@@ -77,12 +63,11 @@ function calculatePercentage(value, total) {
 }
 
 /**
- * Create a timing bar element
- * @param {string} label - Label for the timing
- * @param {number} time - Time in milliseconds
- * @param {number} totalTime - Total request time
- * @param {string} color - Color for the bar
- * @returns {HTMLElement} - Timing bar element
+ * @param {string} label
+ * @param {number} time
+ * @param {number} totalTime
+ * @param {string} color
+ * @returns {HTMLElement}
  */
 function createTimingBar(label, time, totalTime, color) {
     const barContainer = document.createElement('div');
@@ -113,11 +98,10 @@ function createTimingBar(label, time, totalTime, color) {
 }
 
 /**
- * Create a summary metric element
- * @param {string} label - Label for the metric
- * @param {string} value - Value to display
- * @param {string} [title] - Tooltip explaining the value
- * @returns {HTMLElement} - Metric element
+ * @param {string} label
+ * @param {string} value
+ * @param {string} [title]
+ * @returns {HTMLElement}
  */
 function createMetric(label, value, title) {
     const metric = document.createElement('div');
@@ -141,11 +125,10 @@ function createMetric(label, value, title) {
 }
 
 /**
- * Create a waterfall segment for one phase
- * @param {Object} phase - Phase descriptor
- * @param {number} value - Phase duration in milliseconds
- * @param {number} total - Total request time
- * @returns {HTMLElement} - Segment element
+ * @param {Object} phase
+ * @param {number} value
+ * @param {number} total
+ * @returns {HTMLElement}
  */
 function createWaterfallSegment(phase, value, total) {
     const segment = document.createElement('div');
@@ -157,19 +140,17 @@ function createWaterfallSegment(phase, value, total) {
 }
 
 /**
- * Whether a phase holds a duration worth drawing
- * @param {number|null|undefined} value - Phase duration
- * @returns {boolean} - True when the phase is measured and non-zero
+ * @param {number|null|undefined} value
+ * @returns {boolean}
  */
 function isDrawable(value) {
     return typeof value === 'number' && !Number.isNaN(value) && value > 0;
 }
 
 /**
- * Build the summary grid of headline numbers
- * @param {Object} timings - Timing data object
- * @param {number} size - Response size in bytes
- * @returns {HTMLElement} - Summary element
+ * @param {Object} timings
+ * @param {number} size
+ * @returns {HTMLElement}
  */
 function buildSummary(timings, size) {
     const summary = document.createElement('div');
@@ -214,9 +195,8 @@ function buildSummary(timings, size) {
 }
 
 /**
- * Build the per-phase bars and the stacked waterfall
- * @param {Object} timings - Timing data object
- * @returns {HTMLElement} - Breakdown element
+ * @param {Object} timings
+ * @returns {HTMLElement}
  */
 function buildBreakdown(timings) {
     const breakdown = document.createElement('div');
@@ -252,10 +232,7 @@ function buildBreakdown(timings) {
     return breakdown;
 }
 
-/**
- * Build the phase colour legend
- * @returns {HTMLElement} - Legend element
- */
+/** @returns {HTMLElement} */
 function buildLegend() {
     const legend = document.createElement('div');
     legend.className = 'timing-legend';
@@ -289,10 +266,9 @@ function buildLegend() {
 }
 
 /**
- * Display performance metrics for a request
- * @param {HTMLElement} container - Container element
- * @param {Object} timings - Timing data object
- * @param {number} size - Response size in bytes
+ * @param {HTMLElement} container
+ * @param {Object} timings
+ * @param {number} size
  */
 export function displayPerformanceMetrics(container, timings, size) {
     if (!container) {
@@ -311,10 +287,7 @@ export function displayPerformanceMetrics(container, timings, size) {
     container.appendChild(buildLegend());
 }
 
-/**
- * Clear performance metrics display
- * @param {HTMLElement} container - Container element
- */
+/** @param {HTMLElement} container */
 export function clearPerformanceMetrics(container) {
     if (container) {
         container.innerHTML = '<p class="no-data">Send a request to see performance metrics</p>';

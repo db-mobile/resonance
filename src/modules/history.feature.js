@@ -1,6 +1,5 @@
 /**
  * @fileoverview Feature descriptor wiring the request-history controller for the
- * FeatureRegistry.
  * @module history.feature
  */
 

@@ -5,10 +5,6 @@ import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { searchKeymap, highlightSelectionMatches, search } from '@codemirror/search';
 import { createThemedHighlighting } from './editorTheme.js';
 
-/**
- * RequestBodyEditor - Manages CodeMirror editor for request body input
- * Provides syntax highlighting for JSON with line numbers and editing capability
- */
 export class RequestBodyEditor {
     constructor(containerElement, options = {}) {
         this.container = containerElement;
@@ -19,18 +15,12 @@ export class RequestBodyEditor {
         this.init();
     }
 
-    /**
-     * Get theme extensions based on current color scheme
-     * @returns {Array} Array of theme extensions
-     */
+    /** @returns {Array} */
     getThemeExtensions() {
         return [this._themed.extension];
     }
 
-    /**
-     * Get search extensions for Ctrl+F functionality
-     * @returns {Array} Array of search extensions
-     */
+    /** @returns {Array} */
     getSearchExtensions() {
         return [
             search(),
@@ -39,9 +29,6 @@ export class RequestBodyEditor {
         ];
     }
 
-    /**
-     * Initialize the CodeMirror editor
-     */
     init() {
         this._themed = createThemedHighlighting();
         const extensions = [
@@ -75,10 +62,7 @@ export class RequestBodyEditor {
         this._themed.attach(this.view);
     }
 
-    /**
-     * Set content in the editor
-     * @param {string} content - The content to set
-     */
+    /** @param {string} content */
     setContent(content) {
         const transaction = this.view.state.update({
             changes: {
@@ -90,33 +74,21 @@ export class RequestBodyEditor {
         this.view.dispatch(transaction);
     }
 
-    /**
-     * Get the current editor content
-     * @returns {string}
-     */
+    /** @returns {string} */
     getContent() {
         return this.view.state.doc.toString();
     }
 
-    /**
-     * Clear the editor content
-     */
     clear() {
         this.setContent('');
     }
 
-    /**
-     * Set a callback to be called when content changes
-     * @param {function} callback - Function to call with new content
-     */
+    /** @param {function} callback */
     onChange(callback) {
         this.changeCallback = callback;
     }
 
-    /**
-     * Format the JSON content
-     * @returns {boolean} - True if formatting succeeded, false otherwise
-     */
+    /** @returns {boolean} */
     formatJSON() {
         if (this.language !== 'json') {
             return true;
@@ -135,16 +107,10 @@ export class RequestBodyEditor {
         }
     }
 
-    /**
-     * Focus the editor
-     */
     focus() {
         this.view.focus();
     }
 
-    /**
-     * Destroy the editor instance
-     */
     destroy() {
         this._themed?.dispose();
         this._themed = null;

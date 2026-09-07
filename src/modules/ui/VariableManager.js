@@ -3,25 +3,15 @@
  * @module ui/VariableManager
  */
 
-/**
- * Variable management dialog with import/export functionality
- *
- * @class
- * @classdesc Provides a modal interface for CRUD operations on collection variables.
- * Supports key-value pair editing, import/export to JSON, and auto-adds empty rows.
- * Variables use {{variableName}} template syntax in requests.
- */
 import { templateLoader } from '../templateLoader.js';
 import { toast } from './Toast.js';
 import { DynamicVariablesReferenceDialog } from './DynamicVariablesReferenceDialog.js';
 import { pushEscapeHandler } from './modalEscape.js';
+import { BaseModal } from './BaseModal.js';
 
-export class VariableManager {
-    /**
-     * Creates a VariableManager instance
-     */
+export class VariableManager extends BaseModal {
     constructor() {
-        this.dialog = null;
+        super();
         this.onSave = null;
         this.onCancel = null;
         this.releaseEscape = null;
@@ -29,11 +19,9 @@ export class VariableManager {
 
     /**
      * @param {string} collectionName
-     * @param {Array<{name: string, value: string, secret?: boolean}>} entries - Variable
-     *   editor entries. (A plain `{name: value}` object is also accepted for convenience.)
+     * @param {Array<{name: string, value: string, secret?: boolean}>} entries
      * @param {Object} [options]
-     * @returns {Promise<{variables: Object, secretKeys: string[]}|null>} The edited
-     *   variables and the names flagged secret, or null if cancelled.
+     * @returns {Promise<{variables: Object, secretKeys: string[]}|null>}
      */
     show(collectionName, entries = [], options = {}) {
         return new Promise((resolve, _reject) => {
@@ -45,9 +33,6 @@ export class VariableManager {
     }
 
     /**
-     * Accepts either editor entries or a legacy flat `{name: value}` object.
-     *
-     * @private
      * @param {Array|Object} entries
      * @returns {Array<{name: string, value: string, secret: boolean}>}
      */
@@ -59,27 +44,19 @@ export class VariableManager {
     }
 
     createDialog(collectionName, variables, options) {
-        this.dialog = document.createElement('div');
-        this.dialog.className = 'variable-dialog-overlay modal-overlay';
-
-        const dialogContent = document.createElement('div');
-        dialogContent.className = 'variable-dialog modal-dialog modal-dialog--variable-manager modal-dialog--scroll-y';
-
-        const title = options.title || `Variables - ${collectionName}`;
-
-        const fragment = templateLoader.cloneSync(
-            './src/templates/variables/variableManager.html',
-            'tpl-variable-manager-dialog'
-        );
-        dialogContent.appendChild(fragment);
+        const dialogContent = this.mount({
+            overlayClass: 'variable-dialog-overlay',
+            dialogClass: 'variable-dialog modal-dialog modal-dialog--variable-manager modal-dialog--scroll-y',
+            templatePath: './src/templates/variables/variableManager.html',
+            templateId: 'tpl-variable-manager-dialog',
+            closeOnEscape: false,
+            closeOnOverlayClick: false
+        });
 
         const titleEl = dialogContent.querySelector('[data-role="title"]');
         if (titleEl) {
-            titleEl.textContent = title;
+            titleEl.textContent = options.title || `Variables - ${collectionName}`;
         }
-
-        this.dialog.appendChild(dialogContent);
-        document.body.appendChild(this.dialog);
 
         this.populateVariables(variables);
         this.setupEventListeners(dialogContent);
@@ -134,12 +111,6 @@ export class VariableManager {
         container.appendChild(row);
     }
 
-    /**
-     * Reflects a row's secret state: masks the value, shows the reveal toggle, and
-     * highlights the lock button.
-     *
-     * @private
-     */
     _applySecretState(row, isSecret) {
         const valueInput = row.querySelector('.variable-value');
         const secretBtn = row.querySelector('.variable-secret-btn');
@@ -159,11 +130,6 @@ export class VariableManager {
         }
     }
 
-    /**
-     * Wires the per-row secret toggle and reveal toggle.
-     *
-     * @private
-     */
     _setupSecretControls(row) {
         const valueInput = row.querySelector('.variable-value');
         const secretBtn = row.querySelector('.variable-secret-btn');
@@ -214,8 +180,8 @@ export class VariableManager {
             referenceBtn.addEventListener('click', () => new DynamicVariablesReferenceDialog().show());
         }
 
-        this.dialog.addEventListener('click', (e) => {
-            if (e.target === this.dialog) {
+        this.overlay.addEventListener('click', (e) => {
+            if (e.target === this.overlay) {
                 this.close();
             }
         });
@@ -287,10 +253,9 @@ export class VariableManager {
             this.releaseEscape();
             this.releaseEscape = null;
         }
-        if (this.dialog) {
-            this.dialog.remove();
-            this.dialog = null;
-        }
+
+        this.destroy();
+
         this.onSave = null;
         this.onCancel = null;
     }

@@ -25,10 +25,8 @@ const session = new StreamSession({
 });
 
 /**
- * Render the MQTT connection indicator (status pill + Disconnect button) from a
- * tab's state entry. Only touches the DOM, which is shared by the active tab.
  * @param {Object|null} entry
- * @param {boolean} [flash] - briefly flash the pill (a message just arrived)
+ * @param {boolean} [flash]
  */
 function renderMqttStatus(entry, flash = false) {
     const pill = document.getElementById('mqtt-status-pill');
@@ -65,7 +63,6 @@ function renderMqttStatus(entry, flash = false) {
 }
 
 /**
- * Update the indicator only when the given tab is the active one.
  * @param {string} tabId
  * @param {boolean} [flash]
  */
@@ -75,11 +72,7 @@ async function updateMqttUiIfActive(tabId, flash = false) {
     }
 }
 
-/**
- * Re-sync the indicator to a tab's live connection state. Called when restoring
- * or switching into an MQTT tab so the pill/button reflect that tab.
- * @param {string} tabId
- */
+/** @param {string} tabId */
 export async function refreshMqttConnectionUi(tabId) {
     if (await isTabCurrentlyActive(tabId)) {
         renderMqttStatus(session.get(tabId));
@@ -99,9 +92,6 @@ function normalizeMqttBroker(broker) {
 }
 
 /**
- * Extract the host[:port] an MQTT broker URL resolves to, matching how the
- * HTTP and gRPC paths key the certificate store. "mqtts://h:8883/path" and
- * "h:8883" both yield "h:8883"; no default port is injected.
  * @param {string} broker
  * @returns {string}
  */
@@ -114,7 +104,7 @@ function mqttHostForCertLookup(broker) {
 }
 
 /**
- * @param {string} broker - normalized broker URL (always carries a scheme)
+ * @param {string} broker
  * @returns {boolean}
  */
 function isTlsBroker(broker) {
@@ -122,10 +112,6 @@ function isTlsBroker(broker) {
 }
 
 /**
- * Build the TLS options for mqtt_connect, or null for plaintext brokers.
- * Skip-verify follows the global "Verify SSL certificates" setting and the
- * client certificate/CA resolve from the per-host certificate store, same
- * as the HTTP and gRPC paths.
  * @param {string} normalizedBroker
  * @returns {Promise<Object|null>}
  */
@@ -152,20 +138,13 @@ async function buildMqttTlsOptions(normalizedBroker) {
                 tls.clientCert = cert;
             }
         } catch (_e) {
-            /* certificate lookup is best-effort */
         }
     }
     return tls;
 }
 
 /**
- * Handles a backend MQTT event for one tab.
- *
- * A closed tab drops its session before the backend has finished unwinding, and
- * its terminal `disconnect` still arrives. Rendering it would resurrect the
- * tab's response container, so anything without a live session is ignored.
- *
- * @param {{payload: Object}} event - Tauri event carrying the broker payload
+ * @param {{payload: Object}} event
  * @returns {Promise<void>}
  */
 async function handleBackendEvent(event) {
@@ -250,9 +229,7 @@ export const initMqttHandler = createBackendEventListener(
 );
 
 /**
- * Connect to an MQTT broker, subscribe to the configured topic, and optionally
- * publish a message.
- * @param {string} broker - Broker URL (mqtt:// or mqtts://)
+ * @param {string} broker
  * @param {Object} options
  * @param {string} [options.clientId]
  * @param {string} [options.username]
@@ -261,7 +238,7 @@ export const initMqttHandler = createBackendEventListener(
  * @param {string} [options.publishTopic]
  * @param {number} [options.qos]
  * @param {string} [options.payload]
- * @returns {Promise<boolean>} true if a connection was established
+ * @returns {Promise<boolean>}
  */
 export async function handleMqttSend(broker, options = {}) {
     await initMqttHandler();

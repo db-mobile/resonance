@@ -1,11 +1,5 @@
 import { CollectionRepository } from '../../src/modules/storage/CollectionRepository.js';
 
-/**
- * Closing a collection opened in place must leave every file alone, and must
- * keep the stored credentials: they are the only part of such a collection
- * that does not live in its directory, so discarding them would make Close
- * destructive in the one dimension the files are not.
- */
 describe('CollectionRepository.close', () => {
     let repository;
     let backendAPI;

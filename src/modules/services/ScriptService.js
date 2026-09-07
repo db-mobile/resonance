@@ -5,11 +5,7 @@
 
 import { app } from '../appContext.js';
 
-/**
- * Request fields a pre-request script may mutate: the exact set seeded into the
- * script's `request` object and the only keys copied back from the result.
- * @type {ReadonlyArray<string>}
- */
+/** @type {ReadonlyArray<string>} */
 export const SCRIPT_MUTABLE_REQUEST_FIELDS = Object.freeze([
     'url',
     'method',
@@ -19,19 +15,11 @@ export const SCRIPT_MUTABLE_REQUEST_FIELDS = Object.freeze([
     'pathParams'
 ]);
 
-/**
- * Service for managing script operations and execution
- * Coordinates between storage, execution, and environment management
- *
- * @class
- * @classdesc Handles script CRUD operations and execution coordination
- */
 export class ScriptService {
     /**
-     * Creates a ScriptService instance
-     * @param {Object} scriptRepository - ScriptRepository instance
-     * @param {Object} environmentService - EnvironmentService instance
-     * @param {Object} statusDisplay - Status display adapter
+     * @param {Object} scriptRepository
+     * @param {Object} environmentService
+     * @param {Object} statusDisplay
      */
     constructor(scriptRepository, environmentService, statusDisplay) {
         this.repository = scriptRepository;
@@ -40,10 +28,9 @@ export class ScriptService {
     }
 
     /**
-     * Get scripts for an endpoint
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @returns {Promise<Object>} Scripts object
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<Object>}
      */
     async getScripts(collectionId, endpointId) {
         try {
@@ -57,10 +44,9 @@ export class ScriptService {
     }
 
     /**
-     * Save scripts for an endpoint
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {Object} scripts - Scripts to save
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} scripts
      * @returns {Promise<void>}
      */
     async saveScripts(collectionId, endpointId, scripts) {
@@ -72,10 +58,9 @@ export class ScriptService {
     }
 
     /**
-     * Execute a pre-request script
-     * @param {string} script - The script code
-     * @param {Object} requestConfig - Request configuration
-     * @returns {Promise<Object>} Modified request config and execution result
+     * @param {string} script
+     * @param {Object} requestConfig
+     * @returns {Promise<Object>}
      */
     async executePreRequestScript(script, requestConfig) {
         if (!script || script.trim() === '') {
@@ -128,11 +113,10 @@ export class ScriptService {
     }
 
     /**
-     * Execute a test script
-     * @param {string} script - The script code
-     * @param {Object} requestConfig - Request configuration
-     * @param {Object} response - Response data
-     * @returns {Promise<Object>} Execution result
+     * @param {string} script
+     * @param {Object} requestConfig
+     * @param {Object} response
+     * @returns {Promise<Object>}
      */
     async executeTestScript(script, requestConfig, response) {
         if (!script || script.trim() === '') {
@@ -196,15 +180,9 @@ export class ScriptService {
     }
 
     /**
-     * Merge script mutations over the full request config, copying only the
-     * allowlisted {@link SCRIPT_MUTABLE_REQUEST_FIELDS}. Config-only fields
-     * (auth, client cert, timeouts, body type, TLS verification) are never
-     * taken from the script result, so a script cannot inject them.
-     * Non-object shapes are discarded in favor of the original config.
-     * @private
-     * @param {Object} requestConfig - Original request configuration
-     * @param {Object|undefined} modifiedRequest - Request returned by the script runtime
-     * @returns {Object} Request configuration to send
+     * @param {Object} requestConfig
+     * @param {Object|undefined} modifiedRequest
+     * @returns {Object}
      */
     _mergeModifiedRequest(requestConfig, modifiedRequest) {
         if (!modifiedRequest || typeof modifiedRequest !== 'object' || Array.isArray(modifiedRequest)) {
@@ -219,13 +197,7 @@ export class ScriptService {
         return merged;
     }
 
-    /**
-     * The cookie jar controller, when the cookie feature is wired and enabled.
-     * Returns null when cookies are switched off so scripts see an empty jar
-     * and their writes are discarded, matching header-injection behavior.
-     * @private
-     * @returns {Promise<Object|null>} The cookie controller, or null
-     */
+    /** @returns {Promise<Object|null>} */
     async _cookieController() {
         const controller = app.cookieController;
         if (!controller) {
@@ -242,11 +214,7 @@ export class ScriptService {
         return controller;
     }
 
-    /**
-     * Read the active environment's cookies to seed the script sandbox.
-     * @private
-     * @returns {Promise<Array<Object>>} Stored cookies, or an empty list
-     */
+    /** @returns {Promise<Array<Object>>} */
     async _readCookieJar() {
         try {
             const controller = await this._cookieController();
@@ -260,10 +228,7 @@ export class ScriptService {
     }
 
     /**
-     * Apply the cookie operations a script recorded. Runs before the request is
-     * sent for pre-request scripts, so writes are picked up by cookie injection.
-     * @private
-     * @param {Array<Object>|undefined} changes - Recorded cookie operations
+     * @param {Array<Object>|undefined} changes
      * @returns {Promise<void>}
      */
     async _applyCookieChanges(changes) {
@@ -281,9 +246,7 @@ export class ScriptService {
     }
 
     /**
-     * Apply environment variable changes from script execution
-     * @private
-     * @param {Object} changes - Environment changes object
+     * @param {Object} changes
      * @returns {Promise<void>}
      */
     async _applyEnvironmentChanges(changes) {
@@ -313,9 +276,8 @@ export class ScriptService {
     }
 
     /**
-     * Validate script syntax (basic check)
-     * @param {string} script - The script to validate
-     * @returns {Object} Validation result {valid: boolean, error: string}
+     * @param {string} script
+     * @returns {Object}
      */
     validateScript(script) {
         if (!script || script.trim() === '') {

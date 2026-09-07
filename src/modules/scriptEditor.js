@@ -10,9 +10,6 @@ import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { searchKeymap, highlightSelectionMatches, search } from '@codemirror/search';
 import { createThemedHighlighting } from './editorTheme.js';
 
-/**
- * ScriptEditor - CodeMirror editor for JavaScript code editing
- */
 export class ScriptEditor {
     constructor(containerElement) {
         this.container = containerElement;
@@ -23,18 +20,12 @@ export class ScriptEditor {
         this.init();
     }
 
-    /**
-     * Get theme extensions based on current color scheme
-     * @returns {Array} Array of theme extensions
-     */
+    /** @returns {Array} */
     getThemeExtensions() {
         return [this._themed.extension];
     }
 
-    /**
-     * Get search extensions for Ctrl+F functionality
-     * @returns {Array} Array of search extensions
-     */
+    /** @returns {Array} */
     getSearchExtensions() {
         return [
             search(),
@@ -43,9 +34,6 @@ export class ScriptEditor {
         ];
     }
 
-    /**
-     * Initialize the CodeMirror editor
-     */
     init() {
         this._themed = createThemedHighlighting();
         const extensions = [
@@ -76,18 +64,14 @@ export class ScriptEditor {
         this._themed.attach(this.view);
     }
 
-    /**
-     * Register a callback for content changes
-     * @param {Function} callback - Called when content changes
-     */
+    /** @param {Function} callback */
     onChange(callback) {
         this.changeCallback = callback;
     }
 
     /**
-     * Set editor content
-     * @param {string} content - JavaScript code to set
-     * @param {{emitChange?: boolean}} [options] - Pass emitChange false to suppress the change callback
+     * @param {string} content
+     * @param {{emitChange?: boolean}} [options]
      */
     setContent(content, { emitChange = true } = {}) {
         this._suppressChange = !emitChange;
@@ -104,32 +88,20 @@ export class ScriptEditor {
         }
     }
 
-    /**
-     * Get current editor content
-     * @returns {string}
-     */
+    /** @returns {string} */
     getContent() {
         return this.view.state.doc.toString();
     }
 
-    /**
-     * Clear editor content
-     * @param {{emitChange?: boolean}} [options] - Pass emitChange false to suppress the change callback
-     */
+    /** @param {{emitChange?: boolean}} [options] */
     clear(options) {
         this.setContent('', options);
     }
 
-    /**
-     * Focus the editor
-     */
     focus() {
         this.view.focus();
     }
 
-    /**
-     * Destroy the editor
-     */
     destroy() {
         this._themed?.dispose();
         this._themed = null;

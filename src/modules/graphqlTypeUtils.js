@@ -1,7 +1,5 @@
 /**
  * @fileoverview Shared helpers for classifying printed GraphQL type strings into
- * input widgets. Used by both the variables table and the Explorer's inline
- * argument editor.
  * @module graphqlTypeUtils
  */
 
@@ -11,16 +9,14 @@ export const NUMBER_SCALARS = new Set(['Int', 'Float']);
 export const TEXT_SCALARS = new Set(['ID', 'String']);
 
 /**
- * Strip list/non-null decorations from a printed GraphQL type to its base name.
- * @param {string} typeString - e.g. `[String!]!`
- * @returns {string} e.g. `String`
+ * @param {string} typeString
+ * @returns {string}
  */
 export function baseTypeName(typeString) {
     return (typeString || '').replace(/[[\]!]/g, '').trim();
 }
 
 /**
- * Whether a printed type is a list type.
  * @param {string} typeString
  * @returns {boolean}
  */
@@ -29,8 +25,6 @@ export function isListType(typeString) {
 }
 
 /**
- * Choose the input widget for a type. Enum detection needs the schema; everything
- * else is derived from the printed type alone.
  * @param {string} typeString
  * @param {import('graphql').GraphQLSchema|null} [schema]
  * @returns {'number'|'boolean'|'enum'|'text'|'json'}
@@ -60,7 +54,6 @@ export function inputKindForType(typeString, schema = null) {
 }
 
 /**
- * The enum value names for a type, or an empty array.
  * @param {string} typeString
  * @param {import('graphql').GraphQLSchema|null} [schema]
  * @returns {string[]}
@@ -74,8 +67,7 @@ export function enumValuesForType(typeString, schema = null) {
 }
 
 /**
- * Coerce a raw widget value into the JS value to serialize as a variable value.
- * @param {*} raw - string (most inputs) or boolean (checkbox).
+ * @param {*} raw
  * @param {string} typeString
  * @returns {*}
  */

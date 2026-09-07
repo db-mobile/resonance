@@ -7,84 +7,49 @@ import { HistoryRepository } from '../storage/HistoryRepository.js';
 import { statusCategory } from '../utils/statusCategory.js';
 import { grpcStatusName, isGrpcStatusOk } from '../utils/grpcStatus.js';
 
-/**
- * Placeholder stored in place of a redacted credential value.
- * @type {string}
- */
+/** @type {string} */
 export const REDACTED_PLACEHOLDER = '[redacted]';
 
-/**
- * Request header names whose values are always redacted before a history entry
- * is persisted (case-insensitive).
- * @type {ReadonlyArray<string>}
- */
+/** @type {ReadonlyArray<string>} */
 export const SENSITIVE_REQUEST_HEADERS = Object.freeze(['authorization', 'proxy-authorization', 'cookie']);
 
-/**
- * Response header names whose values are always redacted before a history entry
- * is persisted (case-insensitive).
- * @type {ReadonlyArray<string>}
- */
+/** @type {ReadonlyArray<string>} */
 export const SENSITIVE_RESPONSE_HEADERS = Object.freeze(['set-cookie']);
 
-/**
- * Service for managing request history business logic
- *
- * @class
- * @classdesc Provides high-level history operations including history entry creation,
- * retrieval, search, and formatting utilities. Tracks request/response pairs with
- * timestamps and metadata for replay functionality. Includes UI helper methods
- * for formatting timestamps, colors, and URLs.
- */
 export class HistoryService {
-    /**
-     * Creates a HistoryService instance
-     *
-     * @param {Object} backendAPI - The backend IPC API bridge
-     */
+    /** @param {Object} backendAPI */
     constructor(backendAPI) {
         this.repository = new HistoryRepository(backendAPI);
         this.maxHistoryItems = 100;
     }
 
-    /**
-     * Generates a unique history entry ID
-     *
-     * @private
-     * @returns {string} Unique history entry identifier
-     */
+    /** @returns {string} */
     generateId() {
         return `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 
     /**
-     * Creates a new history entry from request and response data
-     *
-     * Captures complete request/response state including method, URL, headers,
-     * body, status, timing, and size information.
-     *
-     * @async
-     * @param {Object} requestConfig - The request configuration
-     * @param {string} requestConfig.method - HTTP method
-     * @param {string} requestConfig.url - Request URL
-     * @param {Object} [requestConfig.headers] - Request headers
-     * @param {*} [requestConfig.body] - Request body
-     * @param {Object} result - The request result
-     * @param {boolean} result.success - Whether request was successful
-     * @param {number} [result.status] - HTTP status code
-     * @param {string} [result.statusText] - HTTP status text
-     * @param {*} [result.data] - Response data
-     * @param {Object} [result.headers] - Response headers
-     * @param {number} [result.ttfb] - Time to first byte (ms)
-     * @param {number} [result.size] - Response size (bytes)
-     * @param {Object} [currentEndpoint=null] - Current endpoint context
-     * @param {string} [currentEndpoint.collectionId] - Collection ID
-     * @param {string} [currentEndpoint.endpointId] - Endpoint ID
-     * @param {string} [environmentName=null] - Active environment name
-     * @param {Object} [sensitive={}] - Extra credential locations to redact
-     * @param {string[]} [sensitive.headerNames] - Request header names to redact (e.g. a configured API-key header)
-     * @param {string[]} [sensitive.queryNames] - Query parameter names to redact (e.g. a configured API-key query param)
-     * @returns {Promise<Object>} The created history entry
+     * @param {Object} requestConfig
+     * @param {string} requestConfig.method
+     * @param {string} requestConfig.url
+     * @param {Object} [requestConfig.headers]
+     * @param {*} [requestConfig.body]
+     * @param {Object} result
+     * @param {boolean} result.success
+     * @param {number} [result.status]
+     * @param {string} [result.statusText]
+     * @param {*} [result.data]
+     * @param {Object} [result.headers]
+     * @param {number} [result.ttfb]
+     * @param {number} [result.size]
+     * @param {Object} [currentEndpoint=null]
+     * @param {string} [currentEndpoint.collectionId]
+     * @param {string} [currentEndpoint.endpointId]
+     * @param {string} [environmentName=null]
+     * @param {Object} [sensitive={}]
+     * @param {string[]} [sensitive.headerNames]
+     * @param {string[]} [sensitive.queryNames]
+     * @returns {Promise<Object>}
      */
     async createHistoryEntry(requestConfig, result, currentEndpoint = null, environmentName = null, sensitive = {}) {
         const headerNames = sensitive.headerNames || [];
@@ -131,16 +96,10 @@ export class HistoryService {
     }
 
     /**
-     * Returns a copy of a header map with sensitive values replaced by
-     * {@link REDACTED_PLACEHOLDER}, matching header names case-insensitively.
-     * Keys (and their original casing) are preserved so the request shape is
-     * still visible in history.
-     *
-     * @private
-     * @param {Object} headers - Header key-value map
-     * @param {ReadonlyArray<string>} baseNames - Always-sensitive lowercased names
-     * @param {string[]} [extraNames=[]] - Additional names to redact
-     * @returns {Object} Redacted header map
+     * @param {Object} headers
+     * @param {ReadonlyArray<string>} baseNames
+     * @param {string[]} [extraNames=[]]
+     * @returns {Object}
      */
     _redactHeaders(headers, baseNames, extraNames = []) {
         if (!headers || typeof headers !== 'object') {
@@ -155,14 +114,9 @@ export class HistoryService {
     }
 
     /**
-     * Replaces the values of the named query parameters in a URL with
-     * {@link REDACTED_PLACEHOLDER}, preserving the parameter names. Returns the
-     * URL unchanged when it has no such parameters or cannot be parsed.
-     *
-     * @private
-     * @param {string} url - The URL to redact
-     * @param {string[]} [queryNames=[]] - Query parameter names to redact
-     * @returns {string} Redacted URL
+     * @param {string} url
+     * @param {string[]} [queryNames=[]]
+     * @returns {string}
      */
     _redactUrlQuery(url, queryNames = []) {
         if (!url || queryNames.length === 0) {
@@ -184,67 +138,43 @@ export class HistoryService {
         }
     }
 
-    /**
-     * Retrieves all history entries
-     *
-     * @async
-     * @returns {Promise<Array<Object>>} Array of history entries, newest first
-     */
+    /** @returns {Promise<Array<Object>>} */
     async getAllHistory() {
         return this.repository.getAll();
     }
 
     /**
-     * Retrieves a specific history entry by ID
-     *
-     * @async
-     * @param {string} id - The history entry ID
-     * @returns {Promise<Object|null>} The history entry or null if not found
+     * @param {string} id
+     * @returns {Promise<Object|null>}
      */
     async getHistoryById(id) {
         return this.repository.getById(id);
     }
 
     /**
-     * Deletes a specific history entry
-     *
-     * @async
-     * @param {string} id - The history entry ID to delete
-     * @returns {Promise<boolean>} True if deletion was successful
+     * @param {string} id
+     * @returns {Promise<boolean>}
      */
     async deleteHistoryEntry(id) {
         return this.repository.delete(id);
     }
 
-    /**
-     * Clears all history entries
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async clearAllHistory() {
         return this.repository.clear();
     }
 
     /**
-     * Retrieves history entries for a specific collection
-     *
-     * @async
-     * @param {string} collectionId - The collection ID
-     * @returns {Promise<Array<Object>>} Array of matching history entries
+     * @param {string} collectionId
+     * @returns {Promise<Array<Object>>}
      */
     async getHistoryByCollection(collectionId) {
         return this.repository.getByCollection(collectionId);
     }
 
     /**
-     * Searches history entries by term
-     *
-     * Searches across URL, method, and other request properties.
-     *
-     * @async
-     * @param {string} searchTerm - The search term
-     * @returns {Promise<Array<Object>>} Array of matching history entries
+     * @param {string} searchTerm
+     * @returns {Promise<Array<Object>>}
      */
     async searchHistory(searchTerm) {
         if (!searchTerm || searchTerm.trim() === '') {
@@ -254,12 +184,8 @@ export class HistoryService {
     }
 
     /**
-     * Formats a timestamp into human-readable relative time
-     *
-     * Returns "Just now", "X mins ago", "X hours ago", "X days ago", or full date.
-     *
-     * @param {number} timestamp - Unix timestamp in milliseconds
-     * @returns {string} Formatted time string
+     * @param {number} timestamp
+     * @returns {string}
      */
     formatTimestamp(timestamp) {
         const date = new Date(timestamp);
@@ -283,15 +209,8 @@ export class HistoryService {
     }
 
     /**
-     * Gets CSS color variable for HTTP status code
-     *
-     * Returns theme-aware color based on status code range:
-     * - 2xx: success (green)
-     * - 3xx: warning (yellow/orange)
-     * - 4xx/5xx: error (red)
-     *
-     * @param {number} status - HTTP status code
-     * @returns {string} CSS color variable or hex color
+     * @param {number} status
+     * @returns {string}
      */
     getStatusColor(status) {
         const colors = {
@@ -305,12 +224,8 @@ export class HistoryService {
     }
 
     /**
-     * Gets CSS color variable for HTTP method
-     *
-     * Returns theme-aware color for common HTTP methods.
-     *
-     * @param {string} method - HTTP method (GET, POST, PUT, DELETE, PATCH)
-     * @returns {string} CSS color variable or hex color
+     * @param {string} method
+     * @returns {string}
      */
     getMethodColor(method) {
         const colors = {
@@ -325,13 +240,8 @@ export class HistoryService {
     }
 
     /**
-     * Decides how an entry's status badge should read. gRPC codes are named
-     * rather than numbered, and code 0 (OK) is a success — testing it for
-     * truthiness the way HTTP statuses are tested would render it as a failure.
-     *
-     * @param {Object} entry - History entry
-     * @returns {{text: string, color: string}|null} Badge text and colour, or
-     *   null when the entry has no status and should show the error badge
+     * @param {Object} entry
+     * @returns {{text: string, color: string}|null}
      */
     getStatusDisplay(entry) {
         const status = entry?.response?.status;
@@ -355,11 +265,9 @@ export class HistoryService {
     }
 
     /**
-     * Truncates a URL to maximum length for display
-     *
-     * @param {string} url - The URL to truncate
-     * @param {number} [maxLength=50] - Maximum length before truncation
-     * @returns {string} Truncated URL with ellipsis if needed
+     * @param {string} url
+     * @param {number} [maxLength=50]
+     * @returns {string}
      */
     truncateUrl(url, maxLength = 50) {
         if (url.length <= maxLength) {return url;}

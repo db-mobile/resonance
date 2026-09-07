@@ -32,9 +32,7 @@ describe('CollectionRepository auth secret redaction', () => {
             config: { token: 'sk-live-abc' }
         });
 
-        // What gets written to disk must not contain the literal secret
         expect(savedEndpoint.authConfig.config.token).toBe('');
-        // The real value lives in the SecretStore
         expect(await secretStore.get('auth:c1:e1', 'token')).toBe('sk-live-abc');
     });
 

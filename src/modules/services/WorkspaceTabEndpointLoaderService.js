@@ -7,18 +7,15 @@ import { app } from '../appContext.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
 import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
 
-/**
- * Handles protocol-specific endpoint mapping and tab restoration for workspace tabs.
- */
 export class WorkspaceTabEndpointLoaderService {
     /**
-     * @param {Object} options - Loader dependencies
-     * @param {WorkspaceTabService} options.service - Workspace tab service
-     * @param {WorkspaceTabStateManager} options.stateManager - Workspace tab state manager
-     * @param {ResponseContainerManager} options.responseContainerManager - Response container manager
-     * @param {WorkspaceTabBar} options.tabBar - Workspace tab bar
-     * @param {Function} options.updateUIForTabType - Updates request/runner UI visibility
-     * @param {Function} options.restoreTabStateSafely - Restores tab state with controller guard handling
+     * @param {Object} options
+     * @param {WorkspaceTabService} options.service
+     * @param {WorkspaceTabStateManager} options.stateManager
+     * @param {ResponseContainerManager} options.responseContainerManager
+     * @param {WorkspaceTabBar} options.tabBar
+     * @param {Function} options.updateUIForTabType
+     * @param {Function} options.restoreTabStateSafely
      */
     constructor({
         service,
@@ -52,14 +49,8 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     /**
-     * Loads a request history entry into a workspace tab.
-     *
-     * The tab is tagged with the entry id so a repeat click on the same history
-     * entry can focus this tab instead of opening another one.
-     *
-     * @async
-     * @param {Object} historyEntry - The history entry to replay
-     * @param {string} targetTabId - The tab to load the entry into
+     * @param {Object} historyEntry
+     * @param {string} targetTabId
      * @returns {Promise<void>}
      */
     async loadHistoryEntry(historyEntry, targetTabId) {
@@ -76,13 +67,8 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     /**
-     * Builds a tab update from a history entry.
-     *
-     * The tab is deliberately left unbound from any collection endpoint, so
-     * saving it cannot overwrite the request the entry originated from.
-     *
-     * @param {Object} historyEntry - The history entry
-     * @returns {Object} Tab update object
+     * @param {Object} historyEntry
+     * @returns {Object}
      */
     createHistoryTabUpdate(historyEntry) {
         const request = historyEntry.request || {};
@@ -104,13 +90,8 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     /**
-     * Builds the gRPC part of a history tab update.
-     *
-     * Metadata comes back from the entry's stored headers, which means
-     * credentials return as `[redacted]` and must be re-entered before sending.
-     *
-     * @param {Object} request - The history entry's request data
-     * @returns {Object} Partial tab update
+     * @param {Object} request
+     * @returns {Object}
      */
     createGrpcHistoryTabUpdate(request) {
         const grpc = request.grpc || {};
@@ -146,14 +127,8 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     /**
-     * Builds the HTTP part of a history tab update.
-     *
-     * The raw URL is preferred so unresolved `{{variables}}` come back as typed,
-     * while query parameters are read from the resolved URL. Authentication is
-     * reset to none because stored credentials are redacted.
-     *
-     * @param {Object} request - The history entry's request data
-     * @returns {Object} Partial tab update
+     * @param {Object} request
+     * @returns {Object}
      */
     createHttpHistoryTabUpdate(request) {
         const rawUrl = request.rawUrl || request.url || '';
@@ -177,10 +152,8 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     /**
-     * Extracts query parameters from a history entry's resolved URL.
-     *
-     * @param {string} url - The resolved request URL
-     * @returns {Object} Query parameter key-value map
+     * @param {string} url
+     * @returns {Object}
      */
     historyQueryParams(url) {
         const queryParams = {};
@@ -201,10 +174,8 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     /**
-     * Maps a history entry's stored body onto the tab request body shape.
-     *
-     * @param {*} body - The stored body
-     * @returns {{mode: string, content: string}} Tab body object
+     * @param {*} body
+     * @returns {{mode: string, content: string}}
      */
     historyBody(body) {
         if (body === null || body === undefined) {
@@ -219,14 +190,8 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     /**
-     * Builds a tab update for an endpoint, dispatching on its protocol
-     * descriptor.
-     *
-     * The HTTP builder stays the fallback so a corrupt or future protocol id
-     * still opens a usable tab.
-     *
-     * @param {Object} endpoint - The endpoint to load
-     * @returns {Object} Tab update object
+     * @param {Object} endpoint
+     * @returns {Object}
      */
     createTabUpdate(endpoint) {
         const builders = {
@@ -244,15 +209,8 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     /**
-     * Builds an SSE tab update.
-     *
-     * The shape must match what WorkspaceTabStateManager captures and restores
-     * for SSE. Two things differ from WebSocket: the method is a real HTTP verb
-     * the user chose rather than a constant, and authentication is editable, so
-     * it is read back rather than forced to none.
-     *
-     * @param {Object} endpoint - The endpoint to load
-     * @returns {Object} Tab update object
+     * @param {Object} endpoint
+     * @returns {Object}
      */
     createSseTabUpdate(endpoint) {
         const { authType, authConfig } = this.buildHttpAuth(endpoint);
@@ -286,13 +244,8 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     /**
-     * Builds an MQTT tab update.
-     *
-     * The broker address takes the place of a URL, and the connection and topic
-     * settings come from the endpoint's MQTT sidecar record.
-     *
-     * @param {Object} endpoint - The endpoint to load
-     * @returns {Object} Tab update object
+     * @param {Object} endpoint
+     * @returns {Object}
      */
     createMqttTabUpdate(endpoint) {
         const mqtt = endpoint.persistedMqttData || {};
@@ -610,9 +563,8 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     /**
-     * Converts persisted entries into rows, keeping the enabled flag
-     * @param {Array<Object>} entries - Persisted {key, value, enabled} entries
-     * @returns {Array<Object>} Normalized rows
+     * @param {Array<Object>} entries
+     * @returns {Array<Object>}
      */
     arrayEntriesToRows(entries = []) {
         return normalizeKeyValueRows(entries);

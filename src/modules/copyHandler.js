@@ -1,8 +1,7 @@
 import { app } from './appContext.js';
 
 /**
- * Copy text to clipboard and show visual feedback
- * @param {string} text - The text to copy
+ * @param {string} text
  * @returns {Promise<void>}
  */
 async function copyToClipboard(text) {
@@ -15,9 +14,8 @@ async function copyToClipboard(text) {
 }
 
 /**
- * Show visual feedback on the copy button
- * @param {HTMLElement} button - The button element
- * @param {boolean} success - Whether the copy was successful
+ * @param {HTMLElement} button
+ * @param {boolean} success
  */
 function showCopyFeedback(button, success) {
     const originalTitle = button.title;
@@ -42,9 +40,8 @@ function showCopyFeedback(button, success) {
 }
 
 /**
- * Handle copy button click for a specific tab
- * @param {HTMLElement} button - The copy button that was clicked
- * @param {string} tabId - The workspace tab ID
+ * @param {HTMLElement} button
+ * @param {string} tabId
  */
 export async function handleCopyResponse(button, tabId) {
     const { responseContainerManager } = app;
@@ -75,9 +72,8 @@ export async function handleCopyResponse(button, tabId) {
 }
 
 /**
- * Handle copy button click for headers
- * @param {HTMLElement} button - The copy button that was clicked
- * @param {string} tabId - The workspace tab ID
+ * @param {HTMLElement} button
+ * @param {string} tabId
  */
 export async function handleCopyHeaders(button, tabId) {
     const { responseContainerManager } = app;
@@ -108,9 +104,8 @@ export async function handleCopyHeaders(button, tabId) {
 }
 
 /**
- * Attach copy handler to a copy button
- * @param {HTMLElement} button - The copy button element
- * @param {string} tabId - The workspace tab ID
+ * @param {HTMLElement} button
+ * @param {string} tabId
  */
 export function attachCopyHandler(button, tabId) {
     if (button) {
@@ -121,9 +116,8 @@ export function attachCopyHandler(button, tabId) {
 }
 
 /**
- * Attach copy handler for headers button
- * @param {HTMLElement} button - The copy button element
- * @param {string} tabId - The workspace tab ID
+ * @param {HTMLElement} button
+ * @param {string} tabId
  */
 export function attachHeadersCopyHandler(button, tabId) {
     if (button) {
@@ -133,8 +127,5 @@ export function attachHeadersCopyHandler(button, tabId) {
     }
 }
 
-/**
- * Initialize copy functionality (legacy support)
- */
 export function initializeCopyHandler() {
 }

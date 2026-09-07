@@ -1,6 +1,5 @@
 /**
  * @fileoverview Feature descriptor wiring the built-in mock server stack (Repository →
- * Service → Controller → Dialog) for the FeatureRegistry.
  * @module mockServer.feature
  */
 

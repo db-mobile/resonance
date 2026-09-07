@@ -108,16 +108,4 @@ describe('ProxyRepository', () => {
         });
     });
 
-    describe('toggleProxyEnabled', () => {
-        test('flips the flag and persists through proxy_set', async () => {
-            mockBackendAPI.store.get.mockResolvedValue({ ...validSettings(), enabled: false });
-
-            const enabled = await repository.toggleProxyEnabled();
-
-            expect(enabled).toBe(true);
-            expect(mockBackendAPI.proxySettings.set).toHaveBeenCalledWith(
-                expect.objectContaining({ enabled: true })
-            );
-        });
-    });
 });

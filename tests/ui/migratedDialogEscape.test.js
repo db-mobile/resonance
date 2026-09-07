@@ -9,11 +9,6 @@ const SELECTOR_TEMPLATE = './src/templates/environment/environmentSelector.html'
 
 const pressEscape = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
-/**
- * Every dialog that used to own a document-level Escape listener now registers on
- * the shared stack. Two properties matter for each: closing by any route releases
- * the registration, and a dialog opened over another absorbs Escape alone.
- */
 describe('migrated dialogs share one Escape stack', () => {
     afterEach(() => {
         document.body.innerHTML = '';

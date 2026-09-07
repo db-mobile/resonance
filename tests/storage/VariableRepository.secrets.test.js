@@ -34,9 +34,7 @@ describe('VariableRepository secret handling', () => {
 
         const apiKeyEntry = savedVariables.find(e => e.key === 'apiKey');
         expect(apiKeyEntry).toEqual({ key: 'apiKey', value: '', secret: true });
-        // non-secret entry keeps its value
         expect(savedVariables.find(e => e.key === 'baseUrl')).toEqual({ key: 'baseUrl', value: 'http://x' });
-        // real value lives in the SecretStore
         expect(await secretStore.get('collvar:c1', 'apiKey')).toBe('super-secret');
     });
 
@@ -82,7 +80,6 @@ describe('VariableRepository secret handling', () => {
 
         await repository.setVariable('c1', 'baseUrl', 'http://x');
 
-        // apiKey must still be secret (value out of band), baseUrl inline
         expect(savedVariables.find(e => e.key === 'apiKey')).toEqual({ key: 'apiKey', value: '', secret: true });
         expect(savedVariables.find(e => e.key === 'baseUrl')).toEqual({ key: 'baseUrl', value: 'http://x' });
         expect(await secretStore.get('collvar:c1', 'apiKey')).toBe('super-secret');

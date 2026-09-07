@@ -1,15 +1,13 @@
 import { SecretStore } from '../../src/modules/storage/SecretStore.js';
 
 /**
- * Builds a mock backendAPI with a store and an optional in-memory keychain.
- *
  * @param {Object} opts
- * @param {boolean} opts.keychain - Whether a keychain is available
- * @param {Object} [opts.seedStore] - Initial store contents
+ * @param {boolean} opts.keychain
+ * @param {Object} [opts.seedStore]
  */
 function makeBackend({ keychain, seedStore = {} }) {
     const store = { ...seedStore };
-    const chain = new Map(); // account -> value
+    const chain = new Map();
     const api = {
         store: {
             get: jest.fn(async (key) => (key in store ? store[key] : null)),
@@ -38,7 +36,6 @@ describe('SecretStore keychain backend', () => {
 
         expect(api.__chain.get('env:1|token')).toBe('sk-live-123');
         expect(await store.get('env:1', 'token')).toBe('sk-live-123');
-        // plaintext secretValues must stay empty; only a non-sensitive index is stored
         expect(api.__store.secretValues).toBeUndefined();
         expect(api.__store.secretIndex).toEqual({ 'env:1': { token: true } });
     });
@@ -94,12 +91,11 @@ describe('SecretStore keychain backend', () => {
         });
         const store = new SecretStore(api);
 
-        // First access triggers migration
         const value = await store.get('env:1', 'token');
 
         expect(value).toBe('legacy-secret');
         expect(api.__chain.get('env:1|token')).toBe('legacy-secret');
-        expect(api.__store.secretValues).toEqual({}); // plaintext cleared
+        expect(api.__store.secretValues).toEqual({});
         expect(api.__store.secretIndex).toEqual({ 'env:1': { token: true } });
     });
 });
@@ -114,7 +110,6 @@ describe('SecretStore fallback (no keychain)', () => {
 
         expect(await store.get('env:1', 'token')).toBe('plain');
         expect(api.__store.secretValues).toEqual({ 'env:1': { token: 'plain' } });
-        // multiple operations -> warning only fires once
         await store.set('env:1', 'token2', 'plain2');
         expect(onFallback).toHaveBeenCalledTimes(1);
     });

@@ -1,7 +1,5 @@
 /**
  * @fileoverview Manages the form-data, URL-encoded, and binary body modes.
- * Form modes render ordered rows ({ key, value, type, filePath, contentType,
- * enabled }); form-data rows can be file parts picked via the native dialog.
  * @module formBodyManager
  */
 
@@ -63,9 +61,7 @@ export class FormBodyManager {
         this._populate(this.urlencodedList, fields, false);
     }
 
-    /**
-     * @returns {{filePath: string, contentType: string}}
-     */
+    /** @returns {{filePath: string, contentType: string}} */
     getBinaryBody() {
         return {
             filePath: this.binaryFilePathInput?.value.trim() || '',

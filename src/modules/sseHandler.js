@@ -22,11 +22,6 @@ const session = new StreamSession({
     })
 });
 
-/**
- * Render one dispatched event the way it arrived on the wire. `retry` is not
- * shown here: it never rides along with a message — the backend applies it and
- * reports it on the `reconnecting` event instead.
- */
 function formatMessage(payload) {
     const parts = [];
     if (payload.event) {
@@ -49,9 +44,6 @@ async function handleBackendEvent(event) {
     }
     const current = session.get(tabId);
 
-    // A closed tab drops its session before the backend has finished unwinding,
-    // and its terminal `close` still arrives. Rendering it would resurrect the
-    // tab's response container, so anything without a live session is ignored.
     if (!current) {
         return;
     }
@@ -133,8 +125,8 @@ export const initSseHandler = createBackendEventListener(
  * @param {string} url
  * @param {Object<string, string>} [headers]
  * @param {object} [options]
- * @param {string} [options.method] - defaults to GET on the backend.
- * @param {string|null} [options.body] - raw body, replayed on each reconnect.
+ * @param {string} [options.method]
+ * @param {string|null} [options.body]
  */
 export async function handleSseConnect(url, headers = {}, { method, body } = {}) {
     await initSseHandler();
@@ -176,8 +168,6 @@ export async function handleSseConnect(url, headers = {}, { method, body } = {})
         });
         await session.updateStatus(tabId, 'SSE connecting...', null);
     } catch (error) {
-        // The stream never started, so nothing will emit a terminal event for
-        // it — drop the session rather than leave the tab stuck on "connecting".
         session.remove(tabId);
         await session.updateStatus(tabId, 'SSE connection failed', null);
         toast.error(`SSE connection failed: ${error.message || error}`);

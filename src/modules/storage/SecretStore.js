@@ -3,10 +3,6 @@
  * @module storage/SecretStore
  */
 
-/**
- * Plaintext fallback backend: secrets stored under the `secretValues` store key as
- * `{ scope: { key: value } }`. Used when no OS keychain is available.
- */
 export class StoreBackend {
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
@@ -97,11 +93,6 @@ export class StoreBackend {
     }
 }
 
-/**
- * Keychain backend: values live in the OS keychain; the `secretIndex` store key holds a
- * non-sensitive index `{ scope: { key: true } }` so scopes can be enumerated without
- * keeping any secret value in the plaintext store.
- */
 export class KeychainBackend {
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
@@ -109,11 +100,6 @@ export class KeychainBackend {
         this._index = null;
     }
 
-    /**
-     * Opaque keychain account string for a (scope, key) pair.
-     *
-     * @private
-     */
     _account(scope, key) {
         return `${scope}|${key}`;
     }
@@ -132,10 +118,7 @@ export class KeychainBackend {
     }
 
     /**
-     * Moves any plaintext secrets from a legacy store key into the keychain, then clears
-     * the plaintext copies. No-op when there is nothing to migrate.
-     *
-     * @param {string} legacyKey - Store key holding `{ scope: { key: value } }`
+     * @param {string} legacyKey
      * @returns {Promise<void>}
      */
     async migrateFrom(legacyKey) {
@@ -250,32 +233,11 @@ export class KeychainBackend {
     }
 }
 
-/**
- * Facade for secret values that must never be written into git-friendly collection
- * files or included in exports.
- *
- * @class
- * @classdesc Secrets are keyed by a `scope` (e.g. `env:<environmentId>`,
- * `auth:<collectionId>:<endpointId>`, or `collvar:<collectionId>`) and a `key` (variable
- * name or auth field).
- *
- * Two interchangeable backends sit behind one public surface, chosen once at first use:
- *  - {@link KeychainBackend}: values live in the OS keychain (encryption at rest); the
- *    plaintext store holds only a non-sensitive index of which secrets exist.
- *  - {@link StoreBackend}: values live in the `secretValues` store key. Used as a
- *    fallback when no usable keychain is available (headless/locked systems), and the
- *    behavior the app shipped with before keychain support.
- *
- * When the keychain is available, any values previously kept in `secretValues` are
- * migrated into the keychain on first use and the plaintext copies cleared.
- */
 export class SecretStore {
     /**
-     * @param {Object} backendAPI - The backend IPC API bridge (provides `store` and,
-     *   when available, `secrets`).
+     * @param {Object} backendAPI
      * @param {Object} [options]
-     * @param {Function} [options.onFallback] - Called once if the keychain is
-     *   unavailable and the plaintext fallback is used (e.g. to surface a UI warning).
+     * @param {Function} [options.onFallback]
      */
     constructor(backendAPI, { onFallback } = {}) {
         this.backendAPI = backendAPI;
@@ -285,12 +247,7 @@ export class SecretStore {
         this.usingKeychain = null;
     }
 
-    /**
-     * Selects and prepares the backend exactly once.
-     *
-     * @private
-     * @returns {Promise<Object>} The active backend
-     */
+    /** @returns {Promise<Object>} */
     async _init() {
         if (this._backend) {
             return this._backend;
@@ -301,10 +258,7 @@ export class SecretStore {
         return this._initPromise;
     }
 
-    /**
-     * @private
-     * @returns {Promise<Object>}
-     */
+    /** @returns {Promise<Object>} */
     async _select() {
         let available = false;
         try {
@@ -328,42 +282,42 @@ export class SecretStore {
         return this._backend;
     }
 
-    /** @param {string} scope @param {string} key @returns {Promise<string|undefined>} */
+    /** @param {string} scope */
     async get(scope, key) {
         return (await this._init()).get(scope, key);
     }
 
-    /** @param {string} scope @returns {Promise<Object>} */
+    /** @param {string} scope */
     async getScope(scope) {
         return (await this._init()).getScope(scope);
     }
 
-    /** @param {string} scope @param {string} key @returns {Promise<boolean>} */
+    /** @param {string} scope */
     async has(scope, key) {
         return (await this._init()).has(scope, key);
     }
 
-    /** @param {string} scope @param {string} key @param {string} value @returns {Promise<void>} */
+    /** @param {string} scope */
     async set(scope, key, value) {
         return (await this._init()).set(scope, key, value);
     }
 
-    /** @param {string} scope @param {string} key @returns {Promise<void>} */
+    /** @param {string} scope */
     async delete(scope, key) {
         return (await this._init()).delete(scope, key);
     }
 
-    /** @param {string} scope @param {string} oldKey @param {string} newKey @returns {Promise<void>} */
+    /** @param {string} scope */
     async rename(scope, oldKey, newKey) {
         return (await this._init()).rename(scope, oldKey, newKey);
     }
 
-    /** @param {string} scope @returns {Promise<void>} */
+    /** @param {string} scope */
     async deleteScope(scope) {
         return (await this._init()).deleteScope(scope);
     }
 
-    /** @param {string} prefix @returns {Promise<void>} */
+    /** @param {string} prefix */
     async deleteScopePrefix(prefix) {
         return (await this._init()).deleteScopePrefix(prefix);
     }

@@ -7,33 +7,20 @@ import { app } from '../appContext.js';
 import { CurlParser } from '../CurlParser.js';
 import { BaseModal } from './BaseModal.js';
 
-/**
- * Dialog for importing cURL commands
- *
- * @class
- * @classdesc Provides a modal dialog for pasting cURL commands and importing
- * them into new or existing collections. Includes real-time parsing preview
- * and collection selection. Escape and click-outside cancel via {@link BaseModal}.
- * @augments BaseModal
- */
+/** @augments */
 export class CurlImportDialog extends BaseModal {
-    /**
-     * Creates a CurlImportDialog instance
-     */
     constructor() {
         super();
-        /** @type {Function|null} Pending promise resolver. */
+        /** @type {Function|null} */
         this.resolve = null;
         this.parsedRequest = null;
     }
 
     /**
-     * Shows the cURL import dialog.
-     *
-     * @param {Array<Object>} collections - Available collections for import target.
-     * @param {Object} [options={}] - Dialog options.
-     * @param {string} [options.targetCollectionId] - Pre-selected collection ID.
-     * @returns {Promise<Object|null>} Resolves to import result or null if cancelled.
+     * @param {Array<Object>} collections
+     * @param {Object} [options={}]
+     * @param {string} [options.targetCollectionId]
+     * @returns {Promise<Object|null>}
      */
     show(collections, options = {}) {
         return new Promise((resolve) => {
@@ -43,11 +30,8 @@ export class CurlImportDialog extends BaseModal {
     }
 
     /**
-     * Builds and displays the dialog.
-     *
-     * @private
-     * @param {Array<Object>} collections - Available collections.
-     * @param {Object} options - Dialog options.
+     * @param {Array<Object>} collections
+     * @param {Object} options
      */
     createDialog(collections, options) {
         const dialog = this.mount({
@@ -67,12 +51,9 @@ export class CurlImportDialog extends BaseModal {
     }
 
     /**
-     * Populates the collection dropdown
-     *
-     * @private
-     * @param {HTMLElement} dialog - Dialog element
-     * @param {Array<Object>} collections - Available collections
-     * @param {string} [targetCollectionId] - Pre-selected collection ID
+     * @param {HTMLElement} dialog
+     * @param {Array<Object>} collections
+     * @param {string} [targetCollectionId]
      */
     populateCollections(dialog, collections, targetCollectionId) {
         const select = dialog.querySelector('#curl-import-collection');
@@ -103,12 +84,7 @@ export class CurlImportDialog extends BaseModal {
         this.updateNewCollectionVisibility(dialog);
     }
 
-    /**
-     * Updates visibility of new collection name and location fields
-     *
-     * @private
-     * @param {HTMLElement} dialog - Dialog element
-     */
+    /** @param {HTMLElement} dialog */
     updateNewCollectionVisibility(dialog) {
         const select = dialog.querySelector('#curl-import-collection');
         const newCollectionGroup = dialog.querySelector('#new-collection-group');
@@ -124,12 +100,8 @@ export class CurlImportDialog extends BaseModal {
     }
 
     /**
-     * Attaches event listeners specific to the import flow. Escape/backdrop
-     * dismissal is handled by {@link BaseModal}.
-     *
-     * @private
-     * @param {HTMLElement} dialog - Dialog element
-     * @param {Array<Object>} collections - Available collections
+     * @param {HTMLElement} dialog
+     * @param {Array<Object>} collections
      */
     setupEventListeners(dialog, collections) {
         const curlInput = dialog.querySelector('#curl-input');
@@ -179,12 +151,7 @@ export class CurlImportDialog extends BaseModal {
         }
     }
 
-    /**
-     * Updates the preview section with parsed cURL data
-     *
-     * @private
-     * @param {HTMLElement} dialog - Dialog element
-     */
+    /** @param {HTMLElement} dialog */
     updatePreview(dialog) {
         const curlInput = dialog.querySelector('#curl-input');
         const previewSection = dialog.querySelector('#curl-preview-section');
@@ -266,11 +233,8 @@ export class CurlImportDialog extends BaseModal {
     }
 
     /**
-     * Handles the import action, resolving with the import result.
-     *
-     * @private
-     * @param {HTMLElement} dialog - Dialog element
-     * @param {Array<Object>} _collections - Available collections
+     * @param {HTMLElement} dialog
+     * @param {Array<Object>} _collections
      */
     handleImport(dialog, _collections) {
         if (!this.parsedRequest) {
@@ -309,12 +273,7 @@ export class CurlImportDialog extends BaseModal {
         this._settle(result);
     }
 
-    /**
-     * Focuses the cURL input field
-     *
-     * @private
-     * @param {HTMLElement} dialog - Dialog element
-     */
+    /** @param {HTMLElement} dialog */
     focusInput(dialog) {
         const curlInput = dialog.querySelector('#curl-input');
         if (curlInput) {
@@ -322,21 +281,13 @@ export class CurlImportDialog extends BaseModal {
         }
     }
 
-    /**
-     * Cancels the dialog (Escape / backdrop / cancel button), resolving with null.
-     *
-     * @protected
-     * @returns {void}
-     */
+    /** @returns {void} */
     onDismiss() {
         this._settle(null);
     }
 
     /**
-     * Resolves the pending promise once and tears the dialog down.
-     *
-     * @private
-     * @param {Object|null} value - Value to resolve with.
+     * @param {Object|null} value
      * @returns {void}
      */
     _settle(value) {

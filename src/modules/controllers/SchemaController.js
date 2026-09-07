@@ -7,16 +7,11 @@ import { createLazyEditorProxy } from '../editorLoader.js';
 import { debounce } from '../utils/debounce.js';
 import { SchemaValidator } from '../schema/SchemaValidator.js';
 
-/**
- * Controller for managing response schema validation
- */
 export class SchemaController {
     /**
-     * Creates a SchemaController instance
-     * 
-     * @param {Object} options - Controller options
-     * @param {Object} options.repository - CollectionRepository instance
-     * @param {Object} options.statusDisplay - Status display adapter
+     * @param {Object} options
+     * @param {Object} options.repository
+     * @param {Object} options.statusDisplay
      */
     constructor({ repository, statusDisplay }) {
         this.repository = repository;
@@ -36,9 +31,6 @@ export class SchemaController {
         this._initialized = false;
     }
 
-    /**
-     * Initializes the schema editor and event listeners
-     */
     initialize() {
         if (this._initialized) {
             return;
@@ -57,10 +49,6 @@ export class SchemaController {
         this._initialized = true;
     }
 
-    /**
-     * Sets up event listeners for schema tab buttons
-     * @private
-     */
     _setupEventListeners() {
         const inferBtn = document.getElementById('schema-infer-btn');
         const clearBtn = document.getElementById('schema-clear-btn');
@@ -74,10 +62,6 @@ export class SchemaController {
         }
     }
 
-    /**
-     * Handles schema content changes with debounced save
-     * @private
-     */
     _handleSchemaChange(_value) {
         if (!this.currentCollectionId || !this.currentEndpointId) {
             return;
@@ -89,10 +73,8 @@ export class SchemaController {
     }
 
     /**
-     * Saves the editor's schema for the given endpoint.
-     * @private
-     * @param {string} collectionId - Collection ID captured when the save was scheduled
-     * @param {string} endpointId - Endpoint ID captured when the save was scheduled
+     * @param {string} collectionId
+     * @param {string} endpointId
      * @returns {Promise<void>}
      */
     async _saveSchema(collectionId, endpointId) {
@@ -109,19 +91,12 @@ export class SchemaController {
         }
     }
 
-    /**
-     * Flushes a pending debounced schema save and waits for it to settle.
-     * @returns {Promise<void>} Resolves once no schema save is pending or in flight
-     */
+    /** @returns {Promise<void>} */
     async flushPendingSave() {
         await this._debouncedSave.flush();
         await this._inFlightSave;
     }
 
-    /**
-     * Updates the validation status display
-     * @private
-     */
     _updateValidationStatus() {
         const statusEl = document.getElementById('schema-validation-status');
         if (!statusEl || !this.editor) {
@@ -146,10 +121,8 @@ export class SchemaController {
     }
 
     /**
-     * Loads schema for the specified endpoint
-     * 
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
+     * @param {string} collectionId
+     * @param {string} endpointId
      */
     async loadSchema(collectionId, endpointId) {
         await this.flushPendingSave();
@@ -172,9 +145,6 @@ export class SchemaController {
         }
     }
 
-    /**
-     * Clears the current endpoint context (when no endpoint is selected)
-     */
     async clearContext() {
         await this.flushPendingSave();
 
@@ -187,18 +157,11 @@ export class SchemaController {
         this._updateValidationStatus();
     }
 
-    /**
-     * Stores the last response body for schema inference
-     * 
-     * @param {*} responseBody - The response body to store
-     */
+    /** @param {*} responseBody */
     setLastResponseBody(responseBody) {
         this.lastResponseBody = responseBody;
     }
 
-    /**
-     * Infers schema from the last response body
-     */
     inferSchemaFromResponse() {
         if (!this.lastResponseBody) {
             this.statusDisplay.update('No response available to infer schema from', null);
@@ -228,9 +191,6 @@ export class SchemaController {
         this._saveSchema(this.currentCollectionId, this.currentEndpointId);
     }
 
-    /**
-     * Clears the current schema
-     */
     clearSchema() {
         this.editor.setSchema(null);
         this._updateValidationStatus();
@@ -239,10 +199,8 @@ export class SchemaController {
     }
 
     /**
-     * Validates response data against the current schema
-     * 
-     * @param {*} responseBody - Response body to validate
-     * @returns {Object} Validation result { valid: boolean, errors: Array }
+     * @param {*} responseBody
+     * @returns {Object}
      */
     validateResponse(responseBody) {
         const schema = this.editor?.getSchema();
@@ -269,11 +227,9 @@ export class SchemaController {
     }
 
     /**
-     * Sets a schema directly (used by OpenAPI import)
-     * 
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {Object} schema - JSON Schema to set
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} schema
      */
     async setSchemaForEndpoint(collectionId, endpointId, schema) {
         try {
@@ -290,20 +246,13 @@ export class SchemaController {
         }
     }
 
-    /**
-     * Updates the editor theme
-     * 
-     * @param {boolean} isDark - Whether to use dark theme
-     */
+    /** @param {boolean} isDark */
     updateTheme(isDark) {
         if (this.editor) {
             this.editor.updateTheme(isDark);
         }
     }
 
-    /**
-     * Destroys the controller and cleans up resources
-     */
     destroy() {
         this._debouncedSave.cancel();
         if (this.editor) {

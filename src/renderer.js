@@ -1,10 +1,6 @@
 /**
  * @fileoverview Main renderer process orchestrator for Resonance
  * @module renderer
- *
- * Initializes and coordinates all UI modules, controllers, services, and repositories.
- * Sets up event listeners, keyboard shortcuts, and manages the application lifecycle
- * in the renderer process.
  */
 
 import { getCurrentEndpoint, setCurrentEndpoint } from './modules/state/currentEndpoint.js';
@@ -17,9 +13,7 @@ import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl } from 
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
-import { handleSendRequest, handleCancelRequest, handleGenerateCurl, setGraphQLBodyManager, invalidateSettingsCache, getSettingsCache, invalidateEnvironmentCache } from './modules/apiHandler.js';
-import { GraphQLBodyManager } from './modules/graphqlBodyManager.js';
-import { FormBodyManager } from './modules/formBodyManager.js';
+import { handleSendRequest, handleCancelRequest, handleGenerateCurl, invalidateSettingsCache, getSettingsCache, invalidateEnvironmentCache } from './modules/apiHandler.js';
 import { applyGrpcState, captureGrpcState, initGrpcUI } from './modules/grpcHandler.js';
 import { initRequestModeManager } from './modules/requestModeManager.js';
 import { initWebSocketHandler } from './modules/websocketHandler.js';
@@ -28,10 +22,6 @@ import { initSseHandler } from './modules/sseHandler.js';
 import { initMqttHandler, handleMqttCancel } from './modules/mqttHandler.js';
 import { initGrpcStreamHandler } from './modules/grpcStreamHandler.js';
 import { loadCollections, importCollectionFile, importPostmanEnvironment, importCurl, openExistingCollection, initializeBodyTracking } from './modules/collectionManager.js';
-import { ThemeManager } from './modules/themeManager.js';
-import { SettingsModal } from './modules/ui/SettingsModal.js';
-import { HttpVersionManager } from './modules/httpVersionManager.js';
-import { TimeoutManager } from './modules/timeoutManager.js';
 import { initResizer } from './modules/resizer.js';
 import { i18n } from './i18n/I18nManager.js';
 import { authManager } from './modules/authManager.js';
@@ -49,16 +39,15 @@ import { mockServerFeature } from './modules/mockServer.feature.js';
 import { schemaFeature } from './modules/schema.feature.js';
 import { historyFeature } from './modules/history.feature.js';
 import { workspaceTabFeature } from './modules/workspaceTab.feature.js';
+import { graphqlBodyFeature } from './modules/graphqlBody.feature.js';
+import { formBodyFeature } from './modules/formBody.feature.js';
+import { settingsFeature } from './modules/settings.feature.js';
 import { StatusDisplayAdapter } from './modules/interfaces/IStatusDisplay.js';
 import { keyboardShortcuts } from './modules/keyboardShortcuts.js';
 import { CollectionRepository } from './modules/storage/CollectionRepository.js';
 import { loadEditor, warmEditors } from './modules/editorLoader.js';
 import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
 import { toast } from './modules/ui/Toast.js';
-
-const themeManager = new ThemeManager();
-const httpVersionManager = new HttpVersionManager();
-const timeoutManager = new TimeoutManager();
 
 app.invalidateApiHandlerSettingsCache = invalidateSettingsCache;
 app.getApiHandlerSettingsCache = getSettingsCache;
@@ -75,16 +64,6 @@ app.secretStore = secretStore;
 
 const collectionRepository = new CollectionRepository(window.backendAPI, secretStore);
 
-const graphqlBodyManager = new GraphQLBodyManager({
-    bodyInput,
-    graphqlQueryEditor: document.getElementById('graphql-query-editor'),
-    graphqlVariablesEditor: document.getElementById('graphql-variables-editor'),
-    graphqlFormatBtn: document.getElementById('graphql-format-btn')
-});
-graphqlBodyManager.initialize();
-setGraphQLBodyManager(graphqlBodyManager);
-app.graphqlBodyManager = graphqlBodyManager;
-
 const featureRegistry = new FeatureRegistry({
     backendAPI: window.backendAPI,
     statusDisplay: statusDisplayAdapter,
@@ -100,11 +79,13 @@ const featureRegistry = new FeatureRegistry({
     },
 });
 featureRegistry.provide('collectionRepository', collectionRepository);
-featureRegistry.provide('graphqlBodyManager', graphqlBodyManager);
 featureRegistry
+    .register(graphqlBodyFeature)
+    .register(formBodyFeature)
     .register(environmentFeature)
     .register(proxyFeature)
     .register(certificateFeature)
+    .register(settingsFeature)
     .register(cookieFeature)
     .register(scriptFeature)
     .register(mockServerFeature)
@@ -117,8 +98,6 @@ const environment = featureRegistry.get('environment');
 const environmentController = environment.controller;
 const environmentService = environment.service;
 const environmentSelector = environment.selector;
-const proxyController = featureRegistry.get('proxy').controller;
-const certificateController = featureRegistry.get('certificate').controller;
 const cookieController = featureRegistry.get('cookie').controller;
 const mockServer = featureRegistry.get('mockServer');
 const mockServerController = mockServer.controller;
@@ -128,37 +107,10 @@ const workspaceTab = featureRegistry.get('workspaceTab');
 const workspaceTabController = workspaceTab.controller;
 const workspaceTabService = workspaceTab.service;
 const workspaceTabStateManager = workspaceTab.stateManager;
+const settingsModal = featureRegistry.get('settings').modal;
 
-const formBodyManager = new FormBodyManager();
-formBodyManager.initialize();
-app.formBodyManager = formBodyManager;
-
-const settingsModal = new SettingsModal(themeManager, i18n, httpVersionManager, timeoutManager, proxyController, certificateController);
-
-/**
- * Initializes application keyboard shortcuts
- *
- * Registers all keyboard shortcuts for the application including:
- * - Request actions (send, cancel, generate cURL)
- * - Navigation (focus URL, toggle sidebars)
- * - Tab switching (request tabs, workspace tabs)
- * - Settings and help
- *
- * Uses platform-aware modifier keys (Cmd on macOS, Ctrl on Windows/Linux).
- *
- * @returns {void}
- */
-/**
- * Save the active workspace tab (Ctrl+S).
- *
- * A tab already backed by a collection endpoint is written straight back to it;
- * an unsaved tab goes through the save-to-collection dialog and is linked to the
- * endpoint it creates. The target comes from the tab's own `endpoint` rather than
- * the shared current-endpoint state, which other paths can leave pointing at a
- * previously opened request — the same source the tab context menu's Save uses.
- *
- * @returns {Promise<void>}
- */
+/** @returns {void} */
+/** @returns {Promise<void>} */
 async function handleSaveShortcut() {
     const controller = app.workspaceTabController;
     const activeTab = controller ? await controller.service.getActiveTab() : null;
@@ -500,10 +452,8 @@ function applyShortcutHints() {
 }
 
 /**
- * Schedule a task to run during browser idle time.
- * Falls back to setTimeout if requestIdleCallback is not available.
- * @param {Function} callback - Task to run
- * @param {number} timeout - Maximum time to wait before forcing execution (ms)
+ * @param {Function} callback
+ * @param {number} timeout
  */
 function scheduleIdleTask(callback, timeout = 2000) {
     if (typeof requestIdleCallback === 'function') {
@@ -637,7 +587,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // globals remain here.
     app.authManager = authManager;
     authManager.getInheritedAuthInfo = async () => {
         const controller = app.collectionController;
@@ -918,9 +867,6 @@ window.addEventListener('beforeunload', async (_e) => {
     }
 });
 
-/**
- * Check for updates on application launch if the setting is enabled
- */
 async function checkForUpdatesOnLaunch() {
     try {
         if (!window.backendAPI?.updater?.check || !window.backendAPI?.updater?.getInstallInfo) {

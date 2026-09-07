@@ -1,13 +1,8 @@
-/**
- * Integration tests for IPC communication
- * These tests verify the communication between Tauri backend and frontend
- */
 
 describe('IPC Integration Tests', () => {
     let mockIpcBridge;
 
     beforeEach(() => {
-        // Mock the IPC bridge that would be used for Tauri communication
         mockIpcBridge = {
             sendApiRequest: jest.fn(),
             importCollection: jest.fn(),

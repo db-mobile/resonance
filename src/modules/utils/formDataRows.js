@@ -1,14 +1,9 @@
 /**
  * @fileoverview Normalization helpers for form-data / urlencoded body rows.
- * The canonical shape is an ordered array of row objects; legacy persisted
- * data used a flat { key: value } object and must keep loading.
  * @module utils/formDataRows
  */
 
 /**
- * Normalize persisted form body fields into the canonical array-of-rows shape.
- * Arrays pass through with defaults applied; legacy flat objects become
- * enabled text rows.
  * @param {Array|Object|null|undefined} fields
  * @returns {Array<{key: string, value: string, type: ('text'|'file'), filePath: string, contentType: string, enabled: boolean}>}
  */
@@ -37,7 +32,6 @@ export function normalizeFormRows(fields) {
 }
 
 /**
- * Whether a normalized row carries any user content worth keeping or sending.
  * @param {{key?: string, value?: string, filePath?: string}} row
  * @returns {boolean}
  */

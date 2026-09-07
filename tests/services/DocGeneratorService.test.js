@@ -84,10 +84,8 @@ describe('DocGeneratorService', () => {
 
         service = new DocGeneratorService(mockCollectionRepository);
 
-        // Reset fetch mock
         global.fetch.mockReset();
 
-        // Clear template cache
         Object.keys(DocGeneratorService).forEach(key => {
             if (key.startsWith('_cached_')) {
                 delete DocGeneratorService[key];
@@ -325,7 +323,6 @@ describe('DocGeneratorService', () => {
 
             const html = await service.generateHtml(mockCollection);
 
-            // Should return empty string when template fails to load
             expect(html).toBe('');
         });
 
@@ -333,7 +330,6 @@ describe('DocGeneratorService', () => {
             await service.generateHtml(mockCollection);
             await service.generateHtml(mockCollection);
 
-            // Template should only be fetched once due to caching
             expect(global.fetch).toHaveBeenCalledTimes(1);
         });
 
@@ -414,9 +410,6 @@ describe('DocGeneratorService', () => {
         test('should not fetch persisted data when includePersistedData is false', async () => {
             await service.generateMarkdown(mockCollection, { includePersistedData: false });
 
-            // Repository should still be called for response schema
-            // but the main persisted data fetch in _generateEndpointMarkdown should not happen
-            // Actually, it's always called for responseSchema, so let's just verify the markdown doesn't include persisted values
             const markdown = await service.generateMarkdown(mockCollection, { includePersistedData: false });
             
             expect(markdown).not.toContain('custom');

@@ -1,10 +1,5 @@
 import { CollectionController } from '../../src/modules/controllers/CollectionController.js';
 
-/**
- * Search used to be folders-else-flat, so a collection holding folders *and*
- * root-level requests could never surface the root ones, and nested folders
- * were not searched at all.
- */
 describe('CollectionController.filterCollections', () => {
     let controller;
 

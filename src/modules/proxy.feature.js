@@ -1,6 +1,5 @@
 /**
  * @fileoverview Feature descriptor wiring the proxy stack (Repository → Service →
- * Controller) for the FeatureRegistry.
  * @module proxy.feature
  */
 
@@ -17,4 +16,5 @@ export const proxyFeature = {
         const controller = new ProxyController(service);
         return { repository, service, controller };
     },
+    provides: { proxyController: 'controller' },
 };

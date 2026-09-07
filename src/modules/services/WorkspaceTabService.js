@@ -3,35 +3,14 @@
  * @module services/WorkspaceTabService
  */
 
-/**
- * Service for workspace tab management business logic
- *
- * @class
- * @classdesc Provides high-level tab operations including creation, switching, closing,
- * and state management. Coordinates between repository and controller layers. Implements
- * observer pattern for tab change notifications. Manages active tab state and ensures
- * at least one tab always exists. Supports tab duplication, renaming, and modification
- * tracking for unsaved changes indication.
- *
- * Event types emitted:
- * - 'tab-created': When a new tab is created
- * - 'tab-switched': When active tab changes
- * - 'tab-closed': When a tab is closed
- * - 'tab-updated': When tab data is modified
- * - 'tab-renamed': When tab is renamed
- * - 'tab-duplicated': When tab is duplicated
- * - 'tabs-cleared': When all tabs are cleared
- */
 import logger from '../logger.js';
 
 const log = logger.scope('WorkspaceTabService');
 
 export class WorkspaceTabService {
     /**
-     * Creates a WorkspaceTabService instance
-     *
-     * @param {WorkspaceTabRepository} repository - Data access layer for tabs
-     * @param {IStatusDisplay} statusDisplay - Status display interface
+     * @param {WorkspaceTabRepository} repository
+     * @param {IStatusDisplay} statusDisplay
      */
     constructor(repository, statusDisplay) {
         this.repository = repository;
@@ -39,15 +18,7 @@ export class WorkspaceTabService {
         this.listeners = [];
     }
 
-    /**
-     * Initializes the tab service
-     *
-     * Ensures at least one tab exists and sets active tab.
-     *
-     * @async
-     * @returns {Promise<Object>} Object with tabs array and activeTabId
-     * @throws {Error} If initialization fails
-     */
+    /** @returns {Promise<Object>} */
     async initialize() {
         try {
             const tabs = await this.repository.getTabs();
@@ -70,48 +41,28 @@ export class WorkspaceTabService {
         }
     }
 
-    /**
-     * Gets all tabs
-     *
-     * @async
-     * @returns {Promise<Array<Object>>} Array of tab objects
-     */
+    /** @returns {Promise<Array<Object>>} */
     async getAllTabs() {
         return this.repository.getTabs();
     }
 
-    /**
-     * Gets the active tab
-     *
-     * @async
-     * @returns {Promise<Object|null>} Active tab object or null if none active
-     */
+    /** @returns {Promise<Object|null>} */
     async getActiveTab() {
         const activeTabId = await this.repository.getActiveTabId();
         if (!activeTabId) {return null;}
         return this.repository.getTabById(activeTabId);
     }
 
-    /**
-     * Gets the active tab ID
-     *
-     * @async
-     * @returns {Promise<string|null>} Active tab ID or null if none active
-     */
+    /** @returns {Promise<string|null>} */
     async getActiveTabId() {
         return this.repository.getActiveTabId();
     }
 
     /**
-     * Creates a new tab
-     *
-     * @async
-     * @param {Object} [options={}] - Tab creation options
-     * @param {string} [options.name] - Tab name
-     * @param {Object} [options.requestData] - Initial request data
-     * @returns {Promise<Object>} The created tab object
-     * @throws {Error} If creation fails
-     * @fires WorkspaceTabService#tab-created
+     * @param {Object} [options={}]
+     * @param {string} [options.name]
+     * @param {Object} [options.requestData]
+     * @returns {Promise<Object>}
      */
     async createTab(options = {}) {
         try {
@@ -125,13 +76,8 @@ export class WorkspaceTabService {
     }
 
     /**
-     * Switches to a different tab
-     *
-     * @async
-     * @param {string} tabId - The ID of tab to switch to
-     * @returns {Promise<Object|null>} The switched-to tab or null if not found
-     * @throws {Error} If switch fails
-     * @fires WorkspaceTabService#tab-switched
+     * @param {string} tabId
+     * @returns {Promise<Object|null>}
      */
     async switchTab(tabId) {
         try {
@@ -151,16 +97,8 @@ export class WorkspaceTabService {
     }
 
     /**
-     * Closes a tab
-     *
-     * Prevents closing the last tab. Automatically switches to another tab
-     * if closing the active tab.
-     *
-     * @async
-     * @param {string} tabId - The ID of tab to close
-     * @returns {Promise<Object|null>} Object with closedTab and newActiveTabId, or null if cannot close
-     * @throws {Error} If close fails
-     * @fires WorkspaceTabService#tab-closed
+     * @param {string} tabId
+     * @returns {Promise<Object|null>}
      */
     async closeTab(tabId) {
         try {
@@ -202,14 +140,9 @@ export class WorkspaceTabService {
     }
 
     /**
-     * Updates tab data
-     *
-     * @async
-     * @param {string} tabId - The tab ID
-     * @param {Object} updates - Updates to apply
-     * @returns {Promise<Object|null>} Updated tab or null if not found
-     * @throws {Error} If update fails
-     * @fires WorkspaceTabService#tab-updated
+     * @param {string} tabId
+     * @param {Object} updates
+     * @returns {Promise<Object|null>}
      */
     async updateTab(tabId, updates) {
         const updatedTab = await this.repository.updateTab(tabId, updates);
@@ -220,14 +153,9 @@ export class WorkspaceTabService {
     }
 
     /**
-     * Renames a tab
-     *
-     * @async
-     * @param {string} tabId - The tab ID
-     * @param {string} newName - New name for tab
-     * @returns {Promise<Object|null>} Updated tab or null if not found
-     * @throws {Error} If rename fails
-     * @fires WorkspaceTabService#tab-renamed
+     * @param {string} tabId
+     * @param {string} newName
+     * @returns {Promise<Object|null>}
      */
     async renameTab(tabId, newName) {
         try {
@@ -243,15 +171,8 @@ export class WorkspaceTabService {
     }
 
     /**
-     * Duplicates a tab
-     *
-     * Creates a copy with "(Copy)" appended to name.
-     *
-     * @async
-     * @param {string} tabId - The tab ID to duplicate
-     * @returns {Promise<Object|null>} Duplicated tab or null if source not found
-     * @throws {Error} If duplication fails
-     * @fires WorkspaceTabService#tab-duplicated
+     * @param {string} tabId
+     * @returns {Promise<Object|null>}
      */
     async duplicateTab(tabId) {
         try {
@@ -278,13 +199,8 @@ export class WorkspaceTabService {
     }
 
     /**
-     * Marks tab as modified or unmodified
-     *
-     * Used to indicate unsaved changes.
-     *
-     * @async
-     * @param {string} tabId - The tab ID
-     * @param {boolean} isModified - Whether tab has unsaved changes
+     * @param {string} tabId
+     * @param {boolean} isModified
      * @returns {Promise<void>}
      */
     async setTabModified(tabId, isModified) {
@@ -292,12 +208,8 @@ export class WorkspaceTabService {
     }
 
     /**
-     * Reorders tabs based on an ordered list of tab IDs
-     *
-     * @async
-     * @param {Array<string>} orderedTabIds - Tab IDs in the desired order
+     * @param {Array<string>} orderedTabIds
      * @returns {Promise<void>}
-     * @fires WorkspaceTabService#tabs-reordered
      */
     async reorderTabs(orderedTabIds) {
         await this.repository.reorderTabs(orderedTabIds);
@@ -305,13 +217,9 @@ export class WorkspaceTabService {
     }
 
     /**
-     * Generates a tab name from request details
-     *
-     * Extracts endpoint from URL path for display.
-     *
-     * @param {string} method - HTTP method
-     * @param {string} url - Request URL
-     * @returns {string} Generated tab name like "GET /users"
+     * @param {string} method
+     * @param {string} url
+     * @returns {string}
      */
     generateTabName(method, url) {
         if (!url) {return 'New Request';}
@@ -328,13 +236,9 @@ export class WorkspaceTabService {
     }
 
     /**
-     * Adds a change listener
-     *
-     * Listener receives event type and data.
-     *
-     * @param {Function} listener - The callback function
-     * @param {string} listener.event - Event type
-     * @param {*} listener.data - Event data
+     * @param {Function} listener
+     * @param {string} listener.event
+     * @param {*} listener.data
      * @returns {void}
      */
     addListener(listener) {
@@ -342,9 +246,7 @@ export class WorkspaceTabService {
     }
 
     /**
-     * Removes a change listener
-     *
-     * @param {Function} listener - The callback function to remove
+     * @param {Function} listener
      * @returns {void}
      */
     removeListener(listener) {
@@ -352,13 +254,8 @@ export class WorkspaceTabService {
     }
 
     /**
-     * Notifies all listeners of a change
-     *
-     * Catches and logs listener errors to prevent disruption.
-     *
-     * @private
-     * @param {string} event - Event type
-     * @param {*} data - Event data
+     * @param {string} event
+     * @param {*} data
      * @returns {void}
      */
     _notifyListeners(event, data) {
@@ -371,15 +268,7 @@ export class WorkspaceTabService {
         });
     }
 
-    /**
-     * Clears all tabs
-     *
-     * WARNING: This removes all tabs from storage.
-     *
-     * @async
-     * @returns {Promise<void>}
-     * @fires WorkspaceTabService#tabs-cleared
-     */
+    /** @returns {Promise<void>} */
     async clearAllTabs() {
         await this.repository.clearAllTabs();
         this._notifyListeners('tabs-cleared', null);

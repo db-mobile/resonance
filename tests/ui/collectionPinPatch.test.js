@@ -1,11 +1,6 @@
 /* global document */
 import { CollectionRenderer } from '../../src/modules/ui/CollectionRenderer.js';
 
-/**
- * Toggling a pin used to reload every collection from disk and rebuild the
- * whole sidebar. The pin state is now patched in place: the row's button flips
- * and only the pinned section is regenerated.
- */
 describe('collection pin in-place patch', () => {
     let renderer;
     const collections = [{

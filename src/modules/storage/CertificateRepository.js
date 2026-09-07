@@ -3,37 +3,14 @@
  * @module storage/CertificateRepository
  */
 
-/**
- * Repository for managing client certificate configuration persistence
- *
- * @class
- * @classdesc Handles CRUD operations for the host-keyed client-certificate list
- * used for mutual TLS and custom CA trust. Only filesystem paths are stored
- * (never certificate bytes), keeping the persisted store git-friendly. Implements
- * defensive programming with auto-initialization and sanitization for packaged
- * app compatibility, mirroring {@link ProxyRepository}.
- */
 export class CertificateRepository {
-    /**
-     * Creates a CertificateRepository instance
-     *
-     * @param {Object} backendAPI - The backend IPC API bridge
-     */
+    /** @param {Object} backendAPI */
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.CERT_KEY = 'clientCertificates';
     }
 
-    /**
-     * Retrieves the certificate list with validation and initialization
-     *
-     * Automatically initializes storage with an empty list if undefined (packaged
-     * app first run). Validates structure and sanitizes each entry.
-     *
-     * @async
-     * @returns {Promise<{items: Array<Object>}>} Certificate configuration
-     * @throws {Error} If storage access fails
-     */
+    /** @returns {Promise<{items: Array<Object>}>} */
     async getCertificates() {
         try {
             const data = await this.backendAPI.store.get(this.CERT_KEY);
@@ -55,12 +32,8 @@ export class CertificateRepository {
     }
 
     /**
-     * Saves the certificate list with validation and sanitization
-     *
-     * @async
-     * @param {{items: Array<Object>}} settings - Certificate configuration to save
-     * @returns {Promise<{items: Array<Object>}>} The validated and saved configuration
-     * @throws {Error} If the format is invalid or save fails
+     * @param {{items: Array<Object>}} settings
+     * @returns {Promise<{items: Array<Object>}>}
      */
     async saveCertificates(settings) {
         try {
@@ -82,11 +55,8 @@ export class CertificateRepository {
     }
 
     /**
-     * Sanitizes a single certificate entry, returning null if it has no usable host
-     *
-     * @private
-     * @param {Object} entry - The certificate entry to sanitize
-     * @returns {Object|null} Sanitized entry, or null when invalid
+     * @param {Object} entry
+     * @returns {Object|null}
      */
     _sanitizeEntry(entry) {
         if (!entry || typeof entry !== 'object') {
@@ -107,12 +77,7 @@ export class CertificateRepository {
         };
     }
 
-    /**
-     * Creates the default (empty) certificate configuration
-     *
-     * @private
-     * @returns {{items: Array<Object>}} Default configuration
-     */
+    /** @returns {{items: Array<Object>}} */
     _getDefault() {
         return { items: [] };
     }

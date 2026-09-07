@@ -1,23 +1,15 @@
 /**
  * @fileoverview Collection palette for the Collection Runner: the left-hand tree
- * of collections and their HTTP endpoints. Clicking an endpoint emits an "add"
- * event; the palette holds no selection state of its own.
  * @module ui/runner/CollectionPalette
  */
 
 import { templateLoader } from '../../templateLoader.js';
 import { flattenRequests } from '../../collections/collectionTree.js';
 
-/**
- * Renders the collection/endpoint source tree and reports endpoint adds.
- *
- * @class
- */
 export class CollectionPalette {
     /**
      * @param {Object} [callbacks]
      * @param {(collection: Object, endpoint: Object) => void} [callbacks.onAddEndpoint]
-     *   Invoked when the user adds an endpoint (via the add button or item click).
      */
     constructor({ onAddEndpoint } = {}) {
         this.container = null;
@@ -25,10 +17,8 @@ export class CollectionPalette {
     }
 
     /**
-     * Renders the collection tree into the given container.
-     *
-     * @param {HTMLElement} container - Tree container element
-     * @param {Array<Object>} collections - Available collections
+     * @param {HTMLElement} container
+     * @param {Array<Object>} collections
      */
     render(container, collections) {
         this.container = container;
@@ -55,11 +45,8 @@ export class CollectionPalette {
     }
 
     /**
-     * Creates a collection element for the tree.
-     *
-     * @private
-     * @param {Object} collection - Collection object
-     * @returns {HTMLElement} Collection element
+     * @param {Object} collection
+     * @returns {HTMLElement}
      */
     _createCollectionElement(collection) {
         const fragment = templateLoader.cloneSync(
@@ -93,11 +80,8 @@ export class CollectionPalette {
     }
 
     /**
-     * Gets all HTTP endpoints from a collection (including folders), excluding gRPC.
-     *
-     * @private
-     * @param {Object} collection - Collection object
-     * @returns {Array<Object>} Array of HTTP endpoints
+     * @param {Object} collection
+     * @returns {Array<Object>}
      */
     _getAllEndpoints(collection) {
         return flattenRequests(collection).filter(
@@ -106,12 +90,9 @@ export class CollectionPalette {
     }
 
     /**
-     * Creates an endpoint element for the tree.
-     *
-     * @private
-     * @param {Object} collection - Parent collection
-     * @param {Object} endpoint - Endpoint object
-     * @returns {HTMLElement} Endpoint element
+     * @param {Object} collection
+     * @param {Object} endpoint
+     * @returns {HTMLElement}
      */
     _createEndpointElement(collection, endpoint) {
         const fragment = templateLoader.cloneSync(

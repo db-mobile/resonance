@@ -1,7 +1,5 @@
 /**
  * @fileoverview Feature descriptor wiring the cookie-jar stack (Repository → Service →
- * Dialog → Controller) for the FeatureRegistry, including the cross-feature sync that
- * keeps the active cookie-jar environment in step with the environment service.
  * @module cookie.feature
  */
 

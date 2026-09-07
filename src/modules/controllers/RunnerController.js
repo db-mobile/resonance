@@ -13,20 +13,10 @@ import { updateStatusDisplay } from '../statusDisplay.js';
 import { templateLoader } from '../templateLoader.js';
 import { toast } from '../ui/Toast.js';
 
-/**
- * Controller for coordinating collection runner operations
- *
- * @class
- * @classdesc Mediates between the runner UI panel, service layer, and workspace
- * tab system. Handles runner lifecycle, execution coordination, and saved
- * runners management.
- */
 export class RunnerController {
     /**
-     * Creates a RunnerController instance
-     *
-     * @param {Object} backendAPI - Backend API for HTTP requests and storage
-     * @param {Function} getCollections - Function to get available collections
+     * @param {Object} backendAPI
+     * @param {Function} getCollections
      */
     constructor(backendAPI, getCollections) {
         this.backendAPI = backendAPI;
@@ -48,12 +38,7 @@ export class RunnerController {
         this._handleStop = this._handleStop.bind(this);
     }
 
-    /**
-     * Initializes the runner panel in a container
-     *
-     * @async
-     * @param {HTMLElement} container - Container element for the panel
-     */
+    /** @param {HTMLElement} container */
     async initialize(container) {
         this.panel = new RunnerPanel(container);
 
@@ -81,13 +66,7 @@ export class RunnerController {
         await this._loadLastRunner(settings);
     }
 
-    /**
-     * Handles save runner action
-     *
-     * @private
-     * @async
-     * @param {Object} runnerData - Runner configuration
-     */
+    /** @param {Object} runnerData */
     async _handleSave(runnerData) {
         try {
             if (this.currentRunnerId) {
@@ -101,13 +80,7 @@ export class RunnerController {
         }
     }
 
-    /**
-     * Returns all saved runners for the dropdown
-     *
-     * @private
-     * @async
-     * @returns {Promise<Array>} Array of saved runners
-     */
+    /** @returns {Promise<Array>} */
     async _handleLoadRunners() {
         try {
             return await this.service.getAllRunners();
@@ -117,13 +90,7 @@ export class RunnerController {
         }
     }
 
-    /**
-     * Handles runner selection from dropdown
-     *
-     * @private
-     * @async
-     * @param {string} runnerId - Selected runner ID
-     */
+    /** @param {string} runnerId */
     async _handleRunnerSelect(runnerId) {
         try {
             const runner = await this.service.getRunner(runnerId);
@@ -139,11 +106,6 @@ export class RunnerController {
         }
     }
 
-    /**
-     * Handles new runner button click
-     *
-     * @private
-     */
     _handleNewRunner() {
         this.currentRunnerId = null;
         if (this.panel) {
@@ -151,13 +113,7 @@ export class RunnerController {
         }
     }
 
-    /**
-     * Handles runner deletion
-     *
-     * @private
-     * @async
-     * @param {string} runnerId - Runner ID to delete
-     */
+    /** @param {string} runnerId */
     async _handleRunnerDelete(runnerId) {
         if (!runnerId) {return;}
 
@@ -187,12 +143,7 @@ export class RunnerController {
         }
     }
 
-    /**
-     * Shows the saved runners dialog
-     *
-     * @private
-     * @param {Array<Object>} runners - Array of saved runners
-     */
+    /** @param {Array<Object>} runners */
     _showSavedRunnersDialog(runners) {
         const fragment = templateLoader.cloneSync(
             './src/templates/runner/runnerPanel.html',
@@ -235,12 +186,9 @@ export class RunnerController {
     }
 
     /**
-     * Creates a saved runner item element
-     *
-     * @private
-     * @param {Object} runner - Runner object
-     * @param {Function} closeDialog - Function to close the dialog
-     * @returns {HTMLElement} Runner item element
+     * @param {Object} runner
+     * @param {Function} closeDialog
+     * @returns {HTMLElement}
      */
     _createSavedRunnerItem(runner, closeDialog) {
         const fragment = templateLoader.cloneSync(
@@ -286,13 +234,7 @@ export class RunnerController {
         return el;
     }
 
-    /**
-     * Loads a runner into the panel
-     *
-     * @private
-     * @async
-     * @param {string} runnerId - Runner ID to load
-     */
+    /** @param {string} runnerId */
     async _loadRunner(runnerId) {
         try {
             const runner = await this.service.getRunner(runnerId);
@@ -306,13 +248,7 @@ export class RunnerController {
         }
     }
 
-    /**
-     * Handles run action
-     *
-     * @private
-     * @async
-     * @param {Object} runnerData - Runner configuration
-     */
+    /** @param {Object} runnerData */
     async _handleRun(runnerData) {
         try {
             let runnerId = this.currentRunnerId;
@@ -349,21 +285,13 @@ export class RunnerController {
         }
     }
 
-    /**
-     * Handles stop action
-     *
-     * @private
-     */
     _handleStop() {
         this.service.stopExecution();
     }
 
     /**
-     * Handles service events
-     *
-     * @private
-     * @param {string} event - Event type
-     * @param {*} data - Event data
+     * @param {string} event
+     * @param {*} data
      */
     _handleServiceEvent(event, data) {
         switch (event) {
@@ -394,11 +322,7 @@ export class RunnerController {
         }
     }
 
-    /**
-     * Creates a new runner tab
-     *
-     * @returns {Object} Tab configuration for workspace tab system
-     */
+    /** @returns {Object} */
     static createRunnerTab() {
         return {
             type: 'runner',
@@ -408,22 +332,14 @@ export class RunnerController {
     }
 
     /**
-     * Checks if this controller manages a runner tab
-     *
-     * @param {Object} tab - Tab object
-     * @returns {boolean} True if this is a runner tab
+     * @param {Object} tab
+     * @returns {boolean}
      */
     static isRunnerTab(tab) {
         return tab?.type === 'runner';
     }
 
-    /**
-     * Saves the last opened runner ID to settings
-     *
-     * @private
-     * @async
-     * @param {string|null} runnerId - Runner ID to save
-     */
+    /** @param {string|null} runnerId */
     async _saveLastRunnerId(runnerId) {
         try {
             const settings = await this.backendAPI.settings.get() || {};
@@ -433,12 +349,6 @@ export class RunnerController {
         }
     }
 
-    /**
-     * Loads the last opened runner on initialization
-     *
-     * @private
-     * @async
-     */
     async _loadLastRunner(settings) {
         try {
             const lastRunnerId = settings?.lastRunnerId;
@@ -456,10 +366,7 @@ export class RunnerController {
         }
     }
 
-    /**
-     * Releases the panel's document-level listeners when the runner tab closes.
-     * @returns {void}
-     */
+    /** @returns {void} */
     destroy() {
         this.panel?.destroy?.();
     }

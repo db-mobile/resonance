@@ -54,9 +54,7 @@ describe('WorkspaceTabRepository', () => {
             const result1 = await repository.getTabs();
             const result2 = await repository.getTabs();
 
-            // Arrays are different instances (shallow copy)
             expect(result1).not.toBe(result2);
-            // But tab objects are same references (memory optimization)
             expect(result1[0]).toBe(result2[0]);
         });
 
@@ -157,7 +155,6 @@ describe('WorkspaceTabRepository', () => {
             const result = await repository.getActiveTabId();
 
             expect(result).toBe('tab-2');
-            // Should not call get since cache is updated
             expect(mockBackendAPI.store.get).not.toHaveBeenCalled();
         });
     });
@@ -191,7 +188,6 @@ describe('WorkspaceTabRepository', () => {
             const result = await repository.getTabById('tab-1');
             const result2 = await repository.getTabById('tab-1');
 
-            // Same reference for memory optimization
             expect(result).toBe(result2);
         });
     });
@@ -258,7 +254,7 @@ describe('WorkspaceTabRepository', () => {
             });
 
             expect(result.request.url).toBe('http://new.com');
-            expect(result.request.method).toBe('GET'); // Preserved
+            expect(result.request.method).toBe('GET');
         });
 
         test('should completely replace response object', async () => {
@@ -315,7 +311,6 @@ describe('WorkspaceTabRepository', () => {
 
             await repository.deleteTab('tab-1');
 
-            // Verify a new default tab was created
             const setCall = mockBackendAPI.store.set.mock.calls[0];
             expect(setCall[1]).toHaveLength(1);
             expect(setCall[1][0].name).toBe('New Request');
@@ -363,7 +358,6 @@ describe('WorkspaceTabRepository', () => {
 
             await repository.clearAllTabs();
 
-            // First call saves tabs, second sets active tab
             expect(mockBackendAPI.store.set).toHaveBeenCalledTimes(2);
             const tabsCall = mockBackendAPI.store.set.mock.calls[0];
             expect(tabsCall[1]).toHaveLength(1);

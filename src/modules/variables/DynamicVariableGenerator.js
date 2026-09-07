@@ -1,7 +1,3 @@
-/**
- * DynamicVariableGenerator - Generates dynamic values for variables with $ prefix
- * Supports per-request caching to ensure same variable resolves to same value within a request
- */
 export class DynamicVariableGenerator {
     constructor() {
         this.requestCache = new Map();
@@ -57,10 +53,9 @@ export class DynamicVariableGenerator {
     }
 
     /**
-     * Generate a value for a dynamic variable, using cache if available
-     * @param {string} name - Variable name (without $ prefix)
-     * @param {string} params - Optional parameters (e.g., "1:100" for randomInt)
-     * @returns {string|number} Generated value
+     * @param {string} name
+     * @param {string} params
+     * @returns {string|number}
      */
     generate(name, params = null) {
         const cacheKey = params ? `${name}:${params}` : name;
@@ -81,16 +76,12 @@ export class DynamicVariableGenerator {
         return value;
     }
 
-    /**
-     * Clear the request cache - call before each new request
-     */
     clearCache() {
         this.requestCache.clear();
     }
 
     /**
-     * Check if a variable name is a supported dynamic variable
-     * @param {string} name - Variable name (without $ prefix)
+     * @param {string} name
      * @returns {boolean}
      */
     isDynamicVariable(name) {
@@ -98,10 +89,9 @@ export class DynamicVariableGenerator {
     }
 
     /**
-     * Get a placeholder string for preview purposes
-     * @param {string} name - Variable name (without $ prefix)
-     * @param {string} params - Optional parameters
-     * @returns {string} Placeholder like "[uuid]" or "[randomInt:1:100]"
+     * @param {string} name
+     * @param {string} params
+     * @returns {string}
      */
     getPlaceholder(name, params = null) {
         if (params) {
@@ -110,18 +100,12 @@ export class DynamicVariableGenerator {
         return `[${name}]`;
     }
 
-    /**
-     * Get list of all supported dynamic variable names
-     * @returns {string[]}
-     */
+    /** @returns {string[]} */
     getSupportedVariables() {
         return Object.keys(this.generators);
     }
 
-    /**
-     * Generate a UUID v4
-     * @returns {string}
-     */
+    /** @returns {string} */
     _generateUUID() {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
             const r = Math.random() * 16 | 0;
@@ -131,8 +115,7 @@ export class DynamicVariableGenerator {
     }
 
     /**
-     * Generate a random integer
-     * @param {string} params - Optional "min:max" format
+     * @param {string} params
      * @returns {number}
      */
     _generateRandomInt(params) {
@@ -164,8 +147,7 @@ export class DynamicVariableGenerator {
     }
 
     /**
-     * Generate a random alphanumeric string
-     * @param {string} params - Optional length as string
+     * @param {string} params
      * @returns {string}
      */
     _generateRandomString(params) {
@@ -186,30 +168,21 @@ export class DynamicVariableGenerator {
         return result;
     }
 
-    /**
-     * Generate a random email address
-     * @returns {string}
-     */
+    /** @returns {string} */
     _generateRandomEmail() {
         const username = this._generateRandomString('8').toLowerCase();
         const domain = this.emailDomains[Math.floor(Math.random() * this.emailDomains.length)];
         return `${username}@${domain}`;
     }
 
-    /**
-     * Generate a random full name
-     * @returns {string}
-     */
+    /** @returns {string} */
     _generateRandomName() {
         const firstName = this.firstNames[Math.floor(Math.random() * this.firstNames.length)];
         const lastName = this.lastNames[Math.floor(Math.random() * this.lastNames.length)];
         return `${firstName} ${lastName}`;
     }
 
-    /**
-     * Generate a random IPv4 address (first octet 1-254, others 0-255)
-     * @returns {string}
-     */
+    /** @returns {string} */
     _generateRandomIPv4() {
         const first = Math.floor(Math.random() * 254) + 1;
         const rest = Array.from({ length: 3 }, () => Math.floor(Math.random() * 256));
@@ -217,9 +190,8 @@ export class DynamicVariableGenerator {
     }
 
     /**
-     * Parse a day-span parameter, falling back to a default on invalid input
-     * @param {string} params - Optional day span as string
-     * @param {number} defaultDays - Fallback day span
+     * @param {string} params
+     * @param {number} defaultDays
      * @returns {number}
      */
     _parseDaySpan(params, defaultDays = 365) {
@@ -233,8 +205,7 @@ export class DynamicVariableGenerator {
     }
 
     /**
-     * Format a date as ISO YYYY-MM-DD
-     * @param {Date} date - Date to format
+     * @param {Date} date
      * @returns {string}
      */
     _formatDateISO(date) {
@@ -242,8 +213,7 @@ export class DynamicVariableGenerator {
     }
 
     /**
-     * Get a date offset from today by a number of days
-     * @param {number} days - Day offset (negative for past)
+     * @param {number} days
      * @returns {Date}
      */
     _dateWithDayOffset(days) {
@@ -253,8 +223,7 @@ export class DynamicVariableGenerator {
     }
 
     /**
-     * Generate a random ISO date within +/- N days of today
-     * @param {string} params - Optional day span as string (default 365)
+     * @param {string} params
      * @returns {string}
      */
     _generateRandomDate(params) {
@@ -264,8 +233,7 @@ export class DynamicVariableGenerator {
     }
 
     /**
-     * Generate a random ISO date 1..N days in the past
-     * @param {string} params - Optional day span as string (default 365)
+     * @param {string} params
      * @returns {string}
      */
     _generateRandomDatePast(params) {
@@ -275,8 +243,7 @@ export class DynamicVariableGenerator {
     }
 
     /**
-     * Generate a random ISO date 1..N days in the future
-     * @param {string} params - Optional day span as string (default 365)
+     * @param {string} params
      * @returns {string}
      */
     _generateRandomDateFuture(params) {
@@ -285,10 +252,7 @@ export class DynamicVariableGenerator {
         return this._formatDateISO(this._dateWithDayOffset(offset));
     }
 
-    /**
-     * Generate a random https URL
-     * @returns {string}
-     */
+    /** @returns {string} */
     _generateRandomUrl() {
         const host = this._generateRandomString('8').toLowerCase();
         const path = this._generateRandomString('6').toLowerCase();
@@ -297,8 +261,7 @@ export class DynamicVariableGenerator {
     }
 
     /**
-     * Generate random lorem ipsum words
-     * @param {string} params - Optional word count as string (default 5, max 100)
+     * @param {string} params
      * @returns {string}
      */
     _generateRandomLoremWords(params) {
@@ -319,8 +282,7 @@ export class DynamicVariableGenerator {
     }
 
     /**
-     * Generate a random price with two decimals
-     * @param {string} params - Optional "min:max" format (default 1:1000)
+     * @param {string} params
      * @returns {string}
      */
     _generateRandomPrice(params) {
@@ -351,10 +313,7 @@ export class DynamicVariableGenerator {
         return (Math.random() * (max - min) + min).toFixed(2);
     }
 
-    /**
-     * Generate a random US-style phone number (+1-AAA-EEE-LLLL)
-     * @returns {string}
-     */
+    /** @returns {string} */
     _generateRandomPhoneNumber() {
         const area = Math.floor(Math.random() * 800) + 200;
         const exchange = Math.floor(Math.random() * 800) + 200;

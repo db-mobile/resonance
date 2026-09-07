@@ -3,25 +3,12 @@
  * @module ui/Toast
  */
 
-/**
- * Lightweight toast notification manager
- *
- * @class
- * @classdesc Displays non-blocking notifications that auto-dismiss.
- * Supports error, success, and info variants. Toasts stack from the
- * bottom-right corner and can be manually dismissed.
- */
 class Toast {
     constructor() {
         this.container = null;
     }
 
-    /**
-     * Lazily creates and inserts the toast container into the DOM
-     *
-     * @private
-     * @returns {HTMLElement}
-     */
+    /** @returns {HTMLElement} */
     getContainer() {
         if (!this.container) {
             this.container = document.createElement('div');
@@ -34,11 +21,9 @@ class Toast {
     }
 
     /**
-     * Shows a toast notification
-     *
-     * @param {string} message - The message to display
-     * @param {'error'|'success'|'info'} [type='info'] - Notification type
-     * @param {number} [duration=4000] - Auto-dismiss delay in ms
+     * @param {string} message
+     * @param {'error'|'success'|'info'} [type='info']
+     * @param {number} [duration=4000]
      * @returns {void}
      */
     show(message, type = 'info', duration = 4000) {
@@ -76,8 +61,6 @@ class Toast {
     }
 
     /**
-     * Shows an error toast
-     *
      * @param {string} message
      * @returns {void}
      */
@@ -86,8 +69,6 @@ class Toast {
     }
 
     /**
-     * Shows a success toast
-     *
      * @param {string} message
      * @returns {void}
      */
@@ -96,8 +77,6 @@ class Toast {
     }
 
     /**
-     * Shows an info toast
-     *
      * @param {string} message
      * @returns {void}
      */
@@ -106,8 +85,6 @@ class Toast {
     }
 
     /**
-     * Shows a warning toast
-     *
      * @param {string} message
      * @returns {void}
      */

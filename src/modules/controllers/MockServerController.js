@@ -6,55 +6,28 @@
 import { SchemaProcessor } from '../schema/SchemaProcessor.js';
 import { findRequest } from '../collections/collectionTree.js';
 
-/**
- * Controller for coordinating mock server operations
- *
- * @class
- * @classdesc Coordinates mock server operations between UI components and the service layer.
- * Manages server lifecycle, settings management, collection configuration, and provides
- * methods for UI interaction.
- */
 export class MockServerController {
     /**
-     * Creates a MockServerController instance
-     *
-     * @param {MockServerService} service - Service layer for business logic
-     * @param {CollectionRepository} collectionRepository - Repository for accessing collections
+     * @param {MockServerService} service
+     * @param {CollectionRepository} collectionRepository
      */
     constructor(service, collectionRepository) {
         this.service = service;
         this.collectionRepository = collectionRepository;
     }
 
-    /**
-     * Initializes the controller
-     *
-     * Sets up service listeners for UI updates.
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async initialize() {
         this.service.addChangeListener((event) => {
             this._handleServiceEvent(event);
         });
     }
 
-    /**
-     * Handles service events
-     *
-     * @private
-     * @param {Object} event - Service event object
-     */
+    /** @param {Object} event */
     _handleServiceEvent(_event) {
     }
 
-    /**
-     * Starts the mock server
-     *
-     * @async
-     * @returns {Promise<Object>} Result object with success status and details
-     */
+    /** @returns {Promise<Object>} */
     async handleStart() {
         try {
             const collections = await this.collectionRepository.getAll();
@@ -75,12 +48,7 @@ export class MockServerController {
         }
     }
 
-    /**
-     * Stops the mock server
-     *
-     * @async
-     * @returns {Promise<Object>} Result object with success status
-     */
+    /** @returns {Promise<Object>} */
     async handleStop() {
         try {
             return await this.service.stopServer();
@@ -92,32 +60,19 @@ export class MockServerController {
         }
     }
 
-    /**
-     * Gets server status
-     *
-     * @async
-     * @returns {Promise<Object>} Status object with running state, port, and request count
-     */
+    /** @returns {Promise<Object>} */
     async getStatus() {
         return this.service.getStatus();
     }
 
-    /**
-     * Gets mock server settings
-     *
-     * @async
-     * @returns {Promise<Object>} Settings object
-     */
+    /** @returns {Promise<Object>} */
     async getSettings() {
         return this.service.getSettings();
     }
 
     /**
-     * Updates mock server port
-     *
-     * @async
-     * @param {number} port - New port number
-     * @returns {Promise<Object>} Result object with success status
+     * @param {number} port
+     * @returns {Promise<Object>}
      */
     async handleUpdatePort(port) {
         try {
@@ -143,11 +98,8 @@ export class MockServerController {
     }
 
     /**
-     * Toggles collection enabled state
-     *
-     * @async
-     * @param {string} collectionId - Collection ID to toggle
-     * @returns {Promise<Object>} Result object with new enabled state
+     * @param {string} collectionId
+     * @returns {Promise<Object>}
      */
     async handleToggleCollection(collectionId) {
         try {
@@ -166,13 +118,10 @@ export class MockServerController {
     }
 
     /**
-     * Sets delay for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {number} delayMs - Delay in milliseconds
-     * @returns {Promise<Object>} Result object with success status
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {number} delayMs
+     * @returns {Promise<Object>}
      */
     async handleSetDelay(collectionId, endpointId, delayMs) {
         try {
@@ -198,13 +147,10 @@ export class MockServerController {
     }
 
     /**
-     * Sets custom response for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {Object|string|null} response - Custom response body (null to reset)
-     * @returns {Promise<Object>} Result object with success status
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object|string|null} response
+     * @returns {Promise<Object>}
      */
     async handleSetCustomResponse(collectionId, endpointId, response) {
         try {
@@ -233,12 +179,9 @@ export class MockServerController {
     }
 
     /**
-     * Gets custom response for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @returns {Promise<Object|null>} Custom response or null
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<Object|null>}
      */
     async getCustomResponse(collectionId, endpointId) {
         try {
@@ -249,12 +192,9 @@ export class MockServerController {
     }
 
     /**
-     * Gets default response for a specific endpoint (from schema)
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @returns {Promise<Object|null>} Default response or null
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<Object|null>}
      */
     async getDefaultResponse(collectionId, endpointId) {
         try {
@@ -308,13 +248,10 @@ export class MockServerController {
     }
 
     /**
-     * Sets custom status code for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {number|null} statusCode - Custom status code (null to reset)
-     * @returns {Promise<Object>} Result object with success status
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {number|null} statusCode
+     * @returns {Promise<Object>}
      */
     async handleSetCustomStatusCode(collectionId, endpointId, statusCode) {
         try {
@@ -342,12 +279,9 @@ export class MockServerController {
     }
 
     /**
-     * Gets custom status code for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @returns {Promise<number|null>} Custom status code or null
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<number|null>}
      */
     async getCustomStatusCode(collectionId, endpointId) {
         try {
@@ -357,12 +291,7 @@ export class MockServerController {
         }
     }
 
-    /**
-     * Gets all collections
-     *
-     * @async
-     * @returns {Promise<Array>} Array of collection objects
-     */
+    /** @returns {Promise<Array>} */
     async getCollections() {
         try {
             return await this.collectionRepository.getAll();
@@ -372,22 +301,14 @@ export class MockServerController {
     }
 
     /**
-     * Gets request logs
-     *
-     * @async
-     * @param {number} limit - Maximum number of logs to return
-     * @returns {Promise<Array>} Array of request log entries
+     * @param {number} limit
+     * @returns {Promise<Array>}
      */
     async getRequestLogs(limit = 20) {
         return this.service.getRequestLogs(limit);
     }
 
-    /**
-     * Clears request logs
-     *
-     * @async
-     * @returns {Promise<Object>} Result object
-     */
+    /** @returns {Promise<Object>} */
     async clearRequestLogs() {
         try {
             await this.service.clearRequestLogs();

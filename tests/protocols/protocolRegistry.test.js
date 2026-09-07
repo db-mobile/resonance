@@ -12,10 +12,6 @@ import {
     projectPersistedData
 } from '../../src/modules/protocols/protocolRegistry.js';
 
-/**
- * The keys returned by CollectionRepository.getAllPersistedEndpointData(),
- * minus responseSchema, which is not projected per protocol.
- */
 const PERSISTED_DATA_KINDS = [
     'url',
     'authConfig',

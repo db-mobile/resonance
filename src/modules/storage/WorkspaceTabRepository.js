@@ -5,22 +5,8 @@
 
 
 
-/**
- * Repository for managing workspace tab persistence
- *
- * @class
- * @classdesc Handles persistence of workspace tabs (multiple request tabs) in the persistent store.
- * Each tab contains complete request/response state including URL, method, headers, body,
- * query params, authentication config, and response data. Implements defensive programming
- * with deep cloning to avoid reference issues and auto-initialization for packaged apps.
- * Ensures at least one tab always exists.
- */
 export class WorkspaceTabRepository {
-    /**
-     * Creates a WorkspaceTabRepository instance
-     *
-     * @param {Object} backendAPI - The backend IPC API bridge
-     */
+    /** @param {Object} backendAPI */
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.STORE_KEY = 'workspace-tabs';
@@ -31,11 +17,9 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Appends a store write to the ordered write chain so a stale write can never overtake a newer one.
-     * @private
-     * @param {string} key - Store key to write
-     * @param {*} value - Value to persist
-     * @returns {Promise<void>} Settles when this write completes
+     * @param {string} key
+     * @param {*} value
+     * @returns {Promise<void>}
      */
     _queueStoreWrite(key, value) {
         const write = this._writeChain
@@ -45,20 +29,7 @@ export class WorkspaceTabRepository {
         return write;
     }
 
-    /**
-     * Retrieves all workspace tabs
-     *
-     * Automatically initializes with default tab if data is invalid. Uses deep cloning
-     * to avoid reference issues between tabs.
-     *
-     * @async
-     * @returns {Promise<Array<Object>>} Array of workspace tab objects
-     */
-    /**
-     * Maximum size in characters for response data stored in tabs.
-     * Responses larger than this will be truncated to save memory.
-     * @private
-     */
+    /** @returns {Promise<Array<Object>>} */
     static MAX_RESPONSE_SIZE = 500000;
 
     async getTabs() {
@@ -85,12 +56,8 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Saves all workspace tabs
-     *
-     * @async
-     * @param {Array<Object>} tabs - Array of tab objects to save
+     * @param {Array<Object>} tabs
      * @returns {Promise<void>}
-     * @throws {Error} If tabs is not an array or save fails
      */
     async saveTabs(tabs) {
         if (!Array.isArray(tabs)) {
@@ -100,12 +67,7 @@ export class WorkspaceTabRepository {
         await this._queueStoreWrite(this.STORE_KEY, tabs);
     }
 
-    /**
-     * Retrieves the active tab ID
-     *
-     * @async
-     * @returns {Promise<string|null>} The active tab ID or null
-     */
+    /** @returns {Promise<string|null>} */
     async getActiveTabId() {
         if (this._activeTabIdCache !== undefined) {
             return this._activeTabIdCache;
@@ -122,12 +84,8 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Sets the active tab ID
-     *
-     * @async
-     * @param {string} tabId - The tab ID to set as active
+     * @param {string} tabId
      * @returns {Promise<void>}
-     * @throws {Error} If save fails
      */
     async setActiveTabId(tabId) {
         this._activeTabIdCache = tabId;
@@ -135,13 +93,8 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Retrieves a tab by ID
-     *
-     * Uses deep cloning to avoid reference issues.
-     *
-     * @async
-     * @param {string} tabId - The tab ID
-     * @returns {Promise<Object|null>} The tab object or null if not found
+     * @param {string} tabId
+     * @returns {Promise<Object|null>}
      */
     async getTabById(tabId) {
         const tabs = await this.getTabs();
@@ -150,18 +103,12 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Adds a new workspace tab
-     *
-     * Merges provided tab data with default tab structure. Generates ID and timestamps.
-     *
-     * @async
-     * @param {Object} tab - Tab object with initial data
-     * @param {string} [tab.id] - Optional tab ID (generated if not provided)
-     * @param {string} [tab.name] - Tab name
-     * @param {Object} [tab.request] - Request configuration
-     * @param {Object} [tab.endpoint] - Associated endpoint data
-     * @returns {Promise<Object>} The created tab object
-     * @throws {Error} If save fails
+     * @param {Object} tab
+     * @param {string} [tab.id]
+     * @param {string} [tab.name]
+     * @param {Object} [tab.request]
+     * @param {Object} [tab.endpoint]
+     * @returns {Promise<Object>}
      */
     async addTab(tab) {
         const tabs = await this.getTabs();
@@ -179,21 +126,14 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Updates an existing workspace tab
-     *
-     * Deep merges nested objects to preserve sub-properties. Uses deep cloning to ensure
-     * each tab has isolated data. Response is completely replaced instead of merged.
-     *
-     * @async
-     * @param {string} tabId - The tab ID to update
-     * @param {Object} updates - Object with properties to update
-     * @param {Object} [updates.request] - Request updates (deep merged)
-     * @param {Object} [updates.response] - Response data (completely replaced)
-     * @param {Object} [updates.endpoint] - Endpoint updates (deep merged)
-     * @param {string} [updates.name] - Tab name
-     * @param {boolean} [updates.isModified] - Modified state
-     * @returns {Promise<Object|null>} The updated tab object or null if not found
-     * @throws {Error} If save fails
+     * @param {string} tabId
+     * @param {Object} updates
+     * @param {Object} [updates.request]
+     * @param {Object} [updates.response]
+     * @param {Object} [updates.endpoint]
+     * @param {string} [updates.name]
+     * @param {boolean} [updates.isModified]
+     * @returns {Promise<Object|null>}
      */
     async updateTab(tabId, updates) {
         const tabs = await this.getTabs();
@@ -253,14 +193,8 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Deletes a workspace tab
-     *
-     * Ensures at least one tab always exists. If deleting the last tab, creates a new default tab.
-     *
-     * @async
-     * @param {string} tabId - The tab ID to delete
-     * @returns {Promise<boolean>} True if deletion succeeded, false if tab not found
-     * @throws {Error} If save fails
+     * @param {string} tabId
+     * @returns {Promise<boolean>}
      */
     async deleteTab(tabId) {
         const tabs = await this.getTabs();
@@ -280,12 +214,8 @@ export class WorkspaceTabRepository {
     }
 
     /**
-     * Reorders tabs based on an ordered list of tab IDs
-     *
-     * @async
-     * @param {Array<string>} orderedTabIds - Tab IDs in the desired order
+     * @param {Array<string>} orderedTabIds
      * @returns {Promise<void>}
-     * @throws {Error} If save fails
      */
     async reorderTabs(orderedTabIds) {
         const tabs = await this.getTabs();
@@ -294,14 +224,7 @@ export class WorkspaceTabRepository {
         await this.saveTabs(reordered);
     }
 
-    /**
-     * Creates a default workspace tab
-     *
-     * Provides initial structure for new tabs with empty request/response data.
-     *
-     * @private
-     * @returns {Object} Default tab object
-     */
+    /** @returns {Object} */
     _createDefaultTab() {
         return {
             id: this._generateTabId(),
@@ -333,25 +256,12 @@ export class WorkspaceTabRepository {
         };
     }
 
-    /**
-     * Generates a unique tab ID
-     *
-     * @private
-     * @returns {string} Unique tab ID
-     */
+    /** @returns {string} */
     _generateTabId() {
         return `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     }
 
-    /**
-     * Clears all tabs and creates a new default tab
-     *
-     * Resets workspace to initial state with single empty tab.
-     *
-     * @async
-     * @returns {Promise<void>}
-     * @throws {Error} If save fails
-     */
+    /** @returns {Promise<void>} */
     async clearAllTabs() {
         const defaultTabs = [this._createDefaultTab()];
         await this.saveTabs(defaultTabs);

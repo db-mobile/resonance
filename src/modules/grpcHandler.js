@@ -34,12 +34,7 @@ import { getCurrentEndpoint } from './state/currentEndpoint.js';
 let methodsCache = new Map();
 const methodFlagsCache = new Map();
 
-/**
- * Which definition source currently drives the service/method lists. Reflection and
- * a loaded proto file are mutually exclusive: whichever was used last wins, and the
- * other card stands down so sends can never route through a stale proto path.
- * @type {{kind: 'none'|'reflection'|'proto', protoPath: string|null}}
- */
+/** @type {{kind: 'none'|'reflection'|'proto', protoPath: string|null}} */
 const activeSource = { kind: 'none', protoPath: null };
 
 function setActiveSource(kind, protoPath = null) {
@@ -70,10 +65,7 @@ function clearMetadataList() {
     }
 }
 
-/**
- * Read the metadata key/value rows as a plain object, skipping unnamed rows.
- * @returns {Object<string, string>} Metadata map
- */
+/** @returns {Object<string, string>} */
 export function getGrpcMetadata() {
     const metadata = {};
     if (!grpcMetadataList) {
@@ -128,12 +120,9 @@ function addOption(select, value, label) {
 }
 
 /**
- * Add an option only if the select does not already offer that value, then select it.
- * Restoring a saved request has no service/method list to hand, so the saved values
- * are injected as options — otherwise assigning `.value` silently resolves to ''.
- * @param {HTMLSelectElement} select - Target select
- * @param {string} value - Option value to guarantee
- * @param {string} label - Visible label
+ * @param {HTMLSelectElement} select
+ * @param {string} value
+ * @param {string} label
  */
 function ensureOption(select, value, label) {
     if (!select || !value) {
@@ -197,12 +186,7 @@ export function setGrpcTls(useTls) {
     }
 }
 
-/**
- * Snapshot the gRPC panel for persistence. Includes the selected method's streaming
- * flags and the active proto path so a restored request can be sent without first
- * re-running reflection.
- * @returns {Object} Persistable gRPC request state
- */
+/** @returns {Object} */
 export function captureGrpcState() {
     const fullMethod = grpcMethodSelect?.value || '';
     const flags = methodFlagsCache.get(fullMethod) || {};
@@ -223,13 +207,7 @@ export function captureGrpcState() {
     };
 }
 
-/**
- * Restore the gRPC panel from persisted state without touching the network. The saved
- * service/method are injected as options and their streaming flags rehydrated, so Send
- * dispatches to the right (unary vs streaming) path straight away. Connect or
- * Load .proto refreshes the full lists on demand.
- * @param {Object} grpcData - State previously produced by captureGrpcState
- */
+/** @param {Object} grpcData */
 export function applyGrpcState(grpcData) {
     const data = grpcData || {};
 
@@ -272,11 +250,6 @@ export function applyGrpcState(grpcData) {
     setGrpcStatus(data.fullMethod ? 'Restored' : '', 'idle');
 }
 
-/**
- * Extract the host[:port] a gRPC target resolves to, matching how the HTTP
- * path keys the certificate store (`new URL(url).host`).
- * "https://h:50051/x" and "h:50051" both yield "h:50051".
- */
 export function grpcHostForCertLookup(target) {
     return (target || '')
         .trim()
@@ -285,11 +258,6 @@ export function grpcHostForCertLookup(target) {
         .toLowerCase();
 }
 
-/**
- * Build the TLS options object for gRPC backend commands. Skip-verify follows
- * the global "Verify SSL certificates" setting (same as HTTP requests), and
- * the client certificate/CA resolve from the per-host certificate store.
- */
 async function buildTlsOptions(target) {
     const useTls = getUseTls();
     let skipVerify = false;
@@ -308,7 +276,6 @@ async function buildTlsOptions(target) {
                 tls.clientCert = cert;
             }
         } catch (_e) {
-            /* certificate lookup is best-effort */
         }
     }
     return tls;
@@ -403,10 +370,8 @@ async function onServiceChange() {
 }
 
 /**
- * Metadata keys must be lowercase ASCII on the wire; header names produced by the
- * auth manager (and typed by hand) are normalised so servers accept them.
- * @param {Object<string, string>} metadata - Raw metadata map
- * @returns {Object<string, string>} Map with lowercased keys
+ * @param {Object<string, string>} metadata
+ * @returns {Object<string, string>}
  */
 function lowercaseMetadataKeys(metadata) {
     const normalized = {};
@@ -416,15 +381,7 @@ function lowercaseMetadataKeys(metadata) {
     return normalized;
 }
 
-/**
- * Build the outgoing metadata: the panel's key/value rows with the effective
- * Authorization config folded in. Digest and AWS SigV4 sign at the HTTP transport
- * layer, which gRPC never reaches, so those are reported as unsupported instead of
- * silently sending nothing.
- *
- * Also reports which keys carry the credentials, so history can redact them.
- * @returns {Promise<{metadata: Object<string, string>, sensitiveNames: string[]}>} Metadata and credential keys
- */
+/** @returns {Promise<{metadata: Object<string, string>, sensitiveNames: string[]}>} */
 async function buildGrpcMetadata(substitution = {}) {
     const metadata = getGrpcMetadata();
     let sensitiveNames = [];
@@ -447,16 +404,12 @@ async function buildGrpcMetadata(substitution = {}) {
 }
 
 /**
- * Resolve {{variables}} in the target, message and metadata. Deliberately avoids
- * RequestBuilderService.processRequestComponents, which prefixes scheme-less URLs
- * with https:// — a gRPC target is a bare host:port. The message is resolved as
- * text before parsing so variables can appear inside JSON values.
- * @param {string} target - Raw target
- * @param {string} rawBody - Raw request JSON text
- * @param {Object} metadata - Raw metadata map
- * @param {{variables: Object, processor: Object}|null} [context] - Variable context to reuse; resolved fresh when omitted
- * @param {string[]} [extraUnresolved] - Unresolved names found elsewhere (e.g. auth config fields)
- * @returns {Promise<{target: string, rawBody: string, metadata: Object}>} Resolved request parts
+ * @param {string} target
+ * @param {string} rawBody
+ * @param {Object} metadata
+ * @param {{variables: Object, processor: Object}|null} [context]
+ * @param {string[]} [extraUnresolved]
+ * @returns {Promise<{target: string, rawBody: string, metadata: Object}>}
  */
 async function resolveGrpcRequest(target, rawBody, metadata, context = null, extraUnresolved = []) {
     const { variables, processor } = context ||
@@ -478,21 +431,15 @@ async function resolveGrpcRequest(target, rawBody, metadata, context = null, ext
 }
 
 /**
- * Resolve variables in the target alone, for the paths that only talk to the
- * server (Connect, method listing, skeleton generation).
- * @param {string} rawTarget - Target as typed, possibly containing {{variables}}
- * @returns {Promise<string>} Resolved target
+ * @param {string} rawTarget
+ * @returns {Promise<string>}
  */
 async function resolveGrpcTarget(rawTarget) {
     const { target } = await resolveGrpcRequest(rawTarget, '', {});
     return target;
 }
 
-/**
- * Guarantee the active proto file is present in the backend registry, which is
- * in-memory and therefore empty after a restart even though the path was restored.
- * @returns {Promise<boolean>} True when the proto is loaded and usable
- */
+/** @returns {Promise<boolean>} */
 async function ensureProtoLoaded() {
     const { protoPath } = activeSource;
     if (!protoPath) {
@@ -664,9 +611,8 @@ export async function handleGrpcSend() {
 }
 
 /**
- * Load a proto file and populate services/methods from it
- * @param {string} protoPath - Path to the .proto file
- * @param {string[]} [includePaths] - Optional additional include paths
+ * @param {string} protoPath
+ * @param {string[]} [includePaths]
  */
 export async function loadProtoFile(protoPath, includePaths = null) {
     try {
@@ -705,9 +651,6 @@ export async function loadProtoFile(protoPath, includePaths = null) {
     }
 }
 
-/**
- * Clear proto file mode and return to reflection mode
- */
 export function clearProtoFile() {
     if (activeSource.protoPath) {
         window.backendAPI.grpc.unloadProto(activeSource.protoPath).catch(() => { });

@@ -3,9 +3,6 @@
  * @module scriptSubTabs
  */
 
-/**
- * Initialize script sub-tab switching functionality
- */
 export function initializeScriptSubTabs() {
     const subTabButtons = document.querySelectorAll('.script-sub-tab');
     const tabPanels = document.querySelectorAll('.script-tab-panel');

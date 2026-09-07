@@ -3,15 +3,7 @@ import { displayResponseWithLineNumbersForTab } from '../apiHandler.js';
 import { updateResponseSize, updateResponseTime, updateStatusDisplay } from '../statusDisplay.js';
 import { debounce } from '../utils/debounce.js';
 
-/**
- * Shared scaffolding for the streaming-protocol handlers (WebSocket, SSE, MQTT,
- * and gRPC streaming). Each protocol keeps its own backend event handling and
- * connect/cancel logic; this module owns the parts that were previously
- * copy-pasted across all four: per-tab session state, transcript building,
- * active-tab guarded status updates, and the Tauri event-listener bootstrap.
- */
-
-/** @returns {Promise<string|null>} the active workspace tab id, if known. */
+/** @returns {Promise<string|null>} */
 export async function getActiveTabId() {
     return app.workspaceTabController
         ? app.workspaceTabController.service.getActiveTabId()
@@ -19,9 +11,6 @@ export async function getActiveTabId() {
 }
 
 /**
- * True when the given tab is the one currently shown, so it is safe to write to
- * the shared response DOM. Treated as active when no tab controller is present
- * (e.g. in tests or before the workspace is wired up).
  * @param {string} tabId
  * @returns {Promise<boolean>}
  */
@@ -34,12 +23,9 @@ export async function isTabCurrentlyActive(tabId) {
 }
 
 /**
- * Build a memoized initializer that subscribes to a backend Tauri event exactly
- * once. Returns a no-op (resolved) promise when running outside Tauri or when
- * the backend for this protocol is unavailable.
- * @param {string} eventName - Tauri event name to listen for.
- * @param {() => boolean} isBackendAvailable - guard; skip when the backend is absent.
- * @param {(event: object) => void} handler - backend event handler.
+ * @param {string} eventName
+ * @param {() => boolean} isBackendAvailable
+ * @param {(event: object) => void} handler
  * @returns {() => Promise<void>}
  */
 export function createBackendEventListener(eventName, isBackendAvailable, handler) {
@@ -63,25 +49,11 @@ export function createBackendEventListener(eventName, isBackendAvailable, handle
     };
 }
 
-/**
- * A transcript is a debugging view of a live stream, not a log file: a chatty
- * endpoint would otherwise grow it without limit, and since every event
- * re-renders and re-persists the whole thing, the cost per event would grow
- * with the transcript. The oldest entries are dropped once either bound is hit.
- */
 const MAX_TRANSCRIPT_ENTRIES = 500;
 const MAX_TRANSCRIPT_CHARS = 256 * 1024;
 
-/**
- * Persisting on every event turns a fast stream into a write storm against the
- * tab store. Only the last write in a burst matters, so coalesce them.
- */
 const PERSIST_DEBOUNCE_MS = 400;
 
-/**
- * Rendering rebuilds the entire editor state, so a fast stream renders at most
- * once per interval: immediately when idle, then trailing for the burst.
- */
 const RENDER_COALESCE_MS = 80;
 
 const ENTRY_SEPARATOR = '\n\n';
@@ -96,17 +68,10 @@ function droppedNotice(count) {
         : `[${count} earlier entries dropped]`;
 }
 
-/**
- * Per-tab transcript session shared by the streaming handlers. Holds the live
- * connection state for each tab and renders/persists a running transcript.
- */
 export class StreamSession {
     /**
      * @param {object} [options]
      * @param {(entry: object, transcript: string, state: string) => (object|null)} [options.buildResponseMeta]
-     *   Maps a tab's session entry to the protocol-specific `response` object to
-     *   persist on the tab. Return null (or omit the option) to skip persistence
-     *   — gRPC streaming, for example, never persists its transcript.
      */
     constructor({ buildResponseMeta = null } = {}) {
         this._entries = new Map();
@@ -127,7 +92,6 @@ export class StreamSession {
     remove(tabId) {
         this._entries.delete(tabId);
         this._buffers.delete(tabId);
-        // The tab is gone; a queued write would target a tab that no longer exists.
         this._persisters.get(tabId)?.cancel();
         this._persisters.delete(tabId);
         const renderState = this._renderStates.get(tabId);
@@ -137,9 +101,6 @@ export class StreamSession {
         this._renderStates.delete(tabId);
     }
 
-    /**
-     * Update the global status display, but only while the owning tab is active.
-     */
     async updateStatus(tabId, text, status = null) {
         if (await isTabCurrentlyActive(tabId)) {
             updateStatusDisplay(text, status);
@@ -149,11 +110,9 @@ export class StreamSession {
     }
 
     /**
-     * Append a timestamped line to the tab's transcript, render it to the shared
-     * response view, and persist it (when a `buildResponseMeta` was provided).
      * @param {string} tabId
-     * @param {string} label - line header (e.g. 'RECEIVED', 'CONNECTED ws://...').
-     * @param {string} [content] - optional body shown on the next line.
+     * @param {string} label
+     * @param {string} [content]
      */
     async append(tabId, label, content = '') {
         const current = this.get(tabId) || {};
@@ -171,9 +130,7 @@ export class StreamSession {
     }
 
     /**
-     * Renders the tab's latest transcript at most once per coalesce interval, skipping hidden tabs entirely.
-     * @private
-     * @param {string} tabId - Tab whose transcript changed
+     * @param {string} tabId
      * @returns {void}
      */
     _scheduleRender(tabId) {
@@ -205,10 +162,8 @@ export class StreamSession {
     }
 
     /**
-     * Renders the tab's current transcript into the response view.
-     * @private
-     * @param {string} tabId - Tab to render
-     * @param {{timer: (number|null), lastRenderedAt: number}} state - Render state to stamp
+     * @param {string} tabId
+     * @param {{timer: (number|null), lastRenderedAt: number}} state
      * @returns {void}
      */
     _renderNow(tabId, state) {
@@ -220,11 +175,6 @@ export class StreamSession {
         displayResponseWithLineNumbersForTab(entry.transcript || '', 'text/plain', tabId);
     }
 
-    /**
-     * The entry buffer backing a tab's transcript. Handlers reset a transcript
-     * by setting it to `''` when a new connection starts, so an empty
-     * transcript means the buffer is stale and starts again.
-     */
     _bufferFor(tabId, current) {
         let buffer = this._buffers.get(tabId);
         if (!buffer || !current.transcript) {
@@ -234,23 +184,12 @@ export class StreamSession {
         return buffer;
     }
 
-    /**
-     * The composed body is maintained incrementally rather than re-joined from
-     * the entries on every event: at steady state each append drops one entry
-     * and adds one, so a rebuild would cost the full cap per event. Only entry
-     * *sizes* are kept, which is all trimming needs.
-     */
     _push(buffer, line) {
         buffer.body = buffer.body ? buffer.body + ENTRY_SEPARATOR + line : line;
         buffer.sizes.push(line.length);
         buffer.chars += line.length + ENTRY_SEPARATOR.length;
     }
 
-    /**
-     * Drop oldest entries until both bounds hold. The newest entry is always
-     * kept, however large it is — truncating an event's body would misrepresent
-     * what the server actually sent.
-     */
     _trim(buffer) {
         while (
             buffer.sizes.length > 1

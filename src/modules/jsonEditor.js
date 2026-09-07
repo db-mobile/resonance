@@ -9,9 +9,6 @@ import { json } from '@codemirror/lang-json';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { createThemedHighlighting } from './editorTheme.js';
 
-/**
- * JSONEditor - CodeMirror editor for editable JSON content
- */
 export class JSONEditor {
     constructor(containerElement) {
         this.container = containerElement;
@@ -21,10 +18,7 @@ export class JSONEditor {
         this.init();
     }
 
-    /**
-     * Get theme extensions based on current color scheme
-     * @returns {Array} Array of theme extensions
-     */
+    /** @returns {Array} */
     getThemeExtensions() {
         const baseTheme = EditorView.theme({
             '&': {
@@ -65,9 +59,6 @@ export class JSONEditor {
         return [this._themed.extension, baseTheme];
     }
 
-    /**
-     * Initialize the CodeMirror editor
-     */
     init() {
         this._themed = createThemedHighlighting();
         const extensions = [
@@ -97,9 +88,6 @@ export class JSONEditor {
         this._themed.attach(this.view);
     }
 
-    /**
-     * Tear down theme listeners. Call when the editor is no longer used.
-     */
     destroy() {
         this._themed?.dispose();
         this._themed = null;
@@ -109,18 +97,12 @@ export class JSONEditor {
         }
     }
 
-    /**
-     * Register a callback for content changes
-     * @param {Function} callback - Called when content changes
-     */
+    /** @param {Function} callback */
     onChange(callback) {
         this.changeCallback = callback;
     }
 
-    /**
-     * Set editor content
-     * @param {string} content - JSON string to set
-     */
+    /** @param {string} content */
     setContent(content) {
         this.view.dispatch({
             changes: {
@@ -131,24 +113,15 @@ export class JSONEditor {
         });
     }
 
-    /**
-     * Get current editor content
-     * @returns {string}
-     */
+    /** @returns {string} */
     getContent() {
         return this.view.state.doc.toString();
     }
 
-    /**
-     * Clear editor content
-     */
     clear() {
         this.setContent('');
     }
 
-    /**
-     * Focus the editor
-     */
     focus() {
         this.view.focus();
     }

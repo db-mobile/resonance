@@ -1,7 +1,3 @@
-/**
- * Internationalization Manager
- * Handles language switching and translation functionality
- */
 export class I18nManager {
     constructor() {
         this.currentLanguage = 'en';

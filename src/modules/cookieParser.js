@@ -1,13 +1,9 @@
-/**
- * Parses Set-Cookie headers and extracts cookie information
- */
 
 import { escapeHtml } from './htmlUtils.js';
 
 /**
- * Parse a single Set-Cookie header value
- * @param {string} cookieString - The Set-Cookie header value
- * @returns {Object} Parsed cookie object
+ * @param {string} cookieString
+ * @returns {Object}
  */
 function parseCookie(cookieString) {
     const parts = cookieString.split(';').map(part => part.trim());
@@ -64,9 +60,8 @@ function parseCookie(cookieString) {
 }
 
 /**
- * Extract cookies from response headers
- * @param {Object} headers - Response headers object
- * @returns {Array} Array of parsed cookie objects
+ * @param {Object} headers
+ * @returns {Array}
  */
 export function extractCookies(headers) {
     if (!headers) {
@@ -97,9 +92,8 @@ export function extractCookies(headers) {
 }
 
 /**
- * Render cookies into a container element
- * @param {HTMLElement} container - Target container
- * @param {Array} cookies - Array of parsed cookie objects
+ * @param {HTMLElement} container
+ * @param {Array} cookies
  * @returns {void}
  */
 export function renderCookies(container, cookies) {
@@ -177,9 +171,8 @@ export function renderCookies(container, cookies) {
 }
 
 /**
- * Format cookies as HTML table
- * @param {Array} cookies - Array of parsed cookie objects
- * @returns {string} HTML string
+ * @param {Array} cookies
+ * @returns {string}
  */
 export function formatCookiesAsHtml(cookies) {
     if (!cookies || cookies.length === 0) {

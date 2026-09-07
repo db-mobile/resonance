@@ -1,9 +1,6 @@
 /**
  * @fileoverview IPC Bridge
  * @module ipcBridge
- *
- * Provides a unified API for the renderer to call into the native backend.
- * Automatically detects the runtime environment and routes IPC calls accordingly.
  */
 
 const isTauri = '__TAURI_INTERNALS__' in window;

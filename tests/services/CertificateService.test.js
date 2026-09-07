@@ -22,7 +22,7 @@ describe('CertificateService', () => {
                     { host: 'ca-only.example.com', certPath: '', keyPath: '', caPath: '/ca.pem', enabled: true }
                 ]
             });
-            await service.getItems(); // warm the cache
+            await service.getItems();
         });
 
         test('returns null before the cache is warmed', () => {
@@ -87,7 +87,6 @@ describe('CertificateService', () => {
             expect(mockRepository.saveCertificates).toHaveBeenCalledWith({ items });
             expect(saved).toEqual(items);
             expect(listener).toHaveBeenCalledWith(expect.objectContaining({ type: 'certificates-updated' }));
-            // cache is refreshed so resolution works immediately after save
             expect(service.getForHost('h')).toEqual({ certPath: '/c.crt', keyPath: '/c.key', caPath: '' });
         });
     });

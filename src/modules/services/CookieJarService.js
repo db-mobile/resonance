@@ -135,10 +135,9 @@ export class CookieJarService {
     }
 
     /**
-     * Process Set-Cookie headers from a response and persist them to the jar.
-     * @param {string[]} setCookieHeaders - Array of raw Set-Cookie header values
-     * @param {string} requestUrl - The URL of the request that produced the response
-     * @param {string} environmentId - Active environment ID (or 'default')
+     * @param {string[]} setCookieHeaders
+     * @param {string} requestUrl
+     * @param {string} environmentId
      */
     async processCookiesFromResponse(setCookieHeaders, requestUrl, environmentId) {
         if (!setCookieHeaders || setCookieHeaders.length === 0) { return; }
@@ -165,8 +164,6 @@ export class CookieJarService {
     }
 
     /**
-     * Build the Cookie header value for a request.
-     * Returns null if no matching cookies.
      * @param {string} requestUrl
      * @param {string} environmentId
      * @returns {Promise<string|null>}
@@ -202,9 +199,8 @@ export class CookieJarService {
     }
 
     /**
-     * Validate a manually entered cookie before it is persisted.
-     * @param {Object} cookie - Cookie fields ({ name, value, domain, path, expires })
-     * @returns {string|null} An error code (name_required, name_invalid, value_invalid, domain_invalid, path_invalid, expires_invalid), or null when valid
+     * @param {Object} cookie
+     * @returns {string|null}
      */
     validateCookie(cookie) {
         const name = cookie?.name ?? '';
@@ -238,13 +234,10 @@ export class CookieJarService {
     }
 
     /**
-     * Persist a manually created or edited cookie. When `originalId` names a
-     * different stored cookie (rename or domain/path move), the old entry is
-     * removed so the composite id stays the only key.
-     * @param {Object} cookie - Cookie fields ({ name, value, domain, path, expires, secure, httpOnly, sameSite })
-     * @param {string} environmentId - Environment the cookie belongs to
-     * @param {string|null} [originalId] - Stored id of the cookie being edited, if any
-     * @returns {Promise<Object>} The persisted cookie
+     * @param {Object} cookie
+     * @param {string} environmentId
+     * @param {string|null} [originalId]
+     * @returns {Promise<Object>}
      */
     async putCookie(cookie, environmentId, originalId = null) {
         const validationError = this.validateCookie(cookie);
@@ -306,9 +299,6 @@ export class CookieJarService {
         this._notify({ type: 'cookies-updated', environmentId: environmentId || 'default' });
     }
 
-    /**
-     * Delete only session cookies (expires === null) for the given environment.
-     */
     async deleteSessionCookies(environmentId) {
         const envId = environmentId || 'default';
         const all = await this.repository.getAll(envId);

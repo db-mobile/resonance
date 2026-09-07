@@ -9,10 +9,7 @@ import { tags } from '@lezer/highlight';
 
 export const THEME_CHANGED_EVENT = 'resonance:theme-changed';
 
-/**
- * Detect if dark mode is active based on the data-theme attribute.
- * @returns {boolean}
- */
+/** @returns {boolean} */
 export function isDarkMode() {
     const theme = document.documentElement.getAttribute('data-theme');
     if (theme === 'dark') {
@@ -24,9 +21,6 @@ export function isDarkMode() {
     return false;
 }
 
-/**
- * Light highlight style on the light view background (#ffffff).
- */
 export const lightHighlightStyle = HighlightStyle.define([
     { tag: tags.keyword,        color: '#613583' },
     { tag: tags.atom,           color: '#c64600' },
@@ -47,9 +41,6 @@ export const lightHighlightStyle = HighlightStyle.define([
     { tag: tags.attributeValue, color: '#15772e' },
 ]);
 
-/**
- * Dark highlight style on the dark view background (#1e1e1e).
- */
 export const darkHighlightStyle = HighlightStyle.define([
     { tag: tags.keyword,        color: '#dc8add' },
     { tag: tags.atom,           color: '#ffbe6f' },
@@ -73,26 +64,12 @@ export const darkHighlightStyle = HighlightStyle.define([
 export const lightHighlighting = syntaxHighlighting(lightHighlightStyle);
 export const darkHighlighting = syntaxHighlighting(darkHighlightStyle);
 
-/**
- * Pick the syntax-highlighting extension for the currently active theme.
- * @returns {import('@codemirror/state').Extension}
- */
+/** @returns {import('@codemirror/state').Extension} */
 export function getHighlighting() {
     return isDarkMode() ? darkHighlighting : lightHighlighting;
 }
 
-/**
- * Create a CodeMirror Compartment that wraps the active highlighting and
- * automatically reconfigures it when the THEME_CHANGED_EVENT fires.
- *
- * Usage:
- *   const themed = createThemedHighlighting();
- *   // include themed.extension in EditorState extensions
- *   themed.attach(view);    // after the view is created
- *   themed.dispose();       // on editor teardown
- *
- * @returns {{ extension: import('@codemirror/state').Extension, attach: (view: import('@codemirror/view').EditorView) => void, dispose: () => void }}
- */
+/** @returns {{ extension: import('@codemirror/state').Extension, attach: (view: import('@codemirror/view').EditorView) => void, dispose: () => void }} */
 export function createThemedHighlighting() {
     const compartment = new Compartment();
     let view = null;

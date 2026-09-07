@@ -62,7 +62,6 @@ describe('VariableRepository', () => {
             await repository.getVariablesForCollection('collection_1');
             await repository.getVariablesForCollection('collection_1');
 
-            // Should only call backend once due to caching
             expect(mockBackendAPI.collections.getVariables).toHaveBeenCalledTimes(1);
         });
 
@@ -94,17 +93,13 @@ describe('VariableRepository', () => {
             mockBackendAPI.collections.getVariables.mockResolvedValue([{ key: 'old', value: 'oldValue' }]);
             mockBackendAPI.collections.saveVariables.mockResolvedValue();
 
-            // First fetch
             await repository.getVariablesForCollection('collection_1');
 
-            // Update variables
             await repository.setVariablesForCollection('collection_1', { new: 'newValue' });
 
-            // Should return updated value from cache without calling backend
             const result = await repository.getVariablesForCollection('collection_1');
 
             expect(result).toEqual({ new: 'newValue' });
-            // getVariables should only be called once (initial fetch)
             expect(mockBackendAPI.collections.getVariables).toHaveBeenCalledTimes(1);
         });
 
@@ -112,18 +107,14 @@ describe('VariableRepository', () => {
             const variables = [{ key: 'baseUrl', value: 'https://api.example.com' }];
             mockBackendAPI.collections.getVariables.mockResolvedValue(variables);
 
-            // Populate cache
             await repository.getVariablesForCollection('collection_1');
             await repository.getVariablesForCollection('collection_2');
 
-            // Invalidate only collection_1
             repository.invalidateCache('collection_1');
 
-            // Fetch again
             await repository.getVariablesForCollection('collection_1');
             await repository.getVariablesForCollection('collection_2');
 
-            // collection_1 should be fetched again, collection_2 should use cache
             expect(mockBackendAPI.collections.getVariables).toHaveBeenCalledTimes(3);
         });
 
@@ -131,18 +122,14 @@ describe('VariableRepository', () => {
             const variables = [{ key: 'baseUrl', value: 'https://api.example.com' }];
             mockBackendAPI.collections.getVariables.mockResolvedValue(variables);
 
-            // Populate cache
             await repository.getVariablesForCollection('collection_1');
             await repository.getVariablesForCollection('collection_2');
 
-            // Invalidate all
             repository.invalidateCache();
 
-            // Fetch again
             await repository.getVariablesForCollection('collection_1');
             await repository.getVariablesForCollection('collection_2');
 
-            // Both should be fetched again
             expect(mockBackendAPI.collections.getVariables).toHaveBeenCalledTimes(4);
         });
 
@@ -151,14 +138,11 @@ describe('VariableRepository', () => {
             mockBackendAPI.collections.getVariables.mockResolvedValue(variables);
             mockBackendAPI.collections.saveVariables.mockRejectedValue(new Error('Write failed'));
 
-            // Populate cache
             await repository.getVariablesForCollection('collection_1');
 
-            // Try to update (will fail)
             await expect(repository.setVariablesForCollection('collection_1', { new: 'value' }))
                 .rejects.toThrow('Failed to save collection variables');
 
-            // Cache should be invalidated, so next fetch should call backend
             await repository.getVariablesForCollection('collection_1');
 
             expect(mockBackendAPI.collections.getVariables).toHaveBeenCalledTimes(2);

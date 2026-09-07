@@ -5,36 +5,22 @@
 
 import { BaseModal } from './BaseModal.js';
 
-/**
- * Modal dialog component for confirmation prompts
- *
- * @class
- * @classdesc Provides a customizable confirmation dialog with promise-based API.
- * Supports keyboard navigation (Enter activates the focused button, Tab cycles
- * buttons; Escape and click-outside cancel via {@link BaseModal}), dangerous
- * action styling, and focus management for accessibility.
- * @augments BaseModal
- */
+/** @augments */
 export class ConfirmDialog extends BaseModal {
-    /**
-     * Creates a ConfirmDialog instance
-     */
     constructor() {
         super();
-        /** @type {Function|null} Pending promise resolver. */
+        /** @type {Function|null} */
         this.resolve = null;
     }
 
     /**
-     * Shows the confirmation dialog and waits for user response.
-     *
-     * @param {string} message - The confirmation message to display.
-     * @param {Object} [options={}] - Dialog configuration options.
-     * @param {string} [options.title='Confirm Action'] - Dialog title.
-     * @param {string} [options.confirmText='Confirm'] - Confirm button label.
-     * @param {string} [options.cancelText='Cancel'] - Cancel button label.
-     * @param {boolean} [options.dangerous=true] - Style confirm as a dangerous action (red button).
-     * @returns {Promise<boolean>} Resolves to true if confirmed, false if cancelled.
+     * @param {string} message
+     * @param {Object} [options={}]
+     * @param {string} [options.title='Confirm Action']
+     * @param {string} [options.confirmText='Confirm']
+     * @param {string} [options.cancelText='Cancel']
+     * @param {boolean} [options.dangerous=true]
+     * @returns {Promise<boolean>}
      */
     show(message, options = {}) {
         return new Promise((resolve) => {
@@ -44,11 +30,8 @@ export class ConfirmDialog extends BaseModal {
     }
 
     /**
-     * Builds and displays the confirmation dialog.
-     *
-     * @private
-     * @param {string} message - Confirmation message.
-     * @param {Object} options - Dialog options.
+     * @param {string} message
+     * @param {Object} options
      * @returns {void}
      */
     createDialog(message, options) {
@@ -83,11 +66,7 @@ export class ConfirmDialog extends BaseModal {
     }
 
     /**
-     * Wires button clicks and Enter/Tab navigation. Escape/backdrop cancel is
-     * handled by {@link BaseModal}.
-     *
-     * @private
-     * @param {HTMLElement} dialog - Dialog element.
+     * @param {HTMLElement} dialog
      * @returns {void}
      */
     setupEventListeners(dialog) {
@@ -120,51 +99,30 @@ export class ConfirmDialog extends BaseModal {
     }
 
     /**
-     * Focuses the cancel button by default to prevent accidental destructive actions.
-     *
-     * @private
-     * @param {HTMLElement} dialog - Dialog element.
+     * @param {HTMLElement} dialog
      * @returns {void}
      */
     focusCancelButton(dialog) {
         dialog.querySelector('#confirm-cancel-btn').focus();
     }
 
-    /**
-     * Confirms the action, resolving with true.
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     confirm() {
         this._settle(true);
     }
 
-    /**
-     * Cancels the action, resolving with false.
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     cancel() {
         this._settle(false);
     }
 
-    /**
-     * Dismiss (Escape / backdrop click) cancels.
-     *
-     * @protected
-     * @returns {void}
-     */
+    /** @returns {void} */
     onDismiss() {
         this.cancel();
     }
 
     /**
-     * Resolves the pending promise once, tears down, and restores app focus.
-     *
-     * @private
-     * @param {boolean} value - Value to resolve with.
+     * @param {boolean} value
      * @returns {void}
      */
     _settle(value) {

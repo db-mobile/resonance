@@ -1,16 +1,5 @@
 import { CollectionService } from '../../src/modules/services/CollectionService.js';
 
-/**
- * Endpoint ids are the join key for state that lives outside the collection
- * file: keychain auth scopes, pinned requests, scripts, mock-server overrides,
- * runner steps and workspace tabs are all keyed `${collectionId}_${endpointId}`.
- *
- * The old generator counted up from `custom_1` over the flat endpoints array,
- * which reused a deleted request's id and gave the replacement that request's
- * credentials and pins. Being a pure function of collection contents, it also
- * minted identical ids on two branches, so a merge produced two request files
- * claiming one id.
- */
 describe('CollectionService.generateEndpointId', () => {
     let service;
 

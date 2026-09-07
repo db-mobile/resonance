@@ -387,7 +387,6 @@ describe('RunnerController', () => {
         test('should handle errors gracefully', async () => {
             mockBackendAPI.settings.get.mockRejectedValue(new Error('Settings error'));
 
-            // Should not throw
             await controller._saveLastRunnerId('runner_1');
         });
     });

@@ -45,12 +45,7 @@ export class Resizer {
         this.setRequestBias(0.4);
     }
 
-    /**
-     * Split the request/response area so the request-config gets `fraction` of the
-     * available height. Used for the default 40/60 split and to bias toward the
-     * request side (e.g. the GraphQL Workbench wants more room for the query).
-     * @param {number} fraction - Portion of available height for `.request-config` (0–1)
-     */
+    /** @param {number} fraction */
     setRequestBias(fraction) {
         const mainContentHeight = this.mainContentArea.clientHeight;
         const requestBuilder = document.querySelector('.request-builder');
@@ -262,10 +257,6 @@ export class HorizontalResizer {
     }
 }
 
-/**
- * Resizes the GraphQL Query / Variables split. The query section grows to fill
- * remaining space (flex: 1 1 0); dragging adjusts the variables pane's height.
- */
 export class GraphQLEditorResizer {
     constructor() {
         this.isDragging = false;
@@ -334,11 +325,6 @@ export class GraphQLEditorResizer {
     }
 }
 
-/**
- * Resizes the GraphQL explorer rail. The divider sits to the left of the rail
- * (which is the right-hand column), so dragging left widens it. Width persists
- * across sessions via the backend store.
- */
 export class GraphQLExplorerResizer {
     constructor() {
         this.isDragging = false;

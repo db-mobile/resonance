@@ -1,7 +1,5 @@
 /**
- * @fileoverview Postman-style click-build GraphQL query explorer. Renders a
- * checkbox tree projected from the query text (the single source of truth):
- * ticking a field rewrites the query AST, editing the query re-derives the tree.
+ * @fileoverview Postman-style click-build GraphQL query explorer.
  * @module graphqlExplorer
  */
 
@@ -18,12 +16,10 @@ const ROOT_SECTIONS = [
 ];
 
 /**
- * Locate the operation a section's edits target: a same-type operation matching
- * the explicit name, else the first operation of that type.
- * @param {Array} definitions - Document definitions.
- * @param {string} operationType - 'query' | 'mutation' | 'subscription'.
+ * @param {Array} definitions
+ * @param {string} operationType
  * @param {string|null} operationName
- * @returns {object|null} The matching OperationDefinition node, or null.
+ * @returns {object|null}
  */
 function findOperation(definitions, operationType, operationName) {
     const ops = definitions.filter(def => def.kind === Kind.OPERATION_DEFINITION);
@@ -39,10 +35,9 @@ function findOperation(definitions, operationType, operationName) {
 }
 
 /**
- * Build an empty operation definition of the given type.
  * @param {string} operationType
  * @param {string|null} operationName
- * @returns {object} An OperationDefinition AST node.
+ * @returns {object}
  */
 function createOperation(operationType, operationName) {
     return {
@@ -56,7 +51,6 @@ function createOperation(operationType, operationName) {
 }
 
 /**
- * Find a direct child Field node by name within a selection set.
  * @param {object|undefined} selectionSet
  * @param {string} name
  * @returns {object|null}
@@ -71,7 +65,6 @@ function findFieldNode(selectionSet, name) {
 }
 
 /**
- * Build a Field AST node, optionally with an (empty) selection set.
  * @param {string} name
  * @param {boolean} withSelectionSet
  * @returns {object}
@@ -90,9 +83,8 @@ function makeFieldNode(name, withSelectionSet) {
 }
 
 /**
- * Parse a query, or return an empty document when the text is blank.
  * @param {string} queryText
- * @returns {object} A Document AST node.
+ * @returns {object}
  */
 function parseOrEmpty(queryText) {
     const trimmed = (queryText || '').trim();
@@ -103,7 +95,6 @@ function parseOrEmpty(queryText) {
 }
 
 /**
- * Whether every field along a path exists in the selection set.
  * @param {object|undefined} selectionSet
  * @param {string[]} path
  * @returns {boolean}
@@ -120,11 +111,7 @@ function pathPresent(selectionSet, path) {
     return true;
 }
 
-/**
- * Drop variable definitions no longer referenced anywhere in the operation's
- * selection set (GraphQL treats an unused variable as an error).
- * @param {object} op - OperationDefinition node.
- */
+/** @param {object} op */
 function pruneUnusedVariables(op) {
     if (!op.variableDefinitions || op.variableDefinitions.length === 0) {
         return;
@@ -135,14 +122,10 @@ function pruneUnusedVariables(op) {
 }
 
 /**
- * Add a field (and any missing ancestors) along a path. Ancestors always get a
- * selection set; the leaf gets one only when it is an object type. Arguments are
- * not added here — they are filled inline in the Explorer (see setArgumentInQuery).
- * @param {object} selectionSet - The operation's root selection set.
+ * @param {object} selectionSet
  * @param {string[]} path
  * @param {boolean} leafIsObject
- * @param {string[]} leafDefaultFields - Scalar/enum field names to pre-select
- *   when the leaf is a newly created object field.
+ * @param {string[]} leafDefaultFields
  */
 function addPath(selectionSet, path, leafIsObject, leafDefaultFields) {
     let current = selectionSet;
@@ -163,7 +146,6 @@ function addPath(selectionSet, path, leafIsObject, leafDefaultFields) {
 }
 
 /**
- * Remove the field at a path and prune any ancestor left with no selections.
  * @param {object|undefined} selectionSet
  * @param {string[]} path
  */
@@ -187,7 +169,6 @@ function removePath(selectionSet, path) {
 }
 
 /**
- * Collect the dotted paths of every field in a selection set (all depths).
  * @param {object|undefined} selectionSet
  * @param {string[]} prefix
  * @param {Set<string>} out
@@ -207,18 +188,14 @@ function collectPaths(selectionSet, prefix, out) {
 }
 
 /**
- * Add or remove a field in a query, returning the reprinted query text. The
- * document AST is edited surgically, so unmodeled nodes (fragments, directives,
- * arguments, aliases on other fields) are preserved on round-trip.
  * @param {object} opts
- * @param {string} opts.queryText - Current query (may be empty).
- * @param {string} [opts.operationType] - Root operation type.
+ * @param {string} opts.queryText
+ * @param {string} [opts.operationType]
  * @param {string|null} [opts.operationName]
- * @param {string[]} opts.path - Field path from the root operation.
- * @param {boolean} [opts.leafIsObject] - Whether the leaf field is an object type.
- * @param {string[]} [opts.leafDefaultFields] - Scalar/enum field names to
- *   pre-select when adding an object leaf, so it is never an empty selection.
- * @returns {string} The new query text.
+ * @param {string[]} opts.path
+ * @param {boolean} [opts.leafIsObject]
+ * @param {string[]} [opts.leafDefaultFields]
+ * @returns {string}
  */
 export function toggleFieldInQuery({
     queryText,
@@ -247,7 +224,6 @@ export function toggleFieldInQuery({
 }
 
 /**
- * Navigate to the Field node at a path within a selection set.
  * @param {object|undefined} selectionSet
  * @param {string[]} path
  * @returns {object|null}
@@ -274,7 +250,6 @@ function capitalize(value) {
 }
 
 /**
- * The names of variables already declared on an operation.
  * @param {object} op
  * @returns {Set<string>}
  */
@@ -285,8 +260,6 @@ function existingVarNames(op) {
 }
 
 /**
- * Pick a unique variable name, preferring the bare argument name and
- * disambiguating with the field name (then a counter) on collision.
  * @param {Set<string>} used
  * @param {string} fieldName
  * @param {string} argName
@@ -306,7 +279,7 @@ function allocVarName(used, fieldName, argName) {
 /**
  * @param {string} argName
  * @param {string} varName
- * @returns {object} An Argument node binding the argument to a variable.
+ * @returns {object}
  */
 function variableArgument(argName, varName) {
     return {
@@ -319,7 +292,7 @@ function variableArgument(argName, varName) {
 /**
  * @param {string} varName
  * @param {string} typeString
- * @returns {object} A VariableDefinition node.
+ * @returns {object}
  */
 function variableDefinition(varName, typeString) {
     return {
@@ -332,7 +305,7 @@ function variableDefinition(varName, typeString) {
 
 /**
  * @param {*} value
- * @returns {string} An input display string for a stored variable value.
+ * @returns {string}
  */
 function toInputString(value) {
     if (value === null || value === undefined || value === '') {
@@ -345,7 +318,6 @@ function toInputString(value) {
 }
 
 /**
- * Parse a variables JSON string into an object (empty object on blank/invalid).
  * @param {string} variablesText
  * @returns {object}
  */
@@ -364,15 +336,14 @@ function parseVariables(variablesText) {
 
 /**
  * @param {object} vars
- * @returns {string} Pretty JSON, or '' when empty.
+ * @returns {string}
  */
 function stringifyVariables(vars) {
     return Object.keys(vars).length === 0 ? '' : JSON.stringify(vars, null, 2);
 }
 
 /**
- * The variable an argument is bound to on a field, or null.
- * @param {object} field - Field node.
+ * @param {object} field
  * @param {string} argName
  * @returns {string|null}
  */
@@ -382,8 +353,6 @@ function boundVariableName(field, argName) {
 }
 
 /**
- * The current value of a field's argument (via its bound variable), as an input
- * display string.
  * @param {object} opts
  * @param {string} opts.queryText
  * @param {string} opts.variablesText
@@ -414,10 +383,6 @@ export function getArgumentValue({ queryText, variablesText, operationType = 'qu
 }
 
 /**
- * Set (or clear) an argument's value. The argument is bound to a query variable
- * (`arg: $var`, auto-declared) and the value is stored in the variables payload.
- * An empty value clears the value; for an optional argument it also unbinds the
- * variable, for a required one it keeps the binding (declared but unset).
  * @param {object} opts
  * @param {string} opts.queryText
  * @param {string} opts.variablesText
@@ -425,9 +390,9 @@ export function getArgumentValue({ queryText, variablesText, operationType = 'qu
  * @param {string|null} [opts.operationName]
  * @param {string[]} opts.path
  * @param {string} opts.argName
- * @param {string} opts.argType - The argument's printed type.
+ * @param {string} opts.argType
  * @param {boolean} [opts.required]
- * @param {*} opts.raw - Widget value (string, or boolean for checkboxes).
+ * @param {*} opts.raw
  * @returns {{query: string, variables: string}}
  */
 export function setArgumentValue({ queryText, variablesText, operationType = 'query', operationName = null, path, argName, argType, required = false, raw }) {
@@ -464,7 +429,6 @@ export function setArgumentValue({ queryText, variablesText, operationType = 'qu
 }
 
 /**
- * List the variable names declared by the operations in a query.
  * @param {string} queryText
  * @returns {string[]}
  */
@@ -490,11 +454,8 @@ export function getDeclaredVariables(queryText) {
 }
 
 /**
- * List the variables declared by the operations in a query, with their types.
  * @param {string} queryText
  * @returns {Array<{name: string, type: string, required: boolean}>}
- *   `type` is the printed GraphQL type (e.g. `ID!`, `[String!]`), `required`
- *   is true for a non-null top-level type.
  */
 export function getDeclaredVariableDefs(queryText) {
     const trimmed = (queryText || '').trim();
@@ -522,11 +483,10 @@ export function getDeclaredVariableDefs(queryText) {
 }
 
 /**
- * Derive the set of selected field paths for a given operation type.
  * @param {string} queryText
  * @param {string} [operationType]
  * @param {string|null} [operationName]
- * @returns {Set<string>|null} Dotted paths, or null when the query cannot be parsed.
+ * @returns {Set<string>|null}
  */
 export function getSelectedPaths(queryText, operationType = 'query', operationName = null) {
     const trimmed = (queryText || '').trim();
@@ -547,13 +507,8 @@ export function getSelectedPaths(queryText, operationType = 'query', operationNa
     return paths;
 }
 
-/**
- * Interactive schema tree bound to a query editor via the onQueryChange callback.
- */
 export class GraphQLExplorer {
-    /**
-     * @param {HTMLElement} railEl - The container to render the tree into.
-     */
+    /** @param {HTMLElement} railEl */
     constructor(railEl) {
         this.railEl = railEl;
         this.schema = null;
@@ -568,8 +523,6 @@ export class GraphQLExplorer {
     }
 
     /**
-     * Build (or rebuild) the whole tree. Expansion state is not preserved across
-     * a full render; use {@link refreshState} for cheap checkbox updates.
      * @param {import('graphql').GraphQLSchema|null} schema
      * @param {string} queryText
      * @param {string} variablesText
@@ -607,8 +560,6 @@ export class GraphQLExplorer {
     }
 
     /**
-     * Recompute checkbox + argument state from new query/variables without
-     * rebuilding the DOM. On a parse error the tree shows the disabled notice.
      * @param {string} queryText
      * @param {string} [variablesText]
      */
@@ -623,9 +574,7 @@ export class GraphQLExplorer {
         this._applySelectionState();
     }
 
-    /**
-     * @param {string} message
-     */
+    /** @param {string} message */
     _renderEmpty(message) {
         const el = document.createElement('div');
         el.className = 'graphql-explorer-empty';
@@ -633,9 +582,7 @@ export class GraphQLExplorer {
         this.railEl.appendChild(el);
     }
 
-    /**
-     * @returns {HTMLElement} The search field wrapper.
-     */
+    /** @returns {HTMLElement} */
     _buildSearch() {
         const input = document.createElement('input');
         input.type = 'search';
@@ -649,9 +596,6 @@ export class GraphQLExplorer {
         return input;
     }
 
-    /**
-     * Render one section per root operation type present in the schema.
-     */
     _renderSections() {
         ROOT_SECTIONS.forEach(({ label, operationType, getter }) => {
             const rootType = this.schema[getter]?.();
@@ -672,8 +616,7 @@ export class GraphQLExplorer {
     }
 
     /**
-     * Build a single field row (checkbox, name, type, optional expander).
-     * @param {object} field - graphql-js field definition.
+     * @param {object} field
      * @param {string[]} path
      * @param {string} operationType
      * @returns {HTMLElement}
@@ -749,9 +692,8 @@ export class GraphQLExplorer {
     }
 
     /**
-     * Build an inline argument row (name + type + typed value input).
-     * @param {object} arg - graphql-js argument definition.
-     * @param {string[]} path - Path of the field that owns the argument.
+     * @param {object} arg
+     * @param {string[]} path
      * @param {string} operationType
      * @returns {HTMLElement}
      */
@@ -786,7 +728,6 @@ export class GraphQLExplorer {
     }
 
     /**
-     * Build the value control for an argument row.
      * @param {string} kind
      * @param {string} argType
      * @returns {HTMLElement}
@@ -822,11 +763,7 @@ export class GraphQLExplorer {
         return input;
     }
 
-    /**
-     * Store an argument row's value on its bound query variable (auto-binding the
-     * variable as needed) and emit the new query + variables.
-     * @param {HTMLElement} control
-     */
+    /** @param {HTMLElement} control */
     _onArgChange(control) {
         const row = control.closest('.graphql-explorer-arg-row');
         if (!row) {
@@ -852,10 +789,7 @@ export class GraphQLExplorer {
         this._emitChange(result);
     }
 
-    /**
-     * Push a {query, variables} result to the host and cache it locally.
-     * @param {{query: string, variables: string}} result
-     */
+    /** @param {{query: string, variables: string}} result */
     _emitChange(result) {
         const queryChanged = result.query !== this.queryText;
         const variablesChanged = result.variables !== this.variablesText;
@@ -870,9 +804,8 @@ export class GraphQLExplorer {
     }
 
     /**
-     * Lazily build (once) and show/hide a field's child rows.
      * @param {HTMLElement} wrapper
-     * @param {object} namedType - The object type whose fields to render.
+     * @param {object} namedType
      * @param {string[]} path
      * @param {string} operationType
      */
@@ -897,15 +830,12 @@ export class GraphQLExplorer {
     }
 
     /**
-     * Handle a checkbox toggle: rewrite the query and expand object fields so the
-     * user can pick sub-fields (an object field with no selections is incomplete).
      * @param {string[]} path
      * @param {string} operationType
      * @param {boolean} leafIsObject
      * @param {HTMLElement} wrapper
      * @param {object|null} leafType
-     * @param {Array<{name: string, type: string}>} [requiredArgs] - Bound to
-     *   variables when the field is turned on (Postman-style).
+     * @param {Array<{name: string, type: string}>} [requiredArgs]
      */
     _onToggle(path, operationType, leafIsObject, wrapper, leafType, requiredArgs = []) {
         let query;
@@ -951,10 +881,7 @@ export class GraphQLExplorer {
     }
 
     /**
-     * The immediate scalar/enum field names of an object type, excluding any that
-     * require arguments (which would be invalid without a supplied value). Used to
-     * pre-populate a freshly checked object field with a sensible default selection.
-     * @param {object|null} namedType - An object type, or null.
+     * @param {object|null} namedType
      * @returns {string[]}
      */
     _defaultScalarFields(namedType) {
@@ -972,10 +899,6 @@ export class GraphQLExplorer {
         });
     }
 
-    /**
-     * Sync every rendered checkbox with the current query, or show the parse-error
-     * notice and disable toggles when the query cannot be parsed.
-     */
     _applySelectionState() {
         const byType = {};
         let parseError = false;
@@ -1005,9 +928,7 @@ export class GraphQLExplorer {
     }
 
     /**
-     * Show a field's argument rows only when it is checked, and refresh each arg
-     * input from the query (skipping the one being edited).
-     * @param {HTMLElement} row - The field's `.graphql-explorer-node`.
+     * @param {HTMLElement} row
      * @param {boolean} checked
      * @param {boolean} parseError
      */
@@ -1042,9 +963,7 @@ export class GraphQLExplorer {
         });
     }
 
-    /**
-     * @param {string} message - Empty string hides the notice.
-     */
+    /** @param {string} message */
     _setNotice(message) {
         if (!this.noticeEl) {
             return;
@@ -1053,10 +972,6 @@ export class GraphQLExplorer {
         this.noticeEl.style.display = message ? '' : 'none';
     }
 
-    /**
-     * Filter rendered rows by the current search term (matches field name).
-     * Rows inside collapsed object fields are only searched once expanded.
-     */
     _applyFilter() {
         const term = this.searchTerm;
         this.treeEl.querySelectorAll('.graphql-explorer-item').forEach(item => {

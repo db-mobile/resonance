@@ -3,27 +3,10 @@
  * @module services/MockServerService
  */
 
-/**
- * Service for managing mock server business logic
- *
- * @class
- * @classdesc Provides high-level mock server operations with validation, error handling,
- * and event notifications. Manages server lifecycle, settings management, and collection
- * configuration. Implements observer pattern for mock server change notifications to keep
- * UI synchronized.
- *
- * Event types emitted:
- * - 'mock-server-started': When mock server starts successfully
- * - 'mock-server-stopped': When mock server stops
- * - 'mock-server-settings-updated': When settings are modified
- * - 'mock-server-error': When an error occurs
- */
 export class MockServerService {
     /**
-     * Creates a MockServerService instance
-     *
-     * @param {MockServerRepository} repository - Data access layer
-     * @param {IStatusDisplay} statusDisplay - Status display interface
+     * @param {MockServerRepository} repository
+     * @param {IStatusDisplay} statusDisplay
      */
     constructor(repository, statusDisplay) {
         this.repository = repository;
@@ -32,13 +15,9 @@ export class MockServerService {
     }
 
     /**
-     * Registers a listener for mock server changes
-     *
-     * Listener receives event objects with type and relevant data.
-     *
-     * @param {Function} callback - The callback function
-     * @param {Object} callback.event - Event object
-     * @param {string} callback.event.type - Event type
+     * @param {Function} callback
+     * @param {Object} callback.event
+     * @param {string} callback.event.type
      * @returns {void}
      */
     addChangeListener(callback) {
@@ -46,9 +25,7 @@ export class MockServerService {
     }
 
     /**
-     * Removes a change listener
-     *
-     * @param {Function} callback - The callback function to remove
+     * @param {Function} callback
      * @returns {void}
      */
     removeChangeListener(callback) {
@@ -56,12 +33,7 @@ export class MockServerService {
     }
 
     /**
-     * Notifies all listeners of mock server change
-     *
-     * Catches and logs listener errors to prevent disruption.
-     *
-     * @private
-     * @param {Object} event - Event object with type and data
+     * @param {Object} event
      * @returns {void}
      */
     _notifyListeners(event) {
@@ -75,14 +47,8 @@ export class MockServerService {
     }
 
     /**
-     * Starts the mock server
-     *
-     * @async
-     * @param {Array} collections - Array of all collection objects
-     * @returns {Promise<Object>} Result object with success status and details
-     * @throws {Error} If startup fails
-     * @fires MockServerService#mock-server-started
-     * @fires MockServerService#mock-server-error
+     * @param {Array} collections
+     * @returns {Promise<Object>}
      */
     async startServer(collections) {
         try {
@@ -131,15 +97,7 @@ export class MockServerService {
         }
     }
 
-    /**
-     * Stops the mock server
-     *
-     * @async
-     * @returns {Promise<Object>} Result object with success status
-     * @throws {Error} If stop operation fails
-     * @fires MockServerService#mock-server-stopped
-     * @fires MockServerService#mock-server-error
-     */
+    /** @returns {Promise<Object>} */
     async stopServer() {
         try {
             const result = await window.backendAPI.mockServer.stop();
@@ -169,12 +127,7 @@ export class MockServerService {
         }
     }
 
-    /**
-     * Gets server status
-     *
-     * @async
-     * @returns {Promise<Object>} Status object with running state, port, and request count
-     */
+    /** @returns {Promise<Object>} */
     async getStatus() {
         try {
             return await window.backendAPI.mockServer.status();
@@ -188,14 +141,7 @@ export class MockServerService {
     }
 
     /**
-     * Checks if requests should be routed through the mock server
-     * 
-     * Returns mock server URL if:
-     * 1. Mock server is running
-     * 2. The collection is enabled for mocking
-     *
-     * @async
-     * @param {string} collectionId - Collection ID to check
+     * @param {string} collectionId
      * @returns {Promise<{shouldUseMock: boolean, mockBaseUrl: string|null}>}
      */
     async shouldUseMockServer(collectionId) {
@@ -223,11 +169,8 @@ export class MockServerService {
     }
 
     /**
-     * Gets request logs
-     *
-     * @async
-     * @param {number} limit - Maximum number of logs to return
-     * @returns {Promise<Array>} Array of request log entries
+     * @param {number} limit
+     * @returns {Promise<Array>}
      */
     async getRequestLogs(limit = 20) {
         try {
@@ -237,23 +180,12 @@ export class MockServerService {
         }
     }
 
-    /**
-     * Clears request logs
-     *
-     * @async
-     * @returns {Promise<Object>} Result object
-     */
+    /** @returns {Promise<Object>} */
     async clearRequestLogs() {
         return window.backendAPI.mockServer.clearLogs();
     }
 
-    /**
-     * Gets mock server settings
-     *
-     * @async
-     * @returns {Promise<Object>} Settings object
-     * @throws {Error} If loading fails
-     */
+    /** @returns {Promise<Object>} */
     async getSettings() {
         try {
             return await this.repository.getSettings();
@@ -264,13 +196,8 @@ export class MockServerService {
     }
 
     /**
-     * Updates mock server settings
-     *
-     * @async
-     * @param {Object} updates - Update object
-     * @returns {Promise<Object>} The updated settings object
-     * @throws {Error} If validation fails or update fails
-     * @fires MockServerService#mock-server-settings-updated
+     * @param {Object} updates
+     * @returns {Promise<Object>}
      */
     async updateSettings(updates) {
         try {
@@ -299,14 +226,10 @@ export class MockServerService {
     }
 
     /**
-     * Sets delay for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {number} delayMs - Delay in milliseconds
-     * @returns {Promise<Object>} Updated settings
-     * @throws {Error} If validation fails or update fails
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {number} delayMs
+     * @returns {Promise<Object>}
      */
     async setEndpointDelay(collectionId, endpointId, delayMs) {
         try {
@@ -327,14 +250,10 @@ export class MockServerService {
     }
 
     /**
-     * Sets custom response for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {Object|null} response - Custom response body (null to reset to default)
-     * @returns {Promise<Object>} Updated settings
-     * @throws {Error} If update fails
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object|null} response
+     * @returns {Promise<Object>}
      */
     async setCustomResponse(collectionId, endpointId, response) {
         try {
@@ -350,12 +269,9 @@ export class MockServerService {
     }
 
     /**
-     * Gets custom response for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @returns {Promise<Object|null>} Custom response or null if using default
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<Object|null>}
      */
     async getCustomResponse(collectionId, endpointId) {
         try {
@@ -366,26 +282,19 @@ export class MockServerService {
     }
 
     /**
-     * Gets default response for a specific endpoint (from schema)
-     *
-     * @async
-     * @param {string} _collectionId - Collection ID (unused, for future implementation)
-     * @param {string} _endpointId - Endpoint ID (unused, for future implementation)
-     * @returns {Promise<Object|null>} Default schema-generated response or null
+     * @param {string} _collectionId
+     * @param {string} _endpointId
+     * @returns {Promise<Object|null>}
      */
     async getDefaultResponse(_collectionId, _endpointId) {
         return null;
     }
 
     /**
-     * Sets custom status code for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @param {number|null} statusCode - Custom status code (null to reset to default)
-     * @returns {Promise<Object>} Updated settings
-     * @throws {Error} If update fails
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {number|null} statusCode
+     * @returns {Promise<Object>}
      */
     async setCustomStatusCode(collectionId, endpointId, statusCode) {
         try {
@@ -401,12 +310,9 @@ export class MockServerService {
     }
 
     /**
-     * Gets custom status code for a specific endpoint
-     *
-     * @async
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @returns {Promise<number|null>} Custom status code or null if using default
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<number|null>}
      */
     async getCustomStatusCode(collectionId, endpointId) {
         try {
@@ -417,12 +323,8 @@ export class MockServerService {
     }
 
     /**
-     * Toggles collection enabled state
-     *
-     * @async
-     * @param {string} collectionId - Collection ID to toggle
-     * @returns {Promise<boolean>} New enabled state
-     * @throws {Error} If toggle operation fails
+     * @param {string} collectionId
+     * @returns {Promise<boolean>}
      */
     async toggleCollectionEnabled(collectionId) {
         try {
@@ -446,10 +348,8 @@ export class MockServerService {
     }
 
     /**
-     * Validates port number
-     *
-     * @param {number} port - Port to validate
-     * @returns {Array<string>} Array of error messages (empty if valid)
+     * @param {number} port
+     * @returns {Array<string>}
      */
     validatePort(port) {
         const errors = [];
@@ -467,10 +367,8 @@ export class MockServerService {
     }
 
     /**
-     * Validates delay value
-     *
-     * @param {number} delay - Delay in milliseconds to validate
-     * @returns {Array<string>} Array of error messages (empty if valid)
+     * @param {number} delay
+     * @returns {Array<string>}
      */
     validateDelay(delay) {
         const errors = [];
@@ -488,10 +386,8 @@ export class MockServerService {
     }
 
     /**
-     * Validates status code
-     *
-     * @param {number} statusCode - Status code to validate
-     * @returns {Array<string>} Array of error messages (empty if valid)
+     * @param {number} statusCode
+     * @returns {Array<string>}
      */
     validateStatusCode(statusCode) {
         const errors = [];
@@ -506,16 +402,7 @@ export class MockServerService {
         return errors;
     }
 
-    /**
-     * Reloads settings in the running mock server
-     *
-     * Hot-reloads endpoint configuration without restarting the server.
-     * Silently fails if server is not running.
-     *
-     * @private
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async _reloadServerSettings() {
         try {
             const status = await this.getStatus();

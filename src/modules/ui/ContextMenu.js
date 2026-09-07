@@ -3,21 +3,10 @@
  * @module ui/ContextMenu
  */
 
-/**
- * Context menu component for right-click interactions
- *
- * @class
- * @classdesc Provides customizable context menus with icons, i18n support,
- * and automatic positioning to stay within viewport bounds. Handles click
- * outside to dismiss and provides static helper methods for common icons.
- */
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 
 export class ContextMenu {
-    /**
-     * Creates a ContextMenu instance
-     */
     constructor() {
         this.currentMenu = null;
         this.clickHandler = null;
@@ -25,18 +14,13 @@ export class ContextMenu {
     }
 
     /**
-     * Shows context menu at event position
-     *
-     * Displays a context menu with provided items at the cursor position.
-     * Automatically adjusts position to stay within viewport bounds.
-     *
-     * @param {MouseEvent} event - The context menu event
-     * @param {Array<Object>} menuItems - Array of menu item configurations
-     * @param {string} menuItems[].label - Item display text
-     * @param {string} [menuItems[].translationKey] - i18n translation key
-     * @param {string} [menuItems[].icon] - SVG icon markup
-     * @param {string} [menuItems[].className] - Additional CSS class
-     * @param {Function} [menuItems[].onClick] - Click handler function
+     * @param {MouseEvent} event
+     * @param {Array<Object>} menuItems
+     * @param {string} menuItems
+     * @param {string} [menuItems[].translationKey]
+     * @param {string} [menuItems[].icon]
+     * @param {string} [menuItems[].className]
+     * @param {Function} [menuItems[].onClick]
      * @returns {void}
      */
     show(event, menuItems) {
@@ -66,14 +50,8 @@ export class ContextMenu {
     }
 
     /**
-     * Creates a menu item element
-     *
-     * Builds menu item with optional icon and i18n support. Attaches
-     * click handler that dismisses menu after execution.
-     *
-     * @private
-     * @param {Object} item - Menu item configuration
-     * @returns {HTMLDivElement} Menu item element
+     * @param {Object} item
+     * @returns {HTMLDivElement}
      */
     createMenuItem(item) {
         const fragment = templateLoader.cloneSync(
@@ -109,14 +87,8 @@ export class ContextMenu {
     }
 
     /**
-     * Adjusts menu position to stay within viewport
-     *
-     * Repositions menu if it would overflow viewport bounds, ensuring
-     * the menu is always fully visible.
-     *
-     * @private
-     * @param {HTMLElement} menu - Menu element
-     * @param {MouseEvent} event - Original mouse event
+     * @param {HTMLElement} menu
+     * @param {MouseEvent} event
      * @returns {void}
      */
     adjustPosition(menu, event) {
@@ -129,15 +101,7 @@ export class ContextMenu {
         }
     }
 
-    /**
-     * Attaches document-level handlers to close menu
-     *
-     * Sets up click and context menu listeners to dismiss the menu.
-     * Uses setTimeout to prevent immediate closure from same event.
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     attachCloseHandlers() {
         this.removeCloseHandlers();
 
@@ -153,12 +117,7 @@ export class ContextMenu {
         }, 0);
     }
 
-    /**
-     * Removes document-level close handlers
-     *
-     * @private
-     * @returns {void}
-     */
+    /** @returns {void} */
     removeCloseHandlers() {
         if (this.clickHandler) {
             document.removeEventListener('click', this.clickHandler);
@@ -170,13 +129,7 @@ export class ContextMenu {
         }
     }
 
-    /**
-     * Hides and removes current menu
-     *
-     * Cleans up menu element and event listeners.
-     *
-     * @returns {void}
-     */
+    /** @returns {void} */
     hide() {
         if (this.currentMenu) {
             this.currentMenu.remove();
@@ -185,61 +138,32 @@ export class ContextMenu {
         this.removeCloseHandlers();
     }
 
-    /**
-     * Creates SVG icon for rename action
-     *
-     * @static
-     * @returns {string} SVG markup for rename icon
-     */
+    /** @returns {string} */
     static createRenameIcon() {
         return 'icon-pencil';
     }
 
-    /**
-     * Creates SVG icon for delete action
-     *
-     * @static
-     * @returns {string} SVG markup for delete icon
-     */
+    /** @returns {string} */
     static createDeleteIcon() {
         return 'icon-trash';
     }
 
-    /**
-     * Creates SVG icon for variable/settings action
-     *
-     * @static
-     * @returns {string} SVG markup for variable icon
-     */
+    /** @returns {string} */
     static createVariableIcon() {
         return 'icon-variable';
     }
 
-    /**
-     * Creates SVG icon for new request/add action
-     *
-     * @static
-     * @returns {string} SVG markup for new request icon
-     */
+    /** @returns {string} */
     static createNewRequestIcon() {
         return 'icon-plus';
     }
 
-    /**
-     * Creates SVG icon for export action
-     *
-     * @static
-     * @returns {string} SVG markup for export icon
-     */
+    /** @returns {string} */
     static createExportIcon() {
         return 'icon-export';
     }
 
-    /**
-     * Creates document/documentation icon
-     * @static
-     * @returns {string} Icon class name
-     */
+    /** @returns {string} */
     static createDocumentIcon() {
         return 'icon-document';
     }

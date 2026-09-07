@@ -3,37 +3,17 @@
  * @module services/CertificateService
  */
 
-/**
- * Service for managing client certificate configuration business logic
- *
- * @class
- * @classdesc Provides high-level operations over the host-keyed client-certificate
- * list used for mutual TLS and custom CA trust. Resolves the certificate that
- * applies to a given request host (exact `host:port` match preferred over a bare
- * `host` match) and maintains an in-memory cache so resolution at request time is
- * synchronous and cheap. Implements the observer pattern for change notifications,
- * mirroring {@link ProxyService}.
- *
- * Event types emitted:
- * - 'certificates-updated': When the certificate list is modified
- */
 export class CertificateService {
-    /**
-     * Creates a CertificateService instance
-     *
-     * @param {CertificateRepository} certificateRepository - Data access layer
-     */
+    /** @param {CertificateRepository} certificateRepository */
     constructor(certificateRepository) {
         this.repository = certificateRepository;
         this.listeners = new Set();
-        /** @type {Array<Object>|null} Cached entries for synchronous host lookups */
+        /** @type {Array<Object>|null} */
         this._cache = null;
     }
 
     /**
-     * Registers a listener for certificate configuration changes
-     *
-     * @param {Function} callback - The callback invoked with an event object
+     * @param {Function} callback
      * @returns {void}
      */
     addChangeListener(callback) {
@@ -41,9 +21,7 @@ export class CertificateService {
     }
 
     /**
-     * Removes a change listener
-     *
-     * @param {Function} callback - The callback to remove
+     * @param {Function} callback
      * @returns {void}
      */
     removeChangeListener(callback) {
@@ -51,10 +29,7 @@ export class CertificateService {
     }
 
     /**
-     * Notifies all listeners of a certificate configuration change
-     *
-     * @private
-     * @param {Object} event - Event object with a `type` field
+     * @param {Object} event
      * @returns {void}
      */
     _notifyListeners(event) {
@@ -67,12 +42,7 @@ export class CertificateService {
         });
     }
 
-    /**
-     * Gets all certificate entries, refreshing the in-memory cache
-     *
-     * @async
-     * @returns {Promise<Array<Object>>} The list of certificate entries
-     */
+    /** @returns {Promise<Array<Object>>} */
     async getItems() {
         const { items } = await this.repository.getCertificates();
         this._cache = items;
@@ -80,18 +50,8 @@ export class CertificateService {
     }
 
     /**
-     * Saves the full certificate list.
-     *
-     * Persistence is lenient (sanitized entries are stored even if mid-edit) so
-     * the settings UI can autosave on every keystroke without losing data;
-     * per-entry validity is surfaced inline via {@link validateEntry} and also
-     * enforced by the backend at request time. The repository drops entries with
-     * an empty host.
-     *
-     * @async
-     * @param {Array<Object>} items - Certificate entries to persist
-     * @returns {Promise<Array<Object>>} The sanitized, saved entries
-     * @fires CertificateService#certificates-updated
+     * @param {Array<Object>} items
+     * @returns {Promise<Array<Object>>}
      */
     async saveItems(items) {
         const saved = await this.repository.saveCertificates({ items });
@@ -102,13 +62,7 @@ export class CertificateService {
     }
 
     /**
-     * Resolves the certificate configuration that applies to a request host.
-     *
-     * Prefers an enabled entry whose host exactly matches `host:port`, then falls
-     * back to an enabled entry matching the bare hostname. Returns only the path
-     * fields needed by the backend, or null when nothing matches.
-     *
-     * @param {string} requestHost - The host (or `host:port`) of the request
+     * @param {string} requestHost
      * @returns {{certPath: string, keyPath: string, caPath: string}|null}
      */
     getForHost(requestHost) {
@@ -139,10 +93,7 @@ export class CertificateService {
     }
 
     /**
-     * Whether an entry has any usable certificate material (client cert or CA)
-     *
-     * @private
-     * @param {Object} entry - Certificate entry
+     * @param {Object} entry
      * @returns {boolean}
      */
     _hasMaterial(entry) {
@@ -150,10 +101,8 @@ export class CertificateService {
     }
 
     /**
-     * Validates a single certificate entry
-     *
-     * @param {Object} entry - Certificate entry to validate
-     * @returns {Array<string>} Array of error messages (empty if valid)
+     * @param {Object} entry
+     * @returns {Array<string>}
      */
     validateEntry(entry) {
         const errors = [];

@@ -1,9 +1,3 @@
-/**
- * PreviewManager
- *
- * Manages preview mode toggling and coordination between code view and preview view.
- * Follows existing pattern from authManager.js and collectionManager.js
- */
 import { PreviewRenderer } from './ui/PreviewRenderer.js';
 
 export class PreviewManager {
@@ -13,13 +7,12 @@ export class PreviewManager {
     }
 
     /**
-     * Initialize preview for a workspace tab
-     * @param {string} tabId - Workspace tab ID
-     * @param {HTMLElement} previewContainer - Preview container element
-     * @param {HTMLElement} codeContainer - Code editor container
-     * @param {ResponseEditor} responseEditor - ResponseEditor instance
-     * @param {HTMLElement} codeBtn - Code view button
-     * @param {HTMLElement} previewBtn - Preview view button
+     * @param {string} tabId
+     * @param {HTMLElement} previewContainer
+     * @param {HTMLElement} codeContainer
+     * @param {ResponseEditor} responseEditor
+     * @param {HTMLElement} codeBtn
+     * @param {HTMLElement} previewBtn
      */
     initializeForTab(tabId, previewContainer, codeContainer, responseEditor, codeBtn, previewBtn) {
         const renderer = new PreviewRenderer(previewContainer);
@@ -50,10 +43,7 @@ export class PreviewManager {
         }
     }
 
-    /**
-     * Show code view
-     * @param {string} tabId - Workspace tab ID
-     */
+    /** @param {string} tabId */
     showCode(tabId) {
         const container = this.containers.get(tabId);
         if (!container) {
@@ -68,10 +58,7 @@ export class PreviewManager {
         this.previewRepository.setPreviewMode(tabId, false);
     }
 
-    /**
-     * Show preview view
-     * @param {string} tabId - Workspace tab ID
-     */
+    /** @param {string} tabId */
     showPreview(tabId) {
         const container = this.containers.get(tabId);
         if (!container) {
@@ -94,10 +81,7 @@ export class PreviewManager {
         this.previewRepository.setPreviewMode(tabId, true);
     }
 
-    /**
-     * Toggle between code and preview mode
-     * @param {string} tabId - Workspace tab ID
-     */
+    /** @param {string} tabId */
     togglePreview(tabId) {
         const currentMode = this.previewRepository.getPreviewMode(tabId);
         if (currentMode) {
@@ -107,10 +91,6 @@ export class PreviewManager {
         }
     }
 
-    /**
-     * Update button visual state
-     * @private
-     */
     _updateButtonState(tabId, isPreviewMode) {
         const container = this.containers.get(tabId);
         if (!container) {
@@ -127,8 +107,7 @@ export class PreviewManager {
     }
 
     /**
-     * Check if content type supports preview
-     * @param {string} contentType - Content type or language
+     * @param {string} contentType
      * @returns {boolean}
      */
     isPreviewable(contentType) {
@@ -136,10 +115,9 @@ export class PreviewManager {
     }
 
     /**
-     * Update preview content (only if currently in preview mode)
-     * @param {string} tabId - Workspace tab ID
-     * @param {string} content - Response content
-     * @param {string} contentType - Content type or language
+     * @param {string} tabId
+     * @param {string} content
+     * @param {string} contentType
      */
     updatePreview(tabId, content, contentType) {
         const container = this.containers.get(tabId);
@@ -153,12 +131,9 @@ export class PreviewManager {
     }
 
     /**
-     * Refresh preview content while the preview pane is showing; a hidden pane
-     * re-renders from the editor when it is next opened, so building it eagerly
-     * would only burn main-thread time on large responses.
-     * @param {string} tabId - Workspace tab ID
-     * @param {string} content - Response content
-     * @param {string} contentType - Content type or language
+     * @param {string} tabId
+     * @param {string} content
+     * @param {string} contentType
      */
     refreshPreviewContent(tabId, content, contentType) {
         const container = this.containers.get(tabId);
@@ -173,10 +148,7 @@ export class PreviewManager {
         container.renderer.render(content, contentType);
     }
 
-    /**
-     * Clear preview
-     * @param {string} tabId - Workspace tab ID
-     */
+    /** @param {string} tabId */
     clearPreview(tabId) {
         const container = this.containers.get(tabId);
         if (container) {
@@ -185,18 +157,16 @@ export class PreviewManager {
     }
 
     /**
-     * Get preview mode state
-     * @param {string} tabId - Workspace tab ID
-     * @returns {boolean} - True if preview mode active
+     * @param {string} tabId
+     * @returns {boolean}
      */
     isPreviewMode(tabId) {
         return this.previewRepository.getPreviewMode(tabId);
     }
 
     /**
-     * Update button enabled/disabled state based on content type
-     * @param {string} tabId - Workspace tab ID
-     * @param {string} contentType - Content type or language
+     * @param {string} tabId
+     * @param {string} contentType
      */
     updateButtonState(tabId, contentType) {
         const container = this.containers.get(tabId);
@@ -215,10 +185,7 @@ export class PreviewManager {
         }
     }
 
-    /**
-     * Remove container reference when tab is closed
-     * @param {string} tabId - Workspace tab ID
-     */
+    /** @param {string} tabId */
     removeContainer(tabId) {
         const container = this.containers.get(tabId);
         if (container) {

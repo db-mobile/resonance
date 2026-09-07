@@ -579,7 +579,6 @@ describe('RunnerService', () => {
         let collection;
 
         beforeEach(() => {
-            // Persisted (collection-level) config that overrides should win against
             service.collectionRepository.getAllPersistedEndpointData = jest.fn().mockResolvedValue({
                 headers: [{ key: 'X-Persisted', value: 'persisted' }],
                 modifiedBody: '{"from":"collection"}',

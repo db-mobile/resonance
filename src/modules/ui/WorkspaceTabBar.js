@@ -8,14 +8,6 @@ import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { toast } from './Toast.js';
 
-/**
- * WorkspaceTabBar
- *
- * @class
- * @classdesc UI component for the workspace tab bar. Handles rendering and interaction
- * with workspace tabs including switching, closing, creating, renaming, and duplicating.
- * Displays tab names with modified indicators and provides context menus.
- */
 export class WorkspaceTabBar {
     constructor(containerId) {
         this.containerId = containerId;
@@ -30,7 +22,6 @@ export class WorkspaceTabBar {
     }
 
     /**
-     * Initialize and render the tab bar
      * @param {Array} tabs
      * @param {string} activeTabId
      */
@@ -87,10 +78,6 @@ export class WorkspaceTabBar {
         this.resizeObserver.observe(tabBar);
     }
 
-    /**
-     * Create a tab element
-     * @private
-     */
     _createTabElement(tab, isActive) {
         const tabEl = document.createElement('div');
         tabEl.className = `workspace-tab u-flex u-items-center${isActive ? ' active' : ''}${tab.isModified ? ' modified' : ''}`;
@@ -193,9 +180,7 @@ export class WorkspaceTabBar {
     }
 
     /**
-     * Commits the DOM tab order to the model and reorder callback; a no-op when the order is unchanged.
-     * @private
-     * @param {HTMLElement} tabEl - Any tab element inside the tabs container
+     * @param {HTMLElement} tabEl
      * @returns {void}
      */
     _commitDragOrder(tabEl) {
@@ -223,10 +208,6 @@ export class WorkspaceTabBar {
         }
     }
 
-    /**
-     * Create and register a compact drag preview for the browser drag image.
-     * @private
-     */
     _setDragPreview(event, tab) {
         this._removeDragPreview();
 
@@ -250,10 +231,6 @@ export class WorkspaceTabBar {
         this.dragPreview = preview;
     }
 
-    /**
-     * Remove any previous drag preview element.
-     * @private
-     */
     _removeDragPreview() {
         if (this.dragPreview) {
             this.dragPreview.remove();
@@ -261,10 +238,6 @@ export class WorkspaceTabBar {
         }
     }
 
-    /**
-     * Create scroll button
-     * @private
-     */
     _createScrollButton(direction) {
         const btn = document.createElement('button');
         btn.className = `workspace-tab-scroll-button ${direction}`;
@@ -285,20 +258,12 @@ export class WorkspaceTabBar {
         return btn;
     }
 
-    /**
-     * Scroll the tab bar
-     * @private
-     */
     _scrollTabs(delta) {
         if (this.tabBar) {
             this.tabBar.scrollLeft += delta;
         }
     }
 
-    /**
-     * Update scroll button visibility and state
-     * @private
-     */
     _updateScrollButtons() {
         if (!this.tabBar || !this.leftScrollBtn || !this.rightScrollBtn) {return;}
 
@@ -326,10 +291,6 @@ export class WorkspaceTabBar {
         }
     }
 
-    /**
-     * Create new tab button
-     * @private
-     */
     _createNewTabButton() {
         const btn = document.createElement('button');
         btn.className = 'workspace-tab-new u-flex u-items-center u-justify-center';
@@ -349,10 +310,6 @@ export class WorkspaceTabBar {
         return btn;
     }
 
-    /**
-     * Show protocol selection menu for new tab
-     * @private
-     */
     _showNewTabMenu(button) {
         const existingDropdown = document.querySelector('.workspace-tab-new-menu');
         if (existingDropdown) {
@@ -409,10 +366,6 @@ export class WorkspaceTabBar {
         setTimeout(() => document.addEventListener('click', closeMenu), 0);
     }
 
-    /**
-     * Create tab list dropdown button
-     * @private
-     */
     _createTabListButton() {
         const btn = document.createElement('button');
         btn.className = 'workspace-tab-list-button u-flex u-items-center u-justify-center';
@@ -432,10 +385,6 @@ export class WorkspaceTabBar {
         return btn;
     }
 
-    /**
-     * Toggle tab list dropdown
-     * @private
-     */
     _toggleTabListDropdown(button) {
         const existingDropdown = document.querySelector('.workspace-tab-list-dropdown');
         if (existingDropdown) {
@@ -486,10 +435,6 @@ export class WorkspaceTabBar {
         setTimeout(() => document.addEventListener('click', closeDropdown), 0);
     }
 
-    /**
-     * Start renaming a tab
-     * @private
-     */
     _startRenaming(tabElement, tab) {
         const existingDropdown = document.querySelector('.workspace-tab-list-dropdown');
         if (existingDropdown) {
@@ -530,10 +475,6 @@ export class WorkspaceTabBar {
         input.select();
     }
 
-    /**
-     * Show context menu for tab
-     * @private
-     */
     _showContextMenu(event, tab) {
         const existingMenu = document.querySelector('.workspace-tab-context-menu');
         if (existingMenu) {
@@ -694,7 +635,6 @@ export class WorkspaceTabBar {
     }
 
     /**
-     * Update a specific tab
      * @param {string} tabId
      * @param {Object} updates
      */
@@ -741,10 +681,7 @@ export class WorkspaceTabBar {
         }
     }
 
-    /**
-     * Set active tab
-     * @param {string} tabId
-     */
+    /** @param {string} tabId */
     setActiveTab(tabId) {
         if (!this.container) {return;}
 

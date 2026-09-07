@@ -1,35 +1,8 @@
 import { app } from '../appContext.js';
 
-/**
- * Builds the protocol-specific URL bars (gRPC, WebSocket, SSE, GraphQL, MQTT)
- * that replace the HTTP method select + URL input while a non-HTTP request mode
- * is active. Each one is a "mirror": it owns the visible input, while the
- * hidden peer input (usually `#url-input`) stays authoritative for everything
- * downstream — tab persistence, the query-params table, autocomplete.
- *
- * Keeping the two in sync is the whole job, and it has to work in both
- * directions:
- *
- * - mirror -> peer: assigning `peer.value` fires no `input` event, so listeners
- *   bound to the peer never run. Modes whose URL can carry a query string
- *   dispatch a real `input` event instead, which drives
- *   `updateQueryParamsFromUrl` and the tab-modified marker.
- * - peer -> mirror: code that rewrites the peer's value directly (the
- *   query-params table, collection loads) dispatches `URL_UPDATED_EVENT`, since
- *   a plain assignment is likewise invisible.
- */
-
-/**
- * Event name dispatched on a peer input after its value is written directly,
- * so mirrored URL sections can pick the change up.
- */
 export const URL_UPDATED_EVENT = 'url-updated';
 
-/**
- * Notify any mirrored URL section that a peer input's value was replaced
- * programmatically.
- * @param {HTMLInputElement|null} peerInput
- */
+/** @param {HTMLInputElement|null} peerInput */
 export function notifyUrlUpdated(peerInput) {
     peerInput?.dispatchEvent(new CustomEvent(URL_UPDATED_EVENT));
 }
@@ -41,20 +14,17 @@ function markTabModified() {
 }
 
 /**
- * Create a protocol URL section and insert it after the method select.
  * @param {object} config
- * @param {string} config.sectionId - id for the wrapper element.
- * @param {string} config.method - `data-method` on the badge (drives its colour).
- * @param {string} config.label - badge text.
- * @param {string} config.inputId - id for the visible mirror input.
- * @param {string} config.inputType - `type` attribute for the mirror input.
+ * @param {string} config.sectionId
+ * @param {string} config.method
+ * @param {string} config.label
+ * @param {string} config.inputId
+ * @param {string} config.inputType
  * @param {string} config.placeholder
  * @param {string} config.ariaLabel
- * @param {string} config.peerId - id of the hidden input this mirrors.
- * @param {boolean} [config.syncQueryParams] - when true, edits dispatch an
- *   `input` event on the peer so the query-params table follows along. Off for
- *   targets that are not query-bearing URLs (gRPC targets, MQTT brokers).
- * @returns {HTMLElement|null} the section, or null when the request URL bar is absent.
+ * @param {string} config.peerId
+ * @param {boolean} [config.syncQueryParams]
+ * @returns {HTMLElement|null}
  */
 export function createMirroredUrlSection({
     sectionId,
@@ -129,7 +99,6 @@ export function createMirroredUrlSection({
 }
 
 /**
- * Copy the peer's current value into the mirror, used when a section is shown.
  * @param {string} inputId
  * @param {string} peerId
  */

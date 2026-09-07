@@ -10,15 +10,12 @@ import { getProtocol } from '../protocols/protocolRegistry.js';
 import { pushEscapeHandler } from './modalEscape.js';
 import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
 
-/**
- * Collection dialog helper for creating and configuring collection-related modals.
- */
 export class CollectionDialogs {
     /**
-     * @param {Object} options - Dialog dependencies
-     * @param {Object} options.backendAPI - Backend IPC API
-     * @param {CollectionService} options.collectionService - Collection service
-     * @param {CollectionRepository} options.collectionRepository - Collection repository
+     * @param {Object} options
+     * @param {Object} options.backendAPI
+     * @param {CollectionService} options.collectionService
+     * @param {CollectionRepository} options.collectionRepository
      */
     constructor({ backendAPI, collectionService, collectionRepository }) {
         this.backendAPI = backendAPI;

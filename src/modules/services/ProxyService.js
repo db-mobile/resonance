@@ -3,27 +3,10 @@
  * @module services/ProxyService
  */
 
-/**
- * Service for managing proxy configuration business logic
- *
- * @class
- * @classdesc Provides high-level proxy operations with comprehensive validation,
- * error handling, and event notifications. Manages HTTP/HTTPS/SOCKS proxy settings,
- * authentication, bypass lists, and timeout configuration. Implements observer pattern
- * for proxy configuration change notifications and provides axios-compatible
- * proxy configuration generation.
- *
- * Event types emitted:
- * - 'proxy-settings-updated': When proxy settings are modified
- * - 'proxy-toggled': When proxy is enabled/disabled
- * - 'proxy-settings-reset': When settings are reset to defaults
- */
 export class ProxyService {
     /**
-     * Creates a ProxyService instance
-     *
-     * @param {ProxyRepository} proxyRepository - Data access layer for proxy settings
-     * @param {IStatusDisplay} statusDisplay - Status display interface
+     * @param {ProxyRepository} proxyRepository
+     * @param {IStatusDisplay} statusDisplay
      */
     constructor(proxyRepository, statusDisplay) {
         this.repository = proxyRepository;
@@ -32,11 +15,9 @@ export class ProxyService {
     }
 
     /**
-     * Registers a listener for proxy configuration changes
-     *
-     * @param {Function} callback - The callback function
-     * @param {Object} callback.event - Event object
-     * @param {string} callback.event.type - Event type
+     * @param {Function} callback
+     * @param {Object} callback.event
+     * @param {string} callback.event.type
      * @returns {void}
      */
     addChangeListener(callback) {
@@ -44,9 +25,7 @@ export class ProxyService {
     }
 
     /**
-     * Removes a change listener
-     *
-     * @param {Function} callback - The callback function to remove
+     * @param {Function} callback
      * @returns {void}
      */
     removeChangeListener(callback) {
@@ -54,12 +33,7 @@ export class ProxyService {
     }
 
     /**
-     * Notifies all listeners of proxy configuration change
-     *
-     * Catches and logs listener errors to prevent disruption.
-     *
-     * @private
-     * @param {Object} event - Event object with type and data
+     * @param {Object} event
      * @returns {void}
      */
     _notifyListeners(event) {
@@ -72,37 +46,24 @@ export class ProxyService {
         });
     }
 
-    /**
-     * Gets current proxy settings
-     *
-     * @async
-     * @returns {Promise<Object>} Proxy settings object
-     * @throws {Error} If retrieval fails
-     */
+    /** @returns {Promise<Object>} */
     async getSettings() {
         return this.repository.getProxySettings();
     }
 
     /**
-     * Updates proxy settings with comprehensive validation
-     *
-     * Validates all settings before saving and notifies listeners of changes.
-     *
-     * @async
-     * @param {Object} settings - Proxy settings object
-     * @param {boolean} [settings.enabled] - Whether proxy is enabled
-     * @param {string} [settings.type] - Proxy type (http, https, socks4, socks5)
-     * @param {string} [settings.host] - Proxy host
-     * @param {number} [settings.port] - Proxy port (1-65535)
-     * @param {Object} [settings.auth] - Authentication settings
-     * @param {boolean} [settings.auth.enabled] - Whether auth is enabled
-     * @param {string} [settings.auth.username] - Username for auth
-     * @param {string} [settings.auth.password] - Password for auth
-     * @param {Array<string>} [settings.bypassList] - Domains to bypass proxy
-     * @param {number} [settings.timeout] - Proxy timeout in ms
-     * @returns {Promise<Object>} Updated proxy settings
-     * @throws {Error} If validation fails or update fails
-     * @fires ProxyService#proxy-settings-updated
+     * @param {Object} settings
+     * @param {boolean} [settings.enabled]
+     * @param {string} [settings.type]
+     * @param {string} [settings.host]
+     * @param {number} [settings.port]
+     * @param {Object} [settings.auth]
+     * @param {boolean} [settings.auth.enabled]
+     * @param {string} [settings.auth.username]
+     * @param {string} [settings.auth.password]
+     * @param {Array<string>} [settings.bypassList]
+     * @param {number} [settings.timeout]
+     * @returns {Promise<Object>}
      */
     async updateSettings(settings) {
         const validationErrors = this.validateSettings(settings);
@@ -120,28 +81,6 @@ export class ProxyService {
         return updatedSettings;
     }
 
-    /**
-     * Toggles proxy enabled/disabled state
-     *
-     * @async
-     * @returns {Promise<boolean>} New enabled state
-     * @throws {Error} If toggle fails
-     * @fires ProxyService#proxy-toggled
-     */
-    async toggleProxy() {
-        const enabled = await this.repository.toggleProxyEnabled();
-
-        this._notifyListeners({
-            type: 'proxy-toggled',
-            enabled: enabled
-        });
-
-        return enabled;
-    }
-
-    /**
-     * Reset proxy settings to defaults
-     */
     async resetToDefaults() {
         const defaultSettings = await this.repository.resetToDefaults();
 
@@ -153,9 +92,6 @@ export class ProxyService {
         return defaultSettings;
     }
 
-    /**
-     * Check if proxy is enabled
-     */
     async isEnabled() {
         try {
             return await this.repository.isProxyEnabled();
@@ -164,9 +100,6 @@ export class ProxyService {
         }
     }
 
-    /**
-     * Check if URL should bypass proxy
-     */
     shouldBypassProxy(url, bypassList) {
         if (!url || !Array.isArray(bypassList) || bypassList.length === 0) {
             return false;
@@ -198,9 +131,6 @@ export class ProxyService {
         }
     }
 
-    /**
-     * Get axios-compatible proxy configuration
-     */
     async getAxiosProxyConfig(requestUrl) {
         try {
             const settings = await this.repository.getProxySettings();
@@ -232,10 +162,6 @@ export class ProxyService {
         }
     }
 
-    /**
-     * Validate proxy settings
-     * Returns array of error messages (empty if valid)
-     */
     validateSettings(settings) {
         const errors = [];
 
@@ -277,17 +203,11 @@ export class ProxyService {
         return errors;
     }
 
-    /**
-     * Validate proxy type
-     */
     isValidProxyType(type) {
         const validTypes = ['http', 'https', 'socks4', 'socks5'];
         return validTypes.includes(type);
     }
 
-    /**
-     * Validate host format
-     */
     isValidHost(host) {
         if (!host || typeof host !== 'string') {return false;}
 
@@ -302,58 +222,14 @@ export class ProxyService {
         return ipv4Pattern.test(cleanHost) || hostnamePattern.test(cleanHost);
     }
 
-    /**
-     * Validate port number
-     */
     isValidPort(port) {
         const portNum = parseInt(port, 10);
         return !isNaN(portNum) && portNum >= 1 && portNum <= 65535;
     }
 
-    /**
-     * Validate timeout
-     */
     isValidTimeout(timeout) {
         const timeoutNum = parseInt(timeout, 10);
         return !isNaN(timeoutNum) && timeoutNum >= 0 && timeoutNum <= 300000;
     }
 
-    /**
-     * Add domain to bypass list
-     */
-    async addBypassDomain(domain) {
-        const settings = await this.repository.getProxySettings();
-
-        if (!domain || typeof domain !== 'string' || domain.trim() === '') {
-            throw new Error('Invalid domain');
-        }
-
-        const cleanDomain = domain.trim();
-
-        if (settings.bypassList.includes(cleanDomain)) {
-            throw new Error('Domain already in bypass list');
-        }
-
-        settings.bypassList.push(cleanDomain);
-        await this.repository.saveProxySettings(settings);
-
-        return settings;
-    }
-
-    /**
-     * Remove domain from bypass list
-     */
-    async removeBypassDomain(domain) {
-        const settings = await this.repository.getProxySettings();
-
-        const index = settings.bypassList.indexOf(domain);
-        if (index === -1) {
-            throw new Error('Domain not found in bypass list');
-        }
-
-        settings.bypassList.splice(index, 1);
-        await this.repository.saveProxySettings(settings);
-
-        return settings;
-    }
 }

@@ -2,13 +2,6 @@
 import { CollectionRenderer } from '../../src/modules/ui/CollectionRenderer.js';
 import { CollectionPalette } from '../../src/modules/ui/runner/CollectionPalette.js';
 
-/**
- * Both the collection tree and the runner palette used to walk the flat
- * `endpoints` array and `folders[].endpoints` separately. The tree took an
- * either/or branch, so a collection holding folders *and* root-level requests
- * rendered only the foldered ones; the palette unioned both lists, so every
- * foldered request appeared twice.
- */
 describe('collection tree rendering with folders and root-level requests', () => {
     const mixedCollection = {
         id: 'c1',

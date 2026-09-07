@@ -77,7 +77,7 @@ describe('HistoryRepository', () => {
 
             expect(result).toEqual(newEntry);
             const setCall = mockBackendAPI.store.set.mock.calls[0];
-            expect(setCall[1][0].id).toBe('h2'); // New entry first
+            expect(setCall[1][0].id).toBe('h2');
         });
 
         test('should limit history to MAX_HISTORY_ITEMS', async () => {
@@ -91,8 +91,8 @@ describe('HistoryRepository', () => {
             await repository.add({ id: 'new', timestamp: 999, request: { url: 'http://new.com' } });
 
             const setCall = mockBackendAPI.store.set.mock.calls[0];
-            expect(setCall[1]).toHaveLength(100); // Limited to 100
-            expect(setCall[1][0].id).toBe('new'); // New entry first
+            expect(setCall[1]).toHaveLength(100);
+            expect(setCall[1][0].id).toBe('new');
         });
 
         test('should respect user-configured history limit', async () => {

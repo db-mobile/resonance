@@ -4,18 +4,9 @@
  */
 
 /**
- * Creates a debounced wrapper that delays invoking `fn` until `wait` ms have
- * elapsed since the last call. Only the trailing call runs, using the most
- * recent arguments.
- *
- * @param {Function} fn - Function to debounce.
- * @param {number} wait - Delay in milliseconds.
+ * @param {Function} fn
+ * @param {number} wait
  * @returns {Function & {cancel: Function, flush: Function, pending: Function}}
- *   The debounced function, augmented with:
- *   - `cancel()` - discard any pending invocation.
- *   - `flush()` - run a pending invocation immediately and return its result,
- *     or `undefined` when nothing is pending.
- *   - `pending()` - whether an invocation is currently scheduled.
  */
 export function debounce(fn, wait) {
     let timer = null;

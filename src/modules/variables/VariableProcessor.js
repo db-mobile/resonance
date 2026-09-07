@@ -26,11 +26,9 @@ export class VariableProcessor {
     }
 
     /**
-     * Run one substitution pass over the input: dynamic variables first, then static.
-     * Unknown variables are left verbatim so callers can detect and preserve them.
-     * @param {string} input - String to substitute into
-     * @param {Object} variables - Static variable name/value map
-     * @returns {string} Input with one round of substitutions applied
+     * @param {string} input
+     * @param {Object} variables
+     * @returns {string}
      */
     _resolvePass(input, variables) {
         const withDynamic = input.replace(this.DYNAMIC_VARIABLE_PATTERN, (match, variableName, params) => {
@@ -114,14 +112,9 @@ export class VariableProcessor {
     }
 
     /**
-     * Collect variable references that remain unresolved in a value.
-     * Walks strings, arrays, and plain objects (keys and values). Static
-     * references are unresolved when their name is missing from the given
-     * variables map; dynamic references are unresolved when the generator is
-     * unknown, and are reported with a `$` prefix.
-     * @param {*} value - String, array, or object to scan
-     * @param {Object} [variables={}] - Static variable name/value map
-     * @returns {string[]} Unique unresolved variable names
+     * @param {*} value
+     * @param {Object} [variables={}]
+     * @returns {string[]}
      */
     extractUnresolvedVariableNames(value, variables = {}) {
         const unresolved = new Set();
@@ -160,17 +153,13 @@ export class VariableProcessor {
         return /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(name);
     }
 
-    /**
-     * Clear the dynamic variable cache - should be called before each request
-     */
     clearDynamicCache() {
         this.dynamicGenerator.clearCache();
     }
 
     /**
-     * Extract dynamic variable names from a template
-     * @param {string} template - Template string to extract from
-     * @returns {Array<{name: string, params: string|null}>} Array of dynamic variable info
+     * @param {string} template
+     * @returns {Array<{name: string, params: string|null}>}
      */
     extractDynamicVariableNames(template) {
         if (!template || typeof template !== 'string') {
@@ -219,11 +208,9 @@ export class VariableProcessor {
     }
 
     /**
-     * Run one preview substitution pass: dynamic variables become placeholders,
-     * static variables become their values, unknown variables stay verbatim.
-     * @param {string} input - String to substitute into
-     * @param {Object} variables - Static variable name/value map
-     * @returns {string} Input with one round of preview substitutions applied
+     * @param {string} input
+     * @param {Object} variables
+     * @returns {string}
      */
     _previewPass(input, variables) {
         const withDynamic = input.replace(this.DYNAMIC_VARIABLE_PATTERN, (match, variableName, params) => {

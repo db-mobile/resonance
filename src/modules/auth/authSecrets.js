@@ -1,15 +1,9 @@
 /**
  * @fileoverview Identifies and redacts secret fields in auth configs so credentials
- * never reach git-friendly collection files or exports.
  * @module auth/authSecrets
  */
 
-/**
- * Secret config fields per auth type. Kept in sync with the field names written by
- * `authManager.js` and with the Rust-side redaction list in `collections.rs`.
- *
- * @type {Object<string, string[]>}
- */
+/** @type {Object<string, string[]>} */
 export const SECRET_AUTH_FIELDS = {
     bearer: ['token'],
     basic: ['password'],
@@ -21,9 +15,6 @@ export const SECRET_AUTH_FIELDS = {
 };
 
 /**
- * A value that is a `{{ template }}` reference resolves from a variable at request
- * time and carries no secret itself, so it is safe to leave on disk.
- *
  * @param {*} value
  * @returns {boolean}
  */
@@ -32,8 +23,6 @@ function isTemplateRef(value) {
 }
 
 /**
- * Returns the secret field names for an auth type ([] if none/unknown).
- *
  * @param {string} type
  * @returns {string[]}
  */
@@ -45,11 +34,7 @@ export function getSecretAuthFields(type) {
 }
 
 /**
- * Splits an auth config into a git-safe copy (literal secret fields blanked) and the
- * extracted secret values. Template references and empty fields are left untouched, so
- * users relying on `{{ secretVar }}` keep their configuration.
- *
- * @param {Object} authConfig - `{ type, config }`
+ * @param {Object} authConfig
  * @returns {{ redacted: Object, secrets: Object }}
  */
 export function splitAuthSecrets(authConfig) {
@@ -76,12 +61,9 @@ export function splitAuthSecrets(authConfig) {
 }
 
 /**
- * Merges extracted secret values back into an auth config read from disk. Only fills
- * fields the on-disk config left empty, so a template reference is never clobbered.
- *
- * @param {Object} authConfig - `{ type, config }`
- * @param {Object} secrets - Map of field -> value
- * @returns {Object} The auth config with secrets restored
+ * @param {Object} authConfig
+ * @param {Object} secrets
+ * @returns {Object}
  */
 export function mergeAuthSecrets(authConfig, secrets) {
     if (!authConfig || typeof authConfig !== 'object' || !secrets || Object.keys(secrets).length === 0) {
@@ -101,8 +83,6 @@ export function mergeAuthSecrets(authConfig, secrets) {
 }
 
 /**
- * Builds the SecretStore scope string for an endpoint's auth secrets.
- *
  * @param {string} collectionId
  * @param {string} endpointId
  * @returns {string}
@@ -111,19 +91,10 @@ export function authSecretScope(collectionId, endpointId) {
     return `auth:${collectionId}:${endpointId}`;
 }
 
-/**
- * Pseudo endpoint ID for collection-level auth secrets. Endpoint IDs are
- * UUIDs or slugs, so this sentinel cannot collide with a real endpoint scope.
- *
- * @type {string}
- */
+/** @type {string} */
 export const COLLECTION_AUTH_SCOPE_ID = '__collection__';
 
 /**
- * Builds the SecretStore scope string for a collection's own auth secrets.
- * Lives under the same `auth:<collectionId>:` prefix as endpoint scopes so
- * collection deletion prunes it automatically.
- *
  * @param {string} collectionId
  * @returns {string}
  */
@@ -132,10 +103,6 @@ export function collectionAuthSecretScope(collectionId) {
 }
 
 /**
- * Builds the SecretStore scope string for a folder's auth secrets. Shares the
- * `auth:<collectionId>:` prefix so collection deletion prunes it automatically;
- * the `__folder__` segment cannot collide with endpoint IDs.
- *
  * @param {string} collectionId
  * @param {string} folderId
  * @returns {string}

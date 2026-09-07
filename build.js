@@ -58,7 +58,6 @@ const bundleAliasPlugin = {
     name: 'bundle-alias',
     setup(build) {
         build.onResolve({ filter: /\.bundle\.js$/ }, (args) => {
-            // Resolve e.g. './responseEditor.bundle.js' → './responseEditor.js'
             const sourceName = args.path.replace('.bundle.js', '.js');
             const resolved = path.resolve(args.resolveDir, sourceName);
             return { path: resolved };

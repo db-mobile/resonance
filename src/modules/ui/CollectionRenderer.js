@@ -3,25 +3,14 @@
  * @module ui/CollectionRenderer
  */
 
-/**
- * UI component for rendering and managing collection tree display
- *
- * @class
- * @classdesc Renders OpenAPI collections in a hierarchical tree with folders, endpoints,
- * and manages expansion states, active selections, and user interactions. Supports
- * persistence of expansion state across sessions.
- */
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { flattenRequests, rootRequests, topLevelFolders } from '../collections/collectionTree.js';
 
 export class CollectionRenderer {
     /**
-     * Creates a CollectionRenderer instance
-     *
-     * @param {string} containerId - DOM element ID where collections will be rendered
-     * @param {Object} [repository=null] - Repository for persisting expansion states
-     * @throws {Error} If container element is not found
+     * @param {string} containerId
+     * @param {Object} [repository=null]
      */
     constructor(containerId, repository = null) {
         this.container = document.getElementById(containerId);
@@ -33,14 +22,7 @@ export class CollectionRenderer {
         this._lastRenderArgs = null;
     }
 
-    /**
-     * Renders empty state when no collections are imported
-     *
-     * Displays a placeholder message with icon encouraging users to import
-     * OpenAPI collections. Updates i18n translations if available.
-     *
-     * @returns {void}
-     */
+    /** @returns {void} */
     renderEmptyState(actions = {}) {
         const fragment = templateLoader.cloneSync(
             './src/templates/collections/collectionRenderer.html',
@@ -66,22 +48,16 @@ export class CollectionRenderer {
     }
 
     /**
-     * Renders collections list with folders and endpoints
-     *
-     * Creates DOM elements for each collection, attaches event handlers, and manages
-     * expansion state. Can preserve current expansion state or load from storage.
-     *
-     * @async
-     * @param {Array<Object>} collections - Array of collection objects to render
-     * @param {Object} [eventHandlers={}] - Event handler callbacks
-     * @param {Function} [eventHandlers.onEndpointClick] - Called when endpoint is clicked
-     * @param {Function} [eventHandlers.onEndpointContextMenu] - Called on endpoint right-click
-     * @param {Function} [eventHandlers.onContextMenu] - Called on collection right-click
-     * @param {Function} [eventHandlers.onEmptySpaceContextMenu] - Called on empty area right-click
-     * @param {boolean} [preserveExpansionState=false] - Whether to preserve current expansion state
-     * @param {Object} [options={}] - Render options
-     * @param {boolean} [options.showSearchEmptyState=false] - Show empty search state instead of import state
-     * @param {boolean} [options.forceExpandAll=false] - Expand all visible collections and folders
+     * @param {Array<Object>} collections
+     * @param {Object} [eventHandlers={}]
+     * @param {Function} [eventHandlers.onEndpointClick]
+     * @param {Function} [eventHandlers.onEndpointContextMenu]
+     * @param {Function} [eventHandlers.onContextMenu]
+     * @param {Function} [eventHandlers.onEmptySpaceContextMenu]
+     * @param {boolean} [preserveExpansionState=false]
+     * @param {Object} [options={}]
+     * @param {boolean} [options.showSearchEmptyState=false]
+     * @param {boolean} [options.forceExpandAll=false]
      * @returns {Promise<void>}
      */
     async renderCollections(collections, eventHandlers = {}, preserveExpansionState = false, options = {}, pinnedRequests = {}) {
@@ -174,10 +150,8 @@ export class CollectionRenderer {
     }
 
     /**
-     * Expands every folder a search matched, at any nesting depth.
-     *
-     * @param {Object} collection - The owning collection
-     * @param {Array} folders - Folders to walk
+     * @param {Object} collection
+     * @param {Array} folders
      */
     expandMatchingFolders(collection, folders) {
         (folders || []).forEach(folder => {
@@ -193,18 +167,13 @@ export class CollectionRenderer {
     }
 
     /**
-     * Creates DOM element for a collection
-     *
-     * Builds the complete collection element including header and endpoints container.
-     * Attaches click and context menu event listeners.
-     *
-     * @param {Object} collection - Collection object to render
-     * @param {string} collection.id - Unique collection identifier
-     * @param {string} collection.name - Collection display name
-     * @param {Array} collection.endpoints - Array of endpoint objects
-     * @param {Array} [collection.folders] - Optional array of folder objects
-     * @param {Object} eventHandlers - Event handler callbacks
-     * @returns {HTMLDivElement} The created collection element
+     * @param {Object} collection
+     * @param {string} collection.id
+     * @param {string} collection.name
+     * @param {Array} collection.endpoints
+     * @param {Array} [collection.folders]
+     * @param {Object} eventHandlers
+     * @returns {HTMLDivElement}
      */
     createPinnedSection(collections, pinnedRequests, eventHandlers) {
         const pinnedKeys = Object.keys(pinnedRequests);
@@ -276,12 +245,10 @@ export class CollectionRenderer {
     }
 
     /**
-     * Creates header element for a collection
-     *
-     * @param {Object} collection - Collection object
-     * @param {string} collection.name - Collection name to display
-     * @param {string} [collection.gitBranch] - Branch of the repository the collection lives in
-     * @returns {HTMLDivElement} Collection header element
+     * @param {Object} collection
+     * @param {string} collection.name
+     * @param {string} [collection.gitBranch]
+     * @returns {HTMLDivElement}
      */
     createCollectionHeader(collection) {
         const headerDiv = document.createElement('div');
@@ -306,9 +273,8 @@ export class CollectionRenderer {
     }
 
     /**
-     * Creates the branch badge shown on a collection stored in a Git repository.
-     * @param {string} branch - Branch name, or short object ID when HEAD is detached
-     * @returns {HTMLSpanElement} Badge element
+     * @param {string} branch
+     * @returns {HTMLSpanElement}
      */
     createGitBadge(branch) {
         const badge = document.createElement('span');
@@ -329,12 +295,7 @@ export class CollectionRenderer {
     }
 
     /**
-     * Updates branch badges on the collections already rendered.
-     *
-     * Patches the existing rows rather than re-rendering: a branch switched in
-     * a terminal must not collapse the tree the user is working in.
-     *
-     * @param {Object} branchesById - Branch name keyed by collection ID; a missing key means no repository
+     * @param {Object} branchesById
      * @returns {void}
      */
     updateGitBadges(branchesById = {}) {
@@ -365,11 +326,10 @@ export class CollectionRenderer {
     }
 
     /**
-     * Patches a single endpoint's pin state in place and rebuilds only the pinned section.
-     * @param {string} collectionId - Owning collection ID
-     * @param {string} endpointId - Endpoint ID whose pin state changed
-     * @param {boolean} isPinned - New pin state
-     * @param {Object} pinnedRequests - Current pinned-request map
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {boolean} isPinned
+     * @param {Object} pinnedRequests
      * @returns {void}
      */
     updatePinnedState(collectionId, endpointId, isPinned, pinnedRequests) {
@@ -397,18 +357,10 @@ export class CollectionRenderer {
     }
 
     /**
-     * Creates container element for endpoints or folders
-     *
-     * Renders either folders (if present) or endpoints directly. Supports
-     * nested folder structure for organizing endpoints.
-     *
-     * Root-level requests render above the folders, so a collection holding both
-     * shows all of its requests rather than only the foldered ones.
-     *
-     * @param {Object} collection - Collection object
-     * @param {Object} eventHandlers - Event handler callbacks
-     * @param {Object} [pinnedRequests] - Pin state keyed `${collectionId}_${endpointId}`
-     * @returns {HTMLDivElement} Container element with endpoints and folders
+     * @param {Object} collection
+     * @param {Object} eventHandlers
+     * @param {Object} [pinnedRequests]
+     * @returns {HTMLDivElement}
      */
     createEndpointsContainer(collection, eventHandlers, pinnedRequests = {}) {
         const endpointsDiv = document.createElement('div');
@@ -429,23 +381,15 @@ export class CollectionRenderer {
     }
 
     /**
-     * Creates DOM element for a folder
-     *
-     * Builds folder element with header, toggle, and nested endpoints. Supports
-     * expansion/collapse with state persistence.
-     *
-     * Nested folders render inside their parent, so the tree mirrors the
-     * directory structure on disk.
-     *
-     * @param {Object} folder - Folder object to render
-     * @param {string} folder.id - Unique folder identifier
-     * @param {string} folder.name - Folder display name
-     * @param {Array} folder.endpoints - Array of endpoint objects in this folder
-     * @param {Array} [folder.folders] - Nested folders
-     * @param {Object} collection - Parent collection object
-     * @param {Object} eventHandlers - Event handler callbacks
-     * @param {Object} [pinnedRequests] - Pin state keyed `${collectionId}_${endpointId}`
-     * @returns {HTMLDivElement} The created folder element
+     * @param {Object} folder
+     * @param {string} folder.id
+     * @param {string} folder.name
+     * @param {Array} folder.endpoints
+     * @param {Array} [folder.folders]
+     * @param {Object} collection
+     * @param {Object} eventHandlers
+     * @param {Object} [pinnedRequests]
+     * @returns {HTMLDivElement}
      */
     createFolderElement(folder, collection, eventHandlers, pinnedRequests = {}) {
         const folderDiv = document.createElement('div');
@@ -501,18 +445,13 @@ export class CollectionRenderer {
     }
 
     /**
-     * Creates DOM element for an endpoint
-     *
-     * Builds endpoint element with HTTP method badge and path. Attaches click
-     * and context menu event handlers.
-     *
-     * @param {Object} endpoint - Endpoint object to render
-     * @param {string} endpoint.id - Unique endpoint identifier
-     * @param {string} endpoint.method - HTTP method (GET, POST, etc.)
-     * @param {string} endpoint.path - Endpoint URL path
-     * @param {Object} collection - Parent collection object
-     * @param {Object} eventHandlers - Event handler callbacks
-     * @returns {HTMLDivElement} The created endpoint element
+     * @param {Object} endpoint
+     * @param {string} endpoint.id
+     * @param {string} endpoint.method
+     * @param {string} endpoint.path
+     * @param {Object} collection
+     * @param {Object} eventHandlers
+     * @returns {HTMLDivElement}
      */
     createEndpointElement(endpoint, collection, eventHandlers, isPinned = false) {
         const endpointDiv = document.createElement('div');
@@ -563,15 +502,10 @@ export class CollectionRenderer {
     }
 
     /**
-     * Attaches event listeners to collection element
-     *
-     * Handles collection expansion/collapse and context menu. Ensures only one
-     * collection is expanded at a time (accordion behavior).
-     *
-     * @param {HTMLDivElement} collectionDiv - Collection container element
-     * @param {HTMLDivElement} headerDiv - Collection header element
-     * @param {Object} collection - Collection object
-     * @param {Object} eventHandlers - Event handler callbacks
+     * @param {HTMLDivElement} collectionDiv
+     * @param {HTMLDivElement} headerDiv
+     * @param {Object} collection
+     * @param {Object} eventHandlers
      * @returns {void}
      */
     attachCollectionEventListeners(collectionDiv, headerDiv, collection, eventHandlers) {
@@ -594,15 +528,7 @@ export class CollectionRenderer {
         }
     }
 
-    /**
-     * Gets current expansion state of all collections and folders
-     *
-     * Captures which collections and folders are currently expanded for persistence.
-     *
-     * @returns {Object} State object mapping collection IDs to expansion states
-     * @returns {Object.expanded} boolean - Whether collection is expanded
-     * @returns {Object.folders} Object - Map of folder IDs to expansion states
-     */
+    /** @returns {Object} */
     getExpansionState() {
         const state = {};
         const collectionElements = this.container.querySelectorAll('.collection-item');
@@ -627,11 +553,7 @@ export class CollectionRenderer {
     }
 
     /**
-     * Restores expansion state from saved state object
-     *
-     * Applies expansion state to collections and folders based on saved preferences.
-     *
-     * @param {Object} expansionState - State object from getExpansionState()
+     * @param {Object} expansionState
      * @returns {void}
      */
     restoreExpansionState(expansionState) {
@@ -654,15 +576,7 @@ export class CollectionRenderer {
         });
     }
 
-    /**
-     * Saves current expansion state to repository
-     *
-     * Persists expansion state for restoration on next render. Silently fails
-     * if repository is not available.
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async saveExpansionState() {
         if (!this.repository) {
             return;
@@ -676,15 +590,7 @@ export class CollectionRenderer {
         }
     }
 
-    /**
-     * Loads expansion state from repository and applies it
-     *
-     * Retrieves saved expansion state and restores it to the UI. Silently fails
-     * if repository is not available.
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async loadAndRestoreExpansionState() {
         if (!this.repository) {
             return;
@@ -699,12 +605,8 @@ export class CollectionRenderer {
     }
 
     /**
-     * Sets an endpoint as active (highlighted)
-     *
-     * Removes active state from all endpoints and applies it to the specified one.
-     *
-     * @param {string} collectionId - Collection ID containing the endpoint
-     * @param {string} endpointId - Endpoint ID to mark as active
+     * @param {string} collectionId
+     * @param {string} endpointId
      * @returns {void}
      */
     setActiveEndpoint(collectionId, endpointId) {
@@ -720,13 +622,7 @@ export class CollectionRenderer {
         }
     }
 
-    /**
-     * Clears active state from all endpoints
-     *
-     * Removes highlighting from any currently active endpoint.
-     *
-     * @returns {void}
-     */
+    /** @returns {void} */
     clearActiveEndpoint() {
         const allEndpoints = this.container.querySelectorAll('.endpoint-item');
         allEndpoints.forEach(endpoint => endpoint.classList.remove('active'));

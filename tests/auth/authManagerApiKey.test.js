@@ -6,14 +6,6 @@ import { templateLoader } from '../../src/modules/templateLoader.js';
 
 const TEMPLATE_PATH = './src/templates/auth/authFields.html';
 
-/**
- * Reopening a saved API-key request must not move the key.
- *
- * The field renderers run before populateAuthFields, and loadAuthConfig keeps
- * the caller's object by reference, so a renderer that writes a default
- * straight onto currentAuthConfig.config overwrites the stored choice before
- * anything reads it back.
- */
 describe('AuthManager api-key location round-trip', () => {
     let authManager;
 

@@ -1,16 +1,11 @@
 /**
  * @fileoverview Helper functions for managing request body content
- * Provides unified interface for both textarea and CodeMirror editor
  * @module modules/requestBodyHelper
  */
 
 import { app } from './appContext.js';
 
-/**
- * Get the current request body content
- * Prioritizes CodeMirror editor, falls back to textarea
- * @returns {string}
- */
+/** @returns {string} */
 export function getRequestBodyContent() {
     if (app.requestBodyEditor) {
         return app.requestBodyEditor.getContent();
@@ -20,9 +15,8 @@ export function getRequestBodyContent() {
 }
 
 /**
- * Captures the request body for code-snippet generation in the shape codeGenerator expects.
- * @param {{bodyMode: string, formBodyManager: Object|null, requestBodyTextEditor: Object|null, jsonContent: string, processor: Object, variables: Object}} options - Body sources and variable context
- * @returns {{body: (string|Object|Array|undefined), bodyType: (string|undefined), error: (string|undefined)}} Snippet body descriptor
+ * @param {{bodyMode: string, formBodyManager: Object|null, requestBodyTextEditor: Object|null, jsonContent: string, processor: Object, variables: Object}} options
+ * @returns {{body: (string|Object|Array|undefined), bodyType: (string|undefined), error: (string|undefined)}}
  */
 export function captureSnippetBody({ bodyMode, formBodyManager, requestBodyTextEditor, jsonContent, processor, variables }) {
     if ((bodyMode === 'formdata' || bodyMode === 'urlencoded') && formBodyManager) {
@@ -77,11 +71,7 @@ export function captureSnippetBody({ bodyMode, formBodyManager, requestBodyTextE
     }
 }
 
-/**
- * Set the request body content
- * Updates both CodeMirror editor and textarea (for backward compatibility)
- * @param {string} content - The content to set
- */
+/** @param {string} content */
 export function setRequestBodyContent(content) {
     const bodyInput = document.getElementById('body-input');
 

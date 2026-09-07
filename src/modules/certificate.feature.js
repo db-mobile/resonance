@@ -1,6 +1,5 @@
 /**
  * @fileoverview Feature descriptor wiring the client-certificate (mTLS) stack
- * (Repository → Service → Controller) for the FeatureRegistry.
  * @module certificate.feature
  */
 
@@ -18,6 +17,7 @@ export const certificateFeature = {
         return { repository, service, controller };
     },
     globals: { certificateController: 'controller' },
+    provides: { certificateController: 'controller' },
     async init({ controller }) {
         await controller.initialize();
     },

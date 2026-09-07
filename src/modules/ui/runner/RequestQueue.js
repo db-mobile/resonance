@@ -1,29 +1,17 @@
 /**
  * @fileoverview Request queue for the Collection Runner: the ordered list of
- * selected requests, with drag-and-drop reordering, removal, and per-row edit
- * triggers. Owns the `requests` array and the current selection highlight.
  * @module ui/runner/RequestQueue
  */
 
 import { templateLoader } from '../../templateLoader.js';
 
-/**
- * Manages the selected-requests list for a runner.
- *
- * Distinguishes user-driven mutations (add/remove/reorder/clear-all), which fire
- * `onChange`, from lifecycle resets (`setRequests`/`reset`), which do not. The
- * count callback fires on every render so the host's counter stays in sync.
- *
- * @class
- */
 export class RequestQueue {
     /**
      * @param {Object} [callbacks]
-     * @param {() => void} [callbacks.onChange] - User changed the request list.
-     * @param {(count: number) => void} [callbacks.onCountChange] - List re-rendered.
-     * @param {(index: number) => void} [callbacks.onEditRequest] - Edit a request.
+     * @param {() => void} [callbacks.onChange]
+     * @param {(count: number) => void} [callbacks.onCountChange]
+     * @param {(index: number) => void} [callbacks.onEditRequest]
      * @param {(collectionId: string, endpointId: string) => Promise<Object>} [callbacks.onResolveEndpointDefaults]
-     *   Resolves a collection's saved config to seed a new request's overrides.
      */
     constructor({ onChange, onCountChange, onEditRequest, onResolveEndpointDefaults } = {}) {
         this.container = null;
@@ -36,61 +24,43 @@ export class RequestQueue {
         this._onResolveEndpointDefaults = onResolveEndpointDefaults || null;
     }
 
-    /**
-     * Binds the list container and performs the initial render.
-     *
-     * @param {HTMLElement} container - The requests-list element
-     */
+    /** @param {HTMLElement} container */
     mount(container) {
         this.container = container;
         this._render();
     }
 
-    /** @returns {number} number of queued requests */
+    /** @returns {number} */
     get count() {
         return this.requests.length;
     }
 
-    /** @returns {Array<Object>} the live requests array */
+    /** @returns {Array<Object>} */
     getRequests() {
         return this.requests;
     }
 
-    /**
-     * Replaces the queued requests (e.g. when loading a saved runner). Silent —
-     * does not fire `onChange`.
-     *
-     * @param {Array<Object>} requests
-     */
+    /** @param {Array<Object>} requests */
     setRequests(requests) {
         this.requests = requests ? [...requests] : [];
         this.selectedIndex = -1;
         this._render();
     }
 
-    /**
-     * Empties the queue without notifying listeners (used by reset/new-runner).
-     */
     reset() {
         this.requests = [];
         this.selectedIndex = -1;
         this._render();
     }
 
-    /**
-     * Empties the queue as a user action, firing `onChange`.
-     */
     clearAll() {
         this.reset();
         this._emitChange();
     }
 
     /**
-     * Adds a request from a collection endpoint, seeding its overrides from the
-     * collection's saved config so the editor opens pre-filled.
-     *
-     * @param {Object} collection - Collection object
-     * @param {Object} endpoint - Endpoint object
+     * @param {Object} collection
+     * @param {Object} endpoint
      */
     async addRequest(collection, endpoint) {
         const request = {
@@ -113,12 +83,9 @@ export class RequestQueue {
     }
 
     /**
-     * Resolves the initial overrides for a request from the collection's saved config.
-     *
-     * @private
-     * @param {string} collectionId - Collection ID
-     * @param {string} endpointId - Endpoint ID
-     * @returns {Promise<Object>} Overrides object
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<Object>}
      */
     async _resolveOverrides(collectionId, endpointId) {
         const empty = { pathParams: [], queryParams: [], headers: [], body: '' };
@@ -145,11 +112,6 @@ export class RequestQueue {
         }
     }
 
-    /**
-     * Renders the selected requests list.
-     *
-     * @private
-     */
     _render() {
         if (!this.container) {return;}
 
@@ -172,12 +134,9 @@ export class RequestQueue {
     }
 
     /**
-     * Creates a request item element.
-     *
-     * @private
-     * @param {Object} request - Request object
-     * @param {number} index - Request index
-     * @returns {HTMLElement} Request item element
+     * @param {Object} request
+     * @param {number} index
+     * @returns {HTMLElement}
      */
     _createItem(request, index) {
         const fragment = templateLoader.cloneSync(
@@ -220,11 +179,6 @@ export class RequestQueue {
         return el;
     }
 
-    /**
-     * Sets up drag and drop for request reordering.
-     *
-     * @private
-     */
     _setupDragAndDrop() {
         const items = this.container.querySelectorAll('.runner-request-item');
 
@@ -260,11 +214,6 @@ export class RequestQueue {
         });
     }
 
-    /**
-     * Reorders requests based on current DOM order.
-     *
-     * @private
-     */
     _reorderFromDOM() {
         const items = this.container.querySelectorAll('.runner-request-item');
         const newOrder = [];
@@ -284,24 +233,14 @@ export class RequestQueue {
         this._emitChange();
     }
 
-    /**
-     * Selects a request for script editing (highlights it and requests an edit).
-     *
-     * @private
-     * @param {number} index - Request index
-     */
+    /** @param {number} index */
     _select(index) {
         this.selectedIndex = index;
         this._render();
         this._onEditRequest?.(index);
     }
 
-    /**
-     * Removes a request from the list.
-     *
-     * @private
-     * @param {number} index - Request index
-     */
+    /** @param {number} index */
     _remove(index) {
         this.requests.splice(index, 1);
 

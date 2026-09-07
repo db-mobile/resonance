@@ -5,13 +5,10 @@
 
 import { getRequestBodyContent, setRequestBodyContent } from '../requestBodyHelper.js';
 
-/**
- * Applies variable substitution to request form elements.
- */
 export class CollectionVariableApplicationService {
     /**
-     * @param {Object} options - Service dependencies
-     * @param {VariableService} options.variableService - Variable service
+     * @param {Object} options
+     * @param {VariableService} options.variableService
      */
     constructor({ variableService }) {
         this.variableService = variableService;

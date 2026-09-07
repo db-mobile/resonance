@@ -1,12 +1,6 @@
 import { CollectionEndpointLoaderService } from '../../src/modules/services/CollectionEndpointLoaderService.js';
 import { app } from '../../src/modules/appContext.js';
 
-/**
- * The read side of the protocol registry.
- *
- * Loading used to re-derive the protocol from the same three-branch chain as
- * saving, so even a correctly stored SSE endpoint came back as http.
- */
 describe('CollectionEndpointLoaderService protocol handling', () => {
     let repository;
     let loader;
