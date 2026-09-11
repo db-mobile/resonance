@@ -23,9 +23,9 @@ import {
     displayResponseWithLineNumbersForTab,
     generateEffectiveAuthData,
     getRequestBuilderService,
-    getSettingsCache,
     warnUnresolvedVariables
 } from './apiHandler.js';
+import { getSettings } from './state/settingsCache.js';
 import { startOrSend as grpcStreamStartOrSend } from './grpcStreamHandler.js';
 import { recordGrpcHistory } from './grpcHistory.js';
 import { createKeyValueRow } from './keyValueManager.js';
@@ -262,7 +262,7 @@ async function buildTlsOptions(target) {
     const useTls = getUseTls();
     let skipVerify = false;
     try {
-        const settings = getSettingsCache() || await window.backendAPI.settings.get();
+        const settings = await getSettings();
         skipVerify = settings?.verifySsl === false;
     } catch (_e) {
         void _e;

@@ -210,6 +210,27 @@ export class WorkspaceTabEndpointLoaderService {
 
     /**
      * @param {Object} endpoint
+     * @param {string} protocol
+     * @param {string} name
+     * @param {Object} request
+     * @returns {Object}
+     */
+    _tabUpdate(endpoint, protocol, name, request) {
+        return {
+            name,
+            type: 'request',
+            endpoint: {
+                collectionId: endpoint.collectionId,
+                endpointId: endpoint.id,
+                protocol
+            },
+            request: { protocol, ...request },
+            isModified: false
+        };
+    }
+
+    /**
+     * @param {Object} endpoint
      * @returns {Object}
      */
     createSseTabUpdate(endpoint) {
@@ -217,30 +238,19 @@ export class WorkspaceTabEndpointLoaderService {
         const contentType = this.resolveBodyContentType(endpoint);
         const mode = contentType && !contentType.toLowerCase().includes('json') ? 'text' : 'json';
 
-        return {
-            name: endpoint.name || 'SSE Request',
-            type: 'request',
-            endpoint: {
-                collectionId: endpoint.collectionId,
-                endpointId: endpoint.id,
-                protocol: 'sse'
+        return this._tabUpdate(endpoint, 'sse', endpoint.name || 'SSE Request', {
+            url: endpoint.persistedUrl || endpoint.path || '',
+            method: endpoint.method || 'GET',
+            pathParams: {},
+            queryParams: this.arrayEntriesToRows(endpoint.persistedQueryParams),
+            headers: this.arrayEntriesToRows(endpoint.persistedHeaders),
+            body: {
+                mode,
+                content: endpoint.persistedBody || ''
             },
-            request: {
-                protocol: 'sse',
-                url: endpoint.persistedUrl || endpoint.path || '',
-                method: endpoint.method || 'GET',
-                pathParams: {},
-                queryParams: this.arrayEntriesToRows(endpoint.persistedQueryParams),
-                headers: this.arrayEntriesToRows(endpoint.persistedHeaders),
-                body: {
-                    mode,
-                    content: endpoint.persistedBody || ''
-                },
-                authType,
-                authConfig
-            },
-            isModified: false
-        };
+            authType,
+            authConfig
+        });
     }
 
     /**
@@ -250,33 +260,22 @@ export class WorkspaceTabEndpointLoaderService {
     createMqttTabUpdate(endpoint) {
         const mqtt = endpoint.persistedMqttData || {};
 
-        return {
-            name: endpoint.name || 'MQTT Request',
-            type: 'request',
-            endpoint: {
-                collectionId: endpoint.collectionId,
-                endpointId: endpoint.id,
-                protocol: 'mqtt'
+        return this._tabUpdate(endpoint, 'mqtt', endpoint.name || 'MQTT Request', {
+            broker: endpoint.persistedUrl || endpoint.path || '',
+            method: 'MQTT',
+            clientId: mqtt.clientId || '',
+            username: mqtt.username || '',
+            password: '',
+            subscribeTopic: mqtt.subscribeTopic || '',
+            publishTopic: mqtt.publishTopic || '',
+            qos: mqtt.qos || 0,
+            body: {
+                mode: 'json',
+                content: endpoint.persistedBody || ''
             },
-            request: {
-                protocol: 'mqtt',
-                broker: endpoint.persistedUrl || endpoint.path || '',
-                method: 'MQTT',
-                clientId: mqtt.clientId || '',
-                username: mqtt.username || '',
-                password: '',
-                subscribeTopic: mqtt.subscribeTopic || '',
-                publishTopic: mqtt.publishTopic || '',
-                qos: mqtt.qos || 0,
-                body: {
-                    mode: 'json',
-                    content: endpoint.persistedBody || ''
-                },
-                authType: 'none',
-                authConfig: {}
-            },
-            isModified: false
-        };
+            authType: 'none',
+            authConfig: {}
+        });
     }
 
     createGraphQLTabUpdate(endpoint) {
@@ -284,57 +283,35 @@ export class WorkspaceTabEndpointLoaderService {
         const { authType, authConfig } = this.buildHttpAuth(endpoint);
         const graphql = endpoint.persistedGraphQLData || {};
 
-        return {
-            name: tabName,
-            type: 'request',
-            endpoint: {
-                collectionId: endpoint.collectionId,
-                endpointId: endpoint.id,
-                protocol: 'graphql'
-            },
-            request: {
-                protocol: 'graphql',
-                url: endpoint.persistedUrl || endpoint.path || '',
-                method: 'POST',
-                query: graphql.query || '',
-                variables: graphql.variables || '',
-                operationName: graphql.operationName || null,
-                headers: this.buildHttpHeaders(endpoint),
-                authType,
-                authConfig
-            },
-            isModified: false
-        };
+        return this._tabUpdate(endpoint, 'graphql', tabName, {
+            url: endpoint.persistedUrl || endpoint.path || '',
+            method: 'POST',
+            query: graphql.query || '',
+            variables: graphql.variables || '',
+            operationName: graphql.operationName || null,
+            headers: this.buildHttpHeaders(endpoint),
+            authType,
+            authConfig
+        });
     }
 
     createGrpcTabUpdate(endpoint) {
         const grpcData = endpoint.grpcData || {};
         const tabName = endpoint.name || 'gRPC Request';
 
-        return {
-            name: tabName,
-            type: 'request',
-            endpoint: {
-                collectionId: endpoint.collectionId,
-                endpointId: endpoint.id,
-                protocol: 'grpc'
-            },
-            request: {
-                protocol: 'grpc',
-                grpc: {
-                    target: grpcData.target || '',
-                    service: grpcData.service || '',
-                    fullMethod: grpcData.fullMethod || endpoint.path || '',
-                    requestJson: grpcData.requestJson || '{}',
-                    metadata: grpcData.metadata || {},
-                    useTls: grpcData.useTls || false,
-                    protoPath: grpcData.protoPath || null,
-                    clientStreaming: grpcData.clientStreaming || false,
-                    serverStreaming: grpcData.serverStreaming || false
-                }
-            },
-            isModified: false
-        };
+        return this._tabUpdate(endpoint, 'grpc', tabName, {
+            grpc: {
+                target: grpcData.target || '',
+                service: grpcData.service || '',
+                fullMethod: grpcData.fullMethod || endpoint.path || '',
+                requestJson: grpcData.requestJson || '{}',
+                metadata: grpcData.metadata || {},
+                useTls: grpcData.useTls || false,
+                protoPath: grpcData.protoPath || null,
+                clientStreaming: grpcData.clientStreaming || false,
+                serverStreaming: grpcData.serverStreaming || false
+            }
+        });
     }
 
     createWebSocketTabUpdate(endpoint) {
@@ -342,57 +319,35 @@ export class WorkspaceTabEndpointLoaderService {
         const headers = this.arrayEntriesToRows(endpoint.persistedHeaders);
         const tabName = endpoint.name || 'WebSocket Request';
 
-        return {
-            name: tabName,
-            type: 'request',
-            endpoint: {
-                collectionId: endpoint.collectionId,
-                endpointId: endpoint.id,
-                protocol: 'websocket'
+        return this._tabUpdate(endpoint, 'websocket', tabName, {
+            url: endpoint.persistedUrl || endpoint.path || '',
+            method: 'WS',
+            pathParams: {},
+            queryParams,
+            headers,
+            body: {
+                mode: 'json',
+                content: endpoint.persistedBody || ''
             },
-            request: {
-                protocol: 'websocket',
-                url: endpoint.persistedUrl || endpoint.path || '',
-                method: 'WS',
-                pathParams: {},
-                queryParams,
-                headers,
-                body: {
-                    mode: 'json',
-                    content: endpoint.persistedBody || ''
-                },
-                authType: 'none',
-                authConfig: {}
-            },
-            isModified: false
-        };
+            authType: 'none',
+            authConfig: {}
+        });
     }
 
     createHttpTabUpdate(endpoint) {
         const tabName = endpoint.name || this.service.generateTabName(endpoint.method, endpoint.path);
         const { authType, authConfig } = this.buildHttpAuth(endpoint);
 
-        return {
-            name: tabName,
-            type: 'request',
-            endpoint: {
-                collectionId: endpoint.collectionId,
-                endpointId: endpoint.id,
-                protocol: 'http'
-            },
-            request: {
-                protocol: 'http',
-                url: this.buildHttpUrl(endpoint),
-                method: endpoint.method,
-                pathParams: this.buildHttpPathParams(endpoint),
-                queryParams: this.buildHttpQueryParams(endpoint),
-                headers: this.buildHttpHeaders(endpoint),
-                body: this.buildHttpBody(endpoint),
-                authType,
-                authConfig
-            },
-            isModified: false
-        };
+        return this._tabUpdate(endpoint, 'http', tabName, {
+            url: this.buildHttpUrl(endpoint),
+            method: endpoint.method,
+            pathParams: this.buildHttpPathParams(endpoint),
+            queryParams: this.buildHttpQueryParams(endpoint),
+            headers: this.buildHttpHeaders(endpoint),
+            body: this.buildHttpBody(endpoint),
+            authType,
+            authConfig
+        });
     }
 
     buildHttpUrl(endpoint) {

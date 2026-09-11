@@ -4,6 +4,7 @@
  */
 
 import logger from '../logger.js';
+import { ChangeEmitter } from './ChangeEmitter.js';
 
 const log = logger.scope('WorkspaceTabService');
 
@@ -15,7 +16,7 @@ export class WorkspaceTabService {
     constructor(repository, statusDisplay) {
         this.repository = repository;
         this.statusDisplay = statusDisplay;
-        this.listeners = [];
+        this._events = new ChangeEmitter();
     }
 
     /** @returns {Promise<Object>} */
@@ -242,7 +243,7 @@ export class WorkspaceTabService {
      * @returns {void}
      */
     addListener(listener) {
-        this.listeners.push(listener);
+        this._events.add(listener);
     }
 
     /**
@@ -250,7 +251,7 @@ export class WorkspaceTabService {
      * @returns {void}
      */
     removeListener(listener) {
-        this.listeners = this.listeners.filter(l => l !== listener);
+        this._events.remove(listener);
     }
 
     /**
@@ -259,13 +260,7 @@ export class WorkspaceTabService {
      * @returns {void}
      */
     _notifyListeners(event, data) {
-        this.listeners.forEach(listener => {
-            try {
-                listener(event, data);
-            } catch (error) {
-                void error;
-            }
-        });
+        this._events.emit(event, data);
     }
 
     /** @returns {Promise<void>} */

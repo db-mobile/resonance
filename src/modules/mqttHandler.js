@@ -1,4 +1,5 @@
-import { clearResponseDisplayForTab, getSettingsCache } from './apiHandler.js';
+import { clearResponseDisplayForTab } from './apiHandler.js';
+import { getSettings } from './state/settingsCache.js';
 import { app } from './appContext.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
@@ -122,7 +123,7 @@ async function buildMqttTlsOptions(normalizedBroker) {
 
     let skipVerify = false;
     try {
-        const settings = getSettingsCache() || (await window.backendAPI.settings.get());
+        const settings = await getSettings();
         skipVerify = settings?.verifySsl === false;
     } catch (_e) {
         void _e;

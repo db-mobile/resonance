@@ -6,6 +6,7 @@
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { flattenRequests, rootRequests, topLevelFolders } from '../collections/collectionTree.js';
+import { el } from '../htmlUtils.js';
 
 export class CollectionRenderer {
     /**
@@ -194,15 +195,11 @@ export class CollectionRenderer {
             return null;
         }
 
-        const section = document.createElement('div');
-        section.className = 'pinned-section expanded';
+        const section = el('div', 'pinned-section expanded');
 
-        const header = document.createElement('div');
-        header.className = 'pinned-section-header';
+        const header = el('div', 'pinned-section-header');
 
-        const toggle = document.createElement('span');
-        toggle.className = 'pinned-section-toggle';
-        toggle.textContent = '▶';
+        const toggle = el('span', 'pinned-section-toggle', '▶');
 
         const label = document.createElement('span');
         label.textContent = (app.i18n && app.i18n.t('sidebar.pinned')) || 'Pinned';
@@ -210,8 +207,7 @@ export class CollectionRenderer {
         header.appendChild(toggle);
         header.appendChild(label);
 
-        const endpointsDiv = document.createElement('div');
-        endpointsDiv.className = 'pinned-section-endpoints';
+        const endpointsDiv = el('div', 'pinned-section-endpoints');
 
         pinnedEntries.forEach(({ collection, endpoint }) => {
             const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers, true);
@@ -229,8 +225,7 @@ export class CollectionRenderer {
     }
 
     createCollectionElement(collection, eventHandlers, pinnedRequests = {}) {
-        const div = document.createElement('div');
-        div.className = 'collection-item';
+        const div = el('div', 'collection-item');
         div.dataset.collectionId = collection.id;
 
         const headerDiv = this.createCollectionHeader(collection);
@@ -251,16 +246,11 @@ export class CollectionRenderer {
      * @returns {HTMLDivElement}
      */
     createCollectionHeader(collection) {
-        const headerDiv = document.createElement('div');
-        headerDiv.className = 'collection-header u-flex u-items-center';
+        const headerDiv = el('div', 'collection-header u-flex u-items-center');
 
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'collection-name';
-        nameDiv.textContent = collection.name;
+        const nameDiv = el('div', 'collection-name', collection.name);
 
-        const toggleDiv = document.createElement('div');
-        toggleDiv.className = 'collection-toggle';
-        toggleDiv.textContent = '▶';
+        const toggleDiv = el('div', 'collection-toggle', '▶');
 
         headerDiv.appendChild(toggleDiv);
         headerDiv.appendChild(nameDiv);
@@ -277,16 +267,12 @@ export class CollectionRenderer {
      * @returns {HTMLSpanElement}
      */
     createGitBadge(branch) {
-        const badge = document.createElement('span');
-        badge.className = 'badge neutral collection-git-badge';
+        const badge = el('span', 'badge neutral collection-git-badge');
         badge.title = branch;
 
-        const icon = document.createElement('span');
-        icon.className = 'icon icon-12 icon-branch';
+        const icon = el('span', 'icon icon-12 icon-branch');
 
-        const label = document.createElement('span');
-        label.className = 'collection-git-branch';
-        label.textContent = branch;
+        const label = el('span', 'collection-git-branch', branch);
 
         badge.appendChild(icon);
         badge.appendChild(label);
@@ -363,8 +349,7 @@ export class CollectionRenderer {
      * @returns {HTMLDivElement}
      */
     createEndpointsContainer(collection, eventHandlers, pinnedRequests = {}) {
-        const endpointsDiv = document.createElement('div');
-        endpointsDiv.className = 'collection-endpoints';
+        const endpointsDiv = el('div', 'collection-endpoints');
 
         rootRequests(collection).forEach(endpoint => {
             const isPinned = !!pinnedRequests[`${collection.id}_${endpoint.id}`];
@@ -392,20 +377,14 @@ export class CollectionRenderer {
      * @returns {HTMLDivElement}
      */
     createFolderElement(folder, collection, eventHandlers, pinnedRequests = {}) {
-        const folderDiv = document.createElement('div');
-        folderDiv.className = 'folder-item';
+        const folderDiv = el('div', 'folder-item');
         folderDiv.dataset.folderId = folder.id;
 
-        const folderHeader = document.createElement('div');
-        folderHeader.className = 'folder-header u-flex u-items-center';
+        const folderHeader = el('div', 'folder-header u-flex u-items-center');
 
-        const folderName = document.createElement('div');
-        folderName.className = 'folder-name';
-        folderName.textContent = folder.name;
+        const folderName = el('div', 'folder-name', folder.name);
 
-        const folderToggle = document.createElement('div');
-        folderToggle.className = 'folder-toggle';
-        folderToggle.textContent = '▶';
+        const folderToggle = el('div', 'folder-toggle', '▶');
 
         folderHeader.appendChild(folderToggle);
         folderHeader.appendChild(folderName);
@@ -418,8 +397,7 @@ export class CollectionRenderer {
             });
         }
 
-        const folderEndpoints = document.createElement('div');
-        folderEndpoints.className = 'folder-endpoints';
+        const folderEndpoints = el('div', 'folder-endpoints');
 
         (folder.endpoints || []).forEach(endpoint => {
             const isPinned = !!pinnedRequests[`${collection.id}_${endpoint.id}`];
@@ -454,23 +432,19 @@ export class CollectionRenderer {
      * @returns {HTMLDivElement}
      */
     createEndpointElement(endpoint, collection, eventHandlers, isPinned = false) {
-        const endpointDiv = document.createElement('div');
-        endpointDiv.className = 'endpoint-item u-flex u-items-center';
+        const endpointDiv = el('div', 'endpoint-item u-flex u-items-center');
         endpointDiv.dataset.endpointId = endpoint.id;
         endpointDiv.dataset.collectionId = collection.id;
 
-        const methodSpan = document.createElement('span');
-        methodSpan.className = 'method-pill';
+        const methodSpan = el('span', 'method-pill');
         methodSpan.dataset.method = endpoint.method.toUpperCase();
         methodSpan.textContent = endpoint.method;
 
-        const pathSpan = document.createElement('span');
-        pathSpan.className = 'endpoint-path';
+        const pathSpan = el('span', 'endpoint-path');
         const displayName = endpoint.name || endpoint.path.replace(/^\{\{baseUrl\}\}/, '').split('?')[0] || 'Unnamed Request';
         pathSpan.textContent = displayName;
 
-        const pinBtn = document.createElement('span');
-        pinBtn.className = `icon icon-14 icon-star endpoint-pin-btn${isPinned ? ' is-pinned' : ''}`;
+        const pinBtn = el('span', `icon icon-14 icon-star endpoint-pin-btn${isPinned ? ' is-pinned' : ''}`);
         pinBtn.title = isPinned ? 'Unpin request' : 'Pin request';
         pinBtn.addEventListener('click', (e) => {
             e.stopPropagation();

@@ -3,6 +3,8 @@
  * @module services/MockServerService
  */
 
+import { ChangeEmitter } from './ChangeEmitter.js';
+
 export class MockServerService {
     /**
      * @param {MockServerRepository} repository
@@ -11,7 +13,7 @@ export class MockServerService {
     constructor(repository, statusDisplay) {
         this.repository = repository;
         this.statusDisplay = statusDisplay;
-        this.listeners = new Set();
+        this._events = new ChangeEmitter();
     }
 
     /**
@@ -21,7 +23,7 @@ export class MockServerService {
      * @returns {void}
      */
     addChangeListener(callback) {
-        this.listeners.add(callback);
+        this._events.add(callback);
     }
 
     /**
@@ -29,7 +31,7 @@ export class MockServerService {
      * @returns {void}
      */
     removeChangeListener(callback) {
-        this.listeners.delete(callback);
+        this._events.remove(callback);
     }
 
     /**
@@ -37,13 +39,7 @@ export class MockServerService {
      * @returns {void}
      */
     _notifyListeners(event) {
-        this.listeners.forEach(callback => {
-            try {
-                callback(event);
-            } catch (error) {
-                void error;
-            }
-        });
+        this._events.emit(event);
     }
 
     /**

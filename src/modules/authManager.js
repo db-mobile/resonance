@@ -7,6 +7,68 @@ import { templateLoader } from './templateLoader.js';
 import { api } from './ipcBridge.js';
 import { textToBase64 } from './utils/encoding.js';
 
+/**
+ * @typedef {Object} AuthFieldSpec
+ * @property {string} id
+ * @property {string} key
+ * @property {'value'|'checked'} [prop]
+ * @property {string} [event]
+ * @property {string} [fallback]
+ * @property {boolean} [seed]
+ * @property {string} [reveals]
+ * @property {string} [dispatch]
+ */
+
+/** @type {Object<string, AuthFieldSpec[]>} */
+const AUTH_FIELDS = {
+    bearer: [
+        { id: 'bearer-token', key: 'token', fallback: '{{bearerToken}}', seed: true }
+    ],
+    basic: [
+        { id: 'basic-username', key: 'username' },
+        { id: 'basic-password', key: 'password' }
+    ],
+    'api-key': [
+        { id: 'api-key-name', key: 'keyName' },
+        { id: 'api-key-value', key: 'keyValue' },
+        { id: 'api-key-location', key: 'location', event: 'change', fallback: 'header', seed: true }
+    ],
+    oauth2: [
+        { id: 'oauth2-grant-type', key: 'grantType', event: 'change', fallback: 'client_credentials', seed: true, dispatch: 'change' },
+        { id: 'oauth2-token-url', key: 'tokenUrl' },
+        { id: 'oauth2-auth-url', key: 'authorizationUrl' },
+        { id: 'oauth2-client-id', key: 'clientId' },
+        { id: 'oauth2-client-secret', key: 'clientSecret' },
+        { id: 'oauth2-username', key: 'username' },
+        { id: 'oauth2-password', key: 'password' },
+        { id: 'oauth2-redirect-uri', key: 'redirectUri', fallback: 'http://localhost:8080/callback' },
+        { id: 'oauth2-scope', key: 'scope' },
+        { id: 'oauth2-audience', key: 'audience' },
+        { id: 'oauth2-use-pkce', key: 'usePkce', prop: 'checked', event: 'change' },
+        { id: 'oauth2-client-auth', key: 'clientAuthMethod', event: 'change', fallback: 'body', seed: true },
+        { id: 'oauth2-token', key: 'token' },
+        { id: 'oauth2-header-prefix', key: 'headerPrefix', fallback: 'Bearer', seed: true },
+        { id: 'oauth2-refresh-token', key: 'refreshToken', reveals: 'oauth2-refresh-token-group' }
+    ],
+    digest: [
+        { id: 'digest-username', key: 'username' },
+        { id: 'digest-password', key: 'password' }
+    ],
+    ntlm: [
+        { id: 'ntlm-username', key: 'username' },
+        { id: 'ntlm-password', key: 'password' },
+        { id: 'ntlm-domain', key: 'domain' },
+        { id: 'ntlm-workstation', key: 'workstation' }
+    ],
+    'aws-v4': [
+        { id: 'aws-access-key-id', key: 'accessKeyId' },
+        { id: 'aws-secret-access-key', key: 'secretAccessKey' },
+        { id: 'aws-region', key: 'region' },
+        { id: 'aws-service', key: 'service' },
+        { id: 'aws-session-token', key: 'sessionToken' }
+    ]
+};
+
 export class AuthManager {
     /**
      * @param {Object} [options]
@@ -36,6 +98,104 @@ export class AuthManager {
             return document.getElementById(id);
         }
         return this.authFieldsContainer?.querySelector(`#${CSS.escape(this.idPrefix + id)}`) || null;
+    }
+
+    /**
+     * @param {AuthFieldSpec} field
+     * @param {Object} config
+     * @returns {string|boolean}
+     */
+    _fieldValue(field, config) {
+        if (field.prop === 'checked') {
+            return config[field.key] !== false;
+        }
+        return config[field.key] || field.fallback || '';
+    }
+
+    /**
+     * @param {AuthFieldSpec} field
+     * @param {*} value
+     * @returns {void}
+     */
+    _revealGroup(field, value) {
+        if (!field.reveals || !value) {
+            return;
+        }
+        const group = this._el(field.reveals);
+        if (group) {
+            group.classList.remove('u-hidden');
+        }
+    }
+
+    /**
+     * @param {string} type
+     * @param {Object<string, Function>} [hooks]
+     * @returns {void}
+     */
+    _bindFields(type, hooks = {}) {
+        const fields = AUTH_FIELDS[type] || [];
+        const { config } = this.currentAuthConfig;
+
+        fields.forEach((field) => {
+            if (field.seed && !config[field.key]) {
+                config[field.key] = field.fallback;
+            }
+
+            const element = this._el(field.id);
+            if (!element) {
+                return;
+            }
+
+            const prop = field.prop || 'value';
+            element[prop] = this._fieldValue(field, config);
+            this._revealGroup(field, element[prop]);
+
+            const hook = hooks[field.id];
+            if (hook) {
+                hook(element[prop], element);
+            }
+
+            element.addEventListener(field.event || 'input', (e) => {
+                const next = prop === 'checked' ? e.target.checked : e.target.value;
+                this.currentAuthConfig.config[field.key] = next;
+                if (hook) {
+                    hook(next, e.target);
+                }
+            });
+        });
+    }
+
+    /**
+     * @param {string} type
+     * @param {Object} config
+     * @returns {void}
+     */
+    _populateFields(type, config) {
+        const fields = AUTH_FIELDS[type] || [];
+        const pending = [];
+
+        fields.forEach((field) => {
+            const prop = field.prop || 'value';
+            if (prop !== 'checked' && !config[field.key]) {
+                return;
+            }
+
+            const element = this._el(field.id);
+            if (!element) {
+                return;
+            }
+
+            element[prop] = this._fieldValue(field, config);
+            this._revealGroup(field, element[prop]);
+
+            if (field.dispatch) {
+                pending.push([element, field.dispatch]);
+            }
+        });
+
+        pending.forEach(([element, eventName]) => {
+            element.dispatchEvent(new Event(eventName));
+        });
     }
 
     /**
@@ -192,21 +352,11 @@ export class AuthManager {
 
     /** @returns {void} */
     renderBearerTokenFields() {
-        const defaultToken = this.currentAuthConfig.config.token || '{{bearerToken}}';
-
         const fragment = this._cloneAuthTemplate('tpl-auth-bearer');
         this.authFieldsContainer.innerHTML = '';
         this.authFieldsContainer.appendChild(fragment);
 
-        const tokenInput = this._el('bearer-token');
-        if (tokenInput) {
-            tokenInput.value = defaultToken;
-            this.currentAuthConfig.config.token = tokenInput.value;
-
-            tokenInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.token = e.target.value;
-            });
-        }
+        this._bindFields('bearer');
     }
 
     /** @returns {void} */
@@ -215,20 +365,7 @@ export class AuthManager {
         this.authFieldsContainer.innerHTML = '';
         this.authFieldsContainer.appendChild(fragment);
 
-        const usernameInput = this._el('basic-username');
-        const passwordInput = this._el('basic-password');
-
-        if (usernameInput) {
-            usernameInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.username = e.target.value;
-            });
-        }
-
-        if (passwordInput) {
-            passwordInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.password = e.target.value;
-            });
-        }
+        this._bindFields('basic');
     }
 
     /** @returns {void} */
@@ -237,30 +374,7 @@ export class AuthManager {
         this.authFieldsContainer.innerHTML = '';
         this.authFieldsContainer.appendChild(fragment);
 
-        const keyNameInput = this._el('api-key-name');
-        const keyValueInput = this._el('api-key-value');
-        const keyLocationSelect = this._el('api-key-location');
-
-        if (keyNameInput) {
-            keyNameInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.keyName = e.target.value;
-            });
-        }
-
-        if (keyValueInput) {
-            keyValueInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.keyValue = e.target.value;
-            });
-        }
-
-        if (keyLocationSelect) {
-            keyLocationSelect.addEventListener('change', (e) => {
-                this.currentAuthConfig.config.location = e.target.value;
-            });
-            if (!this.currentAuthConfig.config.location) {
-                this.currentAuthConfig.config.location = 'header';
-            }
-        }
+        this._bindFields('api-key');
     }
 
     /** @returns {void} */
@@ -269,32 +383,9 @@ export class AuthManager {
         this.authFieldsContainer.innerHTML = '';
         this.authFieldsContainer.appendChild(fragment);
 
-        if (!this.currentAuthConfig.config.grantType) {
-            this.currentAuthConfig.config.grantType = 'client_credentials';
-        }
-        if (!this.currentAuthConfig.config.headerPrefix) {
-            this.currentAuthConfig.config.headerPrefix = 'Bearer';
-        }
-        if (!this.currentAuthConfig.config.clientAuthMethod) {
-            this.currentAuthConfig.config.clientAuthMethod = 'body';
-        }
-
-        const grantTypeSelect = this._el('oauth2-grant-type');
-        const tokenUrlInput = this._el('oauth2-token-url');
-        const authUrlInput = this._el('oauth2-auth-url');
-        const clientIdInput = this._el('oauth2-client-id');
-        const clientSecretInput = this._el('oauth2-client-secret');
-        const usernameInput = this._el('oauth2-username');
-        const passwordInput = this._el('oauth2-password');
-        const redirectUriInput = this._el('oauth2-redirect-uri');
-        const scopeInput = this._el('oauth2-scope');
-        const audienceInput = this._el('oauth2-audience');
-        const usePkceCheckbox = this._el('oauth2-use-pkce');
-        const clientAuthSelect = this._el('oauth2-client-auth');
+        const tokenInput = this._el('oauth2-token');
         const getTokenBtn = this._el('oauth2-get-token-btn');
         const refreshBtn = this._el('oauth2-refresh-btn');
-        const tokenInput = this._el('oauth2-token');
-        const prefixInput = this._el('oauth2-header-prefix');
 
         const authUrlGroup = this._el('oauth2-auth-url-group');
         const usernamePasswordPairGroup = this._el('oauth2-username-password-pair');
@@ -336,106 +427,9 @@ export class AuthManager {
             if (tokenInput) {tokenInput.setAttribute('readonly', 'readonly');}
         };
 
-        if (grantTypeSelect) {
-            grantTypeSelect.value = this.currentAuthConfig.config.grantType || 'client_credentials';
-            updateGrantTypeUI(grantTypeSelect.value);
-
-            grantTypeSelect.addEventListener('change', (e) => {
-                this.currentAuthConfig.config.grantType = e.target.value;
-                updateGrantTypeUI(e.target.value);
-            });
-        }
-
-        if (tokenUrlInput) {
-            tokenUrlInput.value = this.currentAuthConfig.config.tokenUrl || '';
-            tokenUrlInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.tokenUrl = e.target.value;
-            });
-        }
-
-        if (authUrlInput) {
-            authUrlInput.value = this.currentAuthConfig.config.authorizationUrl || '';
-            authUrlInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.authorizationUrl = e.target.value;
-            });
-        }
-
-        if (clientIdInput) {
-            clientIdInput.value = this.currentAuthConfig.config.clientId || '';
-            clientIdInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.clientId = e.target.value;
-            });
-        }
-
-        if (clientSecretInput) {
-            clientSecretInput.value = this.currentAuthConfig.config.clientSecret || '';
-            clientSecretInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.clientSecret = e.target.value;
-            });
-        }
-
-        if (usernameInput) {
-            usernameInput.value = this.currentAuthConfig.config.username || '';
-            usernameInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.username = e.target.value;
-            });
-        }
-
-        if (passwordInput) {
-            passwordInput.value = this.currentAuthConfig.config.password || '';
-            passwordInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.password = e.target.value;
-            });
-        }
-
-        if (redirectUriInput) {
-            redirectUriInput.value = this.currentAuthConfig.config.redirectUri || 'http://localhost:8080/callback';
-            redirectUriInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.redirectUri = e.target.value;
-            });
-        }
-
-        if (scopeInput) {
-            scopeInput.value = this.currentAuthConfig.config.scope || '';
-            scopeInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.scope = e.target.value;
-            });
-        }
-
-        if (audienceInput) {
-            audienceInput.value = this.currentAuthConfig.config.audience || '';
-            audienceInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.audience = e.target.value;
-            });
-        }
-
-        if (usePkceCheckbox) {
-            usePkceCheckbox.checked = this.currentAuthConfig.config.usePkce !== false;
-            usePkceCheckbox.addEventListener('change', (e) => {
-                this.currentAuthConfig.config.usePkce = e.target.checked;
-            });
-        }
-
-        if (clientAuthSelect) {
-            clientAuthSelect.value = this.currentAuthConfig.config.clientAuthMethod || 'body';
-            clientAuthSelect.addEventListener('change', (e) => {
-                this.currentAuthConfig.config.clientAuthMethod = e.target.value;
-            });
-        }
-
-        if (tokenInput) {
-            tokenInput.value = this.currentAuthConfig.config.token || '';
-            tokenInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.token = e.target.value;
-            });
-        }
-
-        if (prefixInput) {
-            prefixInput.value = this.currentAuthConfig.config.headerPrefix || 'Bearer';
-            prefixInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.headerPrefix = e.target.value;
-            });
-        }
+        this._bindFields('oauth2', {
+            'oauth2-grant-type': (grantType) => updateGrantTypeUI(grantType)
+        });
 
         if (getTokenBtn) {
             getTokenBtn.addEventListener('click', async () => {
@@ -544,8 +538,8 @@ export class AuthManager {
                 <strong>Authorization Required</strong><br>
                 A browser window has opened for you to authorize the application.<br>
                 After authorizing, you will be redirected. Copy the authorization code from the URL and paste it below:<br>
-                <input type="text" id="oauth2-auth-code-input" class="input-base form-input u-mt-2" placeholder="Paste authorization code here">
-                <button type="button" id="oauth2-exchange-code-btn" class="btn btn-primary btn-sm u-mt-2">Exchange Code for Token</button>
+                <input type="text" id="${this.idPrefix}oauth2-auth-code-input" class="input-base form-input u-mt-2" placeholder="Paste authorization code here">
+                <button type="button" id="${this.idPrefix}oauth2-exchange-code-btn" class="btn btn-primary btn-sm u-mt-2">Exchange Code for Token</button>
             `;
 
             const exchangeBtn = this._el('oauth2-exchange-code-btn');
@@ -688,20 +682,7 @@ export class AuthManager {
         this.authFieldsContainer.innerHTML = '';
         this.authFieldsContainer.appendChild(fragment);
 
-        const usernameInput = this._el('digest-username');
-        const passwordInput = this._el('digest-password');
-
-        if (usernameInput) {
-            usernameInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.username = e.target.value;
-            });
-        }
-
-        if (passwordInput) {
-            passwordInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.password = e.target.value;
-            });
-        }
+        this._bindFields('digest');
     }
 
     /** @returns {void} */
@@ -710,38 +691,7 @@ export class AuthManager {
         this.authFieldsContainer.innerHTML = '';
         this.authFieldsContainer.appendChild(fragment);
 
-        const usernameInput = this._el('ntlm-username');
-        const passwordInput = this._el('ntlm-password');
-        const domainInput = this._el('ntlm-domain');
-        const workstationInput = this._el('ntlm-workstation');
-
-        if (usernameInput) {
-            usernameInput.value = this.currentAuthConfig.config.username || '';
-            usernameInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.username = e.target.value;
-            });
-        }
-
-        if (passwordInput) {
-            passwordInput.value = this.currentAuthConfig.config.password || '';
-            passwordInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.password = e.target.value;
-            });
-        }
-
-        if (domainInput) {
-            domainInput.value = this.currentAuthConfig.config.domain || '';
-            domainInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.domain = e.target.value;
-            });
-        }
-
-        if (workstationInput) {
-            workstationInput.value = this.currentAuthConfig.config.workstation || '';
-            workstationInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.workstation = e.target.value;
-            });
-        }
+        this._bindFields('ntlm');
     }
 
     /** @returns {void} */
@@ -750,46 +700,7 @@ export class AuthManager {
         this.authFieldsContainer.innerHTML = '';
         this.authFieldsContainer.appendChild(fragment);
 
-        const accessKeyInput = this._el('aws-access-key-id');
-        const secretKeyInput = this._el('aws-secret-access-key');
-        const regionInput = this._el('aws-region');
-        const serviceInput = this._el('aws-service');
-        const sessionTokenInput = this._el('aws-session-token');
-
-        if (accessKeyInput) {
-            accessKeyInput.value = this.currentAuthConfig.config.accessKeyId || '';
-            accessKeyInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.accessKeyId = e.target.value;
-            });
-        }
-
-        if (secretKeyInput) {
-            secretKeyInput.value = this.currentAuthConfig.config.secretAccessKey || '';
-            secretKeyInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.secretAccessKey = e.target.value;
-            });
-        }
-
-        if (regionInput) {
-            regionInput.value = this.currentAuthConfig.config.region || '';
-            regionInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.region = e.target.value;
-            });
-        }
-
-        if (serviceInput) {
-            serviceInput.value = this.currentAuthConfig.config.service || '';
-            serviceInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.service = e.target.value;
-            });
-        }
-
-        if (sessionTokenInput) {
-            sessionTokenInput.value = this.currentAuthConfig.config.sessionToken || '';
-            sessionTokenInput.addEventListener('input', (e) => {
-                this.currentAuthConfig.config.sessionToken = e.target.value;
-            });
-        }
+        this._bindFields('aws-v4');
     }
 
     /**
@@ -911,127 +822,7 @@ export class AuthManager {
 
         if (!config) {return;}
 
-        switch (type) {
-            case 'bearer': {
-                const bearerToken = this._el('bearer-token');
-                if (bearerToken && config.token) {
-                    bearerToken.value = config.token;
-                }
-                break;
-            }
-
-            case 'basic': {
-                const basicUsername = this._el('basic-username');
-                const basicPassword = this._el('basic-password');
-                if (basicUsername && config.username) {
-                    basicUsername.value = config.username;
-                }
-                if (basicPassword && config.password) {
-                    basicPassword.value = config.password;
-                }
-                break;
-            }
-
-            case 'api-key': {
-                const keyName = this._el('api-key-name');
-                const keyValue = this._el('api-key-value');
-                const keyLocation = this._el('api-key-location');
-                if (keyName && config.keyName) {
-                    keyName.value = config.keyName;
-                }
-                if (keyValue && config.keyValue) {
-                    keyValue.value = config.keyValue;
-                }
-                if (keyLocation && config.location) {
-                    keyLocation.value = config.location;
-                }
-                break;
-            }
-
-            case 'oauth2': {
-                const oauth2Token = this._el('oauth2-token');
-                const oauth2Prefix = this._el('oauth2-header-prefix');
-                const oauth2GrantType = this._el('oauth2-grant-type');
-                const oauth2TokenUrl = this._el('oauth2-token-url');
-                const oauth2AuthUrl = this._el('oauth2-auth-url');
-                const oauth2ClientId = this._el('oauth2-client-id');
-                const oauth2ClientSecret = this._el('oauth2-client-secret');
-                const oauth2Username = this._el('oauth2-username');
-                const oauth2Password = this._el('oauth2-password');
-                const oauth2RedirectUri = this._el('oauth2-redirect-uri');
-                const oauth2Scope = this._el('oauth2-scope');
-                const oauth2Audience = this._el('oauth2-audience');
-                const oauth2UsePkce = this._el('oauth2-use-pkce');
-                const oauth2ClientAuth = this._el('oauth2-client-auth');
-                const oauth2RefreshToken = this._el('oauth2-refresh-token');
-
-                if (oauth2Token && config.token) {oauth2Token.value = config.token;}
-                if (oauth2Prefix && config.headerPrefix) {oauth2Prefix.value = config.headerPrefix;}
-                if (oauth2GrantType && config.grantType) {oauth2GrantType.value = config.grantType;}
-                if (oauth2TokenUrl && config.tokenUrl) {oauth2TokenUrl.value = config.tokenUrl;}
-                if (oauth2AuthUrl && config.authorizationUrl) {oauth2AuthUrl.value = config.authorizationUrl;}
-                if (oauth2ClientId && config.clientId) {oauth2ClientId.value = config.clientId;}
-                if (oauth2ClientSecret && config.clientSecret) {oauth2ClientSecret.value = config.clientSecret;}
-                if (oauth2Username && config.username) {oauth2Username.value = config.username;}
-                if (oauth2Password && config.password) {oauth2Password.value = config.password;}
-                if (oauth2RedirectUri && config.redirectUri) {oauth2RedirectUri.value = config.redirectUri;}
-                if (oauth2Scope && config.scope) {oauth2Scope.value = config.scope;}
-                if (oauth2Audience && config.audience) {oauth2Audience.value = config.audience;}
-                if (oauth2UsePkce) {oauth2UsePkce.checked = config.usePkce !== false;}
-                if (oauth2ClientAuth && config.clientAuthMethod) {oauth2ClientAuth.value = config.clientAuthMethod;}
-                if (oauth2RefreshToken && config.refreshToken) {
-                    oauth2RefreshToken.value = config.refreshToken;
-                    const refreshGroup = this._el('oauth2-refresh-token-group');
-                    if (refreshGroup) {refreshGroup.classList.remove('u-hidden');}
-                }
-
-                if (oauth2GrantType && config.grantType) {
-                    oauth2GrantType.dispatchEvent(new Event('change'));
-                }
-                break;
-            }
-
-            case 'digest': {
-                const digestUsername = this._el('digest-username');
-                const digestPassword = this._el('digest-password');
-                if (digestUsername && config.username) {
-                    digestUsername.value = config.username;
-                }
-                if (digestPassword && config.password) {
-                    digestPassword.value = config.password;
-                }
-                break;
-            }
-
-            case 'ntlm': {
-                const ntlmUsername = this._el('ntlm-username');
-                const ntlmPassword = this._el('ntlm-password');
-                const ntlmDomain = this._el('ntlm-domain');
-                const ntlmWorkstation = this._el('ntlm-workstation');
-                if (ntlmUsername && config.username) {ntlmUsername.value = config.username;}
-                if (ntlmPassword && config.password) {ntlmPassword.value = config.password;}
-                if (ntlmDomain && config.domain) {ntlmDomain.value = config.domain;}
-                if (ntlmWorkstation && config.workstation) {ntlmWorkstation.value = config.workstation;}
-                break;
-            }
-
-            case 'aws-v4': {
-                const awsAccessKey = this._el('aws-access-key-id');
-                const awsSecretKey = this._el('aws-secret-access-key');
-                const awsRegion = this._el('aws-region');
-                const awsService = this._el('aws-service');
-                const awsSessionToken = this._el('aws-session-token');
-                if (awsAccessKey && config.accessKeyId) {awsAccessKey.value = config.accessKeyId;}
-                if (awsSecretKey && config.secretAccessKey) {awsSecretKey.value = config.secretAccessKey;}
-                if (awsRegion && config.region) {awsRegion.value = config.region;}
-                if (awsService && config.service) {awsService.value = config.service;}
-                if (awsSessionToken && config.sessionToken) {awsSessionToken.value = config.sessionToken;}
-                break;
-            }
-
-            default:
-                break;
-        }
+        this._populateFields(type, config);
     }
 
     /** @returns {Object} */

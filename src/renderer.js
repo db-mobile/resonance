@@ -175,207 +175,144 @@ async function handleSaveShortcut() {
     }
 }
 
-function initKeyboardShortcuts() {
-    keyboardShortcuts.init();
+function toggleHistorySidebar() {
+    const historySidebar = document.getElementById('history-sidebar');
+    const historyResizerHandle = document.getElementById('history-resizer-handle');
+    const historyToggleBtn = document.getElementById('history-toggle-btn');
+    if (!historySidebar || !historyResizerHandle) {
+        return;
+    }
+    const isVisible = historySidebar.classList.contains('visible');
+    historySidebar.classList.toggle('visible', !isVisible);
+    historyResizerHandle.classList.toggle('visible', !isVisible);
+    if (historyToggleBtn) {
+        historyToggleBtn.classList.toggle('active', !isVisible);
+    }
+}
 
-    keyboardShortcuts.register('Enter', {
-        ctrl: true,
+/** @param {number} delta */
+async function cycleWorkspaceTab(delta) {
+    if (!workspaceTabController) {
+        return;
+    }
+    const tabs = await workspaceTabController.service.getAllTabs();
+    const activeTabId = await workspaceTabController.service.getActiveTabId();
+    const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+    const nextIndex = (currentIndex + delta + tabs.length) % tabs.length;
+    await workspaceTabController.switchTab(tabs[nextIndex].id);
+}
+
+/** @param {number} position */
+async function switchToWorkspaceTab(position) {
+    if (!workspaceTabController) {
+        return;
+    }
+    const tabs = await workspaceTabController.service.getAllTabs();
+    if (tabs.length >= position) {
+        await workspaceTabController.switchTab(tabs[position - 1].id);
+    }
+}
+
+const REQUEST_TAB_SHORTCUTS = [
+    { tab: 'path-params', label: 'Path Params' },
+    { tab: 'query-params', label: 'Query Params' },
+    { tab: 'headers', label: 'Headers' },
+    { tab: 'authorization', label: 'Authorization' },
+    { tab: 'body', label: 'Body' },
+    { tab: 'scripts', label: 'Scripts' }
+];
+
+const SHORTCUTS = [
+    {
+        key: 'Enter', ctrl: true, category: 'Request', description: 'Send request',
         handler: () => {
             if (sendRequestBtn && !sendRequestBtn.disabled) {
                 handleSendRequest();
             }
-        },
-        description: 'Send request',
-        category: 'Request'
-    });
-
-    keyboardShortcuts.register('KeyS', {
-        ctrl: true,
-        handler: () => handleSaveShortcut(),
-        description: 'Save request',
-        category: 'Request'
-    });
-
-    keyboardShortcuts.register('Escape', {
+        }
+    },
+    {
+        key: 'KeyS', ctrl: true, category: 'Request', description: 'Save request',
+        handler: () => handleSaveShortcut()
+    },
+    {
+        key: 'Escape', category: 'Request', description: 'Cancel request',
         handler: () => {
             if (cancelRequestBtn && !cancelRequestBtn.disabled) {
                 handleCancelRequest();
             }
-        },
-        description: 'Cancel request',
-        category: 'Request'
-    });
-
-    keyboardShortcuts.register('KeyL', {
-        ctrl: true,
-        handler: (_e) => {
+        }
+    },
+    {
+        key: 'KeyL', ctrl: true, category: 'Navigation', description: 'Focus URL bar',
+        handler: () => {
             if (urlInput) {
                 urlInput.focus();
                 urlInput.select();
             }
-        },
-        description: 'Focus URL bar',
-        category: 'Navigation'
-    });
-
-    keyboardShortcuts.register('KeyH', {
-        ctrl: true,
-        handler: () => {
-            const historySidebar = document.getElementById('history-sidebar');
-            const historyResizerHandle = document.getElementById('history-resizer-handle');
-            const historyToggleBtn = document.getElementById('history-toggle-btn');
-            if (historySidebar && historyResizerHandle) {
-                const isVisible = historySidebar.classList.contains('visible');
-                if (isVisible) {
-                    historySidebar.classList.remove('visible');
-                    historyResizerHandle.classList.remove('visible');
-                    if (historyToggleBtn) {historyToggleBtn.classList.remove('active');}
-                } else {
-                    historySidebar.classList.add('visible');
-                    historyResizerHandle.classList.add('visible');
-                    if (historyToggleBtn) {historyToggleBtn.classList.add('active');}
-                }
-            }
-        },
-        description: 'Toggle history sidebar',
-        category: 'Navigation'
-    });
-
-    keyboardShortcuts.register('KeyJ', {
-        ctrl: true,
+        }
+    },
+    {
+        key: 'KeyH', ctrl: true, category: 'Navigation', description: 'Toggle history sidebar',
+        handler: toggleHistorySidebar
+    },
+    {
+        key: 'KeyJ', ctrl: true, category: 'Navigation', description: 'Open cookie jar',
         handler: () => {
             if (app.cookieController) {
                 app.cookieController.openCookieManager();
             }
-        },
-        description: 'Open cookie jar',
-        category: 'Navigation'
-    });
-
-    keyboardShortcuts.register('KeyK', {
-        ctrl: true,
+        }
+    },
+    {
+        key: 'KeyK', ctrl: true, category: 'Actions', description: 'Generate cURL command',
         handler: () => {
             if (curlBtn) {
                 handleGenerateCurl();
             }
-        },
-        description: 'Generate cURL command',
-        category: 'Actions'
-    });
-
-    keyboardShortcuts.register('KeyO', {
-        ctrl: true,
+        }
+    },
+    {
+        key: 'KeyO', ctrl: true, category: 'Actions', description: 'Import collection file',
         handler: () => {
             if (importCollectionBtn) {
                 importCollectionFile();
             }
-        },
-        description: 'Import collection file',
-        category: 'Actions'
-    });
-
-    keyboardShortcuts.register('KeyE', {
-        ctrl: true,
+        }
+    },
+    {
+        key: 'KeyE', ctrl: true, category: 'Actions', description: 'Open environment manager',
         handler: () => {
             if (environmentController) {
                 environmentController.openEnvironmentManager();
             }
-        },
-        description: 'Open environment manager',
-        category: 'Actions'
-    });
-
-    keyboardShortcuts.register('Comma', {
-        ctrl: true,
+        }
+    },
+    {
+        key: 'Comma', ctrl: true, category: 'Settings', description: 'Open settings',
         handler: () => {
             if (settingsModal) {
                 settingsModal.show();
             }
-        },
-        description: 'Open settings',
-        category: 'Settings'
-    });
-
-    keyboardShortcuts.register('Slash', {
-        ctrl: true,
-        handler: () => {
-            keyboardShortcuts.showHelp();
-        },
-        description: 'Show keyboard shortcuts',
-        category: 'Help'
-    });
-
-    for (let i = 1; i <= 9; i++) {
-        keyboardShortcuts.register(`Digit${i}`, {
-            ctrl: true,
-            handler: async () => {
-                if (workspaceTabController) {
-                    const tabs = await workspaceTabController.service.getAllTabs();
-                    if (tabs.length >= i) {
-                        await workspaceTabController.switchTab(tabs[i - 1].id);
-                    }
-                }
-            },
-            description: `Switch to workspace tab ${i}`,
-            category: 'Workspace Tabs'
-        });
+        }
+    },
+    {
+        key: 'Slash', ctrl: true, category: 'Help', description: 'Show keyboard shortcuts',
+        handler: () => keyboardShortcuts.showHelp()
     }
+];
 
-    keyboardShortcuts.register('Digit1', {
-        alt: true,
-        handler: () => activateTab('request', 'path-params'),
-        description: 'Switch to Path Params tab',
-        category: 'Request Tabs'
-    });
-
-    keyboardShortcuts.register('Digit2', {
-        alt: true,
-        handler: () => activateTab('request', 'query-params'),
-        description: 'Switch to Query Params tab',
-        category: 'Request Tabs'
-    });
-
-    keyboardShortcuts.register('Digit3', {
-        alt: true,
-        handler: () => activateTab('request', 'headers'),
-        description: 'Switch to Headers tab',
-        category: 'Request Tabs'
-    });
-
-    keyboardShortcuts.register('Digit4', {
-        alt: true,
-        handler: () => activateTab('request', 'authorization'),
-        description: 'Switch to Authorization tab',
-        category: 'Request Tabs'
-    });
-
-    keyboardShortcuts.register('Digit5', {
-        alt: true,
-        handler: () => activateTab('request', 'body'),
-        description: 'Switch to Body tab',
-        category: 'Request Tabs'
-    });
-
-    keyboardShortcuts.register('Digit6', {
-        alt: true,
-        handler: () => activateTab('request', 'scripts'),
-        description: 'Switch to Scripts tab',
-        category: 'Request Tabs'
-    });
-
-    keyboardShortcuts.register('KeyT', {
-        ctrl: true,
+const WORKSPACE_TAB_SHORTCUTS = [
+    {
+        key: 'KeyT', ctrl: true, category: 'Workspace Tabs', description: 'New workspace tab',
         handler: () => {
             if (workspaceTabController) {
                 workspaceTabController.createNewTab();
             }
-        },
-        description: 'New workspace tab',
-        category: 'Workspace Tabs'
-    });
-
-    keyboardShortcuts.register('KeyW', {
-        ctrl: true,
+        }
+    },
+    {
+        key: 'KeyW', ctrl: true, category: 'Workspace Tabs', description: 'Close current tab',
         handler: async () => {
             if (workspaceTabController) {
                 const activeTabId = await workspaceTabController.service.getActiveTabId();
@@ -383,41 +320,46 @@ function initKeyboardShortcuts() {
                     await workspaceTabController.closeTab(activeTabId);
                 }
             }
-        },
-        description: 'Close current tab',
-        category: 'Workspace Tabs'
+        }
+    },
+    {
+        key: 'Tab', ctrl: true, category: 'Workspace Tabs', description: 'Switch to next tab',
+        handler: () => cycleWorkspaceTab(1)
+    },
+    {
+        key: 'Tab', ctrl: true, shift: true, category: 'Workspace Tabs', description: 'Switch to previous tab',
+        handler: () => cycleWorkspaceTab(-1)
+    }
+];
+
+function initKeyboardShortcuts() {
+    keyboardShortcuts.init();
+
+    for (const { key, ...options } of SHORTCUTS) {
+        keyboardShortcuts.register(key, options);
+    }
+
+    for (let i = 1; i <= 9; i++) {
+        keyboardShortcuts.register(`Digit${i}`, {
+            ctrl: true,
+            handler: () => switchToWorkspaceTab(i),
+            description: `Switch to workspace tab ${i}`,
+            category: 'Workspace Tabs'
+        });
+    }
+
+    REQUEST_TAB_SHORTCUTS.forEach(({ tab, label }, index) => {
+        keyboardShortcuts.register(`Digit${index + 1}`, {
+            alt: true,
+            handler: () => activateTab('request', tab),
+            description: `Switch to ${label} tab`,
+            category: 'Request Tabs'
+        });
     });
 
-    keyboardShortcuts.register('Tab', {
-        ctrl: true,
-        handler: async () => {
-            if (workspaceTabController) {
-                const tabs = await workspaceTabController.service.getAllTabs();
-                const activeTabId = await workspaceTabController.service.getActiveTabId();
-                const currentIndex = tabs.findIndex(t => t.id === activeTabId);
-                const nextIndex = (currentIndex + 1) % tabs.length;
-                await workspaceTabController.switchTab(tabs[nextIndex].id);
-            }
-        },
-        description: 'Switch to next tab',
-        category: 'Workspace Tabs'
-    });
-
-    keyboardShortcuts.register('Tab', {
-        ctrl: true,
-        shift: true,
-        handler: async () => {
-            if (workspaceTabController) {
-                const tabs = await workspaceTabController.service.getAllTabs();
-                const activeTabId = await workspaceTabController.service.getActiveTabId();
-                const currentIndex = tabs.findIndex(t => t.id === activeTabId);
-                const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
-                await workspaceTabController.switchTab(tabs[prevIndex].id);
-            }
-        },
-        description: 'Switch to previous tab',
-        category: 'Workspace Tabs'
-    });
+    for (const { key, ...options } of WORKSPACE_TAB_SHORTCUTS) {
+        keyboardShortcuts.register(key, options);
+    }
 
     const keyboardShortcutsBtn = document.getElementById('keyboard-shortcuts-btn');
     if (keyboardShortcutsBtn) {

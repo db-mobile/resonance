@@ -10,6 +10,7 @@ import { EnvironmentRepository } from '../storage/EnvironmentRepository.js';
 import { CollectionRepository } from '../storage/CollectionRepository.js';
 import { CertificateRepository } from '../storage/CertificateRepository.js';
 import { CertificateService } from './CertificateService.js';
+import { ChangeEmitter } from './ChangeEmitter.js';
 import { normalizeFormRows } from '../utils/formDataRows.js';
 import { activeKeyValueRows } from '../utils/keyValueRows.js';
 import { textToBase64 } from '../utils/encoding.js';
@@ -35,7 +36,12 @@ export class RunnerService {
         this.isRunning = false;
         this.shouldStop = false;
         this.currentRunId = null;
-        this.listeners = [];
+        this._events = new ChangeEmitter();
+    }
+
+    /** @returns {Set<Function>} */
+    get listeners() {
+        return this._events.listeners;
     }
 
     /** @returns {Promise<Array<Object>>} */
@@ -837,12 +843,12 @@ export class RunnerService {
 
     /** @param {Function} listener */
     addListener(listener) {
-        this.listeners.push(listener);
+        this._events.add(listener);
     }
 
     /** @param {Function} listener */
     removeListener(listener) {
-        this.listeners = this.listeners.filter(l => l !== listener);
+        this._events.remove(listener);
     }
 
     /**
@@ -850,11 +856,6 @@ export class RunnerService {
      * @param {*} data
      */
     _notifyListeners(event, data) {
-        this.listeners.forEach(listener => {
-            try {
-                listener(event, data);
-            } catch (e) {
-            }
-        });
+        this._events.emit(event, data);
     }
 }

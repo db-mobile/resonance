@@ -3,6 +3,8 @@
  * @module services/ProxyService
  */
 
+import { ChangeEmitter } from './ChangeEmitter.js';
+
 export class ProxyService {
     /**
      * @param {ProxyRepository} proxyRepository
@@ -11,7 +13,7 @@ export class ProxyService {
     constructor(proxyRepository, statusDisplay) {
         this.repository = proxyRepository;
         this.statusDisplay = statusDisplay;
-        this.listeners = new Set();
+        this._events = new ChangeEmitter();
     }
 
     /**
@@ -21,7 +23,7 @@ export class ProxyService {
      * @returns {void}
      */
     addChangeListener(callback) {
-        this.listeners.add(callback);
+        this._events.add(callback);
     }
 
     /**
@@ -29,7 +31,7 @@ export class ProxyService {
      * @returns {void}
      */
     removeChangeListener(callback) {
-        this.listeners.delete(callback);
+        this._events.remove(callback);
     }
 
     /**
@@ -37,13 +39,7 @@ export class ProxyService {
      * @returns {void}
      */
     _notifyListeners(event) {
-        this.listeners.forEach(callback => {
-            try {
-                callback(event);
-            } catch (error) {
-                void error;
-            }
-        });
+        this._events.emit(event);
     }
 
     /** @returns {Promise<Object>} */

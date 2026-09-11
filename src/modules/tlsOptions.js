@@ -1,5 +1,5 @@
 import { app } from './appContext.js';
-import { getSettingsCache } from './apiHandler.js';
+import { getSettings } from './state/settingsCache.js';
 
 /**
  * @param {string} url
@@ -8,7 +8,7 @@ import { getSettingsCache } from './apiHandler.js';
 export async function resolveTlsOptions(url) {
     let verifySsl = true;
     try {
-        const settings = getSettingsCache() || (await window.backendAPI.settings.get());
+        const settings = await getSettings();
         verifySsl = settings?.verifySsl !== false;
     } catch (_e) {
         void _e;

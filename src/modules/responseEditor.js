@@ -1,57 +1,35 @@
-import { EditorView, lineNumbers, keymap } from '@codemirror/view';
+import { EditorView, lineNumbers } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { json } from '@codemirror/lang-json';
 import { xml } from '@codemirror/lang-xml';
 import { html } from '@codemirror/lang-html';
-import { searchKeymap, highlightSelectionMatches, search, openSearchPanel } from '@codemirror/search';
-import { createThemedHighlighting } from './editorTheme.js';
+import { BaseCodeEditor } from './editors/BaseCodeEditor.js';
 
-export class ResponseEditor {
+export class ResponseEditor extends BaseCodeEditor {
     constructor(containerElement) {
-        this.container = containerElement;
-        this.view = null;
+        super(containerElement);
         this.currentLanguage = null;
         this.currentContentType = null;
         this.manualLanguageOverride = null;
         this.languageChangeCallback = null;
-        this._themed = null;
-        this.init();
     }
 
     /** @returns {Array} */
-    getThemeExtensions() {
-        return [this._themed.extension];
-    }
-
-    /** @returns {Array} */
-    getSearchExtensions() {
+    getReadOnlyExtensions() {
         return [
-            search(),
-            highlightSelectionMatches(),
-            keymap.of(searchKeymap)
+            lineNumbers(),
+            EditorState.readOnly.of(true),
+            EditorView.editable.of(false),
+            EditorView.contentAttributes.of({ tabindex: '0' }),
+            EditorView.lineWrapping,
+            ...this.getThemeExtensions(),
+            ...this.getSearchExtensions()
         ];
     }
 
-    init() {
-        this._themed = createThemedHighlighting();
-        const state = EditorState.create({
-            doc: '',
-            extensions: [
-                lineNumbers(),
-                EditorState.readOnly.of(true),
-                EditorView.editable.of(false),
-                EditorView.contentAttributes.of({ tabindex: '0' }),
-                EditorView.lineWrapping,
-                ...this.getThemeExtensions(),
-                ...this.getSearchExtensions()
-            ]
-        });
-
-        this.view = new EditorView({
-            state,
-            parent: this.container
-        });
-        this._themed.attach(this.view);
+    /** @returns {Array} */
+    buildExtensions() {
+        return this.getReadOnlyExtensions();
     }
 
     /**
@@ -149,15 +127,7 @@ export class ResponseEditor {
      * @param {string|null} languageType
      */
     _updateEditorWithLanguage(content, languageType) {
-        const extensions = [
-            lineNumbers(),
-            EditorState.readOnly.of(true),
-            EditorView.editable.of(false),
-            EditorView.contentAttributes.of({ tabindex: '0' }),
-            EditorView.lineWrapping,
-            ...this.getThemeExtensions(),
-            ...this.getSearchExtensions()
-        ];
+        const extensions = this.getReadOnlyExtensions();
 
         if (languageType && languageType !== 'text') {
             const language = this.getLanguageExtension(languageType);
@@ -209,34 +179,7 @@ export class ResponseEditor {
         this._updateEditorWithLanguage(content, languageType);
     }
 
-    clearLanguageOverride() {
-        this.manualLanguageOverride = null;
-        const content = this.getContent();
-        this.setContent(content, this.currentContentType);
-    }
-
     clear() {
         this.setContent('');
-    }
-
-    /** @returns {string} */
-    getContent() {
-        return this.view.state.doc.toString();
-    }
-
-    destroy() {
-        this._themed?.dispose();
-        this._themed = null;
-        if (this.view) {
-            this.view.destroy();
-            this.view = null;
-        }
-    }
-
-    openSearch() {
-        if (this.view) {
-            this.view.focus();
-            openSearchPanel(this.view);
-        }
     }
 }

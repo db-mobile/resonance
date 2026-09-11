@@ -6,6 +6,7 @@
 import { parse, print, visit, parseType, Kind, getNamedType, isObjectType, isScalarType, isEnumType, isRequiredArgument } from 'graphql';
 import { inputKindForType, enumValuesForType, coerceInputValue } from './graphqlTypeUtils.js';
 import { debounce } from './utils/debounce.js';
+import { el } from './htmlUtils.js';
 
 const PATH_SEP = '.';
 
@@ -576,10 +577,8 @@ export class GraphQLExplorer {
 
     /** @param {string} message */
     _renderEmpty(message) {
-        const el = document.createElement('div');
-        el.className = 'graphql-explorer-empty';
-        el.textContent = message;
-        this.railEl.appendChild(el);
+        const empty = el('div', 'graphql-explorer-empty', message);
+        this.railEl.appendChild(empty);
     }
 
     /** @returns {HTMLElement} */
@@ -602,8 +601,7 @@ export class GraphQLExplorer {
             if (!rootType) {
                 return;
             }
-            const section = document.createElement('section');
-            section.className = 'graphql-explorer-section';
+            const section = el('section', 'graphql-explorer-section');
             const heading = document.createElement('h4');
             heading.textContent = label;
             section.appendChild(heading);
@@ -625,11 +623,9 @@ export class GraphQLExplorer {
         const namedType = getNamedType(field.type);
         const isObj = isObjectType(namedType);
 
-        const wrapper = document.createElement('div');
-        wrapper.className = 'graphql-explorer-item';
+        const wrapper = el('div', 'graphql-explorer-item');
 
-        const row = document.createElement('div');
-        row.className = 'graphql-explorer-node';
+        const row = el('div', 'graphql-explorer-node');
         row.dataset.path = path.join(PATH_SEP);
         row.dataset.optype = operationType;
         row.dataset.name = field.name.toLowerCase();
@@ -652,21 +648,15 @@ export class GraphQLExplorer {
         checkbox.addEventListener('change', () => this._onToggle(path, operationType, isObj, wrapper, isObj ? namedType : null, requiredArgs));
         row.appendChild(checkbox);
 
-        const name = document.createElement('span');
-        name.className = 'graphql-explorer-name';
-        name.textContent = field.name;
+        const name = el('span', 'graphql-explorer-name', field.name);
         row.appendChild(name);
 
-        const type = document.createElement('span');
-        type.className = 'graphql-explorer-type';
-        type.textContent = field.type.toString();
+        const type = el('span', 'graphql-explorer-type', field.type.toString());
         row.appendChild(type);
 
         const hasArgs = !!(field.args && field.args.length > 0);
         if (hasArgs) {
-            const argHint = document.createElement('span');
-            argHint.className = 'graphql-explorer-arg-tag';
-            argHint.textContent = 'ARG';
+            const argHint = el('span', 'graphql-explorer-arg-tag', 'ARG');
             argHint.title = 'Takes arguments — check the field to edit them inline.';
             row.appendChild(argHint);
         }
@@ -674,16 +664,14 @@ export class GraphQLExplorer {
         wrapper.appendChild(row);
 
         if (hasArgs) {
-            const argsEl = document.createElement('div');
-            argsEl.className = 'graphql-explorer-args';
+            const argsEl = el('div', 'graphql-explorer-args');
             argsEl.style.display = 'none';
             field.args.forEach(arg => argsEl.appendChild(this._buildArgRow(arg, path, operationType)));
             wrapper.appendChild(argsEl);
         }
 
         if (isObj) {
-            const children = document.createElement('div');
-            children.className = 'graphql-explorer-children';
+            const children = el('div', 'graphql-explorer-children');
             wrapper.appendChild(children);
             chevron.addEventListener('click', () => this._toggleExpand(wrapper, namedType, path, operationType));
         }
@@ -701,22 +689,17 @@ export class GraphQLExplorer {
         const argType = arg.type.toString();
         const kind = inputKindForType(argType, this.schema);
 
-        const row = document.createElement('div');
-        row.className = 'graphql-explorer-arg-row';
+        const row = el('div', 'graphql-explorer-arg-row');
         row.dataset.arg = arg.name;
         row.dataset.argtype = argType;
         row.dataset.required = String(isRequiredArgument(arg));
         row.dataset.path = path.join(PATH_SEP);
         row.dataset.optype = operationType;
 
-        const name = document.createElement('span');
-        name.className = 'graphql-explorer-arg-name';
-        name.textContent = arg.name;
+        const name = el('span', 'graphql-explorer-arg-name', arg.name);
         row.appendChild(name);
 
-        const type = document.createElement('span');
-        type.className = 'graphql-explorer-arg-type';
-        type.textContent = argType;
+        const type = el('span', 'graphql-explorer-arg-type', argType);
         if (isRequiredArgument(arg)) {
             type.classList.add('is-required');
             type.title = 'Required';
@@ -741,8 +724,7 @@ export class GraphQLExplorer {
             return cb;
         }
         if (kind === 'enum') {
-            const select = document.createElement('select');
-            select.className = 'select-base compact graphql-explorer-arg-value';
+            const select = el('select', 'select-base compact graphql-explorer-arg-value');
             ['', ...enumValuesForType(argType, this.schema)].forEach(opt => {
                 const o = document.createElement('option');
                 o.value = opt;

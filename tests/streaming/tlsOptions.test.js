@@ -1,10 +1,10 @@
 /* global window */
-jest.mock('../../src/modules/apiHandler.js', () => ({
-    getSettingsCache: jest.fn()
+jest.mock('../../src/modules/state/settingsCache.js', () => ({
+    getSettings: jest.fn()
 }));
 
 import { app } from '../../src/modules/appContext.js';
-import { getSettingsCache } from '../../src/modules/apiHandler.js';
+import { getSettings } from '../../src/modules/state/settingsCache.js';
 import { resolveTlsOptions } from '../../src/modules/tlsOptions.js';
 
 const URL_UNDER_TEST = 'wss://api.example.com/graphql';
@@ -19,29 +19,22 @@ describe('resolveTlsOptions', () => {
         delete app.certificateController;
     });
 
-    it('reads verifySsl from the warm settings cache without hitting the backend', async () => {
-        getSettingsCache.mockReturnValue({ verifySsl: false });
+    it('reads verifySsl through the shared settings cache, not the backend directly', async () => {
+        getSettings.mockResolvedValue({ verifySsl: false });
 
         expect(await resolveTlsOptions(URL_UNDER_TEST)).toEqual({ verifySsl: false });
+        expect(getSettings).toHaveBeenCalled();
         expect(getFromBackend).not.toHaveBeenCalled();
     });
 
-    it('falls back to the backend when the cache is cold', async () => {
-        getSettingsCache.mockReturnValue(null);
-        getFromBackend.mockResolvedValue({ verifySsl: false });
-
-        expect(await resolveTlsOptions(URL_UNDER_TEST)).toEqual({ verifySsl: false });
-        expect(getFromBackend).toHaveBeenCalled();
-    });
-
     it('defaults to verifying when the setting is absent', async () => {
-        getSettingsCache.mockReturnValue({});
+        getSettings.mockResolvedValue({});
 
         expect(await resolveTlsOptions(URL_UNDER_TEST)).toEqual({ verifySsl: true });
     });
 
     it('attaches the certificate registered for the host of a wss url', async () => {
-        getSettingsCache.mockReturnValue({ verifySsl: true });
+        getSettings.mockResolvedValue({ verifySsl: true });
         const cert = { certPath: '/c.crt', keyPath: '/c.key', caPath: '/ca.pem' };
         const getForHost = jest.fn().mockReturnValue(cert);
         app.certificateController = { getForHost };
@@ -54,22 +47,20 @@ describe('resolveTlsOptions', () => {
     });
 
     it('omits clientCert when no certificate is registered for the host', async () => {
-        getSettingsCache.mockReturnValue({ verifySsl: true });
+        getSettings.mockResolvedValue({ verifySsl: true });
         app.certificateController = { getForHost: jest.fn().mockReturnValue(null) };
 
         expect(await resolveTlsOptions(URL_UNDER_TEST)).toEqual({ verifySsl: true });
     });
 
     it('still verifies when the settings lookup throws', async () => {
-        getSettingsCache.mockImplementation(() => {
-            throw new Error('store unavailable');
-        });
+        getSettings.mockRejectedValue(new Error('store unavailable'));
 
         expect(await resolveTlsOptions(URL_UNDER_TEST)).toEqual({ verifySsl: true });
     });
 
     it('still returns options when the certificate lookup throws', async () => {
-        getSettingsCache.mockReturnValue({ verifySsl: false });
+        getSettings.mockResolvedValue({ verifySsl: false });
         app.certificateController = {
             getForHost: jest.fn(() => {
                 throw new Error('cert store unavailable');
@@ -80,7 +71,7 @@ describe('resolveTlsOptions', () => {
     });
 
     it('does not throw on an unparseable url', async () => {
-        getSettingsCache.mockReturnValue({ verifySsl: true });
+        getSettings.mockResolvedValue({ verifySsl: true });
         app.certificateController = { getForHost: jest.fn() };
 
         expect(await resolveTlsOptions('not a url')).toEqual({ verifySsl: true });
