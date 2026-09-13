@@ -24,11 +24,13 @@ const GRPC_MARKUP = `
 async function loadGrpcHandler(markup = GRPC_MARKUP) {
     document.body.innerHTML = markup;
     jest.resetModules();
+    jest.doMock('../src/modules/state/settingsCache.js', () => ({
+        getSettings: jest.fn(async () => ({}))
+    }));
     jest.doMock('../src/modules/apiHandler.js', () => ({
         displayResponseWithLineNumbersForTab: jest.fn(),
         generateEffectiveAuthData: jest.fn(async () => ({ headers: {}, queryParams: {} })),
         getRequestBuilderService: jest.fn(),
-        getSettingsCache: jest.fn(() => ({})),
         warnUnresolvedVariables: jest.fn()
     }));
     return import('../src/modules/grpcHandler.js');
@@ -49,11 +51,13 @@ async function loadGrpcHandlerForSend({ variables = {}, authData = { headers: {}
     };
     const builder = new RequestBuilderService(() => variableService, () => ({}));
 
+    jest.doMock('../src/modules/state/settingsCache.js', () => ({
+        getSettings: jest.fn(async () => ({}))
+    }));
     jest.doMock('../src/modules/apiHandler.js', () => ({
         displayResponseWithLineNumbersForTab: jest.fn(),
         generateEffectiveAuthData: jest.fn(async () => authData),
         getRequestBuilderService: jest.fn(() => builder),
-        getSettingsCache: jest.fn(() => ({})),
         warnUnresolvedVariables: jest.fn()
     }));
 

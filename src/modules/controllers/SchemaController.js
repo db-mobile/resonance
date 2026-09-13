@@ -246,13 +246,6 @@ export class SchemaController {
         }
     }
 
-    /** @param {boolean} isDark */
-    updateTheme(isDark) {
-        if (this.editor) {
-            this.editor.updateTheme(isDark);
-        }
-    }
-
     destroy() {
         this._debouncedSave.cancel();
         if (this.editor) {

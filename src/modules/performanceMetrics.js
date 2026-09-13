@@ -1,3 +1,4 @@
+import { el } from './htmlUtils.js';
 
 const NOT_MEASURED = 'n/a';
 
@@ -70,24 +71,17 @@ function calculatePercentage(value, total) {
  * @returns {HTMLElement}
  */
 function createTimingBar(label, time, totalTime, color) {
-    const barContainer = document.createElement('div');
-    barContainer.className = 'timing-bar-container';
+    const barContainer = el('div', 'timing-bar-container');
 
-    const labelElement = document.createElement('div');
-    labelElement.className = 'timing-label';
-    labelElement.textContent = label;
+    const labelElement = el('div', 'timing-label', label);
 
-    const barWrapper = document.createElement('div');
-    barWrapper.className = 'timing-bar-wrapper';
+    const barWrapper = el('div', 'timing-bar-wrapper');
 
-    const bar = document.createElement('div');
-    bar.className = 'timing-bar';
+    const bar = el('div', 'timing-bar');
     bar.style.width = `${calculatePercentage(time, totalTime)}%`;
     bar.style.backgroundColor = color;
 
-    const timeElement = document.createElement('div');
-    timeElement.className = 'timing-value';
-    timeElement.textContent = formatTime(time);
+    const timeElement = el('div', 'timing-value', formatTime(time));
 
     barWrapper.appendChild(bar);
     barContainer.appendChild(labelElement);
@@ -104,16 +98,11 @@ function createTimingBar(label, time, totalTime, color) {
  * @returns {HTMLElement}
  */
 function createMetric(label, value, title) {
-    const metric = document.createElement('div');
-    metric.className = 'performance-metric';
+    const metric = el('div', 'performance-metric');
 
-    const labelElement = document.createElement('div');
-    labelElement.className = 'metric-label';
-    labelElement.textContent = label;
+    const labelElement = el('div', 'metric-label', label);
 
-    const valueElement = document.createElement('div');
-    valueElement.className = 'metric-value';
-    valueElement.textContent = value;
+    const valueElement = el('div', 'metric-value', value);
     if (title) {
         valueElement.setAttribute('title', title);
     }
@@ -131,8 +120,7 @@ function createMetric(label, value, title) {
  * @returns {HTMLElement}
  */
 function createWaterfallSegment(phase, value, total) {
-    const segment = document.createElement('div');
-    segment.className = 'waterfall-segment';
+    const segment = el('div', 'waterfall-segment');
     segment.style.width = `${calculatePercentage(value, total)}%`;
     segment.style.backgroundColor = phase.color;
     segment.setAttribute('title', `${phase.label}: ${formatTime(value)}`);
@@ -153,15 +141,13 @@ function isDrawable(value) {
  * @returns {HTMLElement}
  */
 function buildSummary(timings, size) {
-    const summary = document.createElement('div');
-    summary.className = 'performance-summary';
+    const summary = el('div', 'performance-summary');
 
     const summaryTitle = document.createElement('h4');
     summaryTitle.textContent = 'Summary';
     summary.appendChild(summaryTitle);
 
-    const metricsGrid = document.createElement('div');
-    metricsGrid.className = 'metrics-grid';
+    const metricsGrid = el('div', 'metrics-grid');
 
     metricsGrid.appendChild(createMetric('Total Time', formatTime(timings.total)));
 
@@ -185,9 +171,7 @@ function buildSummary(timings, size) {
     summary.appendChild(metricsGrid);
 
     if (timings.connectCount > 1) {
-        const note = document.createElement('p');
-        note.className = 'performance-note';
-        note.textContent = `${timings.connectCount} connections were opened — the phases above are their total.`;
+        const note = el('p', 'performance-note', `${timings.connectCount} connections were opened — the phases above are their total.`);
         summary.appendChild(note);
     }
 
@@ -199,22 +183,18 @@ function buildSummary(timings, size) {
  * @returns {HTMLElement}
  */
 function buildBreakdown(timings) {
-    const breakdown = document.createElement('div');
-    breakdown.className = 'performance-breakdown';
+    const breakdown = el('div', 'performance-breakdown');
 
     const breakdownTitle = document.createElement('h4');
     breakdownTitle.textContent = 'Timing Breakdown';
     breakdown.appendChild(breakdownTitle);
 
-    const timingBars = document.createElement('div');
-    timingBars.className = 'timing-bars';
+    const timingBars = el('div', 'timing-bars');
 
-    const waterfall = document.createElement('div');
-    waterfall.className = 'timing-waterfall';
+    const waterfall = el('div', 'timing-waterfall');
     waterfall.setAttribute('aria-label', 'Request timing waterfall');
 
-    const waterfallBar = document.createElement('div');
-    waterfallBar.className = 'waterfall-bar';
+    const waterfallBar = el('div', 'waterfall-bar');
 
     PHASES.forEach(phase => {
         const value = timings[phase.key];
@@ -234,22 +214,18 @@ function buildBreakdown(timings) {
 
 /** @returns {HTMLElement} */
 function buildLegend() {
-    const legend = document.createElement('div');
-    legend.className = 'timing-legend';
+    const legend = el('div', 'timing-legend');
 
     const legendTitle = document.createElement('h4');
     legendTitle.textContent = 'Legend';
     legend.appendChild(legendTitle);
 
-    const legendItems = document.createElement('div');
-    legendItems.className = 'legend-items';
+    const legendItems = el('div', 'legend-items');
 
     PHASES.forEach(phase => {
-        const item = document.createElement('div');
-        item.className = 'legend-item';
+        const item = el('div', 'legend-item');
 
-        const colorBox = document.createElement('div');
-        colorBox.className = 'legend-color';
+        const colorBox = el('div', 'legend-color');
         colorBox.style.backgroundColor = phase.color;
 
         const label = document.createElement('span');

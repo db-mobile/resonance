@@ -6,6 +6,7 @@
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { pushEscapeHandler } from './modalEscape.js';
+import { updateSetting } from '../state/settingsCache.js';
 
 export class SettingsModal {
     constructor(themeManager, i18nManager = null, httpVersionManager = null, timeoutManager = null, proxyController = null, certificateController = null) {
@@ -455,6 +456,27 @@ export class SettingsModal {
         }
     }
 
+    /**
+     * @param {HTMLElement} overlay
+     * @param {string} selector
+     * @param {string} key
+     * @param {Function} [read]
+     * @returns {void}
+     */
+    _bindSetting(overlay, selector, key, read = (e) => e.target.checked) {
+        const input = overlay.querySelector(selector);
+        if (!input) {
+            return;
+        }
+        input.addEventListener('change', async (e) => {
+            const value = read(e);
+            if (value === undefined) {
+                return;
+            }
+            await updateSetting(key, value);
+        });
+    }
+
     attachEventListeners(overlay) {
         const closeBtn = overlay.querySelector('.dialog-close-btn');
         const themeSelect = overlay.querySelector('select[name="theme"]');
@@ -524,67 +546,37 @@ export class SettingsModal {
             });
         }
 
-        const verifySslCheckbox = overlay.querySelector('input[name="verifySsl"]');
-        if (verifySslCheckbox) {
-            verifySslCheckbox.addEventListener('change', async (e) => {
-                try {
-                    const settings = await window.backendAPI.settings.get();
-                    settings.verifySsl = e.target.checked;
-                    await window.backendAPI.settings.set(settings);
-                    app.invalidateApiHandlerSettingsCache?.();
-                } catch (err) {
-                    void err;
-                }
-            });
-        }
-
-        const followRedirectsCheckbox = overlay.querySelector('input[name="followRedirects"]');
-        if (followRedirectsCheckbox) {
-            followRedirectsCheckbox.addEventListener('change', async (e) => {
-                try {
-                    const settings = await window.backendAPI.settings.get();
-                    settings.followRedirects = e.target.checked;
-                    await window.backendAPI.settings.set(settings);
-                    app.invalidateApiHandlerSettingsCache?.();
-                } catch (err) {
-                    void err;
-                }
-            });
-        }
-
-        const historyLimitInput = overlay.querySelector('input[name="historyLimit"]');
-        if (historyLimitInput) {
-            historyLimitInput.addEventListener('change', async (e) => {
-                const limit = parseInt(e.target.value, 10);
-                if (!isNaN(limit) && limit >= 10) {
-                    try {
-                        const settings = await window.backendAPI.settings.get();
-                        settings.historyLimit = limit;
-                        await window.backendAPI.settings.set(settings);
-                    } catch (err) {
-                        void err;
-                    }
-                }
-            });
-        }
+        this._bindSetting(overlay, 'input[name="verifySsl"]', 'verifySsl');
+        this._bindSetting(overlay, 'input[name="followRedirects"]', 'followRedirects');
+        this._bindSetting(overlay, 'input[name="historyLimit"]', 'historyLimit', (e) => {
+            const limit = parseInt(e.target.value, 10);
+            return !isNaN(limit) && limit >= 10 ? limit : undefined;
+        });
+        this._bindSetting(overlay, 'input[name="checkUpdatesOnLaunch"]', 'checkUpdatesOnLaunch');
 
         const checkUpdatesOnLaunchCheckbox = overlay.querySelector('input[name="checkUpdatesOnLaunch"]');
-        if (checkUpdatesOnLaunchCheckbox) {
-            checkUpdatesOnLaunchCheckbox.addEventListener('change', async (e) => {
-                try {
-                    const settings = await window.backendAPI.settings.get();
-                    settings.checkUpdatesOnLaunch = e.target.checked;
-                    await window.backendAPI.settings.set(settings);
-                } catch (err) {
-                    void err;
-                }
-            });
-        }
 
         if (this.proxyController) {
             this.attachProxyEventListeners(overlay);
         }
 
+        this._attachUpdateChecker(overlay, checkUpdatesOnLaunchCheckbox);
+
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                this.hide(overlay);
+            }
+        });
+
+        this._releaseEscape = pushEscapeHandler(() => this.hide(overlay));
+    }
+
+    /**
+     * @param {HTMLElement} overlay
+     * @param {HTMLElement|null} checkUpdatesOnLaunchCheckbox
+     * @returns {void}
+     */
+    _attachUpdateChecker(overlay, checkUpdatesOnLaunchCheckbox) {
         const checkUpdatesBtn = overlay.querySelector('#check-for-updates-btn');
         const updateStatus = overlay.querySelector('#update-status');
         if (checkUpdatesBtn && updateStatus) {
@@ -672,16 +664,7 @@ export class SettingsModal {
                 }
             });
         }
-
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                this.hide(overlay);
-            }
-        });
-
-        this._releaseEscape = pushEscapeHandler(() => this.hide(overlay));
     }
-
     attachProxyEventListeners(overlay) {
         const proxyEnabled = overlay.querySelector('input[name="proxyEnabled"]');
         const proxyContent = overlay.querySelector('.proxy-settings-content');

@@ -8,6 +8,7 @@ import { templateLoader } from '../templateLoader.js';
 import { toast } from './Toast.js';
 import { pushEscapeHandler } from './modalEscape.js';
 import { BaseModal } from './BaseModal.js';
+import { updateSetting } from '../state/settingsCache.js';
 
 export class CookieManagerDialog extends BaseModal {
     constructor(cookieJarService, environmentService) {
@@ -464,12 +465,7 @@ export class CookieManagerDialog extends BaseModal {
         const enabledToggle = content.querySelector('#cookie-manager-enabled-toggle');
         if (enabledToggle) {
             enabledToggle.addEventListener('change', async (e) => {
-                try {
-                    const settings = await window.backendAPI.settings.get();
-                    settings.cookieJarEnabled = e.target.checked;
-                    await window.backendAPI.settings.set(settings);
-                    app.invalidateApiHandlerSettingsCache?.();
-                } catch (_e) { }
+                await updateSetting('cookieJarEnabled', e.target.checked);
             });
         }
 

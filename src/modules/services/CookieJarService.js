@@ -3,24 +3,24 @@
  * @module services/CookieJarService
  */
 
+import { ChangeEmitter } from './ChangeEmitter.js';
+
 export class CookieJarService {
     constructor(cookieRepository) {
         this.repository = cookieRepository;
-        this.listeners = new Set();
+        this._events = new ChangeEmitter();
     }
 
     addChangeListener(callback) {
-        this.listeners.add(callback);
+        this._events.add(callback);
     }
 
     removeChangeListener(callback) {
-        this.listeners.delete(callback);
+        this._events.remove(callback);
     }
 
     _notify(event) {
-        for (const cb of this.listeners) {
-            try { cb(event); } catch (_e) { }
-        }
+        this._events.emit(event);
     }
 
     _canonicalizeDomain(domain) {

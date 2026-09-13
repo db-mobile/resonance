@@ -21,3 +21,20 @@ export function escapeHtml(value) {
     }
     return String(value).replace(/[&<>"']/g, (char) => HTML_ESCAPE_MAP[char]);
 }
+
+/**
+ * @param {string} tag
+ * @param {string} [className]
+ * @param {string} [text]
+ * @returns {HTMLElement}
+ */
+export function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) {
+        node.className = className;
+    }
+    if (text !== undefined && text !== null) {
+        node.textContent = text;
+    }
+    return node;
+}

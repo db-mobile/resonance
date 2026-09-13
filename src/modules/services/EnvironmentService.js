@@ -3,6 +3,8 @@
  * @module services/EnvironmentService
  */
 
+import { ChangeEmitter } from './ChangeEmitter.js';
+
 export class EnvironmentService {
     /**
      * @param {EnvironmentRepository} environmentRepository
@@ -11,7 +13,7 @@ export class EnvironmentService {
     constructor(environmentRepository, statusDisplay) {
         this.repository = environmentRepository;
         this.statusDisplay = statusDisplay;
-        this.listeners = new Set();
+        this._events = new ChangeEmitter();
     }
 
     /**
@@ -42,7 +44,7 @@ export class EnvironmentService {
      * @returns {void}
      */
     addChangeListener(callback) {
-        this.listeners.add(callback);
+        this._events.add(callback);
     }
 
     /**
@@ -50,7 +52,7 @@ export class EnvironmentService {
      * @returns {void}
      */
     removeChangeListener(callback) {
-        this.listeners.delete(callback);
+        this._events.remove(callback);
     }
 
     /**
@@ -58,13 +60,7 @@ export class EnvironmentService {
      * @returns {void}
      */
     _notifyListeners(event) {
-        this.listeners.forEach(callback => {
-            try {
-                callback(event);
-            } catch (error) {
-                void error;
-            }
-        });
+        this._events.emit(event);
     }
 
     /** @returns {Promise<Array<Object>>} */

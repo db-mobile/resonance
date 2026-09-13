@@ -8,6 +8,7 @@ import { saveAllRequestModifications } from './collectionManager.js';
 import { debounce } from './utils/debounce.js';
 import { findRequest } from './collections/collectionTree.js';
 import { registerPendingSave } from './state/pendingSaves.js';
+import { resolveRequestSettings } from './state/settingsCache.js';
 
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -84,20 +85,13 @@ export function setGraphQLBodyManager(manager) {
 let _variableService = null;
 let _mockServerService = null;
 let _collectionRepository = null;
-let _settingsCache = null;
 
-export function invalidateSettingsCache() {
-    _settingsCache = null;
-}
+export { invalidateSettingsCache, getSettingsCache } from './state/settingsCache.js';
 
 export function invalidateEnvironmentCache() {
     if (_variableService?.environmentRepository) {
         _variableService.environmentRepository._cache = null;
     }
-}
-
-export function getSettingsCache() {
-    return _settingsCache;
 }
 
 function getVariableService() {
@@ -208,21 +202,7 @@ export async function fetchGraphQLIntrospection() {
         return { error: variableProcessingError(error) };
     }
 
-    let timeout = 30000;
-    let verifySsl = true;
-    let followRedirects = true;
-    try {
-        if (!_settingsCache) {
-            _settingsCache = await window.backendAPI.settings.get();
-        }
-        const settings = _settingsCache;
-        const savedTimeout = settings.requestTimeout ?? settings.timeout;
-        timeout = savedTimeout === 0 ? null : (savedTimeout ?? 30000);
-        verifySsl = settings.verifySsl !== false;
-        followRedirects = settings.followRedirects !== false;
-    } catch (e) {
-        void e;
-    }
+    const { timeout, verifySsl, followRedirects } = await resolveRequestSettings();
 
     const requestConfig = {
         method: 'POST',
@@ -791,6 +771,39 @@ async function runStreamingSend(protocolId, { useAuth, buildPayload, send }) {
     await withRequestInProgress(() => send(prepared, payload));
 }
 
+/**
+ * @param {Object} requestConfig
+ * @param {Object} outcome
+ * @param {Object} scriptResult
+ * @param {Object} historySensitive
+ * @returns {Promise<void>}
+ */
+async function recordRequestOutcome(requestConfig, outcome, scriptResult, historySensitive) {
+    const endpoint = getCurrentEndpoint();
+
+    if (app.historyController) {
+        const activeEnvName = await app.environmentController?.service?.getActiveEnvironment()
+            .then(e => e?.name || null)
+            .catch(() => null) || null;
+        app.historyController
+            .addHistoryEntry(requestConfig, outcome, endpoint, activeEnvName, historySensitive)
+            .catch(() => { });
+    }
+
+    if (endpoint && app.scriptController) {
+        try {
+            await app.scriptController.executeTest(
+                endpoint.collectionId,
+                endpoint.endpointId,
+                requestConfig,
+                scriptResult
+            );
+        } catch (error) {
+            void error;
+        }
+    }
+}
+
 export async function handleSendRequest() {
     if (isGrpcMode()) {
         return handleGrpcSend();
@@ -992,23 +1005,7 @@ export async function handleSendRequest() {
         }
     }
 
-    let httpVersion = 'auto';
-    let timeout = 30000;
-    let verifySsl = true;
-    let followRedirects = true;
-    try {
-        if (!_settingsCache) {
-            _settingsCache = await window.backendAPI.settings.get();
-        }
-        const settings = _settingsCache;
-        httpVersion = settings.httpVersion || 'auto';
-        const savedTimeout = settings.requestTimeout ?? settings.timeout;
-        timeout = savedTimeout === 0 ? null : (savedTimeout ?? 30000);
-        verifySsl = settings.verifySsl !== false;
-        followRedirects = settings.followRedirects !== false;
-    } catch (e) {
-        void e;
-    }
+    const { httpVersion, timeout, verifySsl, followRedirects } = await resolveRequestSettings();
 
     let requestConfig = {
         method,
@@ -1181,22 +1178,12 @@ export async function handleSendRequest() {
                 }
             }
 
-            if (app.historyController) {
-                const _activeEnvName = await app.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
-                app.historyController.addHistoryEntry(requestConfig, result, getCurrentEndpoint(), _activeEnvName, historySensitive).catch(() => { });
-            }
-
-            if (getCurrentEndpoint() && app.scriptController) {
-                try {
-                    await app.scriptController.executeTest(
-                        getCurrentEndpoint().collectionId,
-                        getCurrentEndpoint().endpointId,
-                        requestConfig,
-                        { ...result, cookies: extractCookies(result.headers) }
-                    );
-                } catch (error) {
-                }
-            }
+            await recordRequestOutcome(
+                requestConfig,
+                result,
+                { ...result, cookies: extractCookies(result.headers) },
+                historySensitive
+            );
         } else if (result.cancelled) {
             if (await isTabCurrentlyActive(requestTabId)) {
                 updateStatusDisplay('Request cancelled', null);
@@ -1253,22 +1240,7 @@ export async function handleSendRequest() {
             updateResponseSize(error.size);
         }
 
-        if (app.historyController) {
-            const _activeEnvName = await app.environmentController?.service?.getActiveEnvironment().then(e => e?.name || null).catch(() => null) || null;
-            app.historyController.addHistoryEntry(requestConfig, error, getCurrentEndpoint(), _activeEnvName, historySensitive).catch(() => { });
-        }
-
-        if (getCurrentEndpoint() && app.scriptController) {
-            try {
-                await app.scriptController.executeTest(
-                    getCurrentEndpoint().collectionId,
-                    getCurrentEndpoint().endpointId,
-                    requestConfig,
-                    error
-                );
-            } catch (e) {
-            }
-        }
+        await recordRequestOutcome(requestConfig, error, error, historySensitive);
     } finally {
         setRequestInProgress(false);
     }

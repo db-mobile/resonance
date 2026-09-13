@@ -7,6 +7,7 @@ import { setCurrentEndpoint } from '../state/currentEndpoint.js';
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { toast } from './Toast.js';
+import { el } from '../htmlUtils.js';
 
 export class WorkspaceTabBar {
     constructor(containerId) {
@@ -38,12 +39,10 @@ export class WorkspaceTabBar {
 
         const leftScrollBtn = this._createScrollButton('left');
 
-        const tabBar = document.createElement('div');
-        tabBar.className = 'workspace-tab-bar u-flex u-flex-1';
+        const tabBar = el('div', 'workspace-tab-bar u-flex u-flex-1');
         this.tabBar = tabBar;
 
-        const tabsContainer = document.createElement('div');
-        tabsContainer.className = 'workspace-tabs-container u-flex';
+        const tabsContainer = el('div', 'workspace-tabs-container u-flex');
 
         tabs.forEach(tab => {
             const tabElement = this._createTabElement(tab, tab.id === activeTabId);
@@ -79,31 +78,25 @@ export class WorkspaceTabBar {
     }
 
     _createTabElement(tab, isActive) {
-        const tabEl = document.createElement('div');
-        tabEl.className = `workspace-tab u-flex u-items-center${isActive ? ' active' : ''}${tab.isModified ? ' modified' : ''}`;
+        const tabEl = el('div', `workspace-tab u-flex u-items-center${isActive ? ' active' : ''}${tab.isModified ? ' modified' : ''}`);
         tabEl.dataset.tabId = tab.id;
 
-        const nameEl = document.createElement('span');
-        nameEl.className = 'workspace-tab-name';
-        nameEl.textContent = tab.name;
+        const nameEl = el('span', 'workspace-tab-name', tab.name);
         nameEl.title = tab.name;
 
         if (tab.isModified) {
-            const modifiedIndicator = document.createElement('span');
-            modifiedIndicator.className = 'workspace-tab-modified-indicator';
+            const modifiedIndicator = el('span', 'workspace-tab-modified-indicator');
             modifiedIndicator.setAttribute('aria-label', 'Modified');
             tabEl.appendChild(modifiedIndicator);
         }
 
         tabEl.appendChild(nameEl);
 
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'workspace-tab-close';
+        const closeBtn = el('button', 'workspace-tab-close');
         closeBtn.setAttribute('aria-label', 'Close tab');
         closeBtn.title = 'Close tab';
         {
-            const iconEl = document.createElement('span');
-            iconEl.className = 'icon icon-12 icon-x';
+            const iconEl = el('span', 'icon icon-12 icon-x');
             closeBtn.appendChild(iconEl);
         }
 
@@ -211,18 +204,14 @@ export class WorkspaceTabBar {
     _setDragPreview(event, tab) {
         this._removeDragPreview();
 
-        const preview = document.createElement('div');
-        preview.className = `workspace-tab-drag-preview${tab.isModified ? ' modified' : ''}`;
+        const preview = el('div', `workspace-tab-drag-preview${tab.isModified ? ' modified' : ''}`);
 
         if (tab.isModified) {
-            const indicator = document.createElement('span');
-            indicator.className = 'workspace-tab-modified-indicator';
+            const indicator = el('span', 'workspace-tab-modified-indicator');
             preview.appendChild(indicator);
         }
 
-        const name = document.createElement('span');
-        name.className = 'workspace-tab-drag-preview-name';
-        name.textContent = tab.name;
+        const name = el('span', 'workspace-tab-drag-preview-name', tab.name);
         preview.appendChild(name);
 
         document.body.appendChild(preview);
@@ -239,18 +228,15 @@ export class WorkspaceTabBar {
     }
 
     _createScrollButton(direction) {
-        const btn = document.createElement('button');
-        btn.className = `workspace-tab-scroll-button ${direction}`;
+        const btn = el('button', `workspace-tab-scroll-button ${direction}`);
         btn.setAttribute('aria-label', `Scroll ${direction}`);
 
         if (direction === 'left') {
-            const iconEl = document.createElement('span');
-            iconEl.className = 'icon icon-12 icon-chevron-left';
+            const iconEl = el('span', 'icon icon-12 icon-chevron-left');
             btn.appendChild(iconEl);
             btn.addEventListener('click', () => this._scrollTabs(-200));
         } else {
-            const iconEl = document.createElement('span');
-            iconEl.className = 'icon icon-12 icon-chevron-right';
+            const iconEl = el('span', 'icon icon-12 icon-chevron-right');
             btn.appendChild(iconEl);
             btn.addEventListener('click', () => this._scrollTabs(200));
         }
@@ -292,13 +278,11 @@ export class WorkspaceTabBar {
     }
 
     _createNewTabButton() {
-        const btn = document.createElement('button');
-        btn.className = 'workspace-tab-new u-flex u-items-center u-justify-center';
+        const btn = el('button', 'workspace-tab-new u-flex u-items-center u-justify-center');
         btn.setAttribute('aria-label', 'New tab');
         btn.title = 'New tab';
         {
-            const iconEl = document.createElement('span');
-            iconEl.className = 'icon icon-14 icon-plus';
+            const iconEl = el('span', 'icon icon-14 icon-plus');
             btn.appendChild(iconEl);
         }
 
@@ -317,8 +301,7 @@ export class WorkspaceTabBar {
             return;
         }
 
-        const menu = document.createElement('div');
-        menu.className = 'workspace-tab-new-menu dropdown-panel visible';
+        const menu = el('div', 'workspace-tab-new-menu dropdown-panel visible');
 
         const rect = button.getBoundingClientRect();
         menu.style.position = 'fixed';
@@ -337,12 +320,9 @@ export class WorkspaceTabBar {
         ];
 
         protocols.forEach(({ label, protocol }) => {
-            const item = document.createElement('div');
-            item.className = 'dropdown-item';
+            const item = el('div', 'dropdown-item');
 
-            const labelEl = document.createElement('span');
-            labelEl.className = 'dropdown-item-label';
-            labelEl.textContent = label;
+            const labelEl = el('span', 'dropdown-item-label', label);
             item.appendChild(labelEl);
 
             item.addEventListener('click', () => {
@@ -367,13 +347,11 @@ export class WorkspaceTabBar {
     }
 
     _createTabListButton() {
-        const btn = document.createElement('button');
-        btn.className = 'workspace-tab-list-button u-flex u-items-center u-justify-center';
+        const btn = el('button', 'workspace-tab-list-button u-flex u-items-center u-justify-center');
         btn.setAttribute('aria-label', 'All tabs');
         btn.title = 'All tabs';
         {
-            const iconEl = document.createElement('span');
-            iconEl.className = 'icon icon-14 icon-menu';
+            const iconEl = el('span', 'icon icon-14 icon-menu');
             btn.appendChild(iconEl);
         }
 
@@ -392,26 +370,21 @@ export class WorkspaceTabBar {
             return;
         }
 
-        const dropdown = document.createElement('div');
-        dropdown.className = 'workspace-tab-list-dropdown dropdown-panel visible';
+        const dropdown = el('div', 'workspace-tab-list-dropdown dropdown-panel visible');
 
         const rect = button.getBoundingClientRect();
         dropdown.style.top = `${rect.bottom + 4}px`;
         dropdown.style.right = '8px';
 
         this.tabs.forEach(tab => {
-            const item = document.createElement('div');
-            item.className = `workspace-tab-list-item dropdown-item${tab.id === this.activeTabId ? ' active is-active' : ''}`;
+            const item = el('div', `workspace-tab-list-item dropdown-item${tab.id === this.activeTabId ? ' active is-active' : ''}`);
 
             if (tab.isModified) {
-                const indicator = document.createElement('span');
-                indicator.className = 'workspace-tab-list-item-indicator';
+                const indicator = el('span', 'workspace-tab-list-item-indicator');
                 item.appendChild(indicator);
             }
 
-            const name = document.createElement('span');
-            name.className = 'workspace-tab-list-item-name dropdown-item-label';
-            name.textContent = tab.name;
+            const name = el('span', 'workspace-tab-list-item-name dropdown-item-label', tab.name);
             item.appendChild(name);
 
             item.addEventListener('click', () => {
@@ -481,8 +454,7 @@ export class WorkspaceTabBar {
             existingMenu.remove();
         }
 
-        const menu = document.createElement('div');
-        menu.className = 'workspace-tab-context-menu dropdown-panel';
+        const menu = el('div', 'workspace-tab-context-menu dropdown-panel');
         menu.style.left = `${event.pageX}px`;
         menu.style.top = `${event.pageY}px`;
 
@@ -491,16 +463,16 @@ export class WorkspaceTabBar {
                 './src/templates/workspaceTabs/workspaceTabBar.html',
                 'tpl-workspace-tab-context-menu-item'
             );
-            const el = fragment.firstElementChild;
+            const root = fragment.firstElementChild;
 
-            const iconEl = el.querySelector('[data-role="icon"]');
-            const labelEl = el.querySelector('[data-role="label"]');
+            const iconEl = root.querySelector('[data-role="icon"]');
+            const labelEl = root.querySelector('[data-role="label"]');
 
             if (iconEl) {iconEl.classList.add(iconClass);}
             if (labelEl) {labelEl.textContent = label;}
-            if (disabled) {el.classList.add('disabled');}
+            if (disabled) {root.classList.add('disabled');}
 
-            return el;
+            return root;
         };
 
         const createDividerEl = () => {
@@ -666,8 +638,7 @@ export class WorkspaceTabBar {
             if (updates.isModified) {
                 tabEl.classList.add('modified');
                 if (!tabEl.querySelector('.workspace-tab-modified-indicator')) {
-                    const indicator = document.createElement('span');
-                    indicator.className = 'workspace-tab-modified-indicator';
+                    const indicator = el('span', 'workspace-tab-modified-indicator');
                     indicator.setAttribute('aria-label', 'Modified');
                     tabEl.insertBefore(indicator, tabEl.firstChild);
                 }

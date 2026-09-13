@@ -3,133 +3,56 @@
  * @module schemaEditor
  */
 
-import { EditorView, lineNumbers, placeholder, keymap } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
+import { placeholder } from '@codemirror/view';
 import { json } from '@codemirror/lang-json';
-import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
-import { createThemedHighlighting } from './editorTheme.js';
+import { BaseCodeEditor } from './editors/BaseCodeEditor.js';
 import { debounce } from './utils/debounce.js';
 
-export class SchemaEditor {
+export class SchemaEditor extends BaseCodeEditor {
+    /**
+     * @param {HTMLElement} containerElement
+     * @param {{onChange?: Function}} [options]
+     */
     constructor(containerElement, options = {}) {
-        this.container = containerElement;
-        this.view = null;
+        super(containerElement, options);
         this.changeCallback = options.onChange || null;
         this._debouncedChange = debounce(() => {
             if (this.changeCallback) {
                 this.changeCallback(this.getContent());
             }
         }, 500);
-        this._suppressChange = false;
-        this._themed = null;
-        this.init();
     }
 
     /** @returns {Array} */
-    getThemeExtensions() {
-        const baseTheme = EditorView.theme({
-            '&': {
-                height: '100%',
-                fontSize: '13px',
-                backgroundColor: 'var(--bg-primary)'
-            },
-            '.cm-scroller': {
-                fontFamily: '"Fira Code", "Courier New", monospace',
-                overflow: 'auto'
-            },
-            '.cm-gutters': {
-                backgroundColor: 'var(--bg-secondary)',
-                color: 'var(--text-secondary)',
-                border: 'none',
-                paddingRight: '8px'
-            },
-            '.cm-content': {
-                color: 'var(--text-primary)',
-                caretColor: 'var(--text-primary)',
-                padding: '4px 0'
-            },
-            '.cm-line': {
-                padding: '0 8px'
-            },
-            '.cm-placeholder': {
-                color: 'var(--text-tertiary)',
-                fontStyle: 'italic'
-            },
-            '.cm-activeLine': {
-                backgroundColor: 'var(--bg-secondary)'
-            },
-            '.cm-activeLineGutter': {
-                backgroundColor: 'var(--bg-secondary)'
-            }
-        });
-
-        return [this._themed.extension, baseTheme];
-    }
-
-    init() {
-        this._themed = createThemedHighlighting();
-        const extensions = [
-            lineNumbers(),
-            history(),
-            keymap.of([...defaultKeymap, ...historyKeymap]),
-            EditorView.lineWrapping,
+    getExtensions() {
+        return [
             json(),
-            placeholder('{\n  "type": "object",\n  "properties": {}\n}'),
-            EditorView.updateListener.of((update) => {
-                if (update.docChanged && !this._suppressChange) {
-                    this._handleChange();
-                }
-            }),
-            ...this.getThemeExtensions()
+            placeholder('{\n  "type": "object",\n  "properties": {}\n}')
         ];
-
-        const state = EditorState.create({
-            doc: '',
-            extensions
-        });
-
-        this.view = new EditorView({
-            state,
-            parent: this.container
-        });
-        this._themed.attach(this.view);
     }
 
-    _handleChange() {
-        this._debouncedChange();
-    }
-
-    /** @param {Function} callback */
-    onChange(callback) {
-        this.changeCallback = callback;
+    /** @returns {void} */
+    handleDocChanged() {
+        if (this._suppressChange) {
+            return;
+        }
+        this._debouncedChange?.();
     }
 
     /**
      * @param {string} content
      * @param {{emitChange?: boolean}} [options]
      */
-    setContent(content, { emitChange = true } = {}) {
+    setContent(content, options) {
         if (!this.view) {
             return;
         }
 
-        const currentContent = this.getContent();
-        if (currentContent === content) {
+        if (this.getContent() === content) {
             return;
         }
 
-        this._suppressChange = !emitChange;
-        try {
-            this.view.dispatch({
-                changes: {
-                    from: 0,
-                    to: this.view.state.doc.length,
-                    insert: content || ''
-                }
-            });
-        } finally {
-            this._suppressChange = false;
-        }
+        super.setContent(content, options);
     }
 
     /**
@@ -177,28 +100,12 @@ export class SchemaEditor {
         }
     }
 
-    /** @returns {string} */
-    getContent() {
-        return this.view ? this.view.state.doc.toString() : '';
-    }
-
     clear() {
         this.setContent('');
     }
 
-    focus() {
-        if (this.view) {
-            this.view.focus();
-        }
-    }
-
     destroy() {
-        this._debouncedChange.cancel();
-        this._themed?.dispose();
-        this._themed = null;
-        if (this.view) {
-            this.view.destroy();
-            this.view = null;
-        }
+        this._debouncedChange?.cancel();
+        super.destroy();
     }
 }

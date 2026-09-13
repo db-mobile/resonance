@@ -3,11 +3,13 @@
  * @module services/CertificateService
  */
 
+import { ChangeEmitter } from './ChangeEmitter.js';
+
 export class CertificateService {
     /** @param {CertificateRepository} certificateRepository */
     constructor(certificateRepository) {
         this.repository = certificateRepository;
-        this.listeners = new Set();
+        this._events = new ChangeEmitter();
         /** @type {Array<Object>|null} */
         this._cache = null;
     }
@@ -17,7 +19,7 @@ export class CertificateService {
      * @returns {void}
      */
     addChangeListener(callback) {
-        this.listeners.add(callback);
+        this._events.add(callback);
     }
 
     /**
@@ -25,7 +27,7 @@ export class CertificateService {
      * @returns {void}
      */
     removeChangeListener(callback) {
-        this.listeners.delete(callback);
+        this._events.remove(callback);
     }
 
     /**
@@ -33,13 +35,7 @@ export class CertificateService {
      * @returns {void}
      */
     _notifyListeners(event) {
-        this.listeners.forEach(callback => {
-            try {
-                callback(event);
-            } catch (error) {
-                void error;
-            }
-        });
+        this._events.emit(event);
     }
 
     /** @returns {Promise<Array<Object>>} */

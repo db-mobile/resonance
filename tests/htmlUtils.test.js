@@ -1,4 +1,4 @@
-import { escapeHtml } from '../src/modules/htmlUtils.js';
+import { escapeHtml, el } from '../src/modules/htmlUtils.js';
 
 describe('escapeHtml', () => {
     test('should escape HTML special characters', () => {
@@ -17,5 +17,36 @@ describe('escapeHtml', () => {
         expect(escapeHtml(0)).toBe('0');
         expect(escapeHtml(42)).toBe('42');
         expect(escapeHtml(false)).toBe('false');
+    });
+});
+
+describe('el', () => {
+    test('creates a bare element when only a tag is given', () => {
+        const node = el('div');
+        expect(node.tagName).toBe('DIV');
+        expect(node.className).toBe('');
+        expect(node.textContent).toBe('');
+    });
+
+    test('applies a class name', () => {
+        expect(el('span', 'a b').className).toBe('a b');
+    });
+
+    test('applies text content', () => {
+        expect(el('span', 'x', 'hello').textContent).toBe('hello');
+    });
+
+    test('sets an empty string as text, but skips null and undefined', () => {
+        expect(el('span', 'x', '').textContent).toBe('');
+        expect(el('span', 'x', null).textContent).toBe('');
+        expect(el('span', 'x', undefined).textContent).toBe('');
+    });
+
+    test('sets numeric text content', () => {
+        expect(el('span', null, 0).textContent).toBe('0');
+    });
+
+    test('skips a falsy class name', () => {
+        expect(el('span', '', 'hi').className).toBe('');
     });
 });

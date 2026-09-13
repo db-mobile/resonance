@@ -8,6 +8,7 @@ import { templateLoader } from '../templateLoader.js';
 import { SchemaProcessor } from '../schema/SchemaProcessor.js';
 import { pushEscapeHandler } from './modalEscape.js';
 import { flattenRequests } from '../collections/collectionTree.js';
+import { el } from '../htmlUtils.js';
 
 export class MockServerDialog {
     /** @param {MockServerController} controller */
@@ -32,8 +33,7 @@ export class MockServerDialog {
         this.dialog = document.createElement('div');
         this.dialog.className = 'mock-server-overlay modal-overlay';
 
-        const dialogContent = document.createElement('div');
-        dialogContent.className = 'mock-server-dialog modal-dialog modal-dialog--mock-server';
+        const dialogContent = el('div', 'mock-server-dialog modal-dialog modal-dialog--mock-server');
 
         const t = (key, fallback) => app.i18n ? app.i18n.t(key) || fallback : fallback;
 
@@ -186,15 +186,12 @@ export class MockServerDialog {
                 continue;
             }
 
-            const collectionDiv = document.createElement('div');
-            collectionDiv.className = 'mock-server-collection';
+            const collectionDiv = el('div', 'mock-server-collection');
 
-            const headerDiv = document.createElement('div');
-            headerDiv.className = 'mock-server-collection-header u-flex u-items-center u-gap-2';
+            const headerDiv = el('div', 'mock-server-collection-header u-flex u-items-center u-gap-2');
             headerDiv.classList.toggle('has-endpoints', Boolean(isEnabled && httpEndpoints.length > 0));
 
-            const toggleLabel = document.createElement('label');
-            toggleLabel.className = 'toggle-switch';
+            const toggleLabel = el('label', 'toggle-switch');
 
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
@@ -205,12 +202,9 @@ export class MockServerDialog {
                 e.stopPropagation();
             });
 
-            const toggleTrack = document.createElement('span');
-            toggleTrack.className = 'toggle-track';
+            const toggleTrack = el('span', 'toggle-track');
 
-            const labelText = document.createElement('span');
-            labelText.className = 'mock-server-collection-label';
-            labelText.textContent = `${collection.name} (${httpEndpoints.length} ${t('mock_server.endpoints', 'endpoints')})`;
+            const labelText = el('span', 'mock-server-collection-label', `${collection.name} (${httpEndpoints.length} ${t('mock_server.endpoints', 'endpoints')})`);
 
             toggleLabel.appendChild(checkbox);
             toggleLabel.appendChild(toggleTrack);
@@ -219,29 +213,22 @@ export class MockServerDialog {
             collectionDiv.appendChild(headerDiv);
 
             if (isEnabled && httpEndpoints.length > 0) {
-                const endpointsDiv = document.createElement('div');
-                endpointsDiv.className = 'mock-server-endpoints';
+                const endpointsDiv = el('div', 'mock-server-endpoints');
 
                 const endpointsToShow = collection._showAllEndpoints ? httpEndpoints : httpEndpoints.slice(0, 10);
 
                 for (const endpoint of endpointsToShow) {
-                    const endpointDiv = document.createElement('div');
-                    endpointDiv.className = 'mock-server-endpoint u-flex u-items-center u-gap-3';
+                    const endpointDiv = el('div', 'mock-server-endpoint u-flex u-items-center u-gap-3');
 
-                    const methodSpan = document.createElement('span');
-                    methodSpan.className = 'method-pill';
+                    const methodSpan = el('span', 'method-pill');
                     methodSpan.dataset.method = endpoint.method.toUpperCase();
                     methodSpan.textContent = endpoint.method.toUpperCase();
 
-                    const pathSpan = document.createElement('span');
-                    pathSpan.className = 'mock-server-endpoint-path';
-                    pathSpan.textContent = endpoint.path;
+                    const pathSpan = el('span', 'mock-server-endpoint-path', endpoint.path);
 
-                    const editResponseBtn = document.createElement('button');
-                    editResponseBtn.className = 'mock-server-edit-response-btn u-flex u-items-center u-gap-1';
+                    const editResponseBtn = el('button', 'mock-server-edit-response-btn u-flex u-items-center u-gap-1');
                     {
-                        const iconEl = document.createElement('span');
-                        iconEl.className = 'icon icon-12 icon-pencil';
+                        const iconEl = el('span', 'icon icon-12 icon-pencil');
                         const labelEl = document.createElement('span');
                         labelEl.textContent = t('mock_server.edit_response', 'Edit');
                         editResponseBtn.appendChild(iconEl);
@@ -260,16 +247,14 @@ export class MockServerDialog {
                 }
 
                 if (httpEndpoints.length > 10 && !collection._showAllEndpoints) {
-                    const moreDiv = document.createElement('div');
-                    moreDiv.className = 'mock-server-endpoints-toggle u-flex u-items-center u-gap-1';
+                    const moreDiv = el('div', 'mock-server-endpoints-toggle u-flex u-items-center u-gap-1');
                     const showAllText = app.i18n ?
                         app.i18n.t('mock_server.show_all_endpoints', { count: httpEndpoints.length }) || `Show all ${httpEndpoints.length} endpoints` :
                         `Show all ${httpEndpoints.length} endpoints`;
                     {
                         const labelEl = document.createElement('span');
                         labelEl.textContent = showAllText;
-                        const iconEl = document.createElement('span');
-                        iconEl.className = 'icon icon-12 icon-chevron-down';
+                        const iconEl = el('span', 'icon icon-12 icon-chevron-down');
                         moreDiv.appendChild(labelEl);
                         moreDiv.appendChild(iconEl);
                     }
@@ -279,13 +264,11 @@ export class MockServerDialog {
                     });
                     endpointsDiv.appendChild(moreDiv);
                 } else if (endpoints.length > 10 && collection._showAllEndpoints) {
-                    const lessDiv = document.createElement('div');
-                    lessDiv.className = 'mock-server-endpoints-toggle u-flex u-items-center u-gap-1';
+                    const lessDiv = el('div', 'mock-server-endpoints-toggle u-flex u-items-center u-gap-1');
                     {
                         const labelEl = document.createElement('span');
                         labelEl.textContent = t('mock_server.show_less', 'Show less');
-                        const iconEl = document.createElement('span');
-                        iconEl.className = 'icon icon-12 icon-chevron-up';
+                        const iconEl = el('span', 'icon icon-12 icon-chevron-up');
                         lessDiv.appendChild(labelEl);
                         lessDiv.appendChild(iconEl);
                     }
@@ -511,11 +494,9 @@ export class MockServerDialog {
     /** @param {string} message */
     showAlert(message) {
         const t = (key, fallback) => app.i18n ? app.i18n.t(key) || fallback : fallback;
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
+        const overlay = el('div', 'modal-overlay');
 
-        const dialog = document.createElement('div');
-        dialog.className = 'modal-dialog modal-dialog--sm';
+        const dialog = el('div', 'modal-dialog modal-dialog--sm');
 
         const fragment = templateLoader.cloneSync(
             './src/templates/mockServer/mockServerDialog.html',
@@ -569,11 +550,9 @@ export class MockServerDialog {
             this.generateDefaultResponse(endpoint);
         const currentResponse = customResponse || defaultResponse;
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
+        const overlay = el('div', 'modal-overlay');
 
-        const dialog = document.createElement('div');
-        dialog.className = 'modal-dialog modal-dialog--mock-server-response-editor';
+        const dialog = el('div', 'modal-dialog modal-dialog--mock-server-response-editor');
 
         const fragment = templateLoader.cloneSync(
             './src/templates/mockServer/mockServerDialog.html',

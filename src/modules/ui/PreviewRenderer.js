@@ -1,4 +1,5 @@
 import { templateLoader } from '../templateLoader.js';
+import { el } from '../htmlUtils.js';
 
 const MAX_PREVIEW_CHARS = 512 * 1024;
 const MAX_CHILD_ENTRIES = 200;
@@ -57,13 +58,10 @@ export class PreviewRenderer {
      * @returns {HTMLElement}
      */
     _buildJSONTree(data, level = 0) {
-        const node = document.createElement('div');
-        node.className = 'json-tree-node';
+        const node = el('div', 'json-tree-node');
 
         if (data === null) {
-            const valueSpan = document.createElement('span');
-            valueSpan.className = 'json-tree-null';
-            valueSpan.textContent = 'null';
+            const valueSpan = el('span', 'json-tree-null', 'null');
             node.appendChild(valueSpan);
         } else if (Array.isArray(data)) {
             if (this._shouldRenderInline(data)) {
@@ -78,9 +76,7 @@ export class PreviewRenderer {
                 this._buildObjectNode(node, data, level);
             }
         } else {
-            const valueSpan = document.createElement('span');
-            valueSpan.className = `json-tree-${typeof data}`;
-            valueSpan.textContent = JSON.stringify(data);
+            const valueSpan = el('span', `json-tree-${typeof data}`, JSON.stringify(data));
             node.appendChild(valueSpan);
         }
 
@@ -123,9 +119,7 @@ export class PreviewRenderer {
         node.appendChild(document.createTextNode('{ '));
 
         entries.forEach(([key, value], index) => {
-            const keySpan = document.createElement('span');
-            keySpan.className = 'json-tree-key';
-            keySpan.textContent = `"${key}"`;
+            const keySpan = el('span', 'json-tree-key', `"${key}"`);
             node.appendChild(keySpan);
 
             node.appendChild(document.createTextNode(': '));
@@ -186,26 +180,20 @@ export class PreviewRenderer {
             return;
         }
 
-        const toggle = document.createElement('span');
-        toggle.className = 'json-tree-toggle';
-        toggle.textContent = level < 2 ? '▼' : '▶';
+        const toggle = el('span', 'json-tree-toggle', level < 2 ? '▼' : '▶');
         node.appendChild(toggle);
 
         const openBrace = document.createElement('span');
         openBrace.textContent = '{';
         node.appendChild(openBrace);
 
-        const children = document.createElement('div');
-        children.className = 'json-tree-children';
+        const children = el('div', 'json-tree-children');
         children.style.display = level < 2 ? 'block' : 'none';
 
         entries.forEach(([key, value], index) => {
-            const childLine = document.createElement('div');
-            childLine.className = 'json-tree-line';
+            const childLine = el('div', 'json-tree-line');
 
-            const keySpan = document.createElement('span');
-            keySpan.className = 'json-tree-key';
-            keySpan.textContent = `"${key}"`;
+            const keySpan = el('span', 'json-tree-key', `"${key}"`);
             childLine.appendChild(keySpan);
 
             childLine.appendChild(document.createTextNode(': '));
@@ -244,23 +232,19 @@ export class PreviewRenderer {
             return;
         }
 
-        const toggle = document.createElement('span');
-        toggle.className = 'json-tree-toggle';
-        toggle.textContent = level < 2 ? '▼' : '▶';
+        const toggle = el('span', 'json-tree-toggle', level < 2 ? '▼' : '▶');
         node.appendChild(toggle);
 
         const openBracket = document.createElement('span');
         openBracket.textContent = '[';
         node.appendChild(openBracket);
 
-        const children = document.createElement('div');
-        children.className = 'json-tree-children';
+        const children = el('div', 'json-tree-children');
         children.style.display = level < 2 ? 'block' : 'none';
 
         const visible = arr.slice(0, MAX_CHILD_ENTRIES);
         visible.forEach((value, index) => {
-            const childLine = document.createElement('div');
-            childLine.className = 'json-tree-line';
+            const childLine = el('div', 'json-tree-line');
 
             const valueNode = this._buildJSONTree(value, level + 1);
             childLine.appendChild(valueNode);
@@ -291,8 +275,7 @@ export class PreviewRenderer {
     }
 
     _renderHTML(content) {
-        const iframe = document.createElement('iframe');
-        iframe.className = 'response-preview-iframe';
+        const iframe = el('iframe', 'response-preview-iframe');
         iframe.setAttribute('sandbox', 'allow-same-origin');
 
         const cspMeta = '<meta http-equiv="Content-Security-Policy" content="img-src \'none\'; script-src \'none\';">';
@@ -353,51 +336,47 @@ export class PreviewRenderer {
     }
 
     /**
+     * @param {HTMLElement} treeNode
+     * @param {Element} node
+     * @returns {void}
+     */
+    _appendOpenTag(treeNode, node) {
+        const tag = el('span', 'xml-tree-tag', `<${node.tagName}`);
+        treeNode.appendChild(tag);
+
+        for (const attr of node.attributes) {
+            const attrSpan = el('span', 'xml-tree-attribute', ` ${attr.name}`);
+            treeNode.appendChild(attrSpan);
+
+            treeNode.appendChild(document.createTextNode('='));
+
+            const attrValue = el('span', 'xml-tree-string', `"${attr.value}"`);
+            treeNode.appendChild(attrValue);
+        }
+    }
+
+    /**
      * @param {Element} node
      * @param {number} level
      * @returns {HTMLElement}
      */
     _buildXMLTree(node, level = 0) {
-        const treeNode = document.createElement('div');
-        treeNode.className = 'xml-tree-node';
+        const treeNode = el('div', 'xml-tree-node');
 
         const hasChildren = node.children.length > 0;
         const hasText = node.childNodes.length > 0 &&
                        Array.from(node.childNodes).some(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
 
         if (hasChildren) {
-            const toggle = document.createElement('span');
-            toggle.className = 'xml-tree-toggle';
-            toggle.textContent = level < 2 ? '▼' : '▶';
+            const toggle = el('span', 'xml-tree-toggle', level < 2 ? '▼' : '▶');
             treeNode.appendChild(toggle);
 
-            const openTag = document.createElement('span');
-            openTag.className = 'xml-tree-tag';
-            openTag.textContent = `<${node.tagName}`;
-            treeNode.appendChild(openTag);
-
-            if (node.attributes.length > 0) {
-                for (const attr of node.attributes) {
-                    const attrSpan = document.createElement('span');
-                    attrSpan.className = 'xml-tree-attribute';
-                    attrSpan.textContent = ` ${attr.name}`;
-                    treeNode.appendChild(attrSpan);
-
-                    const equalSign = document.createTextNode('=');
-                    treeNode.appendChild(equalSign);
-
-                    const attrValue = document.createElement('span');
-                    attrValue.className = 'xml-tree-string';
-                    attrValue.textContent = `"${attr.value}"`;
-                    treeNode.appendChild(attrValue);
-                }
-            }
+            this._appendOpenTag(treeNode, node);
 
             const closingBracket = document.createTextNode('>');
             treeNode.appendChild(closingBracket);
 
-            const children = document.createElement('div');
-            children.className = 'xml-tree-children';
+            const children = el('div', 'xml-tree-children');
             children.style.display = level < 2 ? 'block' : 'none';
 
             const childElements = Array.from(node.children).slice(0, MAX_CHILD_ENTRIES);
@@ -411,9 +390,7 @@ export class PreviewRenderer {
 
             treeNode.appendChild(children);
 
-            const closeTag = document.createElement('span');
-            closeTag.className = 'xml-tree-tag';
-            closeTag.textContent = `</${node.tagName}>`;
+            const closeTag = el('span', 'xml-tree-tag', `</${node.tagName}>`);
             treeNode.appendChild(closeTag);
 
             toggle.addEventListener('click', (e) => {
@@ -423,59 +400,17 @@ export class PreviewRenderer {
                 toggle.textContent = isExpanded ? '▶' : '▼';
             });
         } else if (hasText) {
-            const tag = document.createElement('span');
-            tag.className = 'xml-tree-tag';
-            tag.textContent = `<${node.tagName}`;
-            treeNode.appendChild(tag);
-
-            if (node.attributes.length > 0) {
-                for (const attr of node.attributes) {
-                    const attrSpan = document.createElement('span');
-                    attrSpan.className = 'xml-tree-attribute';
-                    attrSpan.textContent = ` ${attr.name}`;
-                    treeNode.appendChild(attrSpan);
-
-                    treeNode.appendChild(document.createTextNode('='));
-
-                    const attrValue = document.createElement('span');
-                    attrValue.className = 'xml-tree-string';
-                    attrValue.textContent = `"${attr.value}"`;
-                    treeNode.appendChild(attrValue);
-                }
-            }
+            this._appendOpenTag(treeNode, node);
 
             treeNode.appendChild(document.createTextNode('>'));
 
-            const textContent = document.createElement('span');
-            textContent.className = 'xml-tree-text';
-            textContent.textContent = node.textContent;
+            const textContent = el('span', 'xml-tree-text', node.textContent);
             treeNode.appendChild(textContent);
 
-            const closeTag = document.createElement('span');
-            closeTag.className = 'xml-tree-tag';
-            closeTag.textContent = `</${node.tagName}>`;
+            const closeTag = el('span', 'xml-tree-tag', `</${node.tagName}>`);
             treeNode.appendChild(closeTag);
         } else {
-            const tag = document.createElement('span');
-            tag.className = 'xml-tree-tag';
-            tag.textContent = `<${node.tagName}`;
-            treeNode.appendChild(tag);
-
-            if (node.attributes.length > 0) {
-                for (const attr of node.attributes) {
-                    const attrSpan = document.createElement('span');
-                    attrSpan.className = 'xml-tree-attribute';
-                    attrSpan.textContent = ` ${attr.name}`;
-                    treeNode.appendChild(attrSpan);
-
-                    treeNode.appendChild(document.createTextNode('='));
-
-                    const attrValue = document.createElement('span');
-                    attrValue.className = 'xml-tree-string';
-                    attrValue.textContent = `"${attr.value}"`;
-                    treeNode.appendChild(attrValue);
-                }
-            }
+            this._appendOpenTag(treeNode, node);
 
             treeNode.appendChild(document.createTextNode(' />'));
         }
@@ -497,13 +432,13 @@ export class PreviewRenderer {
             './src/templates/preview/previewRenderer.html',
             'tpl-preview-error'
         );
-        const el = fragment.firstElementChild;
-        const messageEl = el.querySelector('[data-role="message"]');
+        const root = fragment.firstElementChild;
+        const messageEl = root.querySelector('[data-role="message"]');
         if (messageEl) {
             messageEl.textContent = message;
         }
         this.container.innerHTML = '';
-        this.container.appendChild(el);
+        this.container.appendChild(root);
     }
 
     /** @returns {void} */
@@ -517,9 +452,7 @@ export class PreviewRenderer {
      * @returns {void}
      */
     _appendTruncationNotice(children, hiddenCount) {
-        const line = document.createElement('div');
-        line.className = 'json-tree-line json-tree-truncated';
-        line.textContent = `… ${hiddenCount} more entries not shown`;
+        const line = el('div', 'json-tree-line json-tree-truncated', `… ${hiddenCount} more entries not shown`);
         children.appendChild(line);
     }
 
