@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "3.1.13"
+version = "3.2.0"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -130,3 +130,23 @@ codegen-units = 1  # Maximize cross-module optimization (slower compile)
 strip = true       # Strip symbols from the binary
 # panic = "abort" intentionally omitted: the Boa script sandbox relies on
 # unwinding worker-thread panics, which abort would escalate to a full crash.
+
+# Tauri 2.12.0 is not released yet (the covector release PR, tauri-apps/tauri#15634,
+# is still open), so the crates are taken from the 2.x line's `dev` branch at a pinned
+# rev. The reason is tao: 2.11.x pins `tao ^0.35`, while 2.12.0 moves to tao 0.37 +
+# wry 0.56, which carries the Wayland client-side-decoration fixes (tao#1218 —
+# tauri#6562, #13440, #13749, #14251, #14748: title bar buttons, title changes, and
+# no CSD when the compositor offers server-side decorations) plus the Linux
+# thread-safety fixes for set_min_inner_size/set_fullscreen/set_theme (tao#1173).
+# All eight repo crates are patched together so the plugins (which pull tauri-plugin
+# and tauri-utils) resolve against the same tree instead of duplicating them.
+# Drop this whole block once tauri 2.12.0 is on crates.io.
+[patch.crates-io]
+tauri = { git = "https://github.com/tauri-apps/tauri", rev = "d0f38df06a2f4406b388a336694aa18b3c6bf1a9" }
+tauri-build = { git = "https://github.com/tauri-apps/tauri", rev = "d0f38df06a2f4406b388a336694aa18b3c6bf1a9" }
+tauri-codegen = { git = "https://github.com/tauri-apps/tauri", rev = "d0f38df06a2f4406b388a336694aa18b3c6bf1a9" }
+tauri-macros = { git = "https://github.com/tauri-apps/tauri", rev = "d0f38df06a2f4406b388a336694aa18b3c6bf1a9" }
+tauri-plugin = { git = "https://github.com/tauri-apps/tauri", rev = "d0f38df06a2f4406b388a336694aa18b3c6bf1a9" }
+tauri-runtime = { git = "https://github.com/tauri-apps/tauri", rev = "d0f38df06a2f4406b388a336694aa18b3c6bf1a9" }
+tauri-runtime-wry = { git = "https://github.com/tauri-apps/tauri", rev = "d0f38df06a2f4406b388a336694aa18b3c6bf1a9" }
+tauri-utils = { git = "https://github.com/tauri-apps/tauri", rev = "d0f38df06a2f4406b388a336694aa18b3c6bf1a9" }
