@@ -13,7 +13,7 @@ use tauri_plugin_store::StoreExt;
 use super::http_client::{build_http_client, HttpClientOptions};
 use super::proxy::{ProxySettings, ProxyState};
 
-const STORE_FILE: &str = "resonance-store.json";
+use super::store_files::MAIN_STORE as STORE_FILE;
 const SCRIPTS_KEY: &str = "persistedScripts";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

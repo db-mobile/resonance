@@ -18,6 +18,7 @@ pub mod scripts;
 pub mod secrets;
 pub mod sse;
 pub mod store;
+pub mod store_files;
 pub mod timing;
 pub mod tls;
 pub mod updater;

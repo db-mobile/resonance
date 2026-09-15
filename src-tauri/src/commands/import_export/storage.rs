@@ -10,7 +10,7 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_store::StoreExt;
 use tokio::sync::oneshot;
 
-const STORE_FILE: &str = "resonance-store.json";
+use super::super::store_files::MAIN_STORE as STORE_FILE;
 const LAST_IMPORT_DIR_KEY: &str = "lastImportDirectory";
 
 /// Postman OAuth2 parameter names paired with the app's config keys, as

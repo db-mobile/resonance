@@ -39,8 +39,21 @@ export class CollectionEndpointLoaderService {
         }
     }
 
+    /**
+     * @param {Object} collection
+     * @returns {Promise<Object|null>}
+     */
+    async resolveOpenApiSpec(collection) {
+        if (collection._openApiSpec) {
+            return collection._openApiSpec;
+        }
+
+        const full = await this.repository.getById(collection.id);
+        return full?._openApiSpec || null;
+    }
+
     async loadEndpointIntoWorkspaceTab(collection, endpoint) {
-        this.schemaProcessor.setOpenApiSpec(collection._openApiSpec);
+        this.schemaProcessor.setOpenApiSpec(await this.resolveOpenApiSpec(collection));
 
         let requestBodyString = '';
         if (endpoint.requestBody) {

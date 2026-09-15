@@ -3,9 +3,14 @@
  * @module services/HistoryService
  */
 
-import { HistoryRepository } from '../storage/HistoryRepository.js';
+import {
+    HistoryRepository,
+    MAX_HISTORY_REQUEST_SIZE,
+    MAX_HISTORY_RESPONSE_SIZE
+} from '../storage/HistoryRepository.js';
 import { statusCategory } from '../utils/statusCategory.js';
 import { grpcStatusName, isGrpcStatusOk } from '../utils/grpcStatus.js';
+import { truncateBody } from '../utils/truncateBody.js';
 
 /** @type {string} */
 export const REDACTED_PLACEHOLDER = '[redacted]';
@@ -15,6 +20,16 @@ export const SENSITIVE_REQUEST_HEADERS = Object.freeze(['authorization', 'proxy-
 
 /** @type {ReadonlyArray<string>} */
 export const SENSITIVE_RESPONSE_HEADERS = Object.freeze(['set-cookie']);
+
+/**
+ * @param {{truncated: boolean, originalSize: number}} capped
+ * @returns {Object}
+ */
+function truncationFields(capped) {
+    return capped.truncated
+        ? { truncated: true, originalSize: capped.originalSize }
+        : {};
+}
 
 export class HistoryService {
     /** @param {Object} backendAPI */
@@ -55,6 +70,8 @@ export class HistoryService {
         const headerNames = sensitive.headerNames || [];
         const queryNames = sensitive.queryNames || [];
         const responseHeaders = this._redactHeaders(result.headers, SENSITIVE_RESPONSE_HEADERS);
+        const cappedRequestBody = truncateBody(requestConfig.body || null, MAX_HISTORY_REQUEST_SIZE);
+        const cappedResponseData = truncateBody(result.data || null, MAX_HISTORY_RESPONSE_SIZE);
 
         const historyEntry = {
             id: this.generateId(),
@@ -66,7 +83,8 @@ export class HistoryService {
                 url: this._redactUrlQuery(requestConfig.url, queryNames),
                 rawUrl: this._redactUrlQuery(requestConfig.rawUrl || requestConfig.url, queryNames),
                 headers: this._redactHeaders(requestConfig.headers, SENSITIVE_REQUEST_HEADERS, headerNames),
-                body: requestConfig.body || null,
+                body: cappedRequestBody.value,
+                ...truncationFields(cappedRequestBody),
                 collectionId: currentEndpoint?.collectionId || null,
                 endpointId: currentEndpoint?.endpointId || null,
                 grpc: requestConfig.grpc || null
@@ -74,7 +92,8 @@ export class HistoryService {
             response: result.success || result.status ? {
                 status: result.status ?? null,
                 statusText: result.statusText || '',
-                data: result.data || null,
+                data: cappedResponseData.value,
+                ...truncationFields(cappedResponseData),
                 headers: responseHeaders,
                 trailers: result.trailers || null,
                 ttfb: result.ttfb || null,
@@ -84,7 +103,8 @@ export class HistoryService {
                 status: result.status || null,
                 statusText: result.statusText || '',
                 message: result.message || 'Unknown error',
-                data: result.data || null,
+                data: cappedResponseData.value,
+                ...truncationFields(cappedResponseData),
                 headers: responseHeaders,
                 ttfb: result.ttfb || null,
                 size: result.size || null

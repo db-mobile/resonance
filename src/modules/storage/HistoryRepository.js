@@ -3,6 +3,79 @@
  * @module storage/HistoryRepository
  */
 
+import { truncateBody } from '../utils/truncateBody.js';
+
+/** @type {number} */
+export const MAX_HISTORY_RESPONSE_SIZE = 64 * 1024;
+
+/** @type {number} */
+export const MAX_HISTORY_REQUEST_SIZE = 256 * 1024;
+
+/** @type {number} */
+export const MAX_HISTORY_TOTAL_BYTES = 5 * 1024 * 1024;
+
+/**
+ * @param {Object} entry
+ * @returns {Object}
+ */
+export function capHistoryEntry(entry) {
+    if (!entry || typeof entry !== 'object') {
+        return entry;
+    }
+
+    const { request, response } = entry;
+    const cappedRequest = request
+        ? truncateBody(request.body ?? null, MAX_HISTORY_REQUEST_SIZE)
+        : null;
+    const cappedResponse = response
+        ? truncateBody(response.data ?? null, MAX_HISTORY_RESPONSE_SIZE)
+        : null;
+
+    if (!cappedRequest?.truncated && !cappedResponse?.truncated) {
+        return entry;
+    }
+
+    const capped = { ...entry };
+
+    if (cappedRequest?.truncated) {
+        capped.request = {
+            ...request,
+            body: cappedRequest.value,
+            truncated: true,
+            originalSize: cappedRequest.originalSize
+        };
+    }
+
+    if (cappedResponse?.truncated) {
+        capped.response = {
+            ...response,
+            data: cappedResponse.value,
+            truncated: true,
+            originalSize: cappedResponse.originalSize
+        };
+    }
+
+    return capped;
+}
+
+/**
+ * @param {Array<Object>} entries
+ * @param {number} budget
+ * @returns {Array<Object>}
+ */
+export function fitHistoryToBudget(entries, budget) {
+    let total = 0;
+
+    for (let index = 0; index < entries.length; index += 1) {
+        total += JSON.stringify(entries[index])?.length || 0;
+        if (total > budget) {
+            return entries.slice(0, Math.max(1, index));
+        }
+    }
+
+    return entries;
+}
+
 export class HistoryRepository {
     /** @param {Object} backendAPI */
     constructor(backendAPI) {
@@ -35,7 +108,9 @@ export class HistoryRepository {
     async getAll() {
         try {
             const history = await this._getArrayFromStore(this.HISTORY_KEY);
-            return history.sort((a, b) => b.timestamp - a.timestamp);
+            return history
+                .map(capHistoryEntry)
+                .sort((a, b) => b.timestamp - a.timestamp);
         } catch (error) {
             throw new Error(`Failed to load history: ${error.message}`, { cause: error });
         }
@@ -58,6 +133,7 @@ export class HistoryRepository {
             }
 
             history.unshift(historyEntry);
+            history = history.map(capHistoryEntry);
 
             let maxItems = this.MAX_HISTORY_ITEMS;
             try {
@@ -71,6 +147,8 @@ export class HistoryRepository {
             if (history.length > maxItems) {
                 history = history.slice(0, maxItems);
             }
+
+            history = fitHistoryToBudget(history, MAX_HISTORY_TOTAL_BYTES);
 
             await this.backendAPI.store.set(this.HISTORY_KEY, history);
             return historyEntry;

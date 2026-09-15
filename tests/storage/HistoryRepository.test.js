@@ -1,4 +1,9 @@
-import { HistoryRepository } from '../../src/modules/storage/HistoryRepository.js';
+import {
+    HistoryRepository,
+    MAX_HISTORY_RESPONSE_SIZE,
+    MAX_HISTORY_TOTAL_BYTES,
+    fitHistoryToBudget
+} from '../../src/modules/storage/HistoryRepository.js';
 
 describe('HistoryRepository', () => {
     let repository;
@@ -322,5 +327,89 @@ describe('HistoryRepository', () => {
 
             expect(mockBackendAPI.store.set).toHaveBeenCalledWith('requestHistory', []);
         });
+    });
+});
+
+describe('HistoryRepository size bounds', () => {
+    let repository;
+    let mockBackendAPI;
+
+    beforeEach(() => {
+        mockBackendAPI = {
+            store: {
+                get: jest.fn(),
+                set: jest.fn().mockResolvedValue()
+            },
+            settings: {
+                get: jest.fn().mockResolvedValue({})
+            }
+        };
+
+        repository = new HistoryRepository(mockBackendAPI);
+    });
+
+    const entry = (id, { body = null, data = null } = {}) => ({
+        id,
+        timestamp: 1000,
+        request: { url: 'http://example.com', method: 'GET', body },
+        response: { status: 200, data }
+    });
+
+    test('shrinks oversized pre-existing entries on read', async () => {
+        const data = 'z'.repeat(MAX_HISTORY_RESPONSE_SIZE + 100);
+        mockBackendAPI.store.get.mockResolvedValue([entry('h1', { data })]);
+
+        const result = await repository.getAll();
+
+        expect(result[0].response.data).toHaveLength(MAX_HISTORY_RESPONSE_SIZE);
+        expect(result[0].response.truncated).toBe(true);
+        expect(result[0].response.originalSize).toBe(data.length);
+    });
+
+    test('leaves entries within the caps untouched on read', async () => {
+        const original = entry('h1', { data: { ok: true } });
+        mockBackendAPI.store.get.mockResolvedValue([original]);
+
+        const result = await repository.getAll();
+
+        expect(result[0]).toBe(original);
+    });
+
+    test('caps an oversized entry before persisting it', async () => {
+        mockBackendAPI.store.get.mockResolvedValue([]);
+        const data = 'z'.repeat(MAX_HISTORY_RESPONSE_SIZE + 100);
+
+        await repository.add(entry('h1', { data }));
+
+        const persisted = mockBackendAPI.store.set.mock.calls[0][1];
+        expect(persisted[0].response.data).toHaveLength(MAX_HISTORY_RESPONSE_SIZE);
+        expect(persisted[0].response.truncated).toBe(true);
+    });
+
+    test('drops oldest entries once the total budget is exceeded', async () => {
+        const big = 'z'.repeat(MAX_HISTORY_RESPONSE_SIZE);
+        const existing = Array.from({ length: 90 }, (_, index) =>
+            entry(`old-${index}`, { data: big })
+        );
+        mockBackendAPI.store.get.mockResolvedValue(existing);
+
+        await repository.add(entry('new', { data: big }));
+
+        const persisted = mockBackendAPI.store.set.mock.calls[0][1];
+        expect(persisted[0].id).toBe('new');
+        expect(persisted.length).toBeLessThan(91);
+        expect(JSON.stringify(persisted).length).toBeLessThanOrEqual(MAX_HISTORY_TOTAL_BYTES * 1.1);
+    });
+
+    test('keeps the newest entry even when it alone exceeds the budget', () => {
+        const entries = [entry('new'), entry('old')];
+
+        expect(fitHistoryToBudget(entries, 1)).toEqual([entries[0]]);
+    });
+
+    test('keeps everything when the budget is not reached', () => {
+        const entries = [entry('a'), entry('b')];
+
+        expect(fitHistoryToBudget(entries, 1000000)).toBe(entries);
     });
 });

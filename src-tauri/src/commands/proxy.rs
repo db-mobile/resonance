@@ -6,7 +6,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_store::StoreExt;
 
-const STORE_FILE: &str = "resonance-store.json";
+use super::store_files::MAIN_STORE as STORE_FILE;
 const PROXY_KEY: &str = "proxySettings";
 
 /// Every field defaults, so a stored payload written by an older version (or a

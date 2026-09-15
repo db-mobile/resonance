@@ -24,7 +24,8 @@ describe('CollectionEndpointLoaderService protocol handling', () => {
 
     beforeEach(() => {
         repository = {
-            getAllPersistedEndpointData: jest.fn().mockResolvedValue(storedData)
+            getAllPersistedEndpointData: jest.fn().mockResolvedValue(storedData),
+            getById: jest.fn().mockResolvedValue(null)
         };
         loader = new CollectionEndpointLoaderService({
             repository,
@@ -148,5 +149,55 @@ describe('CollectionEndpointLoaderService protocol handling', () => {
         expect(data.protocol).toBe('websocket');
         expect(data.persistedAuthConfig).toBeNull();
         expect(data.persistedQueryParams).toEqual([{ key: 'model', value: 'sonnet' }]);
+    });
+});
+
+describe('CollectionEndpointLoaderService OpenAPI spec resolution', () => {
+    let repository;
+    let schemaProcessor;
+    let loader;
+
+    beforeEach(() => {
+        repository = {
+            getAllPersistedEndpointData: jest.fn().mockResolvedValue({}),
+            getById: jest.fn().mockResolvedValue({ id: 'c1', _openApiSpec: { openapi: '3.0.0' } })
+        };
+        schemaProcessor = { setOpenApiSpec: jest.fn() };
+        loader = new CollectionEndpointLoaderService({
+            repository,
+            collectionService: { generateRequestBody: jest.fn(() => '') },
+            schemaProcessor,
+            getFormElements: jest.fn(),
+            setActiveEndpoint: jest.fn()
+        });
+        app.workspaceTabController = { loadEndpoint: jest.fn().mockResolvedValue(undefined) };
+    });
+
+    test('uses the spec already on the collection without a lookup', async () => {
+        const spec = { openapi: '3.1.0' };
+
+        const resolved = await loader.resolveOpenApiSpec({ id: 'c1', _openApiSpec: spec });
+
+        expect(resolved).toBe(spec);
+        expect(repository.getById).not.toHaveBeenCalled();
+    });
+
+    test('fetches the spec when the list object omits it', async () => {
+        const resolved = await loader.resolveOpenApiSpec({ id: 'c1' });
+
+        expect(repository.getById).toHaveBeenCalledWith('c1');
+        expect(resolved).toEqual({ openapi: '3.0.0' });
+    });
+
+    test('falls back to null when the collection has no spec at all', async () => {
+        repository.getById.mockResolvedValue({ id: 'c1' });
+
+        expect(await loader.resolveOpenApiSpec({ id: 'c1' })).toBeNull();
+    });
+
+    test('loading an endpoint feeds the fetched spec to the schema processor', async () => {
+        await loader.loadEndpointIntoWorkspaceTab({ id: 'c1' }, { id: 'e1', name: 'Get' });
+
+        expect(schemaProcessor.setOpenApiSpec).toHaveBeenCalledWith({ openapi: '3.0.0' });
     });
 });

@@ -4,6 +4,10 @@ import {
     SENSITIVE_REQUEST_HEADERS,
     SENSITIVE_RESPONSE_HEADERS
 } from '../../src/modules/services/HistoryService.js';
+import {
+    MAX_HISTORY_REQUEST_SIZE,
+    MAX_HISTORY_RESPONSE_SIZE
+} from '../../src/modules/storage/HistoryRepository.js';
 
 describe('HistoryService credential redaction', () => {
     let service;
@@ -162,5 +166,95 @@ describe('HistoryService redaction constants', () => {
     it('freezes the sensitive-name lists', () => {
         expect(Object.isFrozen(SENSITIVE_REQUEST_HEADERS)).toBe(true);
         expect(Object.isFrozen(SENSITIVE_RESPONSE_HEADERS)).toBe(true);
+    });
+});
+
+describe('HistoryService body size caps', () => {
+    let service;
+    let added;
+
+    beforeEach(() => {
+        service = new HistoryService({});
+        added = null;
+        service.repository = {
+            add: (entry) => {
+                added = entry;
+                return Promise.resolve(entry);
+            }
+        };
+    });
+
+    const request = () => ({ method: 'POST', url: 'https://api.example.com/users' });
+
+    it('caps an oversized response body and flags it', async () => {
+        const data = 'z'.repeat(MAX_HISTORY_RESPONSE_SIZE + 500);
+
+        await service.createHistoryEntry(request(), {
+            success: true,
+            status: 200,
+            statusText: 'OK',
+            data,
+            headers: {}
+        });
+
+        expect(added.response.data).toHaveLength(MAX_HISTORY_RESPONSE_SIZE);
+        expect(added.response.truncated).toBe(true);
+        expect(added.response.originalSize).toBe(data.length);
+    });
+
+    it('caps an oversized response body on the error branch too', async () => {
+        const data = 'z'.repeat(MAX_HISTORY_RESPONSE_SIZE + 1);
+
+        await service.createHistoryEntry(request(), {
+            success: false,
+            status: null,
+            statusText: '',
+            message: 'boom',
+            data,
+            headers: {}
+        });
+
+        expect(added.response.error).toBe(true);
+        expect(added.response.data).toHaveLength(MAX_HISTORY_RESPONSE_SIZE);
+        expect(added.response.truncated).toBe(true);
+    });
+
+    it('caps an oversized request body at the larger request limit', async () => {
+        const body = 'q'.repeat(MAX_HISTORY_REQUEST_SIZE + 10);
+
+        await service.createHistoryEntry(
+            { ...request(), body },
+            { success: true, status: 200, statusText: 'OK', data: null, headers: {} }
+        );
+
+        expect(added.request.body).toHaveLength(MAX_HISTORY_REQUEST_SIZE);
+        expect(added.request.truncated).toBe(true);
+        expect(added.request.originalSize).toBe(body.length);
+    });
+
+    it('leaves small bodies untouched and unflagged', async () => {
+        const body = { name: 'Ada' };
+
+        await service.createHistoryEntry(
+            { ...request(), body },
+            { success: true, status: 200, statusText: 'OK', data: { ok: true }, headers: {} }
+        );
+
+        expect(added.request.body).toEqual(body);
+        expect(added.response.data).toEqual({ ok: true });
+        expect(added.request.truncated).toBeUndefined();
+        expect(added.response.truncated).toBeUndefined();
+    });
+
+    it('keeps the request body well above the response limit', async () => {
+        const body = 'q'.repeat(MAX_HISTORY_RESPONSE_SIZE + 1000);
+
+        await service.createHistoryEntry(
+            { ...request(), body },
+            { success: true, status: 200, statusText: 'OK', data: null, headers: {} }
+        );
+
+        expect(added.request.body).toBe(body);
+        expect(added.request.truncated).toBeUndefined();
     });
 });

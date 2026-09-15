@@ -86,7 +86,18 @@ fn main() {
             if let Ok(dir) = app.path().app_data_dir() {
                 let _ = std::fs::create_dir_all(&dir);
                 commands::fs_secure::restrict_dir(&dir);
-                commands::fs_secure::restrict_file(&dir.join("resonance-store.json"));
+
+                // Split the legacy single-file store before anything reads it.
+                // The webview loads theme, tabs and collections during boot, so
+                // this cannot wait for an idle task in the frontend the way the
+                // collection format migration does.
+                if let Err(message) = commands::store_files::migrate_store_split(&dir) {
+                    eprintln!("store split migration failed: {}", message);
+                }
+
+                for file in commands::store_files::ALL_STORES {
+                    commands::fs_secure::restrict_file(&dir.join(file));
+                }
             }
             commands::proxy::hydrate_from_store(app.handle());
             Ok(())
