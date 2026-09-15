@@ -3,7 +3,7 @@
  * @module storage/WorkspaceTabRepository
  */
 
-
+import { truncateBody } from '../utils/truncateBody.js';
 
 export class WorkspaceTabRepository {
     /** @param {Object} backendAPI */
@@ -29,9 +29,10 @@ export class WorkspaceTabRepository {
         return write;
     }
 
-    /** @returns {Promise<Array<Object>>} */
+    /** @type {number} */
     static MAX_RESPONSE_SIZE = 500000;
 
+    /** @returns {Promise<Array<Object>>} */
     async getTabs() {
         if (this._tabsCache !== null) {
             return [...this._tabsCache];
@@ -156,13 +157,14 @@ export class WorkspaceTabRepository {
             updates.response : existingTab.response;
 
         if (updates.response !== undefined && mergedResponse?.data) {
-            const dataStr = typeof mergedResponse.data === 'string'
-                ? mergedResponse.data
-                : JSON.stringify(mergedResponse.data);
-            if (dataStr.length > WorkspaceTabRepository.MAX_RESPONSE_SIZE) {
+            const capped = truncateBody(
+                mergedResponse.data,
+                WorkspaceTabRepository.MAX_RESPONSE_SIZE
+            );
+            if (capped.truncated) {
                 mergedResponse = {
                     ...mergedResponse,
-                    data: dataStr.substring(0, WorkspaceTabRepository.MAX_RESPONSE_SIZE),
+                    data: capped.value,
                     truncated: true
                 };
             }

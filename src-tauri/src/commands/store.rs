@@ -3,16 +3,23 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
 
 use super::fs_secure::restrict_file;
+use super::store_files::{store_file_for, ALL_STORES};
 
-const STORE_FILE: &str = "resonance-store.json";
-
-/// Best-effort restriction of the on-disk store file to owner-only access.
+/// Best-effort restriction of one on-disk store file to owner-only access.
 /// The store plugin writes it with the process umask (typically world-readable),
 /// so it holds request history, the cookie jar, and any plaintext-fallback
 /// secrets — tighten it after every save.
-pub(crate) fn restrict_store_file(app: &AppHandle) {
+pub(crate) fn restrict_store_file_named(app: &AppHandle, file: &str) {
     if let Ok(dir) = app.path().app_data_dir() {
-        restrict_file(&dir.join(STORE_FILE));
+        restrict_file(&dir.join(file));
+    }
+}
+
+/// Tightens every store file the app owns, for startup and for callers that
+/// wrote through a path that does not know which file it touched.
+pub(crate) fn restrict_store_file(app: &AppHandle) {
+    for file in ALL_STORES {
+        restrict_store_file_named(app, file);
     }
 }
 
@@ -23,14 +30,17 @@ fn get_default_for_key(key: &str) -> Value {
         "activeEnvironmentId" => Value::Null,
         "requestHistory" => serde_json::json!([]),
         "cookieJar" => serde_json::json!([]),
-        "workspaceTabs" => serde_json::json!([]),
-        "activeWorkspaceTabId" => Value::Null,
+        // These four are the keys the frontend actually uses; the store once
+        // named them workspaceTabs/activeWorkspaceTabId/accentColor/
+        // mockServerSettings, which never matched and so never applied.
+        "workspace-tabs" => serde_json::json!([]),
+        "active-tab-id" => Value::Null,
         "theme" => serde_json::json!("system"),
-        "accentColor" => serde_json::json!("blue"),
+        "accent" => serde_json::json!("blue"),
         "proxySettings" => {
             serde_json::to_value(super::proxy::ProxySettings::default()).unwrap_or(Value::Null)
         }
-        "mockServerSettings" => serde_json::json!({
+        "mockServer" => serde_json::json!({
             "port": 3001,
             "delay": 0,
             "enabled": false
@@ -53,7 +63,7 @@ fn get_default_for_key(key: &str) -> Value {
 
 #[tauri::command]
 pub async fn store_get(app: AppHandle, key: String) -> Result<Value, String> {
-    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
+    let store = app.store(store_file_for(&key)).map_err(|e| e.to_string())?;
 
     let value = store.get(&key).unwrap_or(Value::Null);
 
@@ -66,11 +76,12 @@ pub async fn store_get(app: AppHandle, key: String) -> Result<Value, String> {
 
 #[tauri::command]
 pub async fn store_set(app: AppHandle, key: String, value: Value) -> Result<(), String> {
-    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
+    let file = store_file_for(&key);
+    let store = app.store(file).map_err(|e| e.to_string())?;
 
     store.set(key, value);
     store.save().map_err(|e| e.to_string())?;
-    restrict_store_file(&app);
+    restrict_store_file_named(&app, file);
 
     Ok(())
 }

@@ -11,6 +11,7 @@ use tokio::sync::oneshot;
 
 use super::fs_secure::{restrict_dir, restrict_file};
 
+mod cache;
 mod git;
 mod ipc;
 mod layout;
@@ -21,14 +22,28 @@ mod read;
 mod secrets;
 mod write;
 
+use cache::{read_collection_dir_cached, CollectionCache};
+
 use ipc::to_ipc_collection;
-use read::{read_collection_dir, Layout};
+use read::Layout;
 
 pub(crate) use layout::{desired_endpoint_file_name, find_endpoint_data_file};
 use layout::{find_available_dir, slugify};
 use secrets::redact_auth_secrets;
 
-const STORE_FILE: &str = "resonance-store.json";
+/// The process-wide parsed-collection cache.
+///
+/// A plain static rather than Tauri managed state, following `mock_server`'s
+/// `SERVER_HANDLE`: every helper below is a `fn(&Path)` reached from several
+/// call depths, and threading a handle through all of them would buy nothing.
+/// Serving an entry always revalidates its fingerprint, so a shared cache can
+/// never hand back a stale parse.
+fn collection_cache() -> &'static CollectionCache {
+    static CACHE: std::sync::OnceLock<CollectionCache> = std::sync::OnceLock::new();
+    CACHE.get_or_init(CollectionCache::default)
+}
+
+use super::store_files::MAIN_STORE as STORE_FILE;
 const COLLECTIONS_DIR: &str = "collections";
 const COLLECTION_INDEX_KEY: &str = "collectionIndex";
 const LAST_COLLECTION_DIR_KEY: &str = "lastCollectionDirectory";
@@ -271,7 +286,7 @@ fn is_collection_dir(path: &Path) -> bool {
 fn read_collection_from_dir(path: &Path) -> Result<Collection, String> {
     let mut collection = match Layout::detect(path) {
         Some(Layout::V2) => {
-            let loaded = read_collection_dir(path)?;
+            let loaded = read_collection_dir_cached(collection_cache(), path)?;
             to_ipc_collection(&loaded, &path.to_string_lossy(), false)
         }
         Some(Layout::V1) => {
@@ -429,7 +444,7 @@ fn remove_request_from_tree(node: &mut read::FolderNode, request_id: &str) -> bo
 /// @returns The stored collection, or None for a directory with nothing in it
 fn load_existing(dir: &Path) -> Result<Option<read::LoadedCollection>, String> {
     match Layout::detect(dir) {
-        Some(Layout::V2) => Ok(Some(read_collection_dir(dir)?)),
+        Some(Layout::V2) => Ok(Some(read_collection_dir_cached(collection_cache(), dir)?)),
         Some(Layout::V1) => {
             let collection: Collection =
                 read_json_file(&CollectionPaths::of(dir).collection_json())?;
@@ -521,7 +536,9 @@ fn write_v2_collection_seeded(
         layout: Layout::V2,
     };
 
-    write::write_collection_dir(dir, &mut loaded)
+    write::write_collection_dir(dir, &mut loaded)?;
+    collection_cache().refresh(dir, &loaded);
+    Ok(())
 }
 
 /// Applies seeded per-request state onto a freshly built tree.
@@ -613,6 +630,8 @@ fn prepare_collection_dir(app: &AppHandle, collection: Collection) -> Result<Col
         if current_dir != &target_dir {
             fs::rename(current_dir, &target_dir)
                 .map_err(|e| format!("Failed to rename collection dir: {}", e))?;
+            // The cache is keyed by directory, and this one just moved.
+            collection_cache().remove(current_dir);
         }
     } else if !target_dir.exists() {
         fs::create_dir_all(&target_dir)
@@ -726,7 +745,7 @@ pub(crate) fn load_for_export(
 
     match Layout::detect(&dir) {
         Some(Layout::V2) => {
-            let loaded = read_collection_dir(&dir)?;
+            let loaded = read_collection_dir_cached(collection_cache(), &dir)?;
             let data = loaded
                 .requests()
                 .into_iter()
@@ -912,6 +931,10 @@ pub async fn collection_close(app: AppHandle, collection_id: String) -> Result<(
 /// Loads every collection with a single read per directory and a single index
 /// write, instead of the previous list-then-get shape that parsed each
 /// collection twice and rewrote the index per entry.
+///
+/// The inlined OpenAPI spec is dropped here: it is unbounded, the sidebar never
+/// reads it, and this list is reloaded on every collection refresh. Whoever
+/// needs the spec asks for the one collection through `collection_get`.
 fn load_all_collections(app: &AppHandle) -> Result<Vec<Collection>, String> {
     let mut collections = Vec::new();
     let mut seen = HashSet::new();
@@ -941,6 +964,7 @@ fn load_all_collections(app: &AppHandle) -> Result<Vec<Collection>, String> {
                         index_changed = true;
                     }
                     collection.linked = link::is_linked(&collection.id, &index, &linked);
+                    collection.open_api_spec = None;
                     collections.push(collection);
                 }
             }
@@ -960,6 +984,7 @@ fn load_all_collections(app: &AppHandle) -> Result<Vec<Collection>, String> {
         if let Ok(mut collection) = read_collection_from_dir(&path) {
             if seen.insert(collection.id.clone()) {
                 collection.linked = link::is_linked(&collection.id, &index, &linked);
+                collection.open_api_spec = None;
                 collections.push(collection);
             }
         }
@@ -1022,6 +1047,9 @@ pub async fn collection_delete(app: AppHandle, collection_id: String) -> Result<
             fs::remove_dir_all(&collection_dir)
                 .map_err(|e| format!("Failed to delete collection: {}", e))?;
         }
+        // The tree is gone rather than changed, so there is no fingerprint left
+        // to invalidate the entry against.
+        collection_cache().remove(&collection_dir);
     }
 
     unregister_collection_path(&app, &collection_id)?;
@@ -1038,7 +1066,7 @@ pub async fn collection_get_endpoint_data(
     let paths = CollectionPaths::resolve(&app, &collection_id)?;
 
     if Layout::detect(&paths.dir) == Some(Layout::V2) {
-        let loaded = read_collection_dir(&paths.dir)?;
+        let loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
         return Ok(ipc::find_request(&loaded, &endpoint_id)
             .map(ipc::request_to_endpoint_data)
             .unwrap_or_default());
@@ -1073,11 +1101,13 @@ pub async fn collection_save_endpoint_data(
             .ok_or_else(|| "Collection storage path missing".to_string())?,
     ));
     if Layout::detect(&paths.dir) == Some(Layout::V2) {
-        let mut loaded = read_collection_dir(&paths.dir)?;
+        let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
         if !apply_endpoint_data_in_tree(&mut loaded.root, &endpoint_id, &data) {
             return Err(format!("Endpoint {} not found in collection", endpoint_id));
         }
-        return write::write_collection_dir(&paths.dir, &mut loaded);
+        write::write_collection_dir(&paths.dir, &mut loaded)?;
+        collection_cache().refresh(&paths.dir, &loaded);
+        return Ok(());
     }
 
     let requests_dir = paths.ensure_requests()?;
@@ -1109,7 +1139,7 @@ pub async fn collection_delete_endpoint_data(
     let paths = CollectionPaths::resolve(&app, &collection_id)?;
 
     if Layout::detect(&paths.dir) == Some(Layout::V2) {
-        let mut loaded = read_collection_dir(&paths.dir)?;
+        let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
         let request_file = loaded
             .requests()
             .into_iter()
@@ -1121,6 +1151,8 @@ pub async fn collection_delete_endpoint_data(
             if let Some(file) = request_file {
                 let _ = fs::remove_file(file);
             }
+            // After the removal, so the fingerprint matches what is now on disk.
+            collection_cache().refresh(&paths.dir, &loaded);
         }
         return Ok(());
     }
@@ -1143,7 +1175,7 @@ pub async fn collection_get_variables(
     let paths = CollectionPaths::resolve(&app, &collection_id)?;
 
     if Layout::detect(&paths.dir) == Some(Layout::V2) {
-        return Ok(read_collection_dir(&paths.dir)?.variables);
+        return Ok(read_collection_dir_cached(collection_cache(), &paths.dir)?.variables);
     }
 
     let variables_file = paths.variables_json();
@@ -1174,9 +1206,11 @@ pub async fn collection_save_variables(
     }
 
     if Layout::detect(&paths.dir) == Some(Layout::V2) {
-        let mut loaded = read_collection_dir(&paths.dir)?;
+        let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
         loaded.variables = variables;
-        return write::write_collection_dir(&paths.dir, &mut loaded);
+        write::write_collection_dir(&paths.dir, &mut loaded)?;
+        collection_cache().refresh(&paths.dir, &loaded);
+        return Ok(());
     }
 
     write_json_file(&paths.variables_json(), &variables)?;
@@ -1422,6 +1456,7 @@ pub async fn collections_pick_directory(
 
 #[cfg(test)]
 mod convert_on_save {
+    use super::read::read_collection_dir;
     use super::*;
     use serde_json::json;
     use tempfile::TempDir;
