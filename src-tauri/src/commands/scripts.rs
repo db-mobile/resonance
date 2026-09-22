@@ -35,6 +35,33 @@ pub struct ScriptExecutionData {
     /// the in-script `cookies` / `pm.cookies` API.
     #[serde(default)]
     pub cookies: Vec<Value>,
+    /// Position in a collection-runner run, exposed as `pm.info` and
+    /// `pm.iterationData`. Absent outside the runner.
+    #[serde(default)]
+    pub iteration: IterationInfo,
+}
+
+/// Where a script runs within a collection-runner run. Mirrors Postman:
+/// `iteration` is zero-based and `data` is the current data-file row. Outside
+/// the runner a script sees a single iteration with no data.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct IterationInfo {
+    pub iteration: u32,
+    pub iteration_count: u32,
+    pub data: HashMap<String, String>,
+    pub request_name: Option<String>,
+}
+
+impl Default for IterationInfo {
+    fn default() -> Self {
+        Self {
+            iteration: 0,
+            iteration_count: 1,
+            data: HashMap::new(),
+            request_name: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -212,6 +239,7 @@ struct ScriptContext {
     environment: HashMap<String, String>,
     cookies: Vec<Value>,
     cookie_changes: Vec<Value>,
+    iteration: IterationInfo,
 }
 
 /// Execute a JavaScript script in a sandboxed environment.
@@ -236,6 +264,14 @@ fn execute_script(
     // Setup pm (Postman-like) object for backward compatibility
     let pm_ctx = ctx.clone();
     setup_pm(&mut context, pm_ctx)?;
+
+    // Setup pm.info / pm.iterationData (must come after pm, which they attach to)
+    let event_name = if capture_request {
+        "prerequest"
+    } else {
+        "test"
+    };
+    setup_iteration(&mut context, &ctx, event_name)?;
 
     // Setup the cookie jar API (must come after pm so the glue can attach pm.cookies)
     let cookies_ctx = ctx.clone();
@@ -1099,6 +1135,62 @@ fn cookie_op_native(args: &[JsValue], ctx: &Rc<RefCell<ScriptContext>>) -> JsRes
 /// Register the cookie jar bridge plus the `cookies` / `pm.cookies` JS wrapper.
 /// The jar itself lives on the frontend; recorded operations are applied there
 /// after the script finishes.
+/// Attach `pm.info` (iteration, iterationCount, requestName, eventName) and a
+/// read-only `pm.iterationData` (get / has / toObject) for the current run.
+fn setup_iteration(
+    context: &mut Context,
+    ctx: &Rc<RefCell<ScriptContext>>,
+    event_name: &str,
+) -> Result<(), String> {
+    let payload = {
+        let info = &ctx.borrow().iteration;
+        serde_json::json!({
+            "iteration": info.iteration,
+            "iterationCount": info.iteration_count,
+            "requestName": info.request_name,
+            "eventName": event_name,
+            "data": info.data,
+        })
+    };
+    let payload = serde_json::to_string(&payload).map_err(|e| e.to_string())?;
+
+    let glue_code = format!(
+        r#"
+        (function(payload) {{
+            var data = payload.data || {{}};
+            function has(key) {{
+                return Object.prototype.hasOwnProperty.call(data, key);
+            }}
+            var iterationData = {{
+                get: function(key) {{ return has(key) ? data[key] : undefined; }},
+                has: has,
+                toObject: function() {{
+                    var out = {{}};
+                    for (var key in data) {{ if (has(key)) {{ out[key] = data[key]; }} }}
+                    return out;
+                }}
+            }};
+            iterationData.toJSON = iterationData.toObject;
+            var info = {{
+                iteration: payload.iteration,
+                iterationCount: payload.iterationCount,
+                requestName: payload.requestName === null ? undefined : payload.requestName,
+                eventName: payload.eventName
+            }};
+            if (typeof pm === 'object' && pm !== null) {{
+                pm.info = Object.freeze(info);
+                pm.iterationData = Object.freeze(iterationData);
+            }}
+        }})({payload})
+    "#
+    );
+
+    context
+        .eval(Source::from_bytes(glue_code.as_bytes()))
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn setup_cookies(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<(), String> {
     let read_ctx = ctx.clone();
     let read_fn = unsafe {
@@ -1329,6 +1421,7 @@ fn run_script_sync(
         environment: script_data.environment,
         cookies: script_data.cookies,
         cookie_changes: Vec::new(),
+        iteration: script_data.iteration,
     }));
 
     let result = execute_script(
@@ -1549,6 +1642,130 @@ mod tests {
         let result = execute_script(script, ctx.clone(), false, ProxySettings::default());
         let env = ctx.borrow().environment_changes.clone();
         (result, env)
+    }
+
+    /// Run a test script at a given iteration, returning the environment changes.
+    fn run_script_iteration(
+        script: &str,
+        iteration: IterationInfo,
+    ) -> (Result<(), String>, HashMap<String, Option<String>>) {
+        let ctx = Rc::new(RefCell::new(ScriptContext {
+            request: default_request(),
+            iteration,
+            ..Default::default()
+        }));
+        let result = execute_script(script, ctx.clone(), false, ProxySettings::default());
+        let env = ctx.borrow().environment_changes.clone();
+        (result, env)
+    }
+
+    fn set_to(env: &HashMap<String, Option<String>>, key: &str) -> Option<String> {
+        env.get(key).cloned().flatten()
+    }
+
+    #[test]
+    fn scripts_see_the_runner_iteration_and_its_data_row() {
+        let iteration = IterationInfo {
+            iteration: 2,
+            iteration_count: 3,
+            data: HashMap::from([("email".to_string(), "cy@x.io".to_string())]),
+            request_name: Some("Get user".to_string()),
+        };
+        let (result, env) = run_script_iteration(
+            r#"
+            environment.set('i', String(pm.info.iteration));
+            environment.set('n', String(pm.info.iterationCount));
+            environment.set('name', pm.info.requestName);
+            environment.set('event', pm.info.eventName);
+            environment.set('email', pm.iterationData.get('email'));
+            environment.set('hasEmail', String(pm.iterationData.has('email')));
+            environment.set('hasOther', String(pm.iterationData.has('other')));
+            environment.set('all', JSON.stringify(pm.iterationData.toObject()));
+        "#,
+            iteration,
+        );
+
+        assert!(result.is_ok(), "{:?}", result);
+        assert_eq!(set_to(&env, "i").as_deref(), Some("2"));
+        assert_eq!(set_to(&env, "n").as_deref(), Some("3"));
+        assert_eq!(set_to(&env, "name").as_deref(), Some("Get user"));
+        assert_eq!(set_to(&env, "event").as_deref(), Some("test"));
+        assert_eq!(set_to(&env, "email").as_deref(), Some("cy@x.io"));
+        assert_eq!(set_to(&env, "hasEmail").as_deref(), Some("true"));
+        assert_eq!(set_to(&env, "hasOther").as_deref(), Some("false"));
+        assert_eq!(
+            set_to(&env, "all").as_deref(),
+            Some(r#"{"email":"cy@x.io"}"#)
+        );
+    }
+
+    #[test]
+    fn outside_the_runner_a_script_sees_one_iteration_without_data() {
+        let (result, env) = run_script_iteration(
+            r#"
+            environment.set('i', String(pm.info.iteration));
+            environment.set('n', String(pm.info.iterationCount));
+            environment.set('name', String(pm.info.requestName));
+            environment.set('missing', String(pm.iterationData.get('email')));
+            environment.set('all', JSON.stringify(pm.iterationData));
+        "#,
+            IterationInfo::default(),
+        );
+
+        assert!(result.is_ok(), "{:?}", result);
+        assert_eq!(set_to(&env, "i").as_deref(), Some("0"));
+        assert_eq!(set_to(&env, "n").as_deref(), Some("1"));
+        assert_eq!(set_to(&env, "name").as_deref(), Some("undefined"));
+        assert_eq!(set_to(&env, "missing").as_deref(), Some("undefined"));
+        assert_eq!(set_to(&env, "all").as_deref(), Some("{}"));
+    }
+
+    #[test]
+    fn pre_request_scripts_report_the_prerequest_event() {
+        let ctx = Rc::new(RefCell::new(ScriptContext {
+            request: default_request(),
+            ..Default::default()
+        }));
+        let result = execute_script(
+            "environment.set('event', pm.info.eventName);",
+            ctx.clone(),
+            true,
+            ProxySettings::default(),
+        );
+
+        assert!(result.is_ok(), "{:?}", result);
+        assert_eq!(
+            set_to(&ctx.borrow().environment_changes, "event").as_deref(),
+            Some("prerequest")
+        );
+    }
+
+    #[test]
+    fn iteration_info_is_read_only() {
+        let (result, env) = run_script_iteration(
+            r#"
+            try { pm.info.iteration = 99; } catch (e) {}
+            environment.set('i', String(pm.info.iteration));
+        "#,
+            IterationInfo::default(),
+        );
+
+        assert!(result.is_ok(), "{:?}", result);
+        assert_eq!(set_to(&env, "i").as_deref(), Some("0"));
+    }
+
+    #[test]
+    fn a_payload_without_iteration_info_still_deserializes() {
+        let data: ScriptExecutionData = serde_json::from_value(json!({
+            "script": "",
+            "request": {},
+            "environment": {}
+        }))
+        .unwrap();
+
+        assert_eq!(data.iteration.iteration, 0);
+        assert_eq!(data.iteration.iteration_count, 1);
+        assert!(data.iteration.data.is_empty());
     }
 
     /// Run a script with a seeded cookie jar, returning the recorded operations
@@ -2033,6 +2250,7 @@ mod tests {
             response: None,
             environment: HashMap::new(),
             cookies: Vec::new(),
+            iteration: IterationInfo::default(),
         };
         let result = tokio::task::spawn_blocking(move || {
             run_script_sync(script_data, false, ProxySettings::default())

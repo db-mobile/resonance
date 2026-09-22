@@ -232,7 +232,11 @@ export class RunnerService {
 
                 const request = queue[flat % queue.length];
                 const requestResult = await this._untilStopped(
-                    this._executeRequest(request, runtimeVariables, flat, runContext, dataRows?.[iteration] ?? null)
+                    this._executeRequest(request, runtimeVariables, flat, runContext, {
+                        index: iteration,
+                        count: iterations,
+                        data: dataRows?.[iteration] ?? null
+                    })
                 );
 
                 if (!requestResult) {
@@ -363,10 +367,10 @@ export class RunnerService {
      * @param {Object} runtimeVariables
      * @param {number} index
      * @param {Object|null} [runContext]
-     * @param {Object<string, string>|null} [dataRow]
+     * @param {{index: number, count: number, data: Object<string, string>|null}|null} [iteration]
      * @returns {Promise<Object>}
      */
-    async _executeRequest(request, runtimeVariables, index, runContext = null, dataRow = null) {
+    async _executeRequest(request, runtimeVariables, index, runContext = null, iteration = null) {
         this.variableProcessor.clearDynamicCache();
         const startTime = Date.now();
         const result = {
@@ -386,7 +390,13 @@ export class RunnerService {
         };
 
         try {
-            let variables = await this._buildVariables(request.collectionId, runtimeVariables, runContext, dataRow);
+            let variables = await this._buildVariables(request.collectionId, runtimeVariables, runContext, iteration?.data ?? null);
+            const scriptIteration = {
+                iteration: iteration?.index ?? 0,
+                iterationCount: iteration?.count ?? 1,
+                data: iteration?.data ?? {},
+                requestName: request.name || null
+            };
 
             const collection = await this._getCollectionForRun(request.collectionId, runContext);
             if (!collection) {
@@ -420,7 +430,7 @@ export class RunnerService {
 
             let { requestConfig } = prepared;
             if (scripts.preRequestScript.trim()) {
-                requestConfig = await this._runPreRequestScript(scripts.preRequestScript, prepared, variables, outcome);
+                requestConfig = await this._runPreRequestScript(scripts.preRequestScript, prepared, variables, outcome, scriptIteration);
                 variables = mergeVariables(variables, outcome.variablesSet);
             }
 
@@ -448,7 +458,7 @@ export class RunnerService {
 
             for (const script of [scripts.testScript, request.postResponseScript]) {
                 if (script && script.trim()) {
-                    await this._runTestScript(script, requestConfig, response, variables, outcome);
+                    await this._runTestScript(script, requestConfig, response, variables, outcome, scriptIteration);
                     variables = mergeVariables(variables, outcome.variablesSet);
                 }
             }
@@ -994,9 +1004,10 @@ export class RunnerService {
      * @param {Object} prepared
      * @param {Object} variables
      * @param {Object} outcome
+     * @param {Object} iteration
      * @returns {Promise<Object>}
      */
-    async _runPreRequestScript(script, prepared, variables, outcome) {
+    async _runPreRequestScript(script, prepared, variables, outcome, iteration) {
         const scriptService = app.scriptController?.service;
         const { requestConfig } = prepared;
         if (!scriptService) {
@@ -1009,7 +1020,8 @@ export class RunnerService {
             pathParams: { ...requestConfig.pathParams }
         };
         const { modifiedRequest, result } = await scriptService.executePreRequestScript(script, requestConfig, {
-            environment: variables
+            environment: variables,
+            iteration
         });
         this._collectScriptResult(result, outcome);
 
@@ -1045,9 +1057,10 @@ export class RunnerService {
      * @param {Object} response
      * @param {Object} variables
      * @param {Object} outcome
+     * @param {Object} iteration
      * @returns {Promise<void>}
      */
-    async _runTestScript(script, requestConfig, response, variables, outcome) {
+    async _runTestScript(script, requestConfig, response, variables, outcome, iteration) {
         const scriptService = app.scriptController?.service;
         if (!scriptService) {
             return;
@@ -1056,7 +1069,7 @@ export class RunnerService {
             script,
             requestConfig,
             { ...response, cookies: extractCookies(response.headers) },
-            { environment: variables }
+            { environment: variables, iteration }
         );
         this._collectScriptResult(result, outcome);
     }

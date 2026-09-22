@@ -62,9 +62,10 @@ export class ScriptService {
      * @param {Object} requestConfig
      * @param {Object} [options]
      * @param {Object} [options.environment]
+     * @param {Object} [options.iteration]
      * @returns {Promise<Object>}
      */
-    async executePreRequestScript(script, requestConfig, { environment } = {}) {
+    async executePreRequestScript(script, requestConfig, { environment, iteration } = {}) {
         if (!script || script.trim() === '') {
             return {
                 modifiedRequest: requestConfig,
@@ -86,7 +87,8 @@ export class ScriptService {
                     pathParams: requestConfig.pathParams || {}
                 },
                 environment: environmentVariables || {},
-                cookies: await this._readCookieJar()
+                cookies: await this._readCookieJar(),
+                ...(iteration ? { iteration } : {})
             };
 
             const result = await window.backendAPI.scripts.executePreRequest(scriptData);
@@ -120,9 +122,10 @@ export class ScriptService {
      * @param {Object} response
      * @param {Object} [options]
      * @param {Object} [options.environment]
+     * @param {Object} [options.iteration]
      * @returns {Promise<Object>}
      */
-    async executeTestScript(script, requestConfig, response, { environment } = {}) {
+    async executeTestScript(script, requestConfig, response, { environment, iteration } = {}) {
         if (!script || script.trim() === '') {
             return {
                 success: true,
@@ -161,7 +164,8 @@ export class ScriptService {
                     cookies
                 },
                 environment: environmentVariables || {},
-                cookies: await this._readCookieJar()
+                cookies: await this._readCookieJar(),
+                ...(iteration ? { iteration } : {})
             };
 
             const result = await window.backendAPI.scripts.executeTest(scriptData);

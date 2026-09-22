@@ -986,6 +986,30 @@ describe('RunnerService', () => {
             );
         });
 
+        test('tells pre-request and test scripts which iteration and data row they run in', async () => {
+            app.scriptController.getScriptsForEndpoint.mockResolvedValue({ preRequestScript: 'pre()', testScript: 'test()' });
+            mockBackendAPI.scripts.executePreRequest.mockResolvedValue({
+                success: true, logs: [], errors: [], testResults: [], modifiedEnvironment: {}, modifiedRequest: {}
+            });
+            mockBackendAPI.sendApiRequest.mockResolvedValue({ success: true, status: 200, data: {}, headers: {} });
+
+            await service._executeRequest(request, {}, 5, null, { index: 2, count: 3, data: { email: 'cy@x.io' } });
+
+            const expected = { iteration: 2, iterationCount: 3, data: { email: 'cy@x.io' }, requestName: 'R1' };
+            expect(mockBackendAPI.scripts.executePreRequest.mock.calls[0][0].iteration).toEqual(expected);
+            expect(mockBackendAPI.scripts.executeTest.mock.calls[0][0].iteration).toEqual(expected);
+            expect(mockBackendAPI.scripts.executeTest.mock.calls[0][0].environment.email).toBe('cy@x.io');
+        });
+
+        test('a request run outside the iteration loop is iteration 0 of 1', async () => {
+            mockBackendAPI.sendApiRequest.mockResolvedValue({ success: true, status: 200, data: {}, headers: {} });
+
+            await service._executeRequest({ ...request, postResponseScript: 'test()' }, {}, 0);
+
+            expect(mockBackendAPI.scripts.executeTest.mock.calls[0][0].iteration)
+                .toEqual({ iteration: 0, iterationCount: 1, data: {}, requestName: 'R1' });
+        });
+
         test('refuses protocols the runner cannot drive', async () => {
             service.collectionRepository.getById = jest.fn().mockResolvedValue({
                 ...collection,
@@ -1052,8 +1076,8 @@ describe('RunnerService', () => {
             expect(mockBackendAPI.runner.readDataFile).toHaveBeenCalledWith('/data/users.csv');
             expect(results.iterations).toBe(2);
             expect(service._executeRequest.mock.calls.map(call => call[4])).toEqual([
-                { email: 'ada@x.io' },
-                { email: 'bob@x.io' }
+                { index: 0, count: 2, data: { email: 'ada@x.io' } },
+                { index: 1, count: 2, data: { email: 'bob@x.io' } }
             ]);
             expect(started[0].iterationLabels).toEqual(['email=ada@x.io', 'email=bob@x.io']);
         });
