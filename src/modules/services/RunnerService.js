@@ -23,9 +23,9 @@ import { resolveAuthConfigVariables } from '../auth/authVariables.js';
 import { generateAuthData } from '../auth/authData.js';
 import { deriveRequestSettings } from '../state/settingsCache.js';
 import { extractCookies } from '../cookieParser.js';
-
-/** @type {ReadonlySet<string>} */
-export const RUNNABLE_PROTOCOLS = new Set(['http', 'graphql']);
+import { translate, translateCount } from '../utils/translate.js';
+import { RUNNABLE_PROTOCOLS } from '../utils/runnableRequests.js';
+import { parseDataFile } from '../utils/dataFile.js';
 
 const BODY_METHODS = ['POST', 'PUT', 'PATCH'];
 
@@ -80,7 +80,7 @@ export class RunnerService {
      */
     async createRunner(runnerData) {
         const runner = await this.repository.add(runnerData);
-        this.statusDisplay?.update(`Runner "${runner.name}" created`, null);
+        this.statusDisplay?.update(translate('runner.created', 'Runner "{{name}}" created', { name: runner.name }), null);
         return runner;
     }
 
@@ -92,7 +92,7 @@ export class RunnerService {
     async updateRunner(id, updates) {
         const runner = await this.repository.update(id, updates);
         if (runner) {
-            this.statusDisplay?.update(`Runner "${runner.name}" saved`, null);
+            this.statusDisplay?.update(translate('runner.saved', 'Runner "{{name}}" saved', { name: runner.name }), null);
         }
         return runner;
     }
@@ -104,7 +104,7 @@ export class RunnerService {
     async deleteRunner(id) {
         const success = await this.repository.delete(id);
         if (success) {
-            this.statusDisplay?.update('Runner deleted', null);
+            this.statusDisplay?.update(translate('runner.deleted', 'Runner deleted'), null);
         }
         return success;
     }
@@ -137,12 +137,12 @@ export class RunnerService {
      */
     async executeRunner(runnerId, onProgress) {
         if (this.isRunning) {
-            throw new Error('A runner is already executing');
+            throw new Error(translate('runner.error_already_running', 'A runner is already executing'));
         }
 
         const runner = await this.repository.getById(runnerId);
         if (!runner) {
-            throw new Error('Runner not found');
+            throw new Error(translate('runner.error_not_found', 'Runner not found'));
         }
 
         return this._execute(runner, {
@@ -160,12 +160,12 @@ export class RunnerService {
      */
     async executeRunnerData(runnerData, onProgress) {
         if (this.isRunning) {
-            throw new Error('A runner is already executing');
+            throw new Error(translate('runner.error_already_running', 'A runner is already executing'));
         }
 
         return this._execute(runnerData, {
             runnerId: null,
-            runnerName: runnerData.name || 'Untitled Runner',
+            runnerName: runnerData.name || translate('runner.untitled', 'Untitled Runner'),
             onProgress
         });
     }
@@ -181,20 +181,21 @@ export class RunnerService {
      */
     async _execute(runner, { runnerId, runnerName, onProgress, onFinish = null }) {
         if (!runner.requests || runner.requests.length === 0) {
-            throw new Error('Runner has no requests to execute');
+            throw new Error(translate('runner.error_no_requests', 'Runner has no requests to execute'));
         }
 
         this.isRunning = true;
         this.shouldStop = false;
         this.currentRunId = runnerId ?? 'temp';
 
-        const total = runner.requests.length;
+        const queue = runner.requests;
         const results = {
             runnerId,
             runnerName,
             startTime: Date.now(),
             endTime: null,
-            totalRequests: total,
+            totalRequests: 0,
+            iterations: 1,
             passed: 0,
             failed: 0,
             skipped: 0,
@@ -204,29 +205,42 @@ export class RunnerService {
 
         let runtimeVariables = {};
 
-        this._notifyListeners('run-started', { runnerId, total });
-
         try {
+            const dataRows = await this._loadDataRows(runner.options?.dataFile);
+            const iterations = dataRows ? dataRows.length : clampIterations(runner.options?.iterations);
+            const total = queue.length * iterations;
+            results.iterations = iterations;
+            results.totalRequests = total;
+
+            this._notifyListeners('run-started', {
+                runnerId,
+                total,
+                iterations,
+                iterationLabels: dataRows ? dataRows.map(describeDataRow) : null
+            });
+
             const runContext = await this._buildRunContext();
 
-            for (let i = 0; i < total; i++) {
+            for (let flat = 0; flat < total; flat++) {
                 if (this.shouldStop) {
-                    this._markRemainingAsSkipped(runner.requests, results, i, 'Execution stopped by user');
+                    this._markRemainingAsSkipped(queue, results, flat, translate('runner.skip_stopped', 'Execution stopped by user'));
                     break;
                 }
 
-                this._notifyListeners('request-started', { index: i });
+                const iteration = Math.floor(flat / queue.length);
+                this._notifyListeners('request-started', { index: flat });
 
-                const request = runner.requests[i];
+                const request = queue[flat % queue.length];
                 const requestResult = await this._untilStopped(
-                    this._executeRequest(request, runtimeVariables, i, runContext)
+                    this._executeRequest(request, runtimeVariables, flat, runContext, dataRows?.[iteration] ?? null)
                 );
 
                 if (!requestResult) {
-                    this._markRemainingAsSkipped(runner.requests, results, i, 'Execution stopped by user');
+                    this._markRemainingAsSkipped(queue, results, flat, translate('runner.skip_stopped', 'Execution stopped by user'));
                     break;
                 }
 
+                requestResult.iteration = iteration + 1;
                 results.requests.push(requestResult);
 
                 if (requestResult.variablesSet) {
@@ -242,16 +256,16 @@ export class RunnerService {
                 }
 
                 if (onProgress) {
-                    onProgress(i, total, requestResult);
+                    onProgress(flat, total, requestResult);
                 }
-                this._notifyListeners('request-completed', { index: i, result: requestResult });
+                this._notifyListeners('request-completed', { index: flat, result: requestResult });
 
                 if (failed && runner.options?.stopOnError) {
-                    this._markRemainingAsSkipped(runner.requests, results, i + 1, 'Skipped due to previous error');
+                    this._markRemainingAsSkipped(queue, results, flat + 1, translate('runner.skip_previous_error', 'Skipped due to previous error'));
                     break;
                 }
 
-                if (runner.options?.delayMs > 0 && i < total - 1) {
+                if (runner.options?.delayMs > 0 && flat < total - 1) {
                     await this._delay(runner.options.delayMs);
                 }
             }
@@ -277,7 +291,7 @@ export class RunnerService {
     stopExecution() {
         if (this.isRunning) {
             this.shouldStop = true;
-            this.statusDisplay?.update('Stopping runner...', null);
+            this.statusDisplay?.update(translate('runner.stopping', 'Stopping runner...'), null);
             const waiters = [...this._stopWaiters];
             this._stopWaiters.clear();
             waiters.forEach(wake => wake());
@@ -302,16 +316,17 @@ export class RunnerService {
     }
 
     /**
-     * @param {Array} requests
+     * @param {Array} queue
      * @param {Object} results
      * @param {number} startIndex
      * @param {string} reason
      */
-    _markRemainingAsSkipped(requests, results, startIndex, reason) {
-        for (let j = startIndex; j < requests.length; j++) {
+    _markRemainingAsSkipped(queue, results, startIndex, reason) {
+        for (let flat = startIndex; flat < results.totalRequests; flat++) {
             results.requests.push({
-                index: j,
-                ...requests[j],
+                index: flat,
+                ...queue[flat % queue.length],
+                iteration: Math.floor(flat / queue.length) + 1,
                 status: 'skipped',
                 error: reason
             });
@@ -320,13 +335,38 @@ export class RunnerService {
     }
 
     /**
+     * @param {{path: string, name: string}|null|undefined} dataFile
+     * @returns {Promise<Array<Object<string, string>>|null>}
+     */
+    async _loadDataRows(dataFile) {
+        if (!dataFile?.path) {
+            return null;
+        }
+        let rows;
+        try {
+            const file = await this.backendAPI.runner.readDataFile(dataFile.path);
+            rows = parseDataFile(file.name || dataFile.name, file.content);
+        } catch (error) {
+            throw new Error(translate('runner.data_file_error', 'Data file {{name}}: {{message}}', {
+                name: dataFile.name,
+                message: error?.message || String(error)
+            }), { cause: error });
+        }
+        if (rows.length === 0) {
+            throw new Error(translate('runner.data_file_empty', 'Data file {{name}} has no rows', { name: dataFile.name }));
+        }
+        return rows;
+    }
+
+    /**
      * @param {Object} request
      * @param {Object} runtimeVariables
      * @param {number} index
      * @param {Object|null} [runContext]
+     * @param {Object<string, string>|null} [dataRow]
      * @returns {Promise<Object>}
      */
-    async _executeRequest(request, runtimeVariables, index, runContext = null) {
+    async _executeRequest(request, runtimeVariables, index, runContext = null, dataRow = null) {
         this.variableProcessor.clearDynamicCache();
         const startTime = Date.now();
         const result = {
@@ -346,21 +386,32 @@ export class RunnerService {
         };
 
         try {
-            let variables = await this._buildVariables(request.collectionId, runtimeVariables, runContext);
+            let variables = await this._buildVariables(request.collectionId, runtimeVariables, runContext, dataRow);
 
             const collection = await this._getCollectionForRun(request.collectionId, runContext);
             if (!collection) {
-                throw new Error('The collection this request came from is not open. Remove the request and add it again from Available Requests.');
+                throw new Error(translate(
+                    'runner.error_collection_missing',
+                    'The collection this request came from is not open. Remove the request and add it again from Available Requests.'
+                ));
             }
 
             const endpoint = this._findEndpoint(collection, request.endpointId);
             if (!endpoint) {
-                throw new Error(`"${request.name}" no longer exists in ${collection.name}. Remove it and add it again from Available Requests.`);
+                throw new Error(translate(
+                    'runner.error_endpoint_missing',
+                    '"{{name}}" no longer exists in {{collection}}. Remove it and add it again from Available Requests.',
+                    { name: request.name, collection: collection.name }
+                ));
             }
 
             const protocol = endpoint.protocol || 'http';
             if (!RUNNABLE_PROTOCOLS.has(protocol)) {
-                throw new Error(`${protocol} requests cannot be run by the collection runner`);
+                throw new Error(translate(
+                    'runner.error_protocol',
+                    '{{protocol}} requests cannot be run by the collection runner',
+                    { protocol }
+                ));
             }
 
             const scripts = await this._getEndpointScripts(collection.id, endpoint.id);
@@ -418,7 +469,9 @@ export class RunnerService {
             } else {
                 result.status = 'error';
                 result.error = response.message
-                    || (response.status ? `${response.status} ${response.statusText || ''}`.trim() : 'Request failed');
+                    || (response.status
+                        ? `${response.status} ${response.statusText || ''}`.trim()
+                        : translate('runner.error_request_failed', 'Request failed'));
             }
         } catch (error) {
             result.status = 'error';
@@ -443,12 +496,15 @@ export class RunnerService {
 
         const parts = [];
         if (failedTests.length > 0) {
-            const count = `${failedTests.length} test${failedTests.length > 1 ? 's' : ''} failed`;
+            const count = translateCount('runner.tests_failed', failedTests.length, {
+                one: '{{count}} test failed',
+                other: '{{count}} tests failed'
+            });
             const names = failedTests.map(test => test.message).filter(Boolean);
             parts.push(names.length > 0 ? `${count}: ${names.join('; ')}` : count);
         }
         if (scriptError) {
-            parts.push(`Script error: ${scriptError}`);
+            parts.push(translate('runner.script_error', 'Script error: {{message}}', { message: scriptError }));
         }
         return parts.join(' | ');
     }
@@ -457,9 +513,10 @@ export class RunnerService {
      * @param {string} collectionId
      * @param {Object} runtimeVariables
      * @param {Object|null} [runContext]
+     * @param {Object<string, string>|null} [dataRow]
      * @returns {Promise<Object>}
      */
-    async _buildVariables(collectionId, runtimeVariables, runContext = null) {
+    async _buildVariables(collectionId, runtimeVariables, runContext = null, dataRow = null) {
         let variables = {};
 
         try {
@@ -482,7 +539,7 @@ export class RunnerService {
             void e;
         }
 
-        return mergeVariables(variables, runtimeVariables);
+        return { ...mergeVariables(variables, runtimeVariables), ...dataRow };
     }
 
     /** @returns {Promise<Object>} */
@@ -779,7 +836,7 @@ export class RunnerService {
 
         if (!overrideBody && form?.mode === 'binary') {
             if (!form.filePath) {
-                throw new Error('No file selected for binary body');
+                throw new Error(translate('runner.error_no_binary_file', 'No file selected for binary body'));
             }
             return {
                 body: { filePath: process(form.filePath), contentType: form.contentType || undefined },
@@ -814,7 +871,7 @@ export class RunnerService {
         try {
             return { body: JSON.parse(process(bodyContent.trim())), bodyType: undefined };
         } catch (e) {
-            throw new Error(`Invalid Body JSON: ${e.message}`, { cause: e });
+            throw new Error(translate('runner.error_invalid_body', 'Invalid Body JSON: {{message}}', { message: e.message }), { cause: e });
         }
     }
 
@@ -832,7 +889,10 @@ export class RunnerService {
             try {
                 parsedVariables = JSON.parse(variablesText);
             } catch (e) {
-                throw new Error(`Invalid GraphQL Variables JSON: ${e.message}`, { cause: e });
+                throw new Error(
+                    translate('runner.error_invalid_graphql_variables', 'Invalid GraphQL Variables JSON: {{message}}', { message: e.message }),
+                    { cause: e }
+                );
             }
         }
 
@@ -969,7 +1029,10 @@ export class RunnerService {
         if (authStripped) {
             outcome.logs.push({
                 level: 'warn',
-                message: 'Authentication was not sent: the pre-request script changed the request host.',
+                message: translate(
+                    'runner.auth_stripped',
+                    'Authentication was not sent: the pre-request script changed the request host.'
+                ),
                 timestamp: Date.now()
             });
         }
@@ -1043,6 +1106,26 @@ export class RunnerService {
     _notifyListeners(event, data) {
         this._events.emit(event, data);
     }
+}
+
+export const MAX_ITERATIONS = 1000;
+
+/**
+ * @param {*} value
+ * @returns {number}
+ */
+function clampIterations(value) {
+    const count = parseInt(value, 10);
+    return Number.isFinite(count) ? Math.min(MAX_ITERATIONS, Math.max(1, count)) : 1;
+}
+
+/**
+ * @param {Object<string, string>} row
+ * @returns {string}
+ */
+function describeDataRow(row) {
+    const [first] = Object.entries(row);
+    return first ? `${first[0]}=${first[1]}` : '';
 }
 
 /**

@@ -29,6 +29,9 @@ import { toast } from '../ui/Toast.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { setRequestBodyContent } from '../requestBodyHelper.js';
 import { ChangeEmitter } from '../services/ChangeEmitter.js';
+import { flattenRequests, requestsInFolder } from '../collections/collectionTree.js';
+import { isRunnable } from '../utils/runnableRequests.js';
+import { translate } from '../utils/translate.js';
 import { DocGeneratorService } from '../services/DocGeneratorService.js';
 
 export class CollectionController {
@@ -334,6 +337,12 @@ export class CollectionController {
                 onClick: () => this.handleNewRequest(collection)
             },
             {
+                label: 'Run Collection',
+                translationKey: 'context_menu.run_collection',
+                iconClass: 'icon-play',
+                onClick: () => this.handleRunRequests(collection, flattenRequests(collection), collection.name)
+            },
+            {
                 label: 'Manage Variables',
                 translationKey: 'context_menu.manage_variables',
                 iconClass: ContextMenu.createVariableIcon(),
@@ -523,12 +532,44 @@ export class CollectionController {
     handleFolderContextMenu(event, collection, folder) {
         this.contextMenu.show(event, [
             {
+                label: 'Run Folder',
+                translationKey: 'context_menu.run_folder',
+                iconClass: 'icon-play',
+                onClick: () => this.handleRunRequests(
+                    collection,
+                    requestsInFolder(collection, folder.id),
+                    `${collection.name} / ${folder.name}`
+                )
+            },
+            {
                 label: 'Edit Auth',
                 translationKey: 'context_menu.edit_auth',
                 iconClass: 'icon-lock',
                 onClick: () => this.handleFolderAuth(collection, folder)
             }
         ]);
+    }
+
+    /**
+     * @param {Object} collection
+     * @param {Object[]} endpoints
+     * @param {string} name
+     * @returns {Promise<void>}
+     */
+    async handleRunRequests(collection, endpoints, name) {
+        const runnable = endpoints.filter(isRunnable);
+        if (runnable.length === 0) {
+            toast.info(translate('runner.nothing_runnable', 'There are no HTTP or GraphQL requests to run here'));
+            return;
+        }
+        try {
+            await app.workspaceTabController?.createRunnerTab({
+                name,
+                requests: runnable.map(endpoint => ({ collection, endpoint }))
+            });
+        } catch (error) {
+            toast.error(translate('runner.run_error', 'Runner error: {{message}}', { message: error.message }));
+        }
     }
 
     /**

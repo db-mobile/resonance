@@ -6,6 +6,9 @@
 /** @type {Object|null} */
 let cache = null;
 
+/** @type {Promise<boolean>} */
+let writeQueue = Promise.resolve(true);
+
 /** @returns {void} */
 export function invalidateSettingsCache() {
     cache = null;
@@ -53,15 +56,19 @@ export async function resolveRequestSettings() {
  * @param {*} value
  * @returns {Promise<boolean>}
  */
-export async function updateSetting(key, value) {
-    try {
-        const settings = await window.backendAPI.settings.get();
-        settings[key] = value;
-        await window.backendAPI.settings.set(settings);
-        invalidateSettingsCache();
-        return true;
-    } catch (error) {
-        void error;
-        return false;
-    }
+export function updateSetting(key, value) {
+    const write = writeQueue.then(async () => {
+        try {
+            const settings = await window.backendAPI.settings.get() || {};
+            settings[key] = value;
+            await window.backendAPI.settings.set(settings);
+            invalidateSettingsCache();
+            return true;
+        } catch (error) {
+            void error;
+            return false;
+        }
+    });
+    writeQueue = write;
+    return write;
 }

@@ -261,8 +261,11 @@ export class WorkspaceTabController {
         }
     }
 
-    /** @returns {Promise<Object>} */
-    async createRunnerTab() {
+    /**
+     * @param {{name: string, requests: Array<{collection: Object, endpoint: Object}>}|null} [preset]
+     * @returns {Promise<Object>}
+     */
+    async createRunnerTab(preset = null) {
         try {
             await this._saveCurrentTabState();
 
@@ -278,7 +281,7 @@ export class WorkspaceTabController {
 
             this._updateUIForTabType(newTab);
 
-            await this._initializeRunnerTab(newTab.id);
+            await this._initializeRunnerTab(newTab.id, preset);
 
             return newTab;
         } catch (error) {
@@ -287,8 +290,11 @@ export class WorkspaceTabController {
         }
     }
 
-    /** @param {string} tabId */
-    async _initializeRunnerTab(tabId) {
+    /**
+     * @param {string} tabId
+     * @param {{name: string, requests: Array<{collection: Object, endpoint: Object}>}|null} [preset]
+     */
+    async _initializeRunnerTab(tabId, preset = null) {
         const { RunnerController } = await import('./RunnerController.js');
         const { getCollections, onCollectionsLoaded } = await import('../collectionManager.js');
 
@@ -329,7 +335,7 @@ export class WorkspaceTabController {
             (listener) => onCollectionsLoaded(listener)
         );
 
-        await runnerController.initialize(runnerContainer);
+        await runnerController.initialize(runnerContainer, preset);
         this.runnerControllers.set(tabId, runnerController);
     }
 

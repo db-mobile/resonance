@@ -3,8 +3,9 @@
  * @module ui/runner/RequestQueue
  */
 
-import { app } from '../../appContext.js';
 import { templateLoader } from '../../templateLoader.js';
+import { translate } from '../../utils/translate.js';
+import { escapeHtml } from './runnerDomUtils.js';
 
 export class RequestQueue {
     /**
@@ -57,17 +58,13 @@ export class RequestQueue {
         this._render();
     }
 
-    clearAll() {
-        this.reset();
-        this._emitChange();
-    }
-
     /**
      * @param {Object} collection
      * @param {Object} endpoint
+     * @returns {Object}
      */
-    addRequest(collection, endpoint) {
-        const request = {
+    static buildRequest(collection, endpoint) {
+        return {
             collectionId: collection.id,
             endpointId: endpoint.id,
             name: endpoint.name || endpoint.path,
@@ -76,8 +73,22 @@ export class RequestQueue {
             postResponseScript: '',
             overrides: {}
         };
+    }
 
-        this.requests.push(request);
+    /**
+     * @param {Object} collection
+     * @param {Object} endpoint
+     */
+    addRequest(collection, endpoint) {
+        this.appendRequests([{ collection, endpoint }]);
+    }
+
+    /** @param {Array<{collection: Object, endpoint: Object}>} entries */
+    appendRequests(entries) {
+        if (entries.length === 0) {
+            return;
+        }
+        this.requests.push(...entries.map(({ collection, endpoint }) => RequestQueue.buildRequest(collection, endpoint)));
         this._render();
         this._emitChange();
     }
@@ -93,7 +104,7 @@ export class RequestQueue {
             this.container.innerHTML = `
                 <div class="empty-state-base runner-empty-state">
                     <span class="icon icon-20 icon-plus"></span>
-                    <p>Click requests from the left panel to add them</p>
+                    <p>${escapeHtml(translate('runner.add_requests_hint', 'Click requests from the left panel to add them'))}</p>
                 </div>
             `;
         } else {
@@ -126,7 +137,7 @@ export class RequestQueue {
         }
         if (this.missing.has(request)) {
             el.classList.add('is-missing');
-            el.title = app.i18n?.t('runner.request_missing') || 'This request no longer exists in any open collection';
+            el.title = translate('runner.request_missing', 'This request no longer exists in any open collection');
         }
 
         const methodEl = el.querySelector('[data-role="method"]');

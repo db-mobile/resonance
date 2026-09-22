@@ -231,7 +231,7 @@ describe('RunnerService', () => {
                 { name: 'Request 2' },
                 { name: 'Request 3' }
             ];
-            const results = { requests: [], skipped: 0 };
+            const results = { requests: [], skipped: 0, totalRequests: 3 };
 
             service._markRemainingAsSkipped(requests, results, 1, 'Test reason');
 
@@ -240,6 +240,15 @@ describe('RunnerService', () => {
             expect(results.requests[0].error).toBe('Test reason');
             expect(results.requests[0].index).toBe(1);
             expect(results.skipped).toBe(2);
+        });
+
+        test('continues through later iterations of the queue', () => {
+            const requests = [{ name: 'A' }, { name: 'B' }];
+            const results = { requests: [], skipped: 0, totalRequests: 6 };
+
+            service._markRemainingAsSkipped(requests, results, 3, 'Stopped');
+
+            expect(results.requests.map(r => `${r.iteration}:${r.name}`)).toEqual(['2:B', '3:A', '3:B']);
         });
     });
 
@@ -997,6 +1006,101 @@ describe('RunnerService', () => {
         });
     });
 
+    describe('iterations and data files', () => {
+        beforeEach(() => {
+            service._buildRunContext = jest.fn().mockResolvedValue(null);
+        });
+
+        test('repeats the whole queue for each iteration with flat indexes', async () => {
+            service._executeRequest = jest.fn().mockImplementation(async (request, vars, index) => ({
+                index, name: request.name, status: 'success', variablesSet: {}
+            }));
+
+            const results = await service.executeRunnerData({
+                requests: [{ name: 'A' }, { name: 'B' }],
+                options: { iterations: 3 }
+            });
+
+            expect(results.totalRequests).toBe(6);
+            expect(results.iterations).toBe(3);
+            expect(results.requests.map(r => `${r.iteration}:${r.name}:${r.index}`))
+                .toEqual(['1:A:0', '1:B:1', '2:A:2', '2:B:3', '3:A:4', '3:B:5']);
+        });
+
+        test('clamps the iteration count to 1..1000', async () => {
+            service._executeRequest = jest.fn().mockResolvedValue({ status: 'success', variablesSet: {} });
+
+            const zero = await service.executeRunnerData({ requests: [{}], options: { iterations: 0 } });
+            expect(zero.iterations).toBe(1);
+            const many = await service.executeRunnerData({ requests: [{}], options: { iterations: 5000 } });
+            expect(many.iterations).toBe(1000);
+        });
+
+        test('runs once per data row and passes each row to its requests', async () => {
+            mockBackendAPI.runner = {
+                readDataFile: jest.fn().mockResolvedValue({ name: 'users.csv', content: 'email\nada@x.io\nbob@x.io\n' })
+            };
+            service._executeRequest = jest.fn().mockResolvedValue({ status: 'success', variablesSet: {} });
+            const started = [];
+            service.addListener((event, data) => event === 'run-started' && started.push(data));
+
+            const results = await service.executeRunnerData({
+                requests: [{ name: 'A' }],
+                options: { iterations: 7, dataFile: { path: '/data/users.csv', name: 'users.csv' } }
+            });
+
+            expect(mockBackendAPI.runner.readDataFile).toHaveBeenCalledWith('/data/users.csv');
+            expect(results.iterations).toBe(2);
+            expect(service._executeRequest.mock.calls.map(call => call[4])).toEqual([
+                { email: 'ada@x.io' },
+                { email: 'bob@x.io' }
+            ]);
+            expect(started[0].iterationLabels).toEqual(['email=ada@x.io', 'email=bob@x.io']);
+        });
+
+        test('names the data file when it cannot be read', async () => {
+            mockBackendAPI.runner = { readDataFile: jest.fn().mockRejectedValue('Cannot read data file /x: No such file') };
+
+            await expect(service.executeRunnerData({
+                requests: [{}],
+                options: { dataFile: { path: '/x/users.csv', name: 'users.csv' } }
+            })).rejects.toThrow('Data file users.csv: Cannot read data file /x: No such file');
+            expect(service.isExecuting()).toBe(false);
+        });
+
+        test('rejects a data file without rows', async () => {
+            mockBackendAPI.runner = { readDataFile: jest.fn().mockResolvedValue({ name: 'e.csv', content: 'email\n' }) };
+
+            await expect(service.executeRunnerData({
+                requests: [{}],
+                options: { dataFile: { path: '/e.csv', name: 'e.csv' } }
+            })).rejects.toThrow('Data file e.csv has no rows');
+        });
+
+        test('data row values win over environment and script-set variables', async () => {
+            service.variableRepository.getVariablesForCollection = jest.fn().mockResolvedValue({ user: 'collection' });
+            const runContext = { collectionVars: new Map(), envVars: { user: 'env', other: 'env' } };
+
+            const variables = await service._buildVariables('c1', { user: 'script' }, runContext, { user: 'row' });
+
+            expect(variables).toEqual({ user: 'row', other: 'env' });
+        });
+
+        test('stop-on-error skips every remaining iteration', async () => {
+            service._executeRequest = jest.fn()
+                .mockResolvedValueOnce({ status: 'success', variablesSet: {} })
+                .mockResolvedValueOnce({ status: 'error', variablesSet: {} });
+
+            const results = await service.executeRunnerData({
+                requests: [{ name: 'A' }, { name: 'B' }],
+                options: { iterations: 3, stopOnError: true }
+            });
+
+            expect(results.failed).toBe(1);
+            expect(results.skipped).toBe(4);
+        });
+    });
+
     describe('stopping and progress', () => {
         test('stop cuts a delay short and skips the rest', async () => {
             service._buildRunContext = jest.fn().mockResolvedValue(null);
@@ -1067,7 +1171,7 @@ describe('RunnerService', () => {
 
             expect(results.runnerId).toBe('runner_1');
             expect(results.runnerName).toBe('Smoke');
-            expect(started).toEqual([{ runnerId: 'runner_1', total: 1 }]);
+            expect(started).toEqual([{ runnerId: 'runner_1', total: 1, iterations: 1, iterationLabels: null }]);
             expect(mockRepository.updateLastRun).toHaveBeenCalledWith('runner_1');
         });
 
@@ -1083,7 +1187,7 @@ describe('RunnerService', () => {
 
             expect(results.runnerId).toBeNull();
             expect(results.runnerName).toBe('Untitled Runner');
-            expect(started).toEqual([{ runnerId: null, total: 1 }]);
+            expect(started).toEqual([{ runnerId: null, total: 1, iterations: 1, iterationLabels: null }]);
             expect(mockRepository.updateLastRun).not.toHaveBeenCalled();
         });
 

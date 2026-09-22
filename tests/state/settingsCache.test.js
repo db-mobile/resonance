@@ -113,5 +113,31 @@ describe('settingsCache', () => {
 
             expect(await module.updateSetting('verifySsl', false)).toBe(false);
         });
+
+        it('serialises concurrent writes so neither one is lost', async () => {
+            let stored = { a: 0, b: 0 };
+            const get = jest.fn(async () => {
+                await new Promise(resolve => setTimeout(resolve, 5));
+                return { ...stored };
+            });
+            const set = jest.fn(async (settings) => {
+                stored = settings;
+            });
+            const { module } = await loadModule(get, set);
+
+            await Promise.all([module.updateSetting('a', 1), module.updateSetting('b', 2)]);
+
+            expect(stored).toEqual({ a: 1, b: 2 });
+        });
+
+        it('keeps writing after a failed write', async () => {
+            const set = jest.fn()
+                .mockRejectedValueOnce(new Error('disk full'))
+                .mockResolvedValue(undefined);
+            const { module } = await loadModule(jest.fn(async () => ({})), set);
+
+            expect(await module.updateSetting('a', 1)).toBe(false);
+            expect(await module.updateSetting('b', 2)).toBe(true);
+        });
     });
 });

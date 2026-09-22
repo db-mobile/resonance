@@ -196,6 +196,10 @@
   opacity: var(--dim-opacity);
 }
 
+.runner-endpoint-add-btn:focus-visible {
+  opacity: 1;
+}
+
 .runner-endpoint-add-btn:hover {
   background-color: var(--shade-color);
   opacity: 1;
@@ -334,6 +338,7 @@
 
 .runner-results-header {
   flex-shrink: 0;
+  gap: var(--space-3);
 }
 
 .runner-results-summary {
@@ -659,36 +664,50 @@
   word-break: break-all;
 }
 
-.runner-saved-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+.runner-config {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
 }
 
-.runner-saved-item {
-  min-height: 40px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-small);
-  cursor: pointer;
-}
-
-.runner-saved-item:hover {
-  background-color: var(--shade-color);
-}
-
-.runner-saved-item-name {
+.runner-data-file-btn {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 600;
+  color: inherit;
 }
 
-.runner-saved-item-meta {
-  font-size: var(--font-size-caption);
+.runner-data-file-btn:hover,
+.runner-data-file-btn:focus-visible {
+  text-decoration: underline;
+}
+
+.runner-data-chip.is-error .runner-data-file-btn {
+  color: var(--error-color);
+}
+
+.runner-data-clear-btn {
+  display: inline-flex;
+  align-items: center;
   opacity: var(--dim-opacity);
 }
 
-.runner-config {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+.runner-data-clear-btn:hover,
+.runner-data-clear-btn:focus-visible {
+  opacity: 1;
+}
+
+.runner-results-iteration {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  opacity: var(--dim-opacity);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .runner-file-actions {
@@ -731,4 +750,42 @@
 
 .runner-script-request-info {
   font-size: var(--font-size-small);
+}
+
+.runner-menu-wrapper {
+  position: relative;
+}
+
+.runner-menu-dropdown {
+  top: calc(100% + var(--space-1));
+  right: 0;
+  max-height: 360px;
+}
+
+.runner-history-dropdown {
+  left: 0;
+  right: auto;
+  min-width: 280px;
+}
+
+.runner-history-item {
+  justify-content: space-between;
+}
+
+.runner-history-meta {
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.runner-history-meta .is-failed {
+  color: var(--error-color);
+}
+
+.runner-results-source {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-caption);
+  opacity: var(--dim-opacity);
 }

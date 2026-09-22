@@ -3,17 +3,20 @@
  * @module controllers/RunnerController
  */
 
-import { app } from '../appContext.js';
 import { RunnerRepository } from '../storage/RunnerRepository.js';
 import { RunnerService } from '../services/RunnerService.js';
 import { RunnerPanel } from '../ui/RunnerPanel.js';
 import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { updateStatusDisplay } from '../statusDisplay.js';
-import { templateLoader } from '../templateLoader.js';
 import { toast } from '../ui/Toast.js';
+import { updateSetting } from '../state/settingsCache.js';
+import { translate, translateCount } from '../utils/translate.js';
 import { OVERRIDES_VERSION, endpointDefaults, stripUnchangedOverrides } from '../utils/requestOverrides.js';
 import { resolveRequestLinks } from '../utils/runnerRequestLinks.js';
+import { parseDataFile } from '../utils/dataFile.js';
+import { summarizeRun, toJsonReport, toJunitXml, reportFileName } from '../utils/runnerReport.js';
+import { RunnerHistoryRepository } from '../storage/RunnerHistoryRepository.js';
 
 export class RunnerController {
     /**
@@ -29,10 +32,11 @@ export class RunnerController {
 
         const statusDisplay = new StatusDisplayAdapter(updateStatusDisplay);
         this.repository = RunnerRepository.shared(backendAPI);
+        this.historyRepository = RunnerHistoryRepository.shared(backendAPI);
         this.service = new RunnerService(this.repository, backendAPI, statusDisplay);
 
         this.panel = null;
-        this.currentRunnerId = null;
+        this._currentRunnerId = null;
 
         this._handleSave = this._handleSave.bind(this);
         this._handleLoadRunners = this._handleLoadRunners.bind(this);
@@ -43,8 +47,23 @@ export class RunnerController {
         this._handleStop = this._handleStop.bind(this);
     }
 
-    /** @param {HTMLElement} container */
-    async initialize(container) {
+    /** @type {string|null} */
+    get currentRunnerId() {
+        return this._currentRunnerId;
+    }
+
+    set currentRunnerId(runnerId) {
+        this._currentRunnerId = runnerId;
+        if (this.panel) {
+            this.panel.currentRunnerId = runnerId;
+        }
+    }
+
+    /**
+     * @param {HTMLElement} container
+     * @param {{name: string, requests: Array<{collection: Object, endpoint: Object}>}|null} [preset]
+     */
+    async initialize(container, preset = null) {
         this.panel = new RunnerPanel(container);
 
         this.panel.onRunnerSave = this._handleSave;
@@ -56,6 +75,9 @@ export class RunnerController {
         this.panel.onStop = this._handleStop;
         this.panel.onResolveEndpointDefaults = (collectionId, endpointId) =>
             this.service.getEndpointRequestConfig(collectionId, endpointId);
+        this.panel.onPickDataFile = () => this._pickDataFile();
+        this.panel.onLoadHistory = () => this.historyRepository.list(this.currentRunnerId);
+        this.panel.onExport = (format, summary) => this._exportReport(format, summary);
 
         const [collections, settings] = await Promise.all([
             this.getCollections(),
@@ -71,20 +93,25 @@ export class RunnerController {
             this._handleServiceEvent(event, data);
         });
 
-        await this._loadLastRunner(settings);
+        if (preset) {
+            this.panel.loadPreset(preset);
+        } else {
+            await this._loadLastRunner(settings);
+        }
     }
 
     /** @param {Object} runnerData */
     async _handleSave(runnerData) {
+        const named = { ...runnerData, name: runnerData.name || translate('runner.untitled', 'Untitled Runner') };
         try {
             if (this.currentRunnerId) {
-                await this.service.updateRunner(this.currentRunnerId, runnerData);
+                await this.service.updateRunner(this.currentRunnerId, named);
             } else {
-                const runner = await this.service.createRunner(runnerData);
+                const runner = await this.service.createRunner(named);
                 this.currentRunnerId = runner.id;
             }
         } catch (error) {
-            toast.error(`Error saving runner: ${error.message}`);
+            toast.error(translate('runner.error_saving', 'Error saving runner: {{message}}', { message: error.message }));
         }
     }
 
@@ -93,7 +120,7 @@ export class RunnerController {
         try {
             return await this.service.getAllRunners();
         } catch (error) {
-            toast.error(`Error loading runners: ${error.message}`);
+            toast.error(translate('runner.error_loading_runners', 'Error loading runners: {{message}}', { message: error.message }));
             return [];
         }
     }
@@ -105,20 +132,17 @@ export class RunnerController {
             if (runner) {
                 this.currentRunnerId = runnerId;
                 this.panel?.loadRunner(runner, missing);
-                this.panel.currentRunnerId = runnerId;
+                this._checkDataFile(runner.options?.dataFile);
                 await this._saveLastRunnerId(runnerId);
-                updateStatusDisplay(`Loaded runner: ${runner.name}`, null);
+                updateStatusDisplay(translate('runner.loaded', 'Loaded runner: {{name}}', { name: runner.name }), null);
             }
         } catch (error) {
-            toast.error(`Error loading runner: ${error.message}`);
+            toast.error(translate('runner.error_loading', 'Error loading runner: {{message}}', { message: error.message }));
         }
     }
 
     _handleNewRunner() {
         this.currentRunnerId = null;
-        if (this.panel) {
-            this.panel.currentRunnerId = null;
-        }
     }
 
     /** @param {string} runnerId */
@@ -126,12 +150,15 @@ export class RunnerController {
         if (!runnerId) {return;}
 
         const confirmDialog = new ConfirmDialog();
-        const confirmed = await confirmDialog.show('Are you sure you want to delete this runner?', {
-            title: 'Delete Runner',
-            confirmText: 'Delete',
-            cancelText: 'Cancel',
-            dangerous: true
-        });
+        const confirmed = await confirmDialog.show(
+            translate('runner.delete_confirm', 'Are you sure you want to delete this runner?'),
+            {
+                title: translate('runner.delete_title', 'Delete Runner'),
+                confirmText: translate('common.delete', 'Delete'),
+                cancelText: translate('common.cancel', 'Cancel'),
+                dangerous: true
+            }
+        );
 
         if (!confirmed) {
             return;
@@ -139,120 +166,13 @@ export class RunnerController {
 
         try {
             await this.service.deleteRunner(runnerId);
+            this.historyRepository.remove(runnerId).catch(() => {});
             this.currentRunnerId = null;
-            if (this.panel) {
-                this.panel.currentRunnerId = null;
-            }
             await this._saveLastRunnerId(null);
             this.panel?.startNewRunner();
-            updateStatusDisplay('Runner deleted', null);
+            updateStatusDisplay(translate('runner.deleted', 'Runner deleted'), null);
         } catch (error) {
-            toast.error(`Error deleting runner: ${error.message}`);
-        }
-    }
-
-    /** @param {Array<Object>} runners */
-    _showSavedRunnersDialog(runners) {
-        const fragment = templateLoader.cloneSync(
-            './src/templates/runner/runnerPanel.html',
-            'tpl-runner-saved-list'
-        );
-
-        const overlay = fragment.firstElementChild;
-        document.body.appendChild(overlay);
-
-        const listContainer = overlay.querySelector('[data-role="saved-list"]');
-        const closeButtons = overlay.querySelectorAll('[data-action="close"]');
-
-        const closeDialog = () => {
-            overlay.remove();
-        };
-
-        closeButtons.forEach(btn => btn.addEventListener('click', closeDialog));
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {closeDialog();}
-        });
-
-        if (runners.length === 0) {
-            listContainer.innerHTML = `
-                <div class="empty-state-base runner-empty-state">
-                    <p>No saved runners yet</p>
-                </div>
-            `;
-            return;
-        }
-
-        listContainer.innerHTML = '';
-        runners.forEach(runner => {
-            const itemEl = this._createSavedRunnerItem(runner, closeDialog);
-            listContainer.appendChild(itemEl);
-        });
-
-        if (app.i18n && app.i18n.updateUI) {
-            app.i18n.updateUI();
-        }
-    }
-
-    /**
-     * @param {Object} runner
-     * @param {Function} closeDialog
-     * @returns {HTMLElement}
-     */
-    _createSavedRunnerItem(runner, closeDialog) {
-        const fragment = templateLoader.cloneSync(
-            './src/templates/runner/runnerPanel.html',
-            'tpl-runner-saved-item'
-        );
-
-        const el = fragment.firstElementChild;
-
-        const nameEl = el.querySelector('[data-role="name"]');
-        if (nameEl) {nameEl.textContent = runner.name;}
-
-        const metaEl = el.querySelector('[data-role="meta"]');
-        if (metaEl) {
-            const requestCount = runner.requests?.length || 0;
-            const lastRun = runner.lastRunAt
-                ? new Date(runner.lastRunAt).toLocaleDateString()
-                : 'Never';
-            metaEl.textContent = `${requestCount} requests • Last run: ${lastRun}`;
-        }
-
-        el.querySelector('[data-action="load"]')?.addEventListener('click', async () => {
-            await this._loadRunner(runner.id);
-            closeDialog();
-        });
-
-        el.querySelector('[data-action="delete"]')?.addEventListener('click', async () => {
-            if (confirm(`Delete runner "${runner.name}"?`)) {
-                await this.service.deleteRunner(runner.id);
-                el.remove();
-
-                const listContainer = el.parentElement;
-                if (listContainer && listContainer.children.length === 0) {
-                    listContainer.innerHTML = `
-                        <div class="empty-state-base runner-empty-state">
-                            <p>No saved runners yet</p>
-                        </div>
-                    `;
-                }
-            }
-        });
-
-        return el;
-    }
-
-    /** @param {string} runnerId */
-    async _loadRunner(runnerId) {
-        try {
-            const { runner, missing } = await this._prepareRunner(await this.service.getRunner(runnerId));
-            if (runner) {
-                this.currentRunnerId = runnerId;
-                this.panel?.loadRunner(runner, missing);
-                updateStatusDisplay(`Loaded runner: ${runner.name}`, null);
-            }
-        } catch (error) {
-            toast.error(`Error loading runner: ${error.message}`);
+            toast.error(translate('runner.error_deleting', 'Error deleting runner: {{message}}', { message: error.message }));
         }
     }
 
@@ -263,7 +183,7 @@ export class RunnerController {
 
             if (runnerId) {
                 await this.service.updateRunner(runnerId, runnerData);
-            } else if (runnerData.name && runnerData.name !== 'Untitled Runner') {
+            } else if (runnerData.name) {
                 const runner = await this.service.createRunner(runnerData);
                 runnerId = runner.id;
                 this.currentRunnerId = runnerId;
@@ -285,8 +205,14 @@ export class RunnerController {
 
             this.panel?.showResults(results);
 
+            const summary = summarizeRun(results);
+            this.panel?.setRunSummary(summary);
+            if (runnerId) {
+                this.historyRepository.record(runnerId, summary).catch(() => {});
+            }
+
         } catch (error) {
-            toast.error(`Runner error: ${error.message}`);
+            toast.error(translate('runner.run_error', 'Runner error: {{message}}', { message: error.message }));
             this.panel?.showResults({ error: error.message });
         }
     }
@@ -302,7 +228,11 @@ export class RunnerController {
     _handleServiceEvent(event, data) {
         switch (event) {
             case 'run-started':
-                updateStatusDisplay(`Running ${data.total} requests...`, null);
+                this.panel?.prepareResults?.(data.iterations, data.iterationLabels);
+                updateStatusDisplay(translateCount('runner.running_requests', data.total, {
+                    one: 'Running {{count}} request...',
+                    other: 'Running {{count}} requests...'
+                }), null);
                 break;
 
             case 'request-started':
@@ -312,12 +242,18 @@ export class RunnerController {
             case 'request-completed':
                 if (data.result.status === 'success') {
                     updateStatusDisplay(
-                        `Request ${data.index + 1}: ${data.result.statusCode}`,
+                        translate('runner.request_status', 'Request {{number}}: {{detail}}', {
+                            number: data.index + 1,
+                            detail: data.result.statusCode
+                        }),
                         data.result.statusCode
                     );
                 } else {
                     updateStatusDisplay(
-                        `Request ${data.index + 1}: ${data.result.error}`,
+                        translate('runner.request_status', 'Request {{number}}: {{detail}}', {
+                            number: data.index + 1,
+                            detail: data.result.error
+                        }),
                         null
                     );
                 }
@@ -325,38 +261,20 @@ export class RunnerController {
 
             case 'run-completed':
                 updateStatusDisplay(
-                    `Completed: ${data.passed} passed, ${data.failed} failed (${data.totalTime}ms)`,
+                    translate('runner.completed', 'Completed: {{passed}} passed, {{failed}} failed ({{time}}ms)', {
+                        passed: data.passed,
+                        failed: data.failed,
+                        time: data.totalTime
+                    }),
                     data.failed === 0 ? 200 : null
                 );
                 break;
         }
     }
 
-    /** @returns {Object} */
-    static createRunnerTab() {
-        return {
-            type: 'runner',
-            name: 'Collection Runner',
-            icon: 'play'
-        };
-    }
-
-    /**
-     * @param {Object} tab
-     * @returns {boolean}
-     */
-    static isRunnerTab(tab) {
-        return tab?.type === 'runner';
-    }
-
     /** @param {string|null} runnerId */
     async _saveLastRunnerId(runnerId) {
-        try {
-            const settings = await this.backendAPI.settings.get() || {};
-            settings.lastRunnerId = runnerId;
-            await this.backendAPI.settings.set(settings);
-        } catch (error) {
-        }
+        await updateSetting('lastRunnerId', runnerId);
     }
 
     async _loadLastRunner(settings) {
@@ -367,9 +285,7 @@ export class RunnerController {
                 if (runner) {
                     this.currentRunnerId = lastRunnerId;
                     this.panel?.loadRunner(runner, missing);
-                    if (this.panel) {
-                        this.panel.currentRunnerId = lastRunnerId;
-                    }
+                    this._checkDataFile(runner.options?.dataFile);
                 }
             }
         } catch (error) {
@@ -420,13 +336,81 @@ export class RunnerController {
         }
 
         if (links.relinked > 0) {
-            toast.info(`Re-linked ${links.relinked} request${links.relinked === 1 ? '' : 's'} to the open collections`);
+            toast.info(translateCount('runner.relinked', links.relinked, {
+                one: 'Re-linked {{count}} request to the open collections',
+                other: 'Re-linked {{count}} requests to the open collections'
+            }));
         }
         if (links.missing.size > 0) {
-            toast.warning(`${links.missing.size} request${links.missing.size === 1 ? '' : 's'} in "${runner.name}" no longer exist in any open collection`);
+            toast.warning(translateCount('runner.missing_requests', links.missing.size, {
+                one: '{{count}} request in "{{name}}" no longer exists in any open collection',
+                other: '{{count}} requests in "{{name}}" no longer exist in any open collection'
+            }, { name: runner.name }));
         }
 
         return { runner: { ...runner, requests, overridesVersion: OVERRIDES_VERSION }, missing: links.missing };
+    }
+
+    /**
+     * @param {'json'|'junit'} format
+     * @param {Object} summary
+     * @returns {Promise<void>}
+     */
+    async _exportReport(format, summary) {
+        const junit = format === 'junit';
+        const extension = junit ? 'xml' : 'json';
+        try {
+            const result = await this.backendAPI.runner.saveReport(
+                reportFileName(summary, extension),
+                junit ? toJunitXml(summary) : toJsonReport(summary),
+                junit ? 'JUnit XML' : 'JSON',
+                [extension]
+            );
+            if (result?.success) {
+                toast.success(translate('runner.report_saved', 'Report saved to {{path}}', { path: result.filePath }));
+            }
+        } catch (error) {
+            toast.error(translate('runner.report_error', 'Could not save the report: {{message}}', {
+                message: error?.message || String(error)
+            }));
+        }
+    }
+
+    /** @returns {Promise<{path: string, name: string, rowCount: number}|null>} */
+    async _pickDataFile() {
+        try {
+            const file = await this.backendAPI.runner.pickDataFile();
+            if (!file) {
+                return null;
+            }
+            const rows = parseDataFile(file.name, file.content);
+            if (rows.length === 0) {
+                toast.error(translate('runner.data_file_empty', 'Data file {{name}} has no rows', { name: file.name }));
+                return null;
+            }
+            return { path: file.path, name: file.name, rowCount: rows.length };
+        } catch (error) {
+            toast.error(translate('runner.data_file_unusable', 'Could not use this data file: {{message}}', {
+                message: error?.message || String(error)
+            }));
+            return null;
+        }
+    }
+
+    /**
+     * @param {{path: string, name: string}|null|undefined} dataFile
+     * @returns {Promise<void>}
+     */
+    async _checkDataFile(dataFile) {
+        if (!dataFile?.path) {
+            return;
+        }
+        try {
+            const file = await this.backendAPI.runner.readDataFile(dataFile.path);
+            this.panel?.setDataFile(dataFile, { rowCount: parseDataFile(file.name, file.content).length });
+        } catch (error) {
+            this.panel?.setDataFile(dataFile, { error: error?.message || String(error) });
+        }
     }
 
     /** @returns {void} */

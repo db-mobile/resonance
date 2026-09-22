@@ -29,6 +29,7 @@ fn get_default_for_key(key: &str) -> Value {
         "environments" => serde_json::json!([]),
         "activeEnvironmentId" => Value::Null,
         "requestHistory" => serde_json::json!([]),
+        "runnerRunHistory" => serde_json::json!({}),
         "cookieJar" => serde_json::json!([]),
         // These four are the keys the frontend actually uses; the store once
         // named them workspaceTabs/activeWorkspaceTabId/accentColor/

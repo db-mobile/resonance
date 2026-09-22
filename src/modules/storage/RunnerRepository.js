@@ -88,7 +88,6 @@ export class RunnerRepository {
     /**
      * @param {Object} runner
      * @param {string} runner.name
-     * @param {string} runner.collectionId
      * @param {Array<Object>} runner.requests
      * @returns {Promise<Object>}
      */
@@ -97,7 +96,6 @@ export class RunnerRepository {
             const newRunner = {
                 id: this._generateId(),
                 name: runner.name || 'Untitled Runner',
-                collectionId: runner.collectionId || null,
                 requests: runner.requests || [],
                 overridesVersion: runner.overridesVersion ?? null,
                 options: {
@@ -158,42 +156,11 @@ export class RunnerRepository {
     }
 
     /**
-     * @param {string} collectionId
-     * @returns {Promise<Array<Object>>}
-     */
-    async getByCollectionId(collectionId) {
-        const runners = await this.getAll();
-        return runners.filter(runner => runner.collectionId === collectionId);
-    }
-
-    /**
      * @param {string} id
      * @returns {Promise<Object|null>}
      */
     async updateLastRun(id) {
         return this.update(id, { lastRunAt: Date.now() });
-    }
-
-    /**
-     * @param {string} id
-     * @returns {Promise<Object|null>}
-     */
-    async duplicate(id) {
-        const runner = await this.getById(id);
-        if (!runner) {
-            return null;
-        }
-
-        const duplicatedRunner = {
-            ...runner,
-            id: undefined,
-            name: `${runner.name} (Copy)`,
-            createdAt: undefined,
-            lastModifiedAt: undefined,
-            lastRunAt: null
-        };
-
-        return this.add(duplicatedRunner);
     }
 
     /** @returns {string} */
@@ -229,7 +196,6 @@ function clone(value) {
  * @typedef {Object} Runner
  * @property {string} id
  * @property {string} name
- * @property {string|null} collectionId
  * @property {Array<RunnerRequest>} requests
  * @property {number|null} overridesVersion
  * @property {Object} options

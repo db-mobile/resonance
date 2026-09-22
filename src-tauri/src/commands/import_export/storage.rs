@@ -149,6 +149,9 @@ pub(crate) async fn pick_import_file_with_kind(
         "cookie_jar" => {
             dialog = dialog.add_filter("Cookie Export", &["json"]);
         }
+        "runner_data" => {
+            dialog = dialog.add_filter("Data Files (CSV, JSON)", &["csv", "json"]);
+        }
         _ => {}
     }
 

@@ -1,5 +1,6 @@
 import {
     flattenRequests,
+    requestsInFolder,
     rootRequests,
     topLevelFolders,
     findRequest,
@@ -93,6 +94,21 @@ describe('flattenRequests', () => {
         expect(flattenRequests(undefined)).toEqual([]);
         expect(flattenRequests({})).toEqual([]);
         expect(flattenRequests({ folders: [{ id: 'f1' }] })).toEqual([]);
+    });
+});
+
+describe('requestsInFolder', () => {
+    test('returns a legacy folder\'s requests in display order', () => {
+        expect(requestsInFolder(legacyCollection(), 'f1').map(r => r.id)).toEqual(['r2', 'r3']);
+    });
+
+    test('includes nested folders of an items tree', () => {
+        expect(requestsInFolder(itemsCollection(), 'f1').map(r => r.id)).toEqual(['r2', 'r3']);
+        expect(requestsInFolder(itemsCollection(), 'f2').map(r => r.id)).toEqual(['r3']);
+    });
+
+    test('returns nothing for an unknown folder', () => {
+        expect(requestsInFolder(itemsCollection(), 'nope')).toEqual([]);
     });
 });
 
