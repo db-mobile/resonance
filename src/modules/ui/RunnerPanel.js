@@ -10,6 +10,7 @@ import { RequestEditorModal } from './runner/RequestEditorModal.js';
 import { CollectionPalette } from './runner/CollectionPalette.js';
 import { RequestQueue } from './runner/RequestQueue.js';
 import { RunnerSelectorMenu } from './runner/RunnerSelectorMenu.js';
+import { OVERRIDES_VERSION } from '../utils/requestOverrides.js';
 
 export class RunnerPanel {
     /** @param {HTMLElement} container */
@@ -22,9 +23,7 @@ export class RunnerPanel {
         this.queue = new RequestQueue({
             onChange: () => this._notifyRequestsChange(),
             onCountChange: () => this._updateRequestCount(),
-            onEditRequest: (index) => this._openScriptModal(index),
-            onResolveEndpointDefaults: (collectionId, endpointId) =>
-                this.onResolveEndpointDefaults?.(collectionId, endpointId)
+            onEditRequest: (index) => this._openScriptModal(index)
         });
 
         this.menu = new RunnerSelectorMenu({
@@ -79,6 +78,13 @@ export class RunnerPanel {
 
         if (app.i18n && app.i18n.updateUI) {
             app.i18n.updateUI();
+        }
+    }
+
+    /** @param {Array<Object>} collections */
+    updateCollections(collections) {
+        if (this.dom.collectionTree) {
+            this.palette.render(this.dom.collectionTree, collections);
         }
     }
 
@@ -169,6 +175,8 @@ export class RunnerPanel {
 
         const request = requests[index];
         this.editorModal.open(request, {
+            resolveDefaults: (collectionId, endpointId) =>
+                this.onResolveEndpointDefaults?.(collectionId, endpointId),
             onSave: () => {
                 if (this.onScriptChange) {
                     this.onScriptChange(index, request.postResponseScript);
@@ -252,6 +260,7 @@ export class RunnerPanel {
         return {
             name: this.dom.nameInput?.value || 'Untitled Runner',
             requests: [...this.queue.getRequests()],
+            overridesVersion: OVERRIDES_VERSION,
             options: {
                 stopOnError: this.dom.stopOnErrorCheckbox?.checked ?? true,
                 delayMs: parseInt(this.dom.delayInput?.value, 10) || 0
@@ -259,8 +268,11 @@ export class RunnerPanel {
         };
     }
 
-    /** @param {Object} runner */
-    loadRunner(runner) {
+    /**
+     * @param {Object} runner
+     * @param {Set<number>} [missing]
+     */
+    loadRunner(runner, missing = new Set()) {
         if (this.dom.nameInput) {
             this.dom.nameInput.value = runner.name || 'Untitled Runner';
         }
@@ -272,7 +284,7 @@ export class RunnerPanel {
             this.dom.delayInput.value = runner.options?.delayMs || 0;
         }
 
-        this.queue.setRequests(runner.requests);
+        this.queue.setRequests(runner.requests, missing);
     }
 
     /** @param {Object} results */

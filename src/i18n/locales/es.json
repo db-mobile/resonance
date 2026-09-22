@@ -475,7 +475,17 @@
     "cookie_value": "Valor",
     "cookie_domain": "Dominio",
     "cookie_path": "Ruta",
-    "no_cookies": "No hay cookies en la respuesta"
+    "no_cookies": "No hay cookies en la respuesta",
+    "skipped": "Omitidas",
+    "tests": "Pruebas",
+    "console": "Consola",
+    "no_tests": "No se ejecutaron pruebas para esta solicitud",
+    "no_logs": "Sin salida de consola",
+    "status_running": "En ejecución",
+    "status_skipped": "Omitida",
+    "status_failed": "Fallida",
+    "status_pending": "Pendiente",
+    "request_missing": "Esta solicitud ya no existe en ninguna colección abierta"
   },
   "mqtt": {
     "title": "MQTT",

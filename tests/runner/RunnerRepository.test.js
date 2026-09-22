@@ -283,4 +283,45 @@ describe('RunnerRepository', () => {
             expect(result).toBeNull();
         });
     });
+    describe('shared cache integrity', () => {
+        test('RunnerRepository.shared hands every runner tab the same instance', () => {
+            expect(RunnerRepository.shared(mockBackendAPI)).toBe(RunnerRepository.shared(mockBackendAPI));
+        });
+
+        test('reads are copies, so unsaved UI edits never leak into the cache', async () => {
+            mockBackendAPI.store.get.mockResolvedValue([{ id: 'r1', name: 'R', requests: [{ postResponseScript: '' }] }]);
+
+            const loaded = await repository.getById('r1');
+            loaded.requests[0].postResponseScript = 'unsaved edit';
+
+            const reloaded = await repository.getById('r1');
+            expect(reloaded.requests[0].postResponseScript).toBe('');
+        });
+
+        test('concurrent writes do not lose each other', async () => {
+            mockBackendAPI.store.get.mockResolvedValue([]);
+            mockBackendAPI.store.set.mockResolvedValue();
+
+            await Promise.all([
+                repository.add({ name: 'A' }),
+                repository.add({ name: 'B' })
+            ]);
+
+            const names = (await repository.getAll()).map(runner => runner.name).sort();
+            expect(names).toEqual(['A', 'B']);
+            const lastWrite = mockBackendAPI.store.set.mock.calls.at(-1)[1];
+            expect(lastWrite.map(runner => runner.name).sort()).toEqual(['A', 'B']);
+        });
+
+        test('a failed write does not block later writes', async () => {
+            mockBackendAPI.store.get.mockResolvedValue([]);
+            mockBackendAPI.store.set.mockRejectedValueOnce(new Error('disk full')).mockResolvedValue();
+
+            await expect(repository.add({ name: 'A' })).rejects.toThrow('disk full');
+            const added = await repository.add({ name: 'B' });
+
+            expect(added.name).toBe('B');
+            expect((await repository.getAll()).map(runner => runner.name)).toEqual(['B']);
+        });
+    });
 });

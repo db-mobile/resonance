@@ -24,27 +24,28 @@ export async function getSettings() {
     return cache;
 }
 
+/**
+ * @param {Object|null} settings
+ * @returns {{httpVersion: string, timeout: number|null, verifySsl: boolean, followRedirects: boolean}}
+ */
+export function deriveRequestSettings(settings) {
+    const savedTimeout = settings?.requestTimeout ?? settings?.timeout;
+    return {
+        httpVersion: settings?.httpVersion || 'auto',
+        timeout: savedTimeout === 0 ? null : (savedTimeout ?? 30000),
+        verifySsl: settings?.verifySsl !== false,
+        followRedirects: settings?.followRedirects !== false
+    };
+}
+
 /** @returns {Promise<{httpVersion: string, timeout: number|null, verifySsl: boolean, followRedirects: boolean}>} */
 export async function resolveRequestSettings() {
-    const resolved = {
-        httpVersion: 'auto',
-        timeout: 30000,
-        verifySsl: true,
-        followRedirects: true
-    };
-
     try {
-        const settings = await getSettings();
-        const savedTimeout = settings.requestTimeout ?? settings.timeout;
-        resolved.httpVersion = settings.httpVersion || 'auto';
-        resolved.timeout = savedTimeout === 0 ? null : (savedTimeout ?? 30000);
-        resolved.verifySsl = settings.verifySsl !== false;
-        resolved.followRedirects = settings.followRedirects !== false;
+        return deriveRequestSettings(await getSettings());
     } catch (error) {
         void error;
+        return deriveRequestSettings(null);
     }
-
-    return resolved;
 }
 
 /**

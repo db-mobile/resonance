@@ -5,6 +5,7 @@
 
 import { templateLoader } from '../../templateLoader.js';
 import { flattenRequests } from '../../collections/collectionTree.js';
+import { RUNNABLE_PROTOCOLS } from '../../services/RunnerService.js';
 
 export class CollectionPalette {
     /**
@@ -85,7 +86,7 @@ export class CollectionPalette {
      */
     _getAllEndpoints(collection) {
         return flattenRequests(collection).filter(
-            endpoint => endpoint.protocol !== 'grpc' && endpoint.protocol !== 'websocket'
+            endpoint => RUNNABLE_PROTOCOLS.has(endpoint.protocol || 'http')
         );
     }
 

@@ -28,6 +28,7 @@ import { CollectionAuthDialog } from '../ui/CollectionAuthDialog.js';
 import { toast } from '../ui/Toast.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { setRequestBodyContent } from '../requestBodyHelper.js';
+import { ChangeEmitter } from '../services/ChangeEmitter.js';
 import { DocGeneratorService } from '../services/DocGeneratorService.js';
 
 export class CollectionController {
@@ -98,6 +99,7 @@ export class CollectionController {
         this.collectionsSearchInput = document.getElementById('collections-search-input');
         this.allCollections = [];
         this.searchQuery = '';
+        this._collectionEvents = new ChangeEmitter();
         
         this.handleEndpointClick = this.handleEndpointClick.bind(this);
         this.handleContextMenu = this.handleContextMenu.bind(this);
@@ -150,11 +152,21 @@ export class CollectionController {
         }
     }
 
+    /**
+     * @param {Function} listener
+     * @returns {Function}
+     */
+    onCollectionsLoaded(listener) {
+        this._collectionEvents.add(listener);
+        return () => this._collectionEvents.remove(listener);
+    }
+
     /** @returns {Promise<Array<Object>>} */
     async loadCollections() {
         try {
             this.allCollections = await this.service.loadCollections();
             await this.renderCollections(this.allCollections);
+            this._collectionEvents.emit(this.allCollections);
             return this.allCollections;
         } catch (error) {
             return [];
@@ -166,6 +178,7 @@ export class CollectionController {
         try {
             this.allCollections = await this.service.loadCollections();
             await this.renderCollections(this.allCollections, true);
+            this._collectionEvents.emit(this.allCollections);
             return this.allCollections;
         } catch (error) {
             return [];

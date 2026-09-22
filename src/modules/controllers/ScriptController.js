@@ -38,25 +38,32 @@ export class ScriptController {
     /**
      * @param {string} collectionId
      * @param {string} endpointId
+     * @returns {Promise<{preRequestScript: string, testScript: string}>}
+     */
+    async getScriptsForEndpoint(collectionId, endpointId) {
+        if (this.scriptManager?.flushPendingSave) {
+            await this.scriptManager.flushPendingSave();
+        }
+
+        if (
+            this.scriptManager?.currentCollectionId === collectionId &&
+            this.scriptManager?.currentEndpointId === endpointId &&
+            this.scriptManager?.getCurrentScripts
+        ) {
+            return this.scriptManager.getCurrentScripts();
+        }
+        return this.service.getScripts(collectionId, endpointId);
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
      * @param {Object} requestConfig
      * @returns {Promise<Object>}
      */
     async executePreRequest(collectionId, endpointId, requestConfig) {
         try {
-            if (this.scriptManager?.flushPendingSave) {
-                await this.scriptManager.flushPendingSave();
-            }
-
-            let scripts;
-            if (
-                this.scriptManager?.currentCollectionId === collectionId &&
-                this.scriptManager?.currentEndpointId === endpointId &&
-                this.scriptManager?.getCurrentScripts
-            ) {
-                scripts = this.scriptManager.getCurrentScripts();
-            } else {
-                scripts = await this.service.getScripts(collectionId, endpointId);
-            }
+            const scripts = await this.getScriptsForEndpoint(collectionId, endpointId);
 
             if (!scripts.preRequestScript || scripts.preRequestScript.trim() === '') {
                 return requestConfig;
@@ -92,20 +99,7 @@ export class ScriptController {
      */
     async executeTest(collectionId, endpointId, requestConfig, response) {
         try {
-            if (this.scriptManager?.flushPendingSave) {
-                await this.scriptManager.flushPendingSave();
-            }
-
-            let scripts;
-            if (
-                this.scriptManager?.currentCollectionId === collectionId &&
-                this.scriptManager?.currentEndpointId === endpointId &&
-                this.scriptManager?.getCurrentScripts
-            ) {
-                scripts = this.scriptManager.getCurrentScripts();
-            } else {
-                scripts = await this.service.getScripts(collectionId, endpointId);
-            }
+            const scripts = await this.getScriptsForEndpoint(collectionId, endpointId);
 
             if (!scripts.testScript || scripts.testScript.trim() === '') {
                 return null;

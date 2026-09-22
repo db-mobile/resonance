@@ -7,6 +7,25 @@ import { app } from '../../appContext.js';
 import { templateLoader } from '../../templateLoader.js';
 import { escapeHtml, getStatusCodeClass, getStatusText } from './runnerDomUtils.js';
 
+/** @type {Readonly<Object<string, string>>} */
+const STATUS_CLASSES = Object.freeze({
+    success: 'is-success',
+    error: 'is-error',
+    running: 'is-running',
+    skipped: 'is-skipped'
+});
+
+const ALL_STATUS_CLASSES = ['is-pending', ...Object.values(STATUS_CLASSES)];
+
+/**
+ * @param {string} key
+ * @param {string} fallback
+ * @returns {string}
+ */
+function t(key, fallback) {
+    return app.i18n?.t(key) || fallback;
+}
+
 export class RunnerResultsPanel {
     /** @param {HTMLElement} container */
     constructor(container) {
@@ -107,6 +126,7 @@ export class RunnerResultsPanel {
 
         if (this.dom.passed) {this.dom.passed.textContent = '0';}
         if (this.dom.failed) {this.dom.failed.textContent = '0';}
+        if (this.dom.skipped) {this.dom.skipped.textContent = '0';}
         if (this.dom.totalTime) {this.dom.totalTime.textContent = '—';}
 
         if (this.dom.resultsList) {
@@ -123,6 +143,9 @@ export class RunnerResultsPanel {
         if (this.dom.bodyContent) {this.dom.bodyContent.textContent = '';}
         if (this.dom.headersBody) {this.dom.headersBody.innerHTML = '';}
         if (this.dom.cookiesBody) {this.dom.cookiesBody.innerHTML = '';}
+        if (this.dom.testsList) {this.dom.testsList.innerHTML = '';}
+        if (this.dom.consoleList) {this.dom.consoleList.innerHTML = '';}
+        this._setError(null);
 
         if (this.dom.detailPanel) {
             this.dom.detailPanel.classList.add('is-hidden');
@@ -137,6 +160,7 @@ export class RunnerResultsPanel {
             summary: this.panel.querySelector('[data-role="summary"]'),
             passed: this.panel.querySelector('[data-role="passed"]'),
             failed: this.panel.querySelector('[data-role="failed"]'),
+            skipped: this.panel.querySelector('[data-role="skipped"]'),
             totalTime: this.panel.querySelector('[data-role="total-time"]'),
             resultsList: this.panel.querySelector('[data-role="results-list"]'),
             detailPanel: this.panel.querySelector('[data-role="detail-panel"]'),
@@ -144,10 +168,17 @@ export class RunnerResultsPanel {
             detailName: this.panel.querySelector('[data-role="detail-name"]'),
             detailStatus: this.panel.querySelector('[data-role="detail-status"]'),
             detailTime: this.panel.querySelector('[data-role="detail-time"]'),
+            detailError: this.panel.querySelector('[data-role="detail-error"]'),
             bodyContent: this.panel.querySelector('[data-role="body-content"]'),
             headersBody: this.panel.querySelector('[data-role="headers-body"]'),
             cookiesBody: this.panel.querySelector('[data-role="cookies-body"]'),
-            noCookies: this.panel.querySelector('[data-role="no-cookies"]')
+            noCookies: this.panel.querySelector('[data-role="no-cookies"]'),
+            testsList: this.panel.querySelector('[data-role="tests-list"]'),
+            testsCount: this.panel.querySelector('[data-role="tests-count"]'),
+            noTests: this.panel.querySelector('[data-role="no-tests"]'),
+            consoleList: this.panel.querySelector('[data-role="console-list"]'),
+            logsCount: this.panel.querySelector('[data-role="logs-count"]'),
+            noLogs: this.panel.querySelector('[data-role="no-logs"]')
         };
     }
 
@@ -225,7 +256,10 @@ export class RunnerResultsPanel {
                 time: null,
                 body: null,
                 headers: null,
-                cookies: null
+                cookies: null,
+                error: null,
+                testResults: [],
+                logs: []
             };
             this.data.push(resultData);
 
@@ -296,18 +330,16 @@ export class RunnerResultsPanel {
         }
 
         const statusIcon = el.querySelector('[data-role="status-icon"]');
-        const statusClass =
-            result.status === 'success' ? 'is-success' :
-            result.status === 'error' ? 'is-error' :
-            result.status === 'running' ? 'is-running' : 'is-pending';
+        const statusClass = STATUS_CLASSES[result.status] || 'is-pending';
 
         if (statusIcon) {
-            statusIcon.classList.remove('is-pending', 'is-running', 'is-success', 'is-error');
+            statusIcon.classList.remove(...ALL_STATUS_CLASSES);
             statusIcon.classList.add(statusClass);
         }
 
-        el.classList.remove('is-pending', 'is-running', 'is-success', 'is-error');
+        el.classList.remove(...ALL_STATUS_CLASSES);
         el.classList.add(statusClass);
+        el.title = result.error || '';
 
         const statusCodeEl = el.querySelector('[data-role="status-code"]');
         if (statusCodeEl && result.statusCode != null) {
@@ -352,15 +384,14 @@ export class RunnerResultsPanel {
         }
 
         if (this.dom.detailStatus) {
-            const statusText = result.statusCode ? `${result.statusCode} ${getStatusText(result.statusCode)}` : 'Pending';
-            this.dom.detailStatus.textContent = statusText;
-            this.dom.detailStatus.classList.remove('is-success', 'is-error');
-            if (result.status === 'success') {
-                this.dom.detailStatus.classList.add('is-success');
-            } else if (result.status === 'error') {
-                this.dom.detailStatus.classList.add('is-error');
-            }
+            this.dom.detailStatus.textContent = this._statusLabel(result);
+            this.dom.detailStatus.classList.remove(...ALL_STATUS_CLASSES);
+            this.dom.detailStatus.classList.add(STATUS_CLASSES[result.status] || 'is-pending');
         }
+
+        this._setError(result.error, result.status === 'skipped');
+        this._renderTests(result.testResults || []);
+        this._renderLogs(result.logs || []);
 
         if (this.dom.detailTime) {
             this.dom.detailTime.textContent = result.time != null ? `${result.time}ms` : '';
@@ -422,6 +453,77 @@ export class RunnerResultsPanel {
         }
     }
 
+    /**
+     * @param {Object} result
+     * @returns {string}
+     */
+    _statusLabel(result) {
+        if (result.statusCode) {
+            return `${result.statusCode} ${getStatusText(result.statusCode)}`;
+        }
+        switch (result.status) {
+            case 'running':
+                return t('runner.status_running', 'Running');
+            case 'skipped':
+                return t('runner.status_skipped', 'Skipped');
+            case 'error':
+                return t('runner.status_failed', 'Failed');
+            default:
+                return t('runner.status_pending', 'Pending');
+        }
+    }
+
+    /**
+     * @param {string|null|undefined} message
+     * @param {boolean} [neutral]
+     */
+    _setError(message, neutral = false) {
+        if (!this.dom.detailError) {return;}
+        this.dom.detailError.textContent = message || '';
+        this.dom.detailError.classList.toggle('is-hidden', !message);
+        this.dom.detailError.classList.toggle('is-neutral', neutral);
+    }
+
+    /** @param {Array<{passed: boolean, message: string}>} testResults */
+    _renderTests(testResults) {
+        if (!this.dom.testsList) {return;}
+        this.dom.testsList.innerHTML = '';
+        for (const test of testResults) {
+            const item = document.createElement('li');
+            item.className = `runner-results-test ${test.passed ? 'is-passed' : 'is-failed'}`;
+            const mark = document.createElement('span');
+            mark.className = 'runner-results-test-mark';
+            mark.textContent = test.passed ? '✓' : '✗';
+            const label = document.createElement('span');
+            label.textContent = test.message || '';
+            item.append(mark, label);
+            this.dom.testsList.appendChild(item);
+        }
+        this.dom.noTests?.classList.toggle('is-hidden', testResults.length > 0);
+        if (this.dom.testsCount) {
+            const passed = testResults.filter(test => test.passed).length;
+            this.dom.testsCount.textContent = testResults.length > 0 ? `${passed}/${testResults.length}` : '';
+            this.dom.testsCount.classList.toggle('is-failed', passed < testResults.length);
+        }
+    }
+
+    /** @param {Array<{level?: string, message?: string}|string>} logs */
+    _renderLogs(logs) {
+        if (!this.dom.consoleList) {return;}
+        this.dom.consoleList.innerHTML = '';
+        for (const entry of logs) {
+            const level = typeof entry === 'object' && entry?.level ? entry.level : 'log';
+            const line = document.createElement('div');
+            line.className = `runner-results-log is-${level}`;
+            line.textContent = typeof entry === 'object' && entry !== null ? entry.message ?? '' : String(entry);
+            this.dom.consoleList.appendChild(line);
+        }
+        this.dom.noLogs?.classList.toggle('is-hidden', logs.length > 0);
+        if (this.dom.logsCount) {
+            this.dom.logsCount.textContent = logs.length > 0 ? String(logs.length) : '';
+        }
+    }
+
     /** @param {string} tabName */
     _switchTab(tabName) {
         if (!this.panel) {return;}
@@ -442,6 +544,9 @@ export class RunnerResultsPanel {
         }
         if (this.dom.failed) {
             this.dom.failed.textContent = `${results.failed || 0}`;
+        }
+        if (this.dom.skipped) {
+            this.dom.skipped.textContent = `${results.skipped || 0}`;
         }
         if (this.dom.totalTime) {
             this.dom.totalTime.textContent = `${results.totalTime || 0}ms`;

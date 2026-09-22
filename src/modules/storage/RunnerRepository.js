@@ -3,16 +3,36 @@
  * @module storage/RunnerRepository
  */
 
+/** @type {RunnerRepository|null} */
+let sharedRepository = null;
+
 export class RunnerRepository {
+    /**
+     * @param {Object} backendAPI
+     * @returns {RunnerRepository}
+     */
+    static shared(backendAPI) {
+        if (!sharedRepository || sharedRepository.backendAPI !== backendAPI) {
+            sharedRepository = new RunnerRepository(backendAPI);
+        }
+        return sharedRepository;
+    }
+
     /** @param {Object} backendAPI */
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.RUNNERS_KEY = 'collectionRunners';
         this._cache = null;
+        this._writeQueue = Promise.resolve();
     }
 
     /** @returns {Promise<Array<Object>>} */
     async getAll() {
+        return clone(await this._load());
+    }
+
+    /** @returns {Promise<Array<Object>>} */
+    async _load() {
         if (this._cache !== null) {
             return this._cache;
         }
@@ -23,7 +43,7 @@ export class RunnerRepository {
             if (!Array.isArray(runners)) {
                 await this.backendAPI.store.set(this.RUNNERS_KEY, []);
                 this._cache = [];
-                return [];
+                return this._cache;
             }
 
             this._cache = runners;
@@ -39,11 +59,21 @@ export class RunnerRepository {
      */
     async save(runners) {
         try {
-            this._cache = runners;
             await this.backendAPI.store.set(this.RUNNERS_KEY, runners);
+            this._cache = clone(runners);
         } catch (error) {
             throw new Error(`Failed to save runners: ${error.message}`, { cause: error });
         }
+    }
+
+    /**
+     * @param {function(Array<Object>): Promise<*>} mutate
+     * @returns {Promise<*>}
+     */
+    _write(mutate) {
+        const run = this._writeQueue.then(async () => mutate(clone(await this._load())));
+        this._writeQueue = run.catch(() => {});
+        return run;
     }
 
     /**
@@ -63,26 +93,27 @@ export class RunnerRepository {
      * @returns {Promise<Object>}
      */
     async add(runner) {
-        const runners = await this.getAll();
+        return this._write(async (runners) => {
+            const newRunner = {
+                id: this._generateId(),
+                name: runner.name || 'Untitled Runner',
+                collectionId: runner.collectionId || null,
+                requests: runner.requests || [],
+                overridesVersion: runner.overridesVersion ?? null,
+                options: {
+                    stopOnError: true,
+                    delayMs: 0,
+                    ...runner.options
+                },
+                createdAt: Date.now(),
+                lastModifiedAt: Date.now(),
+                lastRunAt: null
+            };
 
-        const newRunner = {
-            id: this._generateId(),
-            name: runner.name || 'Untitled Runner',
-            collectionId: runner.collectionId || null,
-            requests: runner.requests || [],
-            options: {
-                stopOnError: true,
-                delayMs: 0,
-                ...runner.options
-            },
-            createdAt: Date.now(),
-            lastModifiedAt: Date.now(),
-            lastRunAt: null
-        };
-
-        runners.push(newRunner);
-        await this.save(runners);
-        return newRunner;
+            runners.push(newRunner);
+            await this.save(runners);
+            return clone(newRunner);
+        });
     }
 
     /**
@@ -91,21 +122,22 @@ export class RunnerRepository {
      * @returns {Promise<Object|null>}
      */
     async update(id, updates) {
-        const runners = await this.getAll();
-        const index = runners.findIndex(runner => runner.id === id);
+        return this._write(async (runners) => {
+            const index = runners.findIndex(runner => runner.id === id);
 
-        if (index === -1) {
-            return null;
-        }
+            if (index === -1) {
+                return null;
+            }
 
-        runners[index] = {
-            ...runners[index],
-            ...updates,
-            lastModifiedAt: Date.now()
-        };
+            runners[index] = {
+                ...runners[index],
+                ...clone(updates),
+                lastModifiedAt: Date.now()
+            };
 
-        await this.save(runners);
-        return runners[index];
+            await this.save(runners);
+            return clone(runners[index]);
+        });
     }
 
     /**
@@ -113,15 +145,16 @@ export class RunnerRepository {
      * @returns {Promise<boolean>}
      */
     async delete(id) {
-        const runners = await this.getAll();
-        const updatedRunners = runners.filter(runner => runner.id !== id);
+        return this._write(async (runners) => {
+            const updatedRunners = runners.filter(runner => runner.id !== id);
 
-        if (updatedRunners.length === runners.length) {
-            return false;
-        }
+            if (updatedRunners.length === runners.length) {
+                return false;
+            }
 
-        await this.save(updatedRunners);
-        return true;
+            await this.save(updatedRunners);
+            return true;
+        });
     }
 
     /**
@@ -170,6 +203,14 @@ export class RunnerRepository {
 }
 
 /**
+ * @param {*} value
+ * @returns {*}
+ */
+function clone(value) {
+    return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+/**
  * @typedef {Object} RunnerRequest
  * @property {string} collectionId
  * @property {string} endpointId
@@ -190,6 +231,7 @@ export class RunnerRepository {
  * @property {string} name
  * @property {string|null} collectionId
  * @property {Array<RunnerRequest>} requests
+ * @property {number|null} overridesVersion
  * @property {Object} options
  * @property {boolean} options.stopOnError
  * @property {number} options.delayMs

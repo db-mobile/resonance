@@ -3,6 +3,7 @@
  * @module ui/runner/RequestQueue
  */
 
+import { app } from '../../appContext.js';
 import { templateLoader } from '../../templateLoader.js';
 
 export class RequestQueue {
@@ -11,17 +12,16 @@ export class RequestQueue {
      * @param {() => void} [callbacks.onChange]
      * @param {(count: number) => void} [callbacks.onCountChange]
      * @param {(index: number) => void} [callbacks.onEditRequest]
-     * @param {(collectionId: string, endpointId: string) => Promise<Object>} [callbacks.onResolveEndpointDefaults]
      */
-    constructor({ onChange, onCountChange, onEditRequest, onResolveEndpointDefaults } = {}) {
+    constructor({ onChange, onCountChange, onEditRequest } = {}) {
         this.container = null;
         this.requests = [];
         this.selectedIndex = -1;
+        this.missing = new WeakSet();
 
         this._onChange = onChange || null;
         this._onCountChange = onCountChange || null;
         this._onEditRequest = onEditRequest || null;
-        this._onResolveEndpointDefaults = onResolveEndpointDefaults || null;
     }
 
     /** @param {HTMLElement} container */
@@ -40,9 +40,13 @@ export class RequestQueue {
         return this.requests;
     }
 
-    /** @param {Array<Object>} requests */
-    setRequests(requests) {
+    /**
+     * @param {Array<Object>} requests
+     * @param {Set<number>} [missingIndexes]
+     */
+    setRequests(requests, missingIndexes = new Set()) {
         this.requests = requests ? [...requests] : [];
+        this.missing = new WeakSet(this.requests.filter((_, index) => missingIndexes.has(index)));
         this.selectedIndex = -1;
         this._render();
     }
@@ -62,7 +66,7 @@ export class RequestQueue {
      * @param {Object} collection
      * @param {Object} endpoint
      */
-    async addRequest(collection, endpoint) {
+    addRequest(collection, endpoint) {
         const request = {
             collectionId: collection.id,
             endpointId: endpoint.id,
@@ -70,7 +74,7 @@ export class RequestQueue {
             method: endpoint.method,
             path: endpoint.path,
             postResponseScript: '',
-            overrides: await this._resolveOverrides(collection.id, endpoint.id)
+            overrides: {}
         };
 
         this.requests.push(request);
@@ -80,36 +84,6 @@ export class RequestQueue {
 
     _emitChange() {
         this._onChange?.();
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @returns {Promise<Object>}
-     */
-    async _resolveOverrides(collectionId, endpointId) {
-        const empty = { pathParams: [], queryParams: [], headers: [], body: '' };
-
-        if (!this._onResolveEndpointDefaults) {
-            return empty;
-        }
-
-        try {
-            const config = await this._onResolveEndpointDefaults(collectionId, endpointId);
-            return {
-                pathParams: (config?.pathParams || []).map(p => ({ key: p.key, value: p.value })),
-                queryParams: (config?.queryParams || [])
-                    .filter(p => p.enabled !== false)
-                    .map(p => ({ key: p.key, value: p.value })),
-                headers: (config?.headers || [])
-                    .filter(p => p.enabled !== false)
-                    .map(p => ({ key: p.key, value: p.value })),
-                body: config?.body || ''
-            };
-        } catch (error) {
-            console.error('[RequestQueue] Error resolving endpoint defaults:', error);
-            return empty;
-        }
     }
 
     _render() {
@@ -149,6 +123,10 @@ export class RequestQueue {
 
         if (index === this.selectedIndex) {
             el.classList.add('is-selected');
+        }
+        if (this.missing.has(request)) {
+            el.classList.add('is-missing');
+            el.title = app.i18n?.t('runner.request_missing') || 'This request no longer exists in any open collection';
         }
 
         const methodEl = el.querySelector('[data-role="method"]');

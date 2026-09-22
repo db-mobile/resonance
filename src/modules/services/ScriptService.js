@@ -60,9 +60,11 @@ export class ScriptService {
     /**
      * @param {string} script
      * @param {Object} requestConfig
+     * @param {Object} [options]
+     * @param {Object} [options.environment]
      * @returns {Promise<Object>}
      */
-    async executePreRequestScript(script, requestConfig) {
+    async executePreRequestScript(script, requestConfig, { environment } = {}) {
         if (!script || script.trim() === '') {
             return {
                 modifiedRequest: requestConfig,
@@ -71,7 +73,7 @@ export class ScriptService {
         }
 
         try {
-            const environmentVariables = await this.environmentService.getActiveEnvironmentVariables();
+            const environmentVariables = environment ?? await this.environmentService.getActiveEnvironmentVariables();
 
             const scriptData = {
                 script,
@@ -116,9 +118,11 @@ export class ScriptService {
      * @param {string} script
      * @param {Object} requestConfig
      * @param {Object} response
+     * @param {Object} [options]
+     * @param {Object} [options.environment]
      * @returns {Promise<Object>}
      */
-    async executeTestScript(script, requestConfig, response) {
+    async executeTestScript(script, requestConfig, response, { environment } = {}) {
         if (!script || script.trim() === '') {
             return {
                 success: true,
@@ -129,7 +133,7 @@ export class ScriptService {
         }
 
         try {
-            const environmentVariables = await this.environmentService.getActiveEnvironmentVariables();
+            const environmentVariables = environment ?? await this.environmentService.getActiveEnvironmentVariables();
 
             const status = response?.status ?? response?.statusCode ?? response?.status_code ?? null;
             const statusText = response?.statusText ?? response?.status_text ?? response?.statusMessage ?? '';

@@ -290,7 +290,7 @@ export class WorkspaceTabController {
     /** @param {string} tabId */
     async _initializeRunnerTab(tabId) {
         const { RunnerController } = await import('./RunnerController.js');
-        const { getCollections } = await import('../collectionManager.js');
+        const { getCollections, onCollectionsLoaded } = await import('../collectionManager.js');
 
         const mainContentArea = document.getElementById('main-content-area');
         if (!mainContentArea) {return;}
@@ -325,7 +325,8 @@ export class WorkspaceTabController {
 
         const runnerController = new RunnerController(
             window.backendAPI,
-            () => getCollections()
+            () => getCollections(),
+            (listener) => onCollectionsLoaded(listener)
         );
 
         await runnerController.initialize(runnerContainer);

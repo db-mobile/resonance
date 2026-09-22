@@ -234,6 +234,10 @@
                     <span class="runner-stat-value" data-role="failed">0</span>
                     <span class="runner-stat-label" data-i18n="runner.failed">Failed</span>
                 </div>
+                <div class="runner-stat runner-results-skipped">
+                    <span class="runner-stat-value" data-role="skipped">0</span>
+                    <span class="runner-stat-label" data-i18n="runner.skipped">Skipped</span>
+                </div>
                 <div class="runner-stat runner-results-time">
                     <span class="runner-stat-value" data-role="total-time">—</span>
                     <span class="runner-stat-label" data-i18n="runner.total">Total</span>
@@ -253,11 +257,20 @@
                         <span class="runner-results-detail-status" data-role="detail-status">200 OK</span>
                         <span class="runner-results-detail-time" data-role="detail-time">0ms</span>
                     </div>
+                    <div class="runner-results-error is-hidden" data-role="detail-error" role="alert"></div>
                 </div>
                 <div class="runner-results-detail-tabs">
                     <button class="runner-results-tab is-active" data-tab="body" data-i18n="runner.body">Body</button>
                     <button class="runner-results-tab" data-tab="headers" data-i18n="runner.headers">Headers</button>
                     <button class="runner-results-tab" data-tab="cookies" data-i18n="runner.cookies">Cookies</button>
+                    <button class="runner-results-tab" data-tab="tests">
+                        <span data-i18n="runner.tests">Tests</span>
+                        <span class="runner-results-tab-count" data-role="tests-count"></span>
+                    </button>
+                    <button class="runner-results-tab" data-tab="console">
+                        <span data-i18n="runner.console">Console</span>
+                        <span class="runner-results-tab-count" data-role="logs-count"></span>
+                    </button>
                 </div>
                 <div class="runner-results-detail-content">
                     <div class="runner-results-tab-content is-active" data-content="body">
@@ -288,6 +301,18 @@
                         </table>
                         <div class="runner-results-no-cookies is-hidden" data-role="no-cookies">
                             <span data-i18n="runner.no_cookies">No cookies in response</span>
+                        </div>
+                    </div>
+                    <div class="runner-results-tab-content" data-content="tests">
+                        <ul class="runner-results-tests" data-role="tests-list"></ul>
+                        <div class="runner-results-empty is-hidden" data-role="no-tests">
+                            <span data-i18n="runner.no_tests">No tests ran for this request</span>
+                        </div>
+                    </div>
+                    <div class="runner-results-tab-content" data-content="console">
+                        <div class="runner-results-console" data-role="console-list"></div>
+                        <div class="runner-results-empty is-hidden" data-role="no-logs">
+                            <span data-i18n="runner.no_logs">No console output</span>
                         </div>
                     </div>
                 </div>

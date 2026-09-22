@@ -2,16 +2,18 @@
 import { RunnerController } from '../../src/modules/controllers/RunnerController.js';
 
 // Mock the dependencies
-jest.mock('../../src/modules/storage/RunnerRepository.js', () => ({
-    RunnerRepository: jest.fn().mockImplementation(() => ({
+jest.mock('../../src/modules/storage/RunnerRepository.js', () => {
+    const RunnerRepository = jest.fn().mockImplementation(() => ({
         getAll: jest.fn(),
         getById: jest.fn(),
         add: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
         updateLastRun: jest.fn()
-    }))
-}));
+    }));
+    RunnerRepository.shared = jest.fn((backendAPI) => new RunnerRepository(backendAPI));
+    return { RunnerRepository };
+});
 
 jest.mock('../../src/modules/services/RunnerService.js', () => ({
     RunnerService: jest.fn().mockImplementation(() => ({
@@ -200,13 +202,117 @@ describe('RunnerController', () => {
         });
 
         test('should load selected runner', async () => {
-            const runner = { id: 'runner_1', name: 'Test Runner' };
+            const runner = { id: 'runner_1', name: 'Test Runner', overridesVersion: 2, requests: [] };
             controller.service.getRunner.mockResolvedValue(runner);
 
             await controller._handleRunnerSelect('runner_1');
 
             expect(controller.currentRunnerId).toBe('runner_1');
-            expect(controller.panel.loadRunner).toHaveBeenCalledWith(runner);
+            expect(controller.panel.loadRunner).toHaveBeenCalledWith(runner, new Set());
+        });
+
+        test('migrates snapshot overrides once, keeping only real edits', async () => {
+            mockGetCollections.mockResolvedValue([{ id: 'c1', name: 'API', endpoints: [{ id: 'e1', method: 'GET', path: '/x' }] }]);
+            controller.service.getEndpointRequestConfig = jest.fn().mockResolvedValue({
+                pathParams: [],
+                queryParams: [{ key: 'page', value: '1', enabled: true }],
+                headers: [{ key: 'X-A', value: 'a' }],
+                body: '{"a":1}'
+            });
+            controller.service.getRunner.mockResolvedValue({
+                id: 'runner_1',
+                name: 'Old',
+                requests: [{
+                    collectionId: 'c1',
+                    endpointId: 'e1',
+                    overrides: {
+                        pathParams: [],
+                        queryParams: [{ key: 'page', value: '1' }],
+                        headers: [{ key: 'X-A', value: 'edited' }],
+                        body: '{"a":1}'
+                    }
+                }]
+            });
+
+            await controller._handleRunnerSelect('runner_1');
+
+            const loaded = controller.panel.loadRunner.mock.calls[0][0];
+            expect(loaded.overridesVersion).toBe(2);
+            expect(loaded.requests[0].overrides).toEqual({ headers: [{ key: 'X-A', value: 'edited' }] });
+            expect(controller.repository.update).toHaveBeenCalledWith('runner_1', {
+                requests: loaded.requests,
+                overridesVersion: 2
+            });
+        });
+    });
+
+    describe('re-linking orphaned requests', () => {
+        beforeEach(async () => {
+            await controller.initialize(document.createElement('div'));
+        });
+
+        const orphan = {
+            collectionId: 'old-collection',
+            endpointId: 'old-endpoint',
+            name: 'Get all albums',
+            method: 'GET',
+            path: '/albums',
+            overrides: {}
+        };
+
+        test('re-links a request to the one open endpoint with the same method, path and name', async () => {
+            mockGetCollections.mockResolvedValue([{
+                id: 'new-collection',
+                name: 'JSONPlaceholder API',
+                endpoints: [{ id: 'new-endpoint', name: 'Get all albums', method: 'GET', path: '/albums' }]
+            }]);
+            controller.service.getRunner.mockResolvedValue({ id: 'r1', name: 'testy', overridesVersion: 2, requests: [orphan] });
+
+            await controller._handleRunnerSelect('r1');
+
+            const [loaded, missing] = controller.panel.loadRunner.mock.calls[0];
+            expect(loaded.requests[0]).toMatchObject({ collectionId: 'new-collection', endpointId: 'new-endpoint' });
+            expect(missing.size).toBe(0);
+            expect(controller.repository.update).toHaveBeenCalledWith('r1', {
+                requests: loaded.requests,
+                overridesVersion: 2
+            });
+        });
+
+        test('flags a request as missing when no single endpoint matches', async () => {
+            mockGetCollections.mockResolvedValue([{
+                id: 'new-collection',
+                endpoints: [
+                    { id: 'a', name: 'Get all albums', method: 'GET', path: '/albums' },
+                    { id: 'b', name: 'Get all albums', method: 'GET', path: '/albums' }
+                ]
+            }]);
+            controller.service.getRunner.mockResolvedValue({ id: 'r1', name: 'testy', overridesVersion: 2, requests: [orphan] });
+
+            await controller._handleRunnerSelect('r1');
+
+            const [loaded, missing] = controller.panel.loadRunner.mock.calls[0];
+            expect(loaded.requests[0].collectionId).toBe('old-collection');
+            expect([...missing]).toEqual([0]);
+            expect(controller.repository.update).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('destroy', () => {
+        test('stops a running execution and unsubscribes from collection updates', async () => {
+            const unsubscribe = jest.fn();
+            const subscribe = jest.fn().mockReturnValue(unsubscribe);
+            controller = new RunnerController(mockBackendAPI, mockGetCollections, subscribe);
+            await controller.initialize(document.createElement('div'));
+            controller.panel.destroy = jest.fn();
+            controller.panel.updateCollections = jest.fn();
+
+            subscribe.mock.calls[0][0]([{ id: 'c2' }]);
+            controller.destroy();
+
+            expect(controller.panel.updateCollections).toHaveBeenCalledWith([{ id: 'c2' }]);
+            expect(controller.service.stopExecution).toHaveBeenCalled();
+            expect(unsubscribe).toHaveBeenCalled();
         });
     });
 

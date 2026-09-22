@@ -12,18 +12,23 @@ import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { updateStatusDisplay } from '../statusDisplay.js';
 import { templateLoader } from '../templateLoader.js';
 import { toast } from '../ui/Toast.js';
+import { OVERRIDES_VERSION, endpointDefaults, stripUnchangedOverrides } from '../utils/requestOverrides.js';
+import { resolveRequestLinks } from '../utils/runnerRequestLinks.js';
 
 export class RunnerController {
     /**
      * @param {Object} backendAPI
      * @param {Function} getCollections
+     * @param {Function} [subscribeToCollections]
      */
-    constructor(backendAPI, getCollections) {
+    constructor(backendAPI, getCollections, subscribeToCollections = null) {
         this.backendAPI = backendAPI;
         this.getCollections = getCollections;
+        this.subscribeToCollections = subscribeToCollections;
+        this._unsubscribeCollections = null;
 
         const statusDisplay = new StatusDisplayAdapter(updateStatusDisplay);
-        this.repository = new RunnerRepository(backendAPI);
+        this.repository = RunnerRepository.shared(backendAPI);
         this.service = new RunnerService(this.repository, backendAPI, statusDisplay);
 
         this.panel = null;
@@ -58,6 +63,9 @@ export class RunnerController {
         ]);
 
         this.panel.render(collections);
+        this._unsubscribeCollections = this.subscribeToCollections?.(
+            (latest) => this.panel?.updateCollections(latest)
+        ) || null;
 
         this.service.addListener((event, data) => {
             this._handleServiceEvent(event, data);
@@ -93,10 +101,10 @@ export class RunnerController {
     /** @param {string} runnerId */
     async _handleRunnerSelect(runnerId) {
         try {
-            const runner = await this.service.getRunner(runnerId);
+            const { runner, missing } = await this._prepareRunner(await this.service.getRunner(runnerId));
             if (runner) {
                 this.currentRunnerId = runnerId;
-                this.panel?.loadRunner(runner);
+                this.panel?.loadRunner(runner, missing);
                 this.panel.currentRunnerId = runnerId;
                 await this._saveLastRunnerId(runnerId);
                 updateStatusDisplay(`Loaded runner: ${runner.name}`, null);
@@ -237,10 +245,10 @@ export class RunnerController {
     /** @param {string} runnerId */
     async _loadRunner(runnerId) {
         try {
-            const runner = await this.service.getRunner(runnerId);
+            const { runner, missing } = await this._prepareRunner(await this.service.getRunner(runnerId));
             if (runner) {
                 this.currentRunnerId = runnerId;
-                this.panel?.loadRunner(runner);
+                this.panel?.loadRunner(runner, missing);
                 updateStatusDisplay(`Loaded runner: ${runner.name}`, null);
             }
         } catch (error) {
@@ -253,14 +261,12 @@ export class RunnerController {
         try {
             let runnerId = this.currentRunnerId;
 
-            if (!runnerId && runnerData.name && runnerData.name !== 'Untitled Runner') {
+            if (runnerId) {
+                await this.service.updateRunner(runnerId, runnerData);
+            } else if (runnerData.name && runnerData.name !== 'Untitled Runner') {
                 const runner = await this.service.createRunner(runnerData);
                 runnerId = runner.id;
                 this.currentRunnerId = runnerId;
-            }
-
-            if (runnerId) {
-                await this.service.updateRunner(runnerId, runnerData);
             }
 
             const results = runnerId
@@ -297,6 +303,10 @@ export class RunnerController {
         switch (event) {
             case 'run-started':
                 updateStatusDisplay(`Running ${data.total} requests...`, null);
+                break;
+
+            case 'request-started':
+                this.panel?.markRequestRunning?.(data.index);
                 break;
 
             case 'request-completed':
@@ -353,10 +363,10 @@ export class RunnerController {
         try {
             const lastRunnerId = settings?.lastRunnerId;
             if (lastRunnerId) {
-                const runner = await this.service.getRunner(lastRunnerId);
+                const { runner, missing } = await this._prepareRunner(await this.service.getRunner(lastRunnerId));
                 if (runner) {
                     this.currentRunnerId = lastRunnerId;
-                    this.panel?.loadRunner(runner);
+                    this.panel?.loadRunner(runner, missing);
                     if (this.panel) {
                         this.panel.currentRunnerId = lastRunnerId;
                     }
@@ -366,8 +376,64 @@ export class RunnerController {
         }
     }
 
+    /**
+     * @param {Object|undefined} runner
+     * @returns {Promise<{runner: Object|undefined, missing: Set<number>}>}
+     */
+    async _prepareRunner(runner) {
+        if (!runner) {
+            return { runner, missing: new Set() };
+        }
+
+        let collections = [];
+        try {
+            collections = await this.getCollections() || [];
+        } catch (error) {
+            void error;
+        }
+
+        const links = resolveRequestLinks(runner.requests, collections);
+        let { requests } = links;
+        const needsMigration = runner.overridesVersion !== OVERRIDES_VERSION;
+
+        if (needsMigration) {
+            requests = await Promise.all(requests.map(async (request, index) => {
+                if (links.missing.has(index)) {
+                    return request;
+                }
+                try {
+                    const config = await this.service.getEndpointRequestConfig(request.collectionId, request.endpointId);
+                    return { ...request, overrides: stripUnchangedOverrides(request.overrides, endpointDefaults(config)) };
+                } catch (error) {
+                    void error;
+                    return request;
+                }
+            }));
+        }
+
+        if (needsMigration || links.relinked > 0) {
+            try {
+                await this.repository.update(runner.id, { requests, overridesVersion: OVERRIDES_VERSION });
+            } catch (error) {
+                void error;
+            }
+        }
+
+        if (links.relinked > 0) {
+            toast.info(`Re-linked ${links.relinked} request${links.relinked === 1 ? '' : 's'} to the open collections`);
+        }
+        if (links.missing.size > 0) {
+            toast.warning(`${links.missing.size} request${links.missing.size === 1 ? '' : 's'} in "${runner.name}" no longer exist in any open collection`);
+        }
+
+        return { runner: { ...runner, requests, overridesVersion: OVERRIDES_VERSION }, missing: links.missing };
+    }
+
     /** @returns {void} */
     destroy() {
+        this.service.stopExecution();
+        this._unsubscribeCollections?.();
+        this._unsubscribeCollections = null;
         this.panel?.destroy?.();
     }
 }
