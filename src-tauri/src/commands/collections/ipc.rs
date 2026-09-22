@@ -10,11 +10,11 @@
 //! location so the tree UI can restore it without another format change.
 #![allow(dead_code)]
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::collections::{HashMap, HashSet};
 
-use super::model::{Body, BodyKind, FolderDoc, RequestDoc, FORMAT_VERSION};
-use super::read::{folder_display_name, FolderNode, LoadedCollection, RequestEntry};
+use super::model::{Body, BodyKind, FORMAT_VERSION, FolderDoc, RequestDoc};
+use super::read::{FolderNode, LoadedCollection, RequestEntry, folder_display_name};
 use super::{Collection, EndpointData};
 
 /// Inserts a key only when the value carries something.
@@ -181,10 +181,10 @@ fn folder_to_ipc(node: &FolderNode, path: &mut Vec<String>, flat: &mut Vec<Value
 /// A folder's id: its own metadata when present, else derived from its name so
 /// expansion state and auth scopes stay stable for a hand-made directory.
 fn folder_id(folder: &FolderNode) -> String {
-    if let Some(meta) = &folder.meta {
-        if !meta.id.is_empty() {
-            return meta.id.clone();
-        }
+    if let Some(meta) = &folder.meta
+        && !meta.id.is_empty()
+    {
+        return meta.id.clone();
     }
     format!(
         "folder_{}",
@@ -522,8 +522,8 @@ pub(crate) fn find_request<'a>(
 mod tests {
     use super::*;
     use crate::commands::collections::legacy::v1_to_v2;
-    use crate::commands::collections::model::{FolderDoc, FORMAT_VERSION};
-    use crate::commands::collections::read::{read_collection_dir, Layout, RequestEntry};
+    use crate::commands::collections::model::{FORMAT_VERSION, FolderDoc};
+    use crate::commands::collections::read::{Layout, RequestEntry, read_collection_dir};
     use crate::commands::collections::write::write_collection_dir;
     use std::collections::HashMap;
     use tempfile::TempDir;

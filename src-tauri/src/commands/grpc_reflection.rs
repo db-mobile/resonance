@@ -1,6 +1,6 @@
 use super::api_request::ClientCertConfig;
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use bytes::Buf;
 use http::uri::PathAndQuery;
 use prost::Message;
@@ -741,10 +741,10 @@ fn queue_descriptor(
     seen: &mut HashSet<String>,
     fd: prost_types::FileDescriptorProto,
 ) {
-    if let Some(name) = fd.name.clone() {
-        if seen.insert(name) {
-            collected.push(fd);
-        }
+    if let Some(name) = fd.name.clone()
+        && seen.insert(name)
+    {
+        collected.push(fd);
     }
 }
 

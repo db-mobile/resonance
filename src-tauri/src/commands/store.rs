@@ -3,7 +3,7 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
 
 use super::fs_secure::restrict_file;
-use super::store_files::{store_file_for, ALL_STORES};
+use super::store_files::{ALL_STORES, store_file_for};
 
 /// Best-effort restriction of one on-disk store file to owner-only access.
 /// The store plugin writes it with the process umask (typically world-readable),

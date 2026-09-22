@@ -135,30 +135,27 @@ fn is_asset_entry(entry: &Value) -> bool {
         .get("_resourceType")
         .and_then(|t| t.as_str())
         .map(|t| t.to_ascii_lowercase())
+        && SKIPPED_RESOURCE_TYPES.contains(&resource_type.as_str())
     {
-        if SKIPPED_RESOURCE_TYPES.contains(&resource_type.as_str()) {
-            return true;
-        }
+        return true;
     }
 
     if let Some(mime) = entry
         .pointer("/response/content/mimeType")
         .and_then(|m| m.as_str())
         .map(|m| m.to_ascii_lowercase())
+        && (SKIPPED_MIME_PREFIXES.iter().any(|p| mime.starts_with(p))
+            || SKIPPED_MIME_TYPES.iter().any(|t| mime.starts_with(t)))
     {
-        if SKIPPED_MIME_PREFIXES.iter().any(|p| mime.starts_with(p))
-            || SKIPPED_MIME_TYPES.iter().any(|t| mime.starts_with(t))
-        {
-            return true;
-        }
+        return true;
     }
 
-    if let Some(url_str) = entry.pointer("/request/url").and_then(|u| u.as_str()) {
-        if let Ok(parsed) = url::Url::parse(url_str) {
-            let path = parsed.path().to_ascii_lowercase();
-            if SKIPPED_EXTENSIONS.iter().any(|ext| path.ends_with(ext)) {
-                return true;
-            }
+    if let Some(url_str) = entry.pointer("/request/url").and_then(|u| u.as_str())
+        && let Ok(parsed) = url::Url::parse(url_str)
+    {
+        let path = parsed.path().to_ascii_lowercase();
+        if SKIPPED_EXTENSIONS.iter().any(|ext| path.ends_with(ext)) {
+            return true;
         }
     }
 
@@ -239,22 +236,20 @@ fn extract_parameters(request: &Value) -> Option<Value> {
     let has_cookie_header = header_params
         .keys()
         .any(|k| k.eq_ignore_ascii_case("cookie"));
-    if !has_cookie_header {
-        if let Some(cookies) = request.get("cookies").and_then(|c| c.as_array()) {
-            let pairs: Vec<String> = cookies
-                .iter()
-                .filter_map(|c| {
-                    let name = c.get("name").and_then(|n| n.as_str())?;
-                    let value = c.get("value").and_then(|v| v.as_str()).unwrap_or("");
-                    Some(format!("{}={}", name, value))
-                })
-                .collect();
-            if !pairs.is_empty() {
-                header_params.insert(
-                    "Cookie".to_string(),
-                    param_map_entry(&pairs.join("; "), None),
-                );
-            }
+    if !has_cookie_header && let Some(cookies) = request.get("cookies").and_then(|c| c.as_array()) {
+        let pairs: Vec<String> = cookies
+            .iter()
+            .filter_map(|c| {
+                let name = c.get("name").and_then(|n| n.as_str())?;
+                let value = c.get("value").and_then(|v| v.as_str()).unwrap_or("");
+                Some(format!("{}={}", name, value))
+            })
+            .collect();
+        if !pairs.is_empty() {
+            header_params.insert(
+                "Cookie".to_string(),
+                param_map_entry(&pairs.join("; "), None),
+            );
         }
     }
 
@@ -282,10 +277,10 @@ fn extract_body(post_data: Option<&Value>) -> Option<Value> {
     let text = post_data.get("text").and_then(|t| t.as_str()).unwrap_or("");
     let params = post_data.get("params").and_then(|p| p.as_array());
 
-    if mime.starts_with("application/x-www-form-urlencoded") {
-        if let Some(fields) = param_fields(params, false) {
-            return Some(serde_json::json!({ "type": "urlencoded", "fields": fields }));
-        }
+    if mime.starts_with("application/x-www-form-urlencoded")
+        && let Some(fields) = param_fields(params, false)
+    {
+        return Some(serde_json::json!({ "type": "urlencoded", "fields": fields }));
     }
     if mime.starts_with("multipart/form-data") {
         if let Some(fields) = param_fields(params, true) {

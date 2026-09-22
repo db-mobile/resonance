@@ -9,7 +9,7 @@ use tauri::State;
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
-use super::http_client::{build_http_client, HttpClientOptions};
+use super::http_client::{HttpClientOptions, build_http_client};
 use super::proxy::ProxyState;
 use super::timing::TimingRecorder;
 
@@ -167,8 +167,8 @@ fn ntlm_negotiate_flags(config: &NtlmAuthConfig) -> ntlmclient::Flags {
 
 /// Build the Authorization header carrying the NTLM negotiate (Type 1) message
 fn build_ntlm_negotiate_header(config: &NtlmAuthConfig) -> Result<String, String> {
-    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
     use base64::Engine;
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 
     let message = ntlmclient::Message::Negotiate(ntlmclient::NegotiateMessage {
         flags: ntlm_negotiate_flags(config),
@@ -219,8 +219,8 @@ fn build_ntlm_authenticate_header(
     config: &NtlmAuthConfig,
     challenge_token: &str,
 ) -> Result<String, String> {
-    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
     use base64::Engine;
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 
     let challenge_bytes = BASE64_STANDARD
         .decode(challenge_token)
@@ -353,10 +353,10 @@ fn build_aws_v4_headers(
     headers_to_sign.insert("x-amz-date".to_string(), amz_date.clone());
     headers_to_sign.insert("x-amz-content-sha256".to_string(), payload_hash.clone());
 
-    if let Some(token) = &aws.session_token {
-        if !token.is_empty() {
-            headers_to_sign.insert("x-amz-security-token".to_string(), token.clone());
-        }
+    if let Some(token) = &aws.session_token
+        && !token.is_empty()
+    {
+        headers_to_sign.insert("x-amz-security-token".to_string(), token.clone());
     }
 
     // Include user-supplied headers that are not already covered
@@ -437,10 +437,10 @@ fn build_aws_v4_headers(
     out.insert("Authorization".to_string(), authorization);
     out.insert("x-amz-date".to_string(), amz_date);
     out.insert("x-amz-content-sha256".to_string(), payload_hash);
-    if let Some(token) = &aws.session_token {
-        if !token.is_empty() {
-            out.insert("x-amz-security-token".to_string(), token.clone());
-        }
+    if let Some(token) = &aws.session_token
+        && !token.is_empty()
+    {
+        out.insert("x-amz-security-token".to_string(), token.clone());
     }
 
     Ok(out)
@@ -764,8 +764,8 @@ fn decode_response_body(
         return (Some(serde_json::Value::String(text)), false, None);
     }
 
-    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
     use base64::Engine;
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
     (None, true, Some(BASE64_STANDARD.encode(bytes)))
 }
 
@@ -1037,8 +1037,8 @@ pub async fn send_api_request(
                         // client keeps every leg on that socket. Once the first body is consumed
                         // there is no falling through to the plain-401 path below, so every
                         // branch past that point returns.
-                        if let Some(ntlm_config) = &request_options.ntlm {
-                            if response_offers_ntlm(response.headers()) {
+                        if let Some(ntlm_config) = &request_options.ntlm
+                            && response_offers_ntlm(response.headers()) {
                                 match build_ntlm_negotiate_header(ntlm_config) {
                                     Ok(negotiate_header) => {
                                         let _ = response.bytes().await;
@@ -1083,12 +1083,11 @@ pub async fn send_api_request(
                                     }
                                 }
                             }
-                        }
 
-                        if let Some(auth_config) = &request_options.auth {
-                            if let Some(www_auth) = response.headers().get("www-authenticate") {
-                                if let Ok(www_auth_str) = www_auth.to_str() {
-                                    if let Some(challenge) = DigestChallenge::parse(www_auth_str) {
+                        if let Some(auth_config) = &request_options.auth
+                            && let Some(www_auth) = response.headers().get("www-authenticate")
+                                && let Ok(www_auth_str) = www_auth.to_str()
+                                    && let Some(challenge) = DigestChallenge::parse(www_auth_str) {
                                         let uri = extract_uri(&request_options.url);
 
                                         match build_digest_auth_header(
@@ -1108,9 +1107,6 @@ pub async fn send_api_request(
                                             }
                                         }
                                     }
-                                }
-                            }
-                        }
                     }
 
                     let mut api_response =
@@ -1313,8 +1309,8 @@ pub async fn save_response_body(
     default_file_name: String,
     base64_data: String,
 ) -> Result<serde_json::Value, String> {
-    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
     use base64::Engine;
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
     use tauri_plugin_dialog::{DialogExt, FilePath};
 
     let bytes = BASE64_STANDARD
@@ -1409,8 +1405,8 @@ mod tests {
     }
 
     fn decode_ntlm_header(header: &str) -> ntlmclient::Message {
-        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
         use base64::Engine;
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 
         let token = header.strip_prefix("NTLM ").expect("NTLM scheme prefix");
         let bytes = BASE64_STANDARD.decode(token).expect("valid base64");
@@ -1435,8 +1431,8 @@ mod tests {
     /// challenge, never the password itself.
     #[test]
     fn ntlm_authenticate_header_answers_a_challenge() {
-        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
         use base64::Engine;
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 
         let challenge = ntlmclient::Message::Challenge(ntlmclient::ChallengeMessage {
             target_name: "CORP".to_string(),
@@ -1502,13 +1498,13 @@ mod tests {
     #[tokio::test]
     async fn ntlm_handshake_completes_against_a_mock_server() {
         use axum::{
+            Router,
             http::{HeaderMap, StatusCode},
             response::IntoResponse,
             routing::get,
-            Router,
         };
-        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
         use base64::Engine;
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 
         async fn handler(headers: HeaderMap) -> impl IntoResponse {
             let auth = headers
@@ -1702,8 +1698,8 @@ mod tests {
 
     #[test]
     fn decode_response_body_preserves_non_utf8_as_base64() {
-        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
         use base64::Engine;
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 
         let raw = [0x89u8, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0x01];
         let (data, is_binary, base64) =

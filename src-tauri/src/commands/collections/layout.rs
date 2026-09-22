@@ -184,12 +184,11 @@ pub(crate) fn find_endpoint_data_file(
             .map_err(|e| format!("Failed to read dir entry: {}", e))?
             .path();
 
-        if path.is_file() {
-            if let Some(name) = path.file_name().and_then(|value| value.to_str()) {
-                if name.ends_with(&suffix) {
-                    return Ok(Some(path));
-                }
-            }
+        if path.is_file()
+            && let Some(name) = path.file_name().and_then(|value| value.to_str())
+            && name.ends_with(&suffix)
+        {
+            return Ok(Some(path));
         }
     }
 

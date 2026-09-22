@@ -575,9 +575,11 @@ mod tests {
         let path = dir.path().join("secrets.txt");
         std::fs::write(&path, "x").unwrap();
 
-        assert!(read_runner_data(&path)
-            .unwrap_err()
-            .contains(".csv or .json"));
+        assert!(
+            read_runner_data(&path)
+                .unwrap_err()
+                .contains(".csv or .json")
+        );
     }
 
     #[test]

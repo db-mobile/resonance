@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::State;
 
-use super::http_client::{build_http_client, HttpClientOptions};
+use super::http_client::{HttpClientOptions, build_http_client};
 use super::proxy::ProxyState;
 
 /// OAuth 2.0 Configuration for token requests
@@ -175,10 +175,10 @@ pub fn oauth2_build_authorization_url(params: AuthorizationUrlParams) -> Result<
         query.append_pair("client_id", &params.client_id);
         query.append_pair("redirect_uri", &params.redirect_uri);
 
-        if let Some(scope) = &params.scope {
-            if !scope.is_empty() {
-                query.append_pair("scope", scope);
-            }
+        if let Some(scope) = &params.scope
+            && !scope.is_empty()
+        {
+            query.append_pair("scope", scope);
         }
 
         if let Some(state) = &params.state {
@@ -192,10 +192,10 @@ pub fn oauth2_build_authorization_url(params: AuthorizationUrlParams) -> Result<
             }
         }
 
-        if let Some(audience) = &params.audience {
-            if !audience.is_empty() {
-                query.append_pair("audience", audience);
-            }
+        if let Some(audience) = &params.audience
+            && !audience.is_empty()
+        {
+            query.append_pair("audience", audience);
         }
 
         if let Some(extra) = &params.extra_params {
@@ -312,17 +312,17 @@ pub async fn oauth2_get_token(
     }
 
     // Add scope if provided
-    if let Some(scope) = &config.scope {
-        if !scope.is_empty() {
-            form_params.insert("scope".to_string(), scope.clone());
-        }
+    if let Some(scope) = &config.scope
+        && !scope.is_empty()
+    {
+        form_params.insert("scope".to_string(), scope.clone());
     }
 
     // Add audience if provided (common for Auth0, etc.)
-    if let Some(audience) = &config.audience {
-        if !audience.is_empty() {
-            form_params.insert("audience".to_string(), audience.clone());
-        }
+    if let Some(audience) = &config.audience
+        && !audience.is_empty()
+    {
+        form_params.insert("audience".to_string(), audience.clone());
     }
 
     // Add any extra parameters
@@ -355,10 +355,10 @@ pub async fn oauth2_get_token(
         _ => {
             // Send client credentials in request body (default)
             form_params.insert("client_id".to_string(), config.client_id.clone());
-            if let Some(secret) = &config.client_secret {
-                if !secret.is_empty() {
-                    form_params.insert("client_secret".to_string(), secret.clone());
-                }
+            if let Some(secret) = &config.client_secret
+                && !secret.is_empty()
+            {
+                form_params.insert("client_secret".to_string(), secret.clone());
             }
         }
     }

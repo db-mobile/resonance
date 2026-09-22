@@ -5,11 +5,12 @@ description = "A local-first, zero-account API client with excellent user experi
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
 repository = "https://github.com/db-mobile/resonance"
-edition = "2021"
+edition = "2024"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 tonic-build = "0.13"
+prost-build = "0.13"
 protoc-bin-vendored = "3"
 
 [dependencies]
@@ -133,20 +134,18 @@ strip = true       # Strip symbols from the binary
 
 # Tauri 2.12.0 is not released yet (the covector release PR, tauri-apps/tauri#15634,
 # is still open), so the crates are taken from the 2.x line's `dev` branch at a pinned
-# rev. The reason is tao: 2.11.x pins `tao ^0.35`, while 2.12.0 moves to tao 0.37 +
-# wry 0.56, which carries the Wayland client-side-decoration fixes (tao#1218 —
-# tauri#6562, #13440, #13749, #14251, #14748: title bar buttons, title changes, and
-# no CSD when the compositor offers server-side decorations) plus the Linux
-# thread-safety fixes for set_min_inner_size/set_fullscreen/set_theme (tao#1173).
-# All eight repo crates are patched together so the plugins (which pull tauri-plugin
-# and tauri-utils) resolve against the same tree instead of duplicating them.
+# rev. The reason is tao: 2.11.x pins `tao ^0.35`, while the 2.12 line moves to tao 0.37,
+# which carries the Wayland client-side-decoration fixes (tao#1218 — tauri#6562, #13440,
+# #13749, #14251, #14748: title bar buttons, title changes, and no CSD when the
+# compositor offers server-side decorations) plus the Linux thread-safety fixes for
+# set_min_inner_size/set_fullscreen/set_theme (tao#1173).
+# Only the crates something pulls from crates.io need patching: tauri and tauri-build
+# (this crate), tauri-plugin and tauri-utils (the plugins). The rest of the repo
+# (tauri-runtime, tauri-runtime-wry, tauri-macros, tauri-codegen) follows from git
+# tauri's in-repo path dependencies at the same rev.
 # Drop this whole block once tauri 2.12.0 is on crates.io.
 [patch.crates-io]
 tauri = { git = "https://github.com/tauri-apps/tauri", rev = "1c9ab578eea912394ad7addfaf03b51278bdc6a6" }
 tauri-build = { git = "https://github.com/tauri-apps/tauri", rev = "1c9ab578eea912394ad7addfaf03b51278bdc6a6" }
-tauri-codegen = { git = "https://github.com/tauri-apps/tauri", rev = "1c9ab578eea912394ad7addfaf03b51278bdc6a6" }
-tauri-macros = { git = "https://github.com/tauri-apps/tauri", rev = "1c9ab578eea912394ad7addfaf03b51278bdc6a6" }
 tauri-plugin = { git = "https://github.com/tauri-apps/tauri", rev = "1c9ab578eea912394ad7addfaf03b51278bdc6a6" }
-tauri-runtime = { git = "https://github.com/tauri-apps/tauri", rev = "1c9ab578eea912394ad7addfaf03b51278bdc6a6" }
-tauri-runtime-wry = { git = "https://github.com/tauri-apps/tauri", rev = "1c9ab578eea912394ad7addfaf03b51278bdc6a6" }
 tauri-utils = { git = "https://github.com/tauri-apps/tauri", rev = "1c9ab578eea912394ad7addfaf03b51278bdc6a6" }

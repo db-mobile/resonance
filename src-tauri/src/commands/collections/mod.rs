@@ -22,7 +22,7 @@ mod read;
 mod secrets;
 mod write;
 
-use cache::{read_collection_dir_cached, CollectionCache};
+use cache::{CollectionCache, read_collection_dir_cached};
 
 use ipc::to_ipc_collection;
 use read::Layout;
@@ -245,11 +245,7 @@ fn get_last_collection_directory(app: &AppHandle) -> Option<PathBuf> {
     }
 
     let path = PathBuf::from(dir_str);
-    if path.exists() {
-        Some(path)
-    } else {
-        None
-    }
+    if path.exists() { Some(path) } else { None }
 }
 
 fn save_last_collection_directory(app: &AppHandle, dir: &Path) {
@@ -325,12 +321,12 @@ fn list_collection_endpoints(collection: &Collection) -> Vec<(String, String)> {
     let mut endpoints = Vec::new();
 
     let mut collect_endpoint = |endpoint: &Value| {
-        if let Some(endpoint_id) = endpoint.get("id").and_then(|value| value.as_str()) {
-            if seen.insert(endpoint_id.to_string()) {
-                let endpoint_name =
-                    extract_endpoint_name(endpoint).unwrap_or_else(|| endpoint_id.to_string());
-                endpoints.push((endpoint_id.to_string(), endpoint_name));
-            }
+        if let Some(endpoint_id) = endpoint.get("id").and_then(|value| value.as_str())
+            && seen.insert(endpoint_id.to_string())
+        {
+            let endpoint_name =
+                extract_endpoint_name(endpoint).unwrap_or_else(|| endpoint_id.to_string());
+            endpoints.push((endpoint_id.to_string(), endpoint_name));
         }
     };
 
@@ -387,10 +383,10 @@ pub(crate) fn resolve_collection_dir(
             continue;
         }
 
-        if let Ok(collection) = read_collection_from_dir(&path) {
-            if collection.id == collection_id {
-                return Ok(Some(path));
-            }
+        if let Ok(collection) = read_collection_from_dir(&path)
+            && collection.id == collection_id
+        {
+            return Ok(Some(path));
         }
     }
 
@@ -452,10 +448,10 @@ fn load_existing(dir: &Path) -> Result<Option<read::LoadedCollection>, String> {
             let requests_dir = CollectionPaths::of(dir).requests();
             let mut data = HashMap::new();
             for (endpoint_id, _) in list_collection_endpoints(&collection) {
-                if let Some(file) = find_endpoint_data_file(&requests_dir, &endpoint_id)? {
-                    if let Ok(endpoint_data) = read_json_file::<EndpointData>(&file) {
-                        data.insert(endpoint_id, endpoint_data);
-                    }
+                if let Some(file) = find_endpoint_data_file(&requests_dir, &endpoint_id)?
+                    && let Ok(endpoint_data) = read_json_file::<EndpointData>(&file)
+                {
+                    data.insert(endpoint_id, endpoint_data);
                 }
             }
 
@@ -770,10 +766,10 @@ pub(crate) fn load_for_export(
             let requests_dir = paths.requests();
             let mut data = HashMap::new();
             for (endpoint_id, _) in list_collection_endpoints(&collection) {
-                if let Some(file) = find_endpoint_data_file(&requests_dir, &endpoint_id)? {
-                    if let Ok(endpoint_data) = read_json_file::<EndpointData>(&file) {
-                        data.insert(endpoint_id, endpoint_data);
-                    }
+                if let Some(file) = find_endpoint_data_file(&requests_dir, &endpoint_id)?
+                    && let Ok(endpoint_data) = read_json_file::<EndpointData>(&file)
+                {
+                    data.insert(endpoint_id, endpoint_data);
                 }
             }
 
@@ -956,17 +952,17 @@ fn load_all_collections(app: &AppHandle) -> Result<Vec<Collection>, String> {
                 continue;
             }
 
-            if let Ok(mut collection) = read_collection_from_dir(&path) {
-                if seen.insert(collection.id.clone()) {
-                    let path_str = path.to_string_lossy().to_string();
-                    if index.get(&collection.id) != Some(&path_str) {
-                        index.insert(collection.id.clone(), path_str);
-                        index_changed = true;
-                    }
-                    collection.linked = link::is_linked(&collection.id, &index, &linked);
-                    collection.open_api_spec = None;
-                    collections.push(collection);
+            if let Ok(mut collection) = read_collection_from_dir(&path)
+                && seen.insert(collection.id.clone())
+            {
+                let path_str = path.to_string_lossy().to_string();
+                if index.get(&collection.id) != Some(&path_str) {
+                    index.insert(collection.id.clone(), path_str);
+                    index_changed = true;
                 }
+                collection.linked = link::is_linked(&collection.id, &index, &linked);
+                collection.open_api_spec = None;
+                collections.push(collection);
             }
         }
     }
@@ -981,12 +977,12 @@ fn load_all_collections(app: &AppHandle) -> Result<Vec<Collection>, String> {
             continue;
         }
 
-        if let Ok(mut collection) = read_collection_from_dir(&path) {
-            if seen.insert(collection.id.clone()) {
-                collection.linked = link::is_linked(&collection.id, &index, &linked);
-                collection.open_api_spec = None;
-                collections.push(collection);
-            }
+        if let Ok(mut collection) = read_collection_from_dir(&path)
+            && seen.insert(collection.id.clone())
+        {
+            collection.linked = link::is_linked(&collection.id, &index, &linked);
+            collection.open_api_spec = None;
+            collections.push(collection);
         }
     }
 
@@ -1198,10 +1194,10 @@ pub async fn collection_save_variables(
     // Defense in depth: a variable flagged secret must never carry its value into the
     // git-friendly variables.json. The real value lives in the frontend SecretStore.
     for entry in variables.iter_mut() {
-        if let Some(obj) = entry.as_object_mut() {
-            if obj.get("secret").and_then(|s| s.as_bool()) == Some(true) {
-                obj.insert("value".to_string(), Value::String(String::new()));
-            }
+        if let Some(obj) = entry.as_object_mut()
+            && obj.get("secret").and_then(|s| s.as_bool()) == Some(true)
+        {
+            obj.insert("value".to_string(), Value::String(String::new()));
         }
     }
 

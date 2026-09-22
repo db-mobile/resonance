@@ -1,6 +1,6 @@
 use boa_engine::object::ObjectInitializer;
 use boa_engine::property::Attribute;
-use boa_engine::{js_string, Context, JsNativeError, JsResult, JsValue, NativeFunction, Source};
+use boa_engine::{Context, JsNativeError, JsResult, JsValue, NativeFunction, Source, js_string};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::cell::RefCell;
@@ -10,7 +10,7 @@ use std::time::Duration;
 use tauri::{AppHandle, State};
 use tauri_plugin_store::StoreExt;
 
-use super::http_client::{build_http_client, HttpClientOptions};
+use super::http_client::{HttpClientOptions, build_http_client};
 use super::proxy::{ProxySettings, ProxyState};
 
 use super::store_files::MAIN_STORE as STORE_FILE;
@@ -158,10 +158,10 @@ pub async fn script_get(
     )
     .await?;
 
-    if let Some(value) = endpoint_data.scripts.clone() {
-        if let Ok(scripts) = serde_json::from_value::<ScriptData>(value) {
-            return Ok(scripts);
-        }
+    if let Some(value) = endpoint_data.scripts.clone()
+        && let Ok(scripts) = serde_json::from_value::<ScriptData>(value)
+    {
+        return Ok(scripts);
     }
 
     // Fallback: legacy global-store entry. Migrate into the per-endpoint file
@@ -308,14 +308,12 @@ fn execute_script(
 /// Collect Jest test results accumulated by the in-context test framework.
 fn collect_test_results(context: &mut Context, ctx: &Rc<RefCell<ScriptContext>>) {
     let collect_source = Source::from_bytes(b"__collectResults__()");
-    if let Ok(results_val) = context.eval(collect_source) {
-        if let Some(results_str) = results_val.as_string() {
-            if let Ok(results) =
-                serde_json::from_str::<Vec<TestResult>>(&results_str.to_std_string_escaped())
-            {
-                ctx.borrow_mut().test_results.extend(results);
-            }
-        }
+    if let Ok(results_val) = context.eval(collect_source)
+        && let Some(results_str) = results_val.as_string()
+        && let Ok(results) =
+            serde_json::from_str::<Vec<TestResult>>(&results_str.to_std_string_escaped())
+    {
+        ctx.borrow_mut().test_results.extend(results);
     }
 }
 
@@ -2107,9 +2105,11 @@ mod tests {
         let (result, _) = run_script_env(&script);
         result.expect("script should execute");
         let captured = String::from_utf8_lossy(&handle.join().expect("server thread")).to_string();
-        assert!(captured
-            .to_lowercase()
-            .contains("content-type: application/json"));
+        assert!(
+            captured
+                .to_lowercase()
+                .contains("content-type: application/json")
+        );
         assert!(captured.contains(r#"{"id":7}"#));
     }
 

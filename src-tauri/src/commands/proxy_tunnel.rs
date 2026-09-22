@@ -80,8 +80,8 @@ async fn send_connect(
     );
 
     if let Some((username, password)) = &endpoint.auth {
-        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
         use base64::Engine;
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
         let credentials = BASE64_STANDARD.encode(format!("{}:{}", username, password));
         request.push_str(&format!("Proxy-Authorization: Basic {}\r\n", credentials));
     }
@@ -303,8 +303,10 @@ mod tests {
                     break;
                 }
             }
-            assert!(String::from_utf8_lossy(&request)
-                .starts_with(&format!("CONNECT 127.0.0.1:{} HTTP/1.1", ws_addr.port())));
+            assert!(
+                String::from_utf8_lossy(&request)
+                    .starts_with(&format!("CONNECT 127.0.0.1:{} HTTP/1.1", ws_addr.port()))
+            );
 
             let mut upstream = TcpStream::connect(ws_addr).await.unwrap();
             client

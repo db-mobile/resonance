@@ -1,15 +1,15 @@
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue, ACCEPT, CACHE_CONTROL};
 use reqwest::Method;
+use reqwest::header::{ACCEPT, CACHE_CONTROL, HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{Mutex, oneshot};
 
 use super::api_request::ClientCertConfig;
-use super::http_client::{build_http_client, HttpClientOptions};
+use super::http_client::{HttpClientOptions, build_http_client};
 use super::proxy::{ProxyAction, ProxyState};
 
 /// Reconnection delay used until the server sends its own `retry:` field.
@@ -273,10 +273,10 @@ fn build_header_map(
         header_map.insert(header_name, header_value);
     }
 
-    if let Some(id) = last_event_id {
-        if let Ok(value) = HeaderValue::from_str(id) {
-            header_map.insert(HeaderName::from_static("last-event-id"), value);
-        }
+    if let Some(id) = last_event_id
+        && let Ok(value) = HeaderValue::from_str(id)
+    {
+        header_map.insert(HeaderName::from_static("last-event-id"), value);
     }
 
     Ok(header_map)
@@ -597,10 +597,10 @@ pub async fn sse_connect(
     // the same tab cannot interleave and leave the older stream registered.
     let mut connections = state.connections.lock().await;
 
-    if let Some(previous) = connections.get_mut(&request.tab_id) {
-        if let Some(shutdown) = previous.shutdown.take() {
-            let _ = shutdown.send(());
-        }
+    if let Some(previous) = connections.get_mut(&request.tab_id)
+        && let Some(shutdown) = previous.shutdown.take()
+    {
+        let _ = shutdown.send(());
     }
 
     tokio::spawn(run_stream(
@@ -642,10 +642,10 @@ pub async fn sse_close(
     // The entry stays in place: the task removes itself once it has unwound,
     // which is what lets it emit the terminal `close` for this tab.
     let mut connections = state.connections.lock().await;
-    if let Some(connection) = connections.get_mut(&tab_id) {
-        if let Some(shutdown) = connection.shutdown.take() {
-            let _ = shutdown.send(());
-        }
+    if let Some(connection) = connections.get_mut(&tab_id)
+        && let Some(shutdown) = connection.shutdown.take()
+    {
+        let _ = shutdown.send(());
     }
 
     Ok(SseCommandResponse { success: true })

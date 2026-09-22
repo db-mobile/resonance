@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 
 use super::layout::{COLLECTION_JSON, COLLECTION_YAML, FOLDER_YAML, OPENAPI_YAML, VARIABLES_YAML};
 use super::model::{
-    probe_format, CollectionDoc, FolderDoc, FormatProbe, RequestDoc, FORMAT_VERSION,
+    CollectionDoc, FORMAT_VERSION, FolderDoc, FormatProbe, RequestDoc, probe_format,
 };
 
 /// Which on-disk format a collection directory uses.
@@ -252,13 +252,14 @@ fn read_folder(dir: &Path) -> Result<FolderNode, String> {
                 ));
             }
             node.folders.push(read_folder(&path)?);
-        } else if is_yaml_file(&path) && !is_layout_file(&name) {
-            if let Some(doc) = read_request_file(&path)? {
-                node.requests.push(RequestEntry {
-                    source: Some(path),
-                    doc,
-                });
-            }
+        } else if is_yaml_file(&path)
+            && !is_layout_file(&name)
+            && let Some(doc) = read_request_file(&path)?
+        {
+            node.requests.push(RequestEntry {
+                source: Some(path),
+                doc,
+            });
         }
     }
 
@@ -607,9 +608,11 @@ mod tests {
             "resonanceFormat: 99\nid: c1\nname: Future\n",
         );
 
-        assert!(read_collection_dir(temp.path())
-            .unwrap_err()
-            .contains("newer version"));
+        assert!(
+            read_collection_dir(temp.path())
+                .unwrap_err()
+                .contains("newer version")
+        );
     }
 
     #[test]
@@ -627,10 +630,12 @@ mod tests {
         let temp = TempDir::new().unwrap();
         minimal_collection(temp.path());
 
-        assert!(read_collection_dir(temp.path())
-            .unwrap()
-            .variables
-            .is_empty());
+        assert!(
+            read_collection_dir(temp.path())
+                .unwrap()
+                .variables
+                .is_empty()
+        );
     }
 
     #[test]
@@ -770,9 +775,11 @@ mod tests {
         minimal_collection(temp.path());
         write(temp.path(), "inner/collection.json", "{}");
 
-        assert!(read_collection_dir(temp.path())
-            .unwrap_err()
-            .contains("nested collection"));
+        assert!(
+            read_collection_dir(temp.path())
+                .unwrap_err()
+                .contains("nested collection")
+        );
     }
 
     /// Same seq and same name used to fall back to fs::read_dir order, which

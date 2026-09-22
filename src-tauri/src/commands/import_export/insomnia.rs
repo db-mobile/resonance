@@ -5,7 +5,7 @@
 //! `collection[]` tree with `children`. The request-level converters (auth,
 //! body, headers, template rewrite) are shared between both walks.
 
-use super::common::{derive_base_url, param_map_entry, unique_folder_id, ParsedBody};
+use super::common::{ParsedBody, derive_base_url, param_map_entry, unique_folder_id};
 use super::{Collection, Endpoint, Folder, VariableEntry};
 use crate::commands::scripts::ScriptData;
 use serde_json::Value;
@@ -899,11 +899,13 @@ mod tests {
             .collect();
         assert_eq!(folder_names, vec!["Users", "Users / Admin"]);
         assert_eq!(import.collection.endpoints.len(), 5);
-        assert!(import
-            .collection
-            .endpoints
-            .iter()
-            .any(|e| e.name == "Orphan"));
+        assert!(
+            import
+                .collection
+                .endpoints
+                .iter()
+                .any(|e| e.name == "Orphan")
+        );
     }
 
     #[test]
@@ -959,9 +961,11 @@ mod tests {
 
         let scripts: ScriptData = serde_json::from_value(list.scripts.clone().unwrap()).unwrap();
         assert!(scripts.pre_request_script.contains("console.log('pre');"));
-        assert!(scripts
-            .pre_request_script
-            .contains("[Imported: Insomnia pre-request script]"));
+        assert!(
+            scripts
+                .pre_request_script
+                .contains("[Imported: Insomnia pre-request script]")
+        );
     }
 
     #[test]
@@ -1045,9 +1049,11 @@ mod tests {
 
     #[test]
     fn unrecognized_documents_error_specifically() {
-        assert!(parse_insomnia_export(json!({ "foo": 1 }))
-            .unwrap_err()
-            .contains("Not a recognized Insomnia export"));
+        assert!(
+            parse_insomnia_export(json!({ "foo": 1 }))
+                .unwrap_err()
+                .contains("Not a recognized Insomnia export")
+        );
         assert!(
             parse_insomnia_export(json!({ "type": "environment.insomnia.rest/5.0" }))
                 .unwrap_err()
