@@ -636,6 +636,32 @@ export class WorkspaceTabStateManager {
 
         const containerElements = app.responseContainerManager?.getOrCreateContainer(tabId);
 
+        if (containerElements?.renderedResponse !== response) {
+            this._renderResponsePanes(response, tabId, containerElements);
+        }
+
+        if (response.status) {
+            updateStatusDisplay(`Status: ${response.status} ${response.statusText || ''}`, response.status);
+        } else if (response.websocket?.state === 'open') {
+            updateStatusDisplay('WebSocket connected', 101);
+        } else if (response.websocket?.state === 'closed') {
+            updateStatusDisplay('WebSocket closed', null);
+        } else {
+            updateStatusDisplay('Ready', null);
+        }
+
+        updateResponseTime(response.ttfb);
+
+        updateResponseSize(response.size);
+    }
+
+    /**
+     * @param {Object} response
+     * @param {string} tabId
+     * @param {Object|null} containerElements
+     * @returns {void}
+     */
+    _renderResponsePanes(response, tabId, containerElements) {
         if (response.data) {
             const isStructured = typeof response.data !== 'string';
             const formattedResponse = isStructured
@@ -674,19 +700,9 @@ export class WorkspaceTabStateManager {
             }
         }
 
-        if (response.status) {
-            updateStatusDisplay(`Status: ${response.status} ${response.statusText || ''}`, response.status);
-        } else if (response.websocket?.state === 'open') {
-            updateStatusDisplay('WebSocket connected', 101);
-        } else if (response.websocket?.state === 'closed') {
-            updateStatusDisplay('WebSocket closed', null);
-        } else {
-            updateStatusDisplay('Ready', null);
+        if (containerElements) {
+            containerElements.renderedResponse = response;
         }
-
-        updateResponseTime(response.ttfb);
-
-        updateResponseSize(response.size);
     }
 
     _clearResponse(tabId) {

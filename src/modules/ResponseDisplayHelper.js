@@ -21,6 +21,7 @@ export function getResponseElements(tabId, globalElements = {}) {
         : app.responseContainerManager?.getActiveElements();
 
     if (containerElements) {
+        containerElements.renderedResponse = null;
         return {
             headersEditor: containerElements.headersEditor || null,
             cookiesDisplay: containerElements.cookiesDisplay || null,

@@ -71,4 +71,26 @@ describe('CollectionRepository endpoint write serialization', () => {
 
         expect(stored).toEqual({ existing: 'kept', url: 'second' });
     });
+
+    test('an update matching the stored values skips the write', async () => {
+        stored = { existing: 'kept', headers: [{ key: 'X', value: '1' }] };
+
+        await repository.updateEndpointFields('col', 'ep', { headers: [{ key: 'X', value: '1' }] });
+
+        expect(backendAPI.collections.saveEndpointData).not.toHaveBeenCalled();
+    });
+
+    test('a null update for a field absent on disk counts as unchanged', async () => {
+        await repository.updateEndpointFields('col', 'ep', { modifiedBody: null, graphqlData: null });
+
+        expect(backendAPI.collections.saveEndpointData).not.toHaveBeenCalled();
+    });
+
+    test('a changed value among unchanged ones still writes', async () => {
+        stored = { existing: 'kept', modifiedBody: '{}' };
+
+        await repository.updateEndpointFields('col', 'ep', { modifiedBody: '{"a":1}', formBodyData: null });
+
+        expect(stored).toEqual({ existing: 'kept', modifiedBody: '{"a":1}', formBodyData: null });
+    });
 });

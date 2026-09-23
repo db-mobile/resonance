@@ -16,6 +16,17 @@ const METADATA_FIELDS = Object.freeze([
     'storageParentPath'
 ]);
 
+/**
+ * @param {Object} data
+ * @param {Object} updates
+ * @returns {boolean}
+ */
+function sameFieldValues(data, updates) {
+    return Object.keys(updates).every(
+        (field) => JSON.stringify(data[field] ?? null) === JSON.stringify(updates[field] ?? null)
+    );
+}
+
 export class CollectionRepository {
     static MAX_CACHE_SIZE = 20;
 
@@ -259,6 +270,9 @@ export class CollectionRepository {
     async _updateEndpointField(collectionId, endpointId, field, value) {
         await this._withEndpointWrite(collectionId, endpointId, async () => {
             const data = await this._getEndpointDataForUpdate(collectionId, endpointId);
+            if (sameFieldValues(data, { [field]: value })) {
+                return;
+            }
             data[field] = value;
             await this._saveEndpointData(collectionId, endpointId, data);
         });
@@ -267,6 +281,9 @@ export class CollectionRepository {
     async _updateEndpointFields(collectionId, endpointId, updates) {
         await this._withEndpointWrite(collectionId, endpointId, async () => {
             const data = await this._getEndpointDataForUpdate(collectionId, endpointId);
+            if (sameFieldValues(data, updates)) {
+                return;
+            }
             Object.assign(data, updates);
             await this._saveEndpointData(collectionId, endpointId, data);
         });

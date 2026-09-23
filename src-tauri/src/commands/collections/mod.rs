@@ -224,11 +224,22 @@ fn register_collection_path(
     path: &Path,
 ) -> Result<(), String> {
     let mut index = get_collection_index(app)?;
+    if index_entry_matches(&index, collection_id, path) {
+        return Ok(());
+    }
     index.insert(
         collection_id.to_string(),
         path.to_string_lossy().to_string(),
     );
     save_collection_index(app, &index)
+}
+
+/// Whether the index already maps `collection_id` to `path`, making a
+/// re-registration a no-op that must not rewrite the store file.
+fn index_entry_matches(index: &HashMap<String, String>, collection_id: &str, path: &Path) -> bool {
+    index
+        .get(collection_id)
+        .is_some_and(|existing| *existing == path.to_string_lossy())
 }
 
 fn unregister_collection_path(app: &AppHandle, collection_id: &str) -> Result<(), String> {
@@ -1089,13 +1100,7 @@ pub async fn collection_save_endpoint_data(
         redact_auth_secrets(auth);
     }
 
-    let collection = collection_get(app.clone(), collection_id.clone()).await?;
-    let paths = CollectionPaths::from_dir(PathBuf::from(
-        collection
-            .storage_path
-            .clone()
-            .ok_or_else(|| "Collection storage path missing".to_string())?,
-    ));
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
     if Layout::detect(&paths.dir) == Some(Layout::V2) {
         let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
         if !apply_endpoint_data_in_tree(&mut loaded.root, &endpoint_id, &data) {
@@ -1106,6 +1111,7 @@ pub async fn collection_save_endpoint_data(
         return Ok(());
     }
 
+    let collection = read_collection_from_dir(&paths.dir)?;
     let requests_dir = paths.ensure_requests()?;
 
     let endpoint_name = find_endpoint_name_in_collection(&collection, &endpoint_id)
@@ -1864,5 +1870,44 @@ mod convert_on_save {
             fs::read_to_string(temp.path().join("pets/create-pet.yaml")).unwrap(),
             "an unrelated request was rewritten"
         );
+    }
+}
+
+#[cfg(test)]
+mod index_registration {
+    use super::*;
+
+    fn index_with(id: &str, path: &str) -> HashMap<String, String> {
+        HashMap::from([(id.to_string(), path.to_string())])
+    }
+
+    #[test]
+    fn an_unchanged_entry_matches() {
+        let index = index_with("col-1", "/data/col-1");
+        assert!(index_entry_matches(
+            &index,
+            "col-1",
+            Path::new("/data/col-1")
+        ));
+    }
+
+    #[test]
+    fn a_moved_collection_does_not_match() {
+        let index = index_with("col-1", "/data/col-1");
+        assert!(!index_entry_matches(
+            &index,
+            "col-1",
+            Path::new("/elsewhere/col-1")
+        ));
+    }
+
+    #[test]
+    fn a_missing_entry_does_not_match() {
+        let index = index_with("col-1", "/data/col-1");
+        assert!(!index_entry_matches(
+            &index,
+            "col-2",
+            Path::new("/data/col-1")
+        ));
     }
 }

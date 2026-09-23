@@ -187,7 +187,8 @@ export class ResponseContainerManager {
             previewContainer,
             codeBtn,
             previewBtn,
-            previewManager: this.previewManager
+            previewManager: this.previewManager,
+            renderedResponse: null
         };
     }
 }
