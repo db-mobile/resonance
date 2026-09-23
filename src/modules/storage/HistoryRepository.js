@@ -59,15 +59,24 @@ export function capHistoryEntry(entry) {
 }
 
 /**
+ * @param {Object} entry
+ * @returns {number}
+ */
+function serializedSize(entry) {
+    return JSON.stringify(entry)?.length || 0;
+}
+
+/**
  * @param {Array<Object>} entries
  * @param {number} budget
+ * @param {function(Object): number} [sizeOf]
  * @returns {Array<Object>}
  */
-export function fitHistoryToBudget(entries, budget) {
+export function fitHistoryToBudget(entries, budget, sizeOf = serializedSize) {
     let total = 0;
 
     for (let index = 0; index < entries.length; index += 1) {
-        total += JSON.stringify(entries[index])?.length || 0;
+        total += sizeOf(entries[index]);
         if (total > budget) {
             return entries.slice(0, Math.max(1, index));
         }
@@ -76,43 +85,96 @@ export function fitHistoryToBudget(entries, budget) {
     return entries;
 }
 
+/** @type {HistoryRepository|null} */
+let sharedRepository = null;
+
 export class HistoryRepository {
+    /**
+     * @param {Object} backendAPI
+     * @returns {HistoryRepository}
+     */
+    static shared(backendAPI) {
+        if (!sharedRepository || sharedRepository.backendAPI !== backendAPI) {
+            sharedRepository = new HistoryRepository(backendAPI);
+        }
+        return sharedRepository;
+    }
+
     /** @param {Object} backendAPI */
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.HISTORY_KEY = 'requestHistory';
         this.MAX_HISTORY_ITEMS = 100;
+        /** @type {Array<Object>|null} */
+        this._entries = null;
+        /** @type {WeakMap<Object, number>} */
+        this._sizes = new WeakMap();
+        this._writeQueue = Promise.resolve();
     }
 
     /**
-     * @param {string} key
-     * @param {Array} [defaultValue=[]]
-     * @returns {Promise<Array>}
+     * @param {Object} entry
+     * @returns {number}
      */
-    async _getArrayFromStore(key, defaultValue = []) {
-        try {
-            let data = await this.backendAPI.store.get(key);
-
-            if (!Array.isArray(data)) {
-                data = defaultValue;
-                await this.backendAPI.store.set(key, data);
-            }
-
-            return data;
-        } catch (error) {
-            return defaultValue;
+    _sizeOf(entry) {
+        let size = this._sizes.get(entry);
+        if (size === undefined) {
+            size = serializedSize(entry);
+            this._sizes.set(entry, size);
         }
+        return size;
+    }
+
+    /** @returns {Promise<Array<Object>>} */
+    async _load() {
+        if (this._entries === null) {
+            let data = await this.backendAPI.store.get(this.HISTORY_KEY);
+            if (!Array.isArray(data)) {
+                data = [];
+                await this.backendAPI.store.set(this.HISTORY_KEY, data).catch(() => {});
+            }
+            this._entries = data
+                .map(capHistoryEntry)
+                .sort((a, b) => b.timestamp - a.timestamp);
+        }
+        return this._entries;
+    }
+
+    /**
+     * @param {function(Array<Object>): Promise<Array<Object>>|Array<Object>} mutate
+     * @returns {Promise<void>}
+     */
+    _write(mutate) {
+        const run = this._writeQueue.then(async () => {
+            const next = await mutate([...await this._load()]);
+            await this.backendAPI.store.set(this.HISTORY_KEY, next);
+            this._entries = next;
+        });
+        this._writeQueue = run.catch(() => {});
+        return run;
+    }
+
+    /** @returns {Promise<number>} */
+    async _maxItems() {
+        try {
+            const settings = await this.backendAPI.settings.get();
+            if (typeof settings.historyLimit === 'number' && settings.historyLimit >= 10) {
+                return settings.historyLimit;
+            }
+        } catch (e) {
+            void e;
+        }
+        return this.MAX_HISTORY_ITEMS;
     }
 
     /** @returns {Promise<Array<Object>>} */
     async getAll() {
+        await this._writeQueue;
         try {
-            const history = await this._getArrayFromStore(this.HISTORY_KEY);
-            return history
-                .map(capHistoryEntry)
-                .sort((a, b) => b.timestamp - a.timestamp);
+            return [...await this._load()];
         } catch (error) {
-            throw new Error(`Failed to load history: ${error.message}`, { cause: error });
+            void error;
+            return [];
         }
     }
 
@@ -126,31 +188,11 @@ export class HistoryRepository {
      */
     async add(historyEntry) {
         try {
-            let history = await this._getArrayFromStore(this.HISTORY_KEY);
-
-            if (!Array.isArray(history)) {
-                history = [];
-            }
-
-            history.unshift(historyEntry);
-            history = history.map(capHistoryEntry);
-
-            let maxItems = this.MAX_HISTORY_ITEMS;
-            try {
-                const settings = await this.backendAPI.settings.get();
-                if (typeof settings.historyLimit === 'number' && settings.historyLimit >= 10) {
-                    maxItems = settings.historyLimit;
-                }
-            } catch (e) {
-                void e;
-            }
-            if (history.length > maxItems) {
-                history = history.slice(0, maxItems);
-            }
-
-            history = fitHistoryToBudget(history, MAX_HISTORY_TOTAL_BYTES);
-
-            await this.backendAPI.store.set(this.HISTORY_KEY, history);
+            await this._write(async (history) => {
+                const maxItems = await this._maxItems();
+                const next = [capHistoryEntry(historyEntry), ...history].slice(0, maxItems);
+                return fitHistoryToBudget(next, MAX_HISTORY_TOTAL_BYTES, (entry) => this._sizeOf(entry));
+            });
             return historyEntry;
         } catch (error) {
             throw new Error(`Failed to add history entry: ${error.message}`, { cause: error });
@@ -176,9 +218,7 @@ export class HistoryRepository {
      */
     async delete(id) {
         try {
-            const history = await this._getArrayFromStore(this.HISTORY_KEY);
-            const updatedHistory = history.filter(entry => entry.id !== id);
-            await this.backendAPI.store.set(this.HISTORY_KEY, updatedHistory);
+            await this._write((history) => history.filter(entry => entry.id !== id));
             return true;
         } catch (error) {
             throw new Error(`Failed to delete history entry: ${error.message}`, { cause: error });
@@ -188,7 +228,7 @@ export class HistoryRepository {
     /** @returns {Promise<boolean>} */
     async clear() {
         try {
-            await this.backendAPI.store.set(this.HISTORY_KEY, []);
+            await this._write(() => []);
             return true;
         } catch (error) {
             throw new Error(`Failed to clear history: ${error.message}`, { cause: error });

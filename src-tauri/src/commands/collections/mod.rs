@@ -404,26 +404,50 @@ pub(crate) fn resolve_collection_dir(
     Ok(None)
 }
 
-/// Applies endpoint data onto the matching request anywhere in a tree.
+/// Finds a request anywhere in a tree.
 ///
 /// @param node - Folder to walk
-/// @param request_id - Request to update
-/// @param data - The data the frontend sent
-/// @returns True when the request was found
-fn apply_endpoint_data_in_tree(
-    node: &mut read::FolderNode,
+/// @param request_id - Request to find
+/// @returns The request entry, when present
+fn find_request_entry_mut<'a>(
+    node: &'a mut read::FolderNode,
     request_id: &str,
-    data: &EndpointData,
-) -> bool {
-    for entry in &mut node.requests {
-        if entry.doc.id == request_id {
-            ipc::apply_endpoint_data(&mut entry.doc, data);
-            return true;
-        }
+) -> Option<&'a mut read::RequestEntry> {
+    if let Some(index) = node
+        .requests
+        .iter()
+        .position(|entry| entry.doc.id == request_id)
+    {
+        return Some(&mut node.requests[index]);
     }
     node.folders
         .iter_mut()
-        .any(|folder| apply_endpoint_data_in_tree(folder, request_id, data))
+        .find_map(|folder| find_request_entry_mut(folder, request_id))
+}
+
+/// Applies endpoint data to one request of a v2 tree and persists it.
+///
+/// Only that request's file is rewritten when it already has one; a request
+/// that has never been written falls back to a whole-tree write.
+///
+/// @param dir - The collection directory
+/// @param loaded - The collection, as currently on disk
+/// @param request_id - Request to update
+/// @param data - The data the frontend sent
+/// @returns Ok once the change is on disk
+fn save_endpoint_data_v2(
+    dir: &Path,
+    loaded: &mut read::LoadedCollection,
+    request_id: &str,
+    data: &EndpointData,
+) -> Result<(), String> {
+    let entry = find_request_entry_mut(&mut loaded.root, request_id)
+        .ok_or_else(|| format!("Endpoint {} not found in collection", request_id))?;
+    ipc::apply_endpoint_data(&mut entry.doc, data);
+    if !write::write_request_in_place(entry)? {
+        write::write_collection_dir(dir, loaded)?;
+    }
+    Ok(())
 }
 
 /// Removes a request from a tree, wherever it sits.
@@ -1103,10 +1127,7 @@ pub async fn collection_save_endpoint_data(
     let paths = CollectionPaths::resolve(&app, &collection_id)?;
     if Layout::detect(&paths.dir) == Some(Layout::V2) {
         let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
-        if !apply_endpoint_data_in_tree(&mut loaded.root, &endpoint_id, &data) {
-            return Err(format!("Endpoint {} not found in collection", endpoint_id));
-        }
-        write::write_collection_dir(&paths.dir, &mut loaded)?;
+        save_endpoint_data_v2(&paths.dir, &mut loaded, &endpoint_id, &data)?;
         collection_cache().refresh(&paths.dir, &loaded);
         return Ok(());
     }
@@ -1870,6 +1891,51 @@ mod convert_on_save {
             fs::read_to_string(temp.path().join("pets/create-pet.yaml")).unwrap(),
             "an unrelated request was rewritten"
         );
+    }
+    #[test]
+    fn saving_endpoint_data_rewrites_only_that_request() {
+        let temp = TempDir::new().unwrap();
+        v1_on_disk(temp.path());
+        write_v2_collection(temp.path(), &ipc_from_disk(temp.path())).unwrap();
+
+        let mut loaded = read_collection_dir(temp.path()).unwrap();
+        let unrelated = temp.path().join("pets/create-pet.yaml");
+        let marked = format!("{}# marker\n", fs::read_to_string(&unrelated).unwrap());
+        fs::write(&unrelated, &marked).unwrap();
+
+        let data = EndpointData {
+            url: Some("https://changed.example/health".into()),
+            ..Default::default()
+        };
+        save_endpoint_data_v2(temp.path(), &mut loaded, "custom_1", &data).unwrap();
+
+        assert!(
+            fs::read_to_string(temp.path().join("health.yaml"))
+                .unwrap()
+                .contains("https://changed.example/health")
+        );
+        assert_eq!(
+            marked,
+            fs::read_to_string(&unrelated).unwrap(),
+            "an unrelated request was rewritten"
+        );
+    }
+
+    #[test]
+    fn saving_endpoint_data_for_an_unknown_request_is_an_error() {
+        let temp = TempDir::new().unwrap();
+        v1_on_disk(temp.path());
+        write_v2_collection(temp.path(), &ipc_from_disk(temp.path())).unwrap();
+
+        let mut loaded = read_collection_dir(temp.path()).unwrap();
+        let result = save_endpoint_data_v2(
+            temp.path(),
+            &mut loaded,
+            "missing",
+            &EndpointData::default(),
+        );
+
+        assert!(result.is_err());
     }
 }
 

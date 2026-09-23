@@ -23,7 +23,7 @@ use super::layout::{
     COLLECTION_JSON, COLLECTION_YAML, FOLDER_YAML, OPENAPI_YAML, VARIABLES_YAML,
     find_available_path, request_stem, slugify,
 };
-use super::read::{FolderNode, LoadedCollection, folder_display_name};
+use super::read::{FolderNode, LoadedCollection, RequestEntry, folder_display_name};
 
 /// Gap left between consecutive `seq` values, so a request can be inserted
 /// between two others without renumbering either.
@@ -289,6 +289,25 @@ pub(crate) fn write_collection_dir(
     remove_v1_files(dir)?;
 
     Ok(())
+}
+
+/// Writes one request back to the file it was read from.
+///
+/// A sidecar save changes a single request, so rewriting only its file skips
+/// serializing and comparing the rest of the tree, including the spec.
+///
+/// @param entry - The request, already updated in memory
+/// @returns False when the request has no file or no `seq` yet, in which case
+/// the caller must fall back to a whole-tree write that assigns both
+pub(crate) fn write_request_in_place(entry: &RequestEntry) -> Result<bool, String> {
+    let Some(path) = entry.source.as_deref() else {
+        return Ok(false);
+    };
+    if entry.doc.seq == 0 || !path.exists() {
+        return Ok(false);
+    }
+    write_if_changed(path, &to_yaml(&entry.doc)?)?;
+    Ok(true)
 }
 
 /// Serializes variables for a standalone write.
