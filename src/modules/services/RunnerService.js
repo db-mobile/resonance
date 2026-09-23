@@ -9,13 +9,27 @@ import { VariableRepository } from '../storage/VariableRepository.js';
 import { EnvironmentRepository } from '../storage/EnvironmentRepository.js';
 import { CollectionRepository } from '../storage/CollectionRepository.js';
 import { CertificateRepository } from '../storage/CertificateRepository.js';
+import { MockServerRepository } from '../storage/MockServerRepository.js';
 import { CertificateService } from './CertificateService.js';
+import { MockServerService } from './MockServerService.js';
+import { RequestBuilderService } from './RequestBuilderService.js';
 import { ChangeEmitter } from './ChangeEmitter.js';
 import { normalizeFormRows } from '../utils/formDataRows.js';
 import { activeKeyValueRows } from '../utils/keyValueRows.js';
-import { textToBase64 } from '../utils/encoding.js';
 import { findRequest } from '../collections/collectionTree.js';
+import { buildEndpointUrl } from '../collections/endpointUrl.js';
+import { resolveEffectiveAuthConfig } from '../auth/authInheritance.js';
+import { resolveAuthConfigVariables } from '../auth/authVariables.js';
+import { generateAuthData } from '../auth/authData.js';
+import { deriveRequestSettings } from '../state/settingsCache.js';
 import { extractCookies } from '../cookieParser.js';
+import { translate, translateCount } from '../utils/translate.js';
+import { RUNNABLE_PROTOCOLS } from '../utils/runnableRequests.js';
+import { parseDataFile } from '../utils/dataFile.js';
+
+const BODY_METHODS = ['POST', 'PUT', 'PATCH'];
+
+const ABSOLUTE_OR_TEMPLATED_PATH = /^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/|\{\{)/;
 
 export class RunnerService {
     /**
@@ -32,10 +46,13 @@ export class RunnerService {
         this.environmentRepository = new EnvironmentRepository(backendAPI, app.secretStore);
         this.collectionRepository = new CollectionRepository(backendAPI, app.secretStore);
         this.certificateService = new CertificateService(new CertificateRepository(backendAPI));
+        this.mockServerService = new MockServerService(new MockServerRepository(backendAPI), null);
+        this.requestBuilder = new RequestBuilderService(null, null);
 
         this.isRunning = false;
         this.shouldStop = false;
         this.currentRunId = null;
+        this._stopWaiters = new Set();
         this._events = new ChangeEmitter();
     }
 
@@ -63,7 +80,7 @@ export class RunnerService {
      */
     async createRunner(runnerData) {
         const runner = await this.repository.add(runnerData);
-        this.statusDisplay?.update(`Runner "${runner.name}" created`, null);
+        this.statusDisplay?.update(translate('runner.created', 'Runner "{{name}}" created', { name: runner.name }), null);
         return runner;
     }
 
@@ -75,7 +92,7 @@ export class RunnerService {
     async updateRunner(id, updates) {
         const runner = await this.repository.update(id, updates);
         if (runner) {
-            this.statusDisplay?.update(`Runner "${runner.name}" saved`, null);
+            this.statusDisplay?.update(translate('runner.saved', 'Runner "{{name}}" saved', { name: runner.name }), null);
         }
         return runner;
     }
@@ -87,7 +104,7 @@ export class RunnerService {
     async deleteRunner(id) {
         const success = await this.repository.delete(id);
         if (success) {
-            this.statusDisplay?.update('Runner deleted', null);
+            this.statusDisplay?.update(translate('runner.deleted', 'Runner deleted'), null);
         }
         return success;
     }
@@ -120,12 +137,12 @@ export class RunnerService {
      */
     async executeRunner(runnerId, onProgress) {
         if (this.isRunning) {
-            throw new Error('A runner is already executing');
+            throw new Error(translate('runner.error_already_running', 'A runner is already executing'));
         }
 
         const runner = await this.repository.getById(runnerId);
         if (!runner) {
-            throw new Error('Runner not found');
+            throw new Error(translate('runner.error_not_found', 'Runner not found'));
         }
 
         return this._execute(runner, {
@@ -143,12 +160,12 @@ export class RunnerService {
      */
     async executeRunnerData(runnerData, onProgress) {
         if (this.isRunning) {
-            throw new Error('A runner is already executing');
+            throw new Error(translate('runner.error_already_running', 'A runner is already executing'));
         }
 
         return this._execute(runnerData, {
             runnerId: null,
-            runnerName: runnerData.name || 'Untitled Runner',
+            runnerName: runnerData.name || translate('runner.untitled', 'Untitled Runner'),
             onProgress
         });
     }
@@ -164,19 +181,21 @@ export class RunnerService {
      */
     async _execute(runner, { runnerId, runnerName, onProgress, onFinish = null }) {
         if (!runner.requests || runner.requests.length === 0) {
-            throw new Error('Runner has no requests to execute');
+            throw new Error(translate('runner.error_no_requests', 'Runner has no requests to execute'));
         }
 
         this.isRunning = true;
         this.shouldStop = false;
         this.currentRunId = runnerId ?? 'temp';
 
+        const queue = runner.requests;
         const results = {
             runnerId,
             runnerName,
             startTime: Date.now(),
             endTime: null,
-            totalRequests: runner.requests.length,
+            totalRequests: 0,
+            iterations: 1,
             passed: 0,
             failed: 0,
             skipped: 0,
@@ -186,43 +205,71 @@ export class RunnerService {
 
         let runtimeVariables = {};
 
-        this._notifyListeners('run-started', { runnerId, total: runner.requests.length });
-
         try {
+            const dataRows = await this._loadDataRows(runner.options?.dataFile);
+            const iterations = dataRows ? dataRows.length : clampIterations(runner.options?.iterations);
+            const total = queue.length * iterations;
+            results.iterations = iterations;
+            results.totalRequests = total;
+
+            this._notifyListeners('run-started', {
+                runnerId,
+                total,
+                iterations,
+                iterationLabels: dataRows ? dataRows.map(describeDataRow) : null
+            });
+
             const runContext = await this._buildRunContext();
 
-            for (let i = 0; i < runner.requests.length; i++) {
+            for (let flat = 0; flat < total; flat++) {
                 if (this.shouldStop) {
-                    this._markRemainingAsSkipped(runner.requests, results, i, 'Execution stopped by user');
+                    this._markRemainingAsSkipped(queue, results, flat, translate('runner.skip_stopped', 'Execution stopped by user'));
                     break;
                 }
 
-                const request = runner.requests[i];
-                const requestResult = await this._executeRequest(request, runtimeVariables, i, runContext);
+                const iteration = Math.floor(flat / queue.length);
+                this._notifyListeners('request-started', { index: flat });
 
+                const request = queue[flat % queue.length];
+                const requestResult = await this._untilStopped(
+                    this._executeRequest(request, runtimeVariables, flat, runContext, {
+                        index: iteration,
+                        count: iterations,
+                        data: dataRows?.[iteration] ?? null
+                    })
+                );
+
+                if (!requestResult) {
+                    this._markRemainingAsSkipped(queue, results, flat, translate('runner.skip_stopped', 'Execution stopped by user'));
+                    break;
+                }
+
+                requestResult.iteration = iteration + 1;
                 results.requests.push(requestResult);
 
-                if (requestResult.httpSuccess && requestResult.variablesSet) {
+                if (requestResult.variablesSet) {
                     runtimeVariables = { ...runtimeVariables, ...requestResult.variablesSet };
                     Object.assign(results.variablesSet, requestResult.variablesSet);
                 }
 
-                if (requestResult.status === 'success') {
-                    results.passed++;
-                } else {
+                const failed = requestResult.status !== 'success';
+                if (failed) {
                     results.failed++;
-                    if (runner.options?.stopOnError) {
-                        this._markRemainingAsSkipped(runner.requests, results, i + 1, 'Skipped due to previous error');
-                        break;
-                    }
+                } else {
+                    results.passed++;
                 }
 
                 if (onProgress) {
-                    onProgress(i, runner.requests.length, requestResult);
+                    onProgress(flat, total, requestResult);
                 }
-                this._notifyListeners('request-completed', { index: i, result: requestResult });
+                this._notifyListeners('request-completed', { index: flat, result: requestResult });
 
-                if (runner.options?.delayMs > 0 && i < runner.requests.length - 1) {
+                if (failed && runner.options?.stopOnError) {
+                    this._markRemainingAsSkipped(queue, results, flat + 1, translate('runner.skip_previous_error', 'Skipped due to previous error'));
+                    break;
+                }
+
+                if (runner.options?.delayMs > 0 && flat < total - 1) {
                     await this._delay(runner.options.delayMs);
                 }
             }
@@ -233,6 +280,7 @@ export class RunnerService {
             this.isRunning = false;
             this.shouldStop = false;
             this.currentRunId = null;
+            this._stopWaiters.clear();
 
             if (onFinish) {
                 await onFinish();
@@ -247,7 +295,10 @@ export class RunnerService {
     stopExecution() {
         if (this.isRunning) {
             this.shouldStop = true;
-            this.statusDisplay?.update('Stopping runner...', null);
+            this.statusDisplay?.update(translate('runner.stopping', 'Stopping runner...'), null);
+            const waiters = [...this._stopWaiters];
+            this._stopWaiters.clear();
+            waiters.forEach(wake => wake());
         }
     }
 
@@ -257,16 +308,29 @@ export class RunnerService {
     }
 
     /**
-     * @param {Array} requests
+     * @param {Promise<Object>} work
+     * @returns {Promise<Object|null>}
+     */
+    _untilStopped(work) {
+        return new Promise((resolve, reject) => {
+            const wake = () => resolve(null);
+            this._stopWaiters.add(wake);
+            work.then(resolve, reject).finally(() => this._stopWaiters.delete(wake));
+        });
+    }
+
+    /**
+     * @param {Array} queue
      * @param {Object} results
      * @param {number} startIndex
      * @param {string} reason
      */
-    _markRemainingAsSkipped(requests, results, startIndex, reason) {
-        for (let j = startIndex; j < requests.length; j++) {
+    _markRemainingAsSkipped(queue, results, startIndex, reason) {
+        for (let flat = startIndex; flat < results.totalRequests; flat++) {
             results.requests.push({
-                index: j,
-                ...requests[j],
+                index: flat,
+                ...queue[flat % queue.length],
+                iteration: Math.floor(flat / queue.length) + 1,
                 status: 'skipped',
                 error: reason
             });
@@ -275,12 +339,38 @@ export class RunnerService {
     }
 
     /**
+     * @param {{path: string, name: string}|null|undefined} dataFile
+     * @returns {Promise<Array<Object<string, string>>|null>}
+     */
+    async _loadDataRows(dataFile) {
+        if (!dataFile?.path) {
+            return null;
+        }
+        let rows;
+        try {
+            const file = await this.backendAPI.runner.readDataFile(dataFile.path);
+            rows = parseDataFile(file.name || dataFile.name, file.content);
+        } catch (error) {
+            throw new Error(translate('runner.data_file_error', 'Data file {{name}}: {{message}}', {
+                name: dataFile.name,
+                message: error?.message || String(error)
+            }), { cause: error });
+        }
+        if (rows.length === 0) {
+            throw new Error(translate('runner.data_file_empty', 'Data file {{name}} has no rows', { name: dataFile.name }));
+        }
+        return rows;
+    }
+
+    /**
      * @param {Object} request
      * @param {Object} runtimeVariables
      * @param {number} index
+     * @param {Object|null} [runContext]
+     * @param {{index: number, count: number, data: Object<string, string>|null}|null} [iteration]
      * @returns {Promise<Object>}
      */
-    async _executeRequest(request, runtimeVariables, index, runContext = null) {
+    async _executeRequest(request, runtimeVariables, index, runContext = null, iteration = null) {
         this.variableProcessor.clearDynamicCache();
         const startTime = Date.now();
         const result = {
@@ -295,81 +385,109 @@ export class RunnerService {
             responseTime: null,
             error: null,
             variablesSet: {},
-            logs: []
+            logs: [],
+            testResults: []
         };
 
         try {
-            const variables = await this._buildVariables(request.collectionId, runtimeVariables, runContext);
+            let variables = await this._buildVariables(request.collectionId, runtimeVariables, runContext, iteration?.data ?? null);
+            const scriptIteration = {
+                iteration: iteration?.index ?? 0,
+                iterationCount: iteration?.count ?? 1,
+                data: iteration?.data ?? {},
+                requestName: request.name || null
+            };
 
             const collection = await this._getCollectionForRun(request.collectionId, runContext);
             if (!collection) {
-                throw new Error(`Collection not found: ${request.collectionId}`);
+                throw new Error(translate(
+                    'runner.error_collection_missing',
+                    'The collection this request came from is not open. Remove the request and add it again from Available Requests.'
+                ));
             }
 
             const endpoint = this._findEndpoint(collection, request.endpointId);
             if (!endpoint) {
-                throw new Error(`Endpoint not found: ${request.endpointId}`);
+                throw new Error(translate(
+                    'runner.error_endpoint_missing',
+                    '"{{name}}" no longer exists in {{collection}}. Remove it and add it again from Available Requests.',
+                    { name: request.name, collection: collection.name }
+                ));
             }
 
-            const requestConfig = await this._buildRequestConfig(collection, endpoint, variables, request.overrides, runContext);
+            const protocol = endpoint.protocol || 'http';
+            if (!RUNNABLE_PROTOCOLS.has(protocol)) {
+                throw new Error(translate(
+                    'runner.error_protocol',
+                    '{{protocol}} requests cannot be run by the collection runner',
+                    { protocol }
+                ));
+            }
+
+            const scripts = await this._getEndpointScripts(collection.id, endpoint.id);
+            const prepared = await this._buildRequestConfig(collection, endpoint, variables, request.overrides, runContext);
+            const outcome = { variablesSet: {}, logs: [], testResults: [], errors: [] };
+
+            let { requestConfig } = prepared;
+            if (scripts.preRequestScript.trim()) {
+                requestConfig = await this._runPreRequestScript(scripts.preRequestScript, prepared, variables, outcome, scriptIteration);
+                variables = mergeVariables(variables, outcome.variablesSet);
+            }
+
+            await this._attachClientCert(requestConfig, runContext);
+            await this._attachCookies(requestConfig);
 
             const response = await this.backendAPI.sendApiRequest(requestConfig);
 
-            result.statusCode = response.status;
+            result.statusCode = response.status || null;
             result.responseTime = Date.now() - startTime;
+            result.time = result.responseTime;
+            result.httpSuccess = Boolean(response.success);
+            result.body = response.data ?? null;
+            result.headers = response.headers || {};
+            result.cookies = extractCookies(response.headers);
+            result.response = {
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers,
+                body: response.data
+            };
 
-            if (response.success) {
-                result.status = 'success';
-                result.httpSuccess = true;
-                result.body = response.data;
-                result.headers = response.headers || {};
-                result.cookies = extractCookies(response.headers);
-                result.time = Date.now() - startTime;
-                result.response = {
-                    status: response.status,
-                    statusText: response.statusText,
-                    headers: response.headers,
-                    body: response.data
-                };
+            await this._storeResponseCookies(response, requestConfig.url);
+            this._recordHistory(requestConfig, response, collection.id, endpoint.id, prepared.authData, runContext);
 
-                if (request.postResponseScript) {
-                    const scriptResult = await this._executePostResponseScript(
-                        request.postResponseScript,
-                        requestConfig,
-                        result.response,
-                        variables
-                    );
-
-                    result.variablesSet = scriptResult.variablesSet || {};
-                    result.logs = scriptResult.logs || [];
-                    result.testResults = scriptResult.testResults || [];
-
-                    if (scriptResult.error) {
-                        result.scriptError = scriptResult.error;
-                    }
-
-                    const failureSummary = this._summarizePostScriptFailure(
-                        result.testResults,
-                        scriptResult.error
-                    );
-                    if (failureSummary) {
-                        result.status = 'error';
-                        result.error = failureSummary;
-                    }
+            for (const script of [scripts.testScript, request.postResponseScript]) {
+                if (script && script.trim()) {
+                    await this._runTestScript(script, requestConfig, response, variables, outcome, scriptIteration);
+                    variables = mergeVariables(variables, outcome.variablesSet);
                 }
+            }
+
+            result.variablesSet = outcome.variablesSet;
+            result.logs = outcome.logs;
+            result.testResults = outcome.testResults;
+            if (outcome.errors.length > 0) {
+                result.scriptError = outcome.errors.join('; ');
+            }
+
+            const failureSummary = this._summarizePostScriptFailure(outcome.testResults, result.scriptError || null);
+            if (failureSummary) {
+                result.status = 'error';
+                result.error = failureSummary;
+            } else if (outcome.testResults.length > 0 || response.success) {
+                result.status = 'success';
             } else {
                 result.status = 'error';
-                result.error = response.message || 'Request failed';
-                result.statusCode = response.status || null;
-                result.time = Date.now() - startTime;
-                result.body = response.data || null;
-                result.headers = response.headers || {};
+                result.error = response.message
+                    || (response.status
+                        ? `${response.status} ${response.statusText || ''}`.trim()
+                        : translate('runner.error_request_failed', 'Request failed'));
             }
         } catch (error) {
             result.status = 'error';
             result.error = error.message;
             result.responseTime = Date.now() - startTime;
-            result.time = Date.now() - startTime;
+            result.time = result.responseTime;
         }
 
         return result;
@@ -388,12 +506,15 @@ export class RunnerService {
 
         const parts = [];
         if (failedTests.length > 0) {
-            const count = `${failedTests.length} test${failedTests.length > 1 ? 's' : ''} failed`;
+            const count = translateCount('runner.tests_failed', failedTests.length, {
+                one: '{{count}} test failed',
+                other: '{{count}} tests failed'
+            });
             const names = failedTests.map(test => test.message).filter(Boolean);
             parts.push(names.length > 0 ? `${count}: ${names.join('; ')}` : count);
         }
         if (scriptError) {
-            parts.push(`Script error: ${scriptError}`);
+            parts.push(translate('runner.script_error', 'Script error: {{message}}', { message: scriptError }));
         }
         return parts.join(' | ');
     }
@@ -401,9 +522,11 @@ export class RunnerService {
     /**
      * @param {string} collectionId
      * @param {Object} runtimeVariables
+     * @param {Object|null} [runContext]
+     * @param {Object<string, string>|null} [dataRow]
      * @returns {Promise<Object>}
      */
-    async _buildVariables(collectionId, runtimeVariables, runContext = null) {
+    async _buildVariables(collectionId, runtimeVariables, runContext = null, dataRow = null) {
         let variables = {};
 
         try {
@@ -414,6 +537,7 @@ export class RunnerService {
             }
             variables = { ...variables, ...collectionVars };
         } catch (e) {
+            void e;
         }
 
         try {
@@ -422,11 +546,10 @@ export class RunnerService {
                 : await this.environmentRepository.getActiveEnvironmentVariables();
             variables = { ...variables, ...envVars };
         } catch (e) {
+            void e;
         }
 
-        variables = { ...variables, ...runtimeVariables };
-
-        return variables;
+        return { ...mergeVariables(variables, runtimeVariables), ...dataRow };
     }
 
     /** @returns {Promise<Object>} */
@@ -434,19 +557,24 @@ export class RunnerService {
         const context = {
             settings: null,
             envVars: {},
+            environmentName: null,
             collections: new Map(),
             collectionVars: new Map(),
+            mockBaseUrls: new Map(),
             certificatesLoaded: false
         };
 
+        context.settings = await this._loadSettings();
+
         try {
-            context.settings = await this.backendAPI.settings.get();
+            context.envVars = await this.environmentRepository.getActiveEnvironmentVariables();
         } catch (e) {
             void e;
         }
 
         try {
-            context.envVars = await this.environmentRepository.getActiveEnvironmentVariables();
+            const activeEnvironment = await app.environmentController?.service?.getActiveEnvironment();
+            context.environmentName = activeEnvironment?.name || null;
         } catch (e) {
             void e;
         }
@@ -459,6 +587,16 @@ export class RunnerService {
         }
 
         return context;
+    }
+
+    /** @returns {Promise<Object|null>} */
+    async _loadSettings() {
+        try {
+            return await this.backendAPI.settings.get();
+        } catch (e) {
+            void e;
+            return null;
+        }
     }
 
     /**
@@ -485,352 +623,466 @@ export class RunnerService {
     }
 
     /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<{preRequestScript: string, testScript: string}>}
+     */
+    async _getEndpointScripts(collectionId, endpointId) {
+        try {
+            const scripts = await app.scriptController?.getScriptsForEndpoint(collectionId, endpointId);
+            return {
+                preRequestScript: scripts?.preRequestScript || '',
+                testScript: scripts?.testScript || ''
+            };
+        } catch (e) {
+            void e;
+            return { preRequestScript: '', testScript: '' };
+        }
+    }
+
+    /**
      * @param {Object} collection
      * @param {Object} endpoint
      * @param {Object} variables
      * @param {Object} [overrides]
-     * @returns {Promise<Object>}
+     * @param {Object|null} [runContext]
+     * @returns {Promise<{requestConfig: Object, rawUrl: string, authData: Object, mockRewrite: Object|null}>}
      */
     async _buildRequestConfig(collection, endpoint, variables, overrides, runContext = null) {
+        const processor = this.variableProcessor;
         const persisted = await this.collectionRepository.getAllPersistedEndpointData(collection.id, endpoint.id);
-        const persistedHeaders = persisted.headers || [];
-        const persistedBody = persisted.modifiedBody;
-        const persistedFormBodyData = persisted.formBodyData;
-        const persistedQueryParams = persisted.queryParams || [];
-        const persistedPathParams = persisted.pathParams || [];
         const persistedAuthConfig = await this.collectionRepository.getPersistedAuthConfig(collection.id, endpoint.id);
-
-        const effectivePathParams = overrides?.pathParams?.length ? overrides.pathParams : persistedPathParams;
-        const effectiveQueryParams = activeKeyValueRows(
-            Array.isArray(overrides?.queryParams) ? overrides.queryParams : persistedQueryParams
-        );
-        const effectiveHeaders = activeKeyValueRows(
-            Array.isArray(overrides?.headers) ? overrides.headers : persistedHeaders
-        );
-        const hasBodyOverride = typeof overrides?.body === 'string';
-        const overrideBody = hasBodyOverride && overrides.body.trim() !== '' ? overrides.body : null;
-
-        let effectiveAuthConfig = persistedAuthConfig || endpoint.security || { type: 'inherit', config: {} };
-        if (effectiveAuthConfig?.type === 'inherit') {
-            effectiveAuthConfig = await this.collectionRepository.getInheritedAuthConfig(collection.id, endpoint.id) || null;
-        }
-        
-        let url = endpoint.path;
-        
-        if (!endpoint.path.includes('{{baseUrl}}')) {
-            url = `{{baseUrl}}${endpoint.path}`;
-        }
+        const isGraphQL = (endpoint.protocol || 'http') === 'graphql';
+        const method = isGraphQL ? 'POST' : endpoint.method;
 
         const effectiveVariables = {
             ...variables,
             baseUrl: variables.baseUrl || collection.baseUrl || ''
         };
 
-        if (effectivePathParams.length > 0) {
-            for (const param of effectivePathParams) {
-                if (param.key && param.value) {
-                    effectiveVariables[param.key] = param.value;
+        const rawUrl = buildEndpointUrl({
+            ...endpoint,
+            persistedUrl: persisted.url,
+            collectionBaseUrl: !ABSOLUTE_OR_TEMPLATED_PATH.test(endpoint.path)
+        });
+
+        const pathParams = this._effectivePathParams(endpoint, overrides, persisted);
+        const headers = this._effectiveHeaders(collection, endpoint, overrides, persisted);
+        const queryRows = this._effectiveQueryRows(endpoint, overrides, persisted);
+        const queryParams = Object.fromEntries(queryRows.map(row => [row.key, row.value]));
+
+        const configuredAuth = persistedAuthConfig || endpoint.security || { type: 'inherit', config: {} };
+        const resolvedAuth = withBearerFallback(await resolveEffectiveAuthConfig(configuredAuth, {
+            collectionId: collection.id,
+            endpointId: endpoint.id,
+            repository: this.collectionRepository
+        }), effectiveVariables);
+        const { authConfig: substitutedAuth } = resolveAuthConfigVariables(resolvedAuth, effectiveVariables, processor);
+        const authData = generateAuthData(substitutedAuth);
+        this.requestBuilder.mergeAuthData(headers, queryParams, authData);
+
+        const rowKeys = new Set(queryRows.map(row => row.key));
+        for (const [key, value] of Object.entries(authData.queryParams)) {
+            if (!rowKeys.has(key)) {
+                queryRows.push({ key, value });
+            }
+        }
+
+        const { url: resolvedUrl, queryString, pathParams: processedPathParams } = this.requestBuilder.processRequestComponents({
+            url: rawUrl,
+            pathParams,
+            headers,
+            queryParams,
+            queryRows,
+            variables: effectiveVariables,
+            processor
+        });
+
+        let url = resolvedUrl;
+        let mockRewrite = null;
+        const mockBaseUrl = await this._mockBaseUrlFor(collection.id, runContext);
+        if (mockBaseUrl && endpoint.path) {
+            let mockPath = endpoint.path;
+            for (const [key, value] of Object.entries(processedPathParams)) {
+                mockPath = mockPath.replace(`{${key}}`, () => value);
+            }
+            mockRewrite = { baseUrl: mockBaseUrl, pathTemplate: endpoint.path };
+            url = queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`;
+        }
+
+        const { body, bodyType } = this._buildBody({
+            endpoint,
+            method,
+            isGraphQL,
+            persisted,
+            overrides,
+            variables: effectiveVariables
+        });
+
+        const settings = deriveRequestSettings(runContext ? runContext.settings : await this._loadSettings());
+
+        return {
+            requestConfig: {
+                method,
+                url,
+                rawUrl,
+                headers,
+                queryParams,
+                pathParams: processedPathParams,
+                body,
+                bodyType,
+                httpVersion: settings.httpVersion,
+                timeout: settings.timeout,
+                verifySsl: settings.verifySsl,
+                followRedirects: settings.followRedirects,
+                auth: authData.authConfig,
+                awsAuth: authData.awsAuth || null,
+                ntlm: authData.ntlmAuth || null,
+                clientCert: null
+            },
+            rawUrl,
+            authData,
+            mockRewrite
+        };
+    }
+
+    /**
+     * @param {Object} endpoint
+     * @param {Object} [overrides]
+     * @param {Object} persisted
+     * @returns {Object}
+     */
+    _effectivePathParams(endpoint, overrides, persisted) {
+        const rows = overrides?.pathParams?.length ? overrides.pathParams : persisted.pathParams || [];
+        const pathParams = {};
+        if (rows.length > 0) {
+            for (const row of rows) {
+                if (row.key && row.value) {
+                    pathParams[row.key] = row.value;
                 }
             }
         } else if (endpoint.parameters?.path) {
             for (const [key, param] of Object.entries(endpoint.parameters.path)) {
-                if (param.example && !effectiveVariables[key]) {
-                    effectiveVariables[key] = param.example;
+                if (param.example) {
+                    pathParams[key] = String(param.example);
                 }
             }
         }
+        return pathParams;
+    }
 
-        url = this.variableProcessor.processTemplate(url, effectiveVariables);
+    /**
+     * @param {Object} collection
+     * @param {Object} endpoint
+     * @param {Object} [overrides]
+     * @param {Object} persisted
+     * @returns {Object}
+     */
+    _effectiveHeaders(collection, endpoint, overrides, persisted) {
+        const headers = { ...collection.defaultHeaders, ...endpoint.headers };
+        const rows = activeKeyValueRows(Array.isArray(overrides?.headers) ? overrides.headers : persisted.headers);
+        for (const row of rows) {
+            headers[row.key] = row.value;
+        }
+        for (const [key, value] of Object.entries(headers)) {
+            headers[key] = value === null || value === undefined ? '' : String(value);
+        }
+        return headers;
+    }
 
-        const queryParams = {};
-        if (effectiveQueryParams.length > 0) {
-            for (const param of effectiveQueryParams) {
-                if (param.key) {
-                    queryParams[param.key] = this.variableProcessor.processTemplate(param.value || '', effectiveVariables);
-                }
-            }
-        } else if (endpoint.parameters?.query) {
+    /**
+     * @param {Object} endpoint
+     * @param {Object} [overrides]
+     * @param {Object} persisted
+     * @returns {Array<{key: string, value: string}>}
+     */
+    _effectiveQueryRows(endpoint, overrides, persisted) {
+        const rows = activeKeyValueRows(
+            Array.isArray(overrides?.queryParams) ? overrides.queryParams : persisted.queryParams
+        ).map(row => ({ key: row.key, value: row.value }));
+
+        if (rows.length === 0 && endpoint.parameters?.query) {
             for (const [key, param] of Object.entries(endpoint.parameters.query)) {
                 if (param.example) {
-                    queryParams[key] = this.variableProcessor.processTemplate(param.example, effectiveVariables);
+                    rows.push({ key, value: String(param.example) });
                 }
             }
         }
+        return rows;
+    }
 
-        const queryString = Object.entries(queryParams)
-            .filter(([key, value]) => key && value)
-            .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-            .join('&');
-        if (queryString) {
-            url += (url.includes('?') ? '&' : '?') + queryString;
+    /**
+     * @param {Object} opts
+     * @param {Object} opts.endpoint
+     * @param {string} opts.method
+     * @param {boolean} opts.isGraphQL
+     * @param {Object} opts.persisted
+     * @param {Object} [opts.overrides]
+     * @param {Object} opts.variables
+     * @returns {{body: *, bodyType: string|undefined}}
+     */
+    _buildBody({ endpoint, method, isGraphQL, persisted, overrides, variables }) {
+        const process = (text) => this.variableProcessor.processTemplate(text, variables);
+        const hasBodyOverride = typeof overrides?.body === 'string';
+        const overrideBody = hasBodyOverride && overrides.body.trim() !== '' ? overrides.body : null;
+        const form = persisted.formBodyData;
+
+        if (isGraphQL && !overrideBody && persisted.graphqlData) {
+            return { body: this._buildGraphQLBody(persisted.graphqlData, process), bodyType: undefined };
         }
 
-        if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {
-            url = `https://${url}`;
-        }
-
-        let headers = { ...collection.defaultHeaders };
-        if (endpoint.headers) {
-            headers = { ...headers, ...endpoint.headers };
-        }
-        for (const h of effectiveHeaders) {
-            if (h.key) {
-                headers[h.key] = h.value;
-            }
-        }
-        const processedHeaders = {};
-        for (const [key, value] of Object.entries(headers)) {
-            const processedKey = this.variableProcessor.processTemplate(key, effectiveVariables);
-            const processedValue = this.variableProcessor.processTemplate(String(value), effectiveVariables);
-            processedHeaders[processedKey] = processedValue;
-        }
-
-        let body = undefined;
-        let bodyType = undefined;
-
-        if (!overrideBody && persistedFormBodyData && (persistedFormBodyData.mode === 'formdata' || persistedFormBodyData.mode === 'urlencoded')) {
-            const processed = normalizeFormRows(persistedFormBodyData.fields)
+        if (!overrideBody && (form?.mode === 'formdata' || form?.mode === 'urlencoded')) {
+            const processed = normalizeFormRows(form.fields)
                 .filter((row) => row.enabled !== false)
                 .map((row) => ({
-                    key: this.variableProcessor.processTemplate(row.key, effectiveVariables),
-                    value: row.type === 'file'
-                        ? ''
-                        : this.variableProcessor.processTemplate(row.value || '', effectiveVariables),
+                    key: process(row.key),
+                    value: row.type === 'file' ? '' : process(row.value || ''),
                     type: row.type || 'text',
-                    filePath: row.filePath
-                        ? this.variableProcessor.processTemplate(row.filePath, effectiveVariables)
-                        : undefined,
+                    filePath: row.filePath ? process(row.filePath) : undefined,
                     contentType: row.contentType || undefined
                 }));
-            if (processed.length > 0) {
-                body = processed;
-            }
-            bodyType = persistedFormBodyData.mode;
-        } else if (!overrideBody && persistedFormBodyData && persistedFormBodyData.mode === 'binary') {
-            if (persistedFormBodyData.filePath) {
-                body = {
-                    filePath: this.variableProcessor.processTemplate(persistedFormBodyData.filePath, effectiveVariables),
-                    contentType: persistedFormBodyData.contentType || undefined
-                };
-                bodyType = 'binary';
-            }
-        } else if (overrideBody || ['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-            let bodyContent = overrideBody || (hasBodyOverride ? null : persistedBody);
-            if (!bodyContent && !hasBodyOverride && endpoint.requestBody) {
-                if (endpoint.requestBody.example && endpoint.requestBody.example !== 'null') {
-                    bodyContent = endpoint.requestBody.example;
-                } else if (endpoint.requestBody.schema) {
-                    bodyContent = JSON.stringify(endpoint.requestBody.schema.example || {}, null, 2);
-                }
-            }
-            bodyContent = bodyContent || '';
-            if (bodyContent) {
-                const processedBody = this.variableProcessor.processTemplate(bodyContent, effectiveVariables);
-                try {
-                    body = JSON.parse(processedBody);
-                } catch (e) {
-                    body = processedBody;
-                }
-            }
+            return { body: processed.length > 0 ? processed : undefined, bodyType: form.mode };
         }
 
-        const authData = this._generateAuthData(effectiveAuthConfig, effectiveVariables);
-        Object.assign(processedHeaders, authData.headers);
-        if (Object.keys(authData.queryParams).length > 0) {
-            const authQueryString = Object.entries(authData.queryParams)
-                .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-                .join('&');
-            url += (url.includes('?') ? '&' : '?') + authQueryString;
+        if (!overrideBody && form?.mode === 'binary') {
+            if (!form.filePath) {
+                throw new Error(translate('runner.error_no_binary_file', 'No file selected for binary body'));
+            }
+            return {
+                body: { filePath: process(form.filePath), contentType: form.contentType || undefined },
+                bodyType: 'binary'
+            };
         }
 
-        let httpVersion = 'auto';
-        let timeout = 30000;
+        if (!overrideBody && !BODY_METHODS.includes(method)) {
+            return { body: undefined, bodyType: undefined };
+        }
+
+        if (form?.mode === 'text') {
+            const text = overrideBody || (hasBodyOverride ? '' : form.content || '');
+            return { body: text ? process(text) : undefined, bodyType: 'text' };
+        }
+
+        let bodyContent = overrideBody || (hasBodyOverride ? null : persisted.modifiedBody);
+        if (!bodyContent && !hasBodyOverride && endpoint.requestBody) {
+            if (endpoint.requestBody.example && endpoint.requestBody.example !== 'null') {
+                bodyContent = endpoint.requestBody.example;
+            } else if (endpoint.requestBody.schema) {
+                bodyContent = JSON.stringify(endpoint.requestBody.schema.example || {}, null, 2);
+            }
+        }
+        if (typeof bodyContent !== 'string') {
+            bodyContent = bodyContent ? JSON.stringify(bodyContent) : '';
+        }
+        if (!bodyContent.trim()) {
+            return { body: undefined, bodyType: undefined };
+        }
+
         try {
-            const settings = runContext?.settings || await this.backendAPI.settings.get();
-            httpVersion = settings.httpVersion || 'auto';
-            const savedTimeout = settings.requestTimeout ?? settings.timeout;
-            timeout = savedTimeout === 0 ? null : (savedTimeout ?? 30000);
+            return { body: JSON.parse(process(bodyContent.trim())), bodyType: undefined };
         } catch (e) {
+            throw new Error(translate('runner.error_invalid_body', 'Invalid Body JSON: {{message}}', { message: e.message }), { cause: e });
+        }
+    }
+
+    /**
+     * @param {Object} graphqlData
+     * @param {function(string): string} process
+     * @returns {Object}
+     */
+    _buildGraphQLBody(graphqlData, process) {
+        const query = process((graphqlData.query || '').trim());
+        const variablesText = process((graphqlData.variables || '').trim());
+
+        let parsedVariables = {};
+        if (variablesText) {
+            try {
+                parsedVariables = JSON.parse(variablesText);
+            } catch (e) {
+                throw new Error(
+                    translate('runner.error_invalid_graphql_variables', 'Invalid GraphQL Variables JSON: {{message}}', { message: e.message }),
+                    { cause: e }
+                );
+            }
         }
 
-        let clientCert = null;
+        const body = { query, variables: parsedVariables };
+        if (graphqlData.operationName) {
+            body.operationName = graphqlData.operationName;
+        }
+        return body;
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {Object|null} runContext
+     * @returns {Promise<string|null>}
+     */
+    async _mockBaseUrlFor(collectionId, runContext) {
+        if (runContext?.mockBaseUrls.has(collectionId)) {
+            return runContext.mockBaseUrls.get(collectionId);
+        }
+        let mockBaseUrl = null;
+        try {
+            const { shouldUseMock, mockBaseUrl: base } = await this.mockServerService.shouldUseMockServer(collectionId);
+            mockBaseUrl = shouldUseMock && base ? base : null;
+        } catch (e) {
+            void e;
+        }
+        runContext?.mockBaseUrls.set(collectionId, mockBaseUrl);
+        return mockBaseUrl;
+    }
+
+    /**
+     * @param {Object} requestConfig
+     * @param {Object|null} runContext
+     * @returns {Promise<void>}
+     */
+    async _attachClientCert(requestConfig, runContext) {
         try {
             if (!runContext?.certificatesLoaded) {
                 await this.certificateService.getItems();
             }
-            clientCert = this.certificateService.getForHost(new URL(url).host);
+            requestConfig.clientCert = this.certificateService.getForHost(new URL(requestConfig.url).host) || null;
         } catch (e) {
             void e;
         }
+    }
 
-        return {
-            method: endpoint.method,
-            url,
-            headers: processedHeaders,
-            body,
-            bodyType,
-            httpVersion,
-            timeout,
-            auth: authData.authConfig,
-            awsAuth: authData.awsAuth || null,
-            ntlm: authData.ntlmAuth || null,
-            clientCert
+    /**
+     * @param {Object} requestConfig
+     * @returns {Promise<void>}
+     */
+    async _attachCookies(requestConfig) {
+        if (!app.cookieController) {
+            return;
+        }
+        const cookieHeader = await app.cookieController.getCookieHeader(requestConfig.url);
+        if (!cookieHeader) {
+            return;
+        }
+        requestConfig.headers = requestConfig.headers || {};
+        if (!requestConfig.headers['Cookie'] && !requestConfig.headers['cookie']) {
+            requestConfig.headers['Cookie'] = cookieHeader;
+        }
+    }
+
+    /**
+     * @param {Object} response
+     * @param {string} requestUrl
+     * @returns {Promise<void>}
+     */
+    async _storeResponseCookies(response, requestUrl) {
+        if (app.cookieController && response.setCookies?.length > 0) {
+            await app.cookieController.handleCookiesFromResponse(response.setCookies, requestUrl);
+        }
+    }
+
+    /**
+     * @param {Object} requestConfig
+     * @param {Object} response
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} authData
+     * @param {Object|null} runContext
+     */
+    _recordHistory(requestConfig, response, collectionId, endpointId, authData, runContext) {
+        if (!app.historyController) {
+            return;
+        }
+        const sensitive = {
+            headerNames: Object.keys(authData.headers || {}),
+            queryNames: Object.keys(authData.queryParams || {})
         };
+        app.historyController
+            .addHistoryEntry(requestConfig, response, { collectionId, endpointId }, runContext?.environmentName ?? null, sensitive)
+            .catch(() => {});
     }
 
     /**
      * @param {string} script
-     * @param {Object} request
-     * @param {Object} response
-     * @param {Object} currentVariables
+     * @param {Object} prepared
+     * @param {Object} variables
+     * @param {Object} outcome
+     * @param {Object} iteration
      * @returns {Promise<Object>}
      */
-    async _executePostResponseScript(script, request, response, currentVariables) {
-        if (!script || script.trim() === '') {
-            return { variablesSet: {}, logs: [], testResults: [] };
+    async _runPreRequestScript(script, prepared, variables, outcome, iteration) {
+        const scriptService = app.scriptController?.service;
+        const { requestConfig } = prepared;
+        if (!scriptService) {
+            return requestConfig;
         }
 
-        try {
-            const scriptData = {
-                script,
-                request: {
-                    url: request.url,
-                    method: request.method,
-                    headers: request.headers || {},
-                    body: request.body
-                },
-                response: {
-                    status: response.status,
-                    statusText: response.statusText,
-                    headers: response.headers || {},
-                    body: response.body
-                },
-                environment: currentVariables
-            };
+        const snapshot = {
+            url: requestConfig.url,
+            queryParams: { ...requestConfig.queryParams },
+            pathParams: { ...requestConfig.pathParams }
+        };
+        const { modifiedRequest, result } = await scriptService.executePreRequestScript(script, requestConfig, {
+            environment: variables,
+            iteration
+        });
+        this._collectScriptResult(result, outcome);
 
-            const result = await this.backendAPI.scripts.executeTest(scriptData);
-
-            const rawEnv = result.modifiedEnvironment || {};
-            const variablesSet = {};
-            for (const [key, value] of Object.entries(rawEnv)) {
-                if (value !== null && value !== undefined) {
-                    variablesSet[key] = value;
-                }
-            }
-
-            return {
-                variablesSet,
-                logs: result.logs || [],
-                testResults: result.testResults || [],
-                error: result.errors?.length > 0 ? result.errors.join('; ') : null
-            };
-        } catch (error) {
-            return {
-                variablesSet: {},
-                logs: [],
-                testResults: [],
-                error: error.message
-            };
+        modifiedRequest.url = this.requestBuilder.applyScriptParamMutations({
+            requestConfig: modifiedRequest,
+            snapshot,
+            rawUrl: prepared.rawUrl,
+            variables,
+            processor: this.variableProcessor,
+            mockRewrite: prepared.mockRewrite
+        });
+        const authStripped = this.requestBuilder.stripCrossOriginAuth({
+            requestConfig: modifiedRequest,
+            originalUrl: snapshot.url,
+            authData: prepared.authData
+        });
+        if (authStripped) {
+            outcome.logs.push({
+                level: 'warn',
+                message: translate(
+                    'runner.auth_stripped',
+                    'Authentication was not sent: the pre-request script changed the request host.'
+                ),
+                timestamp: Date.now()
+            });
         }
+        return modifiedRequest;
     }
 
     /**
-     * @param {Object|null} authConfig
+     * @param {string} script
+     * @param {Object} requestConfig
+     * @param {Object} response
      * @param {Object} variables
-     * @returns {Object}
+     * @param {Object} outcome
+     * @param {Object} iteration
+     * @returns {Promise<void>}
      */
-    _generateAuthData(authConfig, variables) {
-        const authData = {
-            headers: {},
-            queryParams: {},
-            authConfig: null
-        };
-
-        if (!authConfig || !authConfig.type || authConfig.type === 'none' || authConfig.type === 'inherit') {
-            return authData;
+    async _runTestScript(script, requestConfig, response, variables, outcome, iteration) {
+        const scriptService = app.scriptController?.service;
+        if (!scriptService) {
+            return;
         }
+        const result = await scriptService.executeTestScript(
+            script,
+            requestConfig,
+            { ...response, cookies: extractCookies(response.headers) },
+            { environment: variables, iteration }
+        );
+        this._collectScriptResult(result, outcome);
+    }
 
-        const { type, config } = authConfig;
-
-        const processValue = (val) => {
-            if (typeof val === 'string') {
-                return this.variableProcessor.processTemplate(val, variables);
-            }
-            return val || '';
-        };
-
-        switch (type) {
-            case 'bearer': {
-                const bearerToken = config.token || variables.bearerToken || '';
-                if (bearerToken) {
-                    authData.headers['Authorization'] = `Bearer ${processValue(bearerToken)}`;
-                }
-                break;
-            }
-
-            case 'basic':
-                if (config.username || config.password) {
-                    const credentials = textToBase64(`${processValue(config.username)}:${processValue(config.password)}`);
-                    authData.headers['Authorization'] = `Basic ${credentials}`;
-                }
-                break;
-
-            case 'api-key':
-                if (config.keyName && config.keyValue) {
-                    const keyName = processValue(config.keyName);
-                    const keyValue = processValue(config.keyValue);
-                    if (config.location === 'header') {
-                        authData.headers[keyName] = keyValue;
-                    } else if (config.location === 'query') {
-                        authData.queryParams[keyName] = keyValue;
-                    }
-                }
-                break;
-
-            case 'oauth2':
-                if (config.token) {
-                    const prefix = config.headerPrefix || 'Bearer';
-                    authData.headers['Authorization'] = `${prefix} ${processValue(config.token)}`;
-                }
-                break;
-
-            case 'digest':
-                if (config.username || config.password) {
-                    authData.authConfig = {
-                        username: processValue(config.username),
-                        password: processValue(config.password)
-                    };
-                }
-                break;
-
-            case 'ntlm':
-                if (config.username || config.password) {
-                    authData.ntlmAuth = {
-                        username: processValue(config.username),
-                        password: processValue(config.password),
-                        domain: config.domain ? processValue(config.domain) : '',
-                        workstation: config.workstation ? processValue(config.workstation) : ''
-                    };
-                }
-                break;
-
-            case 'aws-v4':
-                if (config.accessKeyId && config.secretAccessKey) {
-                    authData.awsAuth = {
-                        accessKeyId: processValue(config.accessKeyId),
-                        secretAccessKey: processValue(config.secretAccessKey),
-                        region: processValue(config.region) || 'us-east-1',
-                        service: processValue(config.service) || '',
-                        sessionToken: config.sessionToken ? processValue(config.sessionToken) : null
-                    };
-                }
-                break;
-
-            default:
-                break;
-        }
-
-        return authData;
+    /**
+     * @param {Object} result
+     * @param {Object} outcome
+     */
+    _collectScriptResult(result, outcome) {
+        outcome.logs.push(...(result?.logs || []));
+        outcome.testResults.push(...(result?.testResults || []));
+        outcome.errors.push(...(result?.errors || []));
+        Object.assign(outcome.variablesSet, result?.modifiedEnvironment || {});
     }
 
     /**
@@ -838,7 +1090,16 @@ export class RunnerService {
      * @returns {Promise<void>}
      */
     _delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise(resolve => {
+            let timer = null;
+            const wake = () => {
+                clearTimeout(timer);
+                this._stopWaiters.delete(wake);
+                resolve();
+            };
+            timer = setTimeout(wake, ms);
+            this._stopWaiters.add(wake);
+        });
     }
 
     /** @param {Function} listener */
@@ -858,4 +1119,53 @@ export class RunnerService {
     _notifyListeners(event, data) {
         this._events.emit(event, data);
     }
+}
+
+export const MAX_ITERATIONS = 1000;
+
+/**
+ * @param {*} value
+ * @returns {number}
+ */
+function clampIterations(value) {
+    const count = parseInt(value, 10);
+    return Number.isFinite(count) ? Math.min(MAX_ITERATIONS, Math.max(1, count)) : 1;
+}
+
+/**
+ * @param {Object<string, string>} row
+ * @returns {string}
+ */
+function describeDataRow(row) {
+    const [first] = Object.entries(row);
+    return first ? `${first[0]}=${first[1]}` : '';
+}
+
+/**
+ * @param {Object} base
+ * @param {Object} changes
+ * @returns {Object}
+ */
+function mergeVariables(base, changes) {
+    const merged = { ...base };
+    for (const [key, value] of Object.entries(changes || {})) {
+        if (value === null || value === undefined) {
+            delete merged[key];
+        } else {
+            merged[key] = value;
+        }
+    }
+    return merged;
+}
+
+/**
+ * @param {Object} authConfig
+ * @param {Object} variables
+ * @returns {Object}
+ */
+function withBearerFallback(authConfig, variables) {
+    if (authConfig?.type !== 'bearer' || authConfig.config?.token || !variables.bearerToken) {
+        return authConfig;
+    }
+    return { ...authConfig, config: { ...authConfig.config, token: '{{bearerToken}}' } };
 }

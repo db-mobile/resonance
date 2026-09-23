@@ -6,6 +6,18 @@
 import { app } from '../../appContext.js';
 import { templateLoader } from '../../templateLoader.js';
 import { escapeHtml, getStatusCodeClass, getStatusText } from './runnerDomUtils.js';
+import { translate } from '../../utils/translate.js';
+import { pushEscapeHandler } from '../modalEscape.js';
+
+/** @type {Readonly<Object<string, string>>} */
+const STATUS_CLASSES = Object.freeze({
+    success: 'is-success',
+    error: 'is-error',
+    running: 'is-running',
+    skipped: 'is-skipped'
+});
+
+const ALL_STATUS_CLASSES = ['is-pending', ...Object.values(STATUS_CLASSES)];
 
 export class RunnerResultsPanel {
     /** @param {HTMLElement} container */
@@ -19,15 +31,29 @@ export class RunnerResultsPanel {
         this.data = [];
         this.selectedIndex = -1;
         this.selectedRequests = [];
+        this.iterations = 1;
+        this.iterationLabels = null;
+        this.summary = null;
+        this.onExport = null;
+        this._closeExportMenu = null;
     }
 
-    /** @param {Array<Object>} selectedRequests */
-    open(selectedRequests) {
+    /**
+     * @param {Array<Object>} selectedRequests
+     * @param {Object} [options]
+     * @param {number} [options.iterations]
+     * @param {string[]|null} [options.labels]
+     */
+    open(selectedRequests, { iterations = 1, labels = null } = {}) {
         this.selectedRequests = selectedRequests || [];
+        this.iterations = Math.max(1, iterations);
+        this.iterationLabels = labels;
 
         if (this.panel) {
             this._clear();
             this._initializeResultsList();
+            this.setSummary(null);
+            this._setSource(null);
             return;
         }
 
@@ -68,6 +94,7 @@ export class RunnerResultsPanel {
     }
 
     hide() {
+        this._closeExportMenu?.();
         if (this.resizer) {
             this.resizer.remove();
             this.resizer = null;
@@ -107,6 +134,7 @@ export class RunnerResultsPanel {
 
         if (this.dom.passed) {this.dom.passed.textContent = '0';}
         if (this.dom.failed) {this.dom.failed.textContent = '0';}
+        if (this.dom.skipped) {this.dom.skipped.textContent = '0';}
         if (this.dom.totalTime) {this.dom.totalTime.textContent = '—';}
 
         if (this.dom.resultsList) {
@@ -123,6 +151,9 @@ export class RunnerResultsPanel {
         if (this.dom.bodyContent) {this.dom.bodyContent.textContent = '';}
         if (this.dom.headersBody) {this.dom.headersBody.innerHTML = '';}
         if (this.dom.cookiesBody) {this.dom.cookiesBody.innerHTML = '';}
+        if (this.dom.testsList) {this.dom.testsList.innerHTML = '';}
+        if (this.dom.consoleList) {this.dom.consoleList.innerHTML = '';}
+        this._setError(null);
 
         if (this.dom.detailPanel) {
             this.dom.detailPanel.classList.add('is-hidden');
@@ -137,6 +168,7 @@ export class RunnerResultsPanel {
             summary: this.panel.querySelector('[data-role="summary"]'),
             passed: this.panel.querySelector('[data-role="passed"]'),
             failed: this.panel.querySelector('[data-role="failed"]'),
+            skipped: this.panel.querySelector('[data-role="skipped"]'),
             totalTime: this.panel.querySelector('[data-role="total-time"]'),
             resultsList: this.panel.querySelector('[data-role="results-list"]'),
             detailPanel: this.panel.querySelector('[data-role="detail-panel"]'),
@@ -144,10 +176,20 @@ export class RunnerResultsPanel {
             detailName: this.panel.querySelector('[data-role="detail-name"]'),
             detailStatus: this.panel.querySelector('[data-role="detail-status"]'),
             detailTime: this.panel.querySelector('[data-role="detail-time"]'),
+            detailError: this.panel.querySelector('[data-role="detail-error"]'),
             bodyContent: this.panel.querySelector('[data-role="body-content"]'),
             headersBody: this.panel.querySelector('[data-role="headers-body"]'),
             cookiesBody: this.panel.querySelector('[data-role="cookies-body"]'),
-            noCookies: this.panel.querySelector('[data-role="no-cookies"]')
+            noCookies: this.panel.querySelector('[data-role="no-cookies"]'),
+            testsList: this.panel.querySelector('[data-role="tests-list"]'),
+            testsCount: this.panel.querySelector('[data-role="tests-count"]'),
+            noTests: this.panel.querySelector('[data-role="no-tests"]'),
+            consoleList: this.panel.querySelector('[data-role="console-list"]'),
+            logsCount: this.panel.querySelector('[data-role="logs-count"]'),
+            noLogs: this.panel.querySelector('[data-role="no-logs"]'),
+            exportButton: this.panel.querySelector('[data-action="toggle-export"]'),
+            exportMenu: this.panel.querySelector('[data-role="export-menu"]'),
+            source: this.panel.querySelector('[data-role="results-source"]')
         };
     }
 
@@ -159,6 +201,96 @@ export class RunnerResultsPanel {
                 this._switchTab(tab.dataset.tab);
             });
         });
+
+        this.dom.exportButton?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (this._closeExportMenu) {
+                this._closeExportMenu();
+            } else {
+                this._openExportMenu();
+            }
+        });
+
+        this.dom.exportMenu?.querySelectorAll('[data-export]').forEach(item => {
+            item.addEventListener('click', () => {
+                this._closeExportMenu?.();
+                if (this.summary) {
+                    this.onExport?.(item.dataset.export, this.summary);
+                }
+            });
+        });
+    }
+
+    _openExportMenu() {
+        if (!this.dom.exportMenu) {return;}
+        this.dom.exportMenu.classList.remove('is-hidden');
+        this.dom.exportButton?.setAttribute('aria-expanded', 'true');
+
+        const onDocumentClick = (event) => {
+            if (!this.dom.exportMenu?.contains(event.target)) {
+                this._closeExportMenu?.();
+            }
+        };
+        document.addEventListener('click', onDocumentClick);
+        const releaseEscape = pushEscapeHandler(() => this._closeExportMenu?.());
+
+        this._closeExportMenu = () => {
+            document.removeEventListener('click', onDocumentClick);
+            releaseEscape();
+            this.dom.exportMenu?.classList.add('is-hidden');
+            this.dom.exportButton?.setAttribute('aria-expanded', 'false');
+            this._closeExportMenu = null;
+        };
+    }
+
+    /** @param {Object|null} summary */
+    setSummary(summary) {
+        this.summary = summary;
+        if (this.dom.exportButton) {
+            this.dom.exportButton.disabled = !summary;
+        }
+    }
+
+    /** @param {string|null} label */
+    _setSource(label) {
+        if (!this.dom.source) {return;}
+        this.dom.source.textContent = label || '';
+        this.dom.source.classList.toggle('is-hidden', !label);
+    }
+
+    /**
+     * @param {Object} summary
+     * @param {string} label
+     */
+    showSummary(summary, label) {
+        this.open([]);
+        this._clear();
+        if (!this.dom.resultsList) {return;}
+
+        let lastIteration = null;
+        this.data = summary.requests.map((request, index) => {
+            if (summary.iterations > 1 && request.iteration !== lastIteration) {
+                lastIteration = request.iteration;
+                this.dom.resultsList.appendChild(this._createIterationHeader(request.iteration - 1));
+            }
+            const resultData = {
+                ...request,
+                index,
+                testResults: request.tests.map(test => ({ passed: test.passed, message: test.name })),
+                body: null,
+                headers: null,
+                cookies: null,
+                logs: [],
+                fromHistory: true
+            };
+            this.dom.resultsList.appendChild(this._createResultItemElement(resultData, index));
+            this._updateResultItem(index, resultData);
+            return resultData;
+        });
+
+        this._updateSummary({ ...summary.summary, totalTime: summary.totalTime });
+        this.setSummary(summary);
+        this._setSource(label);
     }
 
     _attachResizerListeners() {
@@ -215,23 +347,46 @@ export class RunnerResultsPanel {
         this.dom.resultsList.innerHTML = '';
         this.data = [];
 
-        this.selectedRequests.forEach((request, index) => {
-            const resultData = {
-                index,
-                method: request.method,
-                name: request.name,
-                status: 'pending',
-                statusCode: null,
-                time: null,
-                body: null,
-                headers: null,
-                cookies: null
-            };
-            this.data.push(resultData);
+        const queueLength = this.selectedRequests.length;
+        for (let iteration = 0; iteration < this.iterations; iteration++) {
+            if (this.iterations > 1) {
+                this.dom.resultsList.appendChild(this._createIterationHeader(iteration));
+            }
+            this.selectedRequests.forEach((request, position) => {
+                const index = iteration * queueLength + position;
+                const resultData = {
+                    index,
+                    iteration: iteration + 1,
+                    method: request.method,
+                    name: request.name,
+                    status: 'pending',
+                    statusCode: null,
+                    time: null,
+                    body: null,
+                    headers: null,
+                    cookies: null,
+                    error: null,
+                    testResults: [],
+                    logs: []
+                };
+                this.data.push(resultData);
+                this.dom.resultsList.appendChild(this._createResultItemElement(resultData, index));
+            });
+        }
+    }
 
-            const el = this._createResultItemElement(resultData, index);
-            this.dom.resultsList.appendChild(el);
-        });
+    /**
+     * @param {number} iteration
+     * @returns {HTMLElement}
+     */
+    _createIterationHeader(iteration) {
+        const header = document.createElement('div');
+        header.className = 'runner-results-iteration';
+        const label = this.iterationLabels?.[iteration];
+        header.textContent = translate('runner.iteration_label', 'Iteration {{number}}', { number: iteration + 1 })
+            + (label ? ` · ${label}` : '');
+        header.title = header.textContent;
+        return header;
     }
 
     /**
@@ -296,18 +451,16 @@ export class RunnerResultsPanel {
         }
 
         const statusIcon = el.querySelector('[data-role="status-icon"]');
-        const statusClass =
-            result.status === 'success' ? 'is-success' :
-            result.status === 'error' ? 'is-error' :
-            result.status === 'running' ? 'is-running' : 'is-pending';
+        const statusClass = STATUS_CLASSES[result.status] || 'is-pending';
 
         if (statusIcon) {
-            statusIcon.classList.remove('is-pending', 'is-running', 'is-success', 'is-error');
+            statusIcon.classList.remove(...ALL_STATUS_CLASSES);
             statusIcon.classList.add(statusClass);
         }
 
-        el.classList.remove('is-pending', 'is-running', 'is-success', 'is-error');
+        el.classList.remove(...ALL_STATUS_CLASSES);
         el.classList.add(statusClass);
+        el.title = result.error || '';
 
         const statusCodeEl = el.querySelector('[data-role="status-code"]');
         if (statusCodeEl && result.statusCode != null) {
@@ -352,15 +505,14 @@ export class RunnerResultsPanel {
         }
 
         if (this.dom.detailStatus) {
-            const statusText = result.statusCode ? `${result.statusCode} ${getStatusText(result.statusCode)}` : 'Pending';
-            this.dom.detailStatus.textContent = statusText;
-            this.dom.detailStatus.classList.remove('is-success', 'is-error');
-            if (result.status === 'success') {
-                this.dom.detailStatus.classList.add('is-success');
-            } else if (result.status === 'error') {
-                this.dom.detailStatus.classList.add('is-error');
-            }
+            this.dom.detailStatus.textContent = this._statusLabel(result);
+            this.dom.detailStatus.classList.remove(...ALL_STATUS_CLASSES);
+            this.dom.detailStatus.classList.add(STATUS_CLASSES[result.status] || 'is-pending');
         }
+
+        this._setError(result.error, result.status === 'skipped');
+        this._renderTests(result.testResults || []);
+        this._renderLogs(result.logs || []);
 
         if (this.dom.detailTime) {
             this.dom.detailTime.textContent = result.time != null ? `${result.time}ms` : '';
@@ -379,7 +531,9 @@ export class RunnerResultsPanel {
                     bodyText = String(result.body);
                 }
             }
-            this.dom.bodyContent.textContent = bodyText || '(No response body)';
+            this.dom.bodyContent.textContent = bodyText || (result.fromHistory
+                ? translate('runner.history_no_body', 'Response bodies, headers and cookies are not kept in run history')
+                : translate('runner.no_response_body', '(No response body)'));
         }
 
         if (this.dom.headersBody) {
@@ -395,7 +549,7 @@ export class RunnerResultsPanel {
                 });
             } else {
                 const row = document.createElement('tr');
-                row.innerHTML = '<td colspan="2" class="runner-table-empty-cell">No headers</td>';
+                row.innerHTML = `<td colspan="2" class="runner-table-empty-cell">${escapeHtml(translate('runner.no_headers', 'No headers'))}</td>`;
                 this.dom.headersBody.appendChild(row);
             }
         }
@@ -422,6 +576,77 @@ export class RunnerResultsPanel {
         }
     }
 
+    /**
+     * @param {Object} result
+     * @returns {string}
+     */
+    _statusLabel(result) {
+        if (result.statusCode) {
+            return `${result.statusCode} ${getStatusText(result.statusCode)}`;
+        }
+        switch (result.status) {
+            case 'running':
+                return translate('runner.status_running', 'Running');
+            case 'skipped':
+                return translate('runner.status_skipped', 'Skipped');
+            case 'error':
+                return translate('runner.status_failed', 'Failed');
+            default:
+                return translate('runner.status_pending', 'Pending');
+        }
+    }
+
+    /**
+     * @param {string|null|undefined} message
+     * @param {boolean} [neutral]
+     */
+    _setError(message, neutral = false) {
+        if (!this.dom.detailError) {return;}
+        this.dom.detailError.textContent = message || '';
+        this.dom.detailError.classList.toggle('is-hidden', !message);
+        this.dom.detailError.classList.toggle('is-neutral', neutral);
+    }
+
+    /** @param {Array<{passed: boolean, message: string}>} testResults */
+    _renderTests(testResults) {
+        if (!this.dom.testsList) {return;}
+        this.dom.testsList.innerHTML = '';
+        for (const test of testResults) {
+            const item = document.createElement('li');
+            item.className = `runner-results-test ${test.passed ? 'is-passed' : 'is-failed'}`;
+            const mark = document.createElement('span');
+            mark.className = 'runner-results-test-mark';
+            mark.textContent = test.passed ? '✓' : '✗';
+            const label = document.createElement('span');
+            label.textContent = test.message || '';
+            item.append(mark, label);
+            this.dom.testsList.appendChild(item);
+        }
+        this.dom.noTests?.classList.toggle('is-hidden', testResults.length > 0);
+        if (this.dom.testsCount) {
+            const passed = testResults.filter(test => test.passed).length;
+            this.dom.testsCount.textContent = testResults.length > 0 ? `${passed}/${testResults.length}` : '';
+            this.dom.testsCount.classList.toggle('is-failed', passed < testResults.length);
+        }
+    }
+
+    /** @param {Array<{level?: string, message?: string}|string>} logs */
+    _renderLogs(logs) {
+        if (!this.dom.consoleList) {return;}
+        this.dom.consoleList.innerHTML = '';
+        for (const entry of logs) {
+            const level = typeof entry === 'object' && entry?.level ? entry.level : 'log';
+            const line = document.createElement('div');
+            line.className = `runner-results-log is-${level}`;
+            line.textContent = typeof entry === 'object' && entry !== null ? entry.message ?? '' : String(entry);
+            this.dom.consoleList.appendChild(line);
+        }
+        this.dom.noLogs?.classList.toggle('is-hidden', logs.length > 0);
+        if (this.dom.logsCount) {
+            this.dom.logsCount.textContent = logs.length > 0 ? String(logs.length) : '';
+        }
+    }
+
     /** @param {string} tabName */
     _switchTab(tabName) {
         if (!this.panel) {return;}
@@ -442,6 +667,9 @@ export class RunnerResultsPanel {
         }
         if (this.dom.failed) {
             this.dom.failed.textContent = `${results.failed || 0}`;
+        }
+        if (this.dom.skipped) {
+            this.dom.skipped.textContent = `${results.skipped || 0}`;
         }
         if (this.dom.totalTime) {
             this.dom.totalTime.textContent = `${results.totalTime || 0}ms`;

@@ -1,17 +1,19 @@
-/* global document */
+/* global document, window */
 import { RunnerController } from '../../src/modules/controllers/RunnerController.js';
 
 // Mock the dependencies
-jest.mock('../../src/modules/storage/RunnerRepository.js', () => ({
-    RunnerRepository: jest.fn().mockImplementation(() => ({
+jest.mock('../../src/modules/storage/RunnerRepository.js', () => {
+    const RunnerRepository = jest.fn().mockImplementation(() => ({
         getAll: jest.fn(),
         getById: jest.fn(),
         add: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
         updateLastRun: jest.fn()
-    }))
-}));
+    }));
+    RunnerRepository.shared = jest.fn((backendAPI) => new RunnerRepository(backendAPI));
+    return { RunnerRepository };
+});
 
 jest.mock('../../src/modules/services/RunnerService.js', () => ({
     RunnerService: jest.fn().mockImplementation(() => ({
@@ -35,6 +37,10 @@ jest.mock('../../src/modules/ui/RunnerPanel.js', () => ({
         showResults: jest.fn(),
         updateResultWithResponse: jest.fn(),
         getRunnerData: jest.fn(),
+        loadPreset: jest.fn(),
+        setRunSummary: jest.fn(),
+        prepareResults: jest.fn(),
+        setDataFile: jest.fn(),
         _handleNewRunner: jest.fn(),
         currentRunnerId: null,
         onRunnerSave: null,
@@ -90,7 +96,12 @@ describe('RunnerController', () => {
             { id: 'collection_1', name: 'Test Collection' }
         ]);
 
+        window.backendAPI = mockBackendAPI;
         controller = new RunnerController(mockBackendAPI, mockGetCollections);
+    });
+
+    afterEach(() => {
+        delete window.backendAPI;
     });
 
     describe('constructor', () => {
@@ -134,6 +145,16 @@ describe('RunnerController', () => {
     });
 
     describe('_handleSave', () => {
+        test('names an unnamed runner "Untitled Runner" when saving', async () => {
+            await controller.initialize(document.createElement('div'));
+            controller.currentRunnerId = null;
+            controller.service.createRunner.mockResolvedValue({ id: 'runner_new' });
+
+            await controller._handleSave({ name: '', requests: [] });
+
+            expect(controller.service.createRunner).toHaveBeenCalledWith({ name: 'Untitled Runner', requests: [] });
+        });
+
         beforeEach(async () => {
             const mockContainer = document.createElement('div');
             await controller.initialize(mockContainer);
@@ -200,13 +221,214 @@ describe('RunnerController', () => {
         });
 
         test('should load selected runner', async () => {
-            const runner = { id: 'runner_1', name: 'Test Runner' };
+            const runner = { id: 'runner_1', name: 'Test Runner', overridesVersion: 2, requests: [] };
             controller.service.getRunner.mockResolvedValue(runner);
 
             await controller._handleRunnerSelect('runner_1');
 
             expect(controller.currentRunnerId).toBe('runner_1');
-            expect(controller.panel.loadRunner).toHaveBeenCalledWith(runner);
+            expect(controller.panel.loadRunner).toHaveBeenCalledWith(runner, new Set());
+        });
+
+        test('migrates snapshot overrides once, keeping only real edits', async () => {
+            mockGetCollections.mockResolvedValue([{ id: 'c1', name: 'API', endpoints: [{ id: 'e1', method: 'GET', path: '/x' }] }]);
+            controller.service.getEndpointRequestConfig = jest.fn().mockResolvedValue({
+                pathParams: [],
+                queryParams: [{ key: 'page', value: '1', enabled: true }],
+                headers: [{ key: 'X-A', value: 'a' }],
+                body: '{"a":1}'
+            });
+            controller.service.getRunner.mockResolvedValue({
+                id: 'runner_1',
+                name: 'Old',
+                requests: [{
+                    collectionId: 'c1',
+                    endpointId: 'e1',
+                    overrides: {
+                        pathParams: [],
+                        queryParams: [{ key: 'page', value: '1' }],
+                        headers: [{ key: 'X-A', value: 'edited' }],
+                        body: '{"a":1}'
+                    }
+                }]
+            });
+
+            await controller._handleRunnerSelect('runner_1');
+
+            const loaded = controller.panel.loadRunner.mock.calls[0][0];
+            expect(loaded.overridesVersion).toBe(2);
+            expect(loaded.requests[0].overrides).toEqual({ headers: [{ key: 'X-A', value: 'edited' }] });
+            expect(controller.repository.update).toHaveBeenCalledWith('runner_1', {
+                requests: loaded.requests,
+                overridesVersion: 2
+            });
+        });
+    });
+
+    describe('keeping the panel in step with the saved runner', () => {
+        beforeEach(async () => {
+            await controller.initialize(document.createElement('div'));
+        });
+
+        test('a runner created by Run is known to the panel, so history and delete work', async () => {
+            controller.currentRunnerId = null;
+            controller.service.createRunner.mockResolvedValue({ id: 'runner_new' });
+            controller.service.executeRunner.mockResolvedValue({ requests: [] });
+
+            await controller._handleRun({ name: 'Named', requests: [{}] });
+
+            expect(controller.panel.currentRunnerId).toBe('runner_new');
+        });
+
+        test('a runner created by Save is known to the panel', async () => {
+            controller.currentRunnerId = null;
+            controller.service.createRunner.mockResolvedValue({ id: 'runner_saved' });
+
+            await controller._handleSave({ name: 'Named', requests: [] });
+
+            expect(controller.panel.currentRunnerId).toBe('runner_saved');
+        });
+    });
+
+    describe('run history and export', () => {
+        beforeEach(async () => {
+            await controller.initialize(document.createElement('div'));
+            controller.historyRepository = { record: jest.fn().mockResolvedValue(), remove: jest.fn().mockResolvedValue(), list: jest.fn() };
+        });
+
+        const results = {
+            runnerId: 'runner_1', runnerName: 'Smoke', startTime: Date.UTC(2026, 8, 22, 10, 5), endTime: 0, totalTime: 12,
+            iterations: 1, passed: 1, failed: 0, skipped: 0,
+            requests: [{ iteration: 1, name: 'List', method: 'GET', status: 'success', statusCode: 200, time: 12, testResults: [] }]
+        };
+
+        test('records a summary for a saved runner and hands it to the panel', async () => {
+            controller.currentRunnerId = 'runner_1';
+            controller.service.updateRunner.mockResolvedValue({});
+            controller.service.executeRunner.mockResolvedValue(results);
+
+            await controller._handleRun({ name: 'Smoke', requests: [{}] });
+
+            expect(controller.panel.setRunSummary).toHaveBeenCalledWith(expect.objectContaining({ runnerName: 'Smoke' }));
+            expect(controller.historyRepository.record).toHaveBeenCalledWith('runner_1', expect.objectContaining({
+                summary: { passed: 1, failed: 0, skipped: 0 }
+            }));
+        });
+
+        test('keeps no history for an unsaved run', async () => {
+            controller.currentRunnerId = null;
+            controller.service.executeRunnerData.mockResolvedValue({ ...results, runnerId: null });
+
+            await controller._handleRun({ name: '', requests: [{}] });
+
+            expect(controller.panel.setRunSummary).toHaveBeenCalled();
+            expect(controller.historyRepository.record).not.toHaveBeenCalled();
+        });
+
+        test('exports a JUnit report through the save dialog', async () => {
+            mockBackendAPI.runner = { saveReport: jest.fn().mockResolvedValue({ success: true, filePath: '/tmp/r.xml' }) };
+
+            await controller._exportReport('junit', { runnerName: 'Smoke', startedAt: 0, iterations: 1, totalTime: 0, requests: [] });
+
+            const [fileName, content, filterName, extensions] = mockBackendAPI.runner.saveReport.mock.calls[0];
+            expect(fileName).toMatch(/^smoke-\d{8}-\d{4}\.xml$/);
+            expect(content).toContain('<testsuites name="Smoke"');
+            expect(filterName).toBe('JUnit XML');
+            expect(extensions).toEqual(['xml']);
+        });
+
+        test('deleting a runner also deletes its history', async () => {
+            const { ConfirmDialog } = await import('../../src/modules/ui/ConfirmDialog.js');
+            ConfirmDialog.mockImplementation(() => ({ show: jest.fn().mockResolvedValue(true) }));
+            controller.panel.startNewRunner = jest.fn();
+            controller.service.deleteRunner.mockResolvedValue(true);
+
+            await controller._handleRunnerDelete('runner_1');
+
+            expect(controller.historyRepository.remove).toHaveBeenCalledWith('runner_1');
+        });
+    });
+
+    describe('opening with a preset', () => {
+        test('fills the queue from the preset instead of loading the last runner', async () => {
+            mockBackendAPI.settings.get.mockResolvedValue({ lastRunnerId: 'runner_1' });
+            const preset = { name: 'API / pets', requests: [{ collection: { id: 'c1' }, endpoint: { id: 'e1' } }] };
+
+            await controller.initialize(document.createElement('div'), preset);
+
+            expect(controller.panel.loadPreset).toHaveBeenCalledWith(preset);
+            expect(controller.service.getRunner).not.toHaveBeenCalled();
+            expect(controller.currentRunnerId).toBeNull();
+        });
+    });
+
+    describe('re-linking orphaned requests', () => {
+        beforeEach(async () => {
+            await controller.initialize(document.createElement('div'));
+        });
+
+        const orphan = {
+            collectionId: 'old-collection',
+            endpointId: 'old-endpoint',
+            name: 'Get all albums',
+            method: 'GET',
+            path: '/albums',
+            overrides: {}
+        };
+
+        test('re-links a request to the one open endpoint with the same method, path and name', async () => {
+            mockGetCollections.mockResolvedValue([{
+                id: 'new-collection',
+                name: 'JSONPlaceholder API',
+                endpoints: [{ id: 'new-endpoint', name: 'Get all albums', method: 'GET', path: '/albums' }]
+            }]);
+            controller.service.getRunner.mockResolvedValue({ id: 'r1', name: 'testy', overridesVersion: 2, requests: [orphan] });
+
+            await controller._handleRunnerSelect('r1');
+
+            const [loaded, missing] = controller.panel.loadRunner.mock.calls[0];
+            expect(loaded.requests[0]).toMatchObject({ collectionId: 'new-collection', endpointId: 'new-endpoint' });
+            expect(missing.size).toBe(0);
+            expect(controller.repository.update).toHaveBeenCalledWith('r1', {
+                requests: loaded.requests,
+                overridesVersion: 2
+            });
+        });
+
+        test('flags a request as missing when no single endpoint matches', async () => {
+            mockGetCollections.mockResolvedValue([{
+                id: 'new-collection',
+                endpoints: [
+                    { id: 'a', name: 'Get all albums', method: 'GET', path: '/albums' },
+                    { id: 'b', name: 'Get all albums', method: 'GET', path: '/albums' }
+                ]
+            }]);
+            controller.service.getRunner.mockResolvedValue({ id: 'r1', name: 'testy', overridesVersion: 2, requests: [orphan] });
+
+            await controller._handleRunnerSelect('r1');
+
+            const [loaded, missing] = controller.panel.loadRunner.mock.calls[0];
+            expect(loaded.requests[0].collectionId).toBe('old-collection');
+            expect([...missing]).toEqual([0]);
+            expect(controller.repository.update).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('destroy', () => {
+        test('stops a running execution and unsubscribes from collection updates', async () => {
+            const unsubscribe = jest.fn();
+            const subscribe = jest.fn().mockReturnValue(unsubscribe);
+            controller = new RunnerController(mockBackendAPI, mockGetCollections, subscribe);
+            await controller.initialize(document.createElement('div'));
+            controller.panel.destroy = jest.fn();
+            controller.panel.updateCollections = jest.fn();
+
+            subscribe.mock.calls[0][0]([{ id: 'c2' }]);
+            controller.destroy();
+
+            expect(controller.panel.updateCollections).toHaveBeenCalledWith([{ id: 'c2' }]);
+            expect(controller.service.stopExecution).toHaveBeenCalled();
+            expect(unsubscribe).toHaveBeenCalled();
         });
     });
 
@@ -249,13 +471,14 @@ describe('RunnerController', () => {
 
         test('should execute unsaved runner with executeRunnerData', async () => {
             controller.currentRunnerId = null;
-            const runnerData = { name: 'Untitled Runner', requests: [{ id: 'req_1' }] };
+            const runnerData = { name: '', requests: [{ id: 'req_1' }] };
             const results = { passed: 1, failed: 0 };
 
             controller.service.executeRunnerData.mockResolvedValue(results);
 
             await controller._handleRun(runnerData);
 
+            expect(controller.service.createRunner).not.toHaveBeenCalled();
             expect(controller.service.executeRunnerData).toHaveBeenCalled();
             expect(controller.panel.showResults).toHaveBeenCalledWith(results);
         });
@@ -346,24 +569,6 @@ describe('RunnerController', () => {
                 'Completed: 5 passed, 0 failed (1000ms)',
                 200
             );
-        });
-    });
-
-    describe('static methods', () => {
-        test('createRunnerTab should return runner tab config', () => {
-            const tab = RunnerController.createRunnerTab();
-
-            expect(tab).toEqual({
-                type: 'runner',
-                name: 'Collection Runner',
-                icon: 'play'
-            });
-        });
-
-        test('isRunnerTab should return true for runner tabs', () => {
-            expect(RunnerController.isRunnerTab({ type: 'runner' })).toBe(true);
-            expect(RunnerController.isRunnerTab({ type: 'request' })).toBe(false);
-            expect(RunnerController.isRunnerTab(null)).toBe(false);
         });
     });
 

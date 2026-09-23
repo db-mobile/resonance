@@ -482,10 +482,113 @@ pub async fn save_documentation(
     }))
 }
 
+#[tauri::command]
+pub async fn save_text_export(
+    app: AppHandle,
+    default_file_name: String,
+    content: String,
+    filter_name: String,
+    extensions: Vec<String>,
+) -> Result<Value, String> {
+    let extensions: Vec<&str> = extensions.iter().map(String::as_str).collect();
+    let Some(path) = pick_save_path(&app, default_file_name, &filter_name, &extensions).await?
+    else {
+        return Ok(cancelled_export());
+    };
+
+    let file_path = write_export(&app, &path, &content)?;
+
+    Ok(serde_json::json!({
+        "success": true,
+        "filePath": file_path
+    }))
+}
+
+/// Upper bound for a collection-runner data file. Every row becomes an
+/// iteration held in memory, so anything larger is almost certainly a mistake.
+const MAX_RUNNER_DATA_FILE_BYTES: u64 = 10 * 1024 * 1024;
+
+/// Read a collection-runner data file. Only `.csv` and `.json` are accepted
+/// because the path is stored with the runner and re-read on later runs.
+fn read_runner_data(path: &Path) -> Result<Value, String> {
+    let extension = path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(str::to_ascii_lowercase);
+    if !matches!(extension.as_deref(), Some("csv") | Some("json")) {
+        return Err("Data files must be .csv or .json".to_string());
+    }
+
+    let metadata = std::fs::metadata(path)
+        .map_err(|e| format!("Cannot read data file {}: {}", path.display(), e))?;
+    if metadata.len() > MAX_RUNNER_DATA_FILE_BYTES {
+        return Err("Data file is larger than 10 MB".to_string());
+    }
+
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Cannot read data file {}: {}", path.display(), e))?;
+    let name = path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    Ok(serde_json::json!({
+        "path": path.to_string_lossy(),
+        "name": name,
+        "content": content.trim_start_matches('\u{feff}')
+    }))
+}
+
+#[tauri::command]
+pub async fn pick_runner_data_file(app: AppHandle) -> Result<Option<Value>, String> {
+    let Some(file_path) = pick_import_file_with_kind(&app, "runner_data").await? else {
+        return Ok(None);
+    };
+    read_runner_data(&file_path).map(Some)
+}
+
+#[tauri::command]
+pub async fn read_runner_data_file(path: String) -> Result<Value, String> {
+    read_runner_data(Path::new(&path))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn runner_data_is_read_with_the_bom_stripped() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("users.csv");
+        std::fs::write(&path, "\u{feff}email\nada@example.com\n").unwrap();
+
+        let data = read_runner_data(&path).unwrap();
+
+        assert_eq!(data["name"], "users.csv");
+        assert_eq!(data["content"], "email\nada@example.com\n");
+    }
+
+    #[test]
+    fn runner_data_rejects_other_extensions() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("secrets.txt");
+        std::fs::write(&path, "x").unwrap();
+
+        assert!(
+            read_runner_data(&path)
+                .unwrap_err()
+                .contains(".csv or .json")
+        );
+    }
+
+    #[test]
+    fn runner_data_reports_a_missing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let err = read_runner_data(&dir.path().join("gone.json")).unwrap_err();
+
+        assert!(err.contains("Cannot read data file"));
+    }
 
     #[test]
     fn detection_routes_every_supported_format() {

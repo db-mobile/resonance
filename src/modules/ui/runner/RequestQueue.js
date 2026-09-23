@@ -4,6 +4,8 @@
  */
 
 import { templateLoader } from '../../templateLoader.js';
+import { translate } from '../../utils/translate.js';
+import { escapeHtml } from './runnerDomUtils.js';
 
 export class RequestQueue {
     /**
@@ -11,17 +13,16 @@ export class RequestQueue {
      * @param {() => void} [callbacks.onChange]
      * @param {(count: number) => void} [callbacks.onCountChange]
      * @param {(index: number) => void} [callbacks.onEditRequest]
-     * @param {(collectionId: string, endpointId: string) => Promise<Object>} [callbacks.onResolveEndpointDefaults]
      */
-    constructor({ onChange, onCountChange, onEditRequest, onResolveEndpointDefaults } = {}) {
+    constructor({ onChange, onCountChange, onEditRequest } = {}) {
         this.container = null;
         this.requests = [];
         this.selectedIndex = -1;
+        this.missing = new WeakSet();
 
         this._onChange = onChange || null;
         this._onCountChange = onCountChange || null;
         this._onEditRequest = onEditRequest || null;
-        this._onResolveEndpointDefaults = onResolveEndpointDefaults || null;
     }
 
     /** @param {HTMLElement} container */
@@ -40,9 +41,13 @@ export class RequestQueue {
         return this.requests;
     }
 
-    /** @param {Array<Object>} requests */
-    setRequests(requests) {
+    /**
+     * @param {Array<Object>} requests
+     * @param {Set<number>} [missingIndexes]
+     */
+    setRequests(requests, missingIndexes = new Set()) {
         this.requests = requests ? [...requests] : [];
+        this.missing = new WeakSet(this.requests.filter((_, index) => missingIndexes.has(index)));
         this.selectedIndex = -1;
         this._render();
     }
@@ -53,63 +58,43 @@ export class RequestQueue {
         this._render();
     }
 
-    clearAll() {
-        this.reset();
-        this._emitChange();
-    }
-
     /**
      * @param {Object} collection
      * @param {Object} endpoint
+     * @returns {Object}
      */
-    async addRequest(collection, endpoint) {
-        const request = {
+    static buildRequest(collection, endpoint) {
+        return {
             collectionId: collection.id,
             endpointId: endpoint.id,
             name: endpoint.name || endpoint.path,
             method: endpoint.method,
             path: endpoint.path,
             postResponseScript: '',
-            overrides: await this._resolveOverrides(collection.id, endpoint.id)
+            overrides: {}
         };
+    }
 
-        this.requests.push(request);
+    /**
+     * @param {Object} collection
+     * @param {Object} endpoint
+     */
+    addRequest(collection, endpoint) {
+        this.appendRequests([{ collection, endpoint }]);
+    }
+
+    /** @param {Array<{collection: Object, endpoint: Object}>} entries */
+    appendRequests(entries) {
+        if (entries.length === 0) {
+            return;
+        }
+        this.requests.push(...entries.map(({ collection, endpoint }) => RequestQueue.buildRequest(collection, endpoint)));
         this._render();
         this._emitChange();
     }
 
     _emitChange() {
         this._onChange?.();
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @returns {Promise<Object>}
-     */
-    async _resolveOverrides(collectionId, endpointId) {
-        const empty = { pathParams: [], queryParams: [], headers: [], body: '' };
-
-        if (!this._onResolveEndpointDefaults) {
-            return empty;
-        }
-
-        try {
-            const config = await this._onResolveEndpointDefaults(collectionId, endpointId);
-            return {
-                pathParams: (config?.pathParams || []).map(p => ({ key: p.key, value: p.value })),
-                queryParams: (config?.queryParams || [])
-                    .filter(p => p.enabled !== false)
-                    .map(p => ({ key: p.key, value: p.value })),
-                headers: (config?.headers || [])
-                    .filter(p => p.enabled !== false)
-                    .map(p => ({ key: p.key, value: p.value })),
-                body: config?.body || ''
-            };
-        } catch (error) {
-            console.error('[RequestQueue] Error resolving endpoint defaults:', error);
-            return empty;
-        }
     }
 
     _render() {
@@ -119,7 +104,7 @@ export class RequestQueue {
             this.container.innerHTML = `
                 <div class="empty-state-base runner-empty-state">
                     <span class="icon icon-20 icon-plus"></span>
-                    <p>Click requests from the left panel to add them</p>
+                    <p>${escapeHtml(translate('runner.add_requests_hint', 'Click requests from the left panel to add them'))}</p>
                 </div>
             `;
         } else {
@@ -149,6 +134,10 @@ export class RequestQueue {
 
         if (index === this.selectedIndex) {
             el.classList.add('is-selected');
+        }
+        if (this.missing.has(request)) {
+            el.classList.add('is-missing');
+            el.title = translate('runner.request_missing', 'This request no longer exists in any open collection');
         }
 
         const methodEl = el.querySelector('[data-role="method"]');

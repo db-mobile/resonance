@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 
-use super::read::{read_collection_dir, LoadedCollection};
+use super::read::{LoadedCollection, read_collection_dir};
 
 /// How many collections stay resident, mirroring the frontend repository's own
 /// bound so a user with many collections cannot grow this without limit.
@@ -228,9 +228,11 @@ mod tests {
         assert_eq!(first.meta.id, second.meta.id);
         assert_eq!(first.root.requests.len(), second.root.requests.len());
         assert_eq!(cache.len(), 1);
-        assert!(cache
-            .get(temp.path(), &fingerprint(temp.path()).unwrap())
-            .is_some());
+        assert!(
+            cache
+                .get(temp.path(), &fingerprint(temp.path()).unwrap())
+                .is_some()
+        );
     }
 
     #[test]
@@ -302,9 +304,11 @@ mod tests {
         let loaded = read_collection_dir(temp.path()).unwrap();
         cache.refresh(temp.path(), &loaded);
 
-        assert!(cache
-            .get(temp.path(), &fingerprint(temp.path()).unwrap())
-            .is_some());
+        assert!(
+            cache
+                .get(temp.path(), &fingerprint(temp.path()).unwrap())
+                .is_some()
+        );
     }
 
     #[test]

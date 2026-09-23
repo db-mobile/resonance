@@ -1,10 +1,14 @@
+/* global window */
 import { RunnerService } from '../../src/modules/services/RunnerService.js';
+import { ScriptService } from '../../src/modules/services/ScriptService.js';
+import { app } from '../../src/modules/appContext.js';
 
 describe('RunnerService', () => {
     let service;
     let mockRepository;
     let mockBackendAPI;
     let mockStatusDisplay;
+    let mockEnvironmentService;
 
     beforeEach(() => {
         mockRepository = {
@@ -19,7 +23,8 @@ describe('RunnerService', () => {
         mockBackendAPI = {
             sendApiRequest: jest.fn(),
             scripts: {
-                executeTest: jest.fn()
+                executeTest: jest.fn(),
+                executePreRequest: jest.fn()
             },
             settings: {
                 get: jest.fn().mockResolvedValue({})
@@ -35,6 +40,25 @@ describe('RunnerService', () => {
         };
 
         service = new RunnerService(mockRepository, mockBackendAPI, mockStatusDisplay);
+
+        mockEnvironmentService = {
+            getActiveEnvironment: jest.fn().mockResolvedValue({ id: 'env1', name: 'Dev', secretKeys: [] }),
+            getActiveEnvironmentVariables: jest.fn().mockResolvedValue({}),
+            setVariable: jest.fn().mockResolvedValue(undefined),
+            deleteVariable: jest.fn().mockResolvedValue(undefined)
+        };
+        window.backendAPI = mockBackendAPI;
+        app.scriptController = {
+            service: new ScriptService(null, mockEnvironmentService, null),
+            getScriptsForEndpoint: jest.fn().mockResolvedValue({ preRequestScript: '', testScript: '' })
+        };
+    });
+
+    afterEach(() => {
+        delete app.scriptController;
+        delete app.cookieController;
+        delete app.historyController;
+        delete window.backendAPI;
     });
 
     describe('getAllRunners', () => {
@@ -207,7 +231,7 @@ describe('RunnerService', () => {
                 { name: 'Request 2' },
                 { name: 'Request 3' }
             ];
-            const results = { requests: [], skipped: 0 };
+            const results = { requests: [], skipped: 0, totalRequests: 3 };
 
             service._markRemainingAsSkipped(requests, results, 1, 'Test reason');
 
@@ -216,6 +240,15 @@ describe('RunnerService', () => {
             expect(results.requests[0].error).toBe('Test reason');
             expect(results.requests[0].index).toBe(1);
             expect(results.skipped).toBe(2);
+        });
+
+        test('continues through later iterations of the queue', () => {
+            const requests = [{ name: 'A' }, { name: 'B' }];
+            const results = { requests: [], skipped: 0, totalRequests: 6 };
+
+            service._markRemainingAsSkipped(requests, results, 3, 'Stopped');
+
+            expect(results.requests.map(r => `${r.iteration}:${r.name}`)).toEqual(['2:B', '3:A', '3:B']);
         });
     });
 
@@ -260,143 +293,6 @@ describe('RunnerService', () => {
             const result = service._findEndpoint(collection, 'non_existent');
 
             expect(result).toBeNull();
-        });
-    });
-
-    describe('_generateAuthData', () => {
-        test('should return empty auth data for no auth config', () => {
-            const result = service._generateAuthData(null, {});
-
-            expect(result).toEqual({
-                headers: {},
-                queryParams: {},
-                authConfig: null
-            });
-        });
-
-        test('should return empty auth data for none type', () => {
-            const result = service._generateAuthData({ type: 'none' }, {});
-
-            expect(result).toEqual({
-                headers: {},
-                queryParams: {},
-                authConfig: null
-            });
-        });
-
-        test('should generate bearer auth header', () => {
-            const authConfig = {
-                type: 'bearer',
-                config: { token: 'my-token' }
-            };
-
-            const result = service._generateAuthData(authConfig, {});
-
-            expect(result.headers['Authorization']).toBe('Bearer my-token');
-        });
-
-        test('should generate bearer auth from variable', () => {
-            const authConfig = {
-                type: 'bearer',
-                config: {}
-            };
-            const variables = { bearerToken: 'var-token' };
-
-            const result = service._generateAuthData(authConfig, variables);
-
-            expect(result.headers['Authorization']).toBe('Bearer var-token');
-        });
-
-        test('should generate basic auth header', () => {
-            const authConfig = {
-                type: 'basic',
-                config: { username: 'user', password: 'pass' }
-            };
-
-            const result = service._generateAuthData(authConfig, {});
-
-            const expectedCredentials = btoa('user:pass');
-            expect(result.headers['Authorization']).toBe(`Basic ${expectedCredentials}`);
-        });
-
-        test('should generate api-key header', () => {
-            const authConfig = {
-                type: 'api-key',
-                config: { keyName: 'X-API-Key', keyValue: 'secret', location: 'header' }
-            };
-
-            const result = service._generateAuthData(authConfig, {});
-
-            expect(result.headers['X-API-Key']).toBe('secret');
-        });
-
-        test('should generate api-key query param', () => {
-            const authConfig = {
-                type: 'api-key',
-                config: { keyName: 'api_key', keyValue: 'secret', location: 'query' }
-            };
-
-            const result = service._generateAuthData(authConfig, {});
-
-            expect(result.queryParams['api_key']).toBe('secret');
-        });
-
-        test('should generate oauth2 auth header', () => {
-            const authConfig = {
-                type: 'oauth2',
-                config: { token: 'oauth-token', headerPrefix: 'Bearer' }
-            };
-
-            const result = service._generateAuthData(authConfig, {});
-
-            expect(result.headers['Authorization']).toBe('Bearer oauth-token');
-        });
-
-        test('should generate digest auth config', () => {
-            const authConfig = {
-                type: 'digest',
-                config: { username: 'user', password: 'pass' }
-            };
-
-            const result = service._generateAuthData(authConfig, {});
-
-            expect(result.authConfig).toEqual({ username: 'user', password: 'pass' });
-        });
-
-        test('should generate ntlm auth config with variable interpolation', () => {
-            const authConfig = {
-                type: 'ntlm',
-                config: {
-                    username: '{{ntlmUser}}',
-                    password: '{{ntlmPass}}',
-                    domain: 'CORP',
-                    workstation: ''
-                }
-            };
-
-            const result = service._generateAuthData(authConfig, {
-                ntlmUser: 'ada',
-                ntlmPass: 'hunter2'
-            });
-
-            expect(result.ntlmAuth).toEqual({
-                username: 'ada',
-                password: 'hunter2',
-                domain: 'CORP',
-                workstation: ''
-            });
-        });
-
-        test('should process variables in auth values', () => {
-            const authConfig = {
-                type: 'bearer',
-                config: { token: '{{apiToken}}' }
-            };
-            const variables = { apiToken: 'resolved-token' };
-
-            const result = service._generateAuthData(authConfig, variables);
-
-            expect(result.headers['Authorization']).toBe('Bearer resolved-token');
         });
     });
 
@@ -451,89 +347,6 @@ describe('RunnerService', () => {
             service._notifyListeners('test-event', {});
 
             expect(goodListener).toHaveBeenCalled();
-        });
-    });
-
-    describe('_executePostResponseScript', () => {
-        test('should return empty result for empty script', async () => {
-            const result = await service._executePostResponseScript('', {}, {}, {});
-
-            expect(result).toEqual({ variablesSet: {}, logs: [], testResults: [] });
-        });
-
-        test('should return empty result for whitespace-only script', async () => {
-            const result = await service._executePostResponseScript('   ', {}, {}, {});
-
-            expect(result).toEqual({ variablesSet: {}, logs: [], testResults: [] });
-        });
-
-        test('should surface testResults from the backend', async () => {
-            mockBackendAPI.scripts.executeTest.mockResolvedValue({
-                modifiedEnvironment: {},
-                logs: [],
-                errors: [],
-                testResults: [
-                    { passed: true, message: 'status is 200' },
-                    { passed: false, message: 'body has id' }
-                ]
-            });
-
-            const result = await service._executePostResponseScript('pm.test()', {}, {}, {});
-
-            expect(result.testResults).toEqual([
-                { passed: true, message: 'status is 200' },
-                { passed: false, message: 'body has id' }
-            ]);
-        });
-
-        test('should execute script and return variables', async () => {
-            mockBackendAPI.scripts.executeTest.mockResolvedValue({
-                modifiedEnvironment: { newVar: 'value', nullVar: null },
-                logs: ['log1', 'log2'],
-                errors: []
-            });
-
-            const result = await service._executePostResponseScript(
-                'console.log("test")',
-                { url: 'http://test.com', method: 'GET' },
-                { status: 200, body: {} },
-                { existingVar: 'existing' }
-            );
-
-            expect(result.variablesSet).toEqual({ newVar: 'value' });
-            expect(result.logs).toEqual(['log1', 'log2']);
-            expect(result.error).toBeNull();
-        });
-
-        test('should return error from script execution', async () => {
-            mockBackendAPI.scripts.executeTest.mockResolvedValue({
-                modifiedEnvironment: {},
-                logs: [],
-                errors: ['Script error 1', 'Script error 2']
-            });
-
-            const result = await service._executePostResponseScript(
-                'invalid script',
-                {},
-                {},
-                {}
-            );
-
-            expect(result.error).toBe('Script error 1; Script error 2');
-        });
-
-        test('should handle script execution failure', async () => {
-            mockBackendAPI.scripts.executeTest.mockRejectedValue(new Error('Execution failed'));
-
-            const result = await service._executePostResponseScript(
-                'console.log("test")',
-                {},
-                {},
-                {}
-            );
-
-            expect(result.variablesSet).toEqual({});
-            expect(result.error).toBe('Execution failed');
         });
     });
 
@@ -600,7 +413,7 @@ describe('RunnerService', () => {
                 body: '{"from":"override"}'
             };
 
-            const config = await service._buildRequestConfig(
+            const { requestConfig: config } = await service._buildRequestConfig(
                 collection,
                 endpoint,
                 { baseUrl: 'https://api.test' },
@@ -616,7 +429,7 @@ describe('RunnerService', () => {
         });
 
         test('honors explicitly cleared overrides instead of resurrecting persisted config', async () => {
-            const config = await service._buildRequestConfig(
+            const { requestConfig: config } = await service._buildRequestConfig(
                 collection,
                 endpoint,
                 { baseUrl: 'https://api.test' },
@@ -629,7 +442,7 @@ describe('RunnerService', () => {
         });
 
         test('empty path params still fall back so URL templates keep their values', async () => {
-            const config = await service._buildRequestConfig(
+            const { requestConfig: config } = await service._buildRequestConfig(
                 collection,
                 endpoint,
                 { baseUrl: 'https://api.test' },
@@ -640,7 +453,7 @@ describe('RunnerService', () => {
         });
 
         test('should behave as before when no overrides are provided', async () => {
-            const config = await service._buildRequestConfig(collection, endpoint, {
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {
                 baseUrl: 'https://api.test'
             });
 
@@ -682,7 +495,7 @@ describe('RunnerService', () => {
                 ]
             });
 
-            const config = await service._buildRequestConfig(collection, endpoint, {
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {
                 val: 'hello',
                 dir: '/tmp'
             });
@@ -700,7 +513,7 @@ describe('RunnerService', () => {
                 fields: { a: '1', b: '2' }
             });
 
-            const config = await service._buildRequestConfig(collection, endpoint, {});
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {});
 
             expect(config.bodyType).toBe('urlencoded');
             expect(config.body).toEqual([
@@ -716,7 +529,7 @@ describe('RunnerService', () => {
                 contentType: 'application/pdf'
             });
 
-            const config = await service._buildRequestConfig(collection, endpoint, { dir: '/tmp' });
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, { dir: '/tmp' });
 
             expect(config.bodyType).toBe('binary');
             expect(config.body).toEqual({
@@ -725,16 +538,163 @@ describe('RunnerService', () => {
             });
         });
 
-        test('should skip binary bodies with no file path', async () => {
+        test('refuses a binary body with no file path, like the editor does', async () => {
             stubPersisted({
                 mode: 'binary',
                 filePath: ''
             });
 
-            const config = await service._buildRequestConfig(collection, endpoint, {});
+            await expect(service._buildRequestConfig(collection, endpoint, {}))
+                .rejects.toThrow('No file selected for binary body');
+        });
 
-            expect(config.bodyType).toBeUndefined();
-            expect(config.body).toBeUndefined();
+        test('sends text-mode bodies as text instead of a JSON string literal', async () => {
+            stubPersisted({ mode: 'text', content: 'hello {{name}}' });
+
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, { name: 'ada' });
+
+            expect(config.bodyType).toBe('text');
+            expect(config.body).toBe('hello ada');
+        });
+
+        test('rejects an invalid JSON body instead of sending it as a quoted string', async () => {
+            service.collectionRepository.getAllPersistedEndpointData = jest.fn().mockResolvedValue({
+                headers: [], modifiedBody: 'not json', formBodyData: null, queryParams: [], pathParams: []
+            });
+
+            await expect(service._buildRequestConfig(collection, endpoint, {}))
+                .rejects.toThrow('Invalid Body JSON');
+        });
+    });
+
+    describe('_buildRequestConfig parity with the editor send path', () => {
+        let collection;
+
+        const stubPersisted = (overrides = {}) => {
+            service.collectionRepository.getAllPersistedEndpointData = jest.fn().mockResolvedValue({
+                url: null,
+                headers: [],
+                modifiedBody: null,
+                formBodyData: null,
+                graphqlData: null,
+                queryParams: [],
+                pathParams: [],
+                ...overrides
+            });
+        };
+
+        beforeEach(() => {
+            stubPersisted();
+            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
+            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue(null);
+            collection = { id: 'c1', baseUrl: 'https://api.test', defaultHeaders: {} };
+        });
+
+        test('builds a GraphQL POST from the persisted query, variables and operation name', async () => {
+            stubPersisted({
+                graphqlData: {
+                    query: 'query Get($id: ID!) { user(id: $id) { name } }',
+                    variables: '{"id": "{{userId}}"}',
+                    operationName: 'Get'
+                }
+            });
+            const endpoint = { id: 'e1', method: 'GET', protocol: 'graphql', path: '/graphql' };
+
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, { userId: '7' });
+
+            expect(config.method).toBe('POST');
+            expect(config.url).toBe('https://api.test/graphql');
+            expect(config.body).toEqual({
+                query: 'query Get($id: ID!) { user(id: $id) { name } }',
+                variables: { id: '7' },
+                operationName: 'Get'
+            });
+        });
+
+        test('keeps empty-valued and duplicate query params in order', async () => {
+            stubPersisted({
+                queryParams: [
+                    { key: 'tag', value: 'a' },
+                    { key: 'flag', value: '' },
+                    { key: 'tag', value: 'b' },
+                    { key: 'off', value: 'x', enabled: false }
+                ]
+            });
+            const endpoint = { id: 'e1', method: 'GET', path: '/items' };
+
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {});
+
+            expect(config.url).toBe('https://api.test/items?tag=a&flag=&tag=b');
+        });
+
+        test('uses the persisted editor URL when the endpoint has one', async () => {
+            stubPersisted({ url: 'https://other.test/v2/items' });
+            const endpoint = { id: 'e1', method: 'GET', path: '/items' };
+
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {});
+
+            expect(config.url).toBe('https://other.test/v2/items');
+        });
+
+        test('substitutes OpenAPI single-brace path parameters', async () => {
+            const endpoint = {
+                id: 'e1',
+                method: 'GET',
+                path: '/users/{id}',
+                parameters: { path: { id: { example: '42' } } }
+            };
+
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {});
+
+            expect(config.url).toBe('https://api.test/users/42');
+        });
+
+        test('passes the TLS and redirect settings through', async () => {
+            mockBackendAPI.settings.get.mockResolvedValue({ verifySsl: false, followRedirects: false, requestTimeout: 0 });
+            const endpoint = { id: 'e1', method: 'GET', path: '/items' };
+
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {});
+
+            expect(config.verifySsl).toBe(false);
+            expect(config.followRedirects).toBe(false);
+            expect(config.timeout).toBeNull();
+        });
+
+        test('adds api-key query auth to the URL', async () => {
+            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue({
+                type: 'api-key',
+                config: { keyName: 'api_key', keyValue: '{{key}}', location: 'query' }
+            });
+            const endpoint = { id: 'e1', method: 'GET', path: '/items' };
+
+            const { requestConfig: config, authData } = await service._buildRequestConfig(collection, endpoint, { key: 's3cret' });
+
+            expect(config.url).toBe('https://api.test/items?api_key=s3cret');
+            expect(authData.queryParams).toEqual({ api_key: 's3cret' });
+        });
+
+        test('falls back to the bearerToken variable for an empty bearer token', async () => {
+            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue({
+                type: 'bearer',
+                config: { token: '' }
+            });
+            const endpoint = { id: 'e1', method: 'GET', path: '/items' };
+
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, { bearerToken: 'tok' });
+
+            expect(config.headers['Authorization']).toBe('Bearer tok');
+        });
+
+        test('interpolates variables into NTLM credentials', async () => {
+            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue({
+                type: 'ntlm',
+                config: { username: '{{u}}', password: '{{p}}', domain: 'CORP', workstation: '' }
+            });
+            const endpoint = { id: 'e1', method: 'GET', path: '/items' };
+
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, { u: 'ada', p: 'pw' });
+
+            expect(config.ntlm).toEqual({ username: 'ada', password: 'pw', domain: 'CORP', workstation: '' });
         });
     });
 
@@ -763,7 +723,7 @@ describe('RunnerService', () => {
                 config: { token: 'shared-token' }
             });
 
-            const config = await service._buildRequestConfig(collection, endpoint, {});
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {});
 
             expect(service.collectionRepository.getInheritedAuthConfig).toHaveBeenCalledWith('c1', 'e1');
             expect(config.headers['Authorization']).toBe('Bearer shared-token');
@@ -779,7 +739,7 @@ describe('RunnerService', () => {
                 config: { token: 'shared-token' }
             });
 
-            const config = await service._buildRequestConfig(collection, endpoint, {});
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {});
 
             expect(config.headers['Authorization']).toBeUndefined();
         });
@@ -794,7 +754,7 @@ describe('RunnerService', () => {
                 config: { token: 'shared-token' }
             });
 
-            const config = await service._buildRequestConfig(collection, endpoint, {});
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {});
 
             expect(config.headers['Authorization']).toBe('Bearer endpoint-token');
         });
@@ -809,7 +769,7 @@ describe('RunnerService', () => {
                 config: { token: '{{apiToken}}' }
             });
 
-            const config = await service._buildRequestConfig(collection, endpoint, {
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {
                 apiToken: 'resolved-secret'
             });
 
@@ -817,7 +777,7 @@ describe('RunnerService', () => {
         });
 
         test('inherit with no collection auth sends unauthenticated', async () => {
-            const config = await service._buildRequestConfig(collection, endpoint, {});
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {});
 
             expect(config.headers['Authorization']).toBeUndefined();
         });
@@ -838,9 +798,12 @@ describe('RunnerService', () => {
             service.collectionRepository.getById = jest
                 .fn()
                 .mockResolvedValue({ id: 'c1', endpoints: [{ id: 'e1', method: 'GET', path: '/x' }] });
-            service._buildRequestConfig = jest
-                .fn()
-                .mockResolvedValue({ url: 'http://api.test/x', method: 'GET', headers: {} });
+            service._buildRequestConfig = jest.fn().mockResolvedValue({
+                requestConfig: { url: 'http://api.test/x', method: 'GET', headers: {}, queryParams: {}, pathParams: {} },
+                rawUrl: 'http://api.test/x',
+                authData: { headers: {}, queryParams: {} },
+                mockRewrite: null
+            });
             mockBackendAPI.sendApiRequest.mockResolvedValue({
                 success: true,
                 status: 200,
@@ -911,6 +874,302 @@ describe('RunnerService', () => {
         });
     });
 
+    describe('_executeRequest through the shared script and cookie pipeline', () => {
+        const request = { collectionId: 'c1', endpointId: 'e1', name: 'R1', method: 'GET', path: '/x' };
+        const collection = {
+            id: 'c1',
+            baseUrl: 'https://api.test',
+            defaultHeaders: {},
+            endpoints: [{ id: 'e1', method: 'GET', path: '/x' }]
+        };
+
+        beforeEach(() => {
+            service.collectionRepository.getById = jest.fn().mockResolvedValue(collection);
+            service.collectionRepository.getAllPersistedEndpointData = jest.fn().mockResolvedValue({
+                url: null, headers: [], modifiedBody: null, formBodyData: null, graphqlData: null, queryParams: [], pathParams: []
+            });
+            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
+            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue(null);
+            service.variableRepository.getVariablesForCollection = jest.fn().mockResolvedValue({});
+            service.environmentRepository.getActiveEnvironmentVariables = jest.fn().mockResolvedValue({});
+            service.certificateService.getItems = jest.fn().mockResolvedValue([]);
+            mockBackendAPI.scripts.executeTest.mockResolvedValue({
+                modifiedEnvironment: {}, logs: [], errors: [], testResults: []
+            });
+        });
+
+        test('runs tests on a 404 and passes when they pass', async () => {
+            mockBackendAPI.sendApiRequest.mockResolvedValue({
+                success: false, status: 404, statusText: 'Not Found', data: { error: 'nope' }, headers: {}
+            });
+            mockBackendAPI.scripts.executeTest.mockResolvedValue({
+                modifiedEnvironment: {}, logs: [], errors: [], testResults: [{ passed: true, message: 'is 404' }]
+            });
+
+            const result = await service._executeRequest(
+                { ...request, postResponseScript: 'pm.test("is 404", () => {})' }, {}, 0
+            );
+
+            expect(mockBackendAPI.scripts.executeTest).toHaveBeenCalledTimes(1);
+            expect(mockBackendAPI.scripts.executeTest.mock.calls[0][0].response.status).toBe(404);
+            expect(result.status).toBe('success');
+            expect(result.httpSuccess).toBe(false);
+            expect(result.statusCode).toBe(404);
+        });
+
+        test('fails a non-2xx response without tests and reports the status', async () => {
+            mockBackendAPI.sendApiRequest.mockResolvedValue({
+                success: false, status: 500, statusText: 'Internal Server Error', data: null, headers: {}
+            });
+
+            const result = await service._executeRequest(request, {}, 0);
+
+            expect(result.status).toBe('error');
+            expect(result.error).toBe('500 Internal Server Error');
+        });
+
+        test('runs the endpoint pre-request and test scripts before the runner script', async () => {
+            app.scriptController.getScriptsForEndpoint.mockResolvedValue({
+                preRequestScript: 'pre()',
+                testScript: 'endpointTest()'
+            });
+            mockBackendAPI.scripts.executePreRequest.mockResolvedValue({
+                success: true,
+                logs: [{ level: 'log', message: 'pre ran', timestamp: 1 }],
+                errors: [],
+                testResults: [],
+                modifiedEnvironment: { token: 'abc' },
+                modifiedRequest: { headers: { 'X-Signed': '1' } }
+            });
+            mockBackendAPI.sendApiRequest.mockResolvedValue({ success: true, status: 200, data: {}, headers: {} });
+
+            const result = await service._executeRequest({ ...request, postResponseScript: 'runnerTest()' }, {}, 0);
+
+            const sent = mockBackendAPI.sendApiRequest.mock.calls[0][0];
+            expect(sent.headers['X-Signed']).toBe('1');
+            const scriptsRun = mockBackendAPI.scripts.executeTest.mock.calls.map(([data]) => data.script);
+            expect(scriptsRun).toEqual(['endpointTest()', 'runnerTest()']);
+            expect(mockBackendAPI.scripts.executeTest.mock.calls[0][0].environment.token).toBe('abc');
+            expect(mockEnvironmentService.setVariable).toHaveBeenCalledWith('env1', 'token', 'abc', false);
+            expect(result.variablesSet).toEqual({ token: 'abc' });
+            expect(result.logs).toEqual([{ level: 'log', message: 'pre ran', timestamp: 1 }]);
+        });
+
+        test('sends jar cookies and stores Set-Cookie values', async () => {
+            app.cookieController = {
+                getCookieHeader: jest.fn().mockResolvedValue('sid=1'),
+                handleCookiesFromResponse: jest.fn().mockResolvedValue(undefined)
+            };
+            mockBackendAPI.sendApiRequest.mockResolvedValue({
+                success: true, status: 200, data: {}, headers: {}, setCookies: ['sid=2; Path=/']
+            });
+
+            await service._executeRequest(request, {}, 0);
+
+            expect(mockBackendAPI.sendApiRequest.mock.calls[0][0].headers['Cookie']).toBe('sid=1');
+            expect(app.cookieController.handleCookiesFromResponse)
+                .toHaveBeenCalledWith(['sid=2; Path=/'], 'https://api.test/x');
+        });
+
+        test('records a history entry for each request', async () => {
+            app.historyController = { addHistoryEntry: jest.fn().mockResolvedValue(undefined) };
+            mockBackendAPI.sendApiRequest.mockResolvedValue({ success: true, status: 200, data: {}, headers: {} });
+
+            await service._executeRequest(request, {}, 0);
+
+            expect(app.historyController.addHistoryEntry).toHaveBeenCalledWith(
+                expect.objectContaining({ url: 'https://api.test/x' }),
+                expect.objectContaining({ status: 200 }),
+                { collectionId: 'c1', endpointId: 'e1' },
+                null,
+                { headerNames: [], queryNames: [] }
+            );
+        });
+
+        test('tells pre-request and test scripts which iteration and data row they run in', async () => {
+            app.scriptController.getScriptsForEndpoint.mockResolvedValue({ preRequestScript: 'pre()', testScript: 'test()' });
+            mockBackendAPI.scripts.executePreRequest.mockResolvedValue({
+                success: true, logs: [], errors: [], testResults: [], modifiedEnvironment: {}, modifiedRequest: {}
+            });
+            mockBackendAPI.sendApiRequest.mockResolvedValue({ success: true, status: 200, data: {}, headers: {} });
+
+            await service._executeRequest(request, {}, 5, null, { index: 2, count: 3, data: { email: 'cy@x.io' } });
+
+            const expected = { iteration: 2, iterationCount: 3, data: { email: 'cy@x.io' }, requestName: 'R1' };
+            expect(mockBackendAPI.scripts.executePreRequest.mock.calls[0][0].iteration).toEqual(expected);
+            expect(mockBackendAPI.scripts.executeTest.mock.calls[0][0].iteration).toEqual(expected);
+            expect(mockBackendAPI.scripts.executeTest.mock.calls[0][0].environment.email).toBe('cy@x.io');
+        });
+
+        test('a request run outside the iteration loop is iteration 0 of 1', async () => {
+            mockBackendAPI.sendApiRequest.mockResolvedValue({ success: true, status: 200, data: {}, headers: {} });
+
+            await service._executeRequest({ ...request, postResponseScript: 'test()' }, {}, 0);
+
+            expect(mockBackendAPI.scripts.executeTest.mock.calls[0][0].iteration)
+                .toEqual({ iteration: 0, iterationCount: 1, data: {}, requestName: 'R1' });
+        });
+
+        test('refuses protocols the runner cannot drive', async () => {
+            service.collectionRepository.getById = jest.fn().mockResolvedValue({
+                ...collection,
+                endpoints: [{ id: 'e1', method: 'GET', path: '/x', protocol: 'sse' }]
+            });
+
+            const result = await service._executeRequest(request, {}, 0);
+
+            expect(result.status).toBe('error');
+            expect(result.error).toContain('sse');
+            expect(mockBackendAPI.sendApiRequest).not.toHaveBeenCalled();
+        });
+
+        test('an unset variable is removed from later requests', async () => {
+            const variables = await service._buildVariables('c1', { token: null });
+
+            expect(variables).not.toHaveProperty('token');
+        });
+    });
+
+    describe('iterations and data files', () => {
+        beforeEach(() => {
+            service._buildRunContext = jest.fn().mockResolvedValue(null);
+        });
+
+        test('repeats the whole queue for each iteration with flat indexes', async () => {
+            service._executeRequest = jest.fn().mockImplementation(async (request, vars, index) => ({
+                index, name: request.name, status: 'success', variablesSet: {}
+            }));
+
+            const results = await service.executeRunnerData({
+                requests: [{ name: 'A' }, { name: 'B' }],
+                options: { iterations: 3 }
+            });
+
+            expect(results.totalRequests).toBe(6);
+            expect(results.iterations).toBe(3);
+            expect(results.requests.map(r => `${r.iteration}:${r.name}:${r.index}`))
+                .toEqual(['1:A:0', '1:B:1', '2:A:2', '2:B:3', '3:A:4', '3:B:5']);
+        });
+
+        test('clamps the iteration count to 1..1000', async () => {
+            service._executeRequest = jest.fn().mockResolvedValue({ status: 'success', variablesSet: {} });
+
+            const zero = await service.executeRunnerData({ requests: [{}], options: { iterations: 0 } });
+            expect(zero.iterations).toBe(1);
+            const many = await service.executeRunnerData({ requests: [{}], options: { iterations: 5000 } });
+            expect(many.iterations).toBe(1000);
+        });
+
+        test('runs once per data row and passes each row to its requests', async () => {
+            mockBackendAPI.runner = {
+                readDataFile: jest.fn().mockResolvedValue({ name: 'users.csv', content: 'email\nada@x.io\nbob@x.io\n' })
+            };
+            service._executeRequest = jest.fn().mockResolvedValue({ status: 'success', variablesSet: {} });
+            const started = [];
+            service.addListener((event, data) => event === 'run-started' && started.push(data));
+
+            const results = await service.executeRunnerData({
+                requests: [{ name: 'A' }],
+                options: { iterations: 7, dataFile: { path: '/data/users.csv', name: 'users.csv' } }
+            });
+
+            expect(mockBackendAPI.runner.readDataFile).toHaveBeenCalledWith('/data/users.csv');
+            expect(results.iterations).toBe(2);
+            expect(service._executeRequest.mock.calls.map(call => call[4])).toEqual([
+                { index: 0, count: 2, data: { email: 'ada@x.io' } },
+                { index: 1, count: 2, data: { email: 'bob@x.io' } }
+            ]);
+            expect(started[0].iterationLabels).toEqual(['email=ada@x.io', 'email=bob@x.io']);
+        });
+
+        test('names the data file when it cannot be read', async () => {
+            mockBackendAPI.runner = { readDataFile: jest.fn().mockRejectedValue('Cannot read data file /x: No such file') };
+
+            await expect(service.executeRunnerData({
+                requests: [{}],
+                options: { dataFile: { path: '/x/users.csv', name: 'users.csv' } }
+            })).rejects.toThrow('Data file users.csv: Cannot read data file /x: No such file');
+            expect(service.isExecuting()).toBe(false);
+        });
+
+        test('rejects a data file without rows', async () => {
+            mockBackendAPI.runner = { readDataFile: jest.fn().mockResolvedValue({ name: 'e.csv', content: 'email\n' }) };
+
+            await expect(service.executeRunnerData({
+                requests: [{}],
+                options: { dataFile: { path: '/e.csv', name: 'e.csv' } }
+            })).rejects.toThrow('Data file e.csv has no rows');
+        });
+
+        test('data row values win over environment and script-set variables', async () => {
+            service.variableRepository.getVariablesForCollection = jest.fn().mockResolvedValue({ user: 'collection' });
+            const runContext = { collectionVars: new Map(), envVars: { user: 'env', other: 'env' } };
+
+            const variables = await service._buildVariables('c1', { user: 'script' }, runContext, { user: 'row' });
+
+            expect(variables).toEqual({ user: 'row', other: 'env' });
+        });
+
+        test('stop-on-error skips every remaining iteration', async () => {
+            service._executeRequest = jest.fn()
+                .mockResolvedValueOnce({ status: 'success', variablesSet: {} })
+                .mockResolvedValueOnce({ status: 'error', variablesSet: {} });
+
+            const results = await service.executeRunnerData({
+                requests: [{ name: 'A' }, { name: 'B' }],
+                options: { iterations: 3, stopOnError: true }
+            });
+
+            expect(results.failed).toBe(1);
+            expect(results.skipped).toBe(4);
+        });
+    });
+
+    describe('stopping and progress', () => {
+        test('stop cuts a delay short and skips the rest', async () => {
+            service._buildRunContext = jest.fn().mockResolvedValue(null);
+            service._executeRequest = jest.fn().mockResolvedValue({ status: 'success', variablesSet: {} });
+
+            const run = service.executeRunnerData({ requests: [{}, {}], options: { delayMs: 60000 } });
+            await new Promise(resolve => setTimeout(resolve, 0));
+            service.stopExecution();
+            const results = await run;
+
+            expect(service._executeRequest).toHaveBeenCalledTimes(1);
+            expect(results.skipped).toBe(1);
+        });
+
+        test('stop abandons an in-flight request', async () => {
+            service._buildRunContext = jest.fn().mockResolvedValue(null);
+            service._executeRequest = jest.fn().mockReturnValue(new Promise(() => {}));
+
+            const run = service.executeRunnerData({ requests: [{}, {}], options: {} });
+            await new Promise(resolve => setTimeout(resolve, 0));
+            service.stopExecution();
+            const results = await run;
+
+            expect(results.skipped).toBe(2);
+            expect(service.isExecuting()).toBe(false);
+        });
+
+        test('a failing request reports progress before stop-on-error halts the run', async () => {
+            service._buildRunContext = jest.fn().mockResolvedValue(null);
+            service._executeRequest = jest.fn().mockResolvedValue({ status: 'error', variablesSet: {} });
+            const onProgress = jest.fn();
+            const completed = [];
+            service.addListener((event, data) => {
+                if (event === 'request-completed') {
+                    completed.push(data.index);
+                }
+            });
+
+            await service.executeRunnerData({ requests: [{}, {}], options: { stopOnError: true } }, onProgress);
+
+            expect(onProgress).toHaveBeenCalledWith(0, 2, expect.objectContaining({ status: 'error' }));
+            expect(completed).toEqual([0]);
+        });
+    });
+
     describe('saved vs unsaved runs differ only in identity and last-run bookkeeping', () => {
         beforeEach(() => {
             service._executeRequest = jest
@@ -936,7 +1195,7 @@ describe('RunnerService', () => {
 
             expect(results.runnerId).toBe('runner_1');
             expect(results.runnerName).toBe('Smoke');
-            expect(started).toEqual([{ runnerId: 'runner_1', total: 1 }]);
+            expect(started).toEqual([{ runnerId: 'runner_1', total: 1, iterations: 1, iterationLabels: null }]);
             expect(mockRepository.updateLastRun).toHaveBeenCalledWith('runner_1');
         });
 
@@ -952,7 +1211,7 @@ describe('RunnerService', () => {
 
             expect(results.runnerId).toBeNull();
             expect(results.runnerName).toBe('Untitled Runner');
-            expect(started).toEqual([{ runnerId: null, total: 1 }]);
+            expect(started).toEqual([{ runnerId: null, total: 1, iterations: 1, iterationLabels: null }]);
             expect(mockRepository.updateLastRun).not.toHaveBeenCalled();
         });
 

@@ -4,6 +4,7 @@
  */
 
 import { escapeHtml } from './runnerDomUtils.js';
+import { translate, translateCount } from '../../utils/translate.js';
 
 export class RunnerSelectorMenu {
     /**
@@ -74,7 +75,7 @@ export class RunnerSelectorMenu {
         if (!this.dom.list) {return;}
 
         if (!runners || runners.length === 0) {
-            this.dom.list.innerHTML = '<div class="runner-dropdown-empty dropdown-empty">No saved runners</div>';
+            this.dom.list.innerHTML = `<div class="runner-dropdown-empty dropdown-empty">${escapeHtml(translate('runner.no_saved_runners', 'No saved runners yet'))}</div>`;
             return;
         }
 
@@ -84,7 +85,10 @@ export class RunnerSelectorMenu {
             return `
                 <div class="runner-dropdown-item dropdown-item u-flex u-items-center u-justify-between ${isSelected ? 'is-selected is-active' : ''}" data-runner-id="${runner.id}">
                     <span class="runner-dropdown-item-name dropdown-item-label">${escapeHtml(runner.name)}</span>
-                    <span class="dropdown-item-meta">${requestCount} requests</span>
+                    <span class="dropdown-item-meta">${escapeHtml(translateCount('runner.request_count', requestCount, {
+                        one: '{{count}} request',
+                        other: '{{count}} requests'
+                    }))}</span>
                 </div>
             `;
         }).join('');

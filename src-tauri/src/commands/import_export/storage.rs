@@ -46,23 +46,19 @@ pub(crate) fn get_last_import_directory(app: &AppHandle) -> Option<std::path::Pa
         return None;
     }
     let path = std::path::PathBuf::from(dir_str);
-    if path.exists() {
-        Some(path)
-    } else {
-        None
-    }
+    if path.exists() { Some(path) } else { None }
 }
 
 /// Save the directory of a selected file to the store for next time
 pub(crate) fn save_last_import_directory(app: &AppHandle, file_path: &std::path::Path) {
-    if let Some(parent) = file_path.parent() {
-        if let Ok(store) = app.store(STORE_FILE) {
-            store.set(
-                LAST_IMPORT_DIR_KEY.to_string(),
-                serde_json::Value::String(parent.to_string_lossy().to_string()),
-            );
-            let _ = store.save();
-        }
+    if let Some(parent) = file_path.parent()
+        && let Ok(store) = app.store(STORE_FILE)
+    {
+        store.set(
+            LAST_IMPORT_DIR_KEY.to_string(),
+            serde_json::Value::String(parent.to_string_lossy().to_string()),
+        );
+        let _ = store.save();
     }
 }
 
@@ -78,13 +74,13 @@ pub(crate) fn save_collection_to_files(
         .map_err(|e| format!("Failed to serialize folders: {}", e))?;
 
     let mut variables = collection.variables.clone().unwrap_or_default();
-    if variables.is_empty() {
-        if let Some(base_url) = collection.base_url.as_ref().filter(|s| !s.is_empty()) {
-            variables.push(VariableEntry {
-                key: "baseUrl".to_string(),
-                value: base_url.clone(),
-            });
-        }
+    if variables.is_empty()
+        && let Some(base_url) = collection.base_url.as_ref().filter(|s| !s.is_empty())
+    {
+        variables.push(VariableEntry {
+            key: "baseUrl".to_string(),
+            value: base_url.clone(),
+        });
     }
     let variables = variables
         .iter()
@@ -148,6 +144,9 @@ pub(crate) async fn pick_import_file_with_kind(
         }
         "cookie_jar" => {
             dialog = dialog.add_filter("Cookie Export", &["json"]);
+        }
+        "runner_data" => {
+            dialog = dialog.add_filter("Data Files (CSV, JSON)", &["csv", "json"]);
         }
         _ => {}
     }

@@ -1,4 +1,4 @@
-import { app } from './appContext.js';
+import { updateSetting } from './state/settingsCache.js';
 
 export class HttpVersionManager {
     constructor() {
@@ -22,14 +22,7 @@ export class HttpVersionManager {
     }
 
     async saveVersion(version) {
-        try {
-            const settings = await window.backendAPI.settings.get();
-            settings.httpVersion = version;
-            await window.backendAPI.settings.set(settings);
-            app.invalidateApiHandlerSettingsCache?.();
-        } catch (error) {
-            void error;
-        }
+        await updateSetting('httpVersion', version);
     }
 
     async setVersion(version) {

@@ -167,7 +167,7 @@ impl ProxySettings {
             other => {
                 return WsProxyAction::Unsupported {
                     proxy_type: other.to_string(),
-                }
+                };
             }
         };
 
@@ -218,27 +218,27 @@ impl ProxySettings {
 
     /// Shared by both resolvers so the bypass rules cannot drift apart.
     fn should_bypass(url: &str, bypass_list: &[String]) -> bool {
-        if let Ok(parsed) = url::Url::parse(url) {
-            if let Some(host) = parsed.host_str() {
-                for pattern in bypass_list {
-                    let pattern = pattern.trim();
-                    if pattern.is_empty() {
-                        continue;
-                    }
+        if let Ok(parsed) = url::Url::parse(url)
+            && let Some(host) = parsed.host_str()
+        {
+            for pattern in bypass_list {
+                let pattern = pattern.trim();
+                if pattern.is_empty() {
+                    continue;
+                }
 
-                    if pattern == host {
-                        return true;
-                    }
+                if pattern == host {
+                    return true;
+                }
 
-                    if let Some(domain) = pattern.strip_prefix("*.") {
-                        if host.ends_with(domain) {
-                            return true;
-                        }
-                    }
+                if let Some(domain) = pattern.strip_prefix("*.")
+                    && host.ends_with(domain)
+                {
+                    return true;
+                }
 
-                    if pattern.starts_with('.') && host.ends_with(pattern) {
-                        return true;
-                    }
+                if pattern.starts_with('.') && host.ends_with(pattern) {
+                    return true;
                 }
             }
         }

@@ -14,7 +14,7 @@ use serde_json::{Map, Value};
 use std::collections::HashMap;
 
 use super::model::{
-    Body, BodyKind, CollectionDoc, FolderDoc, Params, RequestDoc, Scripts, Spec, FORMAT_VERSION,
+    Body, BodyKind, CollectionDoc, FORMAT_VERSION, FolderDoc, Params, RequestDoc, Scripts, Spec,
 };
 use super::read::{FolderNode, Layout, LoadedCollection, RequestEntry};
 use super::{Collection, EndpointData};
@@ -123,18 +123,18 @@ pub(crate) fn body_from_v1(data: &EndpointData) -> Option<Body> {
             "formdata" => {
                 return Some(Body::Known(BodyKind::FormData {
                     fields: normalize_form_rows(form.get("fields")),
-                }))
+                }));
             }
             "urlencoded" => {
                 return Some(Body::Known(BodyKind::UrlEncoded {
                     fields: normalize_form_rows(form.get("fields")),
-                }))
+                }));
             }
             "binary" => {
                 return Some(Body::Known(BodyKind::Binary {
                     file_path: string_field(form, "filePath").unwrap_or_default(),
                     content_type: string_field(form, "contentType").unwrap_or_default(),
-                }))
+                }));
             }
             "text" => {
                 return Some(Body::Known(BodyKind::Text {
@@ -143,7 +143,7 @@ pub(crate) fn body_from_v1(data: &EndpointData) -> Option<Body> {
                         .and_then(|c| c.as_str())
                         .unwrap_or("")
                         .to_string(),
-                }))
+                }));
             }
             _ => {}
         }
@@ -170,12 +170,12 @@ pub(crate) fn body_from_v1(data: &EndpointData) -> Option<Body> {
         }
     }
 
-    if let Some(body) = &data.modified_body {
-        if !body.is_empty() {
-            return Some(Body::Known(BodyKind::Json {
-                content: body.clone(),
-            }));
-        }
+    if let Some(body) = &data.modified_body
+        && !body.is_empty()
+    {
+        return Some(Body::Known(BodyKind::Json {
+            content: body.clone(),
+        }));
     }
 
     None

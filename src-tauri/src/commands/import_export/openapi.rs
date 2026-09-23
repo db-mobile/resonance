@@ -323,38 +323,37 @@ fn extract_openapi_responses(
         let mut resolved_response = response.clone();
 
         // Resolve schema $ref in content/application/json/schema
-        if let Some(content) = response.get("content") {
-            if let Some(json_content) = content.get("application/json") {
-                if let Some(schema) = json_content.get("schema") {
-                    let resolved_schema = resolve_schema_ref(schema, spec);
+        if let Some(content) = response.get("content")
+            && let Some(json_content) = content.get("application/json")
+            && let Some(schema) = json_content.get("schema")
+        {
+            let resolved_schema = resolve_schema_ref(schema, spec);
 
-                    // Build the resolved response structure
-                    let mut new_response = serde_json::Map::new();
+            // Build the resolved response structure
+            let mut new_response = serde_json::Map::new();
 
-                    // Copy description if present
-                    if let Some(desc) = response.get("description") {
-                        new_response.insert("description".to_string(), desc.clone());
-                    }
-
-                    // Build content with resolved schema
-                    let mut new_content = serde_json::Map::new();
-                    let mut new_json_content = serde_json::Map::new();
-                    new_json_content.insert("schema".to_string(), resolved_schema);
-
-                    // Copy example if present
-                    if let Some(example) = json_content.get("example") {
-                        new_json_content.insert("example".to_string(), example.clone());
-                    }
-
-                    new_content.insert(
-                        "application/json".to_string(),
-                        Value::Object(new_json_content),
-                    );
-                    new_response.insert("content".to_string(), Value::Object(new_content));
-
-                    resolved_response = Value::Object(new_response);
-                }
+            // Copy description if present
+            if let Some(desc) = response.get("description") {
+                new_response.insert("description".to_string(), desc.clone());
             }
+
+            // Build content with resolved schema
+            let mut new_content = serde_json::Map::new();
+            let mut new_json_content = serde_json::Map::new();
+            new_json_content.insert("schema".to_string(), resolved_schema);
+
+            // Copy example if present
+            if let Some(example) = json_content.get("example") {
+                new_json_content.insert("example".to_string(), example.clone());
+            }
+
+            new_content.insert(
+                "application/json".to_string(),
+                Value::Object(new_json_content),
+            );
+            new_response.insert("content".to_string(), Value::Object(new_content));
+
+            resolved_response = Value::Object(new_response);
         }
 
         // Also handle OpenAPI 2.x style schema directly on response
@@ -766,13 +765,13 @@ fn extract_openapi_security(security: Option<&Value>, spec: &Value) -> Option<Va
                     config.insert(key.to_string(), Value::String(url.to_string()));
                 }
             }
-            if let Some(scopes) = flow.get("scopes").and_then(|s| s.as_object()) {
-                if !scopes.is_empty() {
-                    config.insert(
-                        "scope".to_string(),
-                        Value::String(scopes.keys().cloned().collect::<Vec<_>>().join(" ")),
-                    );
-                }
+            if let Some(scopes) = flow.get("scopes").and_then(|s| s.as_object())
+                && !scopes.is_empty()
+            {
+                config.insert(
+                    "scope".to_string(),
+                    Value::String(scopes.keys().cloned().collect::<Vec<_>>().join(" ")),
+                );
             }
 
             Some(serde_json::json!({
@@ -1045,12 +1044,16 @@ mod tests {
         ));
         assert!(matches!(ok(json!({})), SpecVersion::OpenApi30));
 
-        assert!(detect_spec_version(&json!({ "swagger": "1.2" }))
-            .unwrap_err()
-            .contains("1.2"));
-        assert!(detect_spec_version(&json!({ "openapi": "4.0.0" }))
-            .unwrap_err()
-            .contains("4.0.0"));
+        assert!(
+            detect_spec_version(&json!({ "swagger": "1.2" }))
+                .unwrap_err()
+                .contains("1.2")
+        );
+        assert!(
+            detect_spec_version(&json!({ "openapi": "4.0.0" }))
+                .unwrap_err()
+                .contains("4.0.0")
+        );
     }
 
     #[test]

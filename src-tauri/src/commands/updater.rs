@@ -71,7 +71,7 @@ pub async fn updater_check(
             return Err(UpdateError::Updater(format!(
                 "Failed to initialize updater: {}",
                 e
-            )))
+            )));
         }
     };
 
@@ -81,7 +81,7 @@ pub async fn updater_check(
             return Err(UpdateError::Updater(format!(
                 "Failed to check for updates: {}",
                 e
-            )))
+            )));
         }
     };
 

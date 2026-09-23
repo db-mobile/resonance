@@ -22,7 +22,7 @@ mod read;
 mod secrets;
 mod write;
 
-use cache::{read_collection_dir_cached, CollectionCache};
+use cache::{CollectionCache, read_collection_dir_cached};
 
 use ipc::to_ipc_collection;
 use read::Layout;
@@ -224,11 +224,22 @@ fn register_collection_path(
     path: &Path,
 ) -> Result<(), String> {
     let mut index = get_collection_index(app)?;
+    if index_entry_matches(&index, collection_id, path) {
+        return Ok(());
+    }
     index.insert(
         collection_id.to_string(),
         path.to_string_lossy().to_string(),
     );
     save_collection_index(app, &index)
+}
+
+/// Whether the index already maps `collection_id` to `path`, making a
+/// re-registration a no-op that must not rewrite the store file.
+fn index_entry_matches(index: &HashMap<String, String>, collection_id: &str, path: &Path) -> bool {
+    index
+        .get(collection_id)
+        .is_some_and(|existing| *existing == path.to_string_lossy())
 }
 
 fn unregister_collection_path(app: &AppHandle, collection_id: &str) -> Result<(), String> {
@@ -245,11 +256,7 @@ fn get_last_collection_directory(app: &AppHandle) -> Option<PathBuf> {
     }
 
     let path = PathBuf::from(dir_str);
-    if path.exists() {
-        Some(path)
-    } else {
-        None
-    }
+    if path.exists() { Some(path) } else { None }
 }
 
 fn save_last_collection_directory(app: &AppHandle, dir: &Path) {
@@ -325,12 +332,12 @@ fn list_collection_endpoints(collection: &Collection) -> Vec<(String, String)> {
     let mut endpoints = Vec::new();
 
     let mut collect_endpoint = |endpoint: &Value| {
-        if let Some(endpoint_id) = endpoint.get("id").and_then(|value| value.as_str()) {
-            if seen.insert(endpoint_id.to_string()) {
-                let endpoint_name =
-                    extract_endpoint_name(endpoint).unwrap_or_else(|| endpoint_id.to_string());
-                endpoints.push((endpoint_id.to_string(), endpoint_name));
-            }
+        if let Some(endpoint_id) = endpoint.get("id").and_then(|value| value.as_str())
+            && seen.insert(endpoint_id.to_string())
+        {
+            let endpoint_name =
+                extract_endpoint_name(endpoint).unwrap_or_else(|| endpoint_id.to_string());
+            endpoints.push((endpoint_id.to_string(), endpoint_name));
         }
     };
 
@@ -387,36 +394,60 @@ pub(crate) fn resolve_collection_dir(
             continue;
         }
 
-        if let Ok(collection) = read_collection_from_dir(&path) {
-            if collection.id == collection_id {
-                return Ok(Some(path));
-            }
+        if let Ok(collection) = read_collection_from_dir(&path)
+            && collection.id == collection_id
+        {
+            return Ok(Some(path));
         }
     }
 
     Ok(None)
 }
 
-/// Applies endpoint data onto the matching request anywhere in a tree.
+/// Finds a request anywhere in a tree.
 ///
 /// @param node - Folder to walk
-/// @param request_id - Request to update
-/// @param data - The data the frontend sent
-/// @returns True when the request was found
-fn apply_endpoint_data_in_tree(
-    node: &mut read::FolderNode,
+/// @param request_id - Request to find
+/// @returns The request entry, when present
+fn find_request_entry_mut<'a>(
+    node: &'a mut read::FolderNode,
     request_id: &str,
-    data: &EndpointData,
-) -> bool {
-    for entry in &mut node.requests {
-        if entry.doc.id == request_id {
-            ipc::apply_endpoint_data(&mut entry.doc, data);
-            return true;
-        }
+) -> Option<&'a mut read::RequestEntry> {
+    if let Some(index) = node
+        .requests
+        .iter()
+        .position(|entry| entry.doc.id == request_id)
+    {
+        return Some(&mut node.requests[index]);
     }
     node.folders
         .iter_mut()
-        .any(|folder| apply_endpoint_data_in_tree(folder, request_id, data))
+        .find_map(|folder| find_request_entry_mut(folder, request_id))
+}
+
+/// Applies endpoint data to one request of a v2 tree and persists it.
+///
+/// Only that request's file is rewritten when it already has one; a request
+/// that has never been written falls back to a whole-tree write.
+///
+/// @param dir - The collection directory
+/// @param loaded - The collection, as currently on disk
+/// @param request_id - Request to update
+/// @param data - The data the frontend sent
+/// @returns Ok once the change is on disk
+fn save_endpoint_data_v2(
+    dir: &Path,
+    loaded: &mut read::LoadedCollection,
+    request_id: &str,
+    data: &EndpointData,
+) -> Result<(), String> {
+    let entry = find_request_entry_mut(&mut loaded.root, request_id)
+        .ok_or_else(|| format!("Endpoint {} not found in collection", request_id))?;
+    ipc::apply_endpoint_data(&mut entry.doc, data);
+    if !write::write_request_in_place(entry)? {
+        write::write_collection_dir(dir, loaded)?;
+    }
+    Ok(())
 }
 
 /// Removes a request from a tree, wherever it sits.
@@ -452,10 +483,10 @@ fn load_existing(dir: &Path) -> Result<Option<read::LoadedCollection>, String> {
             let requests_dir = CollectionPaths::of(dir).requests();
             let mut data = HashMap::new();
             for (endpoint_id, _) in list_collection_endpoints(&collection) {
-                if let Some(file) = find_endpoint_data_file(&requests_dir, &endpoint_id)? {
-                    if let Ok(endpoint_data) = read_json_file::<EndpointData>(&file) {
-                        data.insert(endpoint_id, endpoint_data);
-                    }
+                if let Some(file) = find_endpoint_data_file(&requests_dir, &endpoint_id)?
+                    && let Ok(endpoint_data) = read_json_file::<EndpointData>(&file)
+                {
+                    data.insert(endpoint_id, endpoint_data);
                 }
             }
 
@@ -770,10 +801,10 @@ pub(crate) fn load_for_export(
             let requests_dir = paths.requests();
             let mut data = HashMap::new();
             for (endpoint_id, _) in list_collection_endpoints(&collection) {
-                if let Some(file) = find_endpoint_data_file(&requests_dir, &endpoint_id)? {
-                    if let Ok(endpoint_data) = read_json_file::<EndpointData>(&file) {
-                        data.insert(endpoint_id, endpoint_data);
-                    }
+                if let Some(file) = find_endpoint_data_file(&requests_dir, &endpoint_id)?
+                    && let Ok(endpoint_data) = read_json_file::<EndpointData>(&file)
+                {
+                    data.insert(endpoint_id, endpoint_data);
                 }
             }
 
@@ -956,17 +987,17 @@ fn load_all_collections(app: &AppHandle) -> Result<Vec<Collection>, String> {
                 continue;
             }
 
-            if let Ok(mut collection) = read_collection_from_dir(&path) {
-                if seen.insert(collection.id.clone()) {
-                    let path_str = path.to_string_lossy().to_string();
-                    if index.get(&collection.id) != Some(&path_str) {
-                        index.insert(collection.id.clone(), path_str);
-                        index_changed = true;
-                    }
-                    collection.linked = link::is_linked(&collection.id, &index, &linked);
-                    collection.open_api_spec = None;
-                    collections.push(collection);
+            if let Ok(mut collection) = read_collection_from_dir(&path)
+                && seen.insert(collection.id.clone())
+            {
+                let path_str = path.to_string_lossy().to_string();
+                if index.get(&collection.id) != Some(&path_str) {
+                    index.insert(collection.id.clone(), path_str);
+                    index_changed = true;
                 }
+                collection.linked = link::is_linked(&collection.id, &index, &linked);
+                collection.open_api_spec = None;
+                collections.push(collection);
             }
         }
     }
@@ -981,12 +1012,12 @@ fn load_all_collections(app: &AppHandle) -> Result<Vec<Collection>, String> {
             continue;
         }
 
-        if let Ok(mut collection) = read_collection_from_dir(&path) {
-            if seen.insert(collection.id.clone()) {
-                collection.linked = link::is_linked(&collection.id, &index, &linked);
-                collection.open_api_spec = None;
-                collections.push(collection);
-            }
+        if let Ok(mut collection) = read_collection_from_dir(&path)
+            && seen.insert(collection.id.clone())
+        {
+            collection.linked = link::is_linked(&collection.id, &index, &linked);
+            collection.open_api_spec = None;
+            collections.push(collection);
         }
     }
 
@@ -1093,23 +1124,15 @@ pub async fn collection_save_endpoint_data(
         redact_auth_secrets(auth);
     }
 
-    let collection = collection_get(app.clone(), collection_id.clone()).await?;
-    let paths = CollectionPaths::from_dir(PathBuf::from(
-        collection
-            .storage_path
-            .clone()
-            .ok_or_else(|| "Collection storage path missing".to_string())?,
-    ));
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
     if Layout::detect(&paths.dir) == Some(Layout::V2) {
         let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
-        if !apply_endpoint_data_in_tree(&mut loaded.root, &endpoint_id, &data) {
-            return Err(format!("Endpoint {} not found in collection", endpoint_id));
-        }
-        write::write_collection_dir(&paths.dir, &mut loaded)?;
+        save_endpoint_data_v2(&paths.dir, &mut loaded, &endpoint_id, &data)?;
         collection_cache().refresh(&paths.dir, &loaded);
         return Ok(());
     }
 
+    let collection = read_collection_from_dir(&paths.dir)?;
     let requests_dir = paths.ensure_requests()?;
 
     let endpoint_name = find_endpoint_name_in_collection(&collection, &endpoint_id)
@@ -1198,10 +1221,10 @@ pub async fn collection_save_variables(
     // Defense in depth: a variable flagged secret must never carry its value into the
     // git-friendly variables.json. The real value lives in the frontend SecretStore.
     for entry in variables.iter_mut() {
-        if let Some(obj) = entry.as_object_mut() {
-            if obj.get("secret").and_then(|s| s.as_bool()) == Some(true) {
-                obj.insert("value".to_string(), Value::String(String::new()));
-            }
+        if let Some(obj) = entry.as_object_mut()
+            && obj.get("secret").and_then(|s| s.as_bool()) == Some(true)
+        {
+            obj.insert("value".to_string(), Value::String(String::new()));
         }
     }
 
@@ -1868,5 +1891,89 @@ mod convert_on_save {
             fs::read_to_string(temp.path().join("pets/create-pet.yaml")).unwrap(),
             "an unrelated request was rewritten"
         );
+    }
+    #[test]
+    fn saving_endpoint_data_rewrites_only_that_request() {
+        let temp = TempDir::new().unwrap();
+        v1_on_disk(temp.path());
+        write_v2_collection(temp.path(), &ipc_from_disk(temp.path())).unwrap();
+
+        let mut loaded = read_collection_dir(temp.path()).unwrap();
+        let unrelated = temp.path().join("pets/create-pet.yaml");
+        let marked = format!("{}# marker\n", fs::read_to_string(&unrelated).unwrap());
+        fs::write(&unrelated, &marked).unwrap();
+
+        let data = EndpointData {
+            url: Some("https://changed.example/health".into()),
+            ..Default::default()
+        };
+        save_endpoint_data_v2(temp.path(), &mut loaded, "custom_1", &data).unwrap();
+
+        assert!(
+            fs::read_to_string(temp.path().join("health.yaml"))
+                .unwrap()
+                .contains("https://changed.example/health")
+        );
+        assert_eq!(
+            marked,
+            fs::read_to_string(&unrelated).unwrap(),
+            "an unrelated request was rewritten"
+        );
+    }
+
+    #[test]
+    fn saving_endpoint_data_for_an_unknown_request_is_an_error() {
+        let temp = TempDir::new().unwrap();
+        v1_on_disk(temp.path());
+        write_v2_collection(temp.path(), &ipc_from_disk(temp.path())).unwrap();
+
+        let mut loaded = read_collection_dir(temp.path()).unwrap();
+        let result = save_endpoint_data_v2(
+            temp.path(),
+            &mut loaded,
+            "missing",
+            &EndpointData::default(),
+        );
+
+        assert!(result.is_err());
+    }
+}
+
+#[cfg(test)]
+mod index_registration {
+    use super::*;
+
+    fn index_with(id: &str, path: &str) -> HashMap<String, String> {
+        HashMap::from([(id.to_string(), path.to_string())])
+    }
+
+    #[test]
+    fn an_unchanged_entry_matches() {
+        let index = index_with("col-1", "/data/col-1");
+        assert!(index_entry_matches(
+            &index,
+            "col-1",
+            Path::new("/data/col-1")
+        ));
+    }
+
+    #[test]
+    fn a_moved_collection_does_not_match() {
+        let index = index_with("col-1", "/data/col-1");
+        assert!(!index_entry_matches(
+            &index,
+            "col-1",
+            Path::new("/elsewhere/col-1")
+        ));
+    }
+
+    #[test]
+    fn a_missing_entry_does_not_match() {
+        let index = index_with("col-1", "/data/col-1");
+        assert!(!index_entry_matches(
+            &index,
+            "col-2",
+            Path::new("/data/col-1")
+        ));
     }
 }

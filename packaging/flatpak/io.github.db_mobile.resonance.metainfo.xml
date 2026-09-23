@@ -119,6 +119,24 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.2.2" date="2026-09-23">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Bring the collection runner in line with the editor's send path</li>
+          <li>Add collection/folder runs, reports, run history and data-driven iterations to the runner</li>
+          <li>Expose the runner iteration to scripts</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.2.1" date="2026-09-15">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Cap history bodies, split the store file, and cache parsed collections</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.2.0" date="2026-09-13">
       <description>
         <p>Reworking release</p>

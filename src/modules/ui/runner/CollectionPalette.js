@@ -5,15 +5,20 @@
 
 import { templateLoader } from '../../templateLoader.js';
 import { flattenRequests } from '../../collections/collectionTree.js';
+import { isRunnable } from '../../utils/runnableRequests.js';
+import { translate } from '../../utils/translate.js';
+import { escapeHtml } from './runnerDomUtils.js';
 
 export class CollectionPalette {
     /**
      * @param {Object} [callbacks]
      * @param {(collection: Object, endpoint: Object) => void} [callbacks.onAddEndpoint]
+     * @param {(collection: Object, endpoints: Object[]) => void} [callbacks.onAddAll]
      */
-    constructor({ onAddEndpoint } = {}) {
+    constructor({ onAddEndpoint, onAddAll } = {}) {
         this.container = null;
         this._onAddEndpoint = onAddEndpoint || null;
+        this._onAddAll = onAddAll || null;
     }
 
     /**
@@ -28,7 +33,7 @@ export class CollectionPalette {
             this.container.innerHTML = `
                 <div class="empty-state-base runner-empty-state">
                     <span class="icon icon-20 icon-spark"></span>
-                    <p>No collections available</p>
+                    <p>${escapeHtml(translate('runner.no_collections', 'No collections available'))}</p>
                 </div>
             `;
             return;
@@ -68,8 +73,14 @@ export class CollectionPalette {
             endpointsContainer?.classList.toggle('is-hidden');
         });
 
+        const endpoints = this._getAllEndpoints(collection);
+
+        el.querySelector('[data-action="add-all"]')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._onAddAll?.(collection, endpoints);
+        });
+
         if (endpointsContainer) {
-            const endpoints = this._getAllEndpoints(collection);
             endpoints.forEach(endpoint => {
                 const endpointEl = this._createEndpointElement(collection, endpoint);
                 endpointsContainer.appendChild(endpointEl);
@@ -84,9 +95,7 @@ export class CollectionPalette {
      * @returns {Array<Object>}
      */
     _getAllEndpoints(collection) {
-        return flattenRequests(collection).filter(
-            endpoint => endpoint.protocol !== 'grpc' && endpoint.protocol !== 'websocket'
-        );
+        return flattenRequests(collection).filter(isRunnable);
     }
 
     /**

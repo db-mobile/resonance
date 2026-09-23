@@ -202,10 +202,6 @@
   height: min(680px, 100%);
 }
 
-.modal-dialog--runner-saved {
-  width: 680px;
-}
-
 .modal-dialog--scroll-y {
   overflow-y: auto;
 }

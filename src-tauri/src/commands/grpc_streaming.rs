@@ -6,17 +6,17 @@ use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, State};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 use tokio::task::AbortHandle;
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use tonic::metadata::{MetadataKey, MetadataValue};
 use tonic::Request;
+use tonic::metadata::{MetadataKey, MetadataValue};
 
 use super::grpc_proto::ProtoState;
 use super::grpc_reflection::{
-    build_descriptor_pool_for_method_with_tls, create_channel, dynamic_message_to_json,
-    json_to_dynamic_message, metadata_to_json_map, normalize_target_with_tls, resolve_method_types,
-    strip_leading_dot, DynamicMessageCodec, GrpcTlsOptions,
+    DynamicMessageCodec, GrpcTlsOptions, build_descriptor_pool_for_method_with_tls, create_channel,
+    dynamic_message_to_json, json_to_dynamic_message, metadata_to_json_map,
+    normalize_target_with_tls, resolve_method_types, strip_leading_dot,
 };
 
 #[derive(Debug, Clone, Deserialize)]

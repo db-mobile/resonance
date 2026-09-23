@@ -101,7 +101,6 @@ describe('RunnerRepository', () => {
 
             const runnerData = {
                 name: 'My Runner',
-                collectionId: 'collection_1',
                 requests: [{ endpointId: 'endpoint_1' }]
             };
 
@@ -109,7 +108,6 @@ describe('RunnerRepository', () => {
 
             expect(result.id).toMatch(/^runner_\d+_[a-z0-9]+$/);
             expect(result.name).toBe('My Runner');
-            expect(result.collectionId).toBe('collection_1');
             expect(result.requests).toEqual([{ endpointId: 'endpoint_1' }]);
             expect(result.options.stopOnError).toBe(true);
             expect(result.options.delayMs).toBe(0);
@@ -125,7 +123,6 @@ describe('RunnerRepository', () => {
             const result = await repository.add({});
 
             expect(result.name).toBe('Untitled Runner');
-            expect(result.collectionId).toBeNull();
             expect(result.requests).toEqual([]);
         });
 
@@ -172,7 +169,7 @@ describe('RunnerRepository', () => {
             const existingRunner = {
                 id: 'runner_1',
                 name: 'Test',
-                collectionId: 'collection_1',
+                options: { stopOnError: false, delayMs: 250 },
                 requests: [{ id: 'req_1' }]
             };
             mockBackendAPI.store.get.mockResolvedValue([existingRunner]);
@@ -180,7 +177,7 @@ describe('RunnerRepository', () => {
 
             const result = await repository.update('runner_1', { name: 'Updated' });
 
-            expect(result.collectionId).toBe('collection_1');
+            expect(result.options).toEqual({ stopOnError: false, delayMs: 250 });
             expect(result.requests).toEqual([{ id: 'req_1' }]);
         });
     });
@@ -211,32 +208,6 @@ describe('RunnerRepository', () => {
         });
     });
 
-    describe('getByCollectionId', () => {
-        test('should return runners for specific collection', async () => {
-            const runners = [
-                { id: 'runner_1', collectionId: 'collection_1' },
-                { id: 'runner_2', collectionId: 'collection_2' },
-                { id: 'runner_3', collectionId: 'collection_1' }
-            ];
-            mockBackendAPI.store.get.mockResolvedValue(runners);
-
-            const result = await repository.getByCollectionId('collection_1');
-
-            expect(result).toHaveLength(2);
-            expect(result.map(r => r.id)).toEqual(['runner_1', 'runner_3']);
-        });
-
-        test('should return empty array when no runners match', async () => {
-            mockBackendAPI.store.get.mockResolvedValue([
-                { id: 'runner_1', collectionId: 'collection_1' }
-            ]);
-
-            const result = await repository.getByCollectionId('collection_2');
-
-            expect(result).toEqual([]);
-        });
-    });
-
     describe('updateLastRun', () => {
         test('should update lastRunAt timestamp', async () => {
             const existingRunner = {
@@ -254,33 +225,45 @@ describe('RunnerRepository', () => {
         });
     });
 
-    describe('duplicate', () => {
-        test('should duplicate runner with new ID and name', async () => {
-            const existingRunner = {
-                id: 'runner_1',
-                name: 'Original Runner',
-                collectionId: 'collection_1',
-                requests: [{ endpointId: 'endpoint_1' }],
-                options: { stopOnError: false, delayMs: 100 }
-            };
-            mockBackendAPI.store.get.mockResolvedValue([existingRunner]);
-            mockBackendAPI.store.set.mockResolvedValue();
-
-            const result = await repository.duplicate('runner_1');
-
-            expect(result.id).not.toBe('runner_1');
-            expect(result.name).toBe('Original Runner (Copy)');
-            expect(result.collectionId).toBe('collection_1');
-            expect(result.requests).toEqual([{ endpointId: 'endpoint_1' }]);
-            expect(result.lastRunAt).toBeNull();
+    describe('shared cache integrity', () => {
+        test('RunnerRepository.shared hands every runner tab the same instance', () => {
+            expect(RunnerRepository.shared(mockBackendAPI)).toBe(RunnerRepository.shared(mockBackendAPI));
         });
 
-        test('should return null for non-existent runner', async () => {
+        test('reads are copies, so unsaved UI edits never leak into the cache', async () => {
+            mockBackendAPI.store.get.mockResolvedValue([{ id: 'r1', name: 'R', requests: [{ postResponseScript: '' }] }]);
+
+            const loaded = await repository.getById('r1');
+            loaded.requests[0].postResponseScript = 'unsaved edit';
+
+            const reloaded = await repository.getById('r1');
+            expect(reloaded.requests[0].postResponseScript).toBe('');
+        });
+
+        test('concurrent writes do not lose each other', async () => {
             mockBackendAPI.store.get.mockResolvedValue([]);
+            mockBackendAPI.store.set.mockResolvedValue();
 
-            const result = await repository.duplicate('non_existent');
+            await Promise.all([
+                repository.add({ name: 'A' }),
+                repository.add({ name: 'B' })
+            ]);
 
-            expect(result).toBeNull();
+            const names = (await repository.getAll()).map(runner => runner.name).sort();
+            expect(names).toEqual(['A', 'B']);
+            const lastWrite = mockBackendAPI.store.set.mock.calls.at(-1)[1];
+            expect(lastWrite.map(runner => runner.name).sort()).toEqual(['A', 'B']);
+        });
+
+        test('a failed write does not block later writes', async () => {
+            mockBackendAPI.store.get.mockResolvedValue([]);
+            mockBackendAPI.store.set.mockRejectedValueOnce(new Error('disk full')).mockResolvedValue();
+
+            await expect(repository.add({ name: 'A' })).rejects.toThrow('disk full');
+            const added = await repository.add({ name: 'B' });
+
+            expect(added.name).toBe('B');
+            expect((await repository.getAll()).map(runner => runner.name)).toEqual(['B']);
         });
     });
 });

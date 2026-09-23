@@ -158,6 +158,17 @@ export function flattenRequests(collection) {
 
 /**
  * @param {Object|null|undefined} collection
+ * @param {string} folderId
+ * @returns {Object[]}
+ */
+export function requestsInFolder(collection, folderId) {
+    return Array.from(walkRequests(collection))
+        .filter(entry => entry.chain.some(folder => folder.id === folderId))
+        .map(entry => entry.request);
+}
+
+/**
+ * @param {Object|null|undefined} collection
  * @returns {Object[]}
  */
 export function rootRequests(collection) {

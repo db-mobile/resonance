@@ -22,27 +22,30 @@ pub const HISTORY_STORE: &str = "resonance-history.json";
 pub const TABS_STORE: &str = "resonance-tabs.json";
 pub const COOKIES_STORE: &str = "resonance-cookies.json";
 pub const GRAPHQL_CACHE_STORE: &str = "resonance-graphql-cache.json";
+pub const RUNNER_HISTORY_STORE: &str = "resonance-runner-history.json";
 
 /// Keys that live outside [`MAIN_STORE`], paired with the file that holds them.
 ///
 /// These are all written from JS only, and each is either large or written
 /// often enough that dragging it along on unrelated saves is what made the
 /// single-file store expensive.
-const RELOCATED_KEYS: [(&str, &str); 5] = [
+const RELOCATED_KEYS: [(&str, &str); 6] = [
     ("requestHistory", HISTORY_STORE),
     ("workspace-tabs", TABS_STORE),
     ("active-tab-id", TABS_STORE),
     ("cookieJar", COOKIES_STORE),
     ("graphqlSchemaCache", GRAPHQL_CACHE_STORE),
+    ("runnerRunHistory", RUNNER_HISTORY_STORE),
 ];
 
 /// Every store file the app owns, for startup permission tightening.
-pub const ALL_STORES: [&str; 5] = [
+pub const ALL_STORES: [&str; 6] = [
     MAIN_STORE,
     HISTORY_STORE,
     TABS_STORE,
     COOKIES_STORE,
     GRAPHQL_CACHE_STORE,
+    RUNNER_HISTORY_STORE,
 ];
 
 /// The file a key is stored in.
@@ -174,6 +177,7 @@ mod tests {
         assert_eq!(store_file_for("active-tab-id"), TABS_STORE);
         assert_eq!(store_file_for("cookieJar"), COOKIES_STORE);
         assert_eq!(store_file_for("graphqlSchemaCache"), GRAPHQL_CACHE_STORE);
+        assert_eq!(store_file_for("runnerRunHistory"), RUNNER_HISTORY_STORE);
     }
 
     #[test]

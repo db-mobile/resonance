@@ -1,6 +1,6 @@
 //! Postman collection parsing: converts a Postman export `Value` into a `Collection`.
 
-use super::common::{derive_base_url, param_map_entry, unique_folder_id, ParsedBody};
+use super::common::{ParsedBody, derive_base_url, param_map_entry, unique_folder_id};
 use super::{Collection, Endpoint, Folder, VariableEntry};
 use crate::commands::scripts::ScriptData;
 use serde_json::Value;
@@ -129,23 +129,23 @@ fn collect_items(
                 folders,
                 used_folder_ids,
             );
-        } else if let Some(request) = item.get("request") {
-            if let Some(endpoint) = parse_postman_request(item, request, inherited) {
-                if name_chain.is_empty() {
-                    endpoints.push(endpoint);
+        } else if let Some(request) = item.get("request")
+            && let Some(endpoint) = parse_postman_request(item, request, inherited)
+        {
+            if name_chain.is_empty() {
+                endpoints.push(endpoint);
+            } else {
+                let composite_name = name_chain.join(" / ");
+                endpoints.push(endpoint.clone());
+                if let Some(folder) = folders.iter_mut().find(|f| f.name == composite_name) {
+                    folder.endpoints.push(endpoint);
                 } else {
-                    let composite_name = name_chain.join(" / ");
-                    endpoints.push(endpoint.clone());
-                    if let Some(folder) = folders.iter_mut().find(|f| f.name == composite_name) {
-                        folder.endpoints.push(endpoint);
-                    } else {
-                        folders.push(Folder {
-                            id: unique_folder_id(&composite_name, used_folder_ids),
-                            name: composite_name,
-                            endpoints: vec![endpoint],
-                            auth_config: folder_auth.cloned(),
-                        });
-                    }
+                    folders.push(Folder {
+                        id: unique_folder_id(&composite_name, used_folder_ids),
+                        name: composite_name,
+                        endpoints: vec![endpoint],
+                        auth_config: folder_auth.cloned(),
+                    });
                 }
             }
         }
@@ -158,12 +158,11 @@ fn extract_postman_base_url(postman: &Value, endpoints: &[Endpoint]) -> Option<S
     if let Some(variables) = postman.get("variable").and_then(|v| v.as_array()) {
         for var in variables {
             let key = var.get("key").and_then(|k| k.as_str()).unwrap_or_default();
-            if key.eq_ignore_ascii_case("baseurl") || key.eq_ignore_ascii_case("base_url") {
-                if let Some(value) = var.get("value").and_then(|v| v.as_str()) {
-                    if !value.is_empty() {
-                        return Some(value.to_string());
-                    }
-                }
+            if (key.eq_ignore_ascii_case("baseurl") || key.eq_ignore_ascii_case("base_url"))
+                && let Some(value) = var.get("value").and_then(|v| v.as_str())
+                && !value.is_empty()
+            {
+                return Some(value.to_string());
             }
         }
     }
@@ -826,10 +825,12 @@ mod tests {
             .find(|f| f.name == "Users / Admin")
             .unwrap();
         assert_eq!(admin_folder.endpoints[0].name, "Delete User");
-        assert!(collection
-            .endpoints
-            .iter()
-            .any(|e| e.id == admin_folder.endpoints[0].id));
+        assert!(
+            collection
+                .endpoints
+                .iter()
+                .any(|e| e.id == admin_folder.endpoints[0].id)
+        );
     }
 
     #[test]
@@ -853,12 +854,16 @@ mod tests {
             .find("console.log('req pre');")
             .expect("request script included");
         assert!(col_pos < folder_pos && folder_pos < own_pos);
-        assert!(scripts
-            .pre_request_script
-            .contains("// [Imported: Postman collection-level pre-request script]"));
-        assert!(scripts
-            .pre_request_script
-            .contains("// [Imported: Postman folder-level (Users) pre-request script]"));
+        assert!(
+            scripts
+                .pre_request_script
+                .contains("// [Imported: Postman collection-level pre-request script]")
+        );
+        assert!(
+            scripts
+                .pre_request_script
+                .contains("// [Imported: Postman folder-level (Users) pre-request script]")
+        );
 
         assert!(scripts.test_script.contains("console.log('col test');"));
         assert!(scripts.test_script.contains("console.log('req test');"));
@@ -868,9 +873,11 @@ mod tests {
         let ping_scripts: ScriptData =
             serde_json::from_value(ping.scripts.clone().expect("inherited scripts present"))
                 .unwrap();
-        assert!(ping_scripts
-            .pre_request_script
-            .contains("console.log('col pre');"));
+        assert!(
+            ping_scripts
+                .pre_request_script
+                .contains("console.log('col pre');")
+        );
         assert!(!ping_scripts.pre_request_script.contains("folder pre"));
     }
 

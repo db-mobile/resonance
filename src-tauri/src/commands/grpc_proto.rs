@@ -9,9 +9,9 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 use tokio::sync::oneshot;
 
 use super::grpc_reflection::{
-    create_channel, dynamic_message_to_json, generate_message_skeleton, json_to_dynamic_message,
-    metadata_to_json_map, normalize_target_with_tls, resolve_method_types, strip_leading_dot,
-    DynamicMessageCodec, GrpcUnaryRequest,
+    DynamicMessageCodec, GrpcUnaryRequest, create_channel, dynamic_message_to_json,
+    generate_message_skeleton, json_to_dynamic_message, metadata_to_json_map,
+    normalize_target_with_tls, resolve_method_types, strip_leading_dot,
 };
 
 /// State to hold loaded proto file descriptors
@@ -91,10 +91,10 @@ pub async fn grpc_parse_proto_file(
         let service_full_name = service.full_name().to_string();
 
         // Extract package from service name
-        if package.is_empty() {
-            if let Some(idx) = service_full_name.rfind('.') {
-                package = service_full_name[..idx].to_string();
-            }
+        if package.is_empty()
+            && let Some(idx) = service_full_name.rfind('.')
+        {
+            package = service_full_name[..idx].to_string();
         }
 
         let mut methods = Vec::new();
@@ -163,8 +163,8 @@ pub async fn grpc_proto_invoke_unary(
     request: GrpcUnaryRequest,
 ) -> Result<Value, String> {
     use http::uri::PathAndQuery;
-    use tonic::metadata::{MetadataKey, MetadataValue};
     use tonic::Request;
+    use tonic::metadata::{MetadataKey, MetadataValue};
 
     let pool = {
         let pools = state.pools.lock().map_err(|e| e.to_string())?;

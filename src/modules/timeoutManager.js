@@ -1,4 +1,4 @@
-import { app } from './appContext.js';
+import { updateSetting } from './state/settingsCache.js';
 
 export class TimeoutManager {
     constructor() {
@@ -20,14 +20,7 @@ export class TimeoutManager {
     }
 
     async saveTimeout(timeout) {
-        try {
-            const settings = await window.backendAPI.settings.get();
-            settings.requestTimeout = timeout;
-            await window.backendAPI.settings.set(settings);
-            app.invalidateApiHandlerSettingsCache?.();
-        } catch (error) {
-            void error;
-        }
+        await updateSetting('requestTimeout', timeout);
     }
 
     async setTimeout(timeout) {

@@ -1,9 +1,9 @@
 use axum::{
+    Router,
     extract::{Path, Query, State as AxumState},
     http::{Method, StatusCode},
     response::Json,
     routing::any,
-    Router,
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -524,14 +524,18 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(response
-            .headers()
-            .get("access-control-allow-origin")
-            .is_none());
-        assert!(response
-            .headers()
-            .get("access-control-allow-credentials")
-            .is_none());
+        assert!(
+            response
+                .headers()
+                .get("access-control-allow-origin")
+                .is_none()
+        );
+        assert!(
+            response
+                .headers()
+                .get("access-control-allow-credentials")
+                .is_none()
+        );
     }
 
     #[tokio::test]
@@ -549,14 +553,18 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(response
-            .headers()
-            .get("access-control-allow-origin")
-            .is_none());
-        assert!(response
-            .headers()
-            .get("access-control-allow-methods")
-            .is_none());
+        assert!(
+            response
+                .headers()
+                .get("access-control-allow-origin")
+                .is_none()
+        );
+        assert!(
+            response
+                .headers()
+                .get("access-control-allow-methods")
+                .is_none()
+        );
     }
 
     #[test]

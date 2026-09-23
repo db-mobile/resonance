@@ -20,10 +20,10 @@ use std::path::{Path, PathBuf};
 
 use super::super::fs_secure::{restrict_dir, restrict_file};
 use super::layout::{
-    find_available_path, request_stem, slugify, COLLECTION_JSON, COLLECTION_YAML, FOLDER_YAML,
-    OPENAPI_YAML, VARIABLES_YAML,
+    COLLECTION_JSON, COLLECTION_YAML, FOLDER_YAML, OPENAPI_YAML, VARIABLES_YAML,
+    find_available_path, request_stem, slugify,
 };
-use super::read::{folder_display_name, FolderNode, LoadedCollection};
+use super::read::{FolderNode, LoadedCollection, RequestEntry, folder_display_name};
 
 /// Gap left between consecutive `seq` values, so a request can be inserted
 /// between two others without renumbering either.
@@ -85,10 +85,10 @@ pub(crate) fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
 /// @param contents - Bytes the file should hold
 /// @returns True when the file was written
 pub(crate) fn write_if_changed(path: &Path, contents: &str) -> Result<bool, String> {
-    if let Ok(existing) = fs::read_to_string(path) {
-        if existing == contents {
-            return Ok(false);
-        }
+    if let Ok(existing) = fs::read_to_string(path)
+        && existing == contents
+    {
+        return Ok(false);
     }
     write_atomic(path, contents)?;
     Ok(true)
@@ -129,11 +129,11 @@ fn assign_missing_seq(node: &mut FolderNode) {
     }
 
     for folder in &mut node.folders {
-        if let Some(meta) = &mut folder.meta {
-            if meta.seq == 0 {
-                next += SEQ_STEP;
-                meta.seq = next;
-            }
+        if let Some(meta) = &mut folder.meta
+            && meta.seq == 0
+        {
+            next += SEQ_STEP;
+            meta.seq = next;
         }
         assign_missing_seq(folder);
     }
@@ -199,10 +199,11 @@ fn write_folder(dir: &Path, node: &mut FolderNode) -> Result<Vec<PathBuf>, Strin
             find_available_dir_for(dir, &stem, current.as_deref())
         };
 
-        if let Some(current_path) = &current {
-            if current_path != &desired && current_path.exists() {
-                relocate(current_path, &desired)?;
-            }
+        if let Some(current_path) = &current
+            && current_path != &desired
+            && current_path.exists()
+        {
+            relocate(current_path, &desired)?;
         }
 
         folder.source = Some(desired.clone());
@@ -290,6 +291,25 @@ pub(crate) fn write_collection_dir(
     Ok(())
 }
 
+/// Writes one request back to the file it was read from.
+///
+/// A sidecar save changes a single request, so rewriting only its file skips
+/// serializing and comparing the rest of the tree, including the spec.
+///
+/// @param entry - The request, already updated in memory
+/// @returns False when the request has no file or no `seq` yet, in which case
+/// the caller must fall back to a whole-tree write that assigns both
+pub(crate) fn write_request_in_place(entry: &RequestEntry) -> Result<bool, String> {
+    let Some(path) = entry.source.as_deref() else {
+        return Ok(false);
+    };
+    if entry.doc.seq == 0 || !path.exists() {
+        return Ok(false);
+    }
+    write_if_changed(path, &to_yaml(&entry.doc)?)?;
+    Ok(true)
+}
+
 /// Serializes variables for a standalone write.
 pub(crate) fn variables_yaml(variables: &[Value]) -> Result<String, String> {
     to_yaml(&variables)
@@ -299,9 +319,9 @@ pub(crate) fn variables_yaml(variables: &[Value]) -> Result<String, String> {
 mod tests {
     use super::*;
     use crate::commands::collections::model::{
-        CollectionDoc, FolderDoc, RequestDoc, FORMAT_VERSION,
+        CollectionDoc, FORMAT_VERSION, FolderDoc, RequestDoc,
     };
-    use crate::commands::collections::read::{read_collection_dir, Layout, RequestEntry};
+    use crate::commands::collections::read::{Layout, RequestEntry, read_collection_dir};
     use serde_json::Map;
     use tempfile::TempDir;
 

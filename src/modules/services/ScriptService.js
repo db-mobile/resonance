@@ -60,9 +60,12 @@ export class ScriptService {
     /**
      * @param {string} script
      * @param {Object} requestConfig
+     * @param {Object} [options]
+     * @param {Object} [options.environment]
+     * @param {Object} [options.iteration]
      * @returns {Promise<Object>}
      */
-    async executePreRequestScript(script, requestConfig) {
+    async executePreRequestScript(script, requestConfig, { environment, iteration } = {}) {
         if (!script || script.trim() === '') {
             return {
                 modifiedRequest: requestConfig,
@@ -71,7 +74,7 @@ export class ScriptService {
         }
 
         try {
-            const environmentVariables = await this.environmentService.getActiveEnvironmentVariables();
+            const environmentVariables = environment ?? await this.environmentService.getActiveEnvironmentVariables();
 
             const scriptData = {
                 script,
@@ -84,7 +87,8 @@ export class ScriptService {
                     pathParams: requestConfig.pathParams || {}
                 },
                 environment: environmentVariables || {},
-                cookies: await this._readCookieJar()
+                cookies: await this._readCookieJar(),
+                ...(iteration ? { iteration } : {})
             };
 
             const result = await window.backendAPI.scripts.executePreRequest(scriptData);
@@ -116,9 +120,12 @@ export class ScriptService {
      * @param {string} script
      * @param {Object} requestConfig
      * @param {Object} response
+     * @param {Object} [options]
+     * @param {Object} [options.environment]
+     * @param {Object} [options.iteration]
      * @returns {Promise<Object>}
      */
-    async executeTestScript(script, requestConfig, response) {
+    async executeTestScript(script, requestConfig, response, { environment, iteration } = {}) {
         if (!script || script.trim() === '') {
             return {
                 success: true,
@@ -129,7 +136,7 @@ export class ScriptService {
         }
 
         try {
-            const environmentVariables = await this.environmentService.getActiveEnvironmentVariables();
+            const environmentVariables = environment ?? await this.environmentService.getActiveEnvironmentVariables();
 
             const status = response?.status ?? response?.statusCode ?? response?.status_code ?? null;
             const statusText = response?.statusText ?? response?.status_text ?? response?.statusMessage ?? '';
@@ -157,7 +164,8 @@ export class ScriptService {
                     cookies
                 },
                 environment: environmentVariables || {},
-                cookies: await this._readCookieJar()
+                cookies: await this._readCookieJar(),
+                ...(iteration ? { iteration } : {})
             };
 
             const result = await window.backendAPI.scripts.executeTest(scriptData);

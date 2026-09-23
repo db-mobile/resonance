@@ -7,7 +7,6 @@ export class ScriptRepository {
     /** @param {Object} backendAPI */
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
-        this.SCRIPTS_KEY = 'persistedScripts';
     }
 
     /**
@@ -16,12 +15,10 @@ export class ScriptRepository {
      * @returns {Promise<{preRequestScript: string, testScript: string}>}
      */
     async getScripts(collectionId, endpointId) {
-        const scripts = await this._getObjectFromStore(this.SCRIPTS_KEY);
-        const key = this._buildKey(collectionId, endpointId);
-
-        return scripts[key] || {
-            preRequestScript: '',
-            testScript: ''
+        const scripts = await this.backendAPI.scripts.get(collectionId, endpointId);
+        return {
+            preRequestScript: scripts?.preRequestScript || '',
+            testScript: scripts?.testScript || ''
         };
     }
 
@@ -34,52 +31,9 @@ export class ScriptRepository {
      * @returns {Promise<void>}
      */
     async saveScripts(collectionId, endpointId, scriptData) {
-        const scripts = await this._getObjectFromStore(this.SCRIPTS_KEY);
-        const key = this._buildKey(collectionId, endpointId);
-
-        scripts[key] = {
+        await this.backendAPI.scripts.save(collectionId, endpointId, {
             preRequestScript: scriptData.preRequestScript || '',
             testScript: scriptData.testScript || ''
-        };
-
-        await this.backendAPI.store.set(this.SCRIPTS_KEY, scripts);
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @returns {Promise<void>}
-     */
-    async deleteScripts(collectionId, endpointId) {
-        const scripts = await this._getObjectFromStore(this.SCRIPTS_KEY);
-        const key = this._buildKey(collectionId, endpointId);
-
-        delete scripts[key];
-
-        await this.backendAPI.store.set(this.SCRIPTS_KEY, scripts);
-    }
-
-    /**
-     * @param {string} key
-     * @param {Object} defaultValue
-     * @returns {Promise<Object>}
-     */
-    async _getObjectFromStore(key, defaultValue = {}) {
-        const value = await this.backendAPI.store.get(key);
-
-        if (value === undefined || value === null || typeof value !== 'object') {
-            return defaultValue;
-        }
-
-        return value;
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @returns {string}
-     */
-    _buildKey(collectionId, endpointId) {
-        return `${collectionId}_${endpointId}`;
+        });
     }
 }

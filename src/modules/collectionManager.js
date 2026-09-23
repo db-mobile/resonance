@@ -38,6 +38,14 @@ export async function getCollections() {
     return controller.loadCollections();
 }
 
+/**
+ * @param {Function} listener
+ * @returns {Function}
+ */
+export function onCollectionsLoaded(listener) {
+    return initializeController().onCollectionsLoaded(listener);
+}
+
 /** @returns {Promise<Object|null>} */
 export function importCollectionFile() {
     const controller = initializeController();

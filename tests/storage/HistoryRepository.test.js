@@ -311,7 +311,7 @@ describe('HistoryRepository', () => {
         });
     });
 
-    describe('_getArrayFromStore', () => {
+    describe('non-array store data', () => {
         test('should return default value for non-array data', async () => {
             mockBackendAPI.store.get.mockResolvedValue('invalid');
 
@@ -411,5 +411,51 @@ describe('HistoryRepository size bounds', () => {
         const entries = [entry('a'), entry('b')];
 
         expect(fitHistoryToBudget(entries, 1000000)).toBe(entries);
+    });
+
+    describe('in-memory cache', () => {
+        test('repeated reads hit the store once', async () => {
+            mockBackendAPI.store.get.mockResolvedValue([{ id: 'h1', timestamp: 1, request: { url: 'a', method: 'GET' } }]);
+
+            await repository.getAll();
+            await repository.search('a');
+            await repository.getById('h1');
+
+            expect(mockBackendAPI.store.get).toHaveBeenCalledTimes(1);
+        });
+
+        test('an added entry is visible without re-reading the store', async () => {
+            mockBackendAPI.store.get.mockResolvedValue([{ id: 'h1', timestamp: 1, request: { url: 'a' } }]);
+
+            await repository.add({ id: 'h2', timestamp: 2, request: { url: 'b' }, response: null });
+            const result = await repository.getAll();
+
+            expect(result.map(entry => entry.id)).toEqual(['h2', 'h1']);
+            expect(mockBackendAPI.store.get).toHaveBeenCalledTimes(1);
+        });
+
+        test('a failed store read does not let a write replace the stored history', async () => {
+            mockBackendAPI.store.get.mockRejectedValue(new Error('disk gone'));
+
+            await expect(
+                repository.add({ id: 'h2', timestamp: 2, request: { url: 'b' }, response: null })
+            ).rejects.toThrow('Failed to add history entry');
+
+            expect(mockBackendAPI.store.set).not.toHaveBeenCalled();
+        });
+
+        test('a failed store write leaves the cache unchanged', async () => {
+            mockBackendAPI.store.get.mockResolvedValue([{ id: 'h1', timestamp: 1, request: { url: 'a' } }]);
+            mockBackendAPI.store.set.mockRejectedValueOnce(new Error('write denied'));
+
+            await expect(repository.delete('h1')).rejects.toThrow('Failed to delete history entry');
+
+            expect((await repository.getAll()).map(entry => entry.id)).toEqual(['h1']);
+        });
+
+        test('shared() returns one repository per backend', () => {
+            expect(HistoryRepository.shared(mockBackendAPI)).toBe(HistoryRepository.shared(mockBackendAPI));
+            expect(HistoryRepository.shared({})).not.toBe(HistoryRepository.shared(mockBackendAPI));
+        });
     });
 });

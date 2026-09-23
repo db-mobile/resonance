@@ -417,6 +417,7 @@ export function displayResponseWithLineNumbersForTab(content, contentType = null
         : app.responseContainerManager?.getActiveElements();
 
     if (containerElements && containerElements.editor) {
+        containerElements.renderedResponse = null;
         containerElements.editor.setContent(content, contentType, languageHint);
 
         if (containerElements.previewManager && containerElements.tabId) {
@@ -448,6 +449,7 @@ export function clearResponseDisplayForTab(tabId = null) {
         : app.responseContainerManager?.getActiveElements();
 
     if (containerElements && containerElements.editor) {
+        containerElements.renderedResponse = null;
         containerElements.editor.clear();
     } else {
         initResponseEditor();

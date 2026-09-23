@@ -44,10 +44,11 @@ pub(crate) fn redact_auth_secrets(auth_config: &mut Value) {
         .and_then(|c| c.as_object_mut())
     {
         for field in fields {
-            if let Some(Value::String(s)) = config.get(*field) {
-                if !s.is_empty() && !is_template_ref(s) {
-                    config.insert((*field).to_string(), Value::String(String::new()));
-                }
+            if let Some(Value::String(s)) = config.get(*field)
+                && !s.is_empty()
+                && !is_template_ref(s)
+            {
+                config.insert((*field).to_string(), Value::String(String::new()));
             }
         }
     }

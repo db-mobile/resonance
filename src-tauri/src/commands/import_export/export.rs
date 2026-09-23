@@ -166,13 +166,13 @@ fn endpoint_to_postman_item(collection: &Collection, endpoint: &Endpoint) -> Val
                 "variables": graphql.get("variables").and_then(|v| v.as_str()).unwrap_or("")
             }
         });
-    } else if let Some(body) = &endpoint.request_body {
-        if let Some(example) = body.get("example").and_then(|v| v.as_str()) {
-            request["body"] = serde_json::json!({
-                "mode": "raw",
-                "raw": example
-            });
-        }
+    } else if let Some(body) = &endpoint.request_body
+        && let Some(example) = body.get("example").and_then(|v| v.as_str())
+    {
+        request["body"] = serde_json::json!({
+            "mode": "raw",
+            "raw": example
+        });
     }
 
     if let Some(auth) = endpoint_auth_to_postman(endpoint) {
@@ -367,10 +367,10 @@ fn insert_into_item_tree(
         }
     };
 
-    if rest.is_empty() {
-        if let Some(auth) = folder_auth {
-            node["auth"] = auth.clone();
-        }
+    if rest.is_empty()
+        && let Some(auth) = folder_auth
+    {
+        node["auth"] = auth.clone();
     }
 
     let children = node
@@ -436,14 +436,14 @@ pub(crate) fn collection_to_postman(collection: &Collection) -> (Value, Vec<Stri
             }));
         }
     }
-    if !has_base_url_variable {
-        if let Some(base_url) = collection.base_url.as_ref().filter(|s| !s.is_empty()) {
-            variables.push(serde_json::json!({
-                "key": "baseUrl",
-                "value": base_url,
-                "type": "string"
-            }));
-        }
+    if !has_base_url_variable
+        && let Some(base_url) = collection.base_url.as_ref().filter(|s| !s.is_empty())
+    {
+        variables.push(serde_json::json!({
+            "key": "baseUrl",
+            "value": base_url,
+            "type": "string"
+        }));
     }
 
     let mut postman = serde_json::json!({
@@ -575,12 +575,16 @@ mod tests {
         let apikey = exported_api_key["request"]["auth"]["apikey"]
             .as_array()
             .unwrap();
-        assert!(apikey
-            .iter()
-            .any(|p| p["key"] == "key" && p["value"] == "X-Api-Key"));
-        assert!(apikey
-            .iter()
-            .any(|p| p["key"] == "value" && p["value"] == "abc"));
+        assert!(
+            apikey
+                .iter()
+                .any(|p| p["key"] == "key" && p["value"] == "X-Api-Key")
+        );
+        assert!(
+            apikey
+                .iter()
+                .any(|p| p["key"] == "value" && p["value"] == "abc")
+        );
 
         let variables = postman["variable"].as_array().unwrap();
         assert_eq!(variables[0]["key"], "apiKey");

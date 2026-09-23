@@ -34,7 +34,7 @@ function truncationFields(capped) {
 export class HistoryService {
     /** @param {Object} backendAPI */
     constructor(backendAPI) {
-        this.repository = new HistoryRepository(backendAPI);
+        this.repository = HistoryRepository.shared(backendAPI);
         this.maxHistoryItems = 100;
     }
 

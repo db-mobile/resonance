@@ -8,6 +8,7 @@ import { templateLoader } from '../../templateLoader.js';
 import { ScriptEditor } from '../../scriptEditor.bundle.js';
 import { JSONEditor } from '../../jsonEditor.bundle.js';
 import { pushEscapeHandler } from '../modalEscape.js';
+import { endpointDefaults, effectiveOverrides, stripUnchangedOverrides } from '../../utils/requestOverrides.js';
 
 export class RequestEditorModal {
     constructor() {
@@ -15,6 +16,8 @@ export class RequestEditorModal {
         this.scriptEditor = null;
         this.bodyEditor = null;
         this.request = null;
+        this.defaults = null;
+        this._opening = false;
         this._onSave = null;
         this._keyHandler = null;
         this._releaseEscape = null;
@@ -24,11 +27,28 @@ export class RequestEditorModal {
      * @param {Object} request
      * @param {Object} [callbacks]
      * @param {() => void} [callbacks.onSave]
+     * @param {(collectionId: string, endpointId: string) => Promise<Object>} [callbacks.resolveDefaults]
+     * @returns {Promise<void>}
      */
-    open(request, { onSave } = {}) {
+    async open(request, { onSave, resolveDefaults } = {}) {
+        if (this.modal || this._opening) {
+            return;
+        }
+
+        let config = null;
+        this._opening = true;
+        try {
+            config = await resolveDefaults?.(request.collectionId, request.endpointId);
+        } catch (error) {
+            void error;
+        } finally {
+            this._opening = false;
+        }
+
         this.request = request;
         this._onSave = onSave || null;
-        const overrides = this._ensureOverrides(request);
+        this.defaults = endpointDefaults(config);
+        const overrides = effectiveOverrides(request.overrides, this.defaults);
 
         const fragment = templateLoader.cloneSync(
             './src/templates/runner/runnerPanel.html',
@@ -75,12 +95,15 @@ export class RequestEditorModal {
     close(save) {
         if (save && this.request) {
             const { request } = this;
-            const overrides = this._ensureOverrides(request);
+            const edited = effectiveOverrides(request.overrides, this.defaults);
 
-            overrides.pathParams = this._collectKvList(this.modal?.querySelector('[data-role="path-params-list"]'));
-            overrides.queryParams = this._collectKvList(this.modal?.querySelector('[data-role="query-params-list"]'));
-            overrides.headers = this._collectKvList(this.modal?.querySelector('[data-role="headers-list"]'));
-            overrides.body = this.bodyEditor ? this.bodyEditor.getContent() : (overrides.body || '');
+            edited.pathParams = this._collectKvList(this.modal?.querySelector('[data-role="path-params-list"]'));
+            edited.queryParams = this._collectKvList(this.modal?.querySelector('[data-role="query-params-list"]'));
+            edited.headers = this._collectKvList(this.modal?.querySelector('[data-role="headers-list"]'));
+            if (this.bodyEditor) {
+                edited.body = this.bodyEditor.getContent();
+            }
+            request.overrides = stripUnchangedOverrides(edited, this.defaults);
 
             request.postResponseScript = this.scriptEditor
                 ? this.scriptEditor.getContent()
@@ -115,23 +138,8 @@ export class RequestEditorModal {
         }
 
         this.request = null;
+        this.defaults = null;
         this._onSave = null;
-    }
-
-    /**
-     * @param {Object} request
-     * @returns {Object}
-     */
-    _ensureOverrides(request) {
-        if (!request.overrides) {
-            request.overrides = { pathParams: [], queryParams: [], headers: [], body: '' };
-        }
-        const o = request.overrides;
-        o.pathParams = o.pathParams || [];
-        o.queryParams = o.queryParams || [];
-        o.headers = o.headers || [];
-        o.body = o.body || '';
-        return o;
     }
 
     /**
