@@ -86,6 +86,7 @@ if (isTauri) {
             getEndpointData: (collectionId, endpointId) => invoke('collection_get_endpoint_data', { collectionId, endpointId }),
             saveEndpointData: (collectionId, endpointId, data) => invoke('collection_save_endpoint_data', { collectionId, endpointId, data }),
             deleteEndpointData: (collectionId, endpointId) => invoke('collection_delete_endpoint_data', { collectionId, endpointId }),
+            deleteFolder: (collectionId, folderId) => invoke('collection_delete_folder', { collectionId, folderId }),
             getVariables: (collectionId) => invoke('collection_get_variables', { collectionId }),
             saveVariables: (collectionId, variables) => invoke('collection_save_variables', { collectionId, variables }),
             needsMigration: () => invoke('collections_needs_migration'),

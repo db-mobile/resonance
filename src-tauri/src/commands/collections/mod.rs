@@ -466,6 +466,46 @@ fn remove_request_from_tree(node: &mut read::FolderNode, request_id: &str) -> bo
         .any(|folder| remove_request_from_tree(folder, request_id))
 }
 
+/// Detaches the folder with `folder_id` (at any depth) and returns it.
+fn take_folder_from_tree(node: &mut read::FolderNode, folder_id: &str) -> Option<read::FolderNode> {
+    if let Some(index) = node
+        .folders
+        .iter()
+        .position(|folder| ipc::folder_id(folder) == folder_id)
+    {
+        return Some(node.folders.remove(index));
+    }
+    node.folders
+        .iter_mut()
+        .find_map(|folder| take_folder_from_tree(folder, folder_id))
+}
+
+/// Removes the files a detached folder owned, deepest first, then its
+/// directories once they are empty. Anything else a user left in the
+/// directory is kept, and so is the directory holding it.
+fn remove_folder_files(folder: &read::FolderNode) {
+    for child in &folder.folders {
+        remove_folder_files(child);
+    }
+    for entry in &folder.requests {
+        if let Some(file) = &entry.source {
+            let _ = fs::remove_file(file);
+        }
+    }
+    if let Some(dir) = &folder.source {
+        let _ = fs::remove_file(dir.join(layout::FOLDER_YAML));
+        let _ = fs::remove_dir(dir);
+    }
+}
+
+/// Collects the ids of every request in a folder, at any depth.
+fn folder_request_ids(folder: &read::FolderNode, out: &mut Vec<String>) {
+    out.extend(folder.requests.iter().map(|entry| entry.doc.id.clone()));
+    for child in &folder.folders {
+        folder_request_ids(child, out);
+    }
+}
+
 /// Loads whatever is already stored for a collection, in either layout.
 ///
 /// A v1 directory is converted on the way in, so a save always merges onto the
@@ -1328,6 +1368,36 @@ pub async fn collection_delete_endpoint_data(
     Ok(())
 }
 
+/// Deletes a folder, everything in it, and the files that held them.
+/// Returns the ids of the requests that were removed so the caller can drop
+/// their secrets and any open tabs.
+#[tauri::command]
+pub async fn collection_delete_folder(
+    app: AppHandle,
+    collection_id: String,
+    folder_id: String,
+) -> Result<Vec<String>, String> {
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
+    if Layout::detect(&paths.dir) != Some(Layout::V2) {
+        return Err(
+            "This collection is still in the legacy format. Make any change to it first so it is converted, then delete the folder again."
+                .to_string(),
+        );
+    }
+
+    let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
+    let folder = take_folder_from_tree(&mut loaded.root, &folder_id)
+        .ok_or_else(|| format!("Folder {} not found in collection", folder_id))?;
+
+    write::write_collection_dir(&paths.dir, &mut loaded)?;
+    remove_folder_files(&folder);
+    collection_cache().refresh(&paths.dir, &loaded);
+
+    let mut removed = Vec::new();
+    folder_request_ids(&folder, &mut removed);
+    Ok(removed)
+}
+
 #[tauri::command]
 pub async fn collection_get_variables(
     app: AppHandle,
@@ -2183,5 +2253,89 @@ mod load_errors {
         assert_eq!(scan.errors.len(), 1);
         assert_eq!(scan.errors[0].id.as_deref(), Some("gone-linked"));
         assert!(scan.index_changed);
+    }
+}
+
+#[cfg(test)]
+mod delete_folder {
+    use super::read::read_collection_dir;
+    use super::*;
+    use serde_json::json;
+    use tempfile::TempDir;
+
+    fn ipc(endpoints: Vec<Value>, folders: Vec<Value>) -> Collection {
+        Collection {
+            id: "c1".into(),
+            name: "C".into(),
+            base_url: String::new(),
+            endpoints,
+            folders,
+            default_headers: Value::Null,
+            auth_config: None,
+            open_api_spec: None,
+            storage_path: None,
+            storage_parent_path: None,
+            linked: false,
+            git_branch: None,
+        }
+    }
+
+    #[test]
+    fn a_nested_folder_and_its_files_are_removed_and_siblings_kept() {
+        let temp = TempDir::new().unwrap();
+        let keep = json!({"id": "keep", "name": "Keep", "method": "GET", "path": "/k"});
+        let inner = json!({"id": "inner", "name": "Inner", "method": "GET", "path": "/i"});
+        let outer = json!({"id": "outer", "name": "Outer", "method": "GET", "path": "/o"});
+        let incoming = ipc(
+            vec![keep.clone(), outer.clone(), inner.clone()],
+            vec![json!({
+                "id": "f_parent", "name": "Parent", "endpoints": [],
+                "folders": [{"id": "f_doomed", "name": "Doomed", "endpoints": [outer],
+                    "folders": [{"id": "f_child", "name": "Child", "endpoints": [inner]}]}]
+            })],
+        );
+        write_v2_collection(temp.path(), &incoming).unwrap();
+        let doomed_dir = temp.path().join("parent").join("doomed");
+        assert!(doomed_dir.exists());
+
+        let mut loaded = read_collection_dir(temp.path()).unwrap();
+        let folder = take_folder_from_tree(&mut loaded.root, "f_doomed").unwrap();
+        write::write_collection_dir(temp.path(), &mut loaded).unwrap();
+        remove_folder_files(&folder);
+
+        let mut removed = Vec::new();
+        folder_request_ids(&folder, &mut removed);
+        removed.sort();
+        assert_eq!(removed, vec!["inner".to_string(), "outer".to_string()]);
+        assert!(!doomed_dir.exists());
+        assert!(temp.path().join("parent").exists());
+
+        let reread = read_collection_dir(temp.path()).unwrap();
+        let ids: Vec<_> = reread
+            .requests()
+            .into_iter()
+            .map(|r| r.doc.id.clone())
+            .collect();
+        assert_eq!(ids, vec!["keep".to_string()]);
+    }
+
+    #[test]
+    fn a_stray_user_file_keeps_its_directory() {
+        let temp = TempDir::new().unwrap();
+        let req = json!({"id": "r", "name": "R", "method": "GET", "path": "/r"});
+        let incoming = ipc(
+            vec![req.clone()],
+            vec![json!({"id": "f1", "name": "Notes", "endpoints": [req]})],
+        );
+        write_v2_collection(temp.path(), &incoming).unwrap();
+        let dir = temp.path().join("notes");
+        fs::write(dir.join("README.md"), "mine").unwrap();
+
+        let mut loaded = read_collection_dir(temp.path()).unwrap();
+        let folder = take_folder_from_tree(&mut loaded.root, "f1").unwrap();
+        remove_folder_files(&folder);
+
+        assert!(dir.join("README.md").exists());
+        assert!(!dir.join(layout::FOLDER_YAML).exists());
     }
 }

@@ -126,7 +126,9 @@
     "delete_title": "Excluir Requisição",
     "confirm_delete": "Tem certeza de que deseja excluir a requisição \"{{name}}\"?\n\nEsta ação não pode ser desfeita.",
     "rename_title": "Renomear Requisição",
-    "rename_label": "Nome da Requisição:"
+    "rename_label": "Nome da Requisição:",
+    "copy_name": "{{name}} (cópia)",
+    "duplicate_error": "Não foi possível duplicar a requisição: {{message}}"
   },
   "context_menu": {
     "new_collection": "Nova Coleção",
@@ -146,7 +148,13 @@
     "unpin_request": "Desafixar Requisição",
     "close_collection": "Fechar coleção",
     "run_collection": "Executar coleção",
-    "run_folder": "Executar pasta"
+    "run_folder": "Executar pasta",
+    "new_folder": "Nova pasta",
+    "new_subfolder": "Nova subpasta",
+    "rename_folder": "Renomear pasta",
+    "delete_folder": "Excluir pasta",
+    "duplicate_request": "Duplicar requisição",
+    "move_request": "Mover para pasta…"
   },
   "docs": {
     "title": "Gerar Documentação",
@@ -345,7 +353,8 @@
     "remove": "Remover",
     "close": "Fechar",
     "yes": "Sim",
-    "no": "Não"
+    "no": "Não",
+    "create": "Criar"
   },
   "errors": {
     "network": "Erro de rede",
@@ -589,5 +598,20 @@
     "status_connecting": "Conectando…",
     "status_connected": "Conectado",
     "status_connected_count": "Conectado · {{count}} recebidos"
+  },
+  "folder": {
+    "new_title": "Nova pasta",
+    "rename_title": "Renomear pasta",
+    "name_label": "Nome da pasta:",
+    "delete_title": "Excluir pasta",
+    "confirm_delete": "Excluir a pasta \"{{name}}\" e as {{count}} requisições nela?\n\nEsta ação não pode ser desfeita.",
+    "error": "A ação na pasta falhou: {{message}}"
+  },
+  "move_request": {
+    "title": "Mover requisição",
+    "label": "Mover para:",
+    "confirm": "Mover",
+    "root": "(Raiz da coleção)",
+    "error": "Não foi possível mover a requisição: {{message}}"
   }
 }

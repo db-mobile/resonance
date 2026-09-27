@@ -126,7 +126,9 @@
     "delete_title": "Elimina richiesta",
     "confirm_delete": "Sei sicuro di voler eliminare la richiesta \"{{name}}\"?\n\nQuesta azione non può essere annullata.",
     "rename_title": "Rinomina richiesta",
-    "rename_label": "Nome della richiesta:"
+    "rename_label": "Nome della richiesta:",
+    "copy_name": "{{name}} (copia)",
+    "duplicate_error": "Impossibile duplicare la richiesta: {{message}}"
   },
   "context_menu": {
     "new_collection": "Nuova collezione",
@@ -146,7 +148,13 @@
     "unpin_request": "Rimuovi dalla barra",
     "close_collection": "Chiudi raccolta",
     "run_collection": "Esegui raccolta",
-    "run_folder": "Esegui cartella"
+    "run_folder": "Esegui cartella",
+    "new_folder": "Nuova cartella",
+    "new_subfolder": "Nuova sottocartella",
+    "rename_folder": "Rinomina cartella",
+    "delete_folder": "Elimina cartella",
+    "duplicate_request": "Duplica richiesta",
+    "move_request": "Sposta in cartella…"
   },
   "docs": {
     "title": "Genera documentazione",
@@ -345,7 +353,8 @@
     "remove": "Rimuovi",
     "close": "Chiudi",
     "yes": "Sì",
-    "no": "No"
+    "no": "No",
+    "create": "Crea"
   },
   "errors": {
     "network": "Errore di rete",
@@ -581,5 +590,20 @@
     "status_connecting": "Connessione…",
     "status_connected": "Connesso",
     "status_connected_count": "Connesso · {{count}} ricevuti"
+  },
+  "folder": {
+    "new_title": "Nuova cartella",
+    "rename_title": "Rinomina cartella",
+    "name_label": "Nome cartella:",
+    "delete_title": "Elimina cartella",
+    "confirm_delete": "Eliminare la cartella \"{{name}}\" e le {{count}} richieste al suo interno?\n\nL’operazione non può essere annullata.",
+    "error": "Operazione sulla cartella non riuscita: {{message}}"
+  },
+  "move_request": {
+    "title": "Sposta richiesta",
+    "label": "Sposta in:",
+    "confirm": "Sposta",
+    "root": "(Radice della raccolta)",
+    "error": "Impossibile spostare la richiesta: {{message}}"
   }
 }

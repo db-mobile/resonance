@@ -126,7 +126,9 @@
     "delete_title": "Anfrage löschen",
     "confirm_delete": "Sind Sie sicher, dass Sie die Anfrage \"{{name}}\" löschen möchten?\n\nDiese Aktion kann nicht rückgängig gemacht werden.",
     "rename_title": "Anfrage umbenennen",
-    "rename_label": "Anfragename:"
+    "rename_label": "Anfragename:",
+    "copy_name": "{{name}} (Kopie)",
+    "duplicate_error": "Die Anfrage konnte nicht dupliziert werden: {{message}}"
   },
   "context_menu": {
     "new_collection": "Neue Sammlung",
@@ -146,7 +148,13 @@
     "unpin_request": "Anfrage lösen",
     "close_collection": "Sammlung schließen",
     "run_collection": "Sammlung ausführen",
-    "run_folder": "Ordner ausführen"
+    "run_folder": "Ordner ausführen",
+    "new_folder": "Neuer Ordner",
+    "new_subfolder": "Neuer Unterordner",
+    "rename_folder": "Ordner umbenennen",
+    "delete_folder": "Ordner löschen",
+    "duplicate_request": "Anfrage duplizieren",
+    "move_request": "In Ordner verschieben…"
   },
   "docs": {
     "title": "Dokumentation generieren",
@@ -345,7 +353,8 @@
     "remove": "Entfernen",
     "close": "Schließen",
     "yes": "Ja",
-    "no": "Nein"
+    "no": "Nein",
+    "create": "Erstellen"
   },
   "errors": {
     "network": "Netzwerkfehler aufgetreten",
@@ -581,5 +590,20 @@
     "status_connecting": "Verbinde…",
     "status_connected": "Verbunden",
     "status_connected_count": "Verbunden · {{count}} empfangen"
+  },
+  "folder": {
+    "new_title": "Neuer Ordner",
+    "rename_title": "Ordner umbenennen",
+    "name_label": "Ordnername:",
+    "delete_title": "Ordner löschen",
+    "confirm_delete": "Den Ordner „{{name}}“ und die {{count}} Anfrage(n) darin löschen?\n\nDies kann nicht rückgängig gemacht werden.",
+    "error": "Ordneraktion fehlgeschlagen: {{message}}"
+  },
+  "move_request": {
+    "title": "Anfrage verschieben",
+    "label": "Verschieben nach:",
+    "confirm": "Verschieben",
+    "root": "(Sammlungsebene)",
+    "error": "Die Anfrage konnte nicht verschoben werden: {{message}}"
   }
 }

@@ -180,7 +180,7 @@ fn folder_to_ipc(node: &FolderNode, path: &mut Vec<String>, flat: &mut Vec<Value
 
 /// A folder's id: its own metadata when present, else derived from its name so
 /// expansion state and auth scopes stay stable for a hand-made directory.
-fn folder_id(folder: &FolderNode) -> String {
+pub(crate) fn folder_id(folder: &FolderNode) -> String {
     if let Some(meta) = &folder.meta
         && !meta.id.is_empty()
     {

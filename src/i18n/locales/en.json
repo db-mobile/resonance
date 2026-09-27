@@ -126,7 +126,9 @@
     "delete_title": "Delete Request",
     "confirm_delete": "Are you sure you want to delete the request \"{{name}}\"?\n\nThis action cannot be undone.",
     "rename_title": "Rename Request",
-    "rename_label": "Request Name:"
+    "rename_label": "Request Name:",
+    "copy_name": "{{name}} (copy)",
+    "duplicate_error": "Could not duplicate the request: {{message}}"
   },
   "context_menu": {
     "new_collection": "New Collection",
@@ -146,7 +148,13 @@
     "unpin_request": "Unpin Request",
     "close_collection": "Close Collection",
     "run_collection": "Run Collection",
-    "run_folder": "Run Folder"
+    "run_folder": "Run Folder",
+    "new_folder": "New Folder",
+    "new_subfolder": "New Subfolder",
+    "rename_folder": "Rename Folder",
+    "delete_folder": "Delete Folder",
+    "duplicate_request": "Duplicate Request",
+    "move_request": "Move to Folder…"
   },
   "docs": {
     "title": "Generate Documentation",
@@ -345,7 +353,8 @@
     "remove": "Remove",
     "close": "Close",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "create": "Create"
   },
   "errors": {
     "network": "Network error occurred",
@@ -589,5 +598,20 @@
     "status_connecting": "Connecting…",
     "status_connected": "Connected",
     "status_connected_count": "Connected · {{count}} received"
+  },
+  "folder": {
+    "new_title": "New Folder",
+    "rename_title": "Rename Folder",
+    "name_label": "Folder Name:",
+    "delete_title": "Delete Folder",
+    "confirm_delete": "Delete the folder \"{{name}}\" and the {{count}} request(s) in it?\n\nThis cannot be undone.",
+    "error": "Folder action failed: {{message}}"
+  },
+  "move_request": {
+    "title": "Move Request",
+    "label": "Move to:",
+    "confirm": "Move",
+    "root": "(Collection root)",
+    "error": "Could not move the request: {{message}}"
   }
 }

@@ -442,12 +442,26 @@ export function insertRequest(collection, folderId, request) {
     return {
         ...collection,
         endpoints,
-        folders: (collection.folders ?? []).map(folder =>
-            folder?.id === folderId
-                ? { ...folder, endpoints: [...(folder.endpoints ?? []), request] }
-                : folder
-        )
+        folders: insertIntoLegacyFolders(collection.folders, folderId, request)
     };
+}
+
+/**
+ * @param {Array|null|undefined} folders
+ * @param {string} folderId
+ * @param {Object} request
+ * @returns {Array}
+ */
+function insertIntoLegacyFolders(folders, folderId, request) {
+    return (folders ?? []).map(folder => {
+        if (folder?.id === folderId) {
+            return { ...folder, endpoints: [...(folder.endpoints ?? []), request] };
+        }
+        if (Array.isArray(folder?.folders)) {
+            return { ...folder, folders: insertIntoLegacyFolders(folder.folders, folderId, request) };
+        }
+        return folder;
+    });
 }
 
 /**
@@ -467,3 +481,96 @@ function insertIntoFolderItems(items, folderId, node) {
         return { ...item, items: insertIntoFolderItems(item.items, folderId, node) };
     });
 }
+
+/**
+ * @param {Object} collection
+ * @param {string|null} parentFolderId
+ * @param {{id: string, name: string}} folder
+ * @returns {Object}
+ */
+export function insertFolder(collection, parentFolderId, folder) {
+    if (parentFolderId && !findFolder(collection, parentFolderId)) {
+        throw new Error(`Folder with id ${parentFolderId} not found in collection`);
+    }
+
+    if (usesItemsTree(collection)) {
+        const node = { type: FOLDER, items: [], ...folder };
+        if (!parentFolderId) {
+            return { ...collection, items: [...collection.items, node] };
+        }
+        return { ...collection, items: insertIntoFolderItems(collection.items, parentFolderId, node) };
+    }
+
+    const node = { endpoints: [], ...folder };
+    if (!parentFolderId) {
+        return { ...collection, folders: [...(collection.folders ?? []), node] };
+    }
+    return { ...collection, folders: insertSubfolder(collection.folders, parentFolderId, node) };
+}
+
+/**
+ * @param {Array|null|undefined} folders
+ * @param {string} parentFolderId
+ * @param {Object} node
+ * @returns {Array}
+ */
+function insertSubfolder(folders, parentFolderId, node) {
+    return (folders ?? []).map(folder => {
+        if (folder?.id === parentFolderId) {
+            return { ...folder, folders: [...(folder.folders ?? []), node] };
+        }
+        if (Array.isArray(folder?.folders)) {
+            return { ...folder, folders: insertSubfolder(folder.folders, parentFolderId, node) };
+        }
+        return folder;
+    });
+}
+
+/**
+ * @param {Object} collection
+ * @param {string} requestId
+ * @param {string|null} targetFolderId
+ * @returns {Object|null}
+ */
+export function moveRequest(collection, requestId, targetFolderId) {
+    const request = findRequest(collection, requestId);
+    if (!request) {
+        return null;
+    }
+    if (targetFolderId && !findFolder(collection, targetFolderId)) {
+        throw new Error(`Folder with id ${targetFolderId} not found in collection`);
+    }
+    return insertRequest(removeRequest(collection, requestId), targetFolderId, request);
+}
+
+/**
+ * @param {Object} collection
+ * @returns {Array<{id: string, name: string, depth: number}>}
+ */
+export function folderOutline(collection) {
+    const out = [];
+    const visitLegacy = (folders, depth) => {
+        for (const folder of folders ?? []) {
+            if (!folder) {
+                continue;
+            }
+            out.push({ id: folder.id, name: folder.name, depth });
+            visitLegacy(folder.folders, depth + 1);
+        }
+    };
+    const visitItems = (items, depth) => {
+        for (const item of items ?? []) {
+            if (item?.type === FOLDER) {
+                out.push({ id: item.id, name: item.name, depth });
+                visitItems(item.items, depth + 1);
+            }
+        }
+    };
+    if (usesItemsTree(collection)) {
+        visitItems(collection.items, 0);
+    } else {
+        visitLegacy(collection?.folders, 0);
+    }
+    return out;
+}
+

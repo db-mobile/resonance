@@ -73,11 +73,13 @@
   max-height: 320px;
 }
 
-.code-snippet-dialog .select-wrapper {
+.code-snippet-dialog .select-wrapper,
+.move-request-dialog .select-wrapper {
   width: 100%;
 }
 
-.code-snippet-dialog .select-wrapper > select {
+.code-snippet-dialog .select-wrapper > select,
+.move-request-dialog .select-wrapper > select {
   width: 100%;
 }
 

@@ -747,6 +747,46 @@ export class CollectionRepository {
 
     /**
      * @param {string} collectionId
+     * @param {string} folderId
+     * @returns {Promise<Array<string>>}
+     */
+    async deleteFolder(collectionId, folderId) {
+        const removed = await this.backendAPI.collections.deleteFolder(collectionId, folderId);
+        this._byIdCache.delete(collectionId);
+        if (this.secretStore) {
+            await this.secretStore.deleteScope(folderAuthSecretScope(collectionId, folderId));
+            for (const endpointId of removed ?? []) {
+                await this.secretStore.deleteScope(authSecretScope(collectionId, endpointId));
+                await this.secretStore.deleteScope(mqttSecretScope(collectionId, endpointId));
+            }
+        }
+        return removed ?? [];
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} sourceId
+     * @param {string} targetId
+     * @returns {Promise<void>}
+     */
+    async copyEndpointData(collectionId, sourceId, targetId) {
+        const data = await this._getEndpointDataForUpdate(collectionId, sourceId);
+        if (data && Object.keys(data).length > 0) {
+            await this._saveEndpointData(collectionId, targetId, data);
+        }
+        if (!this.secretStore) {
+            return;
+        }
+        for (const scopeOf of [authSecretScope, mqttSecretScope]) {
+            const secrets = await this.secretStore.getScope(scopeOf(collectionId, sourceId));
+            for (const [key, value] of Object.entries(secrets)) {
+                await this.secretStore.set(scopeOf(collectionId, targetId), key, value);
+            }
+        }
+    }
+
+    /**
+     * @param {string} collectionId
      * @param {string} endpointId
      * @returns {Promise<void>}
      */

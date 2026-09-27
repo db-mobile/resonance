@@ -100,3 +100,32 @@ describe('collection MQTT data keeps the password in the keychain', () => {
         expect(api.__chain.has('mqtt:c1:e1|password')).toBe(false);
     });
 });
+
+describe('copying and deleting request data', () => {
+    test('copyEndpointData copies the stored data and every secret scope', async () => {
+        const api = makeBackend();
+        const repo = new CollectionRepository(api, new SecretStore(api));
+        api.__endpointData['c1/src'] = { url: 'https://x.test', headers: [{ key: 'A', value: '1' }] };
+        const secrets = repo.secretStore;
+        await secrets.set('auth:c1:src', 'token', 't0k');
+        await secrets.set('mqtt:c1:src', 'password', 'pw');
+
+        await repo.copyEndpointData('c1', 'src', 'dst');
+
+        expect(api.__endpointData['c1/dst']).toEqual(api.__endpointData['c1/src']);
+        expect(await secrets.get('auth:c1:dst', 'token')).toBe('t0k');
+        expect(await secrets.get('mqtt:c1:dst', 'password')).toBe('pw');
+    });
+
+    test('deleteFolder drops the secrets of every removed request and of the folder', async () => {
+        const api = makeBackend();
+        api.collections.deleteFolder = jest.fn().mockResolvedValue(['r1']);
+        const repo = new CollectionRepository(api, new SecretStore(api));
+        await repo.secretStore.set('auth:c1:r1', 'token', 'x');
+        await repo.secretStore.set('auth:c1:__folder__:f1', 'token', 'y');
+
+        await expect(repo.deleteFolder('c1', 'f1')).resolves.toEqual(['r1']);
+        expect(await repo.secretStore.get('auth:c1:r1', 'token')).toBeUndefined();
+        expect(await repo.secretStore.get('auth:c1:__folder__:f1', 'token')).toBeUndefined();
+    });
+});

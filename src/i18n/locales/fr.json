@@ -126,7 +126,9 @@
     "delete_title": "Supprimer la requête",
     "confirm_delete": "Êtes-vous sûr de vouloir supprimer la requête \"{{name}}\" ?\n\nCette action ne peut pas être annulée.",
     "rename_title": "Renommer la requête",
-    "rename_label": "Nom de la requête :"
+    "rename_label": "Nom de la requête :",
+    "copy_name": "{{name}} (copie)",
+    "duplicate_error": "Impossible de dupliquer la requête : {{message}}"
   },
   "context_menu": {
     "new_collection": "Nouvelle collection",
@@ -146,7 +148,13 @@
     "unpin_request": "Désépingler la requête",
     "close_collection": "Fermer la collection",
     "run_collection": "Exécuter la collection",
-    "run_folder": "Exécuter le dossier"
+    "run_folder": "Exécuter le dossier",
+    "new_folder": "Nouveau dossier",
+    "new_subfolder": "Nouveau sous-dossier",
+    "rename_folder": "Renommer le dossier",
+    "delete_folder": "Supprimer le dossier",
+    "duplicate_request": "Dupliquer la requête",
+    "move_request": "Déplacer vers un dossier…"
   },
   "docs": {
     "title": "Générer la documentation",
@@ -345,7 +353,8 @@
     "remove": "Supprimer",
     "close": "Fermer",
     "yes": "Oui",
-    "no": "Non"
+    "no": "Non",
+    "create": "Créer"
   },
   "errors": {
     "network": "Erreur réseau",
@@ -581,5 +590,20 @@
     "status_connecting": "Connexion…",
     "status_connected": "Connecté",
     "status_connected_count": "Connecté · {{count}} reçus"
+  },
+  "folder": {
+    "new_title": "Nouveau dossier",
+    "rename_title": "Renommer le dossier",
+    "name_label": "Nom du dossier :",
+    "delete_title": "Supprimer le dossier",
+    "confirm_delete": "Supprimer le dossier « {{name}} » et les {{count}} requête(s) qu’il contient ?\n\nCette action est irréversible.",
+    "error": "L’action sur le dossier a échoué : {{message}}"
+  },
+  "move_request": {
+    "title": "Déplacer la requête",
+    "label": "Déplacer vers :",
+    "confirm": "Déplacer",
+    "root": "(Racine de la collection)",
+    "error": "Impossible de déplacer la requête : {{message}}"
   }
 }

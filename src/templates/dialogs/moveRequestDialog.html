@@ -1,0 +1,18 @@
+<template id="tpl-move-request-dialog">
+    <div class="u-flex u-flex-col u-gap-4">
+        <h3 class="dialog-title" data-role="title" data-i18n="move_request.title">Move Request</h3>
+        <div class="dialog-body">
+            <div class="u-flex u-flex-col u-gap-2">
+                <label for="move-request-target" class="form-label" data-i18n="move_request.label">Move to:</label>
+                <div class="select-wrapper">
+                    <select id="move-request-target" class="select-base" data-role="target"></select>
+                    <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                </div>
+            </div>
+        </div>
+        <div class="dialog-footer">
+            <button id="move-request-cancel-btn" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
+            <button id="move-request-confirm-btn" class="btn btn-primary" data-i18n="move_request.confirm">Move</button>
+        </div>
+    </div>
+</template>

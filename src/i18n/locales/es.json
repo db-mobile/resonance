@@ -126,7 +126,9 @@
     "delete_title": "Eliminar solicitud",
     "confirm_delete": "¿Estás seguro de que quieres eliminar la solicitud \"{{name}}\"?\n\nEsta acción no se puede deshacer.",
     "rename_title": "Renombrar solicitud",
-    "rename_label": "Nombre de la solicitud:"
+    "rename_label": "Nombre de la solicitud:",
+    "copy_name": "{{name}} (copia)",
+    "duplicate_error": "No se pudo duplicar la solicitud: {{message}}"
   },
   "context_menu": {
     "new_collection": "Nueva colección",
@@ -146,7 +148,13 @@
     "unpin_request": "Desfijar solicitud",
     "close_collection": "Cerrar colección",
     "run_collection": "Ejecutar colección",
-    "run_folder": "Ejecutar carpeta"
+    "run_folder": "Ejecutar carpeta",
+    "new_folder": "Nueva carpeta",
+    "new_subfolder": "Nueva subcarpeta",
+    "rename_folder": "Renombrar carpeta",
+    "delete_folder": "Eliminar carpeta",
+    "duplicate_request": "Duplicar solicitud",
+    "move_request": "Mover a carpeta…"
   },
   "docs": {
     "title": "Generar documentación",
@@ -345,7 +353,8 @@
     "remove": "Quitar",
     "close": "Cerrar",
     "yes": "Sí",
-    "no": "No"
+    "no": "No",
+    "create": "Crear"
   },
   "errors": {
     "network": "Error de red",
@@ -581,5 +590,20 @@
     "status_connecting": "Conectando…",
     "status_connected": "Conectado",
     "status_connected_count": "Conectado · {{count}} recibidos"
+  },
+  "folder": {
+    "new_title": "Nueva carpeta",
+    "rename_title": "Renombrar carpeta",
+    "name_label": "Nombre de la carpeta:",
+    "delete_title": "Eliminar carpeta",
+    "confirm_delete": "¿Eliminar la carpeta \"{{name}}\" y las {{count}} solicitudes que contiene?\n\nEsta acción no se puede deshacer.",
+    "error": "La acción sobre la carpeta falló: {{message}}"
+  },
+  "move_request": {
+    "title": "Mover solicitud",
+    "label": "Mover a:",
+    "confirm": "Mover",
+    "root": "(Raíz de la colección)",
+    "error": "No se pudo mover la solicitud: {{message}}"
   }
 }
