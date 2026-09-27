@@ -133,6 +133,15 @@ export class CollectionService {
 
     /**
      * @param {string} collectionId
+     * @param {string} path
+     * @returns {Promise<Object>}
+     */
+    async relocateCollection(collectionId, path) {
+        return this.repository.relocate(collectionId, path);
+    }
+
+    /**
+     * @param {string} collectionId
      * @param {string} format
      * @returns {Promise<Object>}
      */

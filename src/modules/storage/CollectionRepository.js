@@ -233,6 +233,17 @@ export class CollectionRepository {
         return this.backendAPI.collections.openExisting(path);
     }
 
+    /**
+     * @param {string} collectionId
+     * @param {string} path
+     * @returns {Promise<Object>}
+     */
+    async relocate(collectionId, path) {
+        const collection = await this.backendAPI.collections.relocate(collectionId, path);
+        this._byIdCache.delete(collectionId);
+        return fromWire(collection);
+    }
+
     /** @returns {Promise<Object>} */
     async gitBranches() {
         return this.backendAPI.collections.gitBranches();

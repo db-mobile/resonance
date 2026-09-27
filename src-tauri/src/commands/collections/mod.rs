@@ -1009,6 +1009,77 @@ pub async fn collection_close(app: AppHandle, collection_id: String) -> Result<(
     Ok(())
 }
 
+/// Points an existing index entry (and its linked record) at a new folder,
+/// leaving every other entry alone.
+fn relocate_entry(
+    index: &mut HashMap<String, String>,
+    linked: &mut HashMap<String, String>,
+    collection_id: &str,
+    dir: &Path,
+) {
+    let dir = dir.to_string_lossy().to_string();
+    index.insert(collection_id.to_string(), dir.clone());
+    linked.insert(collection_id.to_string(), dir);
+}
+
+/// Finds the collection with `collection_id` at `picked` or directly below it.
+fn find_collection_dir(
+    picked: &Path,
+    collection_id: &str,
+) -> Result<(PathBuf, Collection), String> {
+    let candidates = if is_collection_dir(picked) {
+        vec![picked.to_path_buf()]
+    } else {
+        link::discover_collection_dirs(picked)?
+    };
+    let mut other_names = Vec::new();
+    for dir in candidates {
+        match read_collection_from_dir(&dir) {
+            Ok(collection) if collection.id == collection_id => return Ok((dir, collection)),
+            Ok(collection) => other_names.push(collection.name),
+            Err(_) => {}
+        }
+    }
+    Err(match other_names.first() {
+        Some(name) => format!("That folder holds \"{name}\", not the missing collection"),
+        None => format!("No collection found in {}", picked.display()),
+    })
+}
+
+/// Re-points a collection whose folder moved, keeping its id and therefore
+/// its keychain credentials.
+///
+/// @param app - Tauri app handle
+/// @param collection_id - The index entry reported as missing
+/// @param path - The folder the user picked
+/// @returns The collection as read from its new location
+#[tauri::command]
+pub async fn collection_relocate(
+    app: AppHandle,
+    collection_id: String,
+    path: String,
+) -> Result<Collection, String> {
+    let picked = PathBuf::from(&path);
+    let default_dir = get_default_collections_dir(&app)?;
+    if link::is_under(&default_dir, &picked) {
+        return Err(format!(
+            "{} is inside Resonance's own collections folder and is already managed",
+            picked.display()
+        ));
+    }
+
+    let (dir, mut collection) = find_collection_dir(&picked, &collection_id)?;
+
+    let mut index = get_collection_index(&app)?;
+    let mut linked = get_linked_collections(&app)?;
+    relocate_entry(&mut index, &mut linked, &collection_id, &dir);
+    save_collection_index(&app, &index)?;
+    save_linked_collections(&app, &linked)?;
+
+    collection.linked = true;
+    Ok(collection)
+}
+
 /// Loads every collection with a single read per directory and a single index
 /// write, instead of the previous list-then-get shape that parsed each
 /// collection twice and rewrote the index per entry.
@@ -1047,8 +1118,37 @@ fn load_all_collections(app: &AppHandle) -> Result<Vec<Collection>, String> {
 #[serde(rename_all = "camelCase")]
 pub struct CollectionLoadError {
     pub path: String,
+    /// The index entry to act on: for `removable` errors, passing it to
+    /// `collection_close` or `collection_relocate` fixes the listing.
     pub id: Option<String>,
     pub message: String,
+    /// `missing`, `not_a_collection`, `unreadable`, `duplicate` or `dir_error`.
+    pub kind: &'static str,
+    /// True for index entries outside the app's own folder, which can be
+    /// dropped from the list without deleting anything.
+    pub removable: bool,
+}
+
+impl CollectionLoadError {
+    fn managed(path: String, kind: &'static str, message: String) -> Self {
+        Self {
+            path,
+            id: None,
+            message,
+            kind,
+            removable: false,
+        }
+    }
+
+    fn indexed(path: String, id: String, kind: &'static str, message: String) -> Self {
+        Self {
+            path,
+            id: Some(id),
+            message,
+            kind,
+            removable: true,
+        }
+    }
 }
 
 /// Load problems from the most recent full collection listing.
@@ -1080,11 +1180,11 @@ fn scan_collections(default_dir: &Path, index: &mut HashMap<String, String>) -> 
                 for entry in entries {
                     match entry {
                         Ok(entry) => paths.push(entry.path()),
-                        Err(e) => scan.errors.push(CollectionLoadError {
-                            path: default_dir.to_string_lossy().to_string(),
-                            id: None,
-                            message: format!("Failed to read directory entry: {e}"),
-                        }),
+                        Err(e) => scan.errors.push(CollectionLoadError::managed(
+                            default_dir.to_string_lossy().to_string(),
+                            "dir_error",
+                            format!("Failed to read directory entry: {e}"),
+                        )),
                     }
                 }
                 paths.sort();
@@ -1097,13 +1197,13 @@ fn scan_collections(default_dir: &Path, index: &mut HashMap<String, String>) -> 
                     match read_collection_from_dir(&path) {
                         Ok(mut collection) => {
                             if let Some(first) = seen.get(&collection.id) {
-                                scan.errors.push(CollectionLoadError {
-                                    path: path_str,
-                                    id: Some(collection.id.clone()),
-                                    message: format!(
+                                scan.errors.push(CollectionLoadError::managed(
+                                    path_str,
+                                    "duplicate",
+                                    format!(
                                         "Duplicate collection id (already used by {first}); a copied collection folder needs a new id"
                                     ),
-                                });
+                                ));
                                 continue;
                             }
                             seen.insert(collection.id.clone(), path_str.clone());
@@ -1114,19 +1214,19 @@ fn scan_collections(default_dir: &Path, index: &mut HashMap<String, String>) -> 
                             collection.open_api_spec = None;
                             scan.collections.push(collection);
                         }
-                        Err(message) => scan.errors.push(CollectionLoadError {
-                            path: path_str,
-                            id: None,
+                        Err(message) => scan.errors.push(CollectionLoadError::managed(
+                            path_str,
+                            "unreadable",
                             message,
-                        }),
+                        )),
                     }
                 }
             }
-            Err(e) => scan.errors.push(CollectionLoadError {
-                path: default_dir.to_string_lossy().to_string(),
-                id: None,
-                message: format!("Failed to read collections dir: {e}"),
-            }),
+            Err(e) => scan.errors.push(CollectionLoadError::managed(
+                default_dir.to_string_lossy().to_string(),
+                "dir_error",
+                format!("Failed to read collections dir: {e}"),
+            )),
         }
     }
 
@@ -1147,45 +1247,48 @@ fn scan_collections(default_dir: &Path, index: &mut HashMap<String, String>) -> 
                 index.remove(&collection_id);
                 scan.index_changed = true;
             } else {
-                scan.errors.push(CollectionLoadError {
-                    path: path_str,
-                    id: Some(collection_id),
-                    message:
-                        "Collection folder not found (moved, deleted or on an unmounted drive)"
-                            .to_string(),
-                });
+                scan.errors.push(CollectionLoadError::indexed(
+                    path_str,
+                    collection_id,
+                    "missing",
+                    "Collection folder not found (moved, deleted or on an unmounted drive)"
+                        .to_string(),
+                ));
             }
             continue;
         }
 
         if !is_collection_dir(&path) {
-            scan.errors.push(CollectionLoadError {
-                path: path_str,
-                id: Some(collection_id),
-                message: "Folder no longer contains a collection".to_string(),
-            });
+            scan.errors.push(CollectionLoadError::indexed(
+                path_str,
+                collection_id,
+                "not_a_collection",
+                "Folder no longer contains a collection".to_string(),
+            ));
             continue;
         }
 
         match read_collection_from_dir(&path) {
             Ok(mut collection) => {
                 if let Some(first) = seen.get(&collection.id) {
-                    scan.errors.push(CollectionLoadError {
-                        path: path_str,
-                        id: Some(collection.id.clone()),
-                        message: format!("Duplicate collection id (already used by {first})"),
-                    });
+                    scan.errors.push(CollectionLoadError::indexed(
+                        path_str,
+                        collection_id,
+                        "duplicate",
+                        format!("Duplicate collection id (already used by {first})"),
+                    ));
                     continue;
                 }
                 seen.insert(collection.id.clone(), path_str);
                 collection.open_api_spec = None;
                 scan.collections.push(collection);
             }
-            Err(message) => scan.errors.push(CollectionLoadError {
-                path: path_str,
-                id: Some(collection_id),
+            Err(message) => scan.errors.push(CollectionLoadError::indexed(
+                path_str,
+                collection_id,
+                "unreadable",
                 message,
-            }),
+            )),
         }
     }
 
@@ -2226,6 +2329,93 @@ mod load_errors {
         );
         assert!(scan.errors.iter().any(|e| e.path.ends_with("broken")));
         assert!(scan.index_changed);
+    }
+
+    #[test]
+    fn errors_carry_their_kind_and_whether_they_can_be_removed() {
+        let root = TempDir::new().unwrap();
+        let managed = root.path().join("managed");
+        fs::create_dir_all(&managed).unwrap();
+        let broken_managed = managed.join("broken");
+        fs::create_dir_all(&broken_managed).unwrap();
+        fs::write(broken_managed.join("collection.json"), "{ nope").unwrap();
+
+        let elsewhere = TempDir::new().unwrap();
+        let empty_linked = elsewhere.path().join("empty");
+        fs::create_dir_all(&empty_linked).unwrap();
+        let broken_linked = elsewhere.path().join("broken");
+        fs::create_dir_all(&broken_linked).unwrap();
+        fs::write(broken_linked.join("collection.json"), "{ nope").unwrap();
+
+        let mut index = HashMap::from([
+            (
+                "gone".to_string(),
+                elsewhere.path().join("gone").to_string_lossy().to_string(),
+            ),
+            (
+                "empty".to_string(),
+                empty_linked.to_string_lossy().to_string(),
+            ),
+            (
+                "bad".to_string(),
+                broken_linked.to_string_lossy().to_string(),
+            ),
+        ]);
+        let scan = scan_collections(&managed, &mut index);
+
+        let mut got: Vec<_> = scan
+            .errors
+            .iter()
+            .map(|e| (e.kind, e.removable, e.id.clone()))
+            .collect();
+        got.sort();
+        assert_eq!(
+            got,
+            vec![
+                ("missing", true, Some("gone".to_string())),
+                ("not_a_collection", true, Some("empty".to_string())),
+                ("unreadable", false, None),
+                ("unreadable", true, Some("bad".to_string())),
+            ]
+        );
+    }
+
+    #[test]
+    fn relocating_replaces_only_that_entry() {
+        let mut index = HashMap::from([
+            ("a".to_string(), "/old/a".to_string()),
+            ("b".to_string(), "/keep/b".to_string()),
+        ]);
+        let mut linked = HashMap::from([("a".to_string(), "/old/a".to_string())]);
+
+        relocate_entry(&mut index, &mut linked, "a", Path::new("/new/a"));
+
+        assert_eq!(index["a"], "/new/a");
+        assert_eq!(index["b"], "/keep/b");
+        assert_eq!(linked["a"], "/new/a");
+    }
+
+    #[test]
+    fn a_moved_collection_is_found_from_its_parent_folder_by_id() {
+        let root = TempDir::new().unwrap();
+        v1_collection(&root.path().join("other"), "col-other");
+        v1_collection(&root.path().join("moved"), "col-a");
+
+        let (dir, collection) = find_collection_dir(root.path(), "col-a").unwrap();
+        assert!(dir.ends_with("moved"));
+        assert_eq!(collection.id, "col-a");
+
+        let (dir, _) = find_collection_dir(&root.path().join("moved"), "col-a").unwrap();
+        assert!(dir.ends_with("moved"));
+    }
+
+    #[test]
+    fn a_folder_holding_a_different_collection_is_rejected() {
+        let root = TempDir::new().unwrap();
+        v1_collection(&root.path().join("other"), "col-other");
+
+        let error = find_collection_dir(&root.path().join("other"), "col-a").unwrap_err();
+        assert!(error.contains("col-other"), "{error}");
     }
 
     #[test]

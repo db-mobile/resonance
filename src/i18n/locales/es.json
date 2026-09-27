@@ -35,7 +35,12 @@
     },
     "load_errors": {
       "toast_one": "No se pudo cargar 1 colección",
-      "toast_other": "No se pudieron cargar {{count}} colecciones"
+      "toast_other": "No se pudieron cargar {{count}} colecciones",
+      "locate": "Localizar…",
+      "remove": "Quitar de la lista",
+      "retry": "Reintentar",
+      "removed_toast": "Quitado de la lista. La carpeta no se ha modificado.",
+      "relocated_toast": "\"{{name}}\" encontrado en su nueva ubicación"
     }
   },
   "import": {

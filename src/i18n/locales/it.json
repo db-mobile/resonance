@@ -35,7 +35,12 @@
     },
     "load_errors": {
       "toast_one": "Impossibile caricare 1 raccolta",
-      "toast_other": "Impossibile caricare {{count}} raccolte"
+      "toast_other": "Impossibile caricare {{count}} raccolte",
+      "locate": "Individua…",
+      "remove": "Rimuovi dall’elenco",
+      "retry": "Riprova",
+      "removed_toast": "Rimosso dall’elenco. La cartella non è stata toccata.",
+      "relocated_toast": "\"{{name}}\" trovato nella nuova posizione"
     }
   },
   "import": {

@@ -82,6 +82,7 @@ if (isTauri) {
             delete: (collectionId) => invoke('collection_delete', { collectionId }),
             close: (collectionId) => invoke('collection_close', { collectionId }),
             openExisting: (path) => invoke('collections_open_existing', { path }),
+            relocate: (collectionId, path) => invoke('collection_relocate', { collectionId, path }),
             gitBranches: () => invoke('collections_git_branches'),
             getEndpointData: (collectionId, endpointId) => invoke('collection_get_endpoint_data', { collectionId, endpointId }),
             saveEndpointData: (collectionId, endpointId, data) => invoke('collection_save_endpoint_data', { collectionId, endpointId, data }),

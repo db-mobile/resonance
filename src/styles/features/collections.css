@@ -249,3 +249,14 @@
   opacity: 0.8;
   overflow-wrap: anywhere;
 }
+
+.collection-load-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.collection-load-error-action {
+  color: var(--error-color);
+}

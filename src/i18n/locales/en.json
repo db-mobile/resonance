@@ -35,7 +35,12 @@
     },
     "load_errors": {
       "toast_one": "1 collection could not be loaded",
-      "toast_other": "{{count}} collections could not be loaded"
+      "toast_other": "{{count}} collections could not be loaded",
+      "locate": "Locate…",
+      "remove": "Remove from list",
+      "retry": "Retry",
+      "removed_toast": "Removed from the list. The folder was not touched.",
+      "relocated_toast": "Found \"{{name}}\" in its new location"
     }
   },
   "import": {

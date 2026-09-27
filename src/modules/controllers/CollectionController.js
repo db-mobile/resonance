@@ -240,7 +240,11 @@ export class CollectionController {
             showSearchEmptyState: isSearching && this.allCollections.length > 0,
             expandSearchResults: isSearching
         }, pinnedRequests);
-        this.renderer.renderLoadErrors(isSearching ? [] : (this.loadErrors ?? []));
+        this.renderer.renderLoadErrors(isSearching ? [] : (this.loadErrors ?? []), {
+            onLocate: (error) => this.handleLocateMissingCollection(error),
+            onRemove: (error) => this.handleRemoveMissingCollection(error),
+            onRetry: () => this.loadCollectionsWithExpansionState()
+        });
     }
 
     initializeCollectionsSearch() {
@@ -927,6 +931,41 @@ export class CollectionController {
             }
         } catch (error) {
             void error;
+        }
+    }
+
+    /**
+     * @param {{id: string, path: string}} error
+     * @returns {Promise<void>}
+     */
+    async handleRemoveMissingCollection(error) {
+        try {
+            await this.service.closeCollection(error.id);
+            await this.closeTabsForCollection(error.id);
+            await this.loadCollectionsWithExpansionState();
+            toast.success(translate('sidebar.load_errors.removed_toast', 'Removed from the list. The folder was not touched.'));
+        } catch (err) {
+            toast.error(err.message || String(err));
+        }
+    }
+
+    /**
+     * @param {{id: string, path: string}} error
+     * @returns {Promise<void>}
+     */
+    async handleLocateMissingCollection(error) {
+        const path = await this.backendAPI.collections.pickDirectory(false).catch(() => null);
+        if (!path) {
+            return;
+        }
+        try {
+            const collection = await this.service.relocateCollection(error.id, path);
+            await this.loadCollectionsWithExpansionState();
+            toast.success(translate('sidebar.load_errors.relocated_toast', 'Found "{{name}}" in its new location', {
+                name: collection?.name || error.id
+            }));
+        } catch (err) {
+            toast.error(typeof err === 'string' ? err : (err.message || String(err)));
         }
     }
 

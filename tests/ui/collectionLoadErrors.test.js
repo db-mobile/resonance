@@ -40,4 +40,38 @@ describe('collection load error rows', () => {
 
         expect(container.querySelector('.collection-load-errors')).toBeNull();
     });
+
+    test('a missing linked folder offers Locate and Remove, which get the error', () => {
+        const onLocate = jest.fn();
+        const onRemove = jest.fn();
+        const error = { path: '/mnt/usb/api', id: 'c9', message: 'Collection folder not found', kind: 'missing', removable: true };
+        renderer.renderLoadErrors([error], { onLocate, onRemove, onRetry: jest.fn() });
+
+        const buttons = [...container.querySelectorAll('.collection-load-error-action')];
+        expect(buttons.map(b => b.dataset.action)).toEqual(['locate', 'remove']);
+        buttons[0].click();
+        buttons[1].click();
+        expect(onLocate).toHaveBeenCalledWith(error);
+        expect(onRemove).toHaveBeenCalledWith(error);
+    });
+
+    test('an unreadable linked collection offers Retry and Remove', () => {
+        renderer.renderLoadErrors([{ path: '/x', id: 'c1', message: 'bad yaml', kind: 'unreadable', removable: true }], {
+            onLocate: jest.fn(), onRemove: jest.fn(), onRetry: jest.fn()
+        });
+        expect([...container.querySelectorAll('.collection-load-error-action')].map(b => b.dataset.action))
+            .toEqual(['retry', 'remove']);
+    });
+
+    test('a broken collection in the app folder only offers Retry', () => {
+        const onRetry = jest.fn();
+        renderer.renderLoadErrors([{ path: '/data/broken', id: null, message: 'bad', kind: 'unreadable', removable: false }], {
+            onLocate: jest.fn(), onRemove: jest.fn(), onRetry
+        });
+        const buttons = [...container.querySelectorAll('.collection-load-error-action')];
+        expect(buttons.map(b => b.dataset.action)).toEqual(['retry']);
+        buttons[0].click();
+        expect(onRetry).toHaveBeenCalled();
+    });
 });
+

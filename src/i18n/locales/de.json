@@ -35,7 +35,12 @@
     },
     "load_errors": {
       "toast_one": "1 Sammlung konnte nicht geladen werden",
-      "toast_other": "{{count}} Sammlungen konnten nicht geladen werden"
+      "toast_other": "{{count}} Sammlungen konnten nicht geladen werden",
+      "locate": "Suchen…",
+      "remove": "Aus der Liste entfernen",
+      "retry": "Erneut versuchen",
+      "removed_toast": "Aus der Liste entfernt. Der Ordner wurde nicht angetastet.",
+      "relocated_toast": "„{{name}}“ am neuen Ort gefunden"
     }
   },
   "import": {

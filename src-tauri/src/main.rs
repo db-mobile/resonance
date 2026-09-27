@@ -11,10 +11,11 @@ use commands::{
     collections::{
         CollectionLoadErrors, collection_close, collection_delete, collection_delete_endpoint_data,
         collection_delete_folder, collection_get, collection_get_endpoint_data,
-        collection_get_variables, collection_save, collection_save_endpoint_data,
-        collection_save_variables, collections_get_all, collections_get_path,
-        collections_git_branches, collections_list, collections_load_errors, collections_migrate,
-        collections_needs_migration, collections_open_existing, collections_pick_directory,
+        collection_get_variables, collection_relocate, collection_save,
+        collection_save_endpoint_data, collection_save_variables, collections_get_all,
+        collections_get_path, collections_git_branches, collections_list, collections_load_errors,
+        collections_migrate, collections_needs_migration, collections_open_existing,
+        collections_pick_directory,
     },
     graphql_subscription::{
         GraphqlSubscriptionState, graphql_subscription_close, graphql_subscription_send,
@@ -201,6 +202,7 @@ fn main() {
             collection_delete,
             collection_get_endpoint_data,
             collection_save_endpoint_data,
+            collection_relocate,
             collection_delete_folder,
             collection_delete_endpoint_data,
             collection_get_variables,
