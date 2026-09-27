@@ -52,151 +52,162 @@
       <div class="doc-content-wrap">
         <div class="doc-page-label">// using scripts</div>
         <h2>Using Scripts</h2>
-        <p class="doc-lead">Resonance runs JavaScript before a request is sent (pre-request scripts) and after the response arrives (test scripts). Scripts execute in a sandboxed environment on your machine — no data leaves the process.</p>
+        <p class="doc-lead">Resonance runs JavaScript before a request is sent (pre-request scripts) and after the response arrives (test scripts). Scripts run in a sandboxed engine embedded in the app — no data leaves your machine unless a script calls <code>sendRequest</code>.</p>
 
         <h3>Overview</h3>
-        <ul class="doc-list">
-          <li>Scripts are written in the <strong>Scripts</strong> tab of the request panel</li>
-          <li>Choose the <strong>Pre-request</strong> or <strong>Test</strong> sub-tab</li>
-          <li>Scripts auto-save after one second of inactivity</li>
-          <li>Output appears in the <strong>Scripts</strong> tab of the response panel after sending</li>
-          <li>Execution timeout: <strong>10 seconds</strong>. No async operations, no external imports</li>
+<ul class="doc-list">
+          <li>Write scripts in the <strong>Scripts</strong> tab of the request panel, in the <strong>Pre-request</strong> or <strong>Test</strong> sub-tab — they save automatically</li>
+          <li>Console output, test results and errors appear in the <strong>Scripts</strong> tab of the response panel</li>
+          <li>The <a href="collection-runner.html">collection runner</a> runs the same scripts for every request in a run</li>
+          <li>Scripts run synchronously, top to bottom — no <code>setTimeout</code>, <code>fetch</code> or Promises that need scheduling</li>
+          <li>A script is stopped after <strong>30 seconds</strong> (for example an endless loop) and reports an error</li>
         </ul>
 
-        <h3>Pre-request Scripts</h3>
-        <p>Run before the request is dispatched. Use them to mutate headers, sign requests, generate timestamps, or seed environment variables.</p>
+        <h3>What Happens After a Script</h3>
+<ul class="doc-list">
+          <li><strong>Pre-request:</strong> changes to <code>request</code> are applied to the outgoing request</li>
+          <li><strong>Pre-request failure:</strong> if the script throws, the request is <strong>not sent</strong> and the error is shown in its place; in the runner the request is marked failed</li>
+          <li><strong>Both:</strong> <code>environment.set</code> / <code>unset</code> changes are saved to the active environment, and <code>pm.collectionVariables.set</code> / <code>unset</code> changes to the request's collection</li>
+        </ul>
 
-        <h4>Example — timestamp header</h4>
-        <pre><code>request.headers['X-Request-Time'] = new Date().toISOString();
-environment.set('requestTimestamp', Date.now());
-console.log('Timestamp set:', request.headers['X-Request-Time']);</code></pre>
-
-        <h4>Example — dynamic auth signature</h4>
-        <pre><code>const secret = environment.get('apiSecret');
-const timestamp = Date.now().toString();
-const signature = btoa(secret + request.method + request.url + timestamp);
-
-request.headers['X-Signature'] = signature;
-request.headers['X-Timestamp'] = timestamp;</code></pre>
-
-        <h3>Test Scripts</h3>
-        <p>Run after the response is received. Validate status codes, assert response shape, and extract values into the environment for downstream requests.</p>
-
-        <h4>Example — assertions</h4>
-        <pre><code>expect(response.status).toBe(200);
-
-const data = JSON.parse(response.body);
-expect(data.id).toBeDefined();
-expect(data.name).toBeTruthy();
-expect(response.headers['content-type']).toContain('application/json');</code></pre>
-
-        <h4>Example — chaining requests</h4>
-        <pre><code>const data = JSON.parse(response.body);
-
-if (data.token) {
-    environment.set('authToken', data.token);
-    console.log('Token saved');
-}
-
-if (data.userId) {
-    environment.set('currentUserId', data.userId);
-}</code></pre>
-
-        <h4>Example — performance assertion</h4>
-        <pre><code>expect(response.status).toBe(200);
-
-if (response.timings && response.timings.total) {
-    expect(response.timings.total).toBeLessThan(1000);
-    console.log('Response time:', response.timings.total, 'ms');
-}</code></pre>
-
-        <h3>Pre-request API</h3>
-        <div class="api-list">
-          <div class="api-item"><code>request.url</code><span>The request URL — readable and writable.</span></div>
-          <div class="api-item"><code>request.method</code><span>HTTP method — readable and writable.</span></div>
-          <div class="api-item"><code>request.headers</code><span>Headers object — add, modify, or delete keys.</span></div>
-          <div class="api-item"><code>request.body</code><span>Request body string — readable and writable.</span></div>
-          <div class="api-item"><code>request.queryParams</code><span>Query parameters object — add, modify, or delete keys.</span></div>
-          <div class="api-item"><code>request.pathParams</code><span>Path parameter values — modify before the URL is built.</span></div>
-          <div class="api-item"><code>environment.get(name)</code><span>Read a variable from the active environment.</span></div>
-          <div class="api-item"><code>environment.set(name, value)</code><span>Write a variable to the active environment.</span></div>
-          <div class="api-item"><code>environment.delete(name)</code><span>Remove a variable from the active environment.</span></div>
-          <div class="api-item"><code>console.log(...args)</code><span>Output to the Scripts response tab.</span></div>
-          <div class="api-item"><code>console.warn(...args)</code><span>Output a warning line.</span></div>
-          <div class="api-item"><code>console.error(...args)</code><span>Output an error line.</span></div>
+        <h3><code>request</code></h3>
+        <p>The outgoing request, mutable in pre-request scripts. Variables such as <code>&#123;&#123;name&#125;&#125;</code> are already resolved when the script runs.</p>
+<div class="api-list">
+          <div class="api-item"><code>request.url</code><span>Fully resolved URL.</span></div>
+          <div class="api-item"><code>request.method</code><span>HTTP method.</span></div>
+          <div class="api-item"><code>request.headers</code><span>Header name → value map. Also has <code>add({key, value})</code>, <code>upsert(...)</code>, <code>remove(name)</code>, <code>get(name)</code>, <code>has(name)</code>.</span></div>
+          <div class="api-item"><code>request.body</code><span>Request body (a parsed object for JSON bodies).</span></div>
+          <div class="api-item"><code>request.queryParams</code><span>Query parameter map — set a key to <code>null</code> to remove it.</span></div>
+          <div class="api-item"><code>request.pathParams</code><span>Path parameter map.</span></div>
         </div>
+<pre><code>request.headers[&quot;Authorization&quot;] = `Bearer ${environment.get(&quot;token&quot;)}`;
+request.queryParams[&quot;page&quot;] = &quot;2&quot;;
+delete request.queryParams[&quot;debug&quot;];</code></pre>
 
-        <h3>Test Script API</h3>
-        <p>Everything from the pre-request API is available, plus the response object and assertion helpers.</p>
-        <div class="api-list">
+        <h3><code>response</code> (test scripts)</h3>
+<div class="api-list">
           <div class="api-item"><code>response.status</code><span>HTTP status code (number).</span></div>
-          <div class="api-item"><code>response.statusText</code><span>Status text, e.g. <em>OK</em> or <em>Not Found</em>.</span></div>
-          <div class="api-item"><code>response.headers</code><span>Response headers object (read-only).</span></div>
-          <div class="api-item"><code>response.body</code><span>Response body as a string — parse with <code>JSON.parse()</code> as needed.</span></div>
-          <div class="api-item"><code>response.cookies</code><span>Array of response cookies.</span></div>
-          <div class="api-item"><code>response.timings</code><span>Timing breakdown object (dns, tcp, tls, ttfb, total).</span></div>
-          <div class="api-item"><code>expect(v).toBe(e)</code><span>Strict equality (<code>===</code>).</span></div>
-          <div class="api-item"><code>expect(v).toEqual(e)</code><span>Deep equality for objects and arrays.</span></div>
-          <div class="api-item"><code>expect(v).toBeDefined()</code><span>Assert value is not <code>undefined</code>.</span></div>
-          <div class="api-item"><code>expect(v).toBeNull()</code><span>Assert value is <code>null</code>.</span></div>
-          <div class="api-item"><code>expect(v).toBeTruthy()</code><span>Assert value is truthy.</span></div>
-          <div class="api-item"><code>expect(v).toBeFalsy()</code><span>Assert value is falsy.</span></div>
-          <div class="api-item"><code>expect(v).toContain(item)</code><span>Assert array or string contains the item.</span></div>
-          <div class="api-item"><code>expect(v).toHaveProperty(key)</code><span>Assert object has the given property.</span></div>
-          <div class="api-item"><code>expect(v).toBeGreaterThan(n)</code><span>Assert value &gt; n.</span></div>
-          <div class="api-item"><code>expect(v).toBeLessThan(n)</code><span>Assert value &lt; n.</span></div>
+          <div class="api-item"><code>response.statusText</code><span>Status reason phrase.</span></div>
+          <div class="api-item"><code>response.headers</code><span>Response header map. Repeated headers are joined with <code>", "</code>.</span></div>
+          <div class="api-item"><code>response.body</code><span>Parsed object when the response was JSON, otherwise a string.</span></div>
+          <div class="api-item"><code>response.timings</code><span>Timing breakdown in ms, e.g. <code>timings.total</code>.</span></div>
+          <div class="api-item"><code>response.cookies</code><span>Every <code>Set-Cookie</code> entry of this response.</span></div>
+        </div>
+<pre><code>expect(response.status).toBe(200);
+expect(response.body.user.email).toMatch(/@example\.com$/);
+environment.set(&quot;userId&quot;, String(response.body.user.id));</code></pre>
+
+        <h3><code>environment</code></h3>
+        <p>Read and write variables of the active environment. Values are strings; a value set earlier in the same script is returned by <code>get</code>.</p>
+<pre><code>const host = environment.get(&quot;host&quot;);
+environment.set(&quot;requestId&quot;, &quot;abc-123&quot;);
+environment.unset(&quot;tempToken&quot;);</code></pre>
+
+        <h3><code>cookies</code></h3>
+        <p>Read and write the cookie jar of the active environment (also <code>pm.cookies</code>). See <a href="cookie-jar.html">Cookie Jar</a>.</p>
+<div class="api-list">
+          <div class="api-item"><code>cookies.get(name[, domain])</code><span>Value of the first matching cookie, or <code>null</code>.</span></div>
+          <div class="api-item"><code>cookies.has(name[, domain])</code><span>Whether a matching cookie exists.</span></div>
+          <div class="api-item"><code>cookies.getAll() / toObject()</code><span>Every cookie, or a <code>{ name: value }</code> map.</span></div>
+          <div class="api-item"><code>cookies.set(name, value[, opts])</code><span>Store a cookie; <code>opts</code> accepts <code>domain</code>, <code>path</code>, <code>expires</code>, <code>secure</code>, <code>httpOnly</code>, <code>sameSite</code>.</span></div>
+          <div class="api-item"><code>cookies.unset(name[, domain, path])</code><span>Remove matching cookies.</span></div>
+          <div class="api-item"><code>cookies.clear()</code><span>Remove every cookie of the active environment.</span></div>
         </div>
 
-        <h3>Common Patterns</h3>
+        <h3>Testing</h3>
+<pre><code>describe(&quot;user endpoint&quot;, () =&gt; {
+    test(&quot;returns 200&quot;, () =&gt; {
+        expect(response.status).toBe(200);
+    });
+    it(&quot;returns a user id&quot;, () =&gt; {
+        expect(response.body.user).toHaveProperty(&quot;id&quot;);
+    });
+});</code></pre>
+        <p>A failing expectation inside <code>test</code> / <code>it</code> fails that test and moves on. <code>expect</code> at the top level records each assertion as its own result and stops the script on failure.</p>
+<div class="api-list">
+          <div class="api-item"><code>toBe(e) / toEqual(e)</code><span>Strict or deep equality.</span></div>
+          <div class="api-item"><code>toBeTruthy() / toBeFalsy()</code><span>Truthiness.</span></div>
+          <div class="api-item"><code>toBeNull() / toBeDefined() / toBeUndefined()</code><span>Null and defined checks.</span></div>
+          <div class="api-item"><code>toContain(item)</code><span>String or array containment.</span></div>
+          <div class="api-item"><code>toBeGreaterThan(n) / toBeLessThan(n)</code><span>Numeric comparison (also <code>…OrEqual</code>).</span></div>
+          <div class="api-item"><code>toHaveLength(n)</code><span><code>actual.length === n</code>.</span></div>
+          <div class="api-item"><code>toMatch(regex)</code><span>Regular expression match.</span></div>
+          <div class="api-item"><code>toHaveProperty(key[, value])</code><span>Property existence and optional value.</span></div>
+          <div class="api-item"><code>.not</code><span>Negates any matcher: <code>expect(x).not.toBe(500)</code>.</span></div>
+        </div>
 
-        <h4>Request chaining</h4>
-        <pre><code>// Login test script — capture token
-const { token } = JSON.parse(response.body);
-environment.set('authToken', token);
-
-// Next request pre-request script — attach token
-request.headers['Authorization'] = `Bearer ${environment.get('authToken')}`;</code></pre>
-
-        <h4>Dynamic test data</h4>
-        <pre><code>const body = JSON.parse(request.body);
-body.email = `test${Date.now()}@example.com`;
-body.ref   = Math.floor(Math.random() * 100000);
-request.body = JSON.stringify(body);</code></pre>
-
-        <h4>Environment-conditional logic</h4>
-        <pre><code>if (environment.get('env') !== 'production') {
-    request.headers['X-Debug'] = 'true';
+        <h3><code>sendRequest(urlOrOptions[, callback])</code></h3>
+        <p>Makes an HTTP request from a script. It is <strong>synchronous</strong> and returns the response directly; the Postman-style callback form also works.</p>
+<pre><code>const res = sendRequest({
+    url: environment.get(&quot;authUrl&quot;),
+    method: &quot;POST&quot;,
+    headers: { &quot;Content-Type&quot;: &quot;application/x-www-form-urlencoded&quot; },
+    body: &quot;grant_type=client_credentials&amp;client_id=&quot; + environment.get(&quot;clientId&quot;)
+});
+if (res.status === 200) {
+    environment.set(&quot;token&quot;, res.json().access_token);
 }</code></pre>
+<ul class="doc-list">
+          <li>Options: <code>url</code> (required), <code>method</code>, <code>headers</code>, <code>body</code> (objects are sent as JSON), <code>timeout</code> in ms (default 10 000, max 60 000)</li>
+          <li>Response: <code>status</code>, <code>statusText</code>, <code>headers</code>, <code>body</code>, <code>json()</code>, <code>text()</code></li>
+          <li>Network errors and timeouts throw — wrap calls in <code>try</code>/<code>catch</code></li>
+          <li>Redirects are followed; the app's proxy settings apply, client certificates do not</li>
+        </ul>
+
+        <h3>Crypto &amp; Encoding</h3>
+<div class="api-list">
+          <div class="api-item"><code>btoa(text) / atob(base64)</code><span>Latin1 ⇄ base64, as in browsers.</span></div>
+          <div class="api-item"><code>crypto.randomUUID()</code><span>Random v4 UUID.</span></div>
+          <div class="api-item"><code>crypto.hash(alg, data[, enc])</code><span><code>md5</code>, <code>sha1</code>, <code>sha256</code>, <code>sha384</code>, <code>sha512</code>; encoding <code>hex</code> (default), <code>base64</code> or <code>base64url</code>.</span></div>
+          <div class="api-item"><code>crypto.hmac(alg, key, data[, enc])</code><span>HMAC with the same algorithms and encodings.</span></div>
+          <div class="api-item"><code>CryptoJS</code><span>Subset of CryptoJS (also via <code>require("crypto-js")</code>): <code>MD5</code>, <code>SHA1</code>, <code>SHA256</code>, <code>SHA384</code>, <code>SHA512</code>, their <code>Hmac…</code> variants, and <code>CryptoJS.enc.Hex / Base64 / Base64url / Utf8 / Latin1</code>.</span></div>
+        </div>
+<pre><code>const signature = CryptoJS.HmacSHA256(request.body, environment.get(&quot;secret&quot;))
+    .toString(CryptoJS.enc.Base64);
+request.headers[&quot;X-Signature&quot;] = signature;</code></pre>
+
+        <h3>Postman Compatibility (<code>pm</code>)</h3>
+        <p>Scripts written for Postman run largely unchanged — including scripts that come in with a Postman import.</p>
+<div class="api-list">
+          <div class="api-item"><code>pm.test(name, fn) / pm.expect(v)</code><span>Chai-style assertions: <code>to.equal</code>, <code>eql</code>, <code>be.a</code>, <code>include</code>, <code>have.property</code>, <code>lengthOf</code>, <code>keys</code>, <code>above</code> / <code>below</code>, <code>match</code>, <code>oneOf</code>, <code>be.ok</code> / <code>true</code> / <code>null</code> / <code>empty</code>, with <code>not</code> and <code>deep</code>.</span></div>
+          <div class="api-item"><code>pm.response</code><span><code>code</code>, <code>status</code> (numeric, as in <code>response</code>), <code>reason()</code>, <code>responseTime</code>, <code>headers.get(name)</code>, <code>json()</code>, <code>text()</code>.</span></div>
+          <div class="api-item"><code>pm.response.to.have.*</code><span><code>status(code)</code>, <code>header(name[, value])</code>, <code>body([text])</code>, <code>jsonBody([path[, value]])</code>; also <code>pm.response.to.be.ok</code> / <code>success</code> / <code>clientError</code> / <code>serverError</code> / <code>notFound</code> / <code>json</code>, each negatable with <code>to.not</code>.</span></div>
+          <div class="api-item"><code>pm.environment</code><span><code>get</code>, <code>set</code>, <code>unset</code>, <code>has</code>, <code>toObject</code>, <code>replaceIn</code>, <code>clear</code>.</span></div>
+          <div class="api-item"><code>pm.collectionVariables</code><span>Same methods, saved to the request's collection.</span></div>
+          <div class="api-item"><code>pm.variables</code><span>Script-local values first, then the runner data row, the environment and the collection; <code>set</code> lasts for this script run only.</span></div>
+          <div class="api-item"><code>pm.globals</code><span>Mapped to the active environment — Resonance has no global scope.</span></div>
+          <div class="api-item"><code>pm.request / pm.sendRequest / pm.cookies</code><span>The same objects as <code>request</code>, <code>sendRequest</code> and <code>cookies</code>.</span></div>
+          <div class="api-item"><code>pm.info / pm.iterationData</code><span>Position and data row of a <a href="collection-runner.html">runner</a> iteration.</span></div>
+        </div>
+        <p>Not supported yet: <code>pm.execution.setNextRequest</code> / <code>skipRequest</code>, <code>pm.vault</code>, and <code>require</code> for modules other than <code>crypto-js</code>.</p>
 
         <h3>Limitations</h3>
-        <ul class="doc-list">
-          <li>Scripts run in a sandboxed JS runtime on your machine — no file system, network, or system access</li>
-          <li>10-second hard timeout per script</li>
-          <li>No <code>require()</code>, <code>import</code>, or external modules</li>
-          <li>Synchronous only — <code>Promise</code> and <code>async/await</code> are not supported</li>
-          <li>Available globals: <code>Date</code>, <code>Math</code>, <code>JSON</code>, <code>btoa</code>, <code>atob</code>, <code>console</code>, and the documented APIs</li>
+<ul class="doc-list">
+          <li>No file system or system access; <code>sendRequest</code> is the only network call</li>
+          <li>No <code>fetch</code>, <code>XMLHttpRequest</code>, <code>import</code>, <code>setTimeout</code> or browser storage</li>
+          <li>Scripts are stopped after 30 seconds; each <code>sendRequest</code> has its own timeout</li>
+          <li>Environment values are stored as strings — convert with <code>String(…)</code> / <code>Number(…)</code></li>
         </ul>
 
         <h3>Troubleshooting</h3>
-        <h4>Script does not run</h4>
-        <ul class="doc-list">
-          <li>Check the Scripts response tab for syntax errors</li>
-          <li>Confirm the script has been saved (auto-save fires after 1 second)</li>
+        <h4>The request was not sent</h4>
+<ul class="doc-list">
+          <li>A failing pre-request script stops the send — the error is shown in the response area and the Scripts tab</li>
         </ul>
-        <h4>Variable missing in next request</h4>
-        <ul class="doc-list">
-          <li>Ensure an environment is active</li>
-          <li>Use <code>console.log(environment.get('varName'))</code> to verify the value was written</li>
-          <li>Check for typos between the <code>environment.set</code> call and the <code>&#123;&#123;varName&#125;&#125;</code> placeholder</li>
+        <h4>Variable missing in the next request</h4>
+<ul class="doc-list">
+          <li>Make sure an environment is active before using <code>environment.set</code></li>
+          <li>Log the value with <code>console.log(environment.get("name"))</code></li>
+          <li>Check the spelling between <code>environment.set</code> and the <code>&#123;&#123;name&#125;&#125;</code> placeholder</li>
         </ul>
         <h4>Assertion fails unexpectedly</h4>
-        <ul class="doc-list">
-          <li>Log <code>response.body</code> and <code>response.status</code> before asserting to see the actual values</li>
-          <li>Confirm <code>JSON.parse(response.body)</code> succeeds — the content-type may not be JSON</li>
+<ul class="doc-list">
+          <li>Log <code>response.status</code> and <code>response.body</code> before asserting</li>
+          <li><code>response.body</code> is already an object for JSON responses — no <code>JSON.parse</code> needed</li>
         </ul>
 
         <h3>Next Steps</h3>
-        <ul class="doc-list">
+<ul class="doc-list">
           <li><a href="documentation.html">Getting Started</a> — request basics and environment setup</li>
           <li><a href="collection-runner.html">Collection Runner</a> — run sequences using script-captured variables</li>
           <li><a href="mock-server.html">Mock Server</a> — test script flows against local mock endpoints</li>

@@ -61,6 +61,7 @@
           <li>Connects over plaintext or TLS</li>
           <li>Sends request metadata (headers) and shows response metadata and trailers</li>
           <li>Edits messages as JSON, with skeletons generated from the method&rsquo;s schema</li>
+          <li>Loads <code>.proto</code> files directly when reflection isn&rsquo;t available &mdash; no <code>protoc</code> installation needed</li>
         </ul>
 
         <h3>Connecting to a Server</h3>
@@ -72,14 +73,23 @@
           <li>Pick a service and method &mdash; the message editor populates with a JSON skeleton</li>
         </ol>
 
+        <h3>Using <code>.proto</code> Files</h3>
+        <ol class="doc-list">
+          <li>In the <strong>Proto file</strong> card, click <strong>Load .proto</strong> and pick the file</li>
+          <li>Resonance compiles it inside the app &mdash; you don&rsquo;t need <code>protoc</code>. Google&rsquo;s well-known types such as <code>google/protobuf/timestamp.proto</code> are built in</li>
+          <li>If the file imports definitions from another folder (for example a <code>googleapis</code> checkout), click <strong>Add import path</strong> and pick that folder. The button is also offered after a failed load, and the file is reloaded with the new path</li>
+          <li>The file and its import paths are saved with the request, so reopening it resolves the same imports</li>
+        </ol>
+
         <h3>RPC Kinds</h3>
         <p>The method kind is shown as a badge next to the selected method. Each kind behaves differently once you send:</p>
         <ul class="doc-list">
-          <li><strong>Unary</strong> &mdash; one request, one response. Click <strong>Send</strong>.</li>
+          <li><strong>Unary</strong> &mdash; one request, one response. Click <strong>Send</strong>; <strong>Cancel</strong> (or <code>Esc</code>) aborts a slow call. The deadline follows the request timeout in Settings, and the response stays in the tab that sent it even if you switch tabs meanwhile</li>
           <li><strong>Server-streaming</strong> &mdash; one request, a stream of responses appended to the transcript as they arrive</li>
           <li><strong>Client-streaming</strong> &mdash; send several messages, then close the stream to receive the single response</li>
           <li><strong>Bidirectional</strong> &mdash; send and receive concurrently; the transcript shows both directions</li>
         </ul>
+        <p>While a stream is open, the button next to <strong>Send</strong> reads <strong>Disconnect</strong>; click it or press <code>Esc</code> to end the stream.</p>
 
         <h3>Metadata, Messages &amp; Trailers</h3>
         <ul class="doc-list">
@@ -93,6 +103,10 @@
         <ul class="doc-list">
           <li>The server must have the gRPC reflection service enabled</li>
           <li>If reflection is unavailable, load the service&rsquo;s <code>.proto</code> file instead</li>
+        </ul>
+        <h4>A <code>.proto</code> file fails to load</h4>
+        <ul class="doc-list">
+          <li>The error names the import that could not be found &mdash; add the folder that contains it with <strong>Add import path</strong></li>
         </ul>
         <h4>TLS handshake fails</h4>
         <ul class="doc-list">

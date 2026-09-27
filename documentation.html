@@ -77,27 +77,47 @@
           <li>Right-click in the collections sidebar and select <strong>New Collection</strong>, then <strong>New Request</strong></li>
           <li>Choose an HTTP method and enter a URL, e.g. <code>https://api.example.com/users</code></li>
           <li>Add headers, query parameters, or a body in the tabs below the URL bar</li>
-          <li>Click <strong>Send Request</strong></li>
-          <li>Inspect the response — Body, Headers, Cookies, and Performance tabs are all available</li>
+          <li>Click <strong>Send</strong> — <strong>Cancel</strong> (or <code>Esc</code>) stops a slow request; each tab cancels only its own request</li>
+          <li>Inspect the response — Body, Headers, Cookies, and Performance tabs are all available. Error responses (4xx/5xx) are kept in the tab just like successful ones</li>
         </ol>
+        <p>Bodies are sent for every method except <code>GET</code> and <code>HEAD</code>, so a <code>DELETE</code> or <code>OPTIONS</code> request can carry one.</p>
 
         <h3>Importing Collections</h3>
-        <h4>OpenAPI / Swagger</h4>
+        <h4>Collection file</h4>
         <ol class="doc-list">
-          <li>Click <strong>Import</strong> in the collections sidebar header and choose <strong>OpenAPI Collection</strong></li>
-          <li>Select your OpenAPI 3.0 YAML or JSON file</li>
-          <li>Resonance parses all endpoints, generates example bodies from schemas, and organises them by path</li>
+          <li>Click <strong>Import</strong> in the collections sidebar header and choose <strong>Collection File</strong></li>
+          <li>Pick an <strong>OpenAPI 3.0 / 3.1</strong> or <strong>Swagger 2.0</strong> spec (YAML or JSON), a <strong>Postman</strong> v2.0 / v2.1 collection, an <strong>Insomnia</strong> export, or a <strong>HAR</strong> file — the format is detected automatically</li>
+          <li>Choose where the collection folder is created, then click <strong>Import</strong></li>
+          <li>OpenAPI endpoints get example bodies generated from their schemas; Postman request examples, auth settings, and scripts are preserved</li>
         </ol>
-        <h4>Postman Collection</h4>
+        <h4>cURL command</h4>
         <ol class="doc-list">
-          <li>Click <strong>Import</strong> and choose <strong>Postman Collection</strong></li>
-          <li>Select a Postman v2.0 or v2.1 JSON file — request examples and auth settings are preserved</li>
+          <li>Click <strong>Import</strong> and choose <strong>cURL Command</strong>, then paste the command</li>
+        </ol>
+        <h4>Existing folder</h4>
+        <ol class="doc-list">
+          <li>Click <strong>Import</strong> and choose <strong>Existing Folder</strong> to open a collection that already lives on disk — for example in a git checkout — in place</li>
         </ol>
         <h4>Postman Environment</h4>
         <ol class="doc-list">
           <li>Click <strong>Import</strong> and choose <strong>Postman Environment</strong></li>
           <li>All variables are imported into a new Resonance environment</li>
         </ol>
+
+        <h3>Organising Collections</h3>
+        <p>Right-click in the collections sidebar for these actions:</p>
+        <ul class="doc-list">
+          <li><strong>Collection:</strong> New Request, New Folder, Run Collection, Manage Variables, Edit Auth, export, Rename, Delete (or Close for a collection opened in place)</li>
+          <li><strong>Folder:</strong> New Request (created inside the folder), New Subfolder, Rename Folder, Run Folder, Edit Auth, Delete Folder (removes the folder and the requests in it)</li>
+          <li><strong>Request:</strong> Pin, Rename, <strong>Duplicate</strong> (copies the body, headers, parameters, scripts, and stored credentials), <strong>Move to Folder…</strong> (another folder or the collection root), Delete</li>
+        </ul>
+        <h4>Collections that fail to load</h4>
+        <p>A collection that cannot be shown appears as a red row at the bottom of the sidebar with the reason. The row offers what makes sense for the cause:</p>
+        <ul class="doc-list">
+          <li><strong>Locate…</strong> — the folder was moved or renamed: pick its new location (or a folder above it) and the collection comes back with its credentials</li>
+          <li><strong>Remove from list</strong> — forget a collection that is gone for good; nothing on disk is touched, and you can open it again with <strong>Import → Existing Folder</strong></li>
+          <li><strong>Retry</strong> — after fixing a file (for example invalid YAML), reload the collections</li>
+        </ul>
 
         <h3>Environments &amp; Variables</h3>
         <ol class="doc-list">
@@ -111,10 +131,18 @@
         <h3>Authentication</h3>
         <ol class="doc-list">
           <li>Open the <strong>Authorization</strong> tab in the request panel</li>
-          <li>Choose a type: <strong>Bearer Token</strong>, <strong>Basic Auth</strong>, <strong>API Key</strong>, <strong>OAuth 2.0</strong>, or <strong>Digest Auth</strong></li>
-          <li>Credentials are saved per-request and stored locally — they are never sent to any external service</li>
-          <li>Reference sensitive values via environment variables: <code>&#123;&#123;token&#125;&#125;</code></li>
+          <li>Choose a type: <strong>Bearer Token</strong>, <strong>Basic Auth</strong>, <strong>API Key</strong>, <strong>OAuth 2.0</strong>, <strong>Digest Auth</strong>, <strong>NTLM</strong>, or <strong>AWS Signature v4</strong></li>
+          <li>Set auth once on a collection or folder (<strong>Edit Auth</strong> in its context menu) and choose <strong>Inherit from Parent</strong> on the requests</li>
+          <li>Credentials are kept in the OS keychain, not in the collection files you commit</li>
+          <li>Reference sensitive values via variables: <code>&#123;&#123;token&#125;&#125;</code> — this also works in the OAuth 2.0 token URL, client ID, and secret</li>
         </ol>
+        <h4>OAuth 2.0 token renewal</h4>
+        <ul class="doc-list">
+          <li>Click <strong>Get Token</strong> once; the token, its expiry, and any refresh token are stored with the auth settings</li>
+          <li>Before a request is sent, a token that expires within 30 seconds is renewed automatically — with the refresh token if there is one, otherwise by repeating a client-credentials or password grant</li>
+          <li>The new token is saved where the auth is configured (request, folder, or collection); the collection runner renews the same way</li>
+          <li>An authorization-code token without a refresh token cannot be renewed automatically — you are warned, and <strong>Get Token</strong> fetches a new one</li>
+        </ul>
 
         <h3>Workspace Tabs</h3>
         <ol class="doc-list">
@@ -138,11 +166,13 @@
           <li><a href="mqtt.html">MQTT</a> &mdash; publish/subscribe with QoS, retain, and wildcards</li>
           <li><a href="sse.html">Server-Sent Events</a> &mdash; <code>text/event-stream</code> with auto-reconnect</li>
         </ul>
+        <p>While a WebSocket, SSE, or gRPC stream is open, the button next to <strong>Send</strong> reads <strong>Disconnect</strong>. GraphQL subscriptions send the request&rsquo;s headers &mdash; including auth &mdash; in the <code>connection_init</code> message, both as <code>payload.headers</code> and as a top-level <code>Authorization</code>, which covers Hasura- and Apollo-style servers.</p>
 
         <h3>Keyboard Shortcuts</h3>
         <ul class="doc-list">
           <li>Press <code>?</code> anywhere to open the shortcuts reference</li>
           <li><code>Ctrl/Cmd+Enter</code> — Send request</li>
+          <li><code>Esc</code> — Cancel the running request, or disconnect an open stream</li>
           <li><code>Ctrl/Cmd+S</code> — Save current endpoint</li>
           <li><code>Ctrl/Cmd+T</code> — New workspace tab</li>
           <li><code>Ctrl/Cmd+W</code> — Close current tab</li>
@@ -152,7 +182,7 @@
         <h3>Exporting Code</h3>
         <ol class="doc-list">
           <li>Right-click an endpoint or use the export button and select <strong>Export Code</strong></li>
-          <li>Choose from cURL, Python, JavaScript, Node.js, Go, PHP, Ruby, or Java</li>
+          <li>Choose from cURL, Python, JavaScript (Fetch or Axios), Node.js, Go, PHP, Ruby, or Java</li>
           <li>The generated snippet copies to your clipboard</li>
         </ol>
 

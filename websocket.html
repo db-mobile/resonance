@@ -59,6 +59,7 @@
           <li>Connects to <code>ws://</code> and <code>wss://</code> endpoints</li>
           <li>Keeps one reusable connection open per request tab</li>
           <li>Sends custom handshake headers (auth tokens, subprotocols, and more)</li>
+          <li>Resolves <code>&#123;&#123;variables&#125;&#125;</code> in the URL, headers, and message</li>
           <li>Shows a transcript of everything sent and received, with timestamps</li>
           <li>Saves WebSocket requests alongside HTTP and gRPC requests</li>
         </ul>
@@ -67,19 +68,19 @@
         <ol class="doc-list">
           <li>Create a request with a <code>ws://</code> or <code>wss://</code> URL &mdash; Resonance switches to WebSocket mode</li>
           <li>Add any handshake headers the server requires</li>
-          <li>Click <strong>Connect</strong> &mdash; the status indicator shows the live connection state</li>
+          <li>Click <strong>Send</strong> &mdash; Resonance connects and, if the message body isn&rsquo;t empty, sends it</li>
           <li>The connection stays open until you disconnect or close the tab</li>
         </ol>
 
         <h3>Sending &amp; Receiving</h3>
         <ul class="doc-list">
-          <li>Type a message and send it &mdash; it appears in the transcript</li>
+          <li>Type a message in the body editor and click <strong>Send</strong> &mdash; it appears in the transcript, with variables already filled in</li>
           <li>Incoming messages append to the transcript as they arrive</li>
           <li>The connection is reusable, so send as many messages as you need</li>
         </ul>
 
         <h3>Closing the Connection</h3>
-        <p>Click <strong>Disconnect</strong> to close the socket, or simply close the tab. Connection state is tracked per tab, so other tabs are unaffected.</p>
+        <p>While the socket is open, the button next to <strong>Send</strong> reads <strong>Disconnect</strong>. Click it, press <code>Esc</code>, or close the tab. Connection state is tracked per tab, so other tabs are unaffected.</p>
 
         <h3>Troubleshooting</h3>
         <h4>Connection refused</h4>

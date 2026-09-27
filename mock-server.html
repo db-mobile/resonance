@@ -56,16 +56,18 @@
 
         <h3>What It Does</h3>
         <ul class="doc-list">
-          <li>Serves mock responses from imported OpenAPI 3.0 collections</li>
-          <li>Generates example payloads from schemas when no custom response is defined</li>
+          <li>Serves mock responses for your collections — imported OpenAPI 3.x / Swagger 2.0 specs work best because they carry examples and schemas</li>
+          <li>Uses the spec's examples, or generates payloads from its schemas when no custom response is defined</li>
           <li>Lets you override the response body, status code, and delay per endpoint</li>
+          <li>Fills placeholders such as <code>&#123;&#123;request.params.id&#125;&#125;</code> in responses, so a mock can echo what it was sent</li>
+          <li>Lets a client ask for a specific documented response (for example the 404) with a <code>Prefer</code> header</li>
           <li>Logs every incoming request so you can inspect method, path, headers, and body</li>
           <li>Collections can be enabled or disabled individually without restarting</li>
         </ul>
 
         <h3>Before You Start</h3>
         <ol class="doc-list">
-          <li>Import an OpenAPI 3.0 specification — see <a href="documentation.html">Getting Started</a></li>
+          <li>Import an OpenAPI or Swagger specification — see <a href="documentation.html">Getting Started</a> — or use any collection you built yourself</li>
           <li>Confirm the collection contains the endpoints you want to mock</li>
           <li>Pick a local port that nothing else is using (e.g. <code>3000</code>)</li>
         </ol>
@@ -81,10 +83,37 @@
 
         <h3>How Responses Are Generated</h3>
         <ul class="doc-list">
-          <li>Each defined path and method becomes a mockable route</li>
-          <li>Schema examples are generated from the OpenAPI definition where available</li>
-          <li>Status codes and content types follow the configured response settings</li>
-          <li>Custom overrides take priority over generated defaults</li>
+          <li>Each request in an enabled collection becomes a route. Path parameters may be written <code>/users/{id}</code>, <code>/users/&#123;&#123;id&#125;&#125;</code> or <code>/users/:id</code>; requests imported from cURL with a full URL match on their path</li>
+          <li>When several routes match, the most specific wins — <code>/users/me</code> is chosen over <code>/users/{id}</code></li>
+          <li>The response is the first documented success status (so an endpoint documented only with <code>201</code> answers <code>201</code>) with its <code>example</code>, the first of its named <code>examples</code>, or a body generated from its schema</li>
+          <li>A custom body or status code set in the dialog replaces the documented one</li>
+        </ul>
+
+        <h3>Response Templating</h3>
+        <p>Any string in a response body — custom or taken from the spec — can contain placeholders that are filled from the incoming request:</p>
+        <div class="api-list">
+          <div class="api-item"><code>&#123;&#123;request.params.name&#125;&#125;</code><span>A path parameter of the matched route.</span></div>
+          <div class="api-item"><code>&#123;&#123;request.query.name&#125;&#125;</code><span>A query parameter.</span></div>
+          <div class="api-item"><code>&#123;&#123;request.headers.name&#125;&#125;</code><span>A request header (case-insensitive).</span></div>
+          <div class="api-item"><code>&#123;&#123;request.body&#125;&#125;</code><span>The whole request body; <code>&#123;&#123;request.body.items.0.id&#125;&#125;</code> reaches into a JSON body.</span></div>
+          <div class="api-item"><code>&#123;&#123;request.method&#125;&#125; / &#123;&#123;request.path&#125;&#125;</code><span>Method and path of the request.</span></div>
+          <div class="api-item"><code>&#123;&#123;$uuid&#125;&#125; / &#123;&#123;$timestamp&#125;&#125; / &#123;&#123;$isoTimestamp&#125;&#125; / &#123;&#123;$randomInt&#125;&#125;</code><span>Fresh values on every response.</span></div>
+        </div>
+        <pre><code>{
+  "id": "&#123;&#123;request.params.id&#125;&#125;",
+  "quantity": "&#123;&#123;request.body.quantity&#125;&#125;",
+  "createdAt": "&#123;&#123;$isoTimestamp&#125;&#125;"
+}</code></pre>
+        <p>A string that consists of a single placeholder keeps the value's type, so <code>"&#123;&#123;request.body.quantity&#125;&#125;"</code> comes back as a number. Unknown placeholders are left as they are.</p>
+
+        <h3>Choosing a Documented Response</h3>
+        <p>To test error handling without changing the mock, send a <code>Prefer</code> header (the convention used by the Prism mock server). It overrides the endpoint's custom body and status for that one request:</p>
+        <pre><code>Prefer: code=404
+Prefer: example=userDeleted
+Prefer: code=404, example=userDeleted</code></pre>
+        <ul class="doc-list">
+          <li><code>code</code> picks the documented response with that status</li>
+          <li><code>example</code> picks a named entry of that response's <code>examples</code></li>
         </ul>
 
         <h3>Customising Endpoints</h3>
@@ -100,7 +129,7 @@
         <p>Use the mock base URL exactly as you would a real API. Pair it with an environment variable so switching between real and mocked is a one-click operation.</p>
         <pre><code>GET  http://localhost:3000/users
 POST http://localhost:3000/orders
-Authorization: Bearer {{token}}</code></pre>
+Authorization: Bearer &#123;&#123;token&#125;&#125;</code></pre>
         <ul class="doc-list">
           <li>Set <code>baseUrl → http://localhost:3000</code> in a <em>Mock</em> environment and switch to it from the selector</li>
           <li>Use <a href="scripts.html">test scripts</a> to chain extracted values between mock requests</li>
@@ -130,6 +159,7 @@ Authorization: Bearer {{token}}</code></pre>
         <ul class="doc-list">
           <li>Verify the OpenAPI operation exists for that method and path</li>
           <li>Check whether a custom override is replacing the generated response</li>
+          <li>Check whether your client sends a <code>Prefer</code> header</li>
           <li>Review the selected status code in the endpoint configuration</li>
         </ul>
         <h4>Client cannot connect</h4>

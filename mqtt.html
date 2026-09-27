@@ -57,11 +57,12 @@
         <h3>What It Does</h3>
         <ul class="doc-list">
           <li>Connects to plaintext (<code>mqtt://</code>, default port 1883), TLS (<code>mqtts://</code>, default port 8883), or bare <code>host:port</code> brokers</li>
-          <li>Subscribes to topics, including wildcards like <code>sensors/#</code></li>
-          <li>Publishes messages with a chosen QoS level and an optional retain flag</li>
-          <li>Supports QoS 0, 1, and 2 for both subscriptions and published messages</li>
+          <li>Subscribes to a topic, including wildcards like <code>sensors/#</code></li>
+          <li>Publishes messages to a topic</li>
+          <li>Supports QoS 0, 1, and 2 for the subscription and published messages</li>
           <li>Optional client ID (auto-generated when blank), username, and password</li>
-          <li>Configurable keep-alive interval</li>
+          <li>Resolves <code>&#123;&#123;variables&#125;&#125;</code> in topics, client ID, credentials, and payload</li>
+          <li>Keeps the password in the OS keychain &mdash; it is not written to the collection files or the saved tab state</li>
           <li>Live status indicator with a received-message count and an incoming-message flash</li>
           <li>Transcript of published and received messages with topics and timestamps</li>
         </ul>
@@ -70,22 +71,22 @@
         <ol class="doc-list">
           <li>Enter the broker URL &mdash; <code>mqtt://broker.example.com</code>, <code>mqtts://&hellip;</code> for TLS, or <code>host:port</code></li>
           <li>Optionally set a client ID, username, and password</li>
-          <li>Adjust the keep-alive interval if your broker needs it</li>
-          <li>Click <strong>Connect</strong> &mdash; the status indicator goes live once connected</li>
+          <li>Click <strong>Send</strong> &mdash; the status indicator goes live once connected. Sending again with the same settings reuses the open connection</li>
+          <li>Use the <strong>Disconnect</strong> button in the MQTT panel to close the connection</li>
         </ol>
 
         <h3>Subscribing</h3>
         <ol class="doc-list">
           <li>Enter a topic filter, e.g. <code>sensors/temperature</code> or <code>sensors/#</code> for a wildcard</li>
-          <li>Choose the QoS level for the subscription</li>
-          <li>Subscribe &mdash; matching messages stream into the transcript as they arrive</li>
+          <li>Choose the QoS level</li>
+          <li>Click <strong>Send</strong> &mdash; matching messages stream into the transcript as they arrive</li>
         </ol>
 
         <h3>Publishing</h3>
         <ol class="doc-list">
           <li>Enter the target topic</li>
-          <li>Choose the QoS level and whether to set the <strong>retain</strong> flag</li>
-          <li>Enter the payload and click <strong>Publish</strong></li>
+          <li>Enter the payload in the body editor</li>
+          <li>Click <strong>Send</strong> &mdash; the message is published on the open connection</li>
         </ol>
 
         <h3>Troubleshooting</h3>

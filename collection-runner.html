@@ -89,17 +89,17 @@
 
         <h3>Variable Chaining</h3>
         <p>Extract values from one response and write them to the environment so later steps can use them in URLs, headers, or bodies.</p>
-        <pre><code>// Request 1 — test script
-const data = JSON.parse(response.body);
-environment.set('authToken', data.token);
-environment.set('userId',    data.user.id);
+        <pre><code>// Request 1 — test script (JSON bodies arrive already parsed)
+environment.set('authToken', response.body.token);
+environment.set('userId',    String(response.body.user.id));
 
 // Request 2 — uses those values automatically
-// Authorization: Bearer {{authToken}}
-// GET {{baseUrl}}/users/{{userId}}</code></pre>
+// Authorization: Bearer &#123;&#123;authToken&#125;&#125;
+// GET &#123;&#123;baseUrl&#125;&#125;/users/&#123;&#123;userId&#125;&#125;</code></pre>
         <ul class="doc-list">
           <li>Use test scripts to capture IDs, tokens, and any workflow state</li>
           <li>Keep variable names stable so saved runner configs stay valid across API changes</li>
+          <li>Values written with <code>pm.collectionVariables.set</code> are saved to the collection and also carry over to the following requests of the run</li>
         </ul>
 
         <h3>Typical Workflow</h3>
@@ -116,6 +116,9 @@ environment.set('userId',    data.user.id);
           <li>Inspect response details for any failed step</li>
           <li>Review script output when a chained variable was not set as expected</li>
           <li>Use timing data to spot unexpectedly slow endpoints</li>
+          <li><strong>Stop</strong> ends the run right away &mdash; the request in flight is cancelled, and its cookies, history entry, and test script are skipped</li>
+          <li>If a request&rsquo;s pre-request script fails, that request is not sent and is marked failed with the script error</li>
+          <li>Expired OAuth 2.0 tokens are renewed automatically before a request is sent, as in the editor</li>
         </ul>
 
         <h3>Best Practices</h3>
