@@ -119,7 +119,7 @@ export const initWebSocketHandler = createBackendEventListener(
     handleBackendEvent
 );
 
-export async function handleWebSocketSend(url, headers = {}) {
+export async function handleWebSocketSend(url, headers = {}, message = getRequestBodyContent()) {
     await initWebSocketHandler();
 
     if (!window.backendAPI?.websocket) {
@@ -144,8 +144,6 @@ export async function handleWebSocketSend(url, headers = {}) {
         });
         clearResponseDisplayForTab(tabId);
     }
-
-    const message = getRequestBodyContent();
 
     try {
         await window.backendAPI.websocket.send({

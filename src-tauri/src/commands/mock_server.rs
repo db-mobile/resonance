@@ -1,7 +1,7 @@
 use axum::{
     Router,
-    extract::{Path, Query, State as AxumState},
-    http::{Method, StatusCode},
+    extract::{Query, State as AxumState},
+    http::{Method, StatusCode, Uri},
     response::Json,
     routing::any,
 };
@@ -231,9 +231,98 @@ pub async fn mock_server_reload_settings() -> Result<Value, String> {
     }))
 }
 
+const MAX_LOGS: usize = 100;
+
+/// Reduce a stored endpoint path to the request path the mock server sees:
+/// absolute URLs (cURL imports) and a leading `{{baseUrl}}`-style host token
+/// are stripped, as are query strings and fragments.
+fn normalize_mock_path(raw: &str) -> String {
+    let mut path = raw.trim();
+
+    if let Some(idx) = path.find("://")
+        && path[..idx].chars().all(|c| c.is_ascii_alphabetic())
+    {
+        let after = &path[idx + 3..];
+        path = after.find('/').map_or("", |slash| &after[slash..]);
+    } else if path.starts_with("{{")
+        && let Some(close) = path.find("}}")
+    {
+        let rest = &path[close + 2..];
+        if rest.is_empty() || rest.starts_with('/') || rest.starts_with('?') {
+            path = rest;
+        }
+    }
+
+    let path = path.split(['?', '#']).next().unwrap_or("");
+    if path.starts_with('/') {
+        path.to_string()
+    } else {
+        format!("/{path}")
+    }
+}
+
+struct CompiledPath {
+    pattern: String,
+    param_names: Vec<String>,
+    literal_segments: usize,
+}
+
+/// Compile a path template into an anchored regex. Literal text is escaped;
+/// `{name}`, `{{name}}` and whole-segment `:name` become single-segment
+/// captures.
+fn compile_mock_path(path: &str) -> CompiledPath {
+    let mut param_names = Vec::new();
+    let mut literal_segments = 0;
+    let mut segments = Vec::new();
+
+    for segment in path.split('/') {
+        if let Some(name) = segment.strip_prefix(':')
+            && !name.is_empty()
+        {
+            param_names.push(name.to_string());
+            segments.push("([^/]+)".to_string());
+            continue;
+        }
+
+        let mut out = String::new();
+        let mut rest = segment;
+        let mut has_param = false;
+        while let Some(open) = rest.find('{') {
+            out.push_str(&regex::escape(&rest[..open]));
+            let (inner_start, closer) = if rest[open..].starts_with("{{") {
+                (open + 2, "}}")
+            } else {
+                (open + 1, "}")
+            };
+            match rest[inner_start..].find(closer) {
+                Some(len) => {
+                    param_names.push(rest[inner_start..inner_start + len].trim().to_string());
+                    out.push_str("([^/]+)");
+                    has_param = true;
+                    rest = &rest[inner_start + len + closer.len()..];
+                }
+                None => {
+                    out.push_str(&regex::escape(&rest[open..]));
+                    rest = "";
+                }
+            }
+        }
+        out.push_str(&regex::escape(rest));
+        if !has_param && !segment.is_empty() {
+            literal_segments += 1;
+        }
+        segments.push(out);
+    }
+
+    CompiledPath {
+        pattern: format!("^{}$", segments.join("/")),
+        param_names,
+        literal_segments,
+    }
+}
+
 fn build_routing_table(collections: &[Value]) -> Vec<MockEndpoint> {
-    let mut endpoints = Vec::new();
-    let param_regex = regex::Regex::new(r"\{([^}]+)\}").unwrap();
+    let mut ranked = Vec::new();
 
     for collection in collections {
         let collection_id = collection
@@ -255,39 +344,45 @@ fn build_routing_table(collections: &[Value]) -> Vec<MockEndpoint> {
                     .unwrap_or("GET")
                     .to_uppercase();
 
-                let path = ep.get("path").and_then(|p| p.as_str()).unwrap_or("/");
+                let raw_path = ep.get("path").and_then(|p| p.as_str()).unwrap_or("/");
+                let path = normalize_mock_path(raw_path);
+                let compiled = compile_mock_path(&path);
 
-                // Convert OpenAPI path to regex pattern
-                // Example: /users/{id} → /users/([^/]+)
-                let mut param_names = Vec::new();
-
-                for cap in param_regex.captures_iter(path) {
-                    if let Some(name) = cap.get(1) {
-                        param_names.push(name.as_str().to_string());
-                    }
-                }
-
-                let path_pattern = param_regex.replace_all(path, "([^/]+)").replace('/', "\\/");
-
-                let path_regex = match Regex::new(&format!("^{}$", path_pattern)) {
-                    Ok(r) => r,
-                    Err(_) => continue,
+                let Ok(path_regex) = Regex::new(&compiled.pattern) else {
+                    continue;
                 };
 
-                endpoints.push(MockEndpoint {
-                    method,
-                    path_regex,
-                    path_pattern: path.to_string(),
-                    param_names,
-                    endpoint: ep.clone(),
-                    collection_id: collection_id.clone(),
-                    collection_name: collection_name.clone(),
-                });
+                let rank = (
+                    std::cmp::Reverse(compiled.literal_segments),
+                    compiled.param_names.len(),
+                );
+                ranked.push((
+                    rank,
+                    MockEndpoint {
+                        method,
+                        path_regex,
+                        path_pattern: path,
+                        param_names: compiled.param_names,
+                        endpoint: ep.clone(),
+                        collection_id: collection_id.clone(),
+                        collection_name: collection_name.clone(),
+                    },
+                ));
             }
         }
     }
 
-    endpoints
+    ranked.sort_by_key(|a| a.0);
+    ranked.into_iter().map(|(_, endpoint)| endpoint).collect()
+}
+
+fn push_log(state: &MockServerState, log: RequestLog) {
+    let mut logs = state.logs.write().unwrap();
+    logs.push(log);
+    if logs.len() > MAX_LOGS {
+        let excess = logs.len() - MAX_LOGS;
+        logs.drain(..excess);
+    }
 }
 
 /// Build the mock-server router.
@@ -307,12 +402,12 @@ fn build_router(state: MockServerState) -> Router {
 
 async fn handle_mock_request(
     method: Method,
-    Path(path): Path<String>,
+    uri: Uri,
     Query(query): Query<HashMap<String, String>>,
     AxumState(state): AxumState<MockServerState>,
 ) -> (StatusCode, Json<Value>) {
     let start = std::time::Instant::now();
-    let path = format!("/{}", path);
+    let path = uri.path().to_string();
 
     // First pass: find matching endpoint and extract needed data
     let match_result = {
@@ -395,11 +490,7 @@ async fn handle_mock_request(
             matched_endpoint: Some(matched_info),
         };
 
-        let mut logs = state.logs.write().unwrap();
-        logs.push(log);
-        if logs.len() > 100 {
-            logs.remove(0);
-        }
+        push_log(&state, log);
 
         return (
             StatusCode::from_u16(status_code).unwrap_or(StatusCode::OK),
@@ -419,7 +510,7 @@ async fn handle_mock_request(
         matched_endpoint: None,
     };
 
-    state.logs.write().unwrap().push(log);
+    push_log(&state, log);
 
     (
         StatusCode::NOT_FOUND,
@@ -605,5 +696,125 @@ mod tests {
             generate_from_schema(&schema),
             serde_json::json!({ "name": "string", "kind": "widget", "count": 7 })
         );
+    }
+
+    fn collection(endpoints: Vec<Value>) -> Value {
+        serde_json::json!({ "id": "c1", "name": "C", "endpoints": endpoints })
+    }
+
+    fn endpoint(id: &str, method: &str, path: &str) -> Value {
+        serde_json::json!({ "id": id, "name": id, "method": method, "path": path })
+    }
+
+    fn state_with(endpoints: Vec<Value>) -> MockServerState {
+        let state = empty_state();
+        *state.endpoints.write().unwrap() = build_routing_table(&[collection(endpoints)]);
+        state
+    }
+
+    async fn call(state: &MockServerState, method: &str, uri: &str) -> (StatusCode, Value) {
+        let response = build_router(state.clone())
+            .oneshot(
+                Request::builder()
+                    .method(method)
+                    .uri(uri)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (
+            status,
+            serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+        )
+    }
+
+    fn matched_id(state: &MockServerState) -> Option<String> {
+        state
+            .logs
+            .read()
+            .unwrap()
+            .last()
+            .and_then(|log| log.matched_endpoint.as_ref())
+            .map(|m| m.endpoint_id.clone())
+    }
+
+    #[test]
+    fn normalizes_absolute_urls_and_host_tokens() {
+        assert_eq!(
+            normalize_mock_path("https://api.example.com/users/1?x=1"),
+            "/users/1"
+        );
+        assert_eq!(normalize_mock_path("http://localhost:8080"), "/");
+        assert_eq!(normalize_mock_path("{{baseUrl}}/users"), "/users");
+        assert_eq!(normalize_mock_path("{{baseUrl}}"), "/");
+        assert_eq!(normalize_mock_path("users/{id}"), "/users/{id}");
+        assert_eq!(
+            normalize_mock_path("/users/{{userId}}"),
+            "/users/{{userId}}"
+        );
+    }
+
+    #[tokio::test]
+    async fn double_brace_and_colon_params_match() {
+        let state = state_with(vec![
+            endpoint("a", "GET", "/users/{{userId}}"),
+            endpoint("b", "GET", "/orders/:orderId/items"),
+        ]);
+        assert_eq!(call(&state, "GET", "/users/42").await.0, StatusCode::OK);
+        assert_eq!(matched_id(&state).as_deref(), Some("a"));
+        assert_eq!(
+            call(&state, "GET", "/orders/7/items").await.0,
+            StatusCode::OK
+        );
+        assert_eq!(matched_id(&state).as_deref(), Some("b"));
+    }
+
+    #[tokio::test]
+    async fn absolute_url_paths_from_curl_imports_match() {
+        let state = state_with(vec![endpoint("a", "POST", "https://api.example.com/login")]);
+        assert_eq!(call(&state, "POST", "/login").await.0, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn literal_route_beats_parameter_route_regardless_of_order() {
+        let state = state_with(vec![
+            endpoint("param", "GET", "/users/{id}"),
+            endpoint("me", "GET", "/users/me"),
+        ]);
+        call(&state, "GET", "/users/me").await;
+        assert_eq!(matched_id(&state).as_deref(), Some("me"));
+        call(&state, "GET", "/users/9").await;
+        assert_eq!(matched_id(&state).as_deref(), Some("param"));
+    }
+
+    #[tokio::test]
+    async fn dots_in_paths_are_literal() {
+        let state = state_with(vec![endpoint("a", "GET", "/v1.0/status")]);
+        assert_eq!(call(&state, "GET", "/v1.0/status").await.0, StatusCode::OK);
+        assert_eq!(
+            call(&state, "GET", "/v1x0/status").await.0,
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[tokio::test]
+    async fn root_path_is_served() {
+        let state = state_with(vec![endpoint("root", "GET", "/")]);
+        assert_eq!(call(&state, "GET", "/").await.0, StatusCode::OK);
+        assert_eq!(matched_id(&state).as_deref(), Some("root"));
+    }
+
+    #[tokio::test]
+    async fn unmatched_request_log_stays_capped() {
+        let state = state_with(vec![endpoint("a", "GET", "/a")]);
+        for _ in 0..(MAX_LOGS + 20) {
+            call(&state, "GET", "/missing").await;
+        }
+        assert_eq!(state.logs.read().unwrap().len(), MAX_LOGS);
     }
 }

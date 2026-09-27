@@ -4,13 +4,6 @@
   "description": "Default capabilities for Resonance",
   "windows": ["main"],
   "permissions": [
-    "core:default",
-    "core:webview:default",
-    "store:default",
-    "dialog:default",
-    "fs:default",
-    "shell:default",
-    "window-state:default",
-    "updater:default"
+    "core:default"
   ]
 }

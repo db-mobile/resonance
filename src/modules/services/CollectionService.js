@@ -223,6 +223,17 @@ export class CollectionService {
 
     /**
      * @param {string} collectionId
+     * @returns {Promise<Object|undefined>}
+     */
+    async _readFresh(collectionId) {
+        if (typeof this.repository.readForUpdate === 'function') {
+            return this.repository.readForUpdate(collectionId);
+        }
+        return this.repository.getById(collectionId);
+    }
+
+    /**
+     * @param {string} collectionId
      * @param {Object} requestData
      * @param {string} requestData.name
      * @param {string} requestData.method
@@ -232,8 +243,8 @@ export class CollectionService {
     async addRequestToCollection(collectionId, requestData) {
         try {
             this.statusDisplay.update('Adding new request...', null);
-            
-            const collection = await this.repository.getById(collectionId);
+
+            const collection = await this._readFresh(collectionId);
             if (!collection) {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }
@@ -284,7 +295,7 @@ export class CollectionService {
                 targetFolder.endpoints.push(newEndpoint);
             }
 
-            await this.repository.saveOne(collection);
+            await this.repository.saveOne(collection, { newRequestIds: [newEndpoint.id] });
 
             await this.persistNewEndpointSidecars(collectionId, newEndpoint.id, descriptor, requestData);
 
@@ -401,7 +412,7 @@ export class CollectionService {
         try {
             this.statusDisplay.update('Renaming request...', null);
 
-            const collection = await this.repository.getById(collectionId);
+            const collection = await this._readFresh(collectionId);
             if (!collection) {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }
@@ -432,7 +443,7 @@ export class CollectionService {
         try {
             this.statusDisplay.update('Deleting request...', null);
 
-            const collection = await this.repository.getById(collectionId);
+            const collection = await this._readFresh(collectionId);
             if (!collection) {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }

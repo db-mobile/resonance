@@ -127,19 +127,22 @@ export class KeychainBackend {
             return;
         }
         const index = await this._loadIndex();
-        for (const [scope, entries] of Object.entries(legacy)) {
-            if (!entries || typeof entries !== 'object') {
-                continue;
-            }
-            for (const [key, value] of Object.entries(entries)) {
-                await this.backendAPI.secrets.set(this._account(scope, key), String(value));
-                if (!index[scope]) {
-                    index[scope] = {};
+        try {
+            for (const [scope, entries] of Object.entries(legacy)) {
+                if (!entries || typeof entries !== 'object') {
+                    continue;
                 }
-                index[scope][key] = true;
+                for (const [key, value] of Object.entries(entries)) {
+                    await this.backendAPI.secrets.set(this._account(scope, key), String(value));
+                    if (!index[scope]) {
+                        index[scope] = {};
+                    }
+                    index[scope][key] = true;
+                }
             }
+        } finally {
+            await this._persistIndex();
         }
-        await this._persistIndex();
         await this.backendAPI.store.set(legacyKey, {});
     }
 
@@ -253,7 +256,10 @@ export class SecretStore {
             return this._backend;
         }
         if (!this._initPromise) {
-            this._initPromise = this._select();
+            this._initPromise = this._select().catch((error) => {
+                this._initPromise = null;
+                throw error;
+            });
         }
         return this._initPromise;
     }

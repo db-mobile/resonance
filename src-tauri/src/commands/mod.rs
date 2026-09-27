@@ -1,5 +1,6 @@
 pub mod api_request;
 pub mod app;
+pub mod cancel_registry;
 pub mod certificates;
 pub mod collections;
 pub mod fs_secure;

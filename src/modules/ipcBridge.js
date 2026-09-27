@@ -43,7 +43,7 @@ if (isTauri) {
             }
         },
         sendApiRequest: (requestOptions) => invoke('send_api_request', { requestOptions }),
-        cancelApiRequest: () => invoke('cancel_api_request'),
+        cancelApiRequest: (requestId) => invoke('cancel_api_request', { requestId }),
         pickUploadFile: () => invoke('pick_upload_file'),
         saveResponseBody: (defaultFileName, base64Data) => invoke('save_response_body', { defaultFileName, base64Data }),
         websocket: {
@@ -76,8 +76,9 @@ if (isTauri) {
         collections: {
             list: () => invoke('collections_list'),
             getAll: () => invoke('collections_get_all'),
+            loadErrors: () => invoke('collections_load_errors'),
             get: (collectionId) => invoke('collection_get', { collectionId }),
-            save: (collection) => invoke('collection_save', { collection }),
+            save: (collection, newRequestIds = null) => invoke('collection_save', { collection, newRequestIds }),
             delete: (collectionId) => invoke('collection_delete', { collectionId }),
             close: (collectionId) => invoke('collection_close', { collectionId }),
             openExisting: (path) => invoke('collections_open_existing', { path }),
@@ -116,6 +117,7 @@ if (isTauri) {
             listServices: (target, tls = null) => invoke('grpc_reflection_list_services', { target, tls }),
             listMethods: (target, serviceName, tls = null) => invoke('grpc_reflection_list_methods', { target, serviceName, tls }),
             invokeUnary: (request) => invoke('grpc_invoke_unary', { request }),
+            unaryCancel: (requestId) => invoke('grpc_unary_cancel', { requestId }),
             getInputSkeleton: (target, fullMethod, tls = null) => invoke('grpc_get_input_skeleton', { target, fullMethod, tls }),
             selectProtoFile: () => invoke('grpc_select_proto_file'),
             parseProtoFile: (protoPath, includePaths = null) => invoke('grpc_parse_proto_file', { protoPath, includePaths }),

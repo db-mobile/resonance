@@ -32,6 +32,10 @@
     "search_empty": {
       "title": "Keine passenden Sammlungen",
       "subtitle": "Versuchen Sie einen anderen Sammlungs- oder Anfragenamen"
+    },
+    "load_errors": {
+      "toast_one": "1 Sammlung konnte nicht geladen werden",
+      "toast_other": "{{count}} Sammlungen konnten nicht geladen werden"
     }
   },
   "import": {
@@ -256,6 +260,8 @@
   "settings": {
     "title": "Einstellungen",
     "tab_general": "Allgemein",
+    "group_appearance": "Darstellung",
+    "group_requests": "Anfragen",
     "tab_proxy": "Proxy",
     "tab_certificates": "Zertifikate",
     "certs_title": "Client-Zertifikate (mTLS)",

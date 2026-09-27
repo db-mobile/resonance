@@ -144,9 +144,13 @@ export class CollectionController {
 
         try {
             const branches = await this.repository.gitBranches();
-            this.allCollections.forEach(collection => {
-                collection.gitBranch = branches[collection.id] ?? null;
-            });
+            const branchChanged = this.allCollections.some(collection =>
+                (collection.gitBranch ?? null) !== (branches[collection.id] ?? null)
+            );
+            if (branchChanged) {
+                await this.loadCollectionsWithExpansionState();
+                return;
+            }
             this.renderer.updateGitBadges(branches);
         } catch (error) {
             return;
@@ -164,10 +168,27 @@ export class CollectionController {
         return () => this._collectionEvents.remove(listener);
     }
 
+    /** @returns {Promise<void>} */
+    async _refreshLoadErrors() {
+        const errors = await this.repository.getLoadErrors();
+        const signature = errors.map(error => `${error.path}\n${error.message}`).sort().join('\n');
+        const changed = signature !== this._loadErrorSignature;
+        this._loadErrorSignature = signature;
+        this.loadErrors = errors;
+        if (changed && errors.length > 0) {
+            toast.warning(translate(
+                errors.length === 1 ? 'sidebar.load_errors.toast_one' : 'sidebar.load_errors.toast_other',
+                errors.length === 1 ? '1 collection could not be loaded' : '{{count}} collections could not be loaded',
+                { count: errors.length }
+            ));
+        }
+    }
+
     /** @returns {Promise<Array<Object>>} */
     async loadCollections() {
         try {
             this.allCollections = await this.service.loadCollections();
+            await this._refreshLoadErrors();
             await this.renderCollections(this.allCollections);
             this._collectionEvents.emit(this.allCollections);
             return this.allCollections;
@@ -180,6 +201,7 @@ export class CollectionController {
     async loadCollectionsWithExpansionState() {
         try {
             this.allCollections = await this.service.loadCollections();
+            await this._refreshLoadErrors();
             await this.renderCollections(this.allCollections, true);
             this._collectionEvents.emit(this.allCollections);
             return this.allCollections;
@@ -216,6 +238,7 @@ export class CollectionController {
             showSearchEmptyState: isSearching && this.allCollections.length > 0,
             expandSearchResults: isSearching
         }, pinnedRequests);
+        this.renderer.renderLoadErrors(isSearching ? [] : (this.loadErrors ?? []));
     }
 
     initializeCollectionsSearch() {

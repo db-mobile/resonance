@@ -812,6 +812,31 @@ describe('RunnerService', () => {
             });
         });
 
+        test('stopping mid-send cancels the request by id and skips its side effects', async () => {
+            let finishSend;
+            mockBackendAPI.sendApiRequest.mockImplementation(() => new Promise(resolve => { finishSend = resolve; }));
+            mockBackendAPI.cancelApiRequest = jest.fn().mockResolvedValue({ success: true });
+            service._storeResponseCookies = jest.fn();
+            service._recordHistory = jest.fn();
+            service.isRunning = true;
+
+            const pending = service._executeRequest(request, {}, 0);
+            for (let i = 0; i < 20 && mockBackendAPI.sendApiRequest.mock.calls.length === 0; i++) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+            const { requestId } = mockBackendAPI.sendApiRequest.mock.calls[0][0];
+
+            service.stopExecution();
+            finishSend({ success: false, cancelled: true });
+            await pending;
+
+            expect(requestId).toEqual(expect.any(String));
+            expect(mockBackendAPI.cancelApiRequest).toHaveBeenCalledWith(requestId);
+            expect(service._storeResponseCookies).not.toHaveBeenCalled();
+            expect(service._recordHistory).not.toHaveBeenCalled();
+            expect(mockBackendAPI.scripts.executeTest).not.toHaveBeenCalled();
+        });
+
         test('marks the request failed when an assertion fails', async () => {
             mockBackendAPI.scripts.executeTest.mockResolvedValue({
                 modifiedEnvironment: {},

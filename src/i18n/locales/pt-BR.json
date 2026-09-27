@@ -32,6 +32,10 @@
     "search_empty": {
       "title": "Nenhuma coleção correspondente",
       "subtitle": "Tente outro nome de coleção ou requisição"
+    },
+    "load_errors": {
+      "toast_one": "Não foi possível carregar 1 coleção",
+      "toast_other": "Não foi possível carregar {{count}} coleções"
     }
   },
   "import": {
@@ -256,6 +260,8 @@
   "settings": {
     "title": "Configurações",
     "tab_general": "Geral",
+    "group_appearance": "Aparência",
+    "group_requests": "Requisições",
     "tab_proxy": "Proxy",
     "tab_certificates": "Certificados",
     "certs_title": "Certificados de cliente (mTLS)",

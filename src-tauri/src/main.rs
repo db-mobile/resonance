@@ -9,11 +9,12 @@ use commands::{
     app::app_get_version,
     certificates::pick_certificate_file,
     collections::{
-        collection_close, collection_delete, collection_delete_endpoint_data, collection_get,
-        collection_get_endpoint_data, collection_get_variables, collection_save,
+        CollectionLoadErrors, collection_close, collection_delete, collection_delete_endpoint_data,
+        collection_get, collection_get_endpoint_data, collection_get_variables, collection_save,
         collection_save_endpoint_data, collection_save_variables, collections_get_all,
-        collections_get_path, collections_git_branches, collections_list, collections_migrate,
-        collections_needs_migration, collections_open_existing, collections_pick_directory,
+        collections_get_path, collections_git_branches, collections_list, collections_load_errors,
+        collections_migrate, collections_needs_migration, collections_open_existing,
+        collections_pick_directory,
     },
     graphql_subscription::{
         GraphqlSubscriptionState, graphql_subscription_close, graphql_subscription_send,
@@ -23,8 +24,8 @@ use commands::{
         grpc_proto_invoke_unary, grpc_select_proto_file, grpc_unload_proto,
     },
     grpc_reflection::{
-        grpc_get_input_skeleton, grpc_invoke_unary, grpc_reflection_list_methods,
-        grpc_reflection_list_services,
+        GrpcUnaryState, grpc_get_input_skeleton, grpc_invoke_unary, grpc_reflection_list_methods,
+        grpc_reflection_list_services, grpc_unary_cancel,
     },
     grpc_streaming::{GrpcStreamingState, grpc_stream_cancel, grpc_stream_send, grpc_stream_start},
     import_export::{
@@ -61,8 +62,6 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri_plugin_window_state::Builder::new()
@@ -73,8 +72,10 @@ fn main() {
                 .build(),
         )
         .manage(RequestState::default())
+        .manage(CollectionLoadErrors::default())
         .manage(ProxyState::default())
         .manage(ProtoState::default())
+        .manage(GrpcUnaryState::default())
         .manage(GrpcStreamingState::default())
         .manage(WebSocketState::default())
         .manage(GraphqlSubscriptionState::default())
@@ -140,6 +141,7 @@ fn main() {
             // gRPC Reflection
             grpc_reflection_list_services,
             grpc_reflection_list_methods,
+            grpc_unary_cancel,
             grpc_invoke_unary,
             grpc_get_input_skeleton,
             // gRPC Proto Files
@@ -193,6 +195,7 @@ fn main() {
             // Collections (file-based)
             collections_list,
             collections_get_all,
+            collections_load_errors,
             collection_get,
             collection_save,
             collection_delete,

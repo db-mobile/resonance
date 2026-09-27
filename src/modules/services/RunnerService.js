@@ -17,12 +17,13 @@ import { ChangeEmitter } from './ChangeEmitter.js';
 import { normalizeFormRows } from '../utils/formDataRows.js';
 import { activeKeyValueRows } from '../utils/keyValueRows.js';
 import { findRequest } from '../collections/collectionTree.js';
-import { buildEndpointUrl } from '../collections/endpointUrl.js';
+import { buildEndpointUrl, buildMockPath } from '../collections/endpointUrl.js';
 import { resolveEffectiveAuthConfig } from '../auth/authInheritance.js';
 import { resolveAuthConfigVariables } from '../auth/authVariables.js';
 import { generateAuthData } from '../auth/authData.js';
 import { deriveRequestSettings } from '../state/settingsCache.js';
-import { extractCookies } from '../cookieParser.js';
+import { responseCookies } from '../cookieParser.js';
+import { newRequestId } from '../state/inFlightRequests.js';
 import { translate, translateCount } from '../utils/translate.js';
 import { RUNNABLE_PROTOCOLS } from '../utils/runnableRequests.js';
 import { parseDataFile } from '../utils/dataFile.js';
@@ -295,6 +296,9 @@ export class RunnerService {
     stopExecution() {
         if (this.isRunning) {
             this.shouldStop = true;
+            if (this._inFlightRequestId) {
+                Promise.resolve(this.backendAPI.cancelApiRequest?.(this._inFlightRequestId)).catch(() => { });
+            }
             this.statusDisplay?.update(translate('runner.stopping', 'Stopping runner...'), null);
             const waiters = [...this._stopWaiters];
             this._stopWaiters.clear();
@@ -434,10 +438,27 @@ export class RunnerService {
                 variables = mergeVariables(variables, outcome.variablesSet);
             }
 
+            if (this.shouldStop) {
+                return result;
+            }
+
             await this._attachClientCert(requestConfig, runContext);
             await this._attachCookies(requestConfig);
 
-            const response = await this.backendAPI.sendApiRequest(requestConfig);
+            requestConfig.requestId = newRequestId();
+            this._inFlightRequestId = requestConfig.requestId;
+            let response;
+            try {
+                response = await this.backendAPI.sendApiRequest(requestConfig);
+            } finally {
+                if (this._inFlightRequestId === requestConfig.requestId) {
+                    this._inFlightRequestId = null;
+                }
+            }
+
+            if (this.shouldStop || response.cancelled) {
+                return result;
+            }
 
             result.statusCode = response.status || null;
             result.responseTime = Date.now() - startTime;
@@ -445,7 +466,7 @@ export class RunnerService {
             result.httpSuccess = Boolean(response.success);
             result.body = response.data ?? null;
             result.headers = response.headers || {};
-            result.cookies = extractCookies(response.headers);
+            result.cookies = responseCookies(response);
             result.response = {
                 status: response.status,
                 statusText: response.statusText,
@@ -702,10 +723,7 @@ export class RunnerService {
         let mockRewrite = null;
         const mockBaseUrl = await this._mockBaseUrlFor(collection.id, runContext);
         if (mockBaseUrl && endpoint.path) {
-            let mockPath = endpoint.path;
-            for (const [key, value] of Object.entries(processedPathParams)) {
-                mockPath = mockPath.replace(`{${key}}`, () => value);
-            }
+            const mockPath = buildMockPath(endpoint.path, processedPathParams);
             mockRewrite = { baseUrl: mockBaseUrl, pathTemplate: endpoint.path };
             url = queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`;
         }
@@ -1068,7 +1086,7 @@ export class RunnerService {
         const result = await scriptService.executeTestScript(
             script,
             requestConfig,
-            { ...response, cookies: extractCookies(response.headers) },
+            { ...response, cookies: responseCookies(response) },
             { environment: variables, iteration }
         );
         this._collectScriptResult(result, outcome);

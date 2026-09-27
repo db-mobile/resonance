@@ -263,6 +263,36 @@ export class CollectionRenderer {
     }
 
     /**
+     * @param {Array<{path: string, id: (string|null), message: string}>} errors
+     * @returns {void}
+     */
+    renderLoadErrors(errors = []) {
+        this.container.querySelector('.collection-load-errors')?.remove();
+        if (errors.length === 0) {
+            return;
+        }
+
+        const list = el('div', 'collection-load-errors');
+        list.setAttribute('role', 'list');
+        for (const error of errors) {
+            const row = el('div', 'collection-load-error');
+            row.setAttribute('role', 'listitem');
+            row.title = `${error.path}\n${error.message}`;
+
+            const icon = el('span', 'icon icon-16 icon-alert-circle collection-load-error-icon');
+            const text = el('div', 'collection-load-error-text');
+            const name = error.path.split(/[\\/]/).filter(Boolean).pop() || error.path;
+            text.appendChild(el('span', 'collection-load-error-name', name));
+            text.appendChild(el('span', 'collection-load-error-message', error.message));
+
+            row.appendChild(icon);
+            row.appendChild(text);
+            list.appendChild(row);
+        }
+        this.container.appendChild(list);
+    }
+
+    /**
      * @param {string} branch
      * @returns {HTMLSpanElement}
      */

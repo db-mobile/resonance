@@ -25,12 +25,15 @@ async function loadGrpcHandler(markup = GRPC_MARKUP) {
     document.body.innerHTML = markup;
     jest.resetModules();
     jest.doMock('../src/modules/state/settingsCache.js', () => ({
-        getSettings: jest.fn(async () => ({}))
+        getSettings: jest.fn(async () => ({})),
+        resolveRequestSettings: jest.fn(async () => ({ timeout: 12000 }))
     }));
     jest.doMock('../src/modules/apiHandler.js', () => ({
         displayResponseWithLineNumbersForTab: jest.fn(),
         generateEffectiveAuthData: jest.fn(async () => ({ headers: {}, queryParams: {} })),
         getRequestBuilderService: jest.fn(),
+        isTabCurrentlyActive: jest.fn(async () => true),
+        setRequestInProgress: jest.fn(),
         warnUnresolvedVariables: jest.fn()
     }));
     return import('../src/modules/grpcHandler.js');
@@ -52,19 +55,23 @@ async function loadGrpcHandlerForSend({ variables = {}, authData = { headers: {}
     const builder = new RequestBuilderService(() => variableService, () => ({}));
 
     jest.doMock('../src/modules/state/settingsCache.js', () => ({
-        getSettings: jest.fn(async () => ({}))
+        getSettings: jest.fn(async () => ({})),
+        resolveRequestSettings: jest.fn(async () => ({ timeout: 12000 }))
     }));
     jest.doMock('../src/modules/apiHandler.js', () => ({
         displayResponseWithLineNumbersForTab: jest.fn(),
         generateEffectiveAuthData: jest.fn(async () => authData),
         getRequestBuilderService: jest.fn(() => builder),
+        isTabCurrentlyActive: jest.fn(async () => true),
+        setRequestInProgress: jest.fn(),
         warnUnresolvedVariables: jest.fn()
     }));
 
     const invokeUnary = jest.fn(async () => ({ success: true, data: {}, headers: {}, trailers: {} }));
     window.backendAPI = { grpc: { invokeUnary } };
 
-    return { module: await import('../src/modules/grpcHandler.js'), invokeUnary };
+    const apiHandler = await import('../src/modules/apiHandler.js');
+    return { module: await import('../src/modules/grpcHandler.js'), invokeUnary, apiHandler };
 }
 
 describe('gRPC send path', () => {
@@ -94,6 +101,48 @@ describe('gRPC send path', () => {
         expect(request.target).toBe('localhost:50051');
         expect(request.requestJson).toEqual({ name: 'world' });
         expect(request.metadata['x-token']).toBe('secret');
+    });
+
+    it('renders the result into the tab that sent it and saves it there', async () => {
+        const { module, invokeUnary, apiHandler } = await loadGrpcHandlerForSend();
+        const { app } = await import('../src/modules/appContext.js');
+        const originContainer = { metadataDisplay: { textContent: '' }, trailersDisplay: { textContent: '' } };
+        const updateTab = jest.fn().mockResolvedValue(undefined);
+        const getActiveTabId = jest.fn().mockResolvedValue('tab-origin');
+        app.workspaceTabController = { service: { getActiveTabId, updateTab } };
+        app.responseContainerManager = {
+            getOrCreateContainer: jest.fn(id => (id === 'tab-origin' ? originContainer : null)),
+            getActiveElements: jest.fn(() => { throw new Error('must not render into the active tab'); })
+        };
+        invokeUnary.mockImplementation(async () => {
+            getActiveTabId.mockResolvedValue('tab-other');
+            return { success: true, data: { ok: 1 }, headers: { h: '1' }, trailers: { t: '2' } };
+        });
+        apiHandler.isTabCurrentlyActive.mockImplementation(async (id) => id === 'tab-other');
+
+        module.applyGrpcState({
+            target: 'localhost:50051',
+            service: 'helloworld.Greeter',
+            fullMethod: '/helloworld.Greeter/SayHello',
+            requestJson: '{}',
+            metadata: {},
+            useTls: false
+        });
+
+        await module.handleGrpcSend();
+
+        const request = invokeUnary.mock.calls[0][0];
+        expect(request.deadlineMs).toBe(12000);
+        expect(request.requestId).toEqual(expect.any(String));
+        expect(apiHandler.displayResponseWithLineNumbersForTab)
+            .toHaveBeenLastCalledWith(JSON.stringify({ ok: 1 }, null, 2), 'application/json', 'tab-origin');
+        expect(originContainer.metadataDisplay.textContent).toContain('"h"');
+        expect(updateTab).toHaveBeenCalledWith('tab-origin', expect.objectContaining({
+            response: expect.objectContaining({ data: { ok: 1 }, grpc: expect.objectContaining({ ok: true }) })
+        }));
+        expect(apiHandler.setRequestInProgress).toHaveBeenLastCalledWith(false);
+        delete app.workspaceTabController;
+        delete app.responseContainerManager;
     });
 
     it('folds Authorization into metadata with a lowercased key', async () => {

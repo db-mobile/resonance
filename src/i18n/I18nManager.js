@@ -2,6 +2,7 @@ export class I18nManager {
     constructor() {
         this.currentLanguage = 'en';
         this.translations = {};
+        this.fallbackTranslations = {};
         this.fallbackLanguage = 'en';
         this.supportedLanguages = {
             'en': 'English',
@@ -40,23 +41,52 @@ export class I18nManager {
         }
     }
 
+    async fetchLocale(language) {
+        const response = await fetch(`src/i18n/locales/${language}.json`);
+        if (!response.ok) {
+            throw new Error(`Failed to load language ${language}`);
+        }
+        return response.json();
+    }
+
+    async ensureFallbackLoaded() {
+        if (Object.keys(this.fallbackTranslations).length > 0) {return;}
+        try {
+            this.fallbackTranslations = await this.fetchLocale(this.fallbackLanguage);
+        } catch (error) {
+            void error;
+        }
+    }
+
     async loadLanguage(language) {
         if (!this.supportedLanguages[language]) {
             language = this.fallbackLanguage;
         }
 
+        await this.ensureFallbackLoaded();
+
+        if (language === this.fallbackLanguage) {
+            this.translations = this.fallbackTranslations;
+            this.currentLanguage = language;
+            return;
+        }
+
         try {
-            const response = await fetch(`src/i18n/locales/${language}.json`);
-            if (!response.ok) {
-                throw new Error(`Failed to load language ${language}`);
-            }
-            this.translations = await response.json();
+            this.translations = await this.fetchLocale(language);
             this.currentLanguage = language;
         } catch (error) {
-            if (language !== this.fallbackLanguage) {
-                await this.loadLanguage(this.fallbackLanguage);
-            }
+            this.translations = this.fallbackTranslations;
+            this.currentLanguage = this.fallbackLanguage;
         }
+    }
+
+    lookup(dictionary, key) {
+        let value = dictionary;
+        for (const k of key.split('.')) {
+            value = value?.[k];
+            if (value === undefined) {return undefined;}
+        }
+        return value;
     }
 
     async setLanguage(language) {
@@ -72,18 +102,13 @@ export class I18nManager {
     }
 
     t(key, params = {}) {
-        const keys = key.split('.');
-        let value = this.translations;
-        
-        for (const k of keys) {
-            value = value?.[k];
-            if (value === undefined) {break;}
+        let value = this.lookup(this.translations, key);
+        if (typeof value !== 'string') {
+            value = this.lookup(this.fallbackTranslations, key);
         }
-        
-        if (value === undefined) {
+        if (typeof value !== 'string') {
             return key;
         }
-        
         return this.interpolate(value, params);
     }
 

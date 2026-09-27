@@ -31,3 +31,36 @@ export function buildEndpointUrl(endpoint) {
 
     return fullUrl;
 }
+
+/**
+ * @param {string} pathTemplate
+ * @returns {string}
+ */
+export function normalizeMockPath(pathTemplate) {
+    let path = String(pathTemplate || '').trim();
+    const scheme = path.match(/^[a-zA-Z]+:\/\/[^/]*/);
+    if (scheme) {
+        path = path.slice(scheme[0].length);
+    } else if (path.startsWith('{{')) {
+        const close = path.indexOf('}}');
+        const rest = close >= 0 ? path.slice(close + 2) : null;
+        if (rest !== null && (rest === '' || rest.startsWith('/') || rest.startsWith('?'))) {
+            path = rest;
+        }
+    }
+    path = path.split(/[?#]/)[0];
+    return path.startsWith('/') ? path : `/${path}`;
+}
+
+/**
+ * @param {string} pathTemplate
+ * @param {Object<string, string>} pathParams
+ * @returns {string}
+ */
+export function buildMockPath(pathTemplate, pathParams = {}) {
+    let path = normalizeMockPath(pathTemplate);
+    for (const [key, value] of Object.entries(pathParams)) {
+        path = path.split(`{{${key}}}`).join(value).split(`{${key}}`).join(value);
+    }
+    return path;
+}

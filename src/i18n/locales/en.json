@@ -32,6 +32,10 @@
     "search_empty": {
       "title": "No matching collections",
       "subtitle": "Try a different collection or request name"
+    },
+    "load_errors": {
+      "toast_one": "1 collection could not be loaded",
+      "toast_other": "{{count}} collections could not be loaded"
     }
   },
   "import": {
@@ -256,6 +260,8 @@
   "settings": {
     "title": "Settings",
     "tab_general": "General",
+    "group_appearance": "Appearance",
+    "group_requests": "Requests",
     "tab_proxy": "Proxy",
     "tab_certificates": "Certificates",
     "certs_title": "Client Certificates (mTLS)",

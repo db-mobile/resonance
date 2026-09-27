@@ -1,4 +1,4 @@
-import { extractCookies } from '../src/modules/cookieParser.js';
+import { extractCookies, responseCookies } from '../src/modules/cookieParser.js';
 
 describe('cookieParser value parsing', () => {
     test('keeps cookie values containing = intact', () => {
@@ -28,5 +28,20 @@ describe('cookieParser value parsing', () => {
         expect(cookies).toHaveLength(2);
         expect(cookies[0]).toMatchObject({ name: 'a', value: '1', httpOnly: true, secure: true });
         expect(cookies[1]).toMatchObject({ name: 'b', value: '2', sameSite: 'None' });
+    });
+});
+
+describe('responseCookies', () => {
+    test('prefers the verbatim Set-Cookie list over the flattened header', () => {
+        const cookies = responseCookies({
+            headers: { 'set-cookie': 'b=2; Expires=Wed, 21 Oct 2026 07:28:00 GMT' },
+            setCookies: ['a=1; Path=/', 'b=2; Expires=Wed, 21 Oct 2026 07:28:00 GMT']
+        });
+        expect(cookies.map(c => c.name)).toEqual(['a', 'b']);
+    });
+
+    test('falls back to the headers when no list is present', () => {
+        expect(responseCookies({ headers: { 'Set-Cookie': 'a=1' } }).map(c => c.name)).toEqual(['a']);
+        expect(responseCookies(null)).toEqual([]);
     });
 });

@@ -282,21 +282,4 @@ export class ScriptService {
         } catch (error) {
         }
     }
-
-    /**
-     * @param {string} script
-     * @returns {Object}
-     */
-    validateScript(script) {
-        if (!script || script.trim() === '') {
-            return { valid: true, error: null };
-        }
-
-        try {
-            new Function(script);
-            return { valid: true, error: null };
-        } catch (error) {
-            return { valid: false, error: error.message };
-        }
-    }
 }

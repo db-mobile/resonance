@@ -9,9 +9,9 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 use tokio::sync::oneshot;
 
 use super::grpc_reflection::{
-    DynamicMessageCodec, GrpcUnaryRequest, create_channel, dynamic_message_to_json,
+    DynamicMessageCodec, GrpcUnaryRequest, GrpcUnaryState, create_channel, dynamic_message_to_json,
     generate_message_skeleton, json_to_dynamic_message, metadata_to_json_map,
-    normalize_target_with_tls, resolve_method_types, strip_leading_dot,
+    normalize_target_with_tls, resolve_method_types, run_cancellable_unary, strip_leading_dot,
 };
 
 /// State to hold loaded proto file descriptors
@@ -159,6 +159,21 @@ pub async fn grpc_proto_get_input_skeleton(
 pub async fn grpc_proto_invoke_unary(
     _app: AppHandle,
     state: State<'_, ProtoState>,
+    unary_state: State<'_, GrpcUnaryState>,
+    proto_path: String,
+    request: GrpcUnaryRequest,
+) -> Result<Value, String> {
+    let request_id = request.request_id.clone();
+    run_cancellable_unary(
+        &unary_state,
+        request_id,
+        invoke_unary_proto(&state, proto_path, request),
+    )
+    .await
+}
+
+async fn invoke_unary_proto(
+    state: &ProtoState,
     proto_path: String,
     request: GrpcUnaryRequest,
 ) -> Result<Value, String> {

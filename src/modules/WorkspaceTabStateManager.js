@@ -7,6 +7,7 @@ import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './s
 
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
 import { formatCookiesAsHtml } from './cookieParser.js';
+import { renderGrpcPanes } from './ResponseDisplayHelper.js';
 import { activateTab } from './tabManager.js';
 import { setRequestBodyContent, getRequestBodyContent } from './requestBodyHelper.js';
 import { setRequestMode, RequestMode, getCurrentMode } from './requestModeManager.js';
@@ -642,6 +643,8 @@ export class WorkspaceTabStateManager {
 
         if (response.status) {
             updateStatusDisplay(`Status: ${response.status} ${response.statusText || ''}`, response.status);
+        } else if (response.grpc) {
+            updateStatusDisplay(response.grpc.ok ? 'gRPC OK' : `gRPC error: ${response.grpc.statusMessage || 'unknown'}`, null);
         } else if (response.websocket?.state === 'open') {
             updateStatusDisplay('WebSocket connected', 101);
         } else if (response.websocket?.state === 'closed') {
@@ -698,6 +701,10 @@ export class WorkspaceTabStateManager {
             } else {
                 clearPerformanceMetrics(containerElements.performanceDisplay);
             }
+        }
+
+        if (response.grpc) {
+            renderGrpcPanes(containerElements, response.grpc);
         }
 
         if (containerElements) {

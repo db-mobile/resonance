@@ -27,6 +27,15 @@ function sameFieldValues(data, updates) {
     );
 }
 
+/**
+ * @param {string} collectionId
+ * @param {string} endpointId
+ * @returns {string}
+ */
+function mqttSecretScope(collectionId, endpointId) {
+    return `mqtt:${collectionId}:${endpointId}`;
+}
+
 export class CollectionRepository {
     static MAX_CACHE_SIZE = 20;
 
@@ -54,6 +63,7 @@ export class CollectionRepository {
 
     /** @returns {Promise<Array<Object>>} */
     async getAll() {
+        this.invalidateCache();
         try {
             const collections = await this.backendAPI.collections.getAll();
             return listFromWire(collections);
@@ -62,14 +72,37 @@ export class CollectionRepository {
         }
     }
 
+    /** @returns {Promise<Array<{path: string, id: (string|null), message: string}>>} */
+    async getLoadErrors() {
+        try {
+            const errors = await this.backendAPI.collections.loadErrors();
+            return Array.isArray(errors) ? errors : [];
+        } catch (error) {
+            void error;
+            return [];
+        }
+    }
+
+    /** @returns {void} */
+    invalidateCache() {
+        this._byIdCache.clear();
+    }
+
     /**
      * @param {Object} collection
+     * @param {Object} [options]
+     * @param {Array<string>} [options.newRequestIds]
      * @returns {Promise<void>}
      */
-    async saveOne(collection) {
+    async saveOne(collection, { newRequestIds } = {}) {
         try {
-            await this.backendAPI.collections.save(toWire(collection));
-            if (collection?.id) {
+            const wire = toWire(collection);
+            const skipped = newRequestIds
+                ? await this.backendAPI.collections.save(wire, newRequestIds)
+                : await this.backendAPI.collections.save(wire);
+            if (Array.isArray(skipped) && skipped.length > 0) {
+                this._byIdCache.delete(collection.id);
+            } else if (collection?.id) {
                 this._addToCache(collection.id, collection);
             }
         } catch (error) {
@@ -170,6 +203,7 @@ export class CollectionRepository {
             this._byIdCache.delete(id);
             if (this.secretStore) {
                 await this.secretStore.deleteScopePrefix(`auth:${id}:`);
+                await this.secretStore.deleteScopePrefix(`mqtt:${id}:`);
             }
             return true;
         } catch (error) {
@@ -229,7 +263,7 @@ export class CollectionRepository {
             graphqlData: data.graphqlData || null,
             formBodyData: data.formBodyData || null,
             grpcData: data.grpcData || null,
-            mqttData: data.mqttData || null,
+            mqttData: await this._hydrateMqttData(collectionId, endpointId, data.mqttData || null),
             responseSchema: data.responseSchema || null
         };
     }
@@ -721,6 +755,7 @@ export class CollectionRepository {
             await this.backendAPI.collections.deleteEndpointData(collectionId, endpointId);
             if (this.secretStore) {
                 await this.secretStore.deleteScope(authSecretScope(collectionId, endpointId));
+                await this.secretStore.deleteScope(mqttSecretScope(collectionId, endpointId));
             }
         } catch (error) {
             throw new Error(`Failed to delete persisted endpoint data: ${error.message || error}`, { cause: error });
@@ -786,7 +821,33 @@ export class CollectionRepository {
      * @returns {Promise<void>}
      */
     async saveMqttData(collectionId, endpointId, data) {
-        return this._writeSidecar(collectionId, endpointId, 'mqttData', data, 'MQTT data');
+        if (!data || !('password' in data)) {
+            return this._writeSidecar(collectionId, endpointId, 'mqttData', data, 'MQTT data');
+        }
+        const { password, ...rest } = data;
+        if (this.secretStore) {
+            const scope = mqttSecretScope(collectionId, endpointId);
+            if (password) {
+                await this.secretStore.set(scope, 'password', password);
+            } else {
+                await this.secretStore.delete(scope, 'password');
+            }
+        }
+        return this._writeSidecar(collectionId, endpointId, 'mqttData', rest, 'MQTT data');
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object|null} mqttData
+     * @returns {Promise<Object|null>}
+     */
+    async _hydrateMqttData(collectionId, endpointId, mqttData) {
+        if (!mqttData || !this.secretStore) {
+            return mqttData;
+        }
+        const password = await this.secretStore.get(mqttSecretScope(collectionId, endpointId), 'password');
+        return password ? { ...mqttData, password } : mqttData;
     }
 
     /**
@@ -795,7 +856,8 @@ export class CollectionRepository {
      * @returns {Promise<Object|null>}
      */
     async getMqttData(collectionId, endpointId) {
-        return this._readSidecar(collectionId, endpointId, 'mqttData', null);
+        const data = await this._readSidecar(collectionId, endpointId, 'mqttData', null);
+        return this._hydrateMqttData(collectionId, endpointId, data);
     }
 
     /**

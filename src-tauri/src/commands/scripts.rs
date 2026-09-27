@@ -16,6 +16,45 @@ use super::proxy::{ProxySettings, ProxyState};
 use super::store_files::MAIN_STORE as STORE_FILE;
 const SCRIPTS_KEY: &str = "persistedScripts";
 
+/// Wall-clock limit for one script run. Blocking `sendRequest` calls count
+/// towards it, but each of those is capped on its own as well.
+const SCRIPT_TIME_LIMIT: Duration = Duration::from_secs(30);
+
+/// VM "clock cycles" between deadline checks.
+const SCRIPT_BUDGET: u32 = 10_000;
+
+enum ScriptRunError {
+    Js(boa_engine::JsError),
+    TimedOut,
+}
+
+/// Runs `source` on the calling thread, checking `limit` every
+/// `SCRIPT_BUDGET` VM cycles so an endless loop cannot pin the thread.
+/// After a timeout the context is mid-execution and must not be reused.
+fn evaluate_with_deadline(
+    context: &mut Context,
+    source: &[u8],
+    limit: Duration,
+) -> Result<JsValue, ScriptRunError> {
+    use std::future::Future;
+    use std::task::{Context as TaskContext, Poll, Waker};
+
+    let script = boa_engine::Script::parse(Source::from_bytes(source), None, context)
+        .map_err(ScriptRunError::Js)?;
+    let started = std::time::Instant::now();
+    let future = script.evaluate_async_with_budget(context, SCRIPT_BUDGET);
+    let mut future = std::pin::pin!(future);
+    let mut task_context = TaskContext::from_waker(Waker::noop());
+
+    loop {
+        match future.as_mut().poll(&mut task_context) {
+            Poll::Ready(result) => return result.map_err(ScriptRunError::Js),
+            Poll::Pending if started.elapsed() > limit => return Err(ScriptRunError::TimedOut),
+            Poll::Pending => {}
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScriptData {
@@ -286,9 +325,7 @@ fn execute_script(
         None
     };
 
-    // Execute the script
-    let source = Source::from_bytes(script.as_bytes());
-    match context.eval(source) {
+    match evaluate_with_deadline(&mut context, script.as_bytes(), SCRIPT_TIME_LIMIT) {
         Ok(_) => {
             collect_test_results(&mut context, &ctx);
             if capture_request {
@@ -296,12 +333,16 @@ fn execute_script(
             }
             Ok(())
         }
-        Err(e) => {
+        Err(ScriptRunError::Js(e)) => {
             if capture_request {
                 let _ = capture_request_mutations(&mut context, &ctx, baseline.as_deref());
             }
             Err(format!("Script error: {}", e))
         }
+        Err(ScriptRunError::TimedOut) => Err(format!(
+            "Script error: exceeded the {} s time limit (endless loop?)",
+            SCRIPT_TIME_LIMIT.as_secs()
+        )),
     }
 }
 
@@ -2262,5 +2303,36 @@ mod tests {
             result.modified_environment.get("status"),
             Some(&Some("200".to_string()))
         );
+    }
+
+    #[test]
+    fn an_endless_loop_hits_the_deadline() {
+        let mut context = Context::default();
+        let started = std::time::Instant::now();
+        let result =
+            evaluate_with_deadline(&mut context, b"while (true) {}", Duration::from_millis(200));
+        assert!(matches!(result, Err(ScriptRunError::TimedOut)));
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[test]
+    fn a_normal_script_completes_under_the_deadline() {
+        let mut context = Context::default();
+        let result = evaluate_with_deadline(
+            &mut context,
+            b"let n = 0; for (let i = 0; i < 100000; i++) { n += i; } n",
+            SCRIPT_TIME_LIMIT,
+        );
+        match result {
+            Ok(value) => assert_eq!(value.as_number(), Some(4_999_950_000.0)),
+            Err(_) => panic!("script should complete"),
+        }
+    }
+
+    #[test]
+    fn syntax_errors_still_surface_as_js_errors() {
+        let mut context = Context::default();
+        let result = evaluate_with_deadline(&mut context, b"let = ;", SCRIPT_TIME_LIMIT);
+        assert!(matches!(result, Err(ScriptRunError::Js(_))));
     }
 }

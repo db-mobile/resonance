@@ -179,6 +179,7 @@ export class SettingsModal {
         );
         tabsContainer.appendChild(updatesTabFragment);
 
+        this.i18nManager?.updateUI(overlay);
         this.attachEventListeners(overlay);
         return overlay;
     }

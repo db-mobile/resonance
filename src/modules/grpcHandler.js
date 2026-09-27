@@ -23,9 +23,13 @@ import {
     displayResponseWithLineNumbersForTab,
     generateEffectiveAuthData,
     getRequestBuilderService,
+    isTabCurrentlyActive,
+    setRequestInProgress,
     warnUnresolvedVariables
 } from './apiHandler.js';
-import { getSettings } from './state/settingsCache.js';
+import { getSettings, resolveRequestSettings } from './state/settingsCache.js';
+import { newRequestId, trackInFlight } from './state/inFlightRequests.js';
+import { renderGrpcPanes } from './ResponseDisplayHelper.js';
 import { startOrSend as grpcStreamStartOrSend } from './grpcStreamHandler.js';
 import { recordGrpcHistory } from './grpcHistory.js';
 import { createKeyValueRow } from './keyValueManager.js';
@@ -540,62 +544,84 @@ export async function handleGrpcSend() {
     }
 
     const startedAt = Date.now();
+    const requestTabId = app.workspaceTabController
+        ? await app.workspaceTabController.service.getActiveTabId()
+        : null;
+    const requestId = newRequestId();
+    const untrack = trackInFlight(requestTabId, requestId);
+    const { timeout } = await resolveRequestSettings();
+    const showStatus = async (text) => {
+        if (await isTabCurrentlyActive(requestTabId)) {
+            updateStatusDisplay(text, null);
+        }
+    };
 
+    setRequestInProgress(true);
     try {
-        updateStatusDisplay('Sending gRPC request...', null);
-        displayResponseWithLineNumbersForTab('Sending gRPC request...', null, null);
+        await showStatus('Sending gRPC request...');
+        displayResponseWithLineNumbersForTab('Sending gRPC request...', null, requestTabId);
 
-        let result;
-        if (usingProto) {
-            result = await window.backendAPI.grpc.protoInvokeUnary(activeSource.protoPath, {
-                target,
-                fullMethod,
-                requestJson,
-                metadata,
-                deadlineMs: 30000,
-                tls
-            });
-        } else {
-            result = await window.backendAPI.grpc.invokeUnary({
-                target,
-                fullMethod,
-                requestJson,
-                metadata,
-                deadlineMs: 30000,
-                tls
-            });
+        const unaryRequest = {
+            target,
+            fullMethod,
+            requestJson,
+            metadata,
+            deadlineMs: timeout,
+            tls,
+            requestId
+        };
+        const result = usingProto
+            ? await window.backendAPI.grpc.protoInvokeUnary(activeSource.protoPath, unaryRequest)
+            : await window.backendAPI.grpc.invokeUnary(unaryRequest);
+
+        if (result.cancelled) {
+            displayResponseWithLineNumbersForTab('Request was cancelled', null, requestTabId);
+            await showStatus('Request cancelled');
+            return;
         }
 
         const formatted = typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2);
-        displayResponseWithLineNumbersForTab(formatted, 'application/json', null);
+        displayResponseWithLineNumbersForTab(formatted, 'application/json', requestTabId);
 
-        const containerElements = app.responseContainerManager?.getActiveElements();
-        if (containerElements) {
-            if (containerElements.metadataDisplay) {
-                const metadataStr = result.headers ? JSON.stringify(result.headers, null, 2) : '{}';
-                containerElements.metadataDisplay.textContent = metadataStr || 'No metadata.';
-            }
-            if (containerElements.trailersDisplay) {
-                const trailersStr = result.trailers ? JSON.stringify(result.trailers, null, 2) : '{}';
-                containerElements.trailersDisplay.textContent = trailersStr || 'No trailers.';
-            }
-        }
+        const grpcPanes = {
+            ok: Boolean(result.success),
+            statusMessage: result.statusMessage || '',
+            metadata: result.headers || {},
+            trailers: result.trailers || {}
+        };
+        const containerElements = requestTabId
+            ? app.responseContainerManager?.getOrCreateContainer(requestTabId)
+            : app.responseContainerManager?.getActiveElements();
+        renderGrpcPanes(containerElements, grpcPanes);
 
-        if (result.success) {
-            updateStatusDisplay('gRPC OK', null);
-        } else {
-            updateStatusDisplay(`gRPC error: ${result.statusMessage || 'unknown'}`, null);
+        await showStatus(result.success ? 'gRPC OK' : `gRPC error: ${result.statusMessage || 'unknown'}`);
+
+        const ttfb = Date.now() - startedAt;
+        if (app.workspaceTabController && requestTabId) {
+            app.workspaceTabController.service.updateTab(requestTabId, {
+                response: {
+                    data: result.data ?? null,
+                    headers: {},
+                    status: null,
+                    statusText: '',
+                    ttfb,
+                    size: null,
+                    timings: null,
+                    cookies: [],
+                    grpc: grpcPanes
+                }
+            }).catch(() => { });
         }
 
         await recordGrpcHistory({
             ...historyContext,
-            result: { ...result, ttfb: Date.now() - startedAt }
+            result: { ...result, ttfb }
         });
     } catch (error) {
         const msg = error.message || String(error);
         toast.error(`gRPC send error: ${msg}`);
-        updateStatusDisplay(`gRPC send error: ${msg}`, null);
-        displayResponseWithLineNumbersForTab(`Error: ${msg}`, null, null);
+        await showStatus(`gRPC send error: ${msg}`);
+        displayResponseWithLineNumbersForTab(`Error: ${msg}`, null, requestTabId);
 
         await recordGrpcHistory({
             ...historyContext,
@@ -607,6 +633,9 @@ export async function handleGrpcSend() {
                 ttfb: Date.now() - startedAt
             }
         });
+    } finally {
+        untrack();
+        setRequestInProgress(false);
     }
 }
 

@@ -17,8 +17,6 @@ protoc-bin-vendored = "3"
 tauri = { version = "2.12", features = [] }
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
-tauri-plugin-fs = "2"
-tauri-plugin-shell = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-updater = "2"
 

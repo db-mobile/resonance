@@ -60,6 +60,19 @@ function parseCookie(cookieString) {
 }
 
 /**
+ * @param {Object} response
+ * @param {Array<string>} [response.setCookies]
+ * @param {Object} [response.headers]
+ * @returns {Array}
+ */
+export function responseCookies(response) {
+    if (Array.isArray(response?.setCookies) && response.setCookies.length > 0) {
+        return extractCookies({ 'set-cookie': response.setCookies });
+    }
+    return extractCookies(response?.headers);
+}
+
+/**
  * @param {Object} headers
  * @returns {Array}
  */

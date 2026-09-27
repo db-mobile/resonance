@@ -32,6 +32,10 @@
     "search_empty": {
       "title": "Nessuna collezione trovata",
       "subtitle": "Prova un altro nome di collezione o richiesta"
+    },
+    "load_errors": {
+      "toast_one": "Impossibile caricare 1 raccolta",
+      "toast_other": "Impossibile caricare {{count}} raccolte"
     }
   },
   "import": {
@@ -256,6 +260,8 @@
   "settings": {
     "title": "Impostazioni",
     "tab_general": "Generale",
+    "group_appearance": "Aspetto",
+    "group_requests": "Richieste",
     "tab_proxy": "Proxy",
     "tab_certificates": "Certificati",
     "certs_title": "Certificati client (mTLS)",
