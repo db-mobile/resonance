@@ -3,6 +3,8 @@
 
 import { requestBarMarkup, requestFormMarkup } from '../helpers/requestBarMarkup.js';
 
+const liveness = { websocket: jest.fn(() => false) };
+
 const handlers = {
     websocket: jest.fn(),
     sse: jest.fn(),
@@ -22,7 +24,8 @@ async function loadApiHandler({ resolveVariablesError = null, variables = null }
     }));
     jest.doMock('../../src/modules/websocketHandler.js', () => ({
         handleWebSocketSend: handlers.websocket,
-        handleWebSocketCancel: jest.fn()
+        handleWebSocketCancel: jest.fn(),
+        isWebSocketLive: liveness.websocket
     }));
     jest.doMock('../../src/modules/sseHandler.js', () => ({
         handleSseConnect: handlers.sse,
@@ -351,3 +354,37 @@ describe('streaming payloads resolve {{variables}}', () => {
         });
     });
 });
+
+describe('a live stream keeps a Disconnect button', () => {
+    test('the cancel button turns into Disconnect while the WebSocket is open and hides once it closes', async () => {
+        const { handleSendRequest, setRequestMode } = await loadApiHandler();
+        const { STREAM_STATE_EVENT } = await import('../../src/modules/streaming/streamState.js');
+        setRequestMode('websocket');
+        document.getElementById('websocket-url-input').value = 'wss://example.test';
+        liveness.websocket.mockReturnValue(true);
+
+        await handleSendRequest();
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        const cancel = document.getElementById('cancel-request-btn');
+        expect(cancel.style.display).not.toBe('none');
+        expect(cancel.textContent).toBe('Disconnect');
+
+        liveness.websocket.mockReturnValue(false);
+        document.dispatchEvent(new CustomEvent(STREAM_STATE_EVENT));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        expect(cancel.style.display).toBe('none');
+        expect(cancel.textContent).toBe('Cancel');
+    });
+
+    test('HTTP mode never shows it', async () => {
+        const { setRequestMode } = await loadApiHandler();
+        liveness.websocket.mockReturnValue(true);
+        setRequestMode('http');
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        expect(document.getElementById('cancel-request-btn').style.display).toBe('none');
+    });
+});
+

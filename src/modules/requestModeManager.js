@@ -6,6 +6,7 @@
 import { app } from './appContext.js';
 import { PROTOCOLS, RequestMode, getProtocol, listProtocolIds, resolveProtocolId } from './protocols/protocolRegistry.js';
 import { setResponseTabsForProtocol } from './tabManager.js';
+import { notifyStreamStateChanged } from './streaming/streamState.js';
 import { createMirroredUrlSection, syncMirroredUrlInput } from './ui/mirroredUrlSection.js';
 
 export { RequestMode };
@@ -135,6 +136,7 @@ export function setRequestMode(mode) {
     updateUIForMode(resolved);
 
     setResponseTabsForProtocol(resolved);
+    notifyStreamStateChanged();
 }
 
 /** @param {string} mode */

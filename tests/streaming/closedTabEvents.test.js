@@ -110,3 +110,47 @@ describe('streaming handlers ignore events for tabs with no session', () => {
         expect(rendered).toContain('hello');
     });
 });
+
+describe('an MQTT send on a live connection', () => {
+    const handlers = {};
+
+    beforeAll(async () => {
+        window.__TAURI_INTERNALS__ = {
+            invoke: jest.fn(async (command, args) => {
+                if (command === 'plugin:event|listen') {
+                    handlers[args.event] = args.handler;
+                }
+            }),
+            transformCallback: (fn) => fn
+        };
+        window.backendAPI = {
+            mqtt: { connect: jest.fn().mockResolvedValue(undefined), publish: jest.fn().mockResolvedValue(undefined) }
+        };
+        jest.resetModules();
+    });
+
+    afterAll(() => {
+        delete window.__TAURI_INTERNALS__;
+        delete window.backendAPI;
+    });
+
+    test('keeps the session open instead of falling back to Connecting', async () => {
+        const { app: freshApp } = await import('../../src/modules/appContext.js');
+        const status = await import('../../src/modules/statusDisplay.js');
+        const mqtt = await import('../../src/modules/mqttHandler.js');
+        freshApp.workspaceTabController = { service: { getActiveTabId: jest.fn().mockResolvedValue('tab-m') } };
+        await mqtt.initMqttHandler();
+
+        await mqtt.handleMqttSend('mqtt://broker.test', { publishTopic: 't', payload: '1' });
+        await handlers['mqtt-event']({ payload: { tabId: 'tab-m', broker: 'mqtt://broker.test', eventType: 'connect' } });
+        status.updateStatusDisplay.mockClear();
+
+        await mqtt.handleMqttSend('mqtt://broker.test', { publishTopic: 't', payload: '2' });
+
+        const texts = status.updateStatusDisplay.mock.calls.map(call => call[0]);
+        expect(texts).not.toContain('MQTT connecting...');
+        expect(window.backendAPI.mqtt.publish).toHaveBeenCalledTimes(2);
+        freshApp.workspaceTabController = null;
+    });
+});
+

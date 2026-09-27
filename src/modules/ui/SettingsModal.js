@@ -641,6 +641,7 @@ export class SettingsModal {
                             installBtn.disabled = true;
                             installBtn.remove();
                             updateStatus.textContent = app.i18n?.t('settings.downloading_update') || 'Downloading...';
+                            updateStatus.className = 'update-status';
                             try {
                                 await window.backendAPI.updater.downloadAndInstall(update);
                                 updateStatus.textContent = app.i18n?.t('settings.update_installed') || 'Update installed! Restart to apply.';
@@ -649,6 +650,9 @@ export class SettingsModal {
                                 const errMsg = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
                                 updateStatus.textContent = `Error: ${errMsg}`;
                                 updateStatus.className = 'update-status error';
+                                installBtn.disabled = false;
+                                installBtn.textContent = app.i18n?.t('settings.retry_update') || 'Retry';
+                                updateStatus.appendChild(installBtn);
                             }
                         });
                         updateStatus.appendChild(installBtn);

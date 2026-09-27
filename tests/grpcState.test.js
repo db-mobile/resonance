@@ -10,6 +10,8 @@ const GRPC_MARKUP = `
         <article class="grpc-source-card" data-source="proto">
             <span id="grpc-proto-status" data-state="idle"></span>
             <span id="grpc-proto-filename"></span>
+            <p id="grpc-proto-includes" hidden></p>
+            <button id="grpc-add-include-btn" style="display: none;"></button>
             <button id="grpc-clear-proto-btn" style="display: none;"></button>
         </article>
     </div>
@@ -311,6 +313,48 @@ describe('gRPC state capture and restore', () => {
         expect(document.getElementById('grpc-proto-filename').textContent).toBe('greeter.proto');
         expect(document.querySelector('[data-source="proto"]').dataset.active).toBe('true');
         expect(document.querySelector('[data-source="reflection"]').dataset.active).toBe('false');
+    });
+
+    it('round-trips proto import paths and lists them on the card', async () => {
+        const { applyGrpcState, captureGrpcState } = await loadGrpcHandler();
+
+        applyGrpcState({
+            target: 'localhost:50051',
+            fullMethod: '/billing.Billing/Get',
+            protoPath: '/work/api/billing.proto',
+            includePaths: ['/work/third_party/googleapis', '/work/shared']
+        });
+
+        expect(captureGrpcState().includePaths).toEqual(['/work/third_party/googleapis', '/work/shared']);
+        const list = document.getElementById('grpc-proto-includes');
+        expect(list.hidden).toBe(false);
+        expect(list.textContent).toBe('Import paths: googleapis, shared');
+        expect(document.getElementById('grpc-add-include-btn').style.display).not.toBe('none');
+    });
+
+    it('a failed proto load offers an import path and retries with it', async () => {
+        const handler = await loadGrpcHandler(`${GRPC_MARKUP}<button id="grpc-connect-btn"></button>`);
+        const parseProtoFile = jest.fn()
+            .mockRejectedValueOnce(new Error('import "common/money.proto" not found'))
+            .mockResolvedValueOnce({ package: 'billing', services: [] });
+        window.backendAPI = {
+            grpc: { parseProtoFile, unloadProto: jest.fn().mockResolvedValue(undefined) },
+            collections: { pickDirectory: jest.fn().mockResolvedValue('/work/shared') }
+        };
+        handler.initGrpcUI?.();
+
+        await expect(handler.loadProtoFile('/work/api/billing.proto')).rejects.toThrow('not found');
+        const addBtn = document.getElementById('grpc-add-include-btn');
+        expect(addBtn.style.display).not.toBe('none');
+
+        addBtn.click();
+        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        expect(window.backendAPI.collections.pickDirectory).toHaveBeenCalledWith(false);
+        expect(parseProtoFile).toHaveBeenLastCalledWith('/work/api/billing.proto', ['/work/shared']);
+        expect(handler.captureGrpcState().includePaths).toEqual(['/work/shared']);
+        delete window.backendAPI;
     });
 
     it('marks the reflection card active when no proto is in play', async () => {

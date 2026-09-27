@@ -226,7 +226,9 @@
     "response": "Resposta",
     "status": "Status",
     "time": "Tempo",
-    "size": "Tamanho"
+    "size": "Tamanho",
+    "disconnect": "Desconectar",
+    "cancel": "Cancelar"
   },
   "tabs": {
     "path_params": "Parâmetros de Caminho",
@@ -329,7 +331,8 @@
     "updates_not_available": "Atualizações não disponíveis nesta versão",
     "updates_managed_externally": "As atualizações são gerenciadas pelo seu gerenciador de pacotes",
     "version_info": "Informações da Versão",
-    "current_version": "Versão atual"
+    "current_version": "Versão atual",
+    "retry_update": "Tentar novamente"
   },
   "theme": {
     "light": "Claro",
@@ -582,7 +585,8 @@
     "history_passed": "{{count}} aprovadas",
     "history_failed": "{{count}} com falha",
     "history_source": "Execução de {{date}}",
-    "history_no_body": "O histórico não guarda corpos de resposta, cabeçalhos nem cookies"
+    "history_no_body": "O histórico não guarda corpos de resposta, cabeçalhos nem cookies",
+    "pre_request_failed": "O script de pré-requisição falhou, então a requisição não foi enviada: {{message}}"
   },
   "mqtt": {
     "title": "MQTT",
@@ -614,5 +618,8 @@
     "confirm": "Mover",
     "root": "(Raiz da coleção)",
     "error": "Não foi possível mover a requisição: {{message}}"
+  },
+  "grpc": {
+    "add_import_path": "Adicionar caminho de importação"
   }
 }

@@ -24,12 +24,12 @@ import { resolveAuthConfigVariables } from '../auth/authVariables.js';
 import { generateAuthData } from '../auth/authData.js';
 import { deriveRequestSettings } from '../state/settingsCache.js';
 import { responseCookies } from '../cookieParser.js';
+import { methodCarriesBody } from '../utils/bodyMethods.js';
 import { newRequestId } from '../state/inFlightRequests.js';
 import { translate, translateCount } from '../utils/translate.js';
 import { RUNNABLE_PROTOCOLS } from '../utils/runnableRequests.js';
 import { parseDataFile } from '../utils/dataFile.js';
 
-const BODY_METHODS = ['POST', 'PUT', 'PATCH'];
 
 const ABSOLUTE_OR_TEMPLATED_PATH = /^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/|\{\{)/;
 
@@ -435,8 +435,18 @@ export class RunnerService {
 
             let { requestConfig } = prepared;
             if (scripts.preRequestScript.trim()) {
+                const errorsBefore = outcome.errors.length;
                 requestConfig = await this._runPreRequestScript(scripts.preRequestScript, prepared, variables, outcome, scriptIteration, collection.id);
                 variables = mergeVariables(variables, outcome.variablesSet);
+                if (outcome.errors.length > errorsBefore) {
+                    result.logs = outcome.logs;
+                    result.variablesSet = outcome.variablesSet;
+                    throw new Error(translate(
+                        'runner.pre_request_failed',
+                        'Pre-request script failed, so the request was not sent: {{message}}',
+                        { message: outcome.errors.slice(errorsBefore).join('; ') }
+                    ));
+                }
             }
 
             if (this.shouldStop) {
@@ -889,7 +899,7 @@ export class RunnerService {
             };
         }
 
-        if (!overrideBody && !BODY_METHODS.includes(method)) {
+        if (!overrideBody && !methodCarriesBody(method)) {
             return { body: undefined, bodyType: undefined };
         }
 

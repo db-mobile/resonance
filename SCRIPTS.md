@@ -29,6 +29,8 @@ reports an error. Each `sendRequest` call also has its own timeout (default
 After a script finishes:
 
 - **Pre-request:** mutations to `request` are applied to the outgoing request.
+  If the script throws, the request is **not sent** and the error is shown in
+  its place (in the runner the request is marked failed).
 - **Both:** changes made via `environment.set` / `environment.unset` are
   persisted to the active environment, and changes made via
   `pm.collectionVariables.set` / `.unset` are persisted to the request's

@@ -211,3 +211,29 @@ describe('OAuth tokens are renewed before sending', () => {
     });
 });
 
+describe('a failing pre-request script stops the send', () => {
+    test('the request is not sent and the error is shown in its place', async () => {
+        const loaded = await loadApiHandler({ success: true, status: 200, headers: {}, data: 'ok' });
+        const { setCurrentEndpoint } = await import('../../src/modules/state/currentEndpoint.js');
+        const { toast } = await import('../../src/modules/ui/Toast.js');
+        const toastError = jest.spyOn(toast, 'error').mockImplementation(() => {});
+        setCurrentEndpoint({ collectionId: 'c1', endpointId: 'e1' });
+        const scriptError = new Error('ReferenceError: foo is not defined');
+        scriptError.name = 'PreRequestScriptError';
+        loaded.app.scriptController = { executePreRequest: jest.fn().mockRejectedValue(scriptError) };
+
+        await loaded.handleSendRequest();
+
+        expect(loaded.app.scriptController.executePreRequest).toHaveBeenCalled();
+        expect(window.backendAPI.sendApiRequest).not.toHaveBeenCalled();
+        expect(document.getElementById('status-display').textContent).toContain('Pre-request script error');
+        expect(toastError).toHaveBeenCalledWith(expect.stringContaining('foo is not defined'));
+        expect(document.getElementById('cancel-request-btn').style.display).toBe('none');
+        toastError.mockRestore();
+        setCurrentEndpoint(null);
+        delete loaded.app.scriptController;
+        delete loaded.app.workspaceTabController;
+        delete loaded.app.cookieController;
+    });
+});
+

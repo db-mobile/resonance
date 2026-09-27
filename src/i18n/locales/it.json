@@ -226,7 +226,9 @@
     "response": "Risposta",
     "status": "Stato",
     "time": "Tempo",
-    "size": "Dimensione"
+    "size": "Dimensione",
+    "disconnect": "Disconnetti",
+    "cancel": "Annulla"
   },
   "tabs": {
     "path_params": "Parametri del Percorso",
@@ -329,7 +331,8 @@
     "updates_not_available": "Aggiornamenti non disponibili in questa versione",
     "updates_managed_externally": "Gli aggiornamenti sono gestiti dal tuo gestore di pacchetti",
     "version_info": "Informazioni Versione",
-    "current_version": "Versione attuale"
+    "current_version": "Versione attuale",
+    "retry_update": "Riprova"
   },
   "theme": {
     "light": "Chiaro",
@@ -574,7 +577,8 @@
     "history_passed": "{{count}} superate",
     "history_failed": "{{count}} non riuscite",
     "history_source": "Esecuzione del {{date}}",
-    "history_no_body": "La cronologia non conserva corpi di risposta, intestazioni e cookie"
+    "history_no_body": "La cronologia non conserva corpi di risposta, intestazioni e cookie",
+    "pre_request_failed": "Lo script pre-richiesta non è riuscito, la richiesta non è stata inviata: {{message}}"
   },
   "mqtt": {
     "title": "MQTT",
@@ -606,5 +610,8 @@
     "confirm": "Sposta",
     "root": "(Radice della raccolta)",
     "error": "Impossibile spostare la richiesta: {{message}}"
+  },
+  "grpc": {
+    "add_import_path": "Aggiungi percorso di importazione"
   }
 }

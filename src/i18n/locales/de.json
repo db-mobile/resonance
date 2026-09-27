@@ -226,7 +226,9 @@
     "response": "Antwort",
     "status": "Status",
     "time": "Zeit",
-    "size": "Größe"
+    "size": "Größe",
+    "disconnect": "Trennen",
+    "cancel": "Abbrechen"
   },
   "tabs": {
     "path_params": "Pfad-Parameter",
@@ -329,7 +331,8 @@
     "updates_not_available": "Updates in diesem Build nicht verfügbar",
     "updates_managed_externally": "Updates werden von Ihrem Paketmanager verwaltet",
     "version_info": "Versionsinformationen",
-    "current_version": "Aktuelle Version"
+    "current_version": "Aktuelle Version",
+    "retry_update": "Erneut versuchen"
   },
   "theme": {
     "light": "Hell",
@@ -574,7 +577,8 @@
     "history_passed": "{{count}} bestanden",
     "history_failed": "{{count}} fehlgeschlagen",
     "history_source": "Ausführung vom {{date}}",
-    "history_no_body": "Antwort-Bodies, Header und Cookies werden im Ausführungsverlauf nicht gespeichert"
+    "history_no_body": "Antwort-Bodies, Header und Cookies werden im Ausführungsverlauf nicht gespeichert",
+    "pre_request_failed": "Das Pre-Request-Skript ist fehlgeschlagen, die Anfrage wurde nicht gesendet: {{message}}"
   },
   "mqtt": {
     "title": "MQTT",
@@ -606,5 +610,8 @@
     "confirm": "Verschieben",
     "root": "(Sammlungsebene)",
     "error": "Die Anfrage konnte nicht verschoben werden: {{message}}"
+  },
+  "grpc": {
+    "add_import_path": "Importpfad hinzufügen"
   }
 }

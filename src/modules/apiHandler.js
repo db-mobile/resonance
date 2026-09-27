@@ -8,6 +8,7 @@ import { saveAllRequestModifications } from './collectionManager.js';
 import { debounce } from './utils/debounce.js';
 import { findRequest } from './collections/collectionTree.js';
 import { buildMockPath } from './collections/endpointUrl.js';
+import { methodCarriesBody } from './utils/bodyMethods.js';
 import { inFlightRequestFor, newRequestId, trackInFlight } from './state/inFlightRequests.js';
 import { registerPendingSave } from './state/pendingSaves.js';
 import { resolveRequestSettings } from './state/settingsCache.js';
@@ -62,8 +63,8 @@ import { MockServerService } from './services/MockServerService.js';
 import { isGrpcMode, isGraphQLMode, getCurrentMode, RequestMode } from './requestModeManager.js';
 import { getProtocol } from './protocols/protocolRegistry.js';
 import { handleGrpcSend } from './grpcHandler.js';
-import { handleWebSocketCancel, handleWebSocketSend } from './websocketHandler.js';
-import { handleSseCancel, handleSseConnect } from './sseHandler.js';
+import { handleWebSocketCancel, handleWebSocketSend, isWebSocketLive } from './websocketHandler.js';
+import { handleSseCancel, handleSseConnect, isSseLive } from './sseHandler.js';
 import { handleMqttCancel, handleMqttSend } from './mqttHandler.js';
 import {
     handleGraphQLSubscriptionStart,
@@ -71,7 +72,9 @@ import {
     isSubscriptionActive
 } from './graphqlSubscriptionHandler.js';
 import { selectActiveOperationType } from './graphqlTransportWs.js';
-import { cancelStream as cancelGrpcStream, hasActiveStream as hasActiveGrpcStream } from './grpcStreamHandler.js';
+import { cancelStream as cancelGrpcStream, hasActiveStream as hasActiveGrpcStream, isGrpcStreamLive } from './grpcStreamHandler.js';
+import { STREAM_STATE_EVENT } from './streaming/streamState.js';
+import { translate } from './utils/translate.js';
 import { RequestBuilderService } from './services/RequestBuilderService.js';
 import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes } from './ResponseDisplayHelper.js';
 import { setResponseMeta, suggestedFileName } from './responseSaver.js';
@@ -512,10 +515,18 @@ export function clearResponseDisplayForTab(tabId = null) {
     }
 }
 
+let requestInProgress = false;
+
+/**
+ * @param {boolean} inProgress
+ * @returns {void}
+ */
 export function setRequestInProgress(inProgress) {
+    requestInProgress = inProgress;
     if (inProgress) {
         sendRequestBtn.style.display = 'none';
         cancelRequestBtn.style.display = 'inline-block';
+        setCancelButtonLabel(false);
         sendRequestBtn.disabled = true;
     } else {
         sendRequestBtn.style.display = 'inline-block';
@@ -523,6 +534,52 @@ export function setRequestInProgress(inProgress) {
         sendRequestBtn.disabled = false;
     }
     app.statusBar?.setRequestRunning(inProgress);
+    if (!inProgress) {
+        refreshStreamControls();
+    }
+}
+
+/** @type {Object<string, function(string): boolean>} */
+const LIVE_STREAM_CHECKS = Object.freeze({
+    [RequestMode.WEBSOCKET]: isWebSocketLive,
+    [RequestMode.SSE]: isSseLive,
+    [RequestMode.GRPC]: isGrpcStreamLive
+});
+
+/**
+ * @param {boolean} disconnect
+ * @returns {void}
+ */
+function setCancelButtonLabel(disconnect) {
+    if (!cancelRequestBtn) {
+        return;
+    }
+    const label = disconnect ? translate('request.disconnect', 'Disconnect') : translate('request.cancel', 'Cancel');
+    cancelRequestBtn.textContent = label;
+    cancelRequestBtn.setAttribute('aria-label', label);
+}
+
+/** @returns {Promise<void>} */
+export async function refreshStreamControls() {
+    if (requestInProgress || !cancelRequestBtn) {
+        return;
+    }
+    const isLive = LIVE_STREAM_CHECKS[getCurrentMode()];
+    const tabId = app.workspaceTabController
+        ? await app.workspaceTabController.service.getActiveTabId()
+        : null;
+    if (requestInProgress) {
+        return;
+    }
+    const live = Boolean(isLive && isLive(tabId));
+    cancelRequestBtn.style.display = live ? 'inline-block' : 'none';
+    setCancelButtonLabel(live);
+}
+
+if (typeof document !== 'undefined') {
+    document.addEventListener(STREAM_STATE_EVENT, () => {
+        refreshStreamControls();
+    });
 }
 
 /** @type {Object<string, function(): Promise<*>>} */
@@ -982,7 +1039,7 @@ export async function handleSendRequest() {
     }
 
     const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
-    if (['POST', 'PUT', 'PATCH'].includes(method) || bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'binary') {
+    if (methodCarriesBody(method) || bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'binary') {
         try {
             const variables = _resolvedVariables;
 
@@ -1130,7 +1187,16 @@ export async function handleSendRequest() {
                     requestConfig
                 );
             } catch (error) {
-                updateStatusDisplay(`Pre-request script error: ${error.message}`, null);
+                const message = `Pre-request script error: ${error.message}`;
+                displayResponseWithLineNumbersForTab(`${message}\n\nThe request was not sent.`, null, requestTabId);
+                clearResponsePanes(requestTabId, globalResponseElements());
+                if (await isTabCurrentlyActive(requestTabId)) {
+                    updateStatusDisplay(message, null);
+                    updateResponseTime(null);
+                    updateResponseSize(null);
+                }
+                toast.error(message);
+                return;
             }
             requestConfig.url = builder.applyScriptParamMutations({
                 requestConfig,
@@ -1372,7 +1438,7 @@ export async function handleGenerateCurl() {
     const bodyMode = bodyModeSelect?.value || 'json';
     let bodyType;
 
-    if (['POST', 'PUT', 'PATCH'].includes(method) ||
+    if (methodCarriesBody(method) ||
         ['formdata', 'urlencoded', 'binary'].includes(bodyMode)) {
         const captured = captureSnippetBody({
             bodyMode,

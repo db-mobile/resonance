@@ -3,6 +3,8 @@
  * @module codeGenerator
  */
 
+import { methodCarriesBody } from './utils/bodyMethods.js';
+
 /**
  * @typedef {Object} RequestConfig
  * @property {string} [method]
@@ -116,7 +118,7 @@ function hasBody(config) {
     if (isFormDataBody(config) || isUrlencodedBody(config) || isBinaryBody(config)) {
         return true;
     }
-    return Boolean(config.body) && ['POST', 'PUT', 'PATCH'].includes((config.method || 'GET').toUpperCase());
+    return Boolean(config.body) && methodCarriesBody(config.method);
 }
 
 /**

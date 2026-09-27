@@ -276,12 +276,14 @@ export async function handleMqttSend(broker, options = {}) {
             transcript: ''
         });
         clearResponseDisplayForTab(tabId);
-    } else {
+    } else if (current.state !== 'open') {
         session.set(tabId, { ...current, state: 'connecting' });
     }
 
-    await session.updateStatus(tabId, 'MQTT connecting...', null);
-    await updateMqttUiIfActive(tabId);
+    if (session.get(tabId)?.state !== 'open') {
+        await session.updateStatus(tabId, 'MQTT connecting...', null);
+        await updateMqttUiIfActive(tabId);
+    }
 
     const tls = await buildMqttTlsOptions(normalizedBroker);
     const connectRequest = {

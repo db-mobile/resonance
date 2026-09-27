@@ -5,6 +5,19 @@
 
 import { toast } from '../ui/Toast.js';
 
+/** @type {string} */
+export const PRE_REQUEST_SCRIPT_ERROR = 'PreRequestScriptError';
+
+/**
+ * @param {Array<string>} errors
+ * @returns {Error}
+ */
+function preRequestScriptError(errors) {
+    const error = new Error((errors || []).filter(Boolean).join('\n') || 'the script failed');
+    error.name = PRE_REQUEST_SCRIPT_ERROR;
+    return error;
+}
+
 export class ScriptController {
     /**
      * @param {Object} scriptService
@@ -80,14 +93,16 @@ export class ScriptController {
             }
 
             if (!result.success) {
-                this._showScriptError('Pre-request script error', result.errors);
+                throw preRequestScriptError(result.errors);
             }
 
             return modifiedRequest;
 
         } catch (error) {
-            this._showError('Pre-request script error', error.message);
-            return requestConfig;
+            if (error.name === PRE_REQUEST_SCRIPT_ERROR) {
+                throw error;
+            }
+            throw preRequestScriptError([error.message]);
         }
     }
 

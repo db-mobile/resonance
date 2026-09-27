@@ -226,7 +226,9 @@
     "response": "Response",
     "status": "Status",
     "time": "Time",
-    "size": "Size"
+    "size": "Size",
+    "disconnect": "Disconnect",
+    "cancel": "Cancel"
   },
   "tabs": {
     "path_params": "Path Params",
@@ -329,7 +331,8 @@
     "updates_not_available": "Updates not available in this build",
     "updates_managed_externally": "Updates are managed by your package manager",
     "version_info": "Version Information",
-    "current_version": "Current version"
+    "current_version": "Current version",
+    "retry_update": "Retry"
   },
   "theme": {
     "light": "Light",
@@ -582,7 +585,8 @@
     "history_passed": "{{count}} passed",
     "history_failed": "{{count}} failed",
     "history_source": "Run from {{date}}",
-    "history_no_body": "Response bodies, headers and cookies are not kept in run history"
+    "history_no_body": "Response bodies, headers and cookies are not kept in run history",
+    "pre_request_failed": "Pre-request script failed, so the request was not sent: {{message}}"
   },
   "mqtt": {
     "title": "MQTT",
@@ -614,5 +618,8 @@
     "confirm": "Move",
     "root": "(Collection root)",
     "error": "Could not move the request: {{message}}"
+  },
+  "grpc": {
+    "add_import_path": "Add import path"
   }
 }

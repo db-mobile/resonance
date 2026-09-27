@@ -90,8 +90,8 @@ ntlmclient = "0.2"
 # Cryptographic RNG for OAuth PKCE verifiers and CSRF state (OS entropy, OpenSSL-free)
 getrandom = "0.3"
 
-# Proto file parsing
-which = "6"
+# Proto file parsing (pure Rust; bundles the well-known types, no protoc needed)
+protox = "0.8"
 
 # JavaScript engine for script execution
 boa_engine = "0.19"

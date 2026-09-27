@@ -857,6 +857,22 @@ describe('RunnerService', () => {
             expect(mockBackendAPI.scripts.executeTest).not.toHaveBeenCalled();
         });
 
+        test('a failing pre-request script skips the send and fails the request', async () => {
+            service._getEndpointScripts = jest.fn().mockResolvedValue({ preRequestScript: 'boom()', testScript: '' });
+            service._runPreRequestScript = jest.fn(async (script, prepared, variables, outcome) => {
+                outcome.errors.push('ReferenceError: boom is not defined');
+                outcome.logs.push({ level: 'log', message: 'before boom' });
+                return prepared.requestConfig;
+            });
+
+            const result = await service._executeRequest(request, {}, 0);
+
+            expect(mockBackendAPI.sendApiRequest).not.toHaveBeenCalled();
+            expect(result.status).toBe('error');
+            expect(result.error).toContain('boom is not defined');
+            expect(result.logs).toEqual([{ level: 'log', message: 'before boom' }]);
+        });
+
         test('marks the request failed when an assertion fails', async () => {
             mockBackendAPI.scripts.executeTest.mockResolvedValue({
                 modifiedEnvironment: {},
