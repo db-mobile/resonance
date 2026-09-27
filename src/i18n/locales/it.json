@@ -446,7 +446,8 @@
     "log_time_ms": "Tempo (ms)",
     "status_code": "Codice di stato",
     "ok": "OK",
-    "error_toggle_server": "Impossibile attivare/disattivare il server"
+    "error_toggle_server": "Impossibile attivare/disattivare il server",
+    "template_hint": "Le stringhe possono usare {{request.params.id}}, {{request.query.nome}}, {{request.headers.nome}}, {{request.body.percorso}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} e {{$randomInt}}. Invia \"Prefer: code=404\" o \"Prefer: example=nome\" per ottenere un’altra risposta documentata."
   },
   "runner": {
     "title": "Collection Runner",

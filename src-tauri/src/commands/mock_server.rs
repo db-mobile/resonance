@@ -1,7 +1,8 @@
 use axum::{
     Router,
+    body::Bytes,
     extract::{Query, State as AxumState},
-    http::{Method, StatusCode, Uri},
+    http::{HeaderMap, Method, StatusCode, Uri},
     response::Json,
     routing::any,
 };
@@ -32,7 +33,6 @@ pub struct MockEndpoint {
     pub path_regex: Regex,
     #[allow(dead_code)] // Stored for debugging/future use
     pub path_pattern: String,
-    #[allow(dead_code)] // Stored for path parameter extraction
     pub param_names: Vec<String>,
     pub endpoint: Value,
     pub collection_id: String,
@@ -405,152 +405,353 @@ async fn handle_mock_request(
     uri: Uri,
     Query(query): Query<HashMap<String, String>>,
     AxumState(state): AxumState<MockServerState>,
+    headers: HeaderMap,
+    body: Bytes,
 ) -> (StatusCode, Json<Value>) {
     let start = std::time::Instant::now();
     let path = uri.path().to_string();
 
-    // First pass: find matching endpoint and extract needed data
     let match_result = {
         let endpoints = state.endpoints.read().unwrap();
         let settings = state.settings.read().unwrap();
 
-        let mut found = None;
-        for endpoint in endpoints.iter() {
-            if endpoint.method != method.as_str().to_uppercase() {
-                continue;
-            }
-
-            if endpoint.path_regex.is_match(&path) {
-                let delay_key = format!(
-                    "{}_{}",
-                    endpoint.collection_id,
-                    endpoint
-                        .endpoint
-                        .get("id")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                );
-
-                let delay = settings.endpoint_delays.get(&delay_key).copied();
-                let custom_response = settings.custom_responses.get(&delay_key).cloned();
-                let custom_status = settings.custom_status_codes.get(&delay_key).copied();
-                let endpoint_data = endpoint.endpoint.clone();
-                let matched_info = MatchedEndpointInfo {
-                    collection_id: endpoint.collection_id.clone(),
-                    collection_name: endpoint.collection_name.clone(),
-                    endpoint_id: endpoint
-                        .endpoint
-                        .get("id")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string(),
-                    endpoint_name: endpoint
-                        .endpoint
-                        .get("name")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string(),
-                };
-
-                found = Some((
-                    delay_key,
-                    delay,
-                    custom_response,
-                    custom_status,
-                    endpoint_data,
-                    matched_info,
-                ));
-                break;
-            }
-        }
-        found
+        endpoints
+            .iter()
+            .filter(|endpoint| endpoint.method == method.as_str().to_uppercase())
+            .find_map(|endpoint| {
+                let captures = endpoint.path_regex.captures(&path)?;
+                let params: HashMap<String, String> = endpoint
+                    .param_names
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, name)| {
+                        captures
+                            .get(index + 1)
+                            .map(|m| (name.clone(), percent_decode(m.as_str())))
+                    })
+                    .collect();
+                let endpoint_id = endpoint
+                    .endpoint
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let key = format!("{}_{}", endpoint.collection_id, endpoint_id);
+                Some(MatchedRoute {
+                    delay: settings.endpoint_delays.get(&key).copied(),
+                    custom_response: settings.custom_responses.get(&key).cloned(),
+                    custom_status: settings.custom_status_codes.get(&key).copied(),
+                    endpoint: endpoint.endpoint.clone(),
+                    params,
+                    info: MatchedEndpointInfo {
+                        collection_id: endpoint.collection_id.clone(),
+                        collection_name: endpoint.collection_name.clone(),
+                        endpoint_name: endpoint
+                            .endpoint
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                        endpoint_id,
+                    },
+                })
+            })
     };
 
-    // Process the match
-    if let Some((_delay_key, delay, custom_response, custom_status, endpoint_data, matched_info)) =
-        match_result
-    {
-        // Apply delay if configured
-        if let Some(delay_ms) = delay {
-            tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
-        }
+    let Some(route) = match_result else {
+        push_log(
+            &state,
+            RequestLog {
+                id: Uuid::new_v4().to_string(),
+                timestamp: chrono::Utc::now().timestamp_millis(),
+                method: method.to_string(),
+                path: path.clone(),
+                query,
+                response_status: 404,
+                response_time: start.elapsed().as_millis() as u64,
+                matched_endpoint: None,
+            },
+        );
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "error": "Endpoint not found",
+                "path": path,
+                "method": method.to_string()
+            })),
+        );
+    };
 
-        let response = custom_response.unwrap_or_else(|| generate_mock_response(&endpoint_data));
-        let status_code = custom_status.unwrap_or(200);
+    if let Some(delay_ms) = route.delay {
+        tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+    }
 
-        // Log request
-        let log = RequestLog {
+    let prefer = parse_prefer(&headers);
+    let (status_code, template) = if prefer.code.is_some() || prefer.example.is_some() {
+        let (code, body) =
+            select_mock_response(&route.endpoint, prefer.code, prefer.example.as_deref());
+        (code.unwrap_or(200), body)
+    } else {
+        let (spec_code, spec_body) = select_mock_response(&route.endpoint, None, None);
+        (
+            route.custom_status.or(spec_code).unwrap_or(200),
+            route.custom_response.unwrap_or(spec_body),
+        )
+    };
+
+    let body_text = String::from_utf8_lossy(&body).into_owned();
+    let context = TemplateContext {
+        method: method.to_string(),
+        path: path.clone(),
+        params: route.params,
+        query: query.clone(),
+        headers,
+        body_json: serde_json::from_str(&body_text).ok(),
+        body_text,
+    };
+    let response = render_template(&template, &context);
+
+    push_log(
+        &state,
+        RequestLog {
             id: Uuid::new_v4().to_string(),
             timestamp: chrono::Utc::now().timestamp_millis(),
             method: method.to_string(),
-            path: path.clone(),
+            path,
             query,
             response_status: status_code,
             response_time: start.elapsed().as_millis() as u64,
-            matched_endpoint: Some(matched_info),
-        };
-
-        push_log(&state, log);
-
-        return (
-            StatusCode::from_u16(status_code).unwrap_or(StatusCode::OK),
-            Json(response),
-        );
-    }
-
-    // 404 - Not found
-    let log = RequestLog {
-        id: Uuid::new_v4().to_string(),
-        timestamp: chrono::Utc::now().timestamp_millis(),
-        method: method.to_string(),
-        path: path.clone(),
-        query,
-        response_status: 404,
-        response_time: start.elapsed().as_millis() as u64,
-        matched_endpoint: None,
-    };
-
-    push_log(&state, log);
+            matched_endpoint: Some(route.info),
+        },
+    );
 
     (
-        StatusCode::NOT_FOUND,
-        Json(serde_json::json!({
-            "error": "Endpoint not found",
-            "path": path,
-            "method": method.to_string()
-        })),
+        StatusCode::from_u16(status_code).unwrap_or(StatusCode::OK),
+        Json(response),
     )
 }
 
-fn generate_mock_response(endpoint: &Value) -> Value {
-    // Try to find response schema and generate example. The media-type key
-    // contains a slash, so the JSON pointer needs the ~1 escape; the unescaped
-    // variant is kept for responses stored as nested objects.
-    if let Some(responses) = endpoint.get("responses") {
-        for code in ["200", "201", "202", "204"] {
-            if let Some(response) = responses.get(code) {
-                if let Some(example) = response
-                    .pointer("/content/application~1json/example")
-                    .or_else(|| response.pointer("/content/application/json/example"))
-                {
-                    return example.clone();
-                }
-                if let Some(schema) = response
-                    .pointer("/content/application~1json/schema")
-                    .or_else(|| response.pointer("/content/application/json/schema"))
-                {
-                    return generate_from_schema(schema);
-                }
+struct MatchedRoute {
+    delay: Option<u64>,
+    custom_response: Option<Value>,
+    custom_status: Option<u16>,
+    endpoint: Value,
+    params: HashMap<String, String>,
+    info: MatchedEndpointInfo,
+}
+
+fn percent_decode(text: &str) -> String {
+    url::form_urlencoded::parse(format!("v={}", text.replace('+', "%2B")).as_bytes())
+        .next()
+        .map(|(_, v)| v.into_owned())
+        .unwrap_or_else(|| text.to_string())
+}
+
+#[derive(Default)]
+struct Prefer {
+    code: Option<u16>,
+    example: Option<String>,
+}
+
+/// Reads a Prism-style `Prefer: code=404, example=notFound` header, which lets
+/// a client pick one of the spec's documented responses per request.
+fn parse_prefer(headers: &HeaderMap) -> Prefer {
+    let mut prefer = Prefer::default();
+    for value in headers.get_all("prefer") {
+        let Ok(text) = value.to_str() else { continue };
+        for part in text.split([',', ';']) {
+            let Some((key, val)) = part.split_once('=') else {
+                continue;
+            };
+            let val = val.trim().trim_matches('"');
+            match key.trim().to_ascii_lowercase().as_str() {
+                "code" => prefer.code = val.parse().ok(),
+                "example" => prefer.example = Some(val.to_string()),
+                _ => {}
+            }
+        }
+    }
+    prefer
+}
+
+fn json_content(response: &Value) -> Option<&Value> {
+    response
+        .pointer("/content/application~1json")
+        .or_else(|| response.pointer("/content/application/json"))
+}
+
+/// Body for one documented response: the named example when asked for one,
+/// else the single `example`, else the first of `examples`, else a body
+/// generated from the schema.
+fn body_for_response(response: &Value, example_name: Option<&str>) -> Option<Value> {
+    let content = json_content(response)?;
+    let examples = content.get("examples").and_then(|e| e.as_object());
+    if let (Some(name), Some(examples)) = (example_name, examples)
+        && let Some(named) = examples.get(name)
+    {
+        return Some(named.get("value").cloned().unwrap_or_else(|| named.clone()));
+    }
+    if let Some(example) = content.get("example") {
+        return Some(example.clone());
+    }
+    if let Some(first) = examples.and_then(|e| e.values().next()) {
+        return Some(first.get("value").cloned().unwrap_or_else(|| first.clone()));
+    }
+    content.get("schema").map(generate_from_schema)
+}
+
+/// Chooses the status and body to mock from the endpoint's documented
+/// responses. Without a preference the first success response wins.
+fn select_mock_response(
+    endpoint: &Value,
+    prefer_code: Option<u16>,
+    prefer_example: Option<&str>,
+) -> (Option<u16>, Value) {
+    let responses = endpoint.get("responses").and_then(|r| r.as_object());
+
+    if let Some(code) = prefer_code {
+        let body = responses
+            .and_then(|r| r.get(&code.to_string()))
+            .and_then(|response| body_for_response(response, prefer_example))
+            .unwrap_or_else(|| serde_json::json!({ "message": format!("No documented body for status {code}") }));
+        return (Some(code), body);
+    }
+
+    if let Some(responses) = responses {
+        let mut codes: Vec<&String> = responses.keys().filter(|c| c.starts_with('2')).collect();
+        codes.sort();
+        if let Some(name) = prefer_example
+            && let Some((code, body)) = responses.iter().find_map(|(code, response)| {
+                json_content(response)
+                    .and_then(|c| c.get("examples"))
+                    .and_then(|e| e.get(name))
+                    .map(|_| (code, body_for_response(response, Some(name))))
+            })
+        {
+            return (code.parse().ok(), body.unwrap_or(Value::Null));
+        }
+        for code in codes {
+            if let Some(body) = body_for_response(&responses[code], None) {
+                return (code.parse().ok(), body);
             }
         }
     }
 
-    // Fallback
-    serde_json::json!({
-        "message": "Mock response",
-        "success": true,
-        "timestamp": chrono::Utc::now().to_rfc3339()
-    })
+    (
+        None,
+        serde_json::json!({
+            "message": "Mock response",
+            "success": true,
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        }),
+    )
+}
+
+#[cfg(test)]
+fn generate_mock_response(endpoint: &Value) -> Value {
+    select_mock_response(endpoint, None, None).1
+}
+
+struct TemplateContext {
+    method: String,
+    path: String,
+    params: HashMap<String, String>,
+    query: HashMap<String, String>,
+    headers: HeaderMap,
+    body_text: String,
+    body_json: Option<Value>,
+}
+
+static PLACEHOLDER: std::sync::LazyLock<Regex> =
+    std::sync::LazyLock::new(|| Regex::new(r"\{\{\s*([^{}]+?)\s*\}\}").unwrap());
+
+fn random_u32() -> u32 {
+    let bytes = Uuid::new_v4().into_bytes();
+    u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+}
+
+/// Resolves one placeholder expression against the incoming request, or the
+/// dynamic values `$uuid`, `$timestamp`, `$isoTimestamp` and `$randomInt`.
+fn lookup_placeholder(expr: &str, ctx: &TemplateContext) -> Option<Value> {
+    match expr {
+        "$uuid" | "$guid" | "$randomUUID" => return Some(Value::from(Uuid::new_v4().to_string())),
+        "$timestamp" => return Some(Value::from(chrono::Utc::now().timestamp())),
+        "$isoTimestamp" => return Some(Value::from(chrono::Utc::now().to_rfc3339())),
+        "$randomInt" => return Some(Value::from(random_u32() % 1001)),
+        "request.method" => return Some(Value::from(ctx.method.clone())),
+        "request.path" => return Some(Value::from(ctx.path.clone())),
+        "request.body" => {
+            return Some(
+                ctx.body_json
+                    .clone()
+                    .unwrap_or_else(|| Value::from(ctx.body_text.clone())),
+            );
+        }
+        _ => {}
+    }
+    if let Some(name) = expr.strip_prefix("request.params.") {
+        return ctx.params.get(name).map(|v| Value::from(v.clone()));
+    }
+    if let Some(name) = expr.strip_prefix("request.query.") {
+        return ctx.query.get(name).map(|v| Value::from(v.clone()));
+    }
+    if let Some(name) = expr.strip_prefix("request.headers.") {
+        return ctx
+            .headers
+            .get(name.to_ascii_lowercase())
+            .and_then(|v| v.to_str().ok())
+            .map(|v| Value::from(v.to_string()));
+    }
+    if let Some(path) = expr.strip_prefix("request.body.") {
+        let mut current = ctx.body_json.as_ref()?;
+        for part in path.split('.') {
+            current = match current {
+                Value::Array(items) => items.get(part.parse::<usize>().ok()?)?,
+                Value::Object(map) => map.get(part)?,
+                _ => return None,
+            };
+        }
+        return Some(current.clone());
+    }
+    None
+}
+
+fn value_as_text(value: &Value) -> String {
+    match value {
+        Value::String(text) => text.clone(),
+        other => other.to_string(),
+    }
+}
+
+/// Fills `{{…}}` placeholders in every string of a response body. A string
+/// that is exactly one placeholder takes the value's JSON type, so
+/// `"{{request.body.count}}"` stays a number; unknown placeholders are kept.
+fn render_template(value: &Value, ctx: &TemplateContext) -> Value {
+    match value {
+        Value::String(text) => {
+            if let Some(caps) = PLACEHOLDER.captures(text)
+                && caps.get(0).map(|m| m.as_str().len()) == Some(text.len())
+                && let Some(found) = lookup_placeholder(&caps[1], ctx)
+            {
+                return found;
+            }
+            let rendered = PLACEHOLDER.replace_all(text, |caps: &regex::Captures| {
+                lookup_placeholder(&caps[1], ctx)
+                    .map(|v| value_as_text(&v))
+                    .unwrap_or_else(|| caps[0].to_string())
+            });
+            Value::String(rendered.into_owned())
+        }
+        Value::Array(items) => {
+            Value::Array(items.iter().map(|v| render_template(v, ctx)).collect())
+        }
+        Value::Object(map) => Value::Object(
+            map.iter()
+                .map(|(k, v)| (k.clone(), render_template(v, ctx)))
+                .collect(),
+        ),
+        other => other.clone(),
+    }
 }
 
 fn generate_from_schema(schema: &Value) -> Value {
@@ -816,5 +1017,143 @@ mod tests {
             call(&state, "GET", "/missing").await;
         }
         assert_eq!(state.logs.read().unwrap().len(), MAX_LOGS);
+    }
+
+    async fn call_with(
+        state: &MockServerState,
+        method: &str,
+        uri: &str,
+        headers: &[(&str, &str)],
+        body: &str,
+    ) -> (StatusCode, Value) {
+        let mut builder = Request::builder().method(method).uri(uri);
+        for (name, value) in headers {
+            builder = builder.header(*name, *value);
+        }
+        let response = build_router(state.clone())
+            .oneshot(builder.body(Body::from(body.to_string())).unwrap())
+            .await
+            .unwrap();
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (
+            status,
+            serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+        )
+    }
+
+    fn state_with_custom(endpoints: Vec<Value>, custom: Value) -> MockServerState {
+        let state = state_with(endpoints);
+        state
+            .settings
+            .write()
+            .unwrap()
+            .custom_responses
+            .insert("c1_e1".to_string(), custom);
+        state
+    }
+
+    #[tokio::test]
+    async fn templates_echo_the_request_and_keep_json_types() {
+        let state = state_with_custom(
+            vec![endpoint("e1", "POST", "/users/{id}/orders")],
+            serde_json::json!({
+                "userId": "{{request.params.id}}",
+                "sort": "{{request.query.sort}}",
+                "trace": "trace-{{request.headers.X-Trace}}",
+                "count": "{{request.body.items.1.qty}}",
+                "echo": "{{request.body}}",
+                "method": "{{request.method}} {{request.path}}",
+                "id": "{{$uuid}}",
+                "unknown": "{{nope}}"
+            }),
+        );
+
+        let (status, body) = call_with(
+            &state,
+            "POST",
+            "/users/42/orders?sort=asc",
+            &[("x-trace", "abc"), ("content-type", "application/json")],
+            r#"{"items":[{"qty":1},{"qty":3}]}"#,
+        )
+        .await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["userId"], "42");
+        assert_eq!(body["sort"], "asc");
+        assert_eq!(body["trace"], "trace-abc");
+        assert_eq!(body["count"], 3);
+        assert_eq!(body["echo"]["items"][0]["qty"], 1);
+        assert_eq!(body["method"], "POST /users/42/orders");
+        assert_eq!(body["id"].as_str().unwrap().len(), 36);
+        assert_eq!(body["unknown"], "{{nope}}");
+    }
+
+    fn documented() -> Value {
+        serde_json::json!({
+            "id": "e1", "name": "Get user", "method": "GET", "path": "/users/{id}",
+            "responses": {
+                "201": { "content": { "application/json": { "example": { "created": true } } } },
+                "404": { "content": { "application/json": { "examples": {
+                    "missing": { "value": { "error": "no such user {{request.params.id}}" } },
+                    "gone": { "value": { "error": "deleted" } }
+                } } } }
+            }
+        })
+    }
+
+    #[tokio::test]
+    async fn the_documented_success_status_is_used_by_default() {
+        let state = state_with(vec![documented()]);
+        let (status, body) = call_with(&state, "GET", "/users/1", &[], "").await;
+        assert_eq!(status, StatusCode::CREATED);
+        assert_eq!(body, serde_json::json!({ "created": true }));
+    }
+
+    #[tokio::test]
+    async fn a_prefer_header_selects_a_documented_status_and_example() {
+        let state = state_with(vec![documented()]);
+
+        let (status, body) =
+            call_with(&state, "GET", "/users/9", &[("prefer", "code=404")], "").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body["error"], "no such user 9");
+
+        let (status, body) = call_with(
+            &state,
+            "GET",
+            "/users/9",
+            &[("prefer", "code=404, example=gone")],
+            "",
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body["error"], "deleted");
+
+        let (status, body) =
+            call_with(&state, "GET", "/users/9", &[("prefer", "example=gone")], "").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body["error"], "deleted");
+    }
+
+    #[tokio::test]
+    async fn a_prefer_header_wins_over_the_custom_response() {
+        let mut ep = documented();
+        ep["id"] = serde_json::json!("e1");
+        let state = state_with_custom(vec![ep], serde_json::json!({ "custom": true }));
+
+        let (_, plain) = call_with(&state, "GET", "/users/1", &[], "").await;
+        assert_eq!(plain, serde_json::json!({ "custom": true }));
+
+        let (status, _) = call_with(&state, "GET", "/users/1", &[("prefer", "code=404")], "").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn encoded_path_params_are_decoded() {
+        assert_eq!(percent_decode("a%20b"), "a b");
+        assert_eq!(percent_decode("a+b"), "a+b");
     }
 }

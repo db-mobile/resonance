@@ -596,6 +596,14 @@ export class MockServerDialog {
             bodyLabelEl.textContent = t('mock_server.response_body', 'Response Body (JSON)');
         }
 
+        const templateHintEl = dialog.querySelector('[data-role="template-hint"]');
+        if (templateHintEl) {
+            templateHintEl.textContent = t(
+                'mock_server.template_hint',
+                'Strings may use {{request.params.id}}, {{request.query.name}}, {{request.headers.name}}, {{request.body.path}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} and {{$randomInt}}. Send "Prefer: code=404" or "Prefer: example=name" to get another documented response.'
+            );
+        }
+
         const resetTextEl = dialog.querySelector('[data-role="reset"]');
         if (resetTextEl) {
             resetTextEl.textContent = t('mock_server.reset_to_default', 'Reset to Default');

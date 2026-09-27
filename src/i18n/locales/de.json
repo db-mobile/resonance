@@ -446,7 +446,8 @@
     "log_time_ms": "Zeit (ms)",
     "status_code": "Statuscode",
     "ok": "OK",
-    "error_toggle_server": "Server konnte nicht umgeschaltet werden"
+    "error_toggle_server": "Server konnte nicht umgeschaltet werden",
+    "template_hint": "Zeichenketten können {{request.params.id}}, {{request.query.name}}, {{request.headers.name}}, {{request.body.pfad}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} und {{$randomInt}} enthalten. Mit „Prefer: code=404“ oder „Prefer: example=name“ erhält man eine andere dokumentierte Antwort."
   },
   "runner": {
     "title": "Collection Runner",

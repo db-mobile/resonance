@@ -446,7 +446,8 @@
     "log_time_ms": "Tempo (ms)",
     "status_code": "Código de Status",
     "ok": "OK",
-    "error_toggle_server": "Falha ao alternar servidor"
+    "error_toggle_server": "Falha ao alternar servidor",
+    "template_hint": "As strings podem usar {{request.params.id}}, {{request.query.nome}}, {{request.headers.nome}}, {{request.body.caminho}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} e {{$randomInt}}. Envie \"Prefer: code=404\" ou \"Prefer: example=nome\" para obter outra resposta documentada."
   },
   "preview": {
     "toggle": "Alternar Visualização",

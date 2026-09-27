@@ -446,7 +446,8 @@
     "log_time_ms": "Temps (ms)",
     "status_code": "Code de statut",
     "ok": "OK",
-    "error_toggle_server": "Échec du basculement du serveur"
+    "error_toggle_server": "Échec du basculement du serveur",
+    "template_hint": "Les chaînes peuvent utiliser {{request.params.id}}, {{request.query.nom}}, {{request.headers.nom}}, {{request.body.chemin}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} et {{$randomInt}}. Envoyez « Prefer: code=404 » ou « Prefer: example=nom » pour obtenir une autre réponse documentée."
   },
   "runner": {
     "title": "Collection Runner",

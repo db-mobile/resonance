@@ -446,7 +446,8 @@
     "log_time_ms": "Tiempo (ms)",
     "status_code": "Código de estado",
     "ok": "OK",
-    "error_toggle_server": "Error al cambiar el servidor"
+    "error_toggle_server": "Error al cambiar el servidor",
+    "template_hint": "Las cadenas pueden usar {{request.params.id}}, {{request.query.nombre}}, {{request.headers.nombre}}, {{request.body.ruta}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} y {{$randomInt}}. Envía \"Prefer: code=404\" o \"Prefer: example=nombre\" para obtener otra respuesta documentada."
   },
   "runner": {
     "title": "Collection Runner",

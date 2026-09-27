@@ -47,7 +47,7 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 - **OpenAPI 3.0 import** (YAML/JSON) with schema-based example generation, **Postman import & export** (v2.0/v2.1 collections and environments), **cURL import** (paste a command), **OpenAPI export** (YAML/JSON)
 - **Code generation in 9 languages** — cURL, Python, JavaScript (Fetch/Axios), Node.js, Go, PHP, Ruby, Java
 - **Documentation generation** — Markdown or HTML docs from any collection, with parameter tables, saved examples, and code samples
-- **Built-in mock server** — generates responses from OpenAPI schemas, custom bodies and delays per endpoint, request logging
+- **Built-in mock server** — generates responses from OpenAPI schemas and examples, custom bodies, status codes and delays per endpoint, response templating (`{{request.params.id}}`, `{{request.body.field}}`, `{{$uuid}}` …), `Prefer: code=… / example=…` to pick a documented response, request logging
 
 ### Automation & Testing
 
