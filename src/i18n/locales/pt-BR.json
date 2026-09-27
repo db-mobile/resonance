@@ -32,6 +32,15 @@
     "search_empty": {
       "title": "Nenhuma coleção correspondente",
       "subtitle": "Tente outro nome de coleção ou requisição"
+    },
+    "load_errors": {
+      "toast_one": "Não foi possível carregar 1 coleção",
+      "toast_other": "Não foi possível carregar {{count}} coleções",
+      "locate": "Localizar…",
+      "remove": "Remover da lista",
+      "retry": "Tentar novamente",
+      "removed_toast": "Removido da lista. A pasta não foi alterada.",
+      "relocated_toast": "\"{{name}}\" encontrado no novo local"
     }
   },
   "import": {
@@ -122,7 +131,9 @@
     "delete_title": "Excluir Requisição",
     "confirm_delete": "Tem certeza de que deseja excluir a requisição \"{{name}}\"?\n\nEsta ação não pode ser desfeita.",
     "rename_title": "Renomear Requisição",
-    "rename_label": "Nome da Requisição:"
+    "rename_label": "Nome da Requisição:",
+    "copy_name": "{{name}} (cópia)",
+    "duplicate_error": "Não foi possível duplicar a requisição: {{message}}"
   },
   "context_menu": {
     "new_collection": "Nova Coleção",
@@ -142,7 +153,13 @@
     "unpin_request": "Desafixar Requisição",
     "close_collection": "Fechar coleção",
     "run_collection": "Executar coleção",
-    "run_folder": "Executar pasta"
+    "run_folder": "Executar pasta",
+    "new_folder": "Nova pasta",
+    "new_subfolder": "Nova subpasta",
+    "rename_folder": "Renomear pasta",
+    "delete_folder": "Excluir pasta",
+    "duplicate_request": "Duplicar requisição",
+    "move_request": "Mover para pasta…"
   },
   "docs": {
     "title": "Gerar Documentação",
@@ -214,7 +231,9 @@
     "response": "Resposta",
     "status": "Status",
     "time": "Tempo",
-    "size": "Tamanho"
+    "size": "Tamanho",
+    "disconnect": "Desconectar",
+    "cancel": "Cancelar"
   },
   "tabs": {
     "path_params": "Parâmetros de Caminho",
@@ -256,6 +275,8 @@
   "settings": {
     "title": "Configurações",
     "tab_general": "Geral",
+    "group_appearance": "Aparência",
+    "group_requests": "Requisições",
     "tab_proxy": "Proxy",
     "tab_certificates": "Certificados",
     "certs_title": "Certificados de cliente (mTLS)",
@@ -315,7 +336,8 @@
     "updates_not_available": "Atualizações não disponíveis nesta versão",
     "updates_managed_externally": "As atualizações são gerenciadas pelo seu gerenciador de pacotes",
     "version_info": "Informações da Versão",
-    "current_version": "Versão atual"
+    "current_version": "Versão atual",
+    "retry_update": "Tentar novamente"
   },
   "theme": {
     "light": "Claro",
@@ -339,7 +361,8 @@
     "remove": "Remover",
     "close": "Fechar",
     "yes": "Sim",
-    "no": "Não"
+    "no": "Não",
+    "create": "Criar"
   },
   "errors": {
     "network": "Erro de rede",
@@ -431,7 +454,8 @@
     "log_time_ms": "Tempo (ms)",
     "status_code": "Código de Status",
     "ok": "OK",
-    "error_toggle_server": "Falha ao alternar servidor"
+    "error_toggle_server": "Falha ao alternar servidor",
+    "template_hint": "As strings podem usar {{request.params.id}}, {{request.query.nome}}, {{request.headers.nome}}, {{request.body.caminho}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} e {{$randomInt}}. Envie \"Prefer: code=404\" ou \"Prefer: example=nome\" para obter outra resposta documentada."
   },
   "preview": {
     "toggle": "Alternar Visualização",
@@ -566,7 +590,8 @@
     "history_passed": "{{count}} aprovadas",
     "history_failed": "{{count}} com falha",
     "history_source": "Execução de {{date}}",
-    "history_no_body": "O histórico não guarda corpos de resposta, cabeçalhos nem cookies"
+    "history_no_body": "O histórico não guarda corpos de resposta, cabeçalhos nem cookies",
+    "pre_request_failed": "O script de pré-requisição falhou, então a requisição não foi enviada: {{message}}"
   },
   "mqtt": {
     "title": "MQTT",
@@ -583,5 +608,23 @@
     "status_connecting": "Conectando…",
     "status_connected": "Conectado",
     "status_connected_count": "Conectado · {{count}} recebidos"
+  },
+  "folder": {
+    "new_title": "Nova pasta",
+    "rename_title": "Renomear pasta",
+    "name_label": "Nome da pasta:",
+    "delete_title": "Excluir pasta",
+    "confirm_delete": "Excluir a pasta \"{{name}}\" e as {{count}} requisições nela?\n\nEsta ação não pode ser desfeita.",
+    "error": "A ação na pasta falhou: {{message}}"
+  },
+  "move_request": {
+    "title": "Mover requisição",
+    "label": "Mover para:",
+    "confirm": "Mover",
+    "root": "(Raiz da coleção)",
+    "error": "Não foi possível mover a requisição: {{message}}"
+  },
+  "grpc": {
+    "add_import_path": "Adicionar caminho de importação"
   }
 }

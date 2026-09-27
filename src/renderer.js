@@ -238,7 +238,7 @@ const SHORTCUTS = [
     {
         key: 'Escape', category: 'Request', description: 'Cancel request',
         handler: () => {
-            if (cancelRequestBtn && !cancelRequestBtn.disabled) {
+            if (cancelRequestBtn && !cancelRequestBtn.disabled && cancelRequestBtn.style.display !== 'none') {
                 handleCancelRequest();
             }
         }

@@ -105,9 +105,12 @@ pub async fn updater_check(
     Ok(info)
 }
 
+/// Downloads and installs the pending update, then restarts into it. The
+/// update stays pending until the install succeeds, so a failed download can
+/// simply be retried.
 #[tauri::command]
 pub async fn updater_download_and_install(
-    #[allow(unused_variables)] app: AppHandle,
+    app: AppHandle,
     pending_update: State<'_, PendingUpdate>,
 ) -> Result<()> {
     // Debug: simulate download and install (wait, then restart)
@@ -119,15 +122,16 @@ pub async fn updater_download_and_install(
         app.restart();
     }
 
-    let update = pending_update.0.lock().unwrap().take();
+    let update = pending_update.0.lock().unwrap().clone();
 
     let Some(update) = update else {
         return Err(UpdateError::NoPendingUpdate);
     };
 
     update.download_and_install(|_, _| {}, || {}).await?;
+    pending_update.0.lock().unwrap().take();
 
-    Ok(())
+    app.restart();
 }
 
 #[derive(Serialize)]

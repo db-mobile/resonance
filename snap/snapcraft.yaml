@@ -1,6 +1,6 @@
 name: db-mobile-resonance
 base: core22
-version: '3.2.2'
+version: '3.2.3'
 title: Resonance
 summary: Test and explore web services
 description: |
@@ -108,7 +108,6 @@ parts:
       - libayatana-appindicator3-1
       - libssl3
       - libproxy1v5
-      - protobuf-compiler
     source: .
     override-build: |
       set -eu

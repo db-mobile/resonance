@@ -29,7 +29,8 @@ import { toast } from '../ui/Toast.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { setRequestBodyContent } from '../requestBodyHelper.js';
 import { ChangeEmitter } from '../services/ChangeEmitter.js';
-import { flattenRequests, requestsInFolder } from '../collections/collectionTree.js';
+import { flattenRequests, requestsInFolder, folderChainForRequest, folderOutline } from '../collections/collectionTree.js';
+import { MoveRequestDialog } from '../ui/MoveRequestDialog.js';
 import { isRunnable } from '../utils/runnableRequests.js';
 import { translate } from '../utils/translate.js';
 import { DocGeneratorService } from '../services/DocGeneratorService.js';
@@ -58,6 +59,7 @@ export class CollectionController {
         this.contextMenu = new ContextMenu();
         this.renameDialog = new RenameDialog();
         this.confirmDialog = new ConfirmDialog();
+        this.moveRequestDialog = new MoveRequestDialog();
         this.variableManager = new VariableManager();
         this.collectionAuthDialog = new CollectionAuthDialog();
         this.curlImportDialog = new CurlImportDialog();
@@ -144,9 +146,13 @@ export class CollectionController {
 
         try {
             const branches = await this.repository.gitBranches();
-            this.allCollections.forEach(collection => {
-                collection.gitBranch = branches[collection.id] ?? null;
-            });
+            const branchChanged = this.allCollections.some(collection =>
+                (collection.gitBranch ?? null) !== (branches[collection.id] ?? null)
+            );
+            if (branchChanged) {
+                await this.loadCollectionsWithExpansionState();
+                return;
+            }
             this.renderer.updateGitBadges(branches);
         } catch (error) {
             return;
@@ -164,10 +170,27 @@ export class CollectionController {
         return () => this._collectionEvents.remove(listener);
     }
 
+    /** @returns {Promise<void>} */
+    async _refreshLoadErrors() {
+        const errors = await this.repository.getLoadErrors();
+        const signature = errors.map(error => `${error.path}\n${error.message}`).sort().join('\n');
+        const changed = signature !== this._loadErrorSignature;
+        this._loadErrorSignature = signature;
+        this.loadErrors = errors;
+        if (changed && errors.length > 0) {
+            toast.warning(translate(
+                errors.length === 1 ? 'sidebar.load_errors.toast_one' : 'sidebar.load_errors.toast_other',
+                errors.length === 1 ? '1 collection could not be loaded' : '{{count}} collections could not be loaded',
+                { count: errors.length }
+            ));
+        }
+    }
+
     /** @returns {Promise<Array<Object>>} */
     async loadCollections() {
         try {
             this.allCollections = await this.service.loadCollections();
+            await this._refreshLoadErrors();
             await this.renderCollections(this.allCollections);
             this._collectionEvents.emit(this.allCollections);
             return this.allCollections;
@@ -180,6 +203,7 @@ export class CollectionController {
     async loadCollectionsWithExpansionState() {
         try {
             this.allCollections = await this.service.loadCollections();
+            await this._refreshLoadErrors();
             await this.renderCollections(this.allCollections, true);
             this._collectionEvents.emit(this.allCollections);
             return this.allCollections;
@@ -216,6 +240,11 @@ export class CollectionController {
             showSearchEmptyState: isSearching && this.allCollections.length > 0,
             expandSearchResults: isSearching
         }, pinnedRequests);
+        this.renderer.renderLoadErrors(isSearching ? [] : (this.loadErrors ?? []), {
+            onLocate: (error) => this.handleLocateMissingCollection(error),
+            onRemove: (error) => this.handleRemoveMissingCollection(error),
+            onRetry: () => this.loadCollectionsWithExpansionState()
+        });
     }
 
     initializeCollectionsSearch() {
@@ -337,6 +366,12 @@ export class CollectionController {
                 onClick: () => this.handleNewRequest(collection)
             },
             {
+                label: 'New Folder',
+                translationKey: 'context_menu.new_folder',
+                iconClass: 'icon-folder',
+                onClick: () => this.handleNewFolder(collection, null)
+            },
+            {
                 label: 'Run Collection',
                 translationKey: 'context_menu.run_collection',
                 iconClass: 'icon-play',
@@ -425,6 +460,18 @@ export class CollectionController {
                 iconClass: ContextMenu.createRenameIcon(),
                 onClick: () => this.handleRenameRequest(collection, endpoint)
             },
+            {
+                label: 'Duplicate Request',
+                translationKey: 'context_menu.duplicate_request',
+                iconClass: 'icon-copy',
+                onClick: () => this.handleDuplicateRequest(collection, endpoint)
+            },
+            ...(folderOutline(collection).length > 0 ? [{
+                label: 'Move to Folder…',
+                translationKey: 'context_menu.move_request',
+                iconClass: 'icon-folder',
+                onClick: () => this.handleMoveRequest(collection, endpoint)
+            }] : []),
             {
                 label: 'Delete Request',
                 translationKey: 'context_menu.delete_request',
@@ -532,6 +579,24 @@ export class CollectionController {
     handleFolderContextMenu(event, collection, folder) {
         this.contextMenu.show(event, [
             {
+                label: 'New Request',
+                translationKey: 'context_menu.new_request',
+                iconClass: ContextMenu.createNewRequestIcon(),
+                onClick: () => this.handleNewRequest(collection, folder.id)
+            },
+            {
+                label: 'New Subfolder',
+                translationKey: 'context_menu.new_subfolder',
+                iconClass: 'icon-folder',
+                onClick: () => this.handleNewFolder(collection, folder.id)
+            },
+            {
+                label: 'Rename Folder',
+                translationKey: 'context_menu.rename_folder',
+                iconClass: ContextMenu.createRenameIcon(),
+                onClick: () => this.handleRenameFolder(collection, folder)
+            },
+            {
                 label: 'Run Folder',
                 translationKey: 'context_menu.run_folder',
                 iconClass: 'icon-play',
@@ -546,8 +611,153 @@ export class CollectionController {
                 translationKey: 'context_menu.edit_auth',
                 iconClass: 'icon-lock',
                 onClick: () => this.handleFolderAuth(collection, folder)
+            },
+            {
+                label: 'Delete Folder',
+                translationKey: 'context_menu.delete_folder',
+                iconClass: ContextMenu.createDeleteIcon(),
+                className: 'context-menu-delete',
+                onClick: () => this.handleDeleteFolder(collection, folder)
             }
         ]);
+    }
+
+    /**
+     * @param {Object} collection
+     * @param {string|null} parentFolderId
+     * @returns {Promise<void>}
+     */
+    async handleNewFolder(collection, parentFolderId) {
+        const name = await this.renameDialog.show('', {
+            title: translate('folder.new_title', 'New Folder'),
+            label: translate('folder.name_label', 'Folder Name:'),
+            confirmText: translate('common.create', 'Create')
+        });
+        if (!name) {
+            return;
+        }
+        try {
+            await this.service.createFolder(collection.id, parentFolderId, name);
+            await this.loadCollectionsWithExpansionState();
+        } catch (error) {
+            toast.error(translate('folder.error', 'Folder action failed: {{message}}', { message: error.message }));
+        }
+    }
+
+    /**
+     * @param {Object} collection
+     * @param {Object} folder
+     * @returns {Promise<void>}
+     */
+    async handleRenameFolder(collection, folder) {
+        const name = await this.renameDialog.show(folder.name, {
+            title: translate('folder.rename_title', 'Rename Folder'),
+            label: translate('folder.name_label', 'Folder Name:'),
+            confirmText: translate('common.rename', 'Rename')
+        });
+        if (!name || name === folder.name) {
+            return;
+        }
+        try {
+            await this.service.renameFolder(collection.id, folder.id, name);
+            await this.loadCollectionsWithExpansionState();
+        } catch (error) {
+            toast.error(translate('folder.error', 'Folder action failed: {{message}}', { message: error.message }));
+        }
+    }
+
+    /**
+     * @param {Object} collection
+     * @param {Object} folder
+     * @returns {Promise<void>}
+     */
+    async handleDeleteFolder(collection, folder) {
+        const count = requestsInFolder(collection, folder.id).length;
+        const confirmed = await this.confirmDialog.show(
+            translate(
+                'folder.confirm_delete',
+                'Delete the folder "{{name}}" and the {{count}} request(s) in it?\n\nThis cannot be undone.',
+                { name: folder.name, count }
+            ),
+            {
+                title: translate('folder.delete_title', 'Delete Folder'),
+                confirmText: translate('common.delete', 'Delete'),
+                cancelText: translate('common.cancel', 'Cancel'),
+                dangerous: true
+            }
+        );
+        if (!confirmed) {
+            return;
+        }
+        try {
+            const removed = await this.service.deleteFolder(collection.id, folder.id);
+            await this._resetIfCurrentEndpoint(collection.id, removed);
+            await this.loadCollectionsWithExpansionState();
+        } catch (error) {
+            toast.error(translate('folder.error', 'Folder action failed: {{message}}', { message: error.message }));
+        }
+    }
+
+    /**
+     * @param {Object} collection
+     * @param {Object} endpoint
+     * @returns {Promise<void>}
+     */
+    async handleDuplicateRequest(collection, endpoint) {
+        try {
+            const baseName = endpoint.name || endpoint.path;
+            const copyName = translate('endpoint.copy_name', '{{name}} (copy)', { name: baseName });
+            await this.service.duplicateRequest(collection.id, endpoint.id, copyName);
+            await this.loadCollectionsWithExpansionState();
+        } catch (error) {
+            toast.error(translate('endpoint.duplicate_error', 'Could not duplicate the request: {{message}}', { message: error.message }));
+        }
+    }
+
+    /**
+     * @param {Object} collection
+     * @param {Object} endpoint
+     * @returns {Promise<void>}
+     */
+    async handleMoveRequest(collection, endpoint) {
+        const currentFolderId = folderChainForRequest(collection, endpoint.id).at(-1)?.id ?? null;
+        const target = await this.moveRequestDialog.show({
+            folders: folderOutline(collection),
+            currentFolderId,
+            rootLabel: translate('move_request.root', '(Collection root)')
+        });
+        if (target === undefined || target === currentFolderId) {
+            return;
+        }
+        try {
+            await this.service.moveRequestToFolder(collection.id, endpoint.id, target);
+            await this.loadCollectionsWithExpansionState();
+        } catch (error) {
+            toast.error(translate('move_request.error', 'Could not move the request: {{message}}', { message: error.message }));
+        }
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {Array<string>} endpointIds
+     * @returns {Promise<void>}
+     */
+    async _resetIfCurrentEndpoint(collectionId, endpointIds) {
+        const current = getCurrentEndpoint();
+        if (!current || current.collectionId !== collectionId || !endpointIds.includes(current.endpointId)) {
+            return;
+        }
+        cancelPendingSaves();
+        const formElements = this.getFormElements();
+        formElements.urlInput.value = '';
+        formElements.methodSelect.value = 'GET';
+        setRequestBodyContent('');
+        this.service.clearKeyValueList(formElements.pathParamsList);
+        this.service.clearKeyValueList(formElements.headersList);
+        this.service.clearKeyValueList(formElements.queryParamsList);
+        setCurrentEndpoint(null);
+        await this.repository.clearLastSelectedRequest();
+        this.renderer.clearActiveEndpoint();
     }
 
     /**
@@ -598,13 +808,14 @@ export class CollectionController {
 
     /**
      * @param {Object} collection
+     * @param {string|null} [folderId]
      * @returns {Promise<void>}
      */
-    async handleNewRequest(collection) {
+    async handleNewRequest(collection, folderId = null) {
         try {
             const requestData = await this.showNewRequestDialog();
             if (requestData) {
-                await this.service.addRequestToCollection(collection.id, requestData);
+                await this.service.addRequestToCollection(collection.id, folderId ? { ...requestData, folderId } : requestData);
                 await this.loadCollectionsWithExpansionState();
             }
         } catch (error) {
@@ -720,6 +931,41 @@ export class CollectionController {
             }
         } catch (error) {
             void error;
+        }
+    }
+
+    /**
+     * @param {{id: string, path: string}} error
+     * @returns {Promise<void>}
+     */
+    async handleRemoveMissingCollection(error) {
+        try {
+            await this.service.closeCollection(error.id);
+            await this.closeTabsForCollection(error.id);
+            await this.loadCollectionsWithExpansionState();
+            toast.success(translate('sidebar.load_errors.removed_toast', 'Removed from the list. The folder was not touched.'));
+        } catch (err) {
+            toast.error(err.message || String(err));
+        }
+    }
+
+    /**
+     * @param {{id: string, path: string}} error
+     * @returns {Promise<void>}
+     */
+    async handleLocateMissingCollection(error) {
+        const path = await this.backendAPI.collections.pickDirectory(false).catch(() => null);
+        if (!path) {
+            return;
+        }
+        try {
+            const collection = await this.service.relocateCollection(error.id, path);
+            await this.loadCollectionsWithExpansionState();
+            toast.success(translate('sidebar.load_errors.relocated_toast', 'Found "{{name}}" in its new location', {
+                name: collection?.name || error.id
+            }));
+        } catch (err) {
+            toast.error(typeof err === 'string' ? err : (err.message || String(err)));
         }
     }
 
@@ -905,24 +1151,7 @@ export class CollectionController {
         if (confirmed) {
             try {
                 await this.service.deleteRequestFromCollection(collection.id, endpoint.id);
-
-                if (getCurrentEndpoint() &&
-                    getCurrentEndpoint().collectionId === collection.id &&
-                    getCurrentEndpoint().endpointId === endpoint.id) {
-                    cancelPendingSaves();
-                    const formElements = this.getFormElements();
-                    formElements.urlInput.value = '';
-                    formElements.methodSelect.value = 'GET';
-                    setRequestBodyContent('');
-                    this.service.clearKeyValueList(formElements.pathParamsList);
-                    this.service.clearKeyValueList(formElements.headersList);
-                    this.service.clearKeyValueList(formElements.queryParamsList);
-                    setCurrentEndpoint(null);
-
-                    await this.repository.clearLastSelectedRequest();
-
-                    this.renderer.clearActiveEndpoint();
-                }
+                await this._resetIfCurrentEndpoint(collection.id, [endpoint.id]);
 
                 await this.loadCollectionsWithExpansionState();
             } catch (error) {

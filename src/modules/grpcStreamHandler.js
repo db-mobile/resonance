@@ -1,11 +1,8 @@
 import { displayResponseWithLineNumbersForTab } from './apiHandler.js';
 import { recordGrpcHistory } from './grpcHistory.js';
 import { toast } from './ui/Toast.js';
-import {
-    StreamSession,
-    createBackendEventListener,
-    getActiveTabId
-} from './streaming/streamSession.js';
+import { StreamSession, createBackendEventListener, getActiveTabId } from './streaming/streamSession.js';
+import { isLiveEntry } from './streaming/streamState.js';
 
 const session = new StreamSession();
 
@@ -206,4 +203,12 @@ export async function clearStreamState(tabId) {
         }
     }
     session.remove(tabId);
+}
+
+/**
+ * @param {string} tabId
+ * @returns {boolean}
+ */
+export function isGrpcStreamLive(tabId) {
+    return isLiveEntry(session.get(tabId));
 }

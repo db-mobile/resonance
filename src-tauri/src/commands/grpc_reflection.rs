@@ -8,7 +8,9 @@ use prost_reflect::{DescriptorPool, DynamicMessage};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
+
+use super::cancel_registry::CancelRegistry;
 use tonic::codec::{Codec, DecodeBuf, Decoder, EncodeBuf, Encoder};
 use tonic::metadata::KeyAndValueRef;
 use tonic::metadata::{MetadataKey, MetadataValue};
@@ -58,13 +60,55 @@ pub struct GrpcUnaryRequest {
     pub deadline_ms: Option<u64>,
     #[serde(default)]
     pub tls: GrpcTlsOptions,
+    /// Caller-chosen id that `grpc_unary_cancel` targets.
+    #[serde(default)]
+    pub request_id: Option<String>,
+}
+
+/// Cancellation handles for in-flight unary calls, shared by the reflection
+/// and proto-file invoke commands.
+#[derive(Default)]
+pub struct GrpcUnaryState {
+    pub cancels: CancelRegistry,
+}
+
+/// Races `call` against a cancel for `request_id`.
+pub(crate) async fn run_cancellable_unary(
+    state: &GrpcUnaryState,
+    request_id: Option<String>,
+    call: impl std::future::Future<Output = Result<Value, String>>,
+) -> Result<Value, String> {
+    let (mut cancel_rx, _guard) = state.cancels.register(request_id);
+    tokio::select! {
+        result = call => result,
+        Ok(()) = &mut cancel_rx => Ok(serde_json::json!({
+            "success": false,
+            "cancelled": true,
+            "status": tonic::Code::Cancelled as i32,
+            "statusMessage": "cancelled"
+        })),
+    }
 }
 
 #[tauri::command]
 pub async fn grpc_invoke_unary(
     _app: AppHandle,
+    state: State<'_, GrpcUnaryState>,
     request: GrpcUnaryRequest,
 ) -> Result<Value, String> {
+    let request_id = request.request_id.clone();
+    run_cancellable_unary(&state, request_id, invoke_unary_reflection(request)).await
+}
+
+#[tauri::command]
+pub async fn grpc_unary_cancel(
+    state: State<'_, GrpcUnaryState>,
+    request_id: String,
+) -> Result<bool, String> {
+    Ok(state.cancels.cancel(&request_id))
+}
+
+async fn invoke_unary_reflection(request: GrpcUnaryRequest) -> Result<Value, String> {
     let target = normalize_target_with_tls(&request.target, request.tls.use_tls);
     let pool =
         build_descriptor_pool_for_method_with_tls(&target, &request.full_method, &request.tls)
@@ -846,5 +890,37 @@ mod tests {
             normalize_target_with_tls("https://api.example.com", false),
             "https://api.example.com"
         );
+    }
+
+    #[tokio::test]
+    async fn a_cancelled_unary_call_reports_cancelled() {
+        let state = GrpcUnaryState::default();
+        let call = async {
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            Ok(serde_json::json!({ "success": true }))
+        };
+        let (result, cancelled) = tokio::join!(
+            run_cancellable_unary(&state, Some("r1".into()), call),
+            async {
+                tokio::task::yield_now().await;
+                state.cancels.cancel("r1")
+            }
+        );
+        assert!(cancelled);
+        let value = result.unwrap();
+        assert_eq!(value["cancelled"], serde_json::json!(true));
+        assert_eq!(value["success"], serde_json::json!(false));
+    }
+
+    #[tokio::test]
+    async fn a_completed_unary_call_returns_its_result() {
+        let state = GrpcUnaryState::default();
+        let value = run_cancellable_unary(&state, Some("r1".into()), async {
+            Ok(serde_json::json!({ "success": true }))
+        })
+        .await
+        .unwrap();
+        assert_eq!(value["success"], serde_json::json!(true));
+        assert!(!state.cancels.cancel("r1"));
     }
 }

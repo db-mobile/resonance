@@ -157,5 +157,36 @@ export default [
             'no-unused-expressions': 'off',
             'max-nested-callbacks': 'off'
         }
+    },
+
+    // Glue evaluated inside the Boa script engine (src-tauri): a classic
+    // script in the same ES5 style as the glue embedded in scripts.rs
+    {
+        files: ['src-tauri/src/commands/script_glue/**/*.js'],
+        languageOptions: {
+            sourceType: 'script',
+            globals: {
+                pm: 'readonly',
+                test: 'readonly',
+                console: 'readonly',
+                __cryptoDigest__: 'readonly',
+                __cryptoHmac__: 'readonly',
+                __base64Encode__: 'readonly',
+                __base64Decode__: 'readonly',
+                __randomUUID__: 'readonly',
+                __collectionVariables__: 'readonly',
+                __setCollectionVariable__: 'readonly',
+                __environmentVariables__: 'readonly'
+            }
+        },
+        rules: {
+            'no-var': 'off',
+            'no-invalid-this': 'off',
+            'prefer-arrow-callback': 'off',
+            'prefer-template': 'off',
+            'prefer-rest-params': 'off',
+            'prefer-spread': 'off',
+            'no-use-before-define': ['error', { functions: false, variables: false }]
+        }
     }
 ];

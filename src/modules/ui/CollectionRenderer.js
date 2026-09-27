@@ -7,6 +7,7 @@ import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { flattenRequests, rootRequests, topLevelFolders } from '../collections/collectionTree.js';
 import { el } from '../htmlUtils.js';
+import { translate } from '../utils/translate.js';
 
 export class CollectionRenderer {
     /**
@@ -260,6 +261,68 @@ export class CollectionRenderer {
         }
 
         return headerDiv;
+    }
+
+    /**
+     * @param {Array<{path: string, id: (string|null), message: string, kind?: string, removable?: boolean}>} errors
+     * @param {Object} [actions]
+     * @param {function(Object): void} [actions.onLocate]
+     * @param {function(Object): void} [actions.onRemove]
+     * @param {function(): void} [actions.onRetry]
+     * @returns {void}
+     */
+    renderLoadErrors(errors = [], actions = {}) {
+        this.container.querySelector('.collection-load-errors')?.remove();
+        if (errors.length === 0) {
+            return;
+        }
+
+        const list = el('div', 'collection-load-errors');
+        list.setAttribute('role', 'list');
+        for (const error of errors) {
+            const row = el('div', 'collection-load-error');
+            row.setAttribute('role', 'listitem');
+            row.title = `${error.path}\n${error.message}`;
+
+            const icon = el('span', 'icon icon-16 icon-alert-circle collection-load-error-icon');
+            const text = el('div', 'collection-load-error-text');
+            const name = error.path.split(/[\\/]/).filter(Boolean).pop() || error.path;
+            text.appendChild(el('span', 'collection-load-error-name', name));
+            text.appendChild(el('span', 'collection-load-error-message', error.message));
+
+            const buttons = el('div', 'collection-load-error-actions');
+            const addButton = (key, fallback, handler) => {
+                if (!handler) {
+                    return;
+                }
+                const button = el('button', 'button flat small collection-load-error-action', translate(key, fallback));
+                button.type = 'button';
+                button.dataset.action = key.split('.').pop();
+                button.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    handler(error);
+                });
+                buttons.appendChild(button);
+            };
+            if (error.removable) {
+                if (error.kind === 'missing' || error.kind === 'not_a_collection') {
+                    addButton('sidebar.load_errors.locate', 'Locate…', actions.onLocate);
+                } else {
+                    addButton('sidebar.load_errors.retry', 'Retry', actions.onRetry);
+                }
+                addButton('sidebar.load_errors.remove', 'Remove from list', actions.onRemove);
+            } else {
+                addButton('sidebar.load_errors.retry', 'Retry', actions.onRetry);
+            }
+            if (buttons.childElementCount > 0) {
+                text.appendChild(buttons);
+            }
+
+            row.appendChild(icon);
+            row.appendChild(text);
+            list.appendChild(row);
+        }
+        this.container.appendChild(list);
     }
 
     /**

@@ -20,11 +20,52 @@ export class ScriptService {
      * @param {Object} scriptRepository
      * @param {Object} environmentService
      * @param {Object} statusDisplay
+     * @param {Object|null} [variableRepository]
      */
-    constructor(scriptRepository, environmentService, statusDisplay) {
+    constructor(scriptRepository, environmentService, statusDisplay, variableRepository = null) {
         this.repository = scriptRepository;
         this.environmentService = environmentService;
         this.statusDisplay = statusDisplay;
+        this.variableRepository = variableRepository;
+    }
+
+    /**
+     * @param {string|undefined} collectionId
+     * @returns {Promise<Object>}
+     */
+    async _readCollectionVariables(collectionId) {
+        if (!collectionId || !this.variableRepository) {
+            return {};
+        }
+        try {
+            const values = await this.variableRepository.getVariablesForCollection(collectionId);
+            const out = {};
+            for (const [key, value] of Object.entries(values || {})) {
+                out[key] = value === null || value === undefined ? '' : String(value);
+            }
+            return out;
+        } catch (error) {
+            void error;
+            return {};
+        }
+    }
+
+    /**
+     * @param {string|undefined} collectionId
+     * @param {Object|undefined} changes
+     * @returns {Promise<void>}
+     */
+    async _applyCollectionVariableChanges(collectionId, changes) {
+        if (!collectionId || !this.variableRepository || !changes) {
+            return;
+        }
+        for (const [key, value] of Object.entries(changes)) {
+            if (value === null) {
+                await this.variableRepository.deleteVariable(collectionId, key);
+            } else {
+                await this.variableRepository.setVariable(collectionId, key, value);
+            }
+        }
     }
 
     /**
@@ -63,9 +104,10 @@ export class ScriptService {
      * @param {Object} [options]
      * @param {Object} [options.environment]
      * @param {Object} [options.iteration]
+     * @param {string} [options.collectionId]
      * @returns {Promise<Object>}
      */
-    async executePreRequestScript(script, requestConfig, { environment, iteration } = {}) {
+    async executePreRequestScript(script, requestConfig, { environment, iteration, collectionId } = {}) {
         if (!script || script.trim() === '') {
             return {
                 modifiedRequest: requestConfig,
@@ -87,6 +129,7 @@ export class ScriptService {
                     pathParams: requestConfig.pathParams || {}
                 },
                 environment: environmentVariables || {},
+                collectionVariables: await this._readCollectionVariables(collectionId),
                 cookies: await this._readCookieJar(),
                 ...(iteration ? { iteration } : {})
             };
@@ -96,6 +139,7 @@ export class ScriptService {
             if (result.modifiedEnvironment && Object.keys(result.modifiedEnvironment).length > 0) {
                 await this._applyEnvironmentChanges(result.modifiedEnvironment);
             }
+            await this._applyCollectionVariableChanges(collectionId, result.modifiedCollectionVariables);
             await this._applyCookieChanges(result.cookieChanges);
 
             return {
@@ -123,9 +167,10 @@ export class ScriptService {
      * @param {Object} [options]
      * @param {Object} [options.environment]
      * @param {Object} [options.iteration]
+     * @param {string} [options.collectionId]
      * @returns {Promise<Object>}
      */
-    async executeTestScript(script, requestConfig, response, { environment, iteration } = {}) {
+    async executeTestScript(script, requestConfig, response, { environment, iteration, collectionId } = {}) {
         if (!script || script.trim() === '') {
             return {
                 success: true,
@@ -164,6 +209,7 @@ export class ScriptService {
                     cookies
                 },
                 environment: environmentVariables || {},
+                collectionVariables: await this._readCollectionVariables(collectionId),
                 cookies: await this._readCookieJar(),
                 ...(iteration ? { iteration } : {})
             };
@@ -173,6 +219,7 @@ export class ScriptService {
             if (result.modifiedEnvironment && Object.keys(result.modifiedEnvironment).length > 0) {
                 await this._applyEnvironmentChanges(result.modifiedEnvironment);
             }
+            await this._applyCollectionVariableChanges(collectionId, result.modifiedCollectionVariables);
             await this._applyCookieChanges(result.cookieChanges);
 
             return result;
@@ -280,23 +327,6 @@ export class ScriptService {
             }
 
         } catch (error) {
-        }
-    }
-
-    /**
-     * @param {string} script
-     * @returns {Object}
-     */
-    validateScript(script) {
-        if (!script || script.trim() === '') {
-            return { valid: true, error: null };
-        }
-
-        try {
-            new Function(script);
-            return { valid: true, error: null };
-        } catch (error) {
-            return { valid: false, error: error.message };
         }
     }
 }

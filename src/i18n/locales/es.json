@@ -32,6 +32,15 @@
     "search_empty": {
       "title": "No hay colecciones coincidentes",
       "subtitle": "Prueba con otro nombre de colección o solicitud"
+    },
+    "load_errors": {
+      "toast_one": "No se pudo cargar 1 colección",
+      "toast_other": "No se pudieron cargar {{count}} colecciones",
+      "locate": "Localizar…",
+      "remove": "Quitar de la lista",
+      "retry": "Reintentar",
+      "removed_toast": "Quitado de la lista. La carpeta no se ha modificado.",
+      "relocated_toast": "\"{{name}}\" encontrado en su nueva ubicación"
     }
   },
   "import": {
@@ -122,7 +131,9 @@
     "delete_title": "Eliminar solicitud",
     "confirm_delete": "¿Estás seguro de que quieres eliminar la solicitud \"{{name}}\"?\n\nEsta acción no se puede deshacer.",
     "rename_title": "Renombrar solicitud",
-    "rename_label": "Nombre de la solicitud:"
+    "rename_label": "Nombre de la solicitud:",
+    "copy_name": "{{name}} (copia)",
+    "duplicate_error": "No se pudo duplicar la solicitud: {{message}}"
   },
   "context_menu": {
     "new_collection": "Nueva colección",
@@ -142,7 +153,13 @@
     "unpin_request": "Desfijar solicitud",
     "close_collection": "Cerrar colección",
     "run_collection": "Ejecutar colección",
-    "run_folder": "Ejecutar carpeta"
+    "run_folder": "Ejecutar carpeta",
+    "new_folder": "Nueva carpeta",
+    "new_subfolder": "Nueva subcarpeta",
+    "rename_folder": "Renombrar carpeta",
+    "delete_folder": "Eliminar carpeta",
+    "duplicate_request": "Duplicar solicitud",
+    "move_request": "Mover a carpeta…"
   },
   "docs": {
     "title": "Generar documentación",
@@ -214,7 +231,9 @@
     "response": "Respuesta",
     "status": "Estado",
     "time": "Tiempo",
-    "size": "Tamaño"
+    "size": "Tamaño",
+    "disconnect": "Desconectar",
+    "cancel": "Cancelar"
   },
   "tabs": {
     "path_params": "Parámetros de Ruta",
@@ -256,6 +275,8 @@
   "settings": {
     "title": "Configuración",
     "tab_general": "General",
+    "group_appearance": "Apariencia",
+    "group_requests": "Solicitudes",
     "tab_proxy": "Proxy",
     "tab_certificates": "Certificados",
     "certs_title": "Certificados de cliente (mTLS)",
@@ -315,7 +336,8 @@
     "updates_not_available": "Actualizaciones no disponibles en esta versión",
     "updates_managed_externally": "Las actualizaciones son gestionadas por su gestor de paquetes",
     "version_info": "Información de Versión",
-    "current_version": "Versión actual"
+    "current_version": "Versión actual",
+    "retry_update": "Reintentar"
   },
   "theme": {
     "light": "Claro",
@@ -339,7 +361,8 @@
     "remove": "Quitar",
     "close": "Cerrar",
     "yes": "Sí",
-    "no": "No"
+    "no": "No",
+    "create": "Crear"
   },
   "errors": {
     "network": "Error de red",
@@ -431,7 +454,8 @@
     "log_time_ms": "Tiempo (ms)",
     "status_code": "Código de estado",
     "ok": "OK",
-    "error_toggle_server": "Error al cambiar el servidor"
+    "error_toggle_server": "Error al cambiar el servidor",
+    "template_hint": "Las cadenas pueden usar {{request.params.id}}, {{request.query.nombre}}, {{request.headers.nombre}}, {{request.body.ruta}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} y {{$randomInt}}. Envía \"Prefer: code=404\" o \"Prefer: example=nombre\" para obtener otra respuesta documentada."
   },
   "runner": {
     "title": "Collection Runner",
@@ -558,7 +582,8 @@
     "history_passed": "{{count}} correctas",
     "history_failed": "{{count}} fallidas",
     "history_source": "Ejecución del {{date}}",
-    "history_no_body": "El historial no conserva cuerpos de respuesta, encabezados ni cookies"
+    "history_no_body": "El historial no conserva cuerpos de respuesta, encabezados ni cookies",
+    "pre_request_failed": "El script previo a la solicitud falló, por lo que no se envió: {{message}}"
   },
   "mqtt": {
     "title": "MQTT",
@@ -575,5 +600,23 @@
     "status_connecting": "Conectando…",
     "status_connected": "Conectado",
     "status_connected_count": "Conectado · {{count}} recibidos"
+  },
+  "folder": {
+    "new_title": "Nueva carpeta",
+    "rename_title": "Renombrar carpeta",
+    "name_label": "Nombre de la carpeta:",
+    "delete_title": "Eliminar carpeta",
+    "confirm_delete": "¿Eliminar la carpeta \"{{name}}\" y las {{count}} solicitudes que contiene?\n\nEsta acción no se puede deshacer.",
+    "error": "La acción sobre la carpeta falló: {{message}}"
+  },
+  "move_request": {
+    "title": "Mover solicitud",
+    "label": "Mover a:",
+    "confirm": "Mover",
+    "root": "(Raíz de la colección)",
+    "error": "No se pudo mover la solicitud: {{message}}"
+  },
+  "grpc": {
+    "add_import_path": "Añadir ruta de importación"
   }
 }

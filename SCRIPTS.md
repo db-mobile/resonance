@@ -18,18 +18,23 @@ response tab.
 ## Execution model
 
 Scripts execute synchronously, top to bottom. There is no event loop:
-`setTimeout`, Promises that need scheduling, `fetch`, and `require` are not
-available. `sendRequest` (below) is the only way to perform network calls, and
-it blocks until the response arrives.
+`setTimeout`, Promises that need scheduling, and `fetch` are not available.
+`sendRequest` (below) is the only way to perform network calls, and it blocks
+until the response arrives.
 
-There is no overall wall-clock limit on script execution; each `sendRequest`
-call has its own timeout (default 10 seconds).
+A script is stopped after **30 seconds** (for example an endless loop) and
+reports an error. Each `sendRequest` call also has its own timeout (default
+10 seconds).
 
 After a script finishes:
 
 - **Pre-request:** mutations to `request` are applied to the outgoing request.
+  If the script throws, the request is **not sent** and the error is shown in
+  its place (in the runner the request is marked failed).
 - **Both:** changes made via `environment.set` / `environment.unset` are
-  persisted to the active environment.
+  persisted to the active environment, and changes made via
+  `pm.collectionVariables.set` / `.unset` are persisted to the request's
+  collection.
 
 ## `request`
 
@@ -249,34 +254,72 @@ The callback runs synchronously, before `sendRequest` returns.
 - Redirects are followed automatically (up to 10); you receive the final
   response.
 - Response bodies are fully buffered in memory — avoid huge downloads.
-- Proxy settings and client certificates configured in the app do **not**
-  apply to `sendRequest` calls.
+- The app's proxy settings apply to `sendRequest`; client certificates do
+  **not**.
 - `sendRequest` is also available in runner test scripts.
+
+## Crypto and encoding
+
+| API | Description |
+| --- | --- |
+| `btoa(text)` / `atob(base64)` | Latin1 ⇄ base64, as in browsers |
+| `crypto.randomUUID()` | Random v4 UUID |
+| `crypto.hash(algorithm, data[, encoding])` | `md5`, `sha1`, `sha256`, `sha384`, `sha512`; encoding `hex` (default), `base64` or `base64url` |
+| `crypto.hmac(algorithm, key, data[, encoding])` | HMAC with the same algorithms and encodings |
+| `CryptoJS` (also `require('crypto-js')`) | Subset of CryptoJS: `MD5`, `SHA1`, `SHA256`, `SHA384`, `SHA512`, `HmacMD5`, `HmacSHA1`, `HmacSHA256`, `HmacSHA384`, `HmacSHA512`, and `CryptoJS.enc.Hex` / `Base64` / `Base64url` / `Utf8` / `Latin1` with `parse` / `stringify` |
+
+Strings are hashed as UTF-8. CryptoJS results are word arrays: call
+`.toString()` for hex or `.toString(CryptoJS.enc.Base64)` for base64.
+
+```javascript
+const signature = CryptoJS.HmacSHA256(request.body, environment.get('secret'))
+    .toString(CryptoJS.enc.Base64);
+request.headers['X-Signature'] = signature;
+```
 
 ## Postman compatibility (`pm`)
 
-For scripts ported from Postman, a `pm` object provides:
+Scripts written for Postman run largely unchanged:
 
-- `pm.environment.get(key)` / `pm.environment.set(key, value)` /
-  `pm.environment.unset(key)`
-- `pm.request` / `pm.response`
-- `pm.test(name, fn)`
-- `pm.sendRequest(urlOrOptions[, callback])` — synchronous, unlike Postman
-- `pm.cookies` — the same object as the `cookies` global
+- **Tests:** `pm.test(name, fn)`, and `pm.expect(value)` with chai-style
+  chains: `to`, `be`, `been`, `is`, `that`, `which`, `and`, `has`, `have`,
+  `with`, `not`, `deep`; assertions `equal`/`eql`, `a`/`an`, `include`/`contain`,
+  `property`, `lengthOf`, `keys`, `above`/`below`/`least`/`most`/`within`,
+  `match`, `oneOf`, `string`, and `ok`, `true`, `false`, `null`, `undefined`,
+  `NaN`, `exist`, `empty`.
+- **Response:** `pm.response.code`, `.status` (the numeric code, as in the
+  bare `response` global), `.statusText`, `.reason()`, `.responseTime`,
+  `.headers.get(name)` / `.has(name)` / `.toObject()`, `.json()`, `.text()`,
+  and `pm.response.to.have.status(code|text)`, `.header(name[, value])`,
+  `.body([text])`, `.jsonBody([path[, value]])`,
+  `pm.response.to.be.ok` / `.success` / `.clientError` / `.serverError` /
+  `.error` / `.notFound` / `.json` …, each also negatable with `to.not`.
+- **Request:** `pm.request` (the same object as `request`), with
+  `pm.request.headers.add({key, value})`, `.upsert(...)`, `.remove(name)`,
+  `.get(name)`, `.has(name)`.
+- **Variables:** `pm.environment` (`get`, `set`, `unset`, `has`, `toObject`,
+  `replaceIn`, `clear`), `pm.collectionVariables` (same methods; saved to the
+  collection), `pm.variables` (script-local values first, then the runner data
+  row, the environment, and the collection; `set` is local to the script run),
+  and `pm.globals`, which maps to the active environment because Resonance has
+  no global scope.
+- **Other:** `pm.sendRequest(urlOrOptions[, callback])` (synchronous, unlike
+  Postman), `pm.cookies`, `pm.info`, `pm.iterationData`.
+
+Not supported yet: `pm.execution.setNextRequest` / `skipRequest`,
+`pm.vault`, and `require` for modules other than `crypto-js`.
 
 The bare globals (`environment`, `request`, `response`, `cookies`, `test`,
-`expect`, `sendRequest`) are the recommended API; `pm.*` exists for easier
-migration.
+`expect`, `sendRequest`) remain the recommended API.
 
 ## Sandbox limitations
 
-- No `fetch`, `XMLHttpRequest`, `require`/`import`, `setTimeout`/`setInterval`,
-  or DOM/browser APIs (`btoa`, `localStorage`, …). `sendRequest` is the only
-  network primitive.
+- No `fetch`, `XMLHttpRequest`, `import`, `setTimeout`/`setInterval`, or
+  DOM/browser APIs (`localStorage`, …). `require` only provides `crypto-js`.
+  `sendRequest` is the only network primitive.
 - Standard JavaScript built-ins (`JSON`, `Math`, `Date`, `RegExp`, string and
   array methods, template literals, arrow functions) are available.
-- Scripts run to completion — there is no wall-clock timeout, so avoid
-  unbounded loops. `sendRequest` calls time out individually (10 s default,
-  60 s max).
+- Scripts are stopped after 30 seconds. `sendRequest` calls time out
+  individually (10 s default, 60 s max).
 - Environment values are stored as strings; convert with `String(...)` /
   `Number(...)` as needed.

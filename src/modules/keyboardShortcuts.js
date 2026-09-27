@@ -1,6 +1,7 @@
 
 import { app } from './appContext.js';
 import { templateLoader } from './templateLoader.js';
+import { pushEscapeHandler } from './ui/modalEscape.js';
 
 class KeyboardShortcutsManager {
     constructor() {
@@ -147,23 +148,19 @@ class KeyboardShortcutsManager {
         const closeBtn = overlay.querySelector('#close-shortcuts-btn');
         const _dialog = overlay.querySelector('#keyboard-shortcuts-dialog');
 
+        let releaseEscape = null;
         const close = () => {
+            releaseEscape?.();
+            releaseEscape = null;
             overlay.remove();
             this.helpDialogVisible = false;
         };
+        releaseEscape = pushEscapeHandler(close);
 
         closeBtn.addEventListener('click', close);
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {close();}
         });
-
-        const escHandler = (e) => {
-            if (e.key === 'Escape') {
-                close();
-                document.removeEventListener('keydown', escHandler);
-            }
-        };
-        document.addEventListener('keydown', escHandler);
     }
 
     _renderHelpContent(containerEl) {

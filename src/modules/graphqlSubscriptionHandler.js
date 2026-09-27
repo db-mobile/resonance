@@ -169,8 +169,15 @@ async function handleProtocolMessage(tabId, entry, msg) {
             return;
         }
         case 'complete': {
+            session.set(tabId, { ...entry, state: 'closed' });
             await session.append(tabId, 'COMPLETE', 'server completed the subscription');
             await session.updateStatus(tabId, 'Subscription complete', null);
+            try {
+                await window.backendAPI?.graphqlSubscription?.close(tabId);
+            } catch (_e) {
+                void _e;
+            }
+            await refreshRunButton(tabId, false);
             return;
         }
         case 'ping': {
@@ -187,6 +194,23 @@ export const initGraphQLSubscriptionHandler = createBackendEventListener(
     () => !!window.backendAPI?.graphqlSubscription,
     handleBackendEvent
 );
+
+/**
+ * @param {Object<string, string>} headers
+ * @returns {Object}
+ */
+export function connectionInitPayload(headers) {
+    const entries = Object.entries(headers || {});
+    if (entries.length === 0) {
+        return {};
+    }
+    const payload = { headers: Object.fromEntries(entries) };
+    const authorization = entries.find(([name]) => name.toLowerCase() === 'authorization');
+    if (authorization) {
+        payload.Authorization = authorization[1];
+    }
+    return payload;
+}
 
 /** @param {{url: string, headers?: object, query: string, variables?: object, operationName?: string|null}} opts */
 export async function handleGraphQLSubscriptionStart({ url, headers = {}, query, variables = {}, operationName = null }) {
@@ -226,7 +250,7 @@ export async function handleGraphQLSubscriptionStart({ url, headers = {}, query,
     await refreshRunButton(tabId, true);
 
     try {
-        await sendFrame(tabId, entry, buildConnectionInit());
+        await sendFrame(tabId, entry, buildConnectionInit(connectionInitPayload(headers)));
     } catch (error) {
         await session.append(tabId, 'ERROR', `Connection failed: ${error.message || error}`);
         await session.updateStatus(tabId, 'Subscription connection failed', null);

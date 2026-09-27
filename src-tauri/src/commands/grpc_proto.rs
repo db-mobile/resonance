@@ -9,9 +9,9 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 use tokio::sync::oneshot;
 
 use super::grpc_reflection::{
-    DynamicMessageCodec, GrpcUnaryRequest, create_channel, dynamic_message_to_json,
+    DynamicMessageCodec, GrpcUnaryRequest, GrpcUnaryState, create_channel, dynamic_message_to_json,
     generate_message_skeleton, json_to_dynamic_message, metadata_to_json_map,
-    normalize_target_with_tls, resolve_method_types, strip_leading_dot,
+    normalize_target_with_tls, resolve_method_types, run_cancellable_unary, strip_leading_dot,
 };
 
 /// State to hold loaded proto file descriptors
@@ -159,6 +159,21 @@ pub async fn grpc_proto_get_input_skeleton(
 pub async fn grpc_proto_invoke_unary(
     _app: AppHandle,
     state: State<'_, ProtoState>,
+    unary_state: State<'_, GrpcUnaryState>,
+    proto_path: String,
+    request: GrpcUnaryRequest,
+) -> Result<Value, String> {
+    let request_id = request.request_id.clone();
+    run_cancellable_unary(
+        &unary_state,
+        request_id,
+        invoke_unary_proto(&state, proto_path, request),
+    )
+    .await
+}
+
+async fn invoke_unary_proto(
+    state: &ProtoState,
     proto_path: String,
     request: GrpcUnaryRequest,
 ) -> Result<Value, String> {
@@ -291,61 +306,81 @@ pub async fn grpc_select_proto_file(app: AppHandle) -> Result<Option<String>, St
     rx.await.map_err(|e| format!("Dialog error: {}", e))
 }
 
-// Helper module for parsing proto files
+/// Compiles `.proto` files in-process with protox, so no `protoc` binary is
+/// needed. Google's well-known types (`google/protobuf/*.proto`) are bundled.
 mod protox_parse {
     use prost_reflect::DescriptorPool;
     use std::path::PathBuf;
-    use std::process::Command;
 
     pub fn parse_proto_file(
         proto_path: &str,
         include_paths: &[PathBuf],
     ) -> Result<DescriptorPool, String> {
-        // Use protoc to compile the proto file to a file descriptor set
-        let protoc = find_protoc()?;
+        let mut compiler = protox::Compiler::new(include_paths)
+            .map_err(|e| format!("Invalid include path: {e}"))?;
+        compiler.include_imports(true);
+        compiler
+            .open_file(proto_path)
+            .map_err(|e| format!("Failed to compile {proto_path}: {e}"))?;
+        Ok(compiler.descriptor_pool())
+    }
+}
 
-        let temp_dir = std::env::temp_dir();
-        let descriptor_path = temp_dir.join(format!("resonance_proto_{}.pb", uuid::Uuid::new_v4()));
+#[cfg(test)]
+mod tests {
+    use super::protox_parse::parse_proto_file;
+    use std::fs;
+    use tempfile::TempDir;
 
-        let mut cmd = Command::new(&protoc);
-        cmd.arg("--descriptor_set_out")
-            .arg(&descriptor_path)
-            .arg("--include_imports");
+    #[test]
+    fn compiles_without_protoc_resolving_well_known_types_and_include_paths() {
+        let service_dir = TempDir::new().unwrap();
+        let shared_dir = TempDir::new().unwrap();
+        fs::create_dir_all(shared_dir.path().join("common")).unwrap();
+        fs::write(
+            shared_dir.path().join("common/money.proto"),
+            "syntax = \"proto3\";\npackage common;\nmessage Money { int64 cents = 1; }\n",
+        )
+        .unwrap();
+        let service = service_dir.path().join("billing.proto");
+        fs::write(
+            &service,
+            r#"syntax = "proto3";
+package billing;
+import "google/protobuf/timestamp.proto";
+import "common/money.proto";
+message Invoice { common.Money total = 1; google.protobuf.Timestamp due = 2; }
+service Billing { rpc Get (Invoice) returns (Invoice); }
+"#,
+        )
+        .unwrap();
 
-        for include in include_paths {
-            cmd.arg("-I").arg(include);
-        }
+        let pool = parse_proto_file(
+            service.to_str().unwrap(),
+            &[
+                service_dir.path().to_path_buf(),
+                shared_dir.path().to_path_buf(),
+            ],
+        )
+        .unwrap();
 
-        cmd.arg(proto_path);
-
-        let output = cmd
-            .output()
-            .map_err(|e| format!("Failed to run protoc: {}", e))?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            // Clean up temp file if it exists
-            let _ = std::fs::remove_file(&descriptor_path);
-            return Err(format!("protoc failed: {}", stderr));
-        }
-
-        // Read the descriptor set
-        let descriptor_bytes = std::fs::read(&descriptor_path)
-            .map_err(|e| format!("Failed to read descriptor set: {}", e))?;
-
-        // Clean up temp file
-        let _ = std::fs::remove_file(&descriptor_path);
-
-        // Parse into DescriptorPool
-        DescriptorPool::decode(descriptor_bytes.as_slice())
-            .map_err(|e| format!("Failed to parse descriptor set: {}", e))
+        let names: Vec<String> = pool.services().map(|s| s.full_name().to_string()).collect();
+        assert_eq!(names, vec!["billing.Billing".to_string()]);
+        assert!(pool.get_message_by_name("common.Money").is_some());
     }
 
-    fn find_protoc() -> Result<PathBuf, String> {
-        if let Ok(path) = which::which("protoc") {
-            return Ok(path);
-        }
+    #[test]
+    fn a_missing_import_is_reported() {
+        let dir = TempDir::new().unwrap();
+        let service = dir.path().join("svc.proto");
+        fs::write(
+            &service,
+            "syntax = \"proto3\";\nimport \"nope/missing.proto\";\n",
+        )
+        .unwrap();
 
-        Err("protoc not found. Please install Protocol Buffers compiler.".to_string())
+        let error =
+            parse_proto_file(service.to_str().unwrap(), &[dir.path().to_path_buf()]).unwrap_err();
+        assert!(error.contains("missing.proto"), "{error}");
     }
 }

@@ -32,6 +32,15 @@
     "search_empty": {
       "title": "No matching collections",
       "subtitle": "Try a different collection or request name"
+    },
+    "load_errors": {
+      "toast_one": "1 collection could not be loaded",
+      "toast_other": "{{count}} collections could not be loaded",
+      "locate": "Locate…",
+      "remove": "Remove from list",
+      "retry": "Retry",
+      "removed_toast": "Removed from the list. The folder was not touched.",
+      "relocated_toast": "Found \"{{name}}\" in its new location"
     }
   },
   "import": {
@@ -122,7 +131,9 @@
     "delete_title": "Delete Request",
     "confirm_delete": "Are you sure you want to delete the request \"{{name}}\"?\n\nThis action cannot be undone.",
     "rename_title": "Rename Request",
-    "rename_label": "Request Name:"
+    "rename_label": "Request Name:",
+    "copy_name": "{{name}} (copy)",
+    "duplicate_error": "Could not duplicate the request: {{message}}"
   },
   "context_menu": {
     "new_collection": "New Collection",
@@ -142,7 +153,13 @@
     "unpin_request": "Unpin Request",
     "close_collection": "Close Collection",
     "run_collection": "Run Collection",
-    "run_folder": "Run Folder"
+    "run_folder": "Run Folder",
+    "new_folder": "New Folder",
+    "new_subfolder": "New Subfolder",
+    "rename_folder": "Rename Folder",
+    "delete_folder": "Delete Folder",
+    "duplicate_request": "Duplicate Request",
+    "move_request": "Move to Folder…"
   },
   "docs": {
     "title": "Generate Documentation",
@@ -214,7 +231,9 @@
     "response": "Response",
     "status": "Status",
     "time": "Time",
-    "size": "Size"
+    "size": "Size",
+    "disconnect": "Disconnect",
+    "cancel": "Cancel"
   },
   "tabs": {
     "path_params": "Path Params",
@@ -256,6 +275,8 @@
   "settings": {
     "title": "Settings",
     "tab_general": "General",
+    "group_appearance": "Appearance",
+    "group_requests": "Requests",
     "tab_proxy": "Proxy",
     "tab_certificates": "Certificates",
     "certs_title": "Client Certificates (mTLS)",
@@ -315,7 +336,8 @@
     "updates_not_available": "Updates not available in this build",
     "updates_managed_externally": "Updates are managed by your package manager",
     "version_info": "Version Information",
-    "current_version": "Current version"
+    "current_version": "Current version",
+    "retry_update": "Retry"
   },
   "theme": {
     "light": "Light",
@@ -339,7 +361,8 @@
     "remove": "Remove",
     "close": "Close",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "create": "Create"
   },
   "errors": {
     "network": "Network error occurred",
@@ -431,7 +454,8 @@
     "log_time_ms": "Time (ms)",
     "status_code": "Status Code",
     "ok": "OK",
-    "error_toggle_server": "Failed to toggle server"
+    "error_toggle_server": "Failed to toggle server",
+    "template_hint": "Strings may use {{request.params.id}}, {{request.query.name}}, {{request.headers.name}}, {{request.body.path}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} and {{$randomInt}}. Send \"Prefer: code=404\" or \"Prefer: example=name\" to get another documented response."
   },
   "preview": {
     "toggle": "Toggle Preview",
@@ -566,7 +590,8 @@
     "history_passed": "{{count}} passed",
     "history_failed": "{{count}} failed",
     "history_source": "Run from {{date}}",
-    "history_no_body": "Response bodies, headers and cookies are not kept in run history"
+    "history_no_body": "Response bodies, headers and cookies are not kept in run history",
+    "pre_request_failed": "Pre-request script failed, so the request was not sent: {{message}}"
   },
   "mqtt": {
     "title": "MQTT",
@@ -583,5 +608,23 @@
     "status_connecting": "Connecting…",
     "status_connected": "Connected",
     "status_connected_count": "Connected · {{count}} received"
+  },
+  "folder": {
+    "new_title": "New Folder",
+    "rename_title": "Rename Folder",
+    "name_label": "Folder Name:",
+    "delete_title": "Delete Folder",
+    "confirm_delete": "Delete the folder \"{{name}}\" and the {{count}} request(s) in it?\n\nThis cannot be undone.",
+    "error": "Folder action failed: {{message}}"
+  },
+  "move_request": {
+    "title": "Move Request",
+    "label": "Move to:",
+    "confirm": "Move",
+    "root": "(Collection root)",
+    "error": "Could not move the request: {{message}}"
+  },
+  "grpc": {
+    "add_import_path": "Add import path"
   }
 }

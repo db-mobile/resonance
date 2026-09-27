@@ -47,7 +47,7 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 - **OpenAPI 3.0 import** (YAML/JSON) with schema-based example generation, **Postman import & export** (v2.0/v2.1 collections and environments), **cURL import** (paste a command), **OpenAPI export** (YAML/JSON)
 - **Code generation in 9 languages** — cURL, Python, JavaScript (Fetch/Axios), Node.js, Go, PHP, Ruby, Java
 - **Documentation generation** — Markdown or HTML docs from any collection, with parameter tables, saved examples, and code samples
-- **Built-in mock server** — generates responses from OpenAPI schemas, custom bodies and delays per endpoint, request logging
+- **Built-in mock server** — generates responses from OpenAPI schemas and examples, custom bodies, status codes and delays per endpoint, response templating (`{{request.params.id}}`, `{{request.body.field}}`, `{{$uuid}}` …), `Prefer: code=… / example=…` to pick a documented response, request logging
 
 ### Automation & Testing
 
@@ -57,7 +57,7 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 
 ### Security
 
-- **Auth methods** — Bearer, Basic, API Key, OAuth 2.0, Digest, NTLM, AWS Signature v4 — configurable at request, folder, or collection level
+- **Auth methods** — Bearer, Basic, API Key, OAuth 2.0 (expired tokens are renewed automatically before sending), Digest, NTLM, AWS Signature v4 — configurable at request, folder, or collection level
 - **Client certificates (mTLS)** — per-host PEM certificates with custom CA trust
 - **Keychain-backed secrets** — literal credentials and secret variables are encrypted at rest in the OS credential store and never written to the git-friendly collection files
 - **Proxy support** — HTTP/HTTPS/SOCKS with authentication and bypass lists

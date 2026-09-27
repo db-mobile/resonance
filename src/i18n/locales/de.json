@@ -32,6 +32,15 @@
     "search_empty": {
       "title": "Keine passenden Sammlungen",
       "subtitle": "Versuchen Sie einen anderen Sammlungs- oder Anfragenamen"
+    },
+    "load_errors": {
+      "toast_one": "1 Sammlung konnte nicht geladen werden",
+      "toast_other": "{{count}} Sammlungen konnten nicht geladen werden",
+      "locate": "Suchen…",
+      "remove": "Aus der Liste entfernen",
+      "retry": "Erneut versuchen",
+      "removed_toast": "Aus der Liste entfernt. Der Ordner wurde nicht angetastet.",
+      "relocated_toast": "„{{name}}“ am neuen Ort gefunden"
     }
   },
   "import": {
@@ -122,7 +131,9 @@
     "delete_title": "Anfrage löschen",
     "confirm_delete": "Sind Sie sicher, dass Sie die Anfrage \"{{name}}\" löschen möchten?\n\nDiese Aktion kann nicht rückgängig gemacht werden.",
     "rename_title": "Anfrage umbenennen",
-    "rename_label": "Anfragename:"
+    "rename_label": "Anfragename:",
+    "copy_name": "{{name}} (Kopie)",
+    "duplicate_error": "Die Anfrage konnte nicht dupliziert werden: {{message}}"
   },
   "context_menu": {
     "new_collection": "Neue Sammlung",
@@ -142,7 +153,13 @@
     "unpin_request": "Anfrage lösen",
     "close_collection": "Sammlung schließen",
     "run_collection": "Sammlung ausführen",
-    "run_folder": "Ordner ausführen"
+    "run_folder": "Ordner ausführen",
+    "new_folder": "Neuer Ordner",
+    "new_subfolder": "Neuer Unterordner",
+    "rename_folder": "Ordner umbenennen",
+    "delete_folder": "Ordner löschen",
+    "duplicate_request": "Anfrage duplizieren",
+    "move_request": "In Ordner verschieben…"
   },
   "docs": {
     "title": "Dokumentation generieren",
@@ -214,7 +231,9 @@
     "response": "Antwort",
     "status": "Status",
     "time": "Zeit",
-    "size": "Größe"
+    "size": "Größe",
+    "disconnect": "Trennen",
+    "cancel": "Abbrechen"
   },
   "tabs": {
     "path_params": "Pfad-Parameter",
@@ -256,6 +275,8 @@
   "settings": {
     "title": "Einstellungen",
     "tab_general": "Allgemein",
+    "group_appearance": "Darstellung",
+    "group_requests": "Anfragen",
     "tab_proxy": "Proxy",
     "tab_certificates": "Zertifikate",
     "certs_title": "Client-Zertifikate (mTLS)",
@@ -315,7 +336,8 @@
     "updates_not_available": "Updates in diesem Build nicht verfügbar",
     "updates_managed_externally": "Updates werden von Ihrem Paketmanager verwaltet",
     "version_info": "Versionsinformationen",
-    "current_version": "Aktuelle Version"
+    "current_version": "Aktuelle Version",
+    "retry_update": "Erneut versuchen"
   },
   "theme": {
     "light": "Hell",
@@ -339,7 +361,8 @@
     "remove": "Entfernen",
     "close": "Schließen",
     "yes": "Ja",
-    "no": "Nein"
+    "no": "Nein",
+    "create": "Erstellen"
   },
   "errors": {
     "network": "Netzwerkfehler aufgetreten",
@@ -431,7 +454,8 @@
     "log_time_ms": "Zeit (ms)",
     "status_code": "Statuscode",
     "ok": "OK",
-    "error_toggle_server": "Server konnte nicht umgeschaltet werden"
+    "error_toggle_server": "Server konnte nicht umgeschaltet werden",
+    "template_hint": "Zeichenketten können {{request.params.id}}, {{request.query.name}}, {{request.headers.name}}, {{request.body.pfad}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} und {{$randomInt}} enthalten. Mit „Prefer: code=404“ oder „Prefer: example=name“ erhält man eine andere dokumentierte Antwort."
   },
   "runner": {
     "title": "Collection Runner",
@@ -558,7 +582,8 @@
     "history_passed": "{{count}} bestanden",
     "history_failed": "{{count}} fehlgeschlagen",
     "history_source": "Ausführung vom {{date}}",
-    "history_no_body": "Antwort-Bodies, Header und Cookies werden im Ausführungsverlauf nicht gespeichert"
+    "history_no_body": "Antwort-Bodies, Header und Cookies werden im Ausführungsverlauf nicht gespeichert",
+    "pre_request_failed": "Das Pre-Request-Skript ist fehlgeschlagen, die Anfrage wurde nicht gesendet: {{message}}"
   },
   "mqtt": {
     "title": "MQTT",
@@ -575,5 +600,23 @@
     "status_connecting": "Verbinde…",
     "status_connected": "Verbunden",
     "status_connected_count": "Verbunden · {{count}} empfangen"
+  },
+  "folder": {
+    "new_title": "Neuer Ordner",
+    "rename_title": "Ordner umbenennen",
+    "name_label": "Ordnername:",
+    "delete_title": "Ordner löschen",
+    "confirm_delete": "Den Ordner „{{name}}“ und die {{count}} Anfrage(n) darin löschen?\n\nDies kann nicht rückgängig gemacht werden.",
+    "error": "Ordneraktion fehlgeschlagen: {{message}}"
+  },
+  "move_request": {
+    "title": "Anfrage verschieben",
+    "label": "Verschieben nach:",
+    "confirm": "Verschieben",
+    "root": "(Sammlungsebene)",
+    "error": "Die Anfrage konnte nicht verschoben werden: {{message}}"
+  },
+  "grpc": {
+    "add_import_path": "Importpfad hinzufügen"
   }
 }

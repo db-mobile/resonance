@@ -4,7 +4,7 @@
  */
 
 import { app } from './appContext.js';
-import { extractCookies, renderCookies } from './cookieParser.js';
+import { responseCookies, renderCookies } from './cookieParser.js';
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
 
 /**
@@ -64,8 +64,9 @@ export function clearResponsePanes(tabId, globalElements = {}) {
  * @param {Object|null} opts.headers
  * @param {Object|null} opts.timings
  * @param {number|null} opts.size
+ * @param {Array<string>} [opts.setCookies]
  */
-export function displayResponsePanes(tabId, globalElements, { headers, timings, size }) {
+export function displayResponsePanes(tabId, globalElements, { headers, timings, size, setCookies }) {
     const els = getResponseElements(tabId, globalElements);
 
     const headersString = headers
@@ -80,7 +81,7 @@ export function displayResponsePanes(tabId, globalElements, { headers, timings, 
         els._headersDisplayFallback.textContent = headersString || 'No response headers.';
     }
 
-    const cookies = extractCookies(headers);
+    const cookies = responseCookies({ headers, setCookies });
     if (els.cookiesDisplay) {
         renderCookies(els.cookiesDisplay, cookies);
     }
@@ -122,7 +123,7 @@ export function displayErrorResponsePanes(tabId, globalElements, error) {
             }
         }
 
-        const cookies = extractCookies(error.headers);
+        const cookies = responseCookies(error);
         if (els.cookiesDisplay) {
             renderCookies(els.cookiesDisplay, cookies);
         }
@@ -145,5 +146,22 @@ export function displayErrorResponsePanes(tabId, globalElements, error) {
         }
     } else if (els.performanceDisplay) {
         clearPerformanceMetrics(els.performanceDisplay);
+    }
+}
+
+/**
+ * @param {Object|null|undefined} containerElements
+ * @param {{metadata: Object, trailers: Object}} panes
+ * @returns {void}
+ */
+export function renderGrpcPanes(containerElements, { metadata, trailers }) {
+    if (!containerElements) {
+        return;
+    }
+    if (containerElements.metadataDisplay) {
+        containerElements.metadataDisplay.textContent = JSON.stringify(metadata || {}, null, 2) || 'No metadata.';
+    }
+    if (containerElements.trailersDisplay) {
+        containerElements.trailersDisplay.textContent = JSON.stringify(trailers || {}, null, 2) || 'No trailers.';
     }
 }

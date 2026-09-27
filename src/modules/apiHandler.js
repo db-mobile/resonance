@@ -7,6 +7,9 @@ import { parseKeyValuePairs, parseKeyValueRows } from './keyValueManager.js';
 import { saveAllRequestModifications } from './collectionManager.js';
 import { debounce } from './utils/debounce.js';
 import { findRequest } from './collections/collectionTree.js';
+import { buildMockPath } from './collections/endpointUrl.js';
+import { methodCarriesBody } from './utils/bodyMethods.js';
+import { inFlightRequestFor, newRequestId, trackInFlight } from './state/inFlightRequests.js';
 import { registerPendingSave } from './state/pendingSaves.js';
 import { resolveRequestSettings } from './state/settingsCache.js';
 
@@ -47,20 +50,21 @@ import { EnvironmentRepository } from './storage/EnvironmentRepository.js';
 import { CollectionRepository } from './storage/CollectionRepository.js';
 import { VariableService } from './services/VariableService.js';
 import { StatusDisplayAdapter } from './interfaces/IStatusDisplay.js';
-import { authManager } from './authManager.js';
-import { resolveEffectiveAuthConfig } from './auth/authInheritance.js';
+import { authManager, setOAuthVariableResolver } from './authManager.js';
+import { resolveEffectiveAuthWithSource } from './auth/authInheritance.js';
+import { ensureFreshOAuthToken } from './auth/oauthRefresh.js';
 import { resolveAuthConfigVariables } from './auth/authVariables.js';
 import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
 import { createLazyEditorProxy } from './editorLoader.js';
-import { extractCookies } from './cookieParser.js';
+import { responseCookies } from './cookieParser.js';
 import { getRequestBodyContent, captureSnippetBody } from './requestBodyHelper.js';
 import { MockServerRepository } from './storage/MockServerRepository.js';
 import { MockServerService } from './services/MockServerService.js';
 import { isGrpcMode, isGraphQLMode, getCurrentMode, RequestMode } from './requestModeManager.js';
 import { getProtocol } from './protocols/protocolRegistry.js';
 import { handleGrpcSend } from './grpcHandler.js';
-import { handleWebSocketCancel, handleWebSocketSend } from './websocketHandler.js';
-import { handleSseCancel, handleSseConnect } from './sseHandler.js';
+import { handleWebSocketCancel, handleWebSocketSend, isWebSocketLive } from './websocketHandler.js';
+import { handleSseCancel, handleSseConnect, isSseLive } from './sseHandler.js';
 import { handleMqttCancel, handleMqttSend } from './mqttHandler.js';
 import {
     handleGraphQLSubscriptionStart,
@@ -68,7 +72,9 @@ import {
     isSubscriptionActive
 } from './graphqlSubscriptionHandler.js';
 import { selectActiveOperationType } from './graphqlTransportWs.js';
-import { cancelStream as cancelGrpcStream, hasActiveStream as hasActiveGrpcStream } from './grpcStreamHandler.js';
+import { cancelStream as cancelGrpcStream, hasActiveStream as hasActiveGrpcStream, isGrpcStreamLive } from './grpcStreamHandler.js';
+import { STREAM_STATE_EVENT } from './streaming/streamState.js';
+import { translate } from './utils/translate.js';
 import { RequestBuilderService } from './services/RequestBuilderService.js';
 import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes } from './ResponseDisplayHelper.js';
 import { setResponseMeta, suggestedFileName } from './responseSaver.js';
@@ -129,21 +135,67 @@ export function getRequestBuilderService() {
     return _requestBuilderService;
 }
 
+setOAuthVariableResolver((collectionId) => {
+    const endpoint = collectionId ? { collectionId } : getCurrentEndpoint();
+    return getRequestBuilderService().resolveVariables(endpoint, {});
+});
+
 /**
- * @param {{variables?: Object, processor?: Object}} [substitution]
+ * @param {{variables?: Object, processor?: Object, refreshOAuth?: boolean}} [substitution]
  * @returns {Promise<Object>}
  */
-export async function generateEffectiveAuthData({ variables, processor } = {}) {
+export async function generateEffectiveAuthData({ variables, processor, refreshOAuth = true } = {}) {
     const current = getCurrentEndpoint();
-    const resolved = await resolveEffectiveAuthConfig(authManager.getAuthConfig(), {
+    const repository = getCollectionRepository();
+    const { authConfig: resolved, source } = await resolveEffectiveAuthWithSource(authManager.getAuthConfig(), {
         collectionId: current?.collectionId,
         endpointId: current?.endpointId,
-        repository: getCollectionRepository()
+        repository
     });
-    const { authConfig: effective, unresolved } = resolveAuthConfigVariables(resolved, variables, processor);
+    const substituted = resolveAuthConfigVariables(resolved, variables, processor);
+    const { unresolved } = substituted;
+    let effective = substituted.authConfig;
+
+    if (refreshOAuth && source) {
+        const renewal = await ensureFreshOAuthToken({
+            rawAuth: resolved,
+            resolvedAuth: effective,
+            key: oauthRefreshKey(current, source),
+            getToken: (request) => window.backendAPI.oauth2.getToken(request),
+            persist: async (nextRaw, result) => {
+                if (source.kind === 'request') {
+                    authManager.applyTokenResult(result);
+                    scheduleEndpointSave();
+                } else if (current?.collectionId) {
+                    await repository.saveAuthConfigAtSource(current.collectionId, current.endpointId, source, nextRaw);
+                }
+            }
+        });
+        effective = renewal.resolvedAuth;
+        if (renewal.error) {
+            toast.warning(renewal.error);
+        }
+    }
+
     const authData = authManager.generateAuthData(effective);
     authData.unresolvedVariables = unresolved;
     return authData;
+}
+
+/**
+ * @param {{collectionId?: string, endpointId?: string}|null} endpoint
+ * @param {{kind: string, folderId?: string}} source
+ * @returns {string}
+ */
+function oauthRefreshKey(endpoint, source) {
+    const collectionId = endpoint?.collectionId ?? '';
+    if (source.kind === 'folder') {
+        return `${collectionId}|folder|${source.folderId}`;
+    }
+    if (source.kind === 'collection') {
+        return `${collectionId}|collection`;
+    }
+    return `${collectionId}|request|${endpoint?.endpointId ?? 'unsaved'}`;
 }
 
 /**
@@ -306,7 +358,11 @@ export function initResponseEditor() {
     }
 }
 
-async function isTabCurrentlyActive(tabId) {
+/**
+ * @param {string|null} tabId
+ * @returns {Promise<boolean>}
+ */
+export async function isTabCurrentlyActive(tabId) {
     if (!tabId || !app.workspaceTabController) {
         return true;
     }
@@ -459,10 +515,18 @@ export function clearResponseDisplayForTab(tabId = null) {
     }
 }
 
+let requestInProgress = false;
+
+/**
+ * @param {boolean} inProgress
+ * @returns {void}
+ */
 export function setRequestInProgress(inProgress) {
+    requestInProgress = inProgress;
     if (inProgress) {
         sendRequestBtn.style.display = 'none';
         cancelRequestBtn.style.display = 'inline-block';
+        setCancelButtonLabel(false);
         sendRequestBtn.disabled = true;
     } else {
         sendRequestBtn.style.display = 'inline-block';
@@ -470,6 +534,52 @@ export function setRequestInProgress(inProgress) {
         sendRequestBtn.disabled = false;
     }
     app.statusBar?.setRequestRunning(inProgress);
+    if (!inProgress) {
+        refreshStreamControls();
+    }
+}
+
+/** @type {Object<string, function(string): boolean>} */
+const LIVE_STREAM_CHECKS = Object.freeze({
+    [RequestMode.WEBSOCKET]: isWebSocketLive,
+    [RequestMode.SSE]: isSseLive,
+    [RequestMode.GRPC]: isGrpcStreamLive
+});
+
+/**
+ * @param {boolean} disconnect
+ * @returns {void}
+ */
+function setCancelButtonLabel(disconnect) {
+    if (!cancelRequestBtn) {
+        return;
+    }
+    const label = disconnect ? translate('request.disconnect', 'Disconnect') : translate('request.cancel', 'Cancel');
+    cancelRequestBtn.textContent = label;
+    cancelRequestBtn.setAttribute('aria-label', label);
+}
+
+/** @returns {Promise<void>} */
+export async function refreshStreamControls() {
+    if (requestInProgress || !cancelRequestBtn) {
+        return;
+    }
+    const isLive = LIVE_STREAM_CHECKS[getCurrentMode()];
+    const tabId = app.workspaceTabController
+        ? await app.workspaceTabController.service.getActiveTabId()
+        : null;
+    if (requestInProgress) {
+        return;
+    }
+    const live = Boolean(isLive && isLive(tabId));
+    cancelRequestBtn.style.display = live ? 'inline-block' : 'none';
+    setCancelButtonLabel(live);
+}
+
+if (typeof document !== 'undefined') {
+    document.addEventListener(STREAM_STATE_EVENT, () => {
+        refreshStreamControls();
+    });
 }
 
 /** @type {Object<string, function(): Promise<*>>} */
@@ -496,6 +606,11 @@ export async function handleCancelRequest() {
             setRequestInProgress(false);
             return;
         }
+        const unaryId = inFlightRequestFor(tabId);
+        if (unaryId) {
+            await window.backendAPI.grpc.unaryCancel(unaryId).catch(() => { });
+        }
+        return;
     }
 
     try {
@@ -503,7 +618,11 @@ export async function handleCancelRequest() {
             ? await app.workspaceTabController.service.getActiveTabId()
             : null;
 
-        const result = await window.backendAPI.cancelApiRequest();
+        const requestId = inFlightRequestFor(requestTabId);
+        if (!requestId) {
+            return;
+        }
+        const result = await window.backendAPI.cancelApiRequest(requestId);
 
         if (result.success) {
             if (await isTabCurrentlyActive(requestTabId)) {
@@ -729,7 +848,12 @@ function readMqttOptions() {
 const STREAMING_SENDS = Object.freeze({
     [RequestMode.WEBSOCKET]: Object.freeze({
         useAuth: true,
-        send: ({ url, headers }) => handleWebSocketSend(url, headers)
+        buildPayload: ({ variables, processor }) => {
+            const message = processor.processTemplate(getRequestBodyContent() || '', variables);
+            warnUnresolvedVariables(processor, { body: message });
+            return message;
+        },
+        send: ({ url, headers }, message) => handleWebSocketSend(url, headers, message)
     }),
     [RequestMode.SSE]: Object.freeze({
         useAuth: true,
@@ -741,7 +865,12 @@ const STREAMING_SENDS = Object.freeze({
     }),
     [RequestMode.MQTT]: Object.freeze({
         useAuth: false,
-        send: ({ url }) => handleMqttSend(url, readMqttOptions())
+        buildPayload: ({ variables, processor }) => {
+            const options = processor.processObject(readMqttOptions(), variables);
+            warnUnresolvedVariables(processor, { body: options });
+            return options;
+        },
+        send: ({ url }, options) => handleMqttSend(url, options)
     })
 });
 
@@ -897,10 +1026,7 @@ export async function handleSendRequest() {
                     const endpoint = findRequest(collection, getCurrentEndpoint().endpointId);
 
                     if (endpoint && endpoint.path) {
-                        let mockPath = endpoint.path;
-                        for (const [key, value] of Object.entries(processedPathParams)) {
-                            mockPath = mockPath.replace(`{${key}}`, () => value);
-                        }
+                        const mockPath = buildMockPath(endpoint.path, processedPathParams);
 
                         mockRewrite = { baseUrl: mockBaseUrl, pathTemplate: endpoint.path };
                         url = queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`;
@@ -913,7 +1039,7 @@ export async function handleSendRequest() {
     }
 
     const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
-    if (['POST', 'PUT', 'PATCH'].includes(method) || bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'binary') {
+    if (methodCarriesBody(method) || bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'binary') {
         try {
             const variables = _resolvedVariables;
 
@@ -1027,6 +1153,7 @@ export async function handleSendRequest() {
     const requestTabId = app.workspaceTabController
         ? await app.workspaceTabController.service.getActiveTabId()
         : null;
+    let untrackRequest = null;
 
     try {
         await new Promise(resolve => requestAnimationFrame(resolve));
@@ -1060,7 +1187,16 @@ export async function handleSendRequest() {
                     requestConfig
                 );
             } catch (error) {
-                updateStatusDisplay(`Pre-request script error: ${error.message}`, null);
+                const message = `Pre-request script error: ${error.message}`;
+                displayResponseWithLineNumbersForTab(`${message}\n\nThe request was not sent.`, null, requestTabId);
+                clearResponsePanes(requestTabId, globalResponseElements());
+                if (await isTabCurrentlyActive(requestTabId)) {
+                    updateStatusDisplay(message, null);
+                    updateResponseTime(null);
+                    updateResponseSize(null);
+                }
+                toast.error(message);
+                return;
             }
             requestConfig.url = builder.applyScriptParamMutations({
                 requestConfig,
@@ -1103,90 +1239,11 @@ export async function handleSendRequest() {
 
         warnUnresolvedVariables(processor, requestConfig, authData.unresolvedVariables || []);
 
+        requestConfig.requestId = newRequestId();
+        untrackRequest = trackInFlight(requestTabId, requestConfig.requestId);
         const result = await window.backendAPI.sendApiRequest(requestConfig);
 
-        if (result.success) {
-            let contentType = null;
-            if (result.headers && result.headers['content-type']) {
-                contentType = result.headers['content-type'];
-            }
-
-            let formattedResponse;
-            let languageHint;
-            if (result.isBinary) {
-                const byteCount = result.size || 0;
-                formattedResponse = `[Binary response — ${byteCount} byte${byteCount === 1 ? '' : 's'}]\n\n`
-                    + `Content-Type: ${contentType || 'application/octet-stream'}\n\n`
-                    + 'This response is not text. Use the Save button in the response toolbar to write it to a file.';
-                languageHint = 'text';
-            } else if (typeof result.data === 'string') {
-                formattedResponse = result.data;
-            } else {
-                formattedResponse = JSON.stringify(result.data, null, 2);
-                languageHint = 'json';
-            }
-
-            setResponseMeta(requestTabId, {
-                isBinary: Boolean(result.isBinary),
-                base64: result.bodyBase64 || null,
-                suggestedName: suggestedFileName(url, contentType)
-            });
-
-            displayResponseWithLineNumbersForTab(formattedResponse, contentType, requestTabId, languageHint);
-
-            if (app.schemaController && !result.isBinary) {
-                app.schemaController.setLastResponseBody(result.data);
-                if (isGraphQLMode()) {
-                    clearSchemaValidationBadge(requestTabId);
-                } else {
-                    const validationResult = app.schemaController.validateResponse(result.data);
-                    displaySchemaValidationResult(validationResult, requestTabId);
-                }
-            }
-
-            displayGraphQLErrorsBadge(result, requestTabId);
-
-            displayResponsePanes(requestTabId, globalResponseElements(), {
-                headers: result.headers,
-                timings: result.timings,
-                size: result.size
-            });
-
-            if (app.cookieController && result.setCookies && result.setCookies.length > 0) {
-                app.cookieController.handleCookiesFromResponse(result.setCookies, requestConfig.url);
-            }
-
-            updateStatusDisplay(`Status: ${result.status} ${result.statusText}`, result.status);
-            updateResponseTime(result.ttfb);
-            updateResponseSize(result.size);
-            setRequestInProgress(false);
-
-            if (app.workspaceTabController && requestTabId) {
-                app.workspaceTabController.service.updateTab(requestTabId, {
-                    response: {
-                        data: result.data,
-                        headers: result.headers || {},
-                        status: result.status,
-                        statusText: result.statusText,
-                        ttfb: result.ttfb,
-                        size: result.size,
-                        timings: result.timings,
-                        cookies: extractCookies(result.headers)
-                    },
-                    isModified: false
-                }).catch(() => { });
-                if (app.workspaceTabController.tabBar?.updateTab) {
-                    app.workspaceTabController.tabBar.updateTab(requestTabId, { isModified: false });
-                }
-            }
-
-            await recordRequestOutcome(
-                requestConfig,
-                result,
-                { ...result, cookies: extractCookies(result.headers) },
-                historySensitive
-            );
-        } else if (result.cancelled) {
+        if (result.cancelled) {
             if (await isTabCurrentlyActive(requestTabId)) {
                 updateStatusDisplay('Request cancelled', null);
                 updateResponseTime(null);
@@ -1196,6 +1253,8 @@ export async function handleSendRequest() {
             clearResponsePanes(requestTabId, globalResponseElements());
             clearGraphQLErrorsBadge(requestTabId);
             setRequestInProgress(false);
+        } else if (result.status) {
+            await handleReceivedResponse(result, { requestConfig, requestTabId, url, historySensitive });
         } else {
             throw result;
         }
@@ -1244,8 +1303,101 @@ export async function handleSendRequest() {
 
         await recordRequestOutcome(requestConfig, error, error, historySensitive);
     } finally {
+        untrackRequest?.();
         setRequestInProgress(false);
     }
+}
+
+/**
+ * @param {Object} result
+ * @param {Object} ctx
+ * @param {Object} ctx.requestConfig
+ * @param {string|null} ctx.requestTabId
+ * @param {string} ctx.url
+ * @param {boolean} ctx.historySensitive
+ * @returns {Promise<void>}
+ */
+async function handleReceivedResponse(result, { requestConfig, requestTabId, url, historySensitive }) {
+    const contentType = result.headers?.['content-type'] ?? null;
+    const isSuccess = result.status >= 200 && result.status < 300;
+
+    let formattedResponse;
+    let languageHint;
+    if (result.isBinary) {
+        const byteCount = result.size || 0;
+        formattedResponse = `[Binary response — ${byteCount} byte${byteCount === 1 ? '' : 's'}]\n\n`
+            + `Content-Type: ${contentType || 'application/octet-stream'}\n\n`
+            + 'This response is not text. Use the Save button in the response toolbar to write it to a file.';
+        languageHint = 'text';
+    } else if (typeof result.data === 'string') {
+        formattedResponse = result.data;
+    } else if (result.data === undefined) {
+        formattedResponse = '';
+    } else {
+        formattedResponse = JSON.stringify(result.data, null, 2);
+        languageHint = 'json';
+    }
+
+    setResponseMeta(requestTabId, {
+        isBinary: Boolean(result.isBinary),
+        base64: result.bodyBase64 || null,
+        suggestedName: suggestedFileName(url, contentType)
+    });
+
+    displayResponseWithLineNumbersForTab(formattedResponse, contentType, requestTabId, languageHint);
+
+    if (app.schemaController && !result.isBinary) {
+        app.schemaController.setLastResponseBody(result.data);
+        if (isGraphQLMode() || !isSuccess) {
+            clearSchemaValidationBadge(requestTabId);
+        } else {
+            const validationResult = app.schemaController.validateResponse(result.data);
+            displaySchemaValidationResult(validationResult, requestTabId);
+        }
+    }
+
+    displayGraphQLErrorsBadge(result, requestTabId);
+
+    displayResponsePanes(requestTabId, globalResponseElements(), {
+        headers: result.headers,
+        timings: result.timings,
+        size: result.size,
+        setCookies: result.setCookies
+    });
+
+    if (app.cookieController && result.setCookies && result.setCookies.length > 0) {
+        app.cookieController.handleCookiesFromResponse(result.setCookies, requestConfig.url);
+    }
+
+    if (await isTabCurrentlyActive(requestTabId)) {
+        updateStatusDisplay(`Status: ${result.status} ${result.statusText || ''}`.trim(), result.status);
+        updateResponseTime(result.ttfb);
+        updateResponseSize(result.size);
+    }
+    setRequestInProgress(false);
+
+    const cookies = responseCookies(result);
+
+    if (app.workspaceTabController && requestTabId) {
+        app.workspaceTabController.service.updateTab(requestTabId, {
+            response: {
+                data: result.data,
+                headers: result.headers || {},
+                status: result.status,
+                statusText: result.statusText,
+                ttfb: result.ttfb,
+                size: result.size,
+                timings: result.timings,
+                cookies
+            },
+            isModified: false
+        }).catch(() => { });
+        if (app.workspaceTabController.tabBar?.updateTab) {
+            app.workspaceTabController.tabBar.updateTab(requestTabId, { isModified: false });
+        }
+    }
+
+    await recordRequestOutcome(requestConfig, result, { ...result, cookies }, historySensitive);
 }
 
 export async function handleGenerateCurl() {
@@ -1269,7 +1421,7 @@ export async function handleGenerateCurl() {
             getCurrentEndpoint(), headers
         ));
 
-        const authData = await generateEffectiveAuthData({ variables: resolvedVariables, processor });
+        const authData = await generateEffectiveAuthData({ variables: resolvedVariables, processor, refreshOAuth: false });
         builder.mergeAuthData(headers, queryParams, authData);
 
         ({ url } = builder.processRequestComponents({
@@ -1286,7 +1438,7 @@ export async function handleGenerateCurl() {
     const bodyMode = bodyModeSelect?.value || 'json';
     let bodyType;
 
-    if (['POST', 'PUT', 'PATCH'].includes(method) ||
+    if (methodCarriesBody(method) ||
         ['formdata', 'urlencoded', 'binary'].includes(bodyMode)) {
         const captured = captureSnippetBody({
             bodyMode,

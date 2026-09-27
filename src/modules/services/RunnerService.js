@@ -17,17 +17,19 @@ import { ChangeEmitter } from './ChangeEmitter.js';
 import { normalizeFormRows } from '../utils/formDataRows.js';
 import { activeKeyValueRows } from '../utils/keyValueRows.js';
 import { findRequest } from '../collections/collectionTree.js';
-import { buildEndpointUrl } from '../collections/endpointUrl.js';
-import { resolveEffectiveAuthConfig } from '../auth/authInheritance.js';
+import { buildEndpointUrl, buildMockPath } from '../collections/endpointUrl.js';
+import { resolveEffectiveAuthWithSource } from '../auth/authInheritance.js';
+import { ensureFreshOAuthToken } from '../auth/oauthRefresh.js';
 import { resolveAuthConfigVariables } from '../auth/authVariables.js';
 import { generateAuthData } from '../auth/authData.js';
 import { deriveRequestSettings } from '../state/settingsCache.js';
-import { extractCookies } from '../cookieParser.js';
+import { responseCookies } from '../cookieParser.js';
+import { methodCarriesBody } from '../utils/bodyMethods.js';
+import { newRequestId } from '../state/inFlightRequests.js';
 import { translate, translateCount } from '../utils/translate.js';
 import { RUNNABLE_PROTOCOLS } from '../utils/runnableRequests.js';
 import { parseDataFile } from '../utils/dataFile.js';
 
-const BODY_METHODS = ['POST', 'PUT', 'PATCH'];
 
 const ABSOLUTE_OR_TEMPLATED_PATH = /^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/|\{\{)/;
 
@@ -295,6 +297,9 @@ export class RunnerService {
     stopExecution() {
         if (this.isRunning) {
             this.shouldStop = true;
+            if (this._inFlightRequestId) {
+                Promise.resolve(this.backendAPI.cancelApiRequest?.(this._inFlightRequestId)).catch(() => { });
+            }
             this.statusDisplay?.update(translate('runner.stopping', 'Stopping runner...'), null);
             const waiters = [...this._stopWaiters];
             this._stopWaiters.clear();
@@ -430,14 +435,41 @@ export class RunnerService {
 
             let { requestConfig } = prepared;
             if (scripts.preRequestScript.trim()) {
-                requestConfig = await this._runPreRequestScript(scripts.preRequestScript, prepared, variables, outcome, scriptIteration);
+                const errorsBefore = outcome.errors.length;
+                requestConfig = await this._runPreRequestScript(scripts.preRequestScript, prepared, variables, outcome, scriptIteration, collection.id);
                 variables = mergeVariables(variables, outcome.variablesSet);
+                if (outcome.errors.length > errorsBefore) {
+                    result.logs = outcome.logs;
+                    result.variablesSet = outcome.variablesSet;
+                    throw new Error(translate(
+                        'runner.pre_request_failed',
+                        'Pre-request script failed, so the request was not sent: {{message}}',
+                        { message: outcome.errors.slice(errorsBefore).join('; ') }
+                    ));
+                }
+            }
+
+            if (this.shouldStop) {
+                return result;
             }
 
             await this._attachClientCert(requestConfig, runContext);
             await this._attachCookies(requestConfig);
 
-            const response = await this.backendAPI.sendApiRequest(requestConfig);
+            requestConfig.requestId = newRequestId();
+            this._inFlightRequestId = requestConfig.requestId;
+            let response;
+            try {
+                response = await this.backendAPI.sendApiRequest(requestConfig);
+            } finally {
+                if (this._inFlightRequestId === requestConfig.requestId) {
+                    this._inFlightRequestId = null;
+                }
+            }
+
+            if (this.shouldStop || response.cancelled) {
+                return result;
+            }
 
             result.statusCode = response.status || null;
             result.responseTime = Date.now() - startTime;
@@ -445,7 +477,7 @@ export class RunnerService {
             result.httpSuccess = Boolean(response.success);
             result.body = response.data ?? null;
             result.headers = response.headers || {};
-            result.cookies = extractCookies(response.headers);
+            result.cookies = responseCookies(response);
             result.response = {
                 status: response.status,
                 statusText: response.statusText,
@@ -458,7 +490,7 @@ export class RunnerService {
 
             for (const script of [scripts.testScript, request.postResponseScript]) {
                 if (script && script.trim()) {
-                    await this._runTestScript(script, requestConfig, response, variables, outcome, scriptIteration);
+                    await this._runTestScript(script, requestConfig, response, variables, outcome, scriptIteration, collection.id);
                     variables = mergeVariables(variables, outcome.variablesSet);
                 }
             }
@@ -672,12 +704,28 @@ export class RunnerService {
         const queryParams = Object.fromEntries(queryRows.map(row => [row.key, row.value]));
 
         const configuredAuth = persistedAuthConfig || endpoint.security || { type: 'inherit', config: {} };
-        const resolvedAuth = withBearerFallback(await resolveEffectiveAuthConfig(configuredAuth, {
+        const { authConfig: inheritedAuth, source: authSource } = await resolveEffectiveAuthWithSource(configuredAuth, {
             collectionId: collection.id,
             endpointId: endpoint.id,
             repository: this.collectionRepository
-        }), effectiveVariables);
-        const { authConfig: substitutedAuth } = resolveAuthConfigVariables(resolvedAuth, effectiveVariables, processor);
+        });
+        const resolvedAuth = withBearerFallback(inheritedAuth, effectiveVariables);
+        let { authConfig: substitutedAuth } = resolveAuthConfigVariables(resolvedAuth, effectiveVariables, processor);
+        if (authSource && resolvedAuth === inheritedAuth) {
+            const renewal = await ensureFreshOAuthToken({
+                rawAuth: resolvedAuth,
+                resolvedAuth: substitutedAuth,
+                key: authSource.kind === 'folder'
+                    ? `${collection.id}|folder|${authSource.folderId}`
+                    : authSource.kind === 'collection' ? `${collection.id}|collection` : `${collection.id}|request|${endpoint.id}`,
+                getToken: (request) => this.backendAPI.oauth2.getToken(request),
+                persist: (nextRaw) => this.collectionRepository.saveAuthConfigAtSource(collection.id, endpoint.id, authSource, nextRaw)
+            });
+            substitutedAuth = renewal.resolvedAuth;
+            if (renewal.error) {
+                this.statusDisplay?.update(renewal.error, null);
+            }
+        }
         const authData = generateAuthData(substitutedAuth);
         this.requestBuilder.mergeAuthData(headers, queryParams, authData);
 
@@ -702,10 +750,7 @@ export class RunnerService {
         let mockRewrite = null;
         const mockBaseUrl = await this._mockBaseUrlFor(collection.id, runContext);
         if (mockBaseUrl && endpoint.path) {
-            let mockPath = endpoint.path;
-            for (const [key, value] of Object.entries(processedPathParams)) {
-                mockPath = mockPath.replace(`{${key}}`, () => value);
-            }
+            const mockPath = buildMockPath(endpoint.path, processedPathParams);
             mockRewrite = { baseUrl: mockBaseUrl, pathTemplate: endpoint.path };
             url = queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`;
         }
@@ -854,7 +899,7 @@ export class RunnerService {
             };
         }
 
-        if (!overrideBody && !BODY_METHODS.includes(method)) {
+        if (!overrideBody && !methodCarriesBody(method)) {
             return { body: undefined, bodyType: undefined };
         }
 
@@ -1005,9 +1050,10 @@ export class RunnerService {
      * @param {Object} variables
      * @param {Object} outcome
      * @param {Object} iteration
+     * @param {string} collectionId
      * @returns {Promise<Object>}
      */
-    async _runPreRequestScript(script, prepared, variables, outcome, iteration) {
+    async _runPreRequestScript(script, prepared, variables, outcome, iteration, collectionId) {
         const scriptService = app.scriptController?.service;
         const { requestConfig } = prepared;
         if (!scriptService) {
@@ -1021,7 +1067,8 @@ export class RunnerService {
         };
         const { modifiedRequest, result } = await scriptService.executePreRequestScript(script, requestConfig, {
             environment: variables,
-            iteration
+            iteration,
+            collectionId
         });
         this._collectScriptResult(result, outcome);
 
@@ -1058,9 +1105,10 @@ export class RunnerService {
      * @param {Object} variables
      * @param {Object} outcome
      * @param {Object} iteration
+     * @param {string} collectionId
      * @returns {Promise<void>}
      */
-    async _runTestScript(script, requestConfig, response, variables, outcome, iteration) {
+    async _runTestScript(script, requestConfig, response, variables, outcome, iteration, collectionId) {
         const scriptService = app.scriptController?.service;
         if (!scriptService) {
             return;
@@ -1068,8 +1116,8 @@ export class RunnerService {
         const result = await scriptService.executeTestScript(
             script,
             requestConfig,
-            { ...response, cookies: extractCookies(response.headers) },
-            { environment: variables, iteration }
+            { ...response, cookies: responseCookies(response) },
+            { environment: variables, iteration, collectionId }
         );
         this._collectScriptResult(result, outcome);
     }
@@ -1082,6 +1130,7 @@ export class RunnerService {
         outcome.logs.push(...(result?.logs || []));
         outcome.testResults.push(...(result?.testResults || []));
         outcome.errors.push(...(result?.errors || []));
+        Object.assign(outcome.variablesSet, result?.modifiedCollectionVariables || {});
         Object.assign(outcome.variablesSet, result?.modifiedEnvironment || {});
     }
 

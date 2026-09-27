@@ -4,7 +4,20 @@
  */
 
 import { app } from '../appContext.js';
-import { flattenRequests, topLevelFolders, walkFolders, findRequest, updateRequest, removeRequest } from '../collections/collectionTree.js';
+import {
+    flattenRequests,
+    topLevelFolders,
+    walkFolders,
+    findRequest,
+    findFolder,
+    folderChainForRequest,
+    updateRequest,
+    updateFolder,
+    removeRequest,
+    insertRequest,
+    insertFolder,
+    moveRequest
+} from '../collections/collectionTree.js';
 import {
     getProtocol,
     derivePath,
@@ -120,6 +133,15 @@ export class CollectionService {
 
     /**
      * @param {string} collectionId
+     * @param {string} path
+     * @returns {Promise<Object>}
+     */
+    async relocateCollection(collectionId, path) {
+        return this.repository.relocate(collectionId, path);
+    }
+
+    /**
+     * @param {string} collectionId
      * @param {string} format
      * @returns {Promise<Object>}
      */
@@ -223,6 +245,17 @@ export class CollectionService {
 
     /**
      * @param {string} collectionId
+     * @returns {Promise<Object|undefined>}
+     */
+    async _readFresh(collectionId) {
+        if (typeof this.repository.readForUpdate === 'function') {
+            return this.repository.readForUpdate(collectionId);
+        }
+        return this.repository.getById(collectionId);
+    }
+
+    /**
+     * @param {string} collectionId
      * @param {Object} requestData
      * @param {string} requestData.name
      * @param {string} requestData.method
@@ -232,8 +265,8 @@ export class CollectionService {
     async addRequestToCollection(collectionId, requestData) {
         try {
             this.statusDisplay.update('Adding new request...', null);
-            
-            const collection = await this.repository.getById(collectionId);
+
+            const collection = await this._readFresh(collectionId);
             if (!collection) {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }
@@ -261,6 +294,14 @@ export class CollectionService {
                 newEndpoint.httpMethod = httpMethod;
             }
 
+            if (requestData.folderId) {
+                const placed = insertRequest(collection, requestData.folderId, newEndpoint);
+                await this.repository.saveOne(placed, { newRequestIds: [newEndpoint.id] });
+                await this.persistNewEndpointSidecars(collectionId, newEndpoint.id, descriptor, requestData);
+                this.statusDisplay.update(`Added new request: ${requestData.name}`, null);
+                return newEndpoint;
+            }
+
             collection.endpoints = collection.endpoints || [];
             collection.endpoints.push(newEndpoint);
 
@@ -284,7 +325,7 @@ export class CollectionService {
                 targetFolder.endpoints.push(newEndpoint);
             }
 
-            await this.repository.saveOne(collection);
+            await this.repository.saveOne(collection, { newRequestIds: [newEndpoint.id] });
 
             await this.persistNewEndpointSidecars(collectionId, newEndpoint.id, descriptor, requestData);
 
@@ -393,6 +434,92 @@ export class CollectionService {
 
     /**
      * @param {string} collectionId
+     * @returns {Promise<Object>}
+     */
+    async _requireFresh(collectionId) {
+        const collection = await this._readFresh(collectionId);
+        if (!collection) {
+            throw new Error(`Collection with id ${collectionId} not found`);
+        }
+        return collection;
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string|null} parentFolderId
+     * @param {string} name
+     * @returns {Promise<Object>}
+     */
+    async createFolder(collectionId, parentFolderId, name) {
+        const collection = await this._requireFresh(collectionId);
+        const folder = { id: this._uniqueFolderId(name, collection), name };
+        await this.repository.saveOne(insertFolder(collection, parentFolderId, folder));
+        return folder;
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} folderId
+     * @param {string} name
+     * @returns {Promise<void>}
+     */
+    async renameFolder(collectionId, folderId, name) {
+        const collection = await this._requireFresh(collectionId);
+        const renamed = updateFolder(collection, folderId, { name });
+        if (!renamed) {
+            throw new Error(`Folder with id ${folderId} not found in collection`);
+        }
+        await this.repository.saveOne(renamed);
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} folderId
+     * @returns {Promise<Array<string>>}
+     */
+    async deleteFolder(collectionId, folderId) {
+        return this.repository.deleteFolder(collectionId, folderId);
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {string} copyName
+     * @returns {Promise<Object>}
+     */
+    async duplicateRequest(collectionId, endpointId, copyName) {
+        const collection = await this._requireFresh(collectionId);
+        const source = findRequest(collection, endpointId);
+        if (!source) {
+            throw new Error(`Endpoint with id ${endpointId} not found in collection`);
+        }
+        const folderId = folderChainForRequest(collection, endpointId).at(-1)?.id ?? null;
+        const copy = { ...JSON.parse(JSON.stringify(source)), id: this.generateEndpointId(collection), name: copyName };
+        await this.repository.saveOne(insertRequest(collection, folderId, copy), { newRequestIds: [copy.id] });
+        await this.repository.copyEndpointData(collectionId, endpointId, copy.id);
+        return copy;
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {string|null} targetFolderId
+     * @returns {Promise<void>}
+     */
+    async moveRequestToFolder(collectionId, endpointId, targetFolderId) {
+        const collection = await this._requireFresh(collectionId);
+        if (targetFolderId && !findFolder(collection, targetFolderId)) {
+            throw new Error(`Folder with id ${targetFolderId} not found in collection`);
+        }
+        const moved = moveRequest(collection, endpointId, targetFolderId);
+        if (!moved) {
+            throw new Error(`Endpoint with id ${endpointId} not found in collection`);
+        }
+        await this.repository.saveOne(moved);
+    }
+
+    /**
+     * @param {string} collectionId
      * @param {string} endpointId
      * @param {string} newName
      * @returns {Promise<Object>}
@@ -401,7 +528,7 @@ export class CollectionService {
         try {
             this.statusDisplay.update('Renaming request...', null);
 
-            const collection = await this.repository.getById(collectionId);
+            const collection = await this._readFresh(collectionId);
             if (!collection) {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }
@@ -432,7 +559,7 @@ export class CollectionService {
         try {
             this.statusDisplay.update('Deleting request...', null);
 
-            const collection = await this.repository.getById(collectionId);
+            const collection = await this._readFresh(collectionId);
             if (!collection) {
                 throw new Error(`Collection with id ${collectionId} not found`);
             }

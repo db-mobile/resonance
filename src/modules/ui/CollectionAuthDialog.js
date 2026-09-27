@@ -68,6 +68,7 @@ export class CollectionAuthDialog extends BaseModal {
             typeSelect,
             fieldsContainer,
             idPrefix: 'colauth-',
+            collectionId: collection.id,
             inheritSummary: 'Falls back to the collection\'s auth configuration.'
         });
 

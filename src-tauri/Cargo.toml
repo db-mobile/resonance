@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "3.2.2"
+version = "3.2.3"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -8,17 +8,15 @@ repository = "https://github.com/db-mobile/resonance"
 edition = "2024"
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.7", features = [] }
 tonic-build = "0.13"
 prost-build = "0.13"
 protoc-bin-vendored = "3"
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2.12", features = [] }
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
-tauri-plugin-fs = "2"
-tauri-plugin-shell = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-updater = "2"
 
@@ -80,6 +78,7 @@ idna_adapter = "=1.2.0"
 # Digest auth + AWS Signature V4
 md5 = "0.7"
 sha2 = "0.10"
+sha1 = "0.10"
 hmac = "0.12"
 hex = "0.4"
 
@@ -91,8 +90,8 @@ ntlmclient = "0.2"
 # Cryptographic RNG for OAuth PKCE verifiers and CSRF state (OS entropy, OpenSSL-free)
 getrandom = "0.3"
 
-# Proto file parsing
-which = "6"
+# Proto file parsing (pure Rust; bundles the well-known types, no protoc needed)
+protox = "0.8"
 
 # JavaScript engine for script execution
 boa_engine = "0.19"
@@ -131,21 +130,3 @@ codegen-units = 1  # Maximize cross-module optimization (slower compile)
 strip = true       # Strip symbols from the binary
 # panic = "abort" intentionally omitted: the Boa script sandbox relies on
 # unwinding worker-thread panics, which abort would escalate to a full crash.
-
-# Tauri 2.12.0 is not released yet (the covector release PR, tauri-apps/tauri#15634,
-# is still open), so the crates are taken from the 2.x line's `dev` branch at a pinned
-# rev. The reason is tao: 2.11.x pins `tao ^0.35`, while the 2.12 line moves to tao 0.37,
-# which carries the Wayland client-side-decoration fixes (tao#1218 — tauri#6562, #13440,
-# #13749, #14251, #14748: title bar buttons, title changes, and no CSD when the
-# compositor offers server-side decorations) plus the Linux thread-safety fixes for
-# set_min_inner_size/set_fullscreen/set_theme (tao#1173).
-# Only the crates something pulls from crates.io need patching: tauri and tauri-build
-# (this crate), tauri-plugin and tauri-utils (the plugins). The rest of the repo
-# (tauri-runtime, tauri-runtime-wry, tauri-macros, tauri-codegen) follows from git
-# tauri's in-repo path dependencies at the same rev.
-# Drop this whole block once tauri 2.12.0 is on crates.io.
-[patch.crates-io]
-tauri = { git = "https://github.com/tauri-apps/tauri", rev = "1c9ab578eea912394ad7addfaf03b51278bdc6a6" }
-tauri-build = { git = "https://github.com/tauri-apps/tauri", rev = "1c9ab578eea912394ad7addfaf03b51278bdc6a6" }
-tauri-plugin = { git = "https://github.com/tauri-apps/tauri", rev = "1c9ab578eea912394ad7addfaf03b51278bdc6a6" }
-tauri-utils = { git = "https://github.com/tauri-apps/tauri", rev = "1c9ab578eea912394ad7addfaf03b51278bdc6a6" }

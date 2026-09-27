@@ -266,7 +266,7 @@ export class WorkspaceTabEndpointLoaderService {
             method: 'MQTT',
             clientId: mqtt.clientId || '',
             username: mqtt.username || '',
-            password: '',
+            password: mqtt.password || '',
             subscribeTopic: mqtt.subscribeTopic || '',
             publishTopic: mqtt.publishTopic || '',
             qos: mqtt.qos || 0,

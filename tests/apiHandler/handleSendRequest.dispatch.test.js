@@ -3,6 +3,8 @@
 
 import { requestBarMarkup, requestFormMarkup } from '../helpers/requestBarMarkup.js';
 
+const liveness = { websocket: jest.fn(() => false) };
+
 const handlers = {
     websocket: jest.fn(),
     sse: jest.fn(),
@@ -10,7 +12,7 @@ const handlers = {
     grpc: jest.fn()
 };
 
-async function loadApiHandler({ resolveVariablesError = null } = {}) {
+async function loadApiHandler({ resolveVariablesError = null, variables = null } = {}) {
     document.body.innerHTML = requestBarMarkup() + requestFormMarkup();
     jest.resetModules();
     Object.values(handlers).forEach(fn => fn.mockReset());
@@ -22,7 +24,8 @@ async function loadApiHandler({ resolveVariablesError = null } = {}) {
     }));
     jest.doMock('../../src/modules/websocketHandler.js', () => ({
         handleWebSocketSend: handlers.websocket,
-        handleWebSocketCancel: jest.fn()
+        handleWebSocketCancel: jest.fn(),
+        isWebSocketLive: liveness.websocket
     }));
     jest.doMock('../../src/modules/sseHandler.js', () => ({
         handleSseConnect: handlers.sse,
@@ -36,7 +39,22 @@ async function loadApiHandler({ resolveVariablesError = null } = {}) {
         handleGrpcSend: handlers.grpc
     }));
 
-    if (!resolveVariablesError) {
+    if (variables) {
+        jest.doMock('../../src/modules/services/RequestBuilderService.js', () => {
+            const { VariableProcessor } = jest.requireActual('../../src/modules/variables/VariableProcessor.js');
+            return {
+                RequestBuilderService: class {
+                    async resolveVariables() {
+                        return { variables, processor: new VariableProcessor() };
+                    }
+                    mergeAuthData() {}
+                    processRequestComponents({ url }) {
+                        return { url, queryString: '', pathParams: {} };
+                    }
+                }
+            };
+        });
+    } else if (!resolveVariablesError) {
         jest.dontMock('../../src/modules/services/RequestBuilderService.js');
     } else {
         jest.doMock('../../src/modules/services/RequestBuilderService.js', () => ({
@@ -301,3 +319,72 @@ describe('SSE carries the method and body', () => {
         expect(handlers.sse.mock.calls[0][2]).toMatchObject({ method: 'GET', body: null });
     });
 });
+
+describe('streaming payloads resolve {{variables}}', () => {
+    test('WebSocket sends the resolved message', async () => {
+        const { handleSendRequest, setRequestMode } = await loadApiHandler({ variables: { token: 'abc' } });
+        setRequestMode('websocket');
+        document.getElementById('websocket-url-input').value = 'wss://example.test';
+        document.querySelector('.body-mode-panel[data-mode="json"]').innerHTML =
+            '<textarea id="body-input">{"token":"{{token}}"}</textarea>';
+
+        await handleSendRequest();
+
+        expect(handlers.websocket.mock.calls[0][2]).toBe('{"token":"abc"}');
+    });
+
+    test('MQTT resolves topics, credentials and payload', async () => {
+        const { handleSendRequest, setRequestMode } = await loadApiHandler({
+            variables: { device: 'd1', user: 'u', pass: 'p' }
+        });
+        setRequestMode('mqtt');
+        document.getElementById('mqtt-broker-input').value = 'mqtt://broker:1883';
+        document.getElementById('mqtt-username-input').value = '{{user}}';
+        document.getElementById('mqtt-password-input').value = '{{pass}}';
+        document.getElementById('mqtt-subscribe-input').value = 'devices/{{device}}/#';
+        document.getElementById('mqtt-topic-input').value = 'devices/{{device}}/cmd';
+
+        await handleSendRequest();
+
+        expect(handlers.mqtt.mock.calls[0][1]).toMatchObject({
+            username: 'u',
+            password: 'p',
+            subscribeTopic: 'devices/d1/#',
+            publishTopic: 'devices/d1/cmd'
+        });
+    });
+});
+
+describe('a live stream keeps a Disconnect button', () => {
+    test('the cancel button turns into Disconnect while the WebSocket is open and hides once it closes', async () => {
+        const { handleSendRequest, setRequestMode } = await loadApiHandler();
+        const { STREAM_STATE_EVENT } = await import('../../src/modules/streaming/streamState.js');
+        setRequestMode('websocket');
+        document.getElementById('websocket-url-input').value = 'wss://example.test';
+        liveness.websocket.mockReturnValue(true);
+
+        await handleSendRequest();
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        const cancel = document.getElementById('cancel-request-btn');
+        expect(cancel.style.display).not.toBe('none');
+        expect(cancel.textContent).toBe('Disconnect');
+
+        liveness.websocket.mockReturnValue(false);
+        document.dispatchEvent(new CustomEvent(STREAM_STATE_EVENT));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        expect(cancel.style.display).toBe('none');
+        expect(cancel.textContent).toBe('Cancel');
+    });
+
+    test('HTTP mode never shows it', async () => {
+        const { setRequestMode } = await loadApiHandler();
+        liveness.websocket.mockReturnValue(true);
+        setRequestMode('http');
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        expect(document.getElementById('cancel-request-btn').style.display).toBe('none');
+    });
+});
+

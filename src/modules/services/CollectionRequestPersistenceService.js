@@ -202,6 +202,7 @@ export class CollectionRequestPersistenceService {
         await this.repository.saveMqttData(collectionId, endpointId, {
             clientId: document.getElementById('mqtt-client-id-input')?.value || '',
             username: document.getElementById('mqtt-username-input')?.value || '',
+            password: document.getElementById('mqtt-password-input')?.value || '',
             subscribeTopic: document.getElementById('mqtt-subscribe-input')?.value || '',
             publishTopic: document.getElementById('mqtt-topic-input')?.value || '',
             qos: Number(document.getElementById('mqtt-qos-select')?.value) || 0

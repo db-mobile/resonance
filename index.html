@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' ipc: http://ipc.localhost; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https: http:;">
     <title>Resonance</title>
     <link rel="stylesheet" href="src/styles/main.css">
 </head>
@@ -412,11 +411,15 @@
                                     <div class="grpc-proto-filename-row">
                                         <span id="grpc-proto-filename" class="proto-filename caption" aria-live="polite"></span>
                                     </div>
+                                    <p id="grpc-proto-includes" class="grpc-proto-includes caption dim-label" hidden></p>
                                     <p class="grpc-source-card-hint caption dim-label">Use type definitions from a local file.</p>
                                     <div class="grpc-source-card-actions">
                                         <button id="grpc-load-proto-btn" class="button small" aria-label="Load Proto File">
                                             <span class="icon icon-14 icon-file"></span>
                                             Load .proto
+                                        </button>
+                                        <button id="grpc-add-include-btn" class="button flat small" aria-label="Add Import Path" title="Add a folder that imports in the .proto file are resolved against" style="display: none;" data-i18n="grpc.add_import_path">
+                                            Add import path
                                         </button>
                                         <button id="grpc-clear-proto-btn" class="button flat small" aria-label="Clear Proto" style="display: none;">
                                             Clear

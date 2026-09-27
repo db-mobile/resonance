@@ -166,17 +166,24 @@ describe('CollectionRequestPersistenceService protocol routing', () => {
             expect(repository.saveMqttData).toHaveBeenCalledWith('c1', 'mqtt1', {
                 clientId: 'resonance-1',
                 username: 'sensor',
+                password: 'hunter2',
                 subscribeTopic: 'sensors/#',
                 publishTopic: 'sensors/cmd',
                 qos: 1
             });
         });
 
-        test('never writes the broker password to stored data', async () => {
-            await service.saveAllRequestModifications('c1', 'mqtt1');
+        test('hands the broker password to the repository, which keeps it out of the sidecar', async () => {
+            const { CollectionRepository } = await import('../../src/modules/storage/CollectionRepository.js');
+            const saveEndpointData = jest.fn().mockResolvedValue(undefined);
+            const real = new CollectionRepository({
+                collections: { getEndpointData: jest.fn().mockResolvedValue({}), saveEndpointData }
+            }, null);
 
-            const stored = JSON.stringify(repository.saveMqttData.mock.calls[0][2]);
-            expect(stored).not.toContain('hunter2');
+            await service.saveAllRequestModifications('c1', 'mqtt1');
+            await real.saveMqttData(...repository.saveMqttData.mock.calls[0]);
+
+            expect(JSON.stringify(saveEndpointData.mock.calls)).not.toContain('hunter2');
         });
 
         test('keeps the broker address as the endpoint path', async () => {

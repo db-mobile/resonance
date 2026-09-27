@@ -2,11 +2,8 @@ import { clearResponseDisplayForTab } from './apiHandler.js';
 import { resolveTlsOptions } from './tlsOptions.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
-import {
-    StreamSession,
-    createBackendEventListener,
-    getActiveTabId
-} from './streaming/streamSession.js';
+import { StreamSession, createBackendEventListener, getActiveTabId } from './streaming/streamSession.js';
+import { isLiveEntry } from './streaming/streamState.js';
 
 const session = new StreamSession({
     buildResponseMeta: (entry, transcript, state) => ({
@@ -189,4 +186,12 @@ export async function clearSseState(tabId) {
         await window.backendAPI.sse.close(tabId);
     }
     session.remove(tabId);
+}
+
+/**
+ * @param {string} tabId
+ * @returns {boolean}
+ */
+export function isSseLive(tabId) {
+    return isLiveEntry(session.get(tabId));
 }

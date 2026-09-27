@@ -27,6 +27,15 @@ function sameFieldValues(data, updates) {
     );
 }
 
+/**
+ * @param {string} collectionId
+ * @param {string} endpointId
+ * @returns {string}
+ */
+function mqttSecretScope(collectionId, endpointId) {
+    return `mqtt:${collectionId}:${endpointId}`;
+}
+
 export class CollectionRepository {
     static MAX_CACHE_SIZE = 20;
 
@@ -54,6 +63,7 @@ export class CollectionRepository {
 
     /** @returns {Promise<Array<Object>>} */
     async getAll() {
+        this.invalidateCache();
         try {
             const collections = await this.backendAPI.collections.getAll();
             return listFromWire(collections);
@@ -62,14 +72,37 @@ export class CollectionRepository {
         }
     }
 
+    /** @returns {Promise<Array<{path: string, id: (string|null), message: string}>>} */
+    async getLoadErrors() {
+        try {
+            const errors = await this.backendAPI.collections.loadErrors();
+            return Array.isArray(errors) ? errors : [];
+        } catch (error) {
+            void error;
+            return [];
+        }
+    }
+
+    /** @returns {void} */
+    invalidateCache() {
+        this._byIdCache.clear();
+    }
+
     /**
      * @param {Object} collection
+     * @param {Object} [options]
+     * @param {Array<string>} [options.newRequestIds]
      * @returns {Promise<void>}
      */
-    async saveOne(collection) {
+    async saveOne(collection, { newRequestIds } = {}) {
         try {
-            await this.backendAPI.collections.save(toWire(collection));
-            if (collection?.id) {
+            const wire = toWire(collection);
+            const skipped = newRequestIds
+                ? await this.backendAPI.collections.save(wire, newRequestIds)
+                : await this.backendAPI.collections.save(wire);
+            if (Array.isArray(skipped) && skipped.length > 0) {
+                this._byIdCache.delete(collection.id);
+            } else if (collection?.id) {
                 this._addToCache(collection.id, collection);
             }
         } catch (error) {
@@ -170,6 +203,7 @@ export class CollectionRepository {
             this._byIdCache.delete(id);
             if (this.secretStore) {
                 await this.secretStore.deleteScopePrefix(`auth:${id}:`);
+                await this.secretStore.deleteScopePrefix(`mqtt:${id}:`);
             }
             return true;
         } catch (error) {
@@ -197,6 +231,17 @@ export class CollectionRepository {
      */
     async openExisting(path) {
         return this.backendAPI.collections.openExisting(path);
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} path
+     * @returns {Promise<Object>}
+     */
+    async relocate(collectionId, path) {
+        const collection = await this.backendAPI.collections.relocate(collectionId, path);
+        this._byIdCache.delete(collectionId);
+        return fromWire(collection);
     }
 
     /** @returns {Promise<Object>} */
@@ -229,7 +274,7 @@ export class CollectionRepository {
             graphqlData: data.graphqlData || null,
             formBodyData: data.formBodyData || null,
             grpcData: data.grpcData || null,
-            mqttData: data.mqttData || null,
+            mqttData: await this._hydrateMqttData(collectionId, endpointId, data.mqttData || null),
             responseSchema: data.responseSchema || null
         };
     }
@@ -629,20 +674,49 @@ export class CollectionRepository {
      */
     async getInheritedAuthConfig(collectionId, endpointId) {
         try {
-            if (endpointId) {
-                const collection = await this._getByIdFresh(collectionId);
-                const chain = folderChainForRequest(collection, endpointId);
-
-                for (let index = chain.length - 1; index >= 0; index -= 1) {
-                    const folder = chain[index];
-                    if (folder?.authConfig?.type && folder.authConfig.type !== 'inherit') {
-                        return this.getFolderAuthConfig(collectionId, folder.id);
-                    }
-                }
+            const source = await this.getInheritedAuthSource(collectionId, endpointId);
+            if (source.kind === 'folder') {
+                return this.getFolderAuthConfig(collectionId, source.folderId);
             }
             return this.getCollectionAuthConfig(collectionId);
         } catch (error) {
             return null;
+        }
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string|null|undefined} endpointId
+     * @returns {Promise<{kind: string, folderId?: string}>}
+     */
+    async getInheritedAuthSource(collectionId, endpointId) {
+        if (endpointId) {
+            const collection = await this._getByIdFresh(collectionId);
+            const chain = folderChainForRequest(collection, endpointId);
+            for (let index = chain.length - 1; index >= 0; index -= 1) {
+                const folder = chain[index];
+                if (folder?.authConfig?.type && folder.authConfig.type !== 'inherit') {
+                    return { kind: 'folder', folderId: folder.id };
+                }
+            }
+        }
+        return { kind: 'collection' };
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string|null} endpointId
+     * @param {{kind: string, folderId?: string}} source
+     * @param {Object} authConfig
+     * @returns {Promise<void>}
+     */
+    async saveAuthConfigAtSource(collectionId, endpointId, source, authConfig) {
+        if (source?.kind === 'folder') {
+            await this.saveFolderAuthConfig(collectionId, source.folderId, authConfig);
+        } else if (source?.kind === 'collection') {
+            await this.saveCollectionAuthConfig(collectionId, authConfig);
+        } else if (source?.kind === 'request' && endpointId) {
+            await this.savePersistedAuthConfig(collectionId, endpointId, authConfig);
         }
     }
 
@@ -713,6 +787,46 @@ export class CollectionRepository {
 
     /**
      * @param {string} collectionId
+     * @param {string} folderId
+     * @returns {Promise<Array<string>>}
+     */
+    async deleteFolder(collectionId, folderId) {
+        const removed = await this.backendAPI.collections.deleteFolder(collectionId, folderId);
+        this._byIdCache.delete(collectionId);
+        if (this.secretStore) {
+            await this.secretStore.deleteScope(folderAuthSecretScope(collectionId, folderId));
+            for (const endpointId of removed ?? []) {
+                await this.secretStore.deleteScope(authSecretScope(collectionId, endpointId));
+                await this.secretStore.deleteScope(mqttSecretScope(collectionId, endpointId));
+            }
+        }
+        return removed ?? [];
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} sourceId
+     * @param {string} targetId
+     * @returns {Promise<void>}
+     */
+    async copyEndpointData(collectionId, sourceId, targetId) {
+        const data = await this._getEndpointDataForUpdate(collectionId, sourceId);
+        if (data && Object.keys(data).length > 0) {
+            await this._saveEndpointData(collectionId, targetId, data);
+        }
+        if (!this.secretStore) {
+            return;
+        }
+        for (const scopeOf of [authSecretScope, mqttSecretScope]) {
+            const secrets = await this.secretStore.getScope(scopeOf(collectionId, sourceId));
+            for (const [key, value] of Object.entries(secrets)) {
+                await this.secretStore.set(scopeOf(collectionId, targetId), key, value);
+            }
+        }
+    }
+
+    /**
+     * @param {string} collectionId
      * @param {string} endpointId
      * @returns {Promise<void>}
      */
@@ -721,6 +835,7 @@ export class CollectionRepository {
             await this.backendAPI.collections.deleteEndpointData(collectionId, endpointId);
             if (this.secretStore) {
                 await this.secretStore.deleteScope(authSecretScope(collectionId, endpointId));
+                await this.secretStore.deleteScope(mqttSecretScope(collectionId, endpointId));
             }
         } catch (error) {
             throw new Error(`Failed to delete persisted endpoint data: ${error.message || error}`, { cause: error });
@@ -786,7 +901,33 @@ export class CollectionRepository {
      * @returns {Promise<void>}
      */
     async saveMqttData(collectionId, endpointId, data) {
-        return this._writeSidecar(collectionId, endpointId, 'mqttData', data, 'MQTT data');
+        if (!data || !('password' in data)) {
+            return this._writeSidecar(collectionId, endpointId, 'mqttData', data, 'MQTT data');
+        }
+        const { password, ...rest } = data;
+        if (this.secretStore) {
+            const scope = mqttSecretScope(collectionId, endpointId);
+            if (password) {
+                await this.secretStore.set(scope, 'password', password);
+            } else {
+                await this.secretStore.delete(scope, 'password');
+            }
+        }
+        return this._writeSidecar(collectionId, endpointId, 'mqttData', rest, 'MQTT data');
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object|null} mqttData
+     * @returns {Promise<Object|null>}
+     */
+    async _hydrateMqttData(collectionId, endpointId, mqttData) {
+        if (!mqttData || !this.secretStore) {
+            return mqttData;
+        }
+        const password = await this.secretStore.get(mqttSecretScope(collectionId, endpointId), 'password');
+        return password ? { ...mqttData, password } : mqttData;
     }
 
     /**
@@ -795,7 +936,8 @@ export class CollectionRepository {
      * @returns {Promise<Object|null>}
      */
     async getMqttData(collectionId, endpointId) {
-        return this._readSidecar(collectionId, endpointId, 'mqttData', null);
+        const data = await this._readSidecar(collectionId, endpointId, 'mqttData', null);
+        return this._hydrateMqttData(collectionId, endpointId, data);
     }
 
     /**

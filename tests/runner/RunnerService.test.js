@@ -776,6 +776,26 @@ describe('RunnerService', () => {
             expect(config.headers['Authorization']).toBe('Bearer resolved-secret');
         });
 
+        test('an expired inherited OAuth token is renewed, sent and saved back to the collection', async () => {
+            service.collectionRepository.getInheritedAuthSource = jest.fn().mockResolvedValue({ kind: 'collection' });
+            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue({
+                type: 'oauth2',
+                config: { token: 'stale', expiresAt: Date.now() - 1000, refreshToken: 'r1', tokenUrl: 'https://{{authHost}}/token', clientId: 'app' }
+            });
+            service.collectionRepository.saveAuthConfigAtSource = jest.fn().mockResolvedValue(undefined);
+            mockBackendAPI.oauth2 = { getToken: jest.fn().mockResolvedValue({ success: true, accessToken: 'fresh', expiresIn: 60 }) };
+
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, { authHost: 'auth.test' });
+
+            expect(mockBackendAPI.oauth2.getToken).toHaveBeenCalledWith(expect.objectContaining({
+                grantType: 'refresh_token', refreshToken: 'r1', tokenUrl: 'https://auth.test/token'
+            }));
+            expect(config.headers['Authorization']).toBe('Bearer fresh');
+            const [collectionId, endpointId, source, saved] = service.collectionRepository.saveAuthConfigAtSource.mock.calls[0];
+            expect([collectionId, endpointId, source]).toEqual(['c1', 'e1', { kind: 'collection' }]);
+            expect(saved.config).toMatchObject({ token: 'fresh', tokenUrl: 'https://{{authHost}}/token' });
+        });
+
         test('inherit with no collection auth sends unauthenticated', async () => {
             const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {});
 
@@ -810,6 +830,47 @@ describe('RunnerService', () => {
                 data: {},
                 headers: {}
             });
+        });
+
+        test('stopping mid-send cancels the request by id and skips its side effects', async () => {
+            let finishSend;
+            mockBackendAPI.sendApiRequest.mockImplementation(() => new Promise(resolve => { finishSend = resolve; }));
+            mockBackendAPI.cancelApiRequest = jest.fn().mockResolvedValue({ success: true });
+            service._storeResponseCookies = jest.fn();
+            service._recordHistory = jest.fn();
+            service.isRunning = true;
+
+            const pending = service._executeRequest(request, {}, 0);
+            for (let i = 0; i < 20 && mockBackendAPI.sendApiRequest.mock.calls.length === 0; i++) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+            const { requestId } = mockBackendAPI.sendApiRequest.mock.calls[0][0];
+
+            service.stopExecution();
+            finishSend({ success: false, cancelled: true });
+            await pending;
+
+            expect(requestId).toEqual(expect.any(String));
+            expect(mockBackendAPI.cancelApiRequest).toHaveBeenCalledWith(requestId);
+            expect(service._storeResponseCookies).not.toHaveBeenCalled();
+            expect(service._recordHistory).not.toHaveBeenCalled();
+            expect(mockBackendAPI.scripts.executeTest).not.toHaveBeenCalled();
+        });
+
+        test('a failing pre-request script skips the send and fails the request', async () => {
+            service._getEndpointScripts = jest.fn().mockResolvedValue({ preRequestScript: 'boom()', testScript: '' });
+            service._runPreRequestScript = jest.fn(async (script, prepared, variables, outcome) => {
+                outcome.errors.push('ReferenceError: boom is not defined');
+                outcome.logs.push({ level: 'log', message: 'before boom' });
+                return prepared.requestConfig;
+            });
+
+            const result = await service._executeRequest(request, {}, 0);
+
+            expect(mockBackendAPI.sendApiRequest).not.toHaveBeenCalled();
+            expect(result.status).toBe('error');
+            expect(result.error).toContain('boom is not defined');
+            expect(result.logs).toEqual([{ level: 'log', message: 'before boom' }]);
         });
 
         test('marks the request failed when an assertion fails', async () => {

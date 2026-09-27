@@ -23,9 +23,13 @@ import {
     displayResponseWithLineNumbersForTab,
     generateEffectiveAuthData,
     getRequestBuilderService,
+    isTabCurrentlyActive,
+    setRequestInProgress,
     warnUnresolvedVariables
 } from './apiHandler.js';
-import { getSettings } from './state/settingsCache.js';
+import { getSettings, resolveRequestSettings } from './state/settingsCache.js';
+import { newRequestId, trackInFlight } from './state/inFlightRequests.js';
+import { renderGrpcPanes } from './ResponseDisplayHelper.js';
 import { startOrSend as grpcStreamStartOrSend } from './grpcStreamHandler.js';
 import { recordGrpcHistory } from './grpcHistory.js';
 import { createKeyValueRow } from './keyValueManager.js';
@@ -34,12 +38,25 @@ import { getCurrentEndpoint } from './state/currentEndpoint.js';
 let methodsCache = new Map();
 const methodFlagsCache = new Map();
 
-/** @type {{kind: 'none'|'reflection'|'proto', protoPath: string|null}} */
-const activeSource = { kind: 'none', protoPath: null };
+/** @type {{kind: 'none'|'reflection'|'proto', protoPath: string|null, includePaths: string[]}} */
+const activeSource = { kind: 'none', protoPath: null, includePaths: [] };
 
-function setActiveSource(kind, protoPath = null) {
+/** @type {string|null} */
+let attemptedProtoPath = null;
+
+/** @type {string[]} */
+let pendingIncludePaths = [];
+
+/**
+ * @param {string} kind
+ * @param {string|null} [protoPath]
+ * @param {string[]} [includePaths]
+ * @returns {void}
+ */
+function setActiveSource(kind, protoPath = null, includePaths = []) {
     activeSource.kind = kind;
     activeSource.protoPath = protoPath;
+    activeSource.includePaths = protoPath ? [...includePaths] : [];
     updateSourceCards();
 }
 
@@ -202,6 +219,7 @@ export function captureGrpcState() {
         metadata: getGrpcMetadata(),
         useTls: grpcTlsCheckbox?.checked || false,
         protoPath: activeSource.protoPath,
+        ...(activeSource.protoPath ? { includePaths: [...activeSource.includePaths] } : {}),
         clientStreaming: !!flags.clientStreaming,
         serverStreaming: !!flags.serverStreaming
     };
@@ -239,7 +257,8 @@ export function applyGrpcState(grpcData) {
     updateMethodKindBadge(data.fullMethod || null);
 
     if (data.protoPath) {
-        setActiveSource('proto', data.protoPath);
+        setActiveSource('proto', data.protoPath, Array.isArray(data.includePaths) ? data.includePaths : []);
+        attemptedProtoPath = data.protoPath;
         updateProtoUI(true, data.protoPath);
         setGrpcStatus('', null);
         return;
@@ -451,7 +470,7 @@ async function ensureProtoLoaded() {
         if (Array.isArray(loaded) && loaded.includes(protoPath)) {
             return true;
         }
-        await window.backendAPI.grpc.parseProtoFile(protoPath, null);
+        await window.backendAPI.grpc.parseProtoFile(protoPath, activeSource.includePaths.length ? activeSource.includePaths : null);
         return true;
     } catch (error) {
         const msg = error.message || String(error);
@@ -540,62 +559,84 @@ export async function handleGrpcSend() {
     }
 
     const startedAt = Date.now();
+    const requestTabId = app.workspaceTabController
+        ? await app.workspaceTabController.service.getActiveTabId()
+        : null;
+    const requestId = newRequestId();
+    const untrack = trackInFlight(requestTabId, requestId);
+    const { timeout } = await resolveRequestSettings();
+    const showStatus = async (text) => {
+        if (await isTabCurrentlyActive(requestTabId)) {
+            updateStatusDisplay(text, null);
+        }
+    };
 
+    setRequestInProgress(true);
     try {
-        updateStatusDisplay('Sending gRPC request...', null);
-        displayResponseWithLineNumbersForTab('Sending gRPC request...', null, null);
+        await showStatus('Sending gRPC request...');
+        displayResponseWithLineNumbersForTab('Sending gRPC request...', null, requestTabId);
 
-        let result;
-        if (usingProto) {
-            result = await window.backendAPI.grpc.protoInvokeUnary(activeSource.protoPath, {
-                target,
-                fullMethod,
-                requestJson,
-                metadata,
-                deadlineMs: 30000,
-                tls
-            });
-        } else {
-            result = await window.backendAPI.grpc.invokeUnary({
-                target,
-                fullMethod,
-                requestJson,
-                metadata,
-                deadlineMs: 30000,
-                tls
-            });
+        const unaryRequest = {
+            target,
+            fullMethod,
+            requestJson,
+            metadata,
+            deadlineMs: timeout,
+            tls,
+            requestId
+        };
+        const result = usingProto
+            ? await window.backendAPI.grpc.protoInvokeUnary(activeSource.protoPath, unaryRequest)
+            : await window.backendAPI.grpc.invokeUnary(unaryRequest);
+
+        if (result.cancelled) {
+            displayResponseWithLineNumbersForTab('Request was cancelled', null, requestTabId);
+            await showStatus('Request cancelled');
+            return;
         }
 
         const formatted = typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2);
-        displayResponseWithLineNumbersForTab(formatted, 'application/json', null);
+        displayResponseWithLineNumbersForTab(formatted, 'application/json', requestTabId);
 
-        const containerElements = app.responseContainerManager?.getActiveElements();
-        if (containerElements) {
-            if (containerElements.metadataDisplay) {
-                const metadataStr = result.headers ? JSON.stringify(result.headers, null, 2) : '{}';
-                containerElements.metadataDisplay.textContent = metadataStr || 'No metadata.';
-            }
-            if (containerElements.trailersDisplay) {
-                const trailersStr = result.trailers ? JSON.stringify(result.trailers, null, 2) : '{}';
-                containerElements.trailersDisplay.textContent = trailersStr || 'No trailers.';
-            }
-        }
+        const grpcPanes = {
+            ok: Boolean(result.success),
+            statusMessage: result.statusMessage || '',
+            metadata: result.headers || {},
+            trailers: result.trailers || {}
+        };
+        const containerElements = requestTabId
+            ? app.responseContainerManager?.getOrCreateContainer(requestTabId)
+            : app.responseContainerManager?.getActiveElements();
+        renderGrpcPanes(containerElements, grpcPanes);
 
-        if (result.success) {
-            updateStatusDisplay('gRPC OK', null);
-        } else {
-            updateStatusDisplay(`gRPC error: ${result.statusMessage || 'unknown'}`, null);
+        await showStatus(result.success ? 'gRPC OK' : `gRPC error: ${result.statusMessage || 'unknown'}`);
+
+        const ttfb = Date.now() - startedAt;
+        if (app.workspaceTabController && requestTabId) {
+            app.workspaceTabController.service.updateTab(requestTabId, {
+                response: {
+                    data: result.data ?? null,
+                    headers: {},
+                    status: null,
+                    statusText: '',
+                    ttfb,
+                    size: null,
+                    timings: null,
+                    cookies: [],
+                    grpc: grpcPanes
+                }
+            }).catch(() => { });
         }
 
         await recordGrpcHistory({
             ...historyContext,
-            result: { ...result, ttfb: Date.now() - startedAt }
+            result: { ...result, ttfb }
         });
     } catch (error) {
         const msg = error.message || String(error);
         toast.error(`gRPC send error: ${msg}`);
-        updateStatusDisplay(`gRPC send error: ${msg}`, null);
-        displayResponseWithLineNumbersForTab(`Error: ${msg}`, null, null);
+        await showStatus(`gRPC send error: ${msg}`);
+        displayResponseWithLineNumbersForTab(`Error: ${msg}`, null, requestTabId);
 
         await recordGrpcHistory({
             ...historyContext,
@@ -607,6 +648,9 @@ export async function handleGrpcSend() {
                 ttfb: Date.now() - startedAt
             }
         });
+    } finally {
+        untrack();
+        setRequestInProgress(false);
     }
 }
 
@@ -615,6 +659,7 @@ export async function handleGrpcSend() {
  * @param {string[]} [includePaths]
  */
 export async function loadProtoFile(protoPath, includePaths = null) {
+    attemptedProtoPath = protoPath;
     try {
         if (grpcProtoStatus) {
             grpcProtoStatus.textContent = 'Loading…';
@@ -622,9 +667,9 @@ export async function loadProtoFile(protoPath, includePaths = null) {
         }
         updateStatusDisplay('Parsing proto file...', null);
 
-        const protoInfo = await window.backendAPI.grpc.parseProtoFile(protoPath, includePaths);
+        const protoInfo = await window.backendAPI.grpc.parseProtoFile(protoPath, includePaths?.length ? includePaths : null);
 
-        setActiveSource('proto', protoPath);
+        setActiveSource('proto', protoPath, includePaths || []);
         setGrpcStatus('', 'idle');
         methodsCache = new Map();
 
@@ -645,6 +690,8 @@ export async function loadProtoFile(protoPath, includePaths = null) {
         return protoInfo;
     } catch (error) {
         setProtoStatusError('Failed');
+        pendingIncludePaths = includePaths ? [...includePaths] : [];
+        renderIncludePaths(pendingIncludePaths, true);
         toast.error(`Proto load error: ${error.message || String(error)}`);
         updateStatusDisplay(`Proto load error: ${error.message || String(error)}`, null);
         throw error;
@@ -655,6 +702,8 @@ export function clearProtoFile() {
     if (activeSource.protoPath) {
         window.backendAPI.grpc.unloadProto(activeSource.protoPath).catch(() => { });
     }
+    attemptedProtoPath = null;
+    pendingIncludePaths = [];
     setActiveSource('none', null);
     methodsCache = new Map();
     methodFlagsCache.clear();
@@ -687,6 +736,8 @@ export function initGrpcUI() {
     if (grpcLoadProtoBtn) {
         grpcLoadProtoBtn.addEventListener('click', onLoadProtoFile);
     }
+
+    document.getElementById('grpc-add-include-btn')?.addEventListener('click', onAddIncludePath);
 
     if (grpcClearProtoBtn) {
         grpcClearProtoBtn.addEventListener('click', onClearProtoFile);
@@ -813,10 +864,54 @@ function onClearProtoFile() {
     updateProtoUI(false, null);
 }
 
+/** @returns {Promise<void>} */
+async function onAddIncludePath() {
+    const protoPath = activeSource.protoPath || attemptedProtoPath;
+    if (!protoPath) {
+        return;
+    }
+    const folder = await window.backendAPI.collections.pickDirectory(false);
+    if (!folder) {
+        return;
+    }
+    const current = activeSource.protoPath ? activeSource.includePaths : pendingIncludePaths;
+    const includePaths = current.includes(folder) ? [...current] : [...current, folder];
+    try {
+        await window.backendAPI.grpc.unloadProto(protoPath).catch(() => { });
+        await loadProtoFile(protoPath, includePaths);
+        pendingIncludePaths = [];
+        updateProtoUI(true, protoPath);
+    } catch (error) {
+        void error;
+    }
+}
+
+/**
+ * @param {string[]} includePaths
+ * @param {boolean} visible
+ * @returns {void}
+ */
+function renderIncludePaths(includePaths, visible) {
+    const addBtn = document.getElementById('grpc-add-include-btn');
+    if (addBtn) {
+        addBtn.style.display = visible ? 'inline-flex' : 'none';
+    }
+    const list = document.getElementById('grpc-proto-includes');
+    if (!list) {
+        return;
+    }
+    list.hidden = includePaths.length === 0;
+    list.textContent = includePaths.length
+        ? `Import paths: ${includePaths.map(p => p.split(/[/\\]/).filter(Boolean).pop() || p).join(', ')}`
+        : '';
+    list.title = includePaths.join('\n');
+}
+
 function updateProtoUI(loaded, protoPath) {
     if (grpcClearProtoBtn) {
         grpcClearProtoBtn.style.display = loaded ? 'inline-flex' : 'none';
     }
+    renderIncludePaths(loaded ? activeSource.includePaths : [], Boolean(loaded && protoPath));
     
     if (grpcProtoFilename) {
         if (loaded && protoPath) {

@@ -32,6 +32,15 @@
     "search_empty": {
       "title": "Nessuna collezione trovata",
       "subtitle": "Prova un altro nome di collezione o richiesta"
+    },
+    "load_errors": {
+      "toast_one": "Impossibile caricare 1 raccolta",
+      "toast_other": "Impossibile caricare {{count}} raccolte",
+      "locate": "Individua…",
+      "remove": "Rimuovi dall’elenco",
+      "retry": "Riprova",
+      "removed_toast": "Rimosso dall’elenco. La cartella non è stata toccata.",
+      "relocated_toast": "\"{{name}}\" trovato nella nuova posizione"
     }
   },
   "import": {
@@ -122,7 +131,9 @@
     "delete_title": "Elimina richiesta",
     "confirm_delete": "Sei sicuro di voler eliminare la richiesta \"{{name}}\"?\n\nQuesta azione non può essere annullata.",
     "rename_title": "Rinomina richiesta",
-    "rename_label": "Nome della richiesta:"
+    "rename_label": "Nome della richiesta:",
+    "copy_name": "{{name}} (copia)",
+    "duplicate_error": "Impossibile duplicare la richiesta: {{message}}"
   },
   "context_menu": {
     "new_collection": "Nuova collezione",
@@ -142,7 +153,13 @@
     "unpin_request": "Rimuovi dalla barra",
     "close_collection": "Chiudi raccolta",
     "run_collection": "Esegui raccolta",
-    "run_folder": "Esegui cartella"
+    "run_folder": "Esegui cartella",
+    "new_folder": "Nuova cartella",
+    "new_subfolder": "Nuova sottocartella",
+    "rename_folder": "Rinomina cartella",
+    "delete_folder": "Elimina cartella",
+    "duplicate_request": "Duplica richiesta",
+    "move_request": "Sposta in cartella…"
   },
   "docs": {
     "title": "Genera documentazione",
@@ -214,7 +231,9 @@
     "response": "Risposta",
     "status": "Stato",
     "time": "Tempo",
-    "size": "Dimensione"
+    "size": "Dimensione",
+    "disconnect": "Disconnetti",
+    "cancel": "Annulla"
   },
   "tabs": {
     "path_params": "Parametri del Percorso",
@@ -256,6 +275,8 @@
   "settings": {
     "title": "Impostazioni",
     "tab_general": "Generale",
+    "group_appearance": "Aspetto",
+    "group_requests": "Richieste",
     "tab_proxy": "Proxy",
     "tab_certificates": "Certificati",
     "certs_title": "Certificati client (mTLS)",
@@ -315,7 +336,8 @@
     "updates_not_available": "Aggiornamenti non disponibili in questa versione",
     "updates_managed_externally": "Gli aggiornamenti sono gestiti dal tuo gestore di pacchetti",
     "version_info": "Informazioni Versione",
-    "current_version": "Versione attuale"
+    "current_version": "Versione attuale",
+    "retry_update": "Riprova"
   },
   "theme": {
     "light": "Chiaro",
@@ -339,7 +361,8 @@
     "remove": "Rimuovi",
     "close": "Chiudi",
     "yes": "Sì",
-    "no": "No"
+    "no": "No",
+    "create": "Crea"
   },
   "errors": {
     "network": "Errore di rete",
@@ -431,7 +454,8 @@
     "log_time_ms": "Tempo (ms)",
     "status_code": "Codice di stato",
     "ok": "OK",
-    "error_toggle_server": "Impossibile attivare/disattivare il server"
+    "error_toggle_server": "Impossibile attivare/disattivare il server",
+    "template_hint": "Le stringhe possono usare {{request.params.id}}, {{request.query.nome}}, {{request.headers.nome}}, {{request.body.percorso}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} e {{$randomInt}}. Invia \"Prefer: code=404\" o \"Prefer: example=nome\" per ottenere un’altra risposta documentata."
   },
   "runner": {
     "title": "Collection Runner",
@@ -558,7 +582,8 @@
     "history_passed": "{{count}} superate",
     "history_failed": "{{count}} non riuscite",
     "history_source": "Esecuzione del {{date}}",
-    "history_no_body": "La cronologia non conserva corpi di risposta, intestazioni e cookie"
+    "history_no_body": "La cronologia non conserva corpi di risposta, intestazioni e cookie",
+    "pre_request_failed": "Lo script pre-richiesta non è riuscito, la richiesta non è stata inviata: {{message}}"
   },
   "mqtt": {
     "title": "MQTT",
@@ -575,5 +600,23 @@
     "status_connecting": "Connessione…",
     "status_connected": "Connesso",
     "status_connected_count": "Connesso · {{count}} ricevuti"
+  },
+  "folder": {
+    "new_title": "Nuova cartella",
+    "rename_title": "Rinomina cartella",
+    "name_label": "Nome cartella:",
+    "delete_title": "Elimina cartella",
+    "confirm_delete": "Eliminare la cartella \"{{name}}\" e le {{count}} richieste al suo interno?\n\nL’operazione non può essere annullata.",
+    "error": "Operazione sulla cartella non riuscita: {{message}}"
+  },
+  "move_request": {
+    "title": "Sposta richiesta",
+    "label": "Sposta in:",
+    "confirm": "Sposta",
+    "root": "(Radice della raccolta)",
+    "error": "Impossibile spostare la richiesta: {{message}}"
+  },
+  "grpc": {
+    "add_import_path": "Aggiungi percorso di importazione"
   }
 }

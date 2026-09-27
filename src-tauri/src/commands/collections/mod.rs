@@ -466,6 +466,46 @@ fn remove_request_from_tree(node: &mut read::FolderNode, request_id: &str) -> bo
         .any(|folder| remove_request_from_tree(folder, request_id))
 }
 
+/// Detaches the folder with `folder_id` (at any depth) and returns it.
+fn take_folder_from_tree(node: &mut read::FolderNode, folder_id: &str) -> Option<read::FolderNode> {
+    if let Some(index) = node
+        .folders
+        .iter()
+        .position(|folder| ipc::folder_id(folder) == folder_id)
+    {
+        return Some(node.folders.remove(index));
+    }
+    node.folders
+        .iter_mut()
+        .find_map(|folder| take_folder_from_tree(folder, folder_id))
+}
+
+/// Removes the files a detached folder owned, deepest first, then its
+/// directories once they are empty. Anything else a user left in the
+/// directory is kept, and so is the directory holding it.
+fn remove_folder_files(folder: &read::FolderNode) {
+    for child in &folder.folders {
+        remove_folder_files(child);
+    }
+    for entry in &folder.requests {
+        if let Some(file) = &entry.source {
+            let _ = fs::remove_file(file);
+        }
+    }
+    if let Some(dir) = &folder.source {
+        let _ = fs::remove_file(dir.join(layout::FOLDER_YAML));
+        let _ = fs::remove_dir(dir);
+    }
+}
+
+/// Collects the ids of every request in a folder, at any depth.
+fn folder_request_ids(folder: &read::FolderNode, out: &mut Vec<String>) {
+    out.extend(folder.requests.iter().map(|entry| entry.doc.id.clone()));
+    for child in &folder.folders {
+        folder_request_ids(child, out);
+    }
+}
+
 /// Loads whatever is already stored for a collection, in either layout.
 ///
 /// A v1 directory is converted on the way in, so a save always merges onto the
@@ -509,8 +549,9 @@ fn load_existing(dir: &Path) -> Result<Option<read::LoadedCollection>, String> {
 /// The per-request state already on disk is carried over: `collection_save`
 /// only ever carries structure, so a folder rename must not blank the bodies
 /// and credentials of the requests inside it.
+#[cfg(test)]
 fn write_v2_collection(dir: &Path, incoming: &Collection) -> Result<(), String> {
-    write_v2_collection_seeded(dir, incoming, None, &HashMap::new())
+    write_v2_collection_seeded(dir, incoming, None, &HashMap::new(), None).map(|_| ())
 }
 
 /// Writes a collection as v2, seeding variables and per-request state that are
@@ -524,16 +565,18 @@ fn write_v2_collection(dir: &Path, incoming: &Collection) -> Result<(), String> 
 /// @param incoming - The collection structure
 /// @param variables - Variables to store, or None to keep what is on disk
 /// @param seed_data - Per-request state keyed by request id
-/// @returns Ok once every file is in place
+/// @param allowed_new - Request ids this save may create; None allows any
+/// @returns The ids of unknown requests that were skipped
 fn write_v2_collection_seeded(
     dir: &Path,
     incoming: &Collection,
     variables: Option<Vec<Value>>,
     seed_data: &HashMap<String, EndpointData>,
-) -> Result<(), String> {
+    allowed_new: Option<&HashSet<String>>,
+) -> Result<Vec<String>, String> {
     let existing = load_existing(dir)?;
 
-    let mut root = ipc::tree_from_ipc(incoming, existing.as_ref());
+    let (mut root, skipped) = ipc::tree_from_ipc_guarded(incoming, existing.as_ref(), allowed_new);
     if !seed_data.is_empty() {
         seed_tree(&mut root, seed_data);
     }
@@ -569,7 +612,7 @@ fn write_v2_collection_seeded(
 
     write::write_collection_dir(dir, &mut loaded)?;
     collection_cache().refresh(dir, &loaded);
-    Ok(())
+    Ok(skipped)
 }
 
 /// Applies seeded per-request state onto a freshly built tree.
@@ -587,7 +630,8 @@ fn seed_tree(node: &mut read::FolderNode, seed: &HashMap<String, EndpointData>) 
 pub(crate) fn persist_collection(
     app: &AppHandle,
     collection: Collection,
-) -> Result<Collection, String> {
+    new_request_ids: &HashSet<String>,
+) -> Result<Vec<String>, String> {
     let persisted = prepare_collection_dir(app, collection)?;
     let target_dir = PathBuf::from(
         persisted
@@ -596,14 +640,20 @@ pub(crate) fn persist_collection(
             .ok_or_else(|| "Collection storage path missing".to_string())?,
     );
 
-    write_v2_collection(&target_dir, &persisted)?;
+    let skipped = write_v2_collection_seeded(
+        &target_dir,
+        &persisted,
+        None,
+        &HashMap::new(),
+        Some(new_request_ids),
+    )?;
     register_collection_path(app, &persisted.id, &target_dir)?;
 
     if let Some(parent) = target_dir.parent() {
         save_last_collection_directory(app, parent);
     }
 
-    Ok(persisted)
+    Ok(skipped)
 }
 
 /// Resolves and prepares a collection's directory, renaming it when the
@@ -746,7 +796,7 @@ pub(crate) fn persist_imported_collection(
             .ok_or_else(|| "Collection storage path missing".to_string())?,
     );
 
-    write_v2_collection_seeded(&dir, &persisted, Some(variables), &endpoint_data)?;
+    write_v2_collection_seeded(&dir, &persisted, Some(variables), &endpoint_data, None)?;
     register_collection_path(app, &persisted.id, &dir)?;
 
     if let Some(parent) = dir.parent() {
@@ -959,6 +1009,77 @@ pub async fn collection_close(app: AppHandle, collection_id: String) -> Result<(
     Ok(())
 }
 
+/// Points an existing index entry (and its linked record) at a new folder,
+/// leaving every other entry alone.
+fn relocate_entry(
+    index: &mut HashMap<String, String>,
+    linked: &mut HashMap<String, String>,
+    collection_id: &str,
+    dir: &Path,
+) {
+    let dir = dir.to_string_lossy().to_string();
+    index.insert(collection_id.to_string(), dir.clone());
+    linked.insert(collection_id.to_string(), dir);
+}
+
+/// Finds the collection with `collection_id` at `picked` or directly below it.
+fn find_collection_dir(
+    picked: &Path,
+    collection_id: &str,
+) -> Result<(PathBuf, Collection), String> {
+    let candidates = if is_collection_dir(picked) {
+        vec![picked.to_path_buf()]
+    } else {
+        link::discover_collection_dirs(picked)?
+    };
+    let mut other_names = Vec::new();
+    for dir in candidates {
+        match read_collection_from_dir(&dir) {
+            Ok(collection) if collection.id == collection_id => return Ok((dir, collection)),
+            Ok(collection) => other_names.push(collection.name),
+            Err(_) => {}
+        }
+    }
+    Err(match other_names.first() {
+        Some(name) => format!("That folder holds \"{name}\", not the missing collection"),
+        None => format!("No collection found in {}", picked.display()),
+    })
+}
+
+/// Re-points a collection whose folder moved, keeping its id and therefore
+/// its keychain credentials.
+///
+/// @param app - Tauri app handle
+/// @param collection_id - The index entry reported as missing
+/// @param path - The folder the user picked
+/// @returns The collection as read from its new location
+#[tauri::command]
+pub async fn collection_relocate(
+    app: AppHandle,
+    collection_id: String,
+    path: String,
+) -> Result<Collection, String> {
+    let picked = PathBuf::from(&path);
+    let default_dir = get_default_collections_dir(&app)?;
+    if link::is_under(&default_dir, &picked) {
+        return Err(format!(
+            "{} is inside Resonance's own collections folder and is already managed",
+            picked.display()
+        ));
+    }
+
+    let (dir, mut collection) = find_collection_dir(&picked, &collection_id)?;
+
+    let mut index = get_collection_index(&app)?;
+    let mut linked = get_linked_collections(&app)?;
+    relocate_entry(&mut index, &mut linked, &collection_id, &dir);
+    save_collection_index(&app, &index)?;
+    save_linked_collections(&app, &linked)?;
+
+    collection.linked = true;
+    Ok(collection)
+}
+
 /// Loads every collection with a single read per directory and a single index
 /// write, instead of the previous list-then-get shape that parsed each
 /// collection twice and rewrote the index per entry.
@@ -967,65 +1088,218 @@ pub async fn collection_close(app: AppHandle, collection_id: String) -> Result<(
 /// reads it, and this list is reloaded on every collection refresh. Whoever
 /// needs the spec asks for the one collection through `collection_get`.
 fn load_all_collections(app: &AppHandle) -> Result<Vec<Collection>, String> {
-    let mut collections = Vec::new();
-    let mut seen = HashSet::new();
     let mut index = get_collection_index(app)?;
     let linked = get_linked_collections(app)?;
-    let mut index_changed = false;
-
     let default_dir = get_default_collections_dir(app)?;
-    if default_dir.exists() {
-        let entries = fs::read_dir(&default_dir)
-            .map_err(|e| format!("Failed to read collections dir: {}", e))?;
 
-        for entry in entries {
-            let path = entry
-                .map_err(|e| format!("Failed to read dir entry: {}", e))?
-                .path();
+    let scan = scan_collections(&default_dir, &mut index);
 
-            if !is_collection_dir(&path) {
-                continue;
-            }
-
-            if let Ok(mut collection) = read_collection_from_dir(&path)
-                && seen.insert(collection.id.clone())
-            {
-                let path_str = path.to_string_lossy().to_string();
-                if index.get(&collection.id) != Some(&path_str) {
-                    index.insert(collection.id.clone(), path_str);
-                    index_changed = true;
-                }
-                collection.linked = link::is_linked(&collection.id, &index, &linked);
-                collection.open_api_spec = None;
-                collections.push(collection);
-            }
-        }
-    }
-
-    for (collection_id, path_str) in index.clone() {
-        if seen.contains(&collection_id) {
-            continue;
-        }
-
-        let path = PathBuf::from(path_str);
-        if !is_collection_dir(&path) {
-            continue;
-        }
-
-        if let Ok(mut collection) = read_collection_from_dir(&path)
-            && seen.insert(collection.id.clone())
-        {
-            collection.linked = link::is_linked(&collection.id, &index, &linked);
-            collection.open_api_spec = None;
-            collections.push(collection);
-        }
-    }
-
-    if index_changed {
+    if scan.index_changed {
         save_collection_index(app, &index)?;
     }
 
-    Ok(collections)
+    if let Some(state) = app.try_state::<CollectionLoadErrors>() {
+        *state.0.lock().unwrap() = scan.errors;
+    }
+
+    Ok(scan
+        .collections
+        .into_iter()
+        .map(|mut collection| {
+            collection.linked = link::is_linked(&collection.id, &index, &linked);
+            collection
+        })
+        .collect())
+}
+
+/// A collection directory that exists (or is registered) but could not be
+/// shown, so the sidebar can say so instead of silently dropping it.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CollectionLoadError {
+    pub path: String,
+    /// The index entry to act on: for `removable` errors, passing it to
+    /// `collection_close` or `collection_relocate` fixes the listing.
+    pub id: Option<String>,
+    pub message: String,
+    /// `missing`, `not_a_collection`, `unreadable`, `duplicate` or `dir_error`.
+    pub kind: &'static str,
+    /// True for index entries outside the app's own folder, which can be
+    /// dropped from the list without deleting anything.
+    pub removable: bool,
+}
+
+impl CollectionLoadError {
+    fn managed(path: String, kind: &'static str, message: String) -> Self {
+        Self {
+            path,
+            id: None,
+            message,
+            kind,
+            removable: false,
+        }
+    }
+
+    fn indexed(path: String, id: String, kind: &'static str, message: String) -> Self {
+        Self {
+            path,
+            id: Some(id),
+            message,
+            kind,
+            removable: true,
+        }
+    }
+}
+
+/// Load problems from the most recent full collection listing.
+#[derive(Default)]
+pub struct CollectionLoadErrors(pub std::sync::Mutex<Vec<CollectionLoadError>>);
+
+struct CollectionScan {
+    collections: Vec<Collection>,
+    errors: Vec<CollectionLoadError>,
+    index_changed: bool,
+}
+
+/// Reads every collection under `default_dir` plus every indexed path outside
+/// it. Unreadable collections, duplicate ids and missing linked folders are
+/// reported rather than dropped; index entries for app-managed folders that
+/// no longer exist are pruned.
+fn scan_collections(default_dir: &Path, index: &mut HashMap<String, String>) -> CollectionScan {
+    let mut scan = CollectionScan {
+        collections: Vec::new(),
+        errors: Vec::new(),
+        index_changed: false,
+    };
+    let mut seen: HashMap<String, String> = HashMap::new();
+
+    if default_dir.exists() {
+        match fs::read_dir(default_dir) {
+            Ok(entries) => {
+                let mut paths: Vec<PathBuf> = Vec::new();
+                for entry in entries {
+                    match entry {
+                        Ok(entry) => paths.push(entry.path()),
+                        Err(e) => scan.errors.push(CollectionLoadError::managed(
+                            default_dir.to_string_lossy().to_string(),
+                            "dir_error",
+                            format!("Failed to read directory entry: {e}"),
+                        )),
+                    }
+                }
+                paths.sort();
+
+                for path in paths {
+                    if !is_collection_dir(&path) {
+                        continue;
+                    }
+                    let path_str = path.to_string_lossy().to_string();
+                    match read_collection_from_dir(&path) {
+                        Ok(mut collection) => {
+                            if let Some(first) = seen.get(&collection.id) {
+                                scan.errors.push(CollectionLoadError::managed(
+                                    path_str,
+                                    "duplicate",
+                                    format!(
+                                        "Duplicate collection id (already used by {first}); a copied collection folder needs a new id"
+                                    ),
+                                ));
+                                continue;
+                            }
+                            seen.insert(collection.id.clone(), path_str.clone());
+                            if index.get(&collection.id) != Some(&path_str) {
+                                index.insert(collection.id.clone(), path_str);
+                                scan.index_changed = true;
+                            }
+                            collection.open_api_spec = None;
+                            scan.collections.push(collection);
+                        }
+                        Err(message) => scan.errors.push(CollectionLoadError::managed(
+                            path_str,
+                            "unreadable",
+                            message,
+                        )),
+                    }
+                }
+            }
+            Err(e) => scan.errors.push(CollectionLoadError::managed(
+                default_dir.to_string_lossy().to_string(),
+                "dir_error",
+                format!("Failed to read collections dir: {e}"),
+            )),
+        }
+    }
+
+    let mut indexed: Vec<(String, String)> = index
+        .iter()
+        .map(|(id, path)| (id.clone(), path.clone()))
+        .collect();
+    indexed.sort();
+
+    for (collection_id, path_str) in indexed {
+        if seen.contains_key(&collection_id) {
+            continue;
+        }
+
+        let path = PathBuf::from(&path_str);
+        if !path.exists() {
+            if path.starts_with(default_dir) {
+                index.remove(&collection_id);
+                scan.index_changed = true;
+            } else {
+                scan.errors.push(CollectionLoadError::indexed(
+                    path_str,
+                    collection_id,
+                    "missing",
+                    "Collection folder not found (moved, deleted or on an unmounted drive)"
+                        .to_string(),
+                ));
+            }
+            continue;
+        }
+
+        if !is_collection_dir(&path) {
+            scan.errors.push(CollectionLoadError::indexed(
+                path_str,
+                collection_id,
+                "not_a_collection",
+                "Folder no longer contains a collection".to_string(),
+            ));
+            continue;
+        }
+
+        match read_collection_from_dir(&path) {
+            Ok(mut collection) => {
+                if let Some(first) = seen.get(&collection.id) {
+                    scan.errors.push(CollectionLoadError::indexed(
+                        path_str,
+                        collection_id,
+                        "duplicate",
+                        format!("Duplicate collection id (already used by {first})"),
+                    ));
+                    continue;
+                }
+                seen.insert(collection.id.clone(), path_str);
+                collection.open_api_spec = None;
+                scan.collections.push(collection);
+            }
+            Err(message) => scan.errors.push(CollectionLoadError::indexed(
+                path_str,
+                collection_id,
+                "unreadable",
+                message,
+            )),
+        }
+    }
+
+    scan
+}
+
+#[tauri::command]
+pub async fn collections_load_errors(
+    state: tauri::State<'_, CollectionLoadErrors>,
+) -> Result<Vec<CollectionLoadError>, String> {
+    Ok(state.0.lock().unwrap().clone())
 }
 
 #[tauri::command]
@@ -1055,10 +1329,17 @@ pub async fn collection_get(app: AppHandle, collection_id: String) -> Result<Col
     Ok(collection)
 }
 
+/// Saves a collection's structure. Requests the frontend has never seen on
+/// disk are only created when listed in `new_request_ids`; the ids of any
+/// other unknown requests (a stale tree) are skipped and returned.
 #[tauri::command]
-pub async fn collection_save(app: AppHandle, collection: Collection) -> Result<(), String> {
-    persist_collection(&app, collection)?;
-    Ok(())
+pub async fn collection_save(
+    app: AppHandle,
+    collection: Collection,
+    new_request_ids: Option<Vec<String>>,
+) -> Result<Vec<String>, String> {
+    let allowed: HashSet<String> = new_request_ids.unwrap_or_default().into_iter().collect();
+    persist_collection(&app, collection, &allowed)
 }
 
 #[tauri::command]
@@ -1188,6 +1469,36 @@ pub async fn collection_delete_endpoint_data(
     }
 
     Ok(())
+}
+
+/// Deletes a folder, everything in it, and the files that held them.
+/// Returns the ids of the requests that were removed so the caller can drop
+/// their secrets and any open tabs.
+#[tauri::command]
+pub async fn collection_delete_folder(
+    app: AppHandle,
+    collection_id: String,
+    folder_id: String,
+) -> Result<Vec<String>, String> {
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
+    if Layout::detect(&paths.dir) != Some(Layout::V2) {
+        return Err(
+            "This collection is still in the legacy format. Make any change to it first so it is converted, then delete the folder again."
+                .to_string(),
+        );
+    }
+
+    let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
+    let folder = take_folder_from_tree(&mut loaded.root, &folder_id)
+        .ok_or_else(|| format!("Folder {} not found in collection", folder_id))?;
+
+    write::write_collection_dir(&paths.dir, &mut loaded)?;
+    remove_folder_files(&folder);
+    collection_cache().refresh(&paths.dir, &loaded);
+
+    let mut removed = Vec::new();
+    folder_request_ids(&folder, &mut removed);
+    Ok(removed)
 }
 
 #[tauri::command]
@@ -1755,6 +2066,7 @@ mod convert_on_save {
             &incoming,
             Some(vec![json!({"key": "legacyVar", "value": "kept"})]),
             &seed,
+            None,
         )
         .unwrap();
 
@@ -1811,6 +2123,7 @@ mod convert_on_save {
                 json!({"key": "baseUrl", "value": "https://api.example.com"}),
             ]),
             &seed,
+            None,
         )
         .unwrap();
 
@@ -1975,5 +2288,244 @@ mod index_registration {
             "col-2",
             Path::new("/data/col-1")
         ));
+    }
+}
+
+#[cfg(test)]
+mod load_errors {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn v1_collection(dir: &Path, id: &str) {
+        fs::create_dir_all(dir).unwrap();
+        fs::write(
+            dir.join("collection.json"),
+            format!(r#"{{"id":"{id}","name":"{id}","endpoints":[],"folders":[]}}"#),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn unreadable_and_duplicate_collections_are_reported_without_hiding_others() {
+        let root = TempDir::new().unwrap();
+        v1_collection(&root.path().join("a"), "col-a");
+        v1_collection(&root.path().join("a-copy"), "col-a");
+        v1_collection(&root.path().join("b"), "col-b");
+        let broken = root.path().join("broken");
+        fs::create_dir_all(&broken).unwrap();
+        fs::write(broken.join("collection.json"), "{ not json").unwrap();
+
+        let mut index = HashMap::new();
+        let scan = scan_collections(root.path(), &mut index);
+
+        let mut ids: Vec<_> = scan.collections.iter().map(|c| c.id.clone()).collect();
+        ids.sort();
+        assert_eq!(ids, vec!["col-a", "col-b"]);
+        assert_eq!(scan.errors.len(), 2);
+        assert!(
+            scan.errors
+                .iter()
+                .any(|e| e.path.ends_with("a-copy") && e.message.contains("Duplicate"))
+        );
+        assert!(scan.errors.iter().any(|e| e.path.ends_with("broken")));
+        assert!(scan.index_changed);
+    }
+
+    #[test]
+    fn errors_carry_their_kind_and_whether_they_can_be_removed() {
+        let root = TempDir::new().unwrap();
+        let managed = root.path().join("managed");
+        fs::create_dir_all(&managed).unwrap();
+        let broken_managed = managed.join("broken");
+        fs::create_dir_all(&broken_managed).unwrap();
+        fs::write(broken_managed.join("collection.json"), "{ nope").unwrap();
+
+        let elsewhere = TempDir::new().unwrap();
+        let empty_linked = elsewhere.path().join("empty");
+        fs::create_dir_all(&empty_linked).unwrap();
+        let broken_linked = elsewhere.path().join("broken");
+        fs::create_dir_all(&broken_linked).unwrap();
+        fs::write(broken_linked.join("collection.json"), "{ nope").unwrap();
+
+        let mut index = HashMap::from([
+            (
+                "gone".to_string(),
+                elsewhere.path().join("gone").to_string_lossy().to_string(),
+            ),
+            (
+                "empty".to_string(),
+                empty_linked.to_string_lossy().to_string(),
+            ),
+            (
+                "bad".to_string(),
+                broken_linked.to_string_lossy().to_string(),
+            ),
+        ]);
+        let scan = scan_collections(&managed, &mut index);
+
+        let mut got: Vec<_> = scan
+            .errors
+            .iter()
+            .map(|e| (e.kind, e.removable, e.id.clone()))
+            .collect();
+        got.sort();
+        assert_eq!(
+            got,
+            vec![
+                ("missing", true, Some("gone".to_string())),
+                ("not_a_collection", true, Some("empty".to_string())),
+                ("unreadable", false, None),
+                ("unreadable", true, Some("bad".to_string())),
+            ]
+        );
+    }
+
+    #[test]
+    fn relocating_replaces_only_that_entry() {
+        let mut index = HashMap::from([
+            ("a".to_string(), "/old/a".to_string()),
+            ("b".to_string(), "/keep/b".to_string()),
+        ]);
+        let mut linked = HashMap::from([("a".to_string(), "/old/a".to_string())]);
+
+        relocate_entry(&mut index, &mut linked, "a", Path::new("/new/a"));
+
+        assert_eq!(index["a"], "/new/a");
+        assert_eq!(index["b"], "/keep/b");
+        assert_eq!(linked["a"], "/new/a");
+    }
+
+    #[test]
+    fn a_moved_collection_is_found_from_its_parent_folder_by_id() {
+        let root = TempDir::new().unwrap();
+        v1_collection(&root.path().join("other"), "col-other");
+        v1_collection(&root.path().join("moved"), "col-a");
+
+        let (dir, collection) = find_collection_dir(root.path(), "col-a").unwrap();
+        assert!(dir.ends_with("moved"));
+        assert_eq!(collection.id, "col-a");
+
+        let (dir, _) = find_collection_dir(&root.path().join("moved"), "col-a").unwrap();
+        assert!(dir.ends_with("moved"));
+    }
+
+    #[test]
+    fn a_folder_holding_a_different_collection_is_rejected() {
+        let root = TempDir::new().unwrap();
+        v1_collection(&root.path().join("other"), "col-other");
+
+        let error = find_collection_dir(&root.path().join("other"), "col-a").unwrap_err();
+        assert!(error.contains("col-other"), "{error}");
+    }
+
+    #[test]
+    fn missing_linked_folder_is_reported_and_missing_managed_folder_is_pruned() {
+        let root = TempDir::new().unwrap();
+        let managed = root.path().join("managed");
+        fs::create_dir_all(&managed).unwrap();
+        let elsewhere = TempDir::new().unwrap();
+
+        let mut index = HashMap::from([
+            (
+                "gone-managed".to_string(),
+                managed.join("gone").to_string_lossy().to_string(),
+            ),
+            (
+                "gone-linked".to_string(),
+                elsewhere.path().join("gone").to_string_lossy().to_string(),
+            ),
+        ]);
+        let scan = scan_collections(&managed, &mut index);
+
+        assert!(scan.collections.is_empty());
+        assert!(!index.contains_key("gone-managed"));
+        assert!(index.contains_key("gone-linked"));
+        assert_eq!(scan.errors.len(), 1);
+        assert_eq!(scan.errors[0].id.as_deref(), Some("gone-linked"));
+        assert!(scan.index_changed);
+    }
+}
+
+#[cfg(test)]
+mod delete_folder {
+    use super::read::read_collection_dir;
+    use super::*;
+    use serde_json::json;
+    use tempfile::TempDir;
+
+    fn ipc(endpoints: Vec<Value>, folders: Vec<Value>) -> Collection {
+        Collection {
+            id: "c1".into(),
+            name: "C".into(),
+            base_url: String::new(),
+            endpoints,
+            folders,
+            default_headers: Value::Null,
+            auth_config: None,
+            open_api_spec: None,
+            storage_path: None,
+            storage_parent_path: None,
+            linked: false,
+            git_branch: None,
+        }
+    }
+
+    #[test]
+    fn a_nested_folder_and_its_files_are_removed_and_siblings_kept() {
+        let temp = TempDir::new().unwrap();
+        let keep = json!({"id": "keep", "name": "Keep", "method": "GET", "path": "/k"});
+        let inner = json!({"id": "inner", "name": "Inner", "method": "GET", "path": "/i"});
+        let outer = json!({"id": "outer", "name": "Outer", "method": "GET", "path": "/o"});
+        let incoming = ipc(
+            vec![keep.clone(), outer.clone(), inner.clone()],
+            vec![json!({
+                "id": "f_parent", "name": "Parent", "endpoints": [],
+                "folders": [{"id": "f_doomed", "name": "Doomed", "endpoints": [outer],
+                    "folders": [{"id": "f_child", "name": "Child", "endpoints": [inner]}]}]
+            })],
+        );
+        write_v2_collection(temp.path(), &incoming).unwrap();
+        let doomed_dir = temp.path().join("parent").join("doomed");
+        assert!(doomed_dir.exists());
+
+        let mut loaded = read_collection_dir(temp.path()).unwrap();
+        let folder = take_folder_from_tree(&mut loaded.root, "f_doomed").unwrap();
+        write::write_collection_dir(temp.path(), &mut loaded).unwrap();
+        remove_folder_files(&folder);
+
+        let mut removed = Vec::new();
+        folder_request_ids(&folder, &mut removed);
+        removed.sort();
+        assert_eq!(removed, vec!["inner".to_string(), "outer".to_string()]);
+        assert!(!doomed_dir.exists());
+        assert!(temp.path().join("parent").exists());
+
+        let reread = read_collection_dir(temp.path()).unwrap();
+        let ids: Vec<_> = reread
+            .requests()
+            .into_iter()
+            .map(|r| r.doc.id.clone())
+            .collect();
+        assert_eq!(ids, vec!["keep".to_string()]);
+    }
+
+    #[test]
+    fn a_stray_user_file_keeps_its_directory() {
+        let temp = TempDir::new().unwrap();
+        let req = json!({"id": "r", "name": "R", "method": "GET", "path": "/r"});
+        let incoming = ipc(
+            vec![req.clone()],
+            vec![json!({"id": "f1", "name": "Notes", "endpoints": [req]})],
+        );
+        write_v2_collection(temp.path(), &incoming).unwrap();
+        let dir = temp.path().join("notes");
+        fs::write(dir.join("README.md"), "mine").unwrap();
+
+        let mut loaded = read_collection_dir(temp.path()).unwrap();
+        let folder = take_folder_from_tree(&mut loaded.root, "f1").unwrap();
+        remove_folder_files(&folder);
+
+        assert!(dir.join("README.md").exists());
+        assert!(!dir.join(layout::FOLDER_YAML).exists());
     }
 }

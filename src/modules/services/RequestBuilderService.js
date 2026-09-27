@@ -4,6 +4,7 @@
  */
 
 import { VariableProcessor } from '../variables/VariableProcessor.js';
+import { buildMockPath } from '../collections/endpointUrl.js';
 
 export class RequestBuilderService {
     /**
@@ -133,11 +134,7 @@ export class RequestBuilderService {
         let base;
         if (pathChanged && !urlEdited) {
             if (mockRewrite) {
-                let mockPath = mockRewrite.pathTemplate;
-                for (const [key, value] of Object.entries(pathParams)) {
-                    mockPath = mockPath.replace(`{${key}}`, () => value);
-                }
-                base = `${mockRewrite.baseUrl}${mockPath}`;
+                base = `${mockRewrite.baseUrl}${buildMockPath(mockRewrite.pathTemplate, pathParams)}`;
             } else {
                 base = processor.processTemplate(rawUrl, { ...variables, ...pathParams });
                 if (base && !base.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {

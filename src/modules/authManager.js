@@ -6,6 +6,19 @@
 import { templateLoader } from './templateLoader.js';
 import { api } from './ipcBridge.js';
 import { generateAuthData } from './auth/authData.js';
+import { resolveAuthConfigVariables } from './auth/authVariables.js';
+import { toast } from './ui/Toast.js';
+
+/** @type {((collectionId: (string|undefined)) => Promise<{variables: Object, processor: Object}>)|null} */
+let oauthVariableResolver = null;
+
+/**
+ * @param {((collectionId: (string|undefined)) => Promise<{variables: Object, processor: Object}>)|null} resolver
+ * @returns {void}
+ */
+export function setOAuthVariableResolver(resolver) {
+    oauthVariableResolver = resolver;
+}
 
 /**
  * @typedef {Object} AuthFieldSpec
@@ -75,9 +88,11 @@ export class AuthManager {
      * @param {HTMLSelectElement} [options.typeSelect]
      * @param {HTMLElement} [options.fieldsContainer]
      * @param {string} [options.idPrefix]
+     * @param {string} [options.collectionId]
      */
     constructor(options = {}) {
         this.idPrefix = options.idPrefix || '';
+        this.collectionId = options.collectionId;
         this.authTypeSelect = options.typeSelect || document.getElementById('auth-type-select');
         this.authFieldsContainer = options.fieldsContainer || document.getElementById('auth-fields-container');
         this.inheritSummary = options.inheritSummary || null;
@@ -444,14 +459,28 @@ export class AuthManager {
         }
     }
 
+    /** @returns {Promise<Object>} */
+    async _resolvedOAuthConfig() {
+        const raw = this.currentAuthConfig.config;
+        if (!oauthVariableResolver) {
+            return raw;
+        }
+        const { variables, processor } = await oauthVariableResolver(this.collectionId);
+        const { authConfig, unresolved } = resolveAuthConfigVariables(this.currentAuthConfig, variables, processor);
+        if (unresolved.length > 0) {
+            const shown = unresolved.slice(0, 5).map(name => `{{${name}}}`).join(', ');
+            toast.warning(`OAuth request sent with unresolved variables: ${shown}`);
+        }
+        return authConfig.config;
+    }
+
     /**
      * @param {HTMLElement} errorGroup
      * @param {HTMLElement} errorMessage
      * @returns {Promise<void>}
      */
     async _handleGetToken(errorGroup, errorMessage) {
-        const {config} = this.currentAuthConfig;
-        const grantType = config.grantType || 'client_credentials';
+        const grantType = this.currentAuthConfig.config.grantType || 'client_credentials';
 
         if (errorGroup) {errorGroup.classList.add('u-hidden');}
 
@@ -464,6 +493,7 @@ export class AuthManager {
             if (grantType === 'authorization_code') {
                 await this._handleAuthorizationCodeFlow();
             } else {
+                const config = await this._resolvedOAuthConfig();
                 const tokenConfig = {
                     grantType: grantType,
                     tokenUrl: config.tokenUrl,
@@ -492,7 +522,7 @@ export class AuthManager {
 
     /** @returns {Promise<void>} */
     async _handleAuthorizationCodeFlow() {
-        const {config} = this.currentAuthConfig;
+        const config = await this._resolvedOAuthConfig();
 
         const state = await api.oauth2.generateState();
 
@@ -559,14 +589,15 @@ export class AuthManager {
      * @returns {Promise<void>}
      */
     async _exchangeAuthorizationCode(code) {
-        const {config} = this.currentAuthConfig;
+        const raw = this.currentAuthConfig.config;
         const errorGroup = this._el('oauth2-error-group');
         const errorMessage = this._el('oauth2-error-message');
 
         try {
+            const config = await this._resolvedOAuthConfig();
             let codeVerifier = null;
-            if (config._pendingState && config.usePkce !== false) {
-                codeVerifier = await api.oauth2.getPkceVerifier(config._pendingState);
+            if (raw._pendingState && config.usePkce !== false) {
+                codeVerifier = await api.oauth2.getPkceVerifier(raw._pendingState);
             }
 
             const tokenConfig = {
@@ -583,8 +614,8 @@ export class AuthManager {
             const result = await api.oauth2.getToken(tokenConfig);
             this._handleTokenResponse(result, errorGroup, errorMessage);
 
-            delete config._pendingState;
-            delete config._pendingPkce;
+            delete raw._pendingState;
+            delete raw._pendingPkce;
         } catch (error) {
             this._showError(errorGroup, errorMessage, error.message || 'Failed to exchange code');
         }
@@ -596,14 +627,13 @@ export class AuthManager {
      * @returns {Promise<void>}
      */
     async _handleRefreshToken(errorGroup, errorMessage) {
-        const {config} = this.currentAuthConfig;
-
-        if (!config.refreshToken) {
+        if (!this.currentAuthConfig.config.refreshToken) {
             this._showError(errorGroup, errorMessage, 'No refresh token available');
             return;
         }
 
         try {
+            const config = await this._resolvedOAuthConfig();
             const tokenConfig = {
                 grantType: 'refresh_token',
                 tokenUrl: config.tokenUrl,
@@ -617,6 +647,16 @@ export class AuthManager {
             this._handleTokenResponse(result, errorGroup, errorMessage);
         } catch (error) {
             this._showError(errorGroup, errorMessage, error.message || 'Failed to refresh token');
+        }
+    }
+
+    /**
+     * @param {Object} result
+     * @returns {void}
+     */
+    applyTokenResult(result) {
+        if (this.currentAuthConfig?.type === 'oauth2') {
+            this._handleTokenResponse(result, null, null);
         }
     }
 
@@ -640,11 +680,16 @@ export class AuthManager {
             }
 
             const tokenExpires = this._el('oauth2-token-expires');
-            if (tokenExpires && result.expiresIn) {
+            if (result.expiresIn) {
                 const expiresAt = new Date(Date.now() + result.expiresIn * 1000);
-                tokenExpires.textContent = `Expires: ${expiresAt.toLocaleTimeString()}`;
-                tokenExpires.classList.remove('u-hidden');
                 this.currentAuthConfig.config.expiresAt = expiresAt.getTime();
+                if (tokenExpires) {
+                    tokenExpires.textContent = `Expires: ${expiresAt.toLocaleTimeString()}`;
+                    tokenExpires.classList.remove('u-hidden');
+                }
+            } else {
+                delete this.currentAuthConfig.config.expiresAt;
+                tokenExpires?.classList.add('u-hidden');
             }
 
             if (result.refreshToken) {

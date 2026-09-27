@@ -210,3 +210,53 @@
   font-size: var(--font-size-caption);
   opacity: var(--dim-opacity);
 }
+
+.collection-load-errors {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-2);
+}
+
+.collection-load-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  margin: 1px 0;
+  color: var(--error-color);
+}
+
+.collection-load-error-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.collection-load-error-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.collection-load-error-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collection-load-error-message {
+  font-size: 0.85em;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+
+.collection-load-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.collection-load-error-action {
+  color: var(--error-color);
+}

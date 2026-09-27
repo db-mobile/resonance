@@ -2,6 +2,7 @@ import { app } from '../appContext.js';
 import { displayResponseWithLineNumbersForTab } from '../apiHandler.js';
 import { updateResponseSize, updateResponseTime, updateStatusDisplay } from '../statusDisplay.js';
 import { debounce } from '../utils/debounce.js';
+import { notifyStreamStateChanged } from './streamState.js';
 
 /** @returns {Promise<string|null>} */
 export async function getActiveTabId() {
@@ -86,11 +87,19 @@ export class StreamSession {
     }
 
     set(tabId, entry) {
+        const previousState = this._entries.get(tabId)?.state;
         this._entries.set(tabId, entry);
+        if (previousState !== entry?.state) {
+            notifyStreamStateChanged();
+        }
     }
 
     remove(tabId) {
+        const hadEntry = this._entries.has(tabId);
         this._entries.delete(tabId);
+        if (hadEntry) {
+            notifyStreamStateChanged();
+        }
         this._buffers.delete(tabId);
         this._persisters.get(tabId)?.cancel();
         this._persisters.delete(tabId);

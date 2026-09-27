@@ -3,6 +3,25 @@
  * @module storage/VariableRepository
  */
 
+/** @type {WeakMap<Object, Map<string, Object>>} */
+const cachesByBackend = new WeakMap();
+
+/**
+ * @param {Object} backendAPI
+ * @returns {Map<string, Object>}
+ */
+function sharedCacheFor(backendAPI) {
+    if (!backendAPI || typeof backendAPI !== 'object') {
+        return new Map();
+    }
+    let cache = cachesByBackend.get(backendAPI);
+    if (!cache) {
+        cache = new Map();
+        cachesByBackend.set(backendAPI, cache);
+    }
+    return cache;
+}
+
 export class VariableRepository {
     /**
      * @param {Object} backendAPI
@@ -11,7 +30,7 @@ export class VariableRepository {
     constructor(backendAPI, secretStore = null) {
         this.backendAPI = backendAPI;
         this.secretStore = secretStore;
-        this._cache = new Map();
+        this._cache = sharedCacheFor(backendAPI);
     }
 
     /**

@@ -3,11 +3,8 @@ import { clearResponseDisplayForTab } from './apiHandler.js';
 import { resolveTlsOptions } from './tlsOptions.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
-import {
-    StreamSession,
-    createBackendEventListener,
-    getActiveTabId
-} from './streaming/streamSession.js';
+import { StreamSession, createBackendEventListener, getActiveTabId } from './streaming/streamSession.js';
+import { isLiveEntry } from './streaming/streamState.js';
 
 const session = new StreamSession({
     buildResponseMeta: (entry, transcript, state) => ({
@@ -119,7 +116,7 @@ export const initWebSocketHandler = createBackendEventListener(
     handleBackendEvent
 );
 
-export async function handleWebSocketSend(url, headers = {}) {
+export async function handleWebSocketSend(url, headers = {}, message = getRequestBodyContent()) {
     await initWebSocketHandler();
 
     if (!window.backendAPI?.websocket) {
@@ -144,8 +141,6 @@ export async function handleWebSocketSend(url, headers = {}) {
         });
         clearResponseDisplayForTab(tabId);
     }
-
-    const message = getRequestBodyContent();
 
     try {
         await window.backendAPI.websocket.send({
@@ -190,4 +185,12 @@ export async function clearWebSocketState(tabId) {
         await window.backendAPI.websocket.close(tabId);
     }
     session.remove(tabId);
+}
+
+/**
+ * @param {string} tabId
+ * @returns {boolean}
+ */
+export function isWebSocketLive(tabId) {
+    return isLiveEntry(session.get(tabId));
 }

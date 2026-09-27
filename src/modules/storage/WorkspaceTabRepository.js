@@ -6,9 +6,14 @@
 import { truncateBody } from '../utils/truncateBody.js';
 
 export class WorkspaceTabRepository {
-    /** @param {Object} backendAPI */
-    constructor(backendAPI) {
+    /**
+     * @param {Object} backendAPI
+     * @param {Object|null} [secretStore]
+     */
+    constructor(backendAPI, secretStore = null) {
         this.backendAPI = backendAPI;
+        this.secretStore = secretStore;
+        this._syncedSecrets = new Map();
         this.STORE_KEY = 'workspace-tabs';
         this.ACTIVE_TAB_KEY = 'active-tab-id';
         this._tabsCache = null;
@@ -24,9 +29,85 @@ export class WorkspaceTabRepository {
     _queueStoreWrite(key, value) {
         const write = this._writeChain
             .catch(() => { })
-            .then(() => this.backendAPI.store.set(key, value));
+            .then(async () => {
+                if (key === this.STORE_KEY && this.secretStore) {
+                    await this._syncTabSecrets(value);
+                    return this.backendAPI.store.set(key, value.map(tab => this._withoutSecrets(tab)));
+                }
+                return this.backendAPI.store.set(key, value);
+            });
         this._writeChain = write;
         return write;
+    }
+
+    /**
+     * @param {string} tabId
+     * @returns {string}
+     */
+    _secretScope(tabId) {
+        return `tab:${tabId}`;
+    }
+
+    /**
+     * @param {Object} tab
+     * @returns {Object}
+     */
+    _withoutSecrets(tab) {
+        if (!tab?.request || !('password' in tab.request)) {
+            return tab;
+        }
+        return { ...tab, request: { ...tab.request, password: '' } };
+    }
+
+    /**
+     * @param {Array<Object>} tabs
+     * @returns {Promise<void>}
+     */
+    async _syncTabSecrets(tabs) {
+        const liveIds = new Set();
+        for (const tab of tabs) {
+            liveIds.add(tab.id);
+            const password = tab.request?.password || '';
+            if (this._syncedSecrets.get(tab.id) === password) {
+                continue;
+            }
+            if (password) {
+                await this.secretStore.set(this._secretScope(tab.id), 'mqttPassword', password);
+            } else {
+                await this.secretStore.delete(this._secretScope(tab.id), 'mqttPassword');
+            }
+            this._syncedSecrets.set(tab.id, password);
+        }
+        for (const tabId of [...this._syncedSecrets.keys()]) {
+            if (!liveIds.has(tabId)) {
+                await this.secretStore.deleteScope(this._secretScope(tabId));
+                this._syncedSecrets.delete(tabId);
+            }
+        }
+    }
+
+    /**
+     * @param {Array<Object>} tabs
+     * @returns {Promise<Array<Object>>}
+     */
+    async _hydrateTabSecrets(tabs) {
+        if (!this.secretStore) {
+            return tabs;
+        }
+        const hydrated = [];
+        for (const tab of tabs) {
+            if (tab?.request?.protocol !== 'mqtt') {
+                hydrated.push(tab);
+                continue;
+            }
+            const stored = await this.secretStore.get(this._secretScope(tab.id), 'mqttPassword');
+            if (stored !== undefined && stored !== null) {
+                this._syncedSecrets.set(tab.id, stored);
+            }
+            const password = stored ?? tab.request.password ?? '';
+            hydrated.push({ ...tab, request: { ...tab.request, password } });
+        }
+        return hydrated;
     }
 
     /** @type {number} */
@@ -47,8 +128,17 @@ export class WorkspaceTabRepository {
                 return [...defaultTabs];
             }
 
-            this._tabsCache = data;
-            return [...data];
+            let hydrated = data;
+            try {
+                hydrated = await this._hydrateTabSecrets(data);
+            } catch (error) {
+                void error;
+            }
+            this._tabsCache = hydrated;
+            if (this.secretStore && data.some(tab => tab?.request?.password)) {
+                this._queueStoreWrite(this.STORE_KEY, hydrated).catch(() => { });
+            }
+            return [...hydrated];
         } catch (error) {
             const defaultTabs = [this._createDefaultTab()];
             this._tabsCache = defaultTabs;

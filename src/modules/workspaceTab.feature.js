@@ -20,7 +20,7 @@ export const workspaceTabFeature = {
         previewRepository.load();
         const responseContainerManager = new ResponseContainerManager(previewRepository);
 
-        const repository = new WorkspaceTabRepository(ctx.backendAPI);
+        const repository = new WorkspaceTabRepository(ctx.backendAPI, ctx.secretStore);
         const service = new WorkspaceTabService(repository, ctx.statusDisplay);
         const tabBar = new WorkspaceTabBar('workspace-tab-bar-container');
 

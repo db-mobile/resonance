@@ -123,4 +123,28 @@ describe('SecretStore fallback (no keychain)', () => {
         expect(api.__store.secretValues).toEqual({ 'env:1': { token: 'plain' } });
         expect(api.__chain.size).toBe(0);
     });
+
+    test('a failed migration does not wedge the store: the next call retries', async () => {
+        const api = makeBackend({
+            keychain: true,
+            seedStore: { secretValues: { 'env:1': { a: '1', b: '2' } } }
+        });
+        let calls = 0;
+        const realSet = api.secrets.set.getMockImplementation();
+        api.secrets.set.mockImplementation(async (account, value) => {
+            calls += 1;
+            if (calls === 2) {
+                throw new Error('keychain locked');
+            }
+            return realSet(account, value);
+        });
+        const store = new SecretStore(api);
+
+        await expect(store.get('env:1', 'a')).rejects.toThrow('keychain locked');
+        expect(api.__store.secretIndex).toEqual({ 'env:1': { a: true } });
+        expect(api.__store.secretValues).toEqual({ 'env:1': { a: '1', b: '2' } });
+
+        expect(await store.get('env:1', 'b')).toBe('2');
+        expect(api.__store.secretValues).toEqual({});
+    });
 });

@@ -3,12 +3,13 @@ use reqwest::{Method, RequestBuilder, Response};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::State;
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
+use super::cancel_registry::CancelRegistry;
 use super::http_client::{HttpClientOptions, build_http_client};
 use super::proxy::ProxyState;
 use super::timing::TimingRecorder;
@@ -477,6 +478,10 @@ pub struct RequestOptions {
     /// Client certificate (mTLS) and custom CA configuration, resolved by host
     #[serde(default)]
     pub client_cert: Option<ClientCertConfig>,
+    /// Caller-chosen id that `cancel_api_request` targets; without one the
+    /// request cannot be cancelled.
+    #[serde(default)]
+    pub request_id: Option<String>,
 }
 
 /// One row of a "formdata" or "urlencoded" body sent as a JSON array.
@@ -557,6 +562,53 @@ fn form_rows_to_pairs(rows: &[serde_json::Value]) -> Vec<(String, String)> {
         .filter_map(|row| serde_json::from_value::<FormPart>(row.clone()).ok())
         .map(|p| (p.key, p.value.unwrap_or_default()))
         .collect()
+}
+
+/// Key/value pairs of a URL-encoded body: the current row-array shape or the
+/// legacy flat object from older persisted data.
+fn urlencoded_pairs(body: &serde_json::Value) -> Vec<(String, String)> {
+    if let Some(rows) = body.as_array() {
+        form_rows_to_pairs(rows)
+    } else if let Some(obj) = body.as_object() {
+        obj.iter()
+            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
+            .collect()
+    } else {
+        Vec::new()
+    }
+}
+
+/// `application/x-www-form-urlencoded` serialization, byte-identical to what
+/// reqwest's `.form()` produces.
+fn encode_form_pairs(pairs: &[(String, String)]) -> String {
+    url::form_urlencoded::Serializer::new(String::new())
+        .extend_pairs(pairs)
+        .finish()
+}
+
+/// The exact payload bytes the request will carry, so the AWS signature
+/// covers what is actually sent. Multipart bodies get a random boundary per
+/// send and therefore cannot be signed ahead of time.
+fn wire_body_bytes(
+    body_type: &str,
+    body: Option<&serde_json::Value>,
+    binary: Option<&Vec<u8>>,
+) -> Result<Vec<u8>, String> {
+    if let Some(bytes) = binary {
+        return Ok(bytes.clone());
+    }
+    let Some(body) = body else {
+        return Ok(Vec::new());
+    };
+    match body_type {
+        "text" => Ok(body.as_str().unwrap_or("").as_bytes().to_vec()),
+        "urlencoded" => Ok(encode_form_pairs(&urlencoded_pairs(body)).into_bytes()),
+        "formdata" => Err(
+            "AWS Signature V4 cannot sign multipart form-data bodies. Use a JSON, text, URL-encoded or binary body instead."
+                .to_string(),
+        ),
+        _ => serde_json::to_vec(body).map_err(|e| format!("Invalid JSON body: {}", e)),
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -769,16 +821,9 @@ fn decode_response_body(
     (None, true, Some(BASE64_STANDARD.encode(bytes)))
 }
 
+#[derive(Default)]
 pub struct RequestState {
-    pub cancel_tx: Mutex<Option<oneshot::Sender<()>>>,
-}
-
-impl Default for RequestState {
-    fn default() -> Self {
-        Self {
-            cancel_tx: Mutex::new(None),
-        }
-    }
+    pub cancels: CancelRegistry,
 }
 
 #[tauri::command]
@@ -787,9 +832,7 @@ pub async fn send_api_request(
     proxy_state: State<'_, ProxyState>,
     request_options: RequestOptions,
 ) -> Result<ApiResponse, String> {
-    // Create cancellation channel
-    let (cancel_tx, cancel_rx) = oneshot::channel();
-    *state.cancel_tx.lock().unwrap() = Some(cancel_tx);
+    let (mut cancel_rx, _cancel_guard) = state.cancels.register(request_options.request_id.clone());
 
     let start_timestamp = chrono::Utc::now().timestamp_millis() as u64;
     let mut timings = RequestTimings::unmeasured(start_timestamp);
@@ -899,16 +942,15 @@ pub async fn send_api_request(
     // the method, URL, headers, and body hash.
     let aws_headers: Option<HashMap<String, String>> = if let Some(aws) = &request_options.aws_auth
     {
-        // For "binary" the signature covers the actual file bytes. For
-        // "formdata" the multipart boundary is generated per send, so a correct
-        // signature is not possible here (pre-existing limitation); other body
-        // types keep the historical JSON serialization.
-        let body_bytes = match (&binary_body_bytes, &request_options.body) {
-            (Some(bytes), _) => bytes.clone(),
-            (None, Some(b)) => serde_json::to_vec(b).unwrap_or_default(),
-            (None, None) => Vec::new(),
-        };
-        let existing = request_options.headers.clone().unwrap_or_default();
+        let body_bytes = wire_body_bytes(
+            &body_type,
+            request_options.body.as_ref(),
+            binary_body_bytes.as_ref(),
+        )?;
+        let mut existing = request_options.headers.clone().unwrap_or_default();
+        if body_type == "formdata" || body_type == "urlencoded" {
+            existing.retain(|k, _| !k.eq_ignore_ascii_case("content-type"));
+        }
         Some(build_aws_v4_headers(
             aws,
             &request_options.method,
@@ -944,18 +986,12 @@ pub async fn send_api_request(
         }
         match body_type.as_str() {
             "urlencoded" => {
-                if let Some(body) = &request_options.body {
-                    if let Some(rows) = body.as_array() {
-                        let pairs = form_rows_to_pairs(rows);
-                        rb = rb.form(&pairs);
-                    } else if let Some(obj) = body.as_object() {
-                        // Legacy flat-object shape from older persisted data
-                        let pairs: Vec<(String, String)> = obj
-                            .iter()
-                            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
-                            .collect();
-                        rb = rb.form(&pairs);
-                    }
+                if let Some(body) = &request_options.body
+                    && (body.is_array() || body.is_object())
+                {
+                    rb = rb
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .body(encode_form_pairs(&urlencoded_pairs(body)));
                 }
             }
             "formdata" => {
@@ -1017,122 +1053,153 @@ pub async fn send_api_request(
     // segments summing to less than the total.
     let start_time = Instant::now();
 
-    // Execute request with cancellation support
-    let request_future = build_request(None)?.send();
-
-    tokio::select! {
-        result = request_future => {
-            match result {
-                Ok(response) => {
-                    // Check for 401 with Digest challenge - retry with auth if credentials provided.
-                    // A challenge we cannot answer (an unsupported algorithm, say) is reported on
-                    // the 401 we return, so the user sees why the credentials were never sent
-                    // rather than a bare 401.
-                    let mut digest_error: Option<String> = None;
-                    let mut ntlm_error: Option<String> = None;
-                    if response.status().as_u16() == 401 {
-                        // NTLM: a three-leg handshake (negotiate -> challenge -> authenticate)
-                        // bound to one TCP connection. Each intermediate 401 body is drained so
-                        // reqwest returns the socket to the pool, and single_connection on the
-                        // client keeps every leg on that socket. Once the first body is consumed
-                        // there is no falling through to the plain-401 path below, so every
-                        // branch past that point returns.
-                        if let Some(ntlm_config) = &request_options.ntlm
-                            && response_offers_ntlm(response.headers()) {
-                                match build_ntlm_negotiate_header(ntlm_config) {
-                                    Ok(negotiate_header) => {
-                                        let _ = response.bytes().await;
-                                        let negotiate_result =
-                                            build_request(Some(negotiate_header))?.send().await;
-                                        let challenge_response = match negotiate_result {
-                                            Ok(challenge_response) => challenge_response,
+    // Everything from the first send to the last body byte (auth retries
+    // included) runs inside one future, so a cancel lands at any stage.
+    let pipeline = async {
+        match build_request(None)?.send().await {
+            Ok(response) => {
+                // Check for 401 with Digest challenge - retry with auth if credentials provided.
+                // A challenge we cannot answer (an unsupported algorithm, say) is reported on
+                // the 401 we return, so the user sees why the credentials were never sent
+                // rather than a bare 401.
+                let mut digest_error: Option<String> = None;
+                let mut ntlm_error: Option<String> = None;
+                if response.status().as_u16() == 401 {
+                    // NTLM: a three-leg handshake (negotiate -> challenge -> authenticate)
+                    // bound to one TCP connection. Each intermediate 401 body is drained so
+                    // reqwest returns the socket to the pool, and single_connection on the
+                    // client keeps every leg on that socket. Once the first body is consumed
+                    // there is no falling through to the plain-401 path below, so every
+                    // branch past that point returns.
+                    if let Some(ntlm_config) = &request_options.ntlm
+                        && response_offers_ntlm(response.headers())
+                    {
+                        match build_ntlm_negotiate_header(ntlm_config) {
+                            Ok(negotiate_header) => {
+                                let _ = response.bytes().await;
+                                let negotiate_result =
+                                    build_request(Some(negotiate_header))?.send().await;
+                                let challenge_response = match negotiate_result {
+                                    Ok(challenge_response) => challenge_response,
+                                    Err(e) => {
+                                        return process_response(
+                                            Err(e),
+                                            &mut timings,
+                                            start_time,
+                                            &recorder,
+                                        )
+                                        .await;
+                                    }
+                                };
+                                match extract_ntlm_challenge_token(challenge_response.headers()) {
+                                    Some(token) => {
+                                        match build_ntlm_authenticate_header(ntlm_config, &token) {
+                                            Ok(authenticate_header) => {
+                                                let _ = challenge_response.bytes().await;
+                                                let final_result =
+                                                    build_request(Some(authenticate_header))?
+                                                        .send()
+                                                        .await;
+                                                return process_response(
+                                                    final_result,
+                                                    &mut timings,
+                                                    start_time,
+                                                    &recorder,
+                                                )
+                                                .await;
+                                            }
                                             Err(e) => {
-                                                return process_response(Err(e), &mut timings, start_time, &recorder, &state).await;
-                                            }
-                                        };
-                                        match extract_ntlm_challenge_token(challenge_response.headers()) {
-                                            Some(token) => {
-                                                match build_ntlm_authenticate_header(ntlm_config, &token) {
-                                                    Ok(authenticate_header) => {
-                                                        let _ = challenge_response.bytes().await;
-                                                        let final_result =
-                                                            build_request(Some(authenticate_header))?.send().await;
-                                                        return process_response(final_result, &mut timings, start_time, &recorder, &state).await;
-                                                    }
-                                                    Err(e) => {
-                                                        let mut api_response =
-                                                            process_response(Ok(challenge_response), &mut timings, start_time, &recorder, &state).await?;
-                                                        api_response.message =
-                                                            Some(format!("NTLM authentication failed: {}", e));
-                                                        return Ok(api_response);
-                                                    }
-                                                }
-                                            }
-                                            None => {
-                                                let mut api_response =
-                                                    process_response(Ok(challenge_response), &mut timings, start_time, &recorder, &state).await?;
-                                                api_response.message = Some(
-                                                    "NTLM authentication failed: the server did not answer the negotiate message with an NTLM challenge".to_string(),
-                                                );
+                                                let mut api_response = process_response(
+                                                    Ok(challenge_response),
+                                                    &mut timings,
+                                                    start_time,
+                                                    &recorder,
+                                                )
+                                                .await?;
+                                                api_response.message = Some(format!(
+                                                    "NTLM authentication failed: {}",
+                                                    e
+                                                ));
                                                 return Ok(api_response);
                                             }
                                         }
                                     }
-                                    Err(e) => {
-                                        ntlm_error = Some(e);
+                                    None => {
+                                        let mut api_response = process_response(
+                                            Ok(challenge_response),
+                                            &mut timings,
+                                            start_time,
+                                            &recorder,
+                                        )
+                                        .await?;
+                                        api_response.message = Some(
+                                                    "NTLM authentication failed: the server did not answer the negotiate message with an NTLM challenge".to_string(),
+                                                );
+                                        return Ok(api_response);
                                     }
                                 }
                             }
-
-                        if let Some(auth_config) = &request_options.auth
-                            && let Some(www_auth) = response.headers().get("www-authenticate")
-                                && let Ok(www_auth_str) = www_auth.to_str()
-                                    && let Some(challenge) = DigestChallenge::parse(www_auth_str) {
-                                        let uri = extract_uri(&request_options.url);
-
-                                        match build_digest_auth_header(
-                                            &auth_config.username,
-                                            &auth_config.password,
-                                            request_options.method.to_uppercase().as_str(),
-                                            &uri,
-                                            &challenge,
-                                        ) {
-                                            Ok(auth_header) => {
-                                                // Retry with digest auth
-                                                let retry_result = build_request(Some(auth_header))?.send().await;
-                                                return process_response(retry_result, &mut timings, start_time, &recorder, &state).await;
-                                            }
-                                            Err(e) => {
-                                                digest_error = Some(e);
-                                            }
-                                        }
-                                    }
+                            Err(e) => {
+                                ntlm_error = Some(e);
+                            }
+                        }
                     }
 
-                    let mut api_response =
-                        process_response(Ok(response), &mut timings, start_time, &recorder, &state).await?;
-                    if let Some(e) = digest_error {
-                        api_response.message =
-                            Some(format!("Digest authentication failed: {}", e));
+                    if let Some(auth_config) = &request_options.auth
+                        && let Some(www_auth) = response.headers().get("www-authenticate")
+                        && let Ok(www_auth_str) = www_auth.to_str()
+                        && let Some(challenge) = DigestChallenge::parse(www_auth_str)
+                    {
+                        let uri = extract_uri(&request_options.url);
+
+                        match build_digest_auth_header(
+                            &auth_config.username,
+                            &auth_config.password,
+                            request_options.method.to_uppercase().as_str(),
+                            &uri,
+                            &challenge,
+                        ) {
+                            Ok(auth_header) => {
+                                // Retry with digest auth
+                                let retry_result = build_request(Some(auth_header))?.send().await;
+                                return process_response(
+                                    retry_result,
+                                    &mut timings,
+                                    start_time,
+                                    &recorder,
+                                )
+                                .await;
+                            }
+                            Err(e) => {
+                                digest_error = Some(e);
+                            }
+                        }
                     }
-                    if let Some(e) = ntlm_error {
-                        api_response.message =
-                            Some(format!("NTLM authentication failed: {}", e));
-                    }
-                    Ok(api_response)
                 }
-                Err(e) => {
-                    process_response(Err(e), &mut timings, start_time, &recorder, &state).await
+
+                let mut api_response =
+                    process_response(Ok(response), &mut timings, start_time, &recorder).await?;
+                if let Some(e) = digest_error {
+                    api_response.message = Some(format!("Digest authentication failed: {}", e));
                 }
+                if let Some(e) = ntlm_error {
+                    api_response.message = Some(format!("NTLM authentication failed: {}", e));
+                }
+                Ok(api_response)
             }
+            Err(e) => process_response(Err(e), &mut timings, start_time, &recorder).await,
         }
-        _ = cancel_rx => {
+    };
+
+    tokio::select! {
+        result = pipeline => result,
+        Ok(()) = &mut cancel_rx => {
+            let mut timings = RequestTimings::unmeasured(start_timestamp);
             timings.total = elapsed_millis(start_time);
             let snapshot = recorder.snapshot();
             timings.dns = snapshot.dns;
             timings.connect = snapshot.connect;
             timings.connect_count = snapshot.connect_count;
-            *state.cancel_tx.lock().unwrap() = None;
 
             Ok(ApiResponse {
                 success: false,
@@ -1177,7 +1244,6 @@ async fn process_response(
     timings: &mut RequestTimings,
     start_time: Instant,
     recorder: &TimingRecorder,
-    state: &State<'_, RequestState>,
 ) -> Result<ApiResponse, String> {
     match result {
         Ok(response) => {
@@ -1200,11 +1266,7 @@ async fn process_response(
                 .map(|s| s.to_string())
                 .collect();
 
-            let headers: HashMap<String, String> = response
-                .headers()
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
-                .collect();
+            let headers = collect_response_headers(response.headers());
 
             let bytes = response.bytes().await.map_err(|e| e.to_string())?;
             let size = bytes.len();
@@ -1214,8 +1276,6 @@ async fn process_response(
 
             let (data, is_binary, body_base64) =
                 decode_response_body(&bytes, headers.get("content-type").map(String::as_str));
-
-            *state.cancel_tx.lock().unwrap() = None;
 
             Ok(ApiResponse {
                 success: (200..300).contains(&status),
@@ -1241,7 +1301,6 @@ async fn process_response(
             timings.dns = snapshot.dns;
             timings.connect = snapshot.connect;
             timings.connect_count = snapshot.connect_count;
-            *state.cancel_tx.lock().unwrap() = None;
 
             // Provide specific error messages for common error types
             let message = if e.is_timeout() {
@@ -1344,14 +1403,31 @@ pub async fn save_response_body(
 #[tauri::command]
 pub async fn cancel_api_request(
     state: State<'_, RequestState>,
+    request_id: String,
 ) -> Result<serde_json::Value, String> {
-    let mut cancel_tx = state.cancel_tx.lock().unwrap();
-    if let Some(tx) = cancel_tx.take() {
-        let _ = tx.send(());
+    if state.cancels.cancel(&request_id) {
         Ok(serde_json::json!({ "success": true, "message": "Request cancelled" }))
     } else {
         Ok(serde_json::json!({ "success": false, "message": "No active request to cancel" }))
     }
+}
+
+/// Flattens response headers into one string per name. Repeated headers
+/// (Link, Vary, WWW-Authenticate, ...) are joined with ", " instead of the
+/// last one silently winning; Set-Cookie is also reported separately and
+/// verbatim through `set_cookies`.
+fn collect_response_headers(headers: &reqwest::header::HeaderMap) -> HashMap<String, String> {
+    let mut out: HashMap<String, String> = HashMap::new();
+    for (name, value) in headers {
+        let value = String::from_utf8_lossy(value.as_bytes()).into_owned();
+        out.entry(name.to_string())
+            .and_modify(|existing| {
+                existing.push_str(", ");
+                existing.push_str(&value);
+            })
+            .or_insert(value);
+    }
+    out
 }
 
 #[cfg(test)]
@@ -1862,5 +1938,64 @@ mod tests {
                 ("b".to_string(), "3".to_string()),
             ]
         );
+    }
+
+    #[test]
+    fn repeated_response_headers_are_joined_not_dropped() {
+        use reqwest::header::{HeaderMap, HeaderValue};
+        let mut headers = HeaderMap::new();
+        headers.append("vary", HeaderValue::from_static("Accept"));
+        headers.append("vary", HeaderValue::from_static("Origin"));
+        headers.append("content-type", HeaderValue::from_static("application/json"));
+        headers.append("x-raw", HeaderValue::from_bytes(b"caf\xe9").unwrap());
+
+        let flat = collect_response_headers(&headers);
+
+        assert_eq!(flat.get("vary").map(String::as_str), Some("Accept, Origin"));
+        assert_eq!(
+            flat.get("content-type").map(String::as_str),
+            Some("application/json")
+        );
+        assert_eq!(flat.get("x-raw").map(String::as_str), Some("caf\u{fffd}"));
+    }
+
+    #[test]
+    fn signed_body_bytes_match_what_is_sent() {
+        let text = serde_json::json!("hello world");
+        assert_eq!(
+            wire_body_bytes("text", Some(&text), None).unwrap(),
+            b"hello world"
+        );
+
+        let rows = serde_json::json!([
+            { "key": "a", "value": "1 2" },
+            { "key": "a", "value": "x&y" },
+            { "key": "b" }
+        ]);
+        assert_eq!(
+            wire_body_bytes("urlencoded", Some(&rows), None).unwrap(),
+            b"a=1+2&a=x%26y&b="
+        );
+
+        let legacy = serde_json::json!({ "k": "v" });
+        assert_eq!(
+            wire_body_bytes("urlencoded", Some(&legacy), None).unwrap(),
+            b"k=v"
+        );
+
+        let json = serde_json::json!({ "n": 1 });
+        assert_eq!(
+            wire_body_bytes("json", Some(&json), None).unwrap(),
+            serde_json::to_vec(&json).unwrap()
+        );
+
+        let file = vec![0u8, 1, 2];
+        assert_eq!(
+            wire_body_bytes("binary", Some(&serde_json::json!({})), Some(&file)).unwrap(),
+            file
+        );
+
+        assert!(wire_body_bytes("formdata", Some(&rows), None).is_err());
+        assert!(wire_body_bytes("json", None, None).unwrap().is_empty());
     }
 }

@@ -180,7 +180,7 @@ fn folder_to_ipc(node: &FolderNode, path: &mut Vec<String>, flat: &mut Vec<Value
 
 /// A folder's id: its own metadata when present, else derived from its name so
 /// expansion state and auth scopes stay stable for a hand-made directory.
-fn folder_id(folder: &FolderNode) -> String {
+pub(crate) fn folder_id(folder: &FolderNode) -> String {
     if let Some(meta) = &folder.meta
         && !meta.id.is_empty()
     {
@@ -306,9 +306,30 @@ fn index_folders(node: &FolderNode, out: &mut HashMap<String, FolderNode>) {
     }
 }
 
+/// Which request ids a save may create. `allowed: None` accepts every
+/// unknown id; otherwise an id that is neither on disk nor listed is a stale
+/// frontend view of a request deleted elsewhere (a branch switch, say) and is
+/// skipped instead of being recreated as an empty file.
+struct NewRequestGuard<'a> {
+    allowed: Option<&'a HashSet<String>>,
+    skipped: Vec<String>,
+}
+
 /// Builds one request entry, preserving whatever is already on disk for it.
-fn entry_for(endpoint: &Value, existing: &HashMap<String, RequestEntry>) -> Option<RequestEntry> {
+fn entry_for(
+    endpoint: &Value,
+    existing: &HashMap<String, RequestEntry>,
+    guard: &mut NewRequestGuard<'_>,
+) -> Option<RequestEntry> {
     let id = ipc_string(endpoint, "id")?;
+
+    if !existing.contains_key(&id)
+        && let Some(allowed) = guard.allowed
+        && !allowed.contains(&id)
+    {
+        guard.skipped.push(id);
+        return None;
+    }
 
     let mut entry = existing.get(&id).cloned().unwrap_or_else(|| {
         RequestEntry::new(RequestDoc::new(
@@ -330,10 +351,26 @@ fn entry_for(endpoint: &Value, existing: &HashMap<String, RequestEntry>) -> Opti
 /// @param incoming - The collection as the frontend sent it
 /// @param existing - What is currently on disk, if anything
 /// @returns The root folder of the tree to write
+#[cfg(test)]
 pub(crate) fn tree_from_ipc(
     incoming: &Collection,
     existing: Option<&LoadedCollection>,
 ) -> FolderNode {
+    tree_from_ipc_guarded(incoming, existing, None).0
+}
+
+/// [`tree_from_ipc`] that only creates requests whose ids are in
+/// `allowed_new` (when given and something is already on disk), returning the
+/// ids it skipped.
+pub(crate) fn tree_from_ipc_guarded(
+    incoming: &Collection,
+    existing: Option<&LoadedCollection>,
+    allowed_new: Option<&HashSet<String>>,
+) -> (FolderNode, Vec<String>) {
+    let mut guard = NewRequestGuard {
+        allowed: existing.and(allowed_new),
+        skipped: Vec::new(),
+    };
     let existing_requests = existing.map(index_requests).unwrap_or_default();
 
     let mut existing_folders = HashMap::new();
@@ -356,7 +393,7 @@ pub(crate) fn tree_from_ipc(
         if foldered_ids.contains(&id) {
             continue;
         }
-        if let Some(entry) = entry_for(endpoint, &existing_requests) {
+        if let Some(entry) = entry_for(endpoint, &existing_requests, &mut guard) {
             root.requests.push(entry);
         }
     }
@@ -364,12 +401,14 @@ pub(crate) fn tree_from_ipc(
     renumber_if_reordered(&mut root.requests, existing.map(|loaded| &loaded.root));
 
     for folder in &incoming.folders {
-        if let Some(node) = folder_from_ipc(folder, &existing_requests, &existing_folders) {
+        if let Some(node) =
+            folder_from_ipc(folder, &existing_requests, &existing_folders, &mut guard)
+        {
             root.folders.push(node);
         }
     }
 
-    root
+    (root, guard.skipped)
 }
 
 /// Renumbers a folder's requests when the incoming order differs from the one
@@ -439,6 +478,7 @@ fn folder_from_ipc(
     folder: &Value,
     existing_requests: &HashMap<String, RequestEntry>,
     existing_folders: &HashMap<String, FolderNode>,
+    guard: &mut NewRequestGuard<'_>,
 ) -> Option<FolderNode> {
     let folder_id = ipc_string(folder, "id")?;
     let previous = existing_folders.get(&folder_id);
@@ -467,7 +507,7 @@ fn folder_from_ipc(
 
     if let Some(endpoints) = folder.get("endpoints").and_then(|e| e.as_array()) {
         for endpoint in endpoints {
-            if let Some(entry) = entry_for(endpoint, existing_requests) {
+            if let Some(entry) = entry_for(endpoint, existing_requests, guard) {
                 node.requests.push(entry);
             }
         }
@@ -477,7 +517,9 @@ fn folder_from_ipc(
 
     if let Some(children) = folder.get("folders").and_then(|f| f.as_array()) {
         for child in children {
-            if let Some(child_node) = folder_from_ipc(child, existing_requests, existing_folders) {
+            if let Some(child_node) =
+                folder_from_ipc(child, existing_requests, existing_folders, guard)
+            {
                 node.folders.push(child_node);
             }
         }
@@ -1016,6 +1058,61 @@ mod save_path {
         assert_eq!(root.requests[0].doc.name, "Fresh");
         assert_eq!(root.requests[0].doc.method.as_deref(), Some("GET"));
         assert!(root.requests[0].source.is_none());
+    }
+
+    /// A save from a stale frontend tree (the request was deleted on disk,
+    /// e.g. by a branch switch) must not recreate it as an empty file.
+    #[test]
+    fn a_stale_unknown_request_is_skipped_not_recreated() {
+        let existing = existing_with_state();
+        let incoming = ipc_collection(
+            vec![
+                json!({"id": "r1", "name": "Kept", "method": "POST", "path": "/pets"}),
+                json!({"id": "gone", "name": "Deleted elsewhere", "method": "GET", "path": "/x"}),
+            ],
+            vec![json!({"id": "f1", "name": "F", "endpoints": [
+                json!({"id": "gone2", "name": "Also deleted", "method": "GET", "path": "/y"})
+            ]})],
+        );
+
+        let (root, skipped) =
+            tree_from_ipc_guarded(&incoming, Some(&existing), Some(&HashSet::new()));
+
+        let ids: Vec<_> = root.requests.iter().map(|r| r.doc.id.as_str()).collect();
+        assert_eq!(ids, vec!["r1"]);
+        assert!(root.folders[0].requests.is_empty());
+        assert_eq!(skipped, vec!["gone".to_string(), "gone2".to_string()]);
+    }
+
+    #[test]
+    fn a_listed_new_request_is_created() {
+        let existing = existing_with_state();
+        let incoming = ipc_collection(
+            vec![
+                json!({"id": "r1", "name": "Kept", "method": "POST", "path": "/pets"}),
+                json!({"id": "new1", "name": "Fresh", "method": "GET", "path": "/x"}),
+            ],
+            vec![],
+        );
+        let allowed = HashSet::from(["new1".to_string()]);
+
+        let (root, skipped) = tree_from_ipc_guarded(&incoming, Some(&existing), Some(&allowed));
+
+        assert_eq!(root.requests.len(), 2);
+        assert!(skipped.is_empty());
+    }
+
+    #[test]
+    fn a_brand_new_collection_accepts_every_request() {
+        let incoming = ipc_collection(
+            vec![json!({"id": "a", "name": "A", "method": "GET", "path": "/a"})],
+            vec![],
+        );
+
+        let (root, skipped) = tree_from_ipc_guarded(&incoming, None, Some(&HashSet::new()));
+
+        assert_eq!(root.requests.len(), 1);
+        assert!(skipped.is_empty());
     }
 
     /// An OpenAPI import reaches the writer as an IPC collection whose
