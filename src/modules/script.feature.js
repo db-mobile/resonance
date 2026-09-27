@@ -4,6 +4,7 @@
  */
 
 import { ScriptRepository } from './storage/ScriptRepository.js';
+import { VariableRepository } from './storage/VariableRepository.js';
 import { ScriptService } from './services/ScriptService.js';
 import { InlineScriptManager } from './ui/InlineScriptManager.js';
 import { ScriptConsolePanel } from './ui/ScriptConsolePanel.js';
@@ -16,7 +17,8 @@ export const scriptFeature = {
         const environmentService = ctx.get('environmentService');
 
         const repository = new ScriptRepository(ctx.backendAPI);
-        const service = new ScriptService(repository, environmentService, ctx.statusDisplay);
+        const variableRepository = new VariableRepository(ctx.backendAPI, ctx.secretStore);
+        const service = new ScriptService(repository, environmentService, ctx.statusDisplay, variableRepository);
 
         const inlineScriptManager = new InlineScriptManager();
         inlineScriptManager.initialize();

@@ -71,7 +71,8 @@ export class ScriptController {
 
             const { modifiedRequest, result } = await this.service.executePreRequestScript(
                 scripts.preRequestScript,
-                requestConfig
+                requestConfig,
+                { collectionId }
             );
 
             if (result.logs.length > 0 || result.errors.length > 0) {
@@ -108,7 +109,8 @@ export class ScriptController {
             const result = await this.service.executeTestScript(
                 scripts.testScript,
                 requestConfig,
-                response
+                response,
+                { collectionId }
             );
 
             if (this.consolePanel) {

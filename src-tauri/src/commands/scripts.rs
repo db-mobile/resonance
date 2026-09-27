@@ -78,6 +78,10 @@ pub struct ScriptExecutionData {
     /// `pm.iterationData`. Absent outside the runner.
     #[serde(default)]
     pub iteration: IterationInfo,
+    /// The request's collection variables, readable and writable through
+    /// `pm.collectionVariables`.
+    #[serde(default)]
+    pub collection_variables: HashMap<String, String>,
 }
 
 /// Where a script runs within a collection-runner run. Mirrors Postman:
@@ -112,6 +116,10 @@ pub struct ScriptResult {
     pub test_results: Vec<TestResult>,
     pub modified_request: Option<Value>,
     pub modified_environment: HashMap<String, Option<String>>,
+    /// Collection-variable writes (`None` = unset) made through
+    /// `pm.collectionVariables`.
+    #[serde(default)]
+    pub modified_collection_variables: HashMap<String, Option<String>>,
     /// Ordered cookie operations recorded by the script:
     /// { op: "set", cookie } | { op: "delete", name, domain?, path? } | { op: "clear" }.
     #[serde(default)]
@@ -279,6 +287,8 @@ struct ScriptContext {
     cookies: Vec<Value>,
     cookie_changes: Vec<Value>,
     iteration: IterationInfo,
+    collection_variables: HashMap<String, String>,
+    collection_variable_changes: HashMap<String, Option<String>>,
 }
 
 /// Execute a JavaScript script in a sandboxed environment.
@@ -318,6 +328,11 @@ fn execute_script(
 
     // Setup sendRequest (must come after pm so the glue can attach pm.sendRequest)
     setup_send_request(&mut context, proxy_settings)?;
+
+    // Crypto helpers, then the Postman compatibility layer that builds on
+    // everything above
+    setup_crypto(&mut context)?;
+    setup_pm_compat(&mut context, ctx.clone())?;
 
     let baseline = if capture_request {
         stringify_request_global(&mut context).ok().flatten()
@@ -747,7 +762,12 @@ fn setup_pm(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<()
                 .first()
                 .map(|v| v.display().to_string().trim_matches('"').to_string())
                 .unwrap_or_default();
-            let value = env_get_ctx.borrow().environment.get(&key).cloned();
+            let borrowed = env_get_ctx.borrow();
+            let value = match borrowed.environment_changes.get(&key) {
+                Some(change) => change.clone(),
+                None => borrowed.environment.get(&key).cloned(),
+            };
+            drop(borrowed);
             match value {
                 Some(v) => Ok(JsValue::from(js_string!(v))),
                 None => Ok(JsValue::undefined()),
@@ -797,37 +817,6 @@ fn setup_pm(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<()
         .function(env_unset_fn, js_string!("unset"), 1)
         .build();
 
-    // pm.test(name, fn) - simplified test runner
-    let test_ctx = ctx.clone();
-    let test_fn = unsafe {
-        NativeFunction::from_closure(move |_, args, context| {
-            let name = args
-                .first()
-                .map(|v| v.display().to_string().trim_matches('"').to_string())
-                .unwrap_or("Unnamed test".to_string());
-
-            let callback = args.get(1);
-            let passed = if let Some(cb) = callback {
-                if cb.is_callable() {
-                    cb.as_callable()
-                        .unwrap()
-                        .call(&JsValue::undefined(), &[], context)
-                        .is_ok()
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
-
-            test_ctx.borrow_mut().test_results.push(TestResult {
-                passed,
-                message: name,
-            });
-            Ok(JsValue::undefined())
-        })
-    };
-
     // Create request object from context
     let request_json = {
         let borrowed = ctx.borrow();
@@ -867,7 +856,6 @@ fn setup_pm(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<()
             response_obj.clone(),
             Attribute::all(),
         )
-        .function(test_fn, js_string!("test"), 2)
         .build();
 
     context
@@ -1442,6 +1430,234 @@ fn setup_send_request(context: &mut Context, proxy_settings: ProxySettings) -> R
     Ok(())
 }
 
+/// Hex-encoded inputs keep the native boundary byte-exact: the JS side
+/// converts strings and CryptoJS word arrays to hex before calling in.
+fn hex_arg(args: &[JsValue], index: usize) -> JsResult<Vec<u8>> {
+    let text = args
+        .get(index)
+        .and_then(|v| v.as_string())
+        .map(|s| s.to_std_string_escaped())
+        .unwrap_or_default();
+    hex::decode(text).map_err(|e| {
+        JsNativeError::typ()
+            .with_message(format!("invalid bytes: {e}"))
+            .into()
+    })
+}
+
+fn string_arg(args: &[JsValue], index: usize) -> String {
+    args.get(index)
+        .and_then(|v| v.as_string())
+        .map(|s| s.to_std_string_escaped())
+        .unwrap_or_default()
+}
+
+fn digest_bytes(algorithm: &str, data: &[u8]) -> JsResult<Vec<u8>> {
+    use sha2::Digest;
+    Ok(match algorithm {
+        "md5" => md5::compute(data).0.to_vec(),
+        "sha1" => sha1::Sha1::digest(data).to_vec(),
+        "sha256" => sha2::Sha256::digest(data).to_vec(),
+        "sha384" => sha2::Sha384::digest(data).to_vec(),
+        "sha512" => sha2::Sha512::digest(data).to_vec(),
+        other => {
+            return Err(JsNativeError::typ()
+                .with_message(format!("unsupported hash algorithm: {other}"))
+                .into());
+        }
+    })
+}
+
+/// RFC 2104 HMAC over the `md5` crate, which does not implement the
+/// RustCrypto traits the `hmac` crate needs.
+fn hmac_md5(key: &[u8], data: &[u8]) -> Vec<u8> {
+    const BLOCK: usize = 64;
+    let mut block_key = if key.len() > BLOCK {
+        md5::compute(key).0.to_vec()
+    } else {
+        key.to_vec()
+    };
+    block_key.resize(BLOCK, 0);
+    let mut inner: Vec<u8> = block_key.iter().map(|b| b ^ 0x36).collect();
+    inner.extend_from_slice(data);
+    let mut outer: Vec<u8> = block_key.iter().map(|b| b ^ 0x5c).collect();
+    outer.extend_from_slice(&md5::compute(inner).0);
+    md5::compute(outer).0.to_vec()
+}
+
+fn hmac_bytes(algorithm: &str, key: &[u8], data: &[u8]) -> JsResult<Vec<u8>> {
+    use hmac::{Hmac, Mac};
+    fn run<M: Mac + hmac::digest::KeyInit>(key: &[u8], data: &[u8]) -> Vec<u8> {
+        let mut mac =
+            <M as hmac::digest::KeyInit>::new_from_slice(key).expect("HMAC accepts any key length");
+        mac.update(data);
+        mac.finalize().into_bytes().to_vec()
+    }
+    Ok(match algorithm {
+        "md5" => hmac_md5(key, data),
+        "sha1" => run::<Hmac<sha1::Sha1>>(key, data),
+        "sha256" => run::<Hmac<sha2::Sha256>>(key, data),
+        "sha384" => run::<Hmac<sha2::Sha384>>(key, data),
+        "sha512" => run::<Hmac<sha2::Sha512>>(key, data),
+        other => {
+            return Err(JsNativeError::typ()
+                .with_message(format!("unsupported HMAC algorithm: {other}"))
+                .into());
+        }
+    })
+}
+
+/// Registers the byte-level primitives behind `CryptoJS`, `crypto`, `btoa`
+/// and `atob`: digests, HMAC, base64 and random UUIDs.
+fn setup_crypto(context: &mut Context) -> Result<(), String> {
+    use base64::Engine;
+    use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
+
+    let digest_fn = NativeFunction::from_fn_ptr(|_, args, _| {
+        let data = hex_arg(args, 1)?;
+        let out = digest_bytes(&string_arg(args, 0), &data)?;
+        Ok(JsValue::from(js_string!(hex::encode(out))))
+    });
+    let hmac_fn = NativeFunction::from_fn_ptr(|_, args, _| {
+        let key = hex_arg(args, 1)?;
+        let data = hex_arg(args, 2)?;
+        let out = hmac_bytes(&string_arg(args, 0), &key, &data)?;
+        Ok(JsValue::from(js_string!(hex::encode(out))))
+    });
+    let b64_encode_fn = NativeFunction::from_fn_ptr(|_, args, _| {
+        let data = hex_arg(args, 0)?;
+        let url_safe = args.get(1).is_some_and(|v| v.to_boolean());
+        let text = if url_safe {
+            URL_SAFE_NO_PAD.encode(data)
+        } else {
+            STANDARD.encode(data)
+        };
+        Ok(JsValue::from(js_string!(text)))
+    });
+    let b64_decode_fn = NativeFunction::from_fn_ptr(|_, args, _| {
+        let text: String = string_arg(args, 0)
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .collect();
+        let normalized = text.replace('-', "+").replace('_', "/");
+        let padded = match normalized.len() % 4 {
+            2 => format!("{normalized}=="),
+            3 => format!("{normalized}="),
+            _ => normalized,
+        };
+        let bytes = STANDARD
+            .decode(padded)
+            .map_err(|e| JsNativeError::typ().with_message(format!("invalid base64: {e}")))?;
+        Ok(JsValue::from(js_string!(hex::encode(bytes))))
+    });
+    let uuid_fn = NativeFunction::from_fn_ptr(|_, _, _| {
+        Ok(JsValue::from(js_string!(uuid::Uuid::new_v4().to_string())))
+    });
+
+    for (name, length, function) in [
+        (js_string!("__cryptoDigest__"), 2, digest_fn),
+        (js_string!("__cryptoHmac__"), 3, hmac_fn),
+        (js_string!("__base64Encode__"), 2, b64_encode_fn),
+        (js_string!("__base64Decode__"), 1, b64_decode_fn),
+        (js_string!("__randomUUID__"), 0, uuid_fn),
+    ] {
+        context
+            .register_global_callable(name, length, function)
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Installs the Postman-compatible surface (`pm.expect`, `pm.response.*`,
+/// `pm.variables`, `pm.collectionVariables`, `pm.globals`, `CryptoJS`,
+/// `btoa`/`atob`, …) from `script_glue/pm_compat.js`.
+fn setup_pm_compat(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<(), String> {
+    let snapshot_ctx = ctx.clone();
+    let collection_snapshot_fn = unsafe {
+        NativeFunction::from_closure(move |_, _, _| {
+            let borrowed = snapshot_ctx.borrow();
+            let mut merged = borrowed.collection_variables.clone();
+            for (key, change) in &borrowed.collection_variable_changes {
+                match change {
+                    Some(value) => {
+                        merged.insert(key.clone(), value.clone());
+                    }
+                    None => {
+                        merged.remove(key);
+                    }
+                }
+            }
+            let json = serde_json::to_string(&merged).unwrap_or_else(|_| "{}".to_string());
+            Ok(JsValue::from(js_string!(json)))
+        })
+    };
+    let write_ctx = ctx.clone();
+    let collection_write_fn = unsafe {
+        NativeFunction::from_closure(move |_, args, _| {
+            let key = string_arg(args, 0);
+            let value = match args.get(1) {
+                Some(v) if !v.is_null_or_undefined() => {
+                    Some(v.display().to_string().trim_matches('"').to_string())
+                }
+                _ => None,
+            };
+            write_ctx
+                .borrow_mut()
+                .collection_variable_changes
+                .insert(key, value);
+            Ok(JsValue::undefined())
+        })
+    };
+    let env_snapshot_ctx = ctx;
+    let environment_snapshot_fn = unsafe {
+        NativeFunction::from_closure(move |_, _, _| {
+            let borrowed = env_snapshot_ctx.borrow();
+            let mut merged = borrowed.environment.clone();
+            for (key, change) in &borrowed.environment_changes {
+                match change {
+                    Some(value) => {
+                        merged.insert(key.clone(), value.clone());
+                    }
+                    None => {
+                        merged.remove(key);
+                    }
+                }
+            }
+            let json = serde_json::to_string(&merged).unwrap_or_else(|_| "{}".to_string());
+            Ok(JsValue::from(js_string!(json)))
+        })
+    };
+
+    context
+        .register_global_callable(
+            js_string!("__collectionVariables__"),
+            0,
+            collection_snapshot_fn,
+        )
+        .map_err(|e| e.to_string())?;
+    context
+        .register_global_callable(
+            js_string!("__setCollectionVariable__"),
+            2,
+            collection_write_fn,
+        )
+        .map_err(|e| e.to_string())?;
+    context
+        .register_global_callable(
+            js_string!("__environmentVariables__"),
+            0,
+            environment_snapshot_fn,
+        )
+        .map_err(|e| e.to_string())?;
+
+    context
+        .eval(Source::from_bytes(
+            include_str!("script_glue/pm_compat.js").as_bytes(),
+        ))
+        .map_err(|e| format!("pm compatibility layer failed to load: {e}"))?;
+    Ok(())
+}
+
 /// Build the script context, execute the script, and assemble the result.
 /// Runs synchronously; callers must invoke it from a blocking thread because
 /// `sendRequest` drives its HTTP future with `Handle::block_on`, which panics
@@ -1461,6 +1677,8 @@ fn run_script_sync(
         cookies: script_data.cookies,
         cookie_changes: Vec::new(),
         iteration: script_data.iteration,
+        collection_variables: script_data.collection_variables,
+        collection_variable_changes: HashMap::new(),
     }));
 
     let result = execute_script(
@@ -1484,6 +1702,7 @@ fn run_script_sync(
         test_results: ctx_ref.test_results.clone(),
         modified_request,
         modified_environment: ctx_ref.environment_changes.clone(),
+        modified_collection_variables: ctx_ref.collection_variable_changes.clone(),
         cookie_changes: ctx_ref.cookie_changes.clone(),
     }
 }
@@ -1501,6 +1720,7 @@ pub async fn script_execute_pre_request(
             test_results: Vec::new(),
             modified_request: Some(script_data.request),
             modified_environment: HashMap::new(),
+            modified_collection_variables: HashMap::new(),
             cookie_changes: Vec::new(),
         });
     }
@@ -1524,6 +1744,7 @@ pub async fn script_execute_test(
             test_results: Vec::new(),
             modified_request: None,
             modified_environment: HashMap::new(),
+            modified_collection_variables: HashMap::new(),
             cookie_changes: Vec::new(),
         });
     }
@@ -2292,6 +2513,7 @@ mod tests {
             environment: HashMap::new(),
             cookies: Vec::new(),
             iteration: IterationInfo::default(),
+            collection_variables: HashMap::new(),
         };
         let result = tokio::task::spawn_blocking(move || {
             run_script_sync(script_data, false, ProxySettings::default())
@@ -2334,5 +2556,175 @@ mod tests {
         let mut context = Context::default();
         let result = evaluate_with_deadline(&mut context, b"let = ;", SCRIPT_TIME_LIMIT);
         assert!(matches!(result, Err(ScriptRunError::Js(_))));
+    }
+
+    mod pm_compat {
+        use super::*;
+
+        fn run_test_script(
+            script: &str,
+            response: Value,
+            collection: &[(&str, &str)],
+        ) -> ScriptResult {
+            run_script_sync(
+                ScriptExecutionData {
+                    script: script.to_string(),
+                    request: json!({ "url": "https://api.test/x", "method": "GET", "headers": { "Accept": "*/*" } }),
+                    response: Some(response),
+                    environment: HashMap::from([
+                        ("envOnly".to_string(), "e".to_string()),
+                        ("shared".to_string(), "from-env".to_string()),
+                    ]),
+                    cookies: Vec::new(),
+                    iteration: IterationInfo::default(),
+                    collection_variables: collection
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .collect(),
+                },
+                false,
+                ProxySettings::default(),
+            )
+        }
+
+        fn ok_response() -> Value {
+            json!({
+                "status": 200,
+                "statusText": "OK",
+                "headers": { "Content-Type": "application/json" },
+                "body": { "id": 7, "tags": ["a", "b"], "user": { "name": "Ada" } },
+                "timings": { "total": 42.0 },
+                "cookies": []
+            })
+        }
+
+        fn results(result: &ScriptResult) -> Vec<(bool, String)> {
+            result
+                .test_results
+                .iter()
+                .map(|r| (r.passed, r.message.clone()))
+                .collect()
+        }
+
+        #[test]
+        fn crypto_matches_known_vectors() {
+            let script = r#"
+                var msg = "The quick brown fox jumps over the lazy dog";
+                pm.test("sha256", function () { pm.expect(CryptoJS.SHA256("abc").toString()).to.equal("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"); });
+                pm.test("md5", function () { pm.expect(CryptoJS.MD5("").toString()).to.equal("d41d8cd98f00b204e9800998ecf8427e"); });
+                pm.test("hmac256 hex", function () { pm.expect(CryptoJS.HmacSHA256(msg, "key").toString(CryptoJS.enc.Hex)).to.equal("f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"); });
+                pm.test("hmac256 b64", function () { pm.expect(CryptoJS.HmacSHA256(msg, "key").toString(CryptoJS.enc.Base64)).to.equal("97yD9DBThCSxMpjmqm+xQ+9NWaFJRhdZl0edvC0aPNg="); });
+                pm.test("hmac1", function () { pm.expect(CryptoJS.HmacSHA1(msg, "key").toString()).to.equal("de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9"); });
+                pm.test("hmacmd5", function () { pm.expect(CryptoJS.HmacMD5(msg, "key").toString()).to.equal("80070713463e7749b90c2dc24911e275"); });
+                pm.test("utf8", function () { pm.expect(CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse("é"))).to.equal("w6k="); });
+                pm.test("roundtrip", function () { pm.expect(CryptoJS.enc.Base64.parse("w6k=").toString(CryptoJS.enc.Utf8)).to.equal("é"); });
+                pm.test("btoa", function () { pm.expect(btoa("hello")).to.equal("aGVsbG8="); pm.expect(atob("aGVsbG8=")).to.equal("hello"); });
+                pm.test("crypto helpers", function () {
+                    pm.expect(crypto.hmac("sha256", "key", msg, "base64")).to.equal("97yD9DBThCSxMpjmqm+xQ+9NWaFJRhdZl0edvC0aPNg=");
+                    pm.expect(crypto.randomUUID()).to.match(/^[0-9a-f-]{36}$/);
+                });
+                pm.test("require", function () { pm.expect(require("crypto-js")).to.equal(CryptoJS); });
+            "#;
+            let result = run_test_script(script, ok_response(), &[]);
+            assert!(result.success, "{:?}", result.errors);
+            let failed: Vec<_> = results(&result).into_iter().filter(|(p, _)| !p).collect();
+            assert!(failed.is_empty(), "{failed:?}");
+            assert_eq!(result.test_results.len(), 11);
+        }
+
+        #[test]
+        fn pm_expect_and_response_assertions_record_one_result_each() {
+            let script = r#"
+                pm.test("status", function () { pm.response.to.have.status(200); pm.response.to.be.ok; pm.response.to.not.be.error; });
+                pm.test("json", function () {
+                    var body = pm.response.json();
+                    pm.expect(body).to.have.property("id", 7);
+                    pm.expect(body.tags).to.include("b").and.have.lengthOf(2);
+                    pm.expect(body.user).to.deep.equal({ name: "Ada" });
+                    pm.expect(body).to.be.an("object").that.has.all.keys("id", "tags", "user");
+                    pm.expect(body.id).to.be.above(5).and.below(10);
+                    pm.expect(null).to.be.null;
+                    pm.expect([]).to.be.empty;
+                    pm.expect(body.missing).to.not.exist;
+                });
+                pm.test("headers", function () {
+                    pm.expect(pm.response.headers.get("content-type")).to.equal("application/json");
+                    pm.response.to.have.header("Content-Type");
+                    pm.expect(pm.response.code).to.equal(200);
+                    pm.expect(pm.response.responseTime).to.equal(42);
+                });
+                pm.test("fails with a message", function () { pm.expect(pm.response.code).to.equal(201); });
+            "#;
+            let result = run_test_script(script, ok_response(), &[]);
+            assert!(result.success, "{:?}", result.errors);
+            let got = results(&result);
+            assert_eq!(got.len(), 4, "{got:?}");
+            assert!(got[0].0 && got[1].0 && got[2].0, "{got:?}");
+            assert!(!got[3].0);
+            assert_eq!(got[3].1, "fails with a message: expected 200 to equal 201");
+        }
+
+        #[test]
+        fn variable_scopes_resolve_and_collection_writes_are_reported() {
+            let script = r#"
+                pm.test("precedence", function () {
+                    pm.expect(pm.variables.get("shared")).to.equal("from-env");
+                    pm.expect(pm.variables.get("colOnly")).to.equal("c");
+                    pm.variables.set("shared", "local");
+                    pm.expect(pm.variables.get("shared")).to.equal("local");
+                    pm.expect(pm.variables.replaceIn("{{shared}}/{{colOnly}}/{{nope}}")).to.equal("local/c/{{nope}}");
+                });
+                pm.collectionVariables.set("token", "abc");
+                pm.collectionVariables.unset("colOnly");
+                pm.test("collection writes are visible", function () {
+                    pm.expect(pm.collectionVariables.get("token")).to.equal("abc");
+                    pm.expect(pm.collectionVariables.has("colOnly")).to.be.false;
+                });
+                pm.environment.set("fresh", "1");
+                pm.test("environment reads its own writes", function () {
+                    pm.expect(pm.environment.get("fresh")).to.equal("1");
+                    pm.expect(pm.environment.toObject()).to.include({ envOnly: "e", fresh: "1" });
+                });
+            "#;
+            let result = run_test_script(
+                script,
+                ok_response(),
+                &[("colOnly", "c"), ("shared", "from-collection")],
+            );
+            assert!(result.success, "{:?}", result.errors);
+            assert!(
+                results(&result).iter().all(|(p, _)| *p),
+                "{:?}",
+                results(&result)
+            );
+            assert_eq!(
+                result.modified_collection_variables,
+                HashMap::from([
+                    ("token".to_string(), Some("abc".to_string())),
+                    ("colOnly".to_string(), None)
+                ])
+            );
+        }
+
+        #[test]
+        fn request_header_helpers_mutate_the_captured_request() {
+            let ctx = Rc::new(RefCell::new(ScriptContext {
+                request: json!({ "url": "https://api.test", "method": "GET", "headers": { "Accept": "*/*" } }),
+                ..Default::default()
+            }));
+            execute_script(
+                r#"pm.request.headers.upsert({ key: "accept", value: "application/json" });
+                   pm.request.headers.add({ key: "X-Sig", value: "1" });
+                   pm.request.headers.remove("x-missing");"#,
+                ctx.clone(),
+                true,
+                ProxySettings::default(),
+            )
+            .unwrap();
+            assert_eq!(
+                ctx.borrow().request["headers"],
+                json!({ "Accept": "application/json", "X-Sig": "1" })
+            );
+        }
     }
 }

@@ -434,7 +434,7 @@ export class RunnerService {
 
             let { requestConfig } = prepared;
             if (scripts.preRequestScript.trim()) {
-                requestConfig = await this._runPreRequestScript(scripts.preRequestScript, prepared, variables, outcome, scriptIteration);
+                requestConfig = await this._runPreRequestScript(scripts.preRequestScript, prepared, variables, outcome, scriptIteration, collection.id);
                 variables = mergeVariables(variables, outcome.variablesSet);
             }
 
@@ -479,7 +479,7 @@ export class RunnerService {
 
             for (const script of [scripts.testScript, request.postResponseScript]) {
                 if (script && script.trim()) {
-                    await this._runTestScript(script, requestConfig, response, variables, outcome, scriptIteration);
+                    await this._runTestScript(script, requestConfig, response, variables, outcome, scriptIteration, collection.id);
                     variables = mergeVariables(variables, outcome.variablesSet);
                 }
             }
@@ -1023,9 +1023,10 @@ export class RunnerService {
      * @param {Object} variables
      * @param {Object} outcome
      * @param {Object} iteration
+     * @param {string} collectionId
      * @returns {Promise<Object>}
      */
-    async _runPreRequestScript(script, prepared, variables, outcome, iteration) {
+    async _runPreRequestScript(script, prepared, variables, outcome, iteration, collectionId) {
         const scriptService = app.scriptController?.service;
         const { requestConfig } = prepared;
         if (!scriptService) {
@@ -1039,7 +1040,8 @@ export class RunnerService {
         };
         const { modifiedRequest, result } = await scriptService.executePreRequestScript(script, requestConfig, {
             environment: variables,
-            iteration
+            iteration,
+            collectionId
         });
         this._collectScriptResult(result, outcome);
 
@@ -1076,9 +1078,10 @@ export class RunnerService {
      * @param {Object} variables
      * @param {Object} outcome
      * @param {Object} iteration
+     * @param {string} collectionId
      * @returns {Promise<void>}
      */
-    async _runTestScript(script, requestConfig, response, variables, outcome, iteration) {
+    async _runTestScript(script, requestConfig, response, variables, outcome, iteration, collectionId) {
         const scriptService = app.scriptController?.service;
         if (!scriptService) {
             return;
@@ -1087,7 +1090,7 @@ export class RunnerService {
             script,
             requestConfig,
             { ...response, cookies: responseCookies(response) },
-            { environment: variables, iteration }
+            { environment: variables, iteration, collectionId }
         );
         this._collectScriptResult(result, outcome);
     }
@@ -1100,6 +1103,7 @@ export class RunnerService {
         outcome.logs.push(...(result?.logs || []));
         outcome.testResults.push(...(result?.testResults || []));
         outcome.errors.push(...(result?.errors || []));
+        Object.assign(outcome.variablesSet, result?.modifiedCollectionVariables || {});
         Object.assign(outcome.variablesSet, result?.modifiedEnvironment || {});
     }
 
