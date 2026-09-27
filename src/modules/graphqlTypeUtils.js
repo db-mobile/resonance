@@ -5,14 +5,14 @@
 
 import { isEnumType, isScalarType } from 'graphql';
 
-export const NUMBER_SCALARS = new Set(['Int', 'Float']);
-export const TEXT_SCALARS = new Set(['ID', 'String']);
+const NUMBER_SCALARS = new Set(['Int', 'Float']);
+const TEXT_SCALARS = new Set(['ID', 'String']);
 
 /**
  * @param {string} typeString
  * @returns {string}
  */
-export function baseTypeName(typeString) {
+function baseTypeName(typeString) {
     return (typeString || '').replace(/[[\]!]/g, '').trim();
 }
 
@@ -20,7 +20,7 @@ export function baseTypeName(typeString) {
  * @param {string} typeString
  * @returns {boolean}
  */
-export function isListType(typeString) {
+function isListType(typeString) {
     return (typeString || '').includes('[');
 }
 

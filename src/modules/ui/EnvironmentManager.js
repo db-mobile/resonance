@@ -356,12 +356,15 @@ export class EnvironmentManager {
         const variables = environment?.variables || {};
         const secretKeys = Array.isArray(environment?.secretKeys) ? environment.secretKeys : [];
 
-        for (const [name, value] of Object.entries(variables)) {
+        const rows = await Promise.all(Object.entries(variables).map(async ([name, value]) => {
             const isSecret = secretKeys.includes(name);
             const resolvedValue = isSecret
                 ? await this.service.getSecretValue(environment.id, name)
                 : value;
-            this.addVariableRow({ name, value: resolvedValue, isSecret }, container);
+            return { name, value: resolvedValue, isSecret };
+        }));
+        for (const row of rows) {
+            this.addVariableRow(row, container);
         }
 
         this.addVariableRow({}, container);

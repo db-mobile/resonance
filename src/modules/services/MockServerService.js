@@ -3,8 +3,6 @@
  * @module services/MockServerService
  */
 
-import { ChangeEmitter } from './ChangeEmitter.js';
-
 export class MockServerService {
     /**
      * @param {MockServerRepository} repository
@@ -13,33 +11,6 @@ export class MockServerService {
     constructor(repository, statusDisplay) {
         this.repository = repository;
         this.statusDisplay = statusDisplay;
-        this._events = new ChangeEmitter();
-    }
-
-    /**
-     * @param {Function} callback
-     * @param {Object} callback.event
-     * @param {string} callback.event.type
-     * @returns {void}
-     */
-    addChangeListener(callback) {
-        this._events.add(callback);
-    }
-
-    /**
-     * @param {Function} callback
-     * @returns {void}
-     */
-    removeChangeListener(callback) {
-        this._events.remove(callback);
-    }
-
-    /**
-     * @param {Object} event
-     * @returns {void}
-     */
-    _notifyListeners(event) {
-        this._events.emit(event);
     }
 
     /**
@@ -57,10 +28,6 @@ export class MockServerService {
             if (enabledCollections.length === 0) {
                 const error = new Error('No collections enabled. Please enable at least one collection.');
                 this.statusDisplay.update(error.message, null);
-                this._notifyListeners({
-                    type: 'mock-server-error',
-                    message: error.message
-                });
                 throw error;
             }
 
@@ -68,27 +35,14 @@ export class MockServerService {
 
             if (result.success) {
                 this.statusDisplay.update(`Mock server started on port ${result.port}`, null);
-                this._notifyListeners({
-                    type: 'mock-server-started',
-                    port: result.port,
-                    collectionsCount: enabledCollections.length
-                });
             } else {
                 this.statusDisplay.update(`Failed to start mock server: ${result.message}`, null);
-                this._notifyListeners({
-                    type: 'mock-server-error',
-                    message: result.message
-                });
             }
 
             return result;
         } catch (error) {
             const message = error.message || 'Failed to start mock server';
             this.statusDisplay.update(message, null);
-            this._notifyListeners({
-                type: 'mock-server-error',
-                message
-            });
             throw error;
         }
     }
@@ -100,25 +54,14 @@ export class MockServerService {
 
             if (result.success) {
                 this.statusDisplay.update('Mock server stopped', null);
-                this._notifyListeners({
-                    type: 'mock-server-stopped'
-                });
             } else {
                 this.statusDisplay.update(`Failed to stop mock server: ${result.message}`, null);
-                this._notifyListeners({
-                    type: 'mock-server-error',
-                    message: result.message
-                });
             }
 
             return result;
         } catch (error) {
             const message = error.message || 'Failed to stop mock server';
             this.statusDisplay.update(message, null);
-            this._notifyListeners({
-                type: 'mock-server-error',
-                message
-            });
             throw error;
         }
     }
@@ -204,11 +147,6 @@ export class MockServerService {
 
             this.statusDisplay.update('Mock server settings updated', null);
 
-            this._notifyListeners({
-                type: 'mock-server-settings-updated',
-                settings: updatedSettings,
-                requiresRestart
-            });
 
             if (requiresRestart) {
                 this.statusDisplay.update('Port changed. Please restart the mock server for changes to take effect.', null);
@@ -327,14 +265,6 @@ export class MockServerService {
             const settings = await this.repository.toggleCollectionEnabled(collectionId);
             const isEnabled = settings.enabledCollections.includes(collectionId);
 
-            this._notifyListeners({
-                type: 'mock-server-settings-updated',
-                settings,
-                collectionToggled: {
-                    collectionId,
-                    enabled: isEnabled
-                }
-            });
 
             return isEnabled;
         } catch (error) {

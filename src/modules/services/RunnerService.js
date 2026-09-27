@@ -683,7 +683,6 @@ export class RunnerService {
     async _buildRequestConfig(collection, endpoint, variables, overrides, runContext = null) {
         const processor = this.variableProcessor;
         const persisted = await this.collectionRepository.getAllPersistedEndpointData(collection.id, endpoint.id);
-        const persistedAuthConfig = await this.collectionRepository.getPersistedAuthConfig(collection.id, endpoint.id);
         const isGraphQL = (endpoint.protocol || 'http') === 'graphql';
         const method = isGraphQL ? 'POST' : endpoint.method;
 
@@ -703,7 +702,7 @@ export class RunnerService {
         const queryRows = this._effectiveQueryRows(endpoint, overrides, persisted);
         const queryParams = Object.fromEntries(queryRows.map(row => [row.key, row.value]));
 
-        const configuredAuth = persistedAuthConfig || endpoint.security || { type: 'inherit', config: {} };
+        const configuredAuth = persisted.authConfig || endpoint.security || { type: 'inherit', config: {} };
         const { authConfig: inheritedAuth, source: authSource } = await resolveEffectiveAuthWithSource(configuredAuth, {
             collectionId: collection.id,
             endpointId: endpoint.id,
@@ -1170,7 +1169,7 @@ export class RunnerService {
     }
 }
 
-export const MAX_ITERATIONS = 1000;
+const MAX_ITERATIONS = 1000;
 
 /**
  * @param {*} value

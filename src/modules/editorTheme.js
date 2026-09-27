@@ -8,7 +8,7 @@ import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Compartment } from '@codemirror/state';
 import { tags } from '@lezer/highlight';
 
-export const THEME_CHANGED_EVENT = 'resonance:theme-changed';
+const THEME_CHANGED_EVENT = 'resonance:theme-changed';
 
 export const baseEditorTheme = EditorView.theme({
     '&': {
@@ -48,7 +48,7 @@ export const baseEditorTheme = EditorView.theme({
 
 
 /** @returns {boolean} */
-export function isDarkMode() {
+function isDarkMode() {
     const theme = document.documentElement.getAttribute('data-theme');
     if (theme === 'dark') {
         return true;
@@ -59,7 +59,7 @@ export function isDarkMode() {
     return false;
 }
 
-export const lightHighlightStyle = HighlightStyle.define([
+const lightHighlightStyle = HighlightStyle.define([
     { tag: tags.keyword,        color: '#613583' },
     { tag: tags.atom,           color: '#c64600' },
     { tag: tags.bool,           color: '#c64600' },
@@ -79,7 +79,7 @@ export const lightHighlightStyle = HighlightStyle.define([
     { tag: tags.attributeValue, color: '#15772e' },
 ]);
 
-export const darkHighlightStyle = HighlightStyle.define([
+const darkHighlightStyle = HighlightStyle.define([
     { tag: tags.keyword,        color: '#dc8add' },
     { tag: tags.atom,           color: '#ffbe6f' },
     { tag: tags.bool,           color: '#ffbe6f' },
@@ -99,11 +99,11 @@ export const darkHighlightStyle = HighlightStyle.define([
     { tag: tags.attributeValue, color: '#8ff0a4' },
 ]);
 
-export const lightHighlighting = syntaxHighlighting(lightHighlightStyle);
-export const darkHighlighting = syntaxHighlighting(darkHighlightStyle);
+const lightHighlighting = syntaxHighlighting(lightHighlightStyle);
+const darkHighlighting = syntaxHighlighting(darkHighlightStyle);
 
 /** @returns {import('@codemirror/state').Extension} */
-export function getHighlighting() {
+function getHighlighting() {
     return isDarkMode() ? darkHighlighting : lightHighlighting;
 }
 

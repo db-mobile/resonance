@@ -94,7 +94,3 @@ export async function saveRequestToCollection(requestData) {
     const controller = initializeController();
     return controller.showSaveToCollectionDialog(requestData);
 }
-
-if (typeof window !== 'undefined' && window.backendAPI) {
-    initializeController();
-}

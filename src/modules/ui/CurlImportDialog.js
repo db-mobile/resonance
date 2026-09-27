@@ -42,7 +42,7 @@ export class CurlImportDialog extends BaseModal {
         });
 
         if (app.i18n && app.i18n.updateUI) {
-            app.i18n.updateUI();
+            app.i18n.updateUI(dialog);
         }
 
         this.populateCollections(dialog, collections, options.targetCollectionId);

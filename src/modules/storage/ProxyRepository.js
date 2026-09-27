@@ -62,31 +62,6 @@ export class ProxyRepository {
         }
     }
 
-    /**
-     * @param {Object} updates
-     * @returns {Promise<Object>}
-     */
-    async updateProxySettings(updates) {
-        try {
-            const currentSettings = await this.getProxySettings();
-            const updatedSettings = {
-                ...currentSettings,
-                ...updates
-            };
-
-            if (updates.auth) {
-                updatedSettings.auth = {
-                    ...currentSettings.auth,
-                    ...updates.auth
-                };
-            }
-
-            return await this.saveProxySettings(updatedSettings);
-        } catch (error) {
-            throw new Error(`Failed to update proxy settings: ${error.message}`, { cause: error });
-        }
-    }
-
     /** @returns {Promise<Object>} */
     async resetToDefaults() {
         try {

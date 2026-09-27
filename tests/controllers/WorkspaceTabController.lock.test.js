@@ -37,7 +37,6 @@ describe('WorkspaceTabController lifecycle lock', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         service = {
-            addListener: jest.fn(),
             getActiveTabId: jest.fn().mockResolvedValue('tab-A'),
             getAllTabs: jest.fn().mockResolvedValue([{ id: 'tab-A' }, { id: 'tab-B' }, { id: 'tab-C' }]),
             switchTab: jest.fn(async (id) => ({ id, type: 'http' })),

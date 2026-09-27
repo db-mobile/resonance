@@ -178,4 +178,4 @@ if (isTauri) {
 }
 
 export default api;
-export { api, isTauri };
+export { api };

@@ -36,14 +36,37 @@ describe('CollectionRepository auth secret redaction', () => {
         expect(await secretStore.get('auth:c1:e1', 'token')).toBe('sk-live-abc');
     });
 
-    test('getPersistedAuthConfig rehydrates the credential', async () => {
+    test('updateEndpointFields keeps a credential in the batch out of the persisted file', async () => {
+        await repository.updateEndpointFields('c1', 'e1', {
+            url: 'https://api.test',
+            authConfig: { type: 'bearer', config: { token: 'sk-live-abc' } }
+        });
+
+        expect(savedEndpoint.url).toBe('https://api.test');
+        expect(savedEndpoint.authConfig.config.token).toBe('');
+        expect(await secretStore.get('auth:c1:e1', 'token')).toBe('sk-live-abc');
+    });
+
+    test('getAllPersistedEndpointData rehydrates the credential for the editor', async () => {
         await repository.savePersistedAuthConfig('c1', 'e1', {
             type: 'bearer',
             config: { token: 'sk-live-abc' }
         });
 
-        const loaded = await repository.getPersistedAuthConfig('c1', 'e1');
-        expect(loaded.config.token).toBe('sk-live-abc');
+        const loaded = await repository.getAllPersistedEndpointData('c1', 'e1');
+        expect(loaded.authConfig.config.token).toBe('sk-live-abc');
+    });
+
+    test('re-saving the auth config loaded for the editor keeps the stored secret', async () => {
+        await repository.savePersistedAuthConfig('c1', 'e1', {
+            type: 'bearer',
+            config: { token: 'sk-live-abc' }
+        });
+
+        const loaded = await repository.getAllPersistedEndpointData('c1', 'e1');
+        await repository.savePersistedAuthConfig('c1', 'e1', loaded.authConfig);
+
+        expect(await secretStore.get('auth:c1:e1', 'token')).toBe('sk-live-abc');
     });
 
     test('template references are preserved on disk and not stored as secrets', async () => {
@@ -241,7 +264,7 @@ describe('CollectionRepository auth secret redaction', () => {
             expect(loaded.config.token).toBe('sk-folder');
         });
 
-        test('getInheritedAuthConfig prefers folder auth for its endpoints', async () => {
+        test('getInheritedAuth prefers folder auth for its endpoints', async () => {
             await repository.saveFolderAuthConfig('c1', 'f1', {
                 type: 'bearer',
                 config: { token: 'sk-folder' }
@@ -252,11 +275,25 @@ describe('CollectionRepository auth secret redaction', () => {
             });
             repository._byIdCache.clear();
 
-            const forFolderEndpoint = await repository.getInheritedAuthConfig('c1', 'e1');
+            const forFolderEndpoint = (await repository.getInheritedAuth('c1', 'e1')).authConfig;
             expect(forFolderEndpoint.config.token).toBe('sk-folder');
 
-            const forOtherEndpoint = await repository.getInheritedAuthConfig('c1', 'e2');
+            const forOtherEndpoint = (await repository.getInheritedAuth('c1', 'e2')).authConfig;
             expect(forOtherEndpoint.config.token).toBe('sk-collection');
+        });
+
+        test('getInheritedAuth reads the collection once and reports the source', async () => {
+            await repository.saveFolderAuthConfig('c1', 'f1', {
+                type: 'bearer',
+                config: { token: 'sk-folder' }
+            });
+            repository._byIdCache.clear();
+            mockBackendAPI.collections.get.mockClear();
+
+            const inherited = await repository.getInheritedAuth('c1', 'e1');
+
+            expect(inherited.source).toEqual({ kind: 'folder', folderId: 'f1' });
+            expect(mockBackendAPI.collections.get).toHaveBeenCalledTimes(1);
         });
 
         test('a folder auth of explicit none opts its endpoints out', async () => {
@@ -267,7 +304,7 @@ describe('CollectionRepository auth secret redaction', () => {
             });
             repository._byIdCache.clear();
 
-            const resolved = await repository.getInheritedAuthConfig('c1', 'e1');
+            const resolved = (await repository.getInheritedAuth('c1', 'e1')).authConfig;
             expect(resolved.type).toBe('none');
         });
 
@@ -279,7 +316,7 @@ describe('CollectionRepository auth secret redaction', () => {
             });
             repository._byIdCache.clear();
 
-            const resolved = await repository.getInheritedAuthConfig('c1', 'e1');
+            const resolved = (await repository.getInheritedAuth('c1', 'e1')).authConfig;
             expect(resolved.config.token).toBe('sk-collection');
         });
 
@@ -301,7 +338,7 @@ describe('CollectionRepository auth secret redaction', () => {
             await repository.saveOne(renamed);
             repository._byIdCache.clear();
 
-            const resolved = await repository.getInheritedAuthConfig('c1', 'e1');
+            const resolved = (await repository.getInheritedAuth('c1', 'e1')).authConfig;
             expect(resolved.config.token).toBe('sk-folder');
         });
 
@@ -341,7 +378,7 @@ describe('CollectionRepository auth secret redaction', () => {
                 });
                 repository._byIdCache.clear();
 
-                const resolved = await repository.getInheritedAuthConfig('c1', 'innerRequest');
+                const resolved = (await repository.getInheritedAuth('c1', 'innerRequest')).authConfig;
                 expect(resolved.config.token).toBe('sk-inner');
             });
 
@@ -353,7 +390,7 @@ describe('CollectionRepository auth secret redaction', () => {
                 await repository.saveFolderAuthConfig('c1', 'inner', { type: 'inherit', config: {} });
                 repository._byIdCache.clear();
 
-                const resolved = await repository.getInheritedAuthConfig('c1', 'innerRequest');
+                const resolved = (await repository.getInheritedAuth('c1', 'innerRequest')).authConfig;
                 expect(resolved.config.token).toBe('sk-outer');
             });
 
@@ -364,7 +401,7 @@ describe('CollectionRepository auth secret redaction', () => {
                 });
                 repository._byIdCache.clear();
 
-                const resolved = await repository.getInheritedAuthConfig('c1', 'innerRequest');
+                const resolved = (await repository.getInheritedAuth('c1', 'innerRequest')).authConfig;
                 expect(resolved.config.token).toBe('sk-collection');
             });
 
@@ -376,7 +413,7 @@ describe('CollectionRepository auth secret redaction', () => {
                 await repository.saveFolderAuthConfig('c1', 'inner', { type: 'none', config: {} });
                 repository._byIdCache.clear();
 
-                const resolved = await repository.getInheritedAuthConfig('c1', 'innerRequest');
+                const resolved = (await repository.getInheritedAuth('c1', 'innerRequest')).authConfig;
                 expect(resolved.type).toBe('none');
             });
 
@@ -391,41 +428,41 @@ describe('CollectionRepository auth secret redaction', () => {
                 });
                 repository._byIdCache.clear();
 
-                const resolved = await repository.getInheritedAuthConfig('c1', 'outerRequest');
+                const resolved = (await repository.getInheritedAuth('c1', 'outerRequest')).authConfig;
                 expect(resolved.config.token).toBe('sk-outer');
             });
         });
 
         test('auth edits saved via one repository instance are visible to another', async () => {
             const otherRepository = new CollectionRepository(mockBackendAPI, secretStore);
-            await otherRepository.getInheritedAuthConfig('c1', 'e1');
+            await otherRepository.getInheritedAuth('c1', 'e1');
 
             await repository.saveCollectionAuthConfig('c1', {
                 type: 'basic',
                 config: { username: 'u', password: 'p@ss' }
             });
-            let resolved = await otherRepository.getInheritedAuthConfig('c1', 'e1');
+            let resolved = (await otherRepository.getInheritedAuth('c1', 'e1')).authConfig;
             expect(resolved.type).toBe('basic');
 
             await repository.saveCollectionAuthConfig('c1', {
                 type: 'bearer',
                 config: { token: 'sk-new' }
             });
-            resolved = await otherRepository.getInheritedAuthConfig('c1', 'e1');
+            resolved = (await otherRepository.getInheritedAuth('c1', 'e1')).authConfig;
             expect(resolved.type).toBe('bearer');
             expect(resolved.config.token).toBe('sk-new');
         });
 
         test('folder auth edits are also visible across repository instances', async () => {
             const otherRepository = new CollectionRepository(mockBackendAPI, secretStore);
-            await otherRepository.getInheritedAuthConfig('c1', 'e1');
+            await otherRepository.getInheritedAuth('c1', 'e1');
 
             await repository.saveFolderAuthConfig('c1', 'f1', {
                 type: 'bearer',
                 config: { token: 'sk-folder' }
             });
 
-            const resolved = await otherRepository.getInheritedAuthConfig('c1', 'e1');
+            const resolved = (await otherRepository.getInheritedAuth('c1', 'e1')).authConfig;
             expect(resolved.type).toBe('bearer');
             expect(resolved.config.token).toBe('sk-folder');
         });

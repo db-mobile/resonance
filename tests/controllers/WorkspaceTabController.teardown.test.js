@@ -32,7 +32,7 @@ describe('WorkspaceTabController tab-close teardown', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        const service = { addListener: jest.fn() };
+        const service = {};
         const tabBar = {};
         const stateManager = {};
         responseContainerManager = { removeContainer: jest.fn() };

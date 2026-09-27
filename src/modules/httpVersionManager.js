@@ -37,36 +37,4 @@ export class HttpVersionManager {
     getCurrentVersion() {
         return this.currentVersion;
     }
-
-    getCurrentVersionDisplay() {
-        const versionMap = {
-            'auto': 'Auto',
-            'http1': 'HTTP/1.x',
-            'http2': 'HTTP/2'
-        };
-        return versionMap[this.currentVersion] || 'Auto';
-    }
-
-    getAvailableVersions() {
-        return [...this.availableVersions];
-    }
-
-    getAxiosConfig() {
-        const config = {};
-        
-        switch (this.currentVersion) {
-            case 'http1':
-                config.httpVersion = '1.1';
-                config.http2 = false;
-                break;
-            case 'http2':
-                config.http2 = true;
-                break;
-            case 'auto':
-            default:
-                break;
-        }
-        
-        return config;
-    }
 }

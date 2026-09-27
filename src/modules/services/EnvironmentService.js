@@ -186,15 +186,6 @@ export class EnvironmentService {
 
     /**
      * @param {string} environmentId
-     * @param {string} newName
-     * @returns {Promise<Object>}
-     */
-    async renameEnvironment(environmentId, newName) {
-        return this.updateEnvironment(environmentId, { name: newName });
-    }
-
-    /**
-     * @param {string} environmentId
      * @returns {Promise<boolean>}
      */
     async deleteEnvironment(environmentId) {
@@ -256,15 +247,6 @@ export class EnvironmentService {
         }
     }
 
-    async updateEnvironmentVariables(environmentId, variables) {
-        try {
-            return await this.updateEnvironment(environmentId, { variables });
-        } catch (error) {
-            this.statusDisplay.update(`Error updating environment variables: ${error.message}`, null);
-            throw error;
-        }
-    }
-
     /**
      * @param {string} environmentId
      * @param {string} name
@@ -274,6 +256,20 @@ export class EnvironmentService {
     async setVariable(environmentId, name, value, isSecret = false) {
         try {
             await this.repository.setEnvironmentVariable(environmentId, name, value, isSecret);
+            return true;
+        } catch (error) {
+            this.statusDisplay.update(`Error setting variable: ${error.message}`, null);
+            throw error;
+        }
+    }
+
+    /**
+     * @param {string} environmentId
+     * @param {Object} changes
+     */
+    async applyVariableChanges(environmentId, changes) {
+        try {
+            await this.repository.applyVariableChanges(environmentId, changes);
             return true;
         } catch (error) {
             this.statusDisplay.update(`Error setting variable: ${error.message}`, null);
@@ -387,14 +383,5 @@ export class EnvironmentService {
         }
 
         return name;
-    }
-
-    isValidEnvironmentName(name) {
-        if (!name || typeof name !== 'string') {
-            return false;
-        }
-
-        const trimmed = name.trim();
-        return trimmed.length > 0 && trimmed.length <= 100;
     }
 }

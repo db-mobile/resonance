@@ -75,7 +75,7 @@ export class CollectionRenderer {
                 this.renderEmptyState(eventHandlers.onEmptyStateActions ?? {});
             }
             if (app.i18n && app.i18n.updateUI) {
-                app.i18n.updateUI();
+                app.i18n.updateUI(this.container);
             }
             if (eventHandlers.onEmptySpaceContextMenu) {
                 this.emptySpaceContextMenuHandler = (e) => {
@@ -136,7 +136,7 @@ export class CollectionRenderer {
         }
 
         if (app.i18n && app.i18n.updateUI) {
-            app.i18n.updateUI();
+            app.i18n.updateUI(this.container);
         }
     }
 

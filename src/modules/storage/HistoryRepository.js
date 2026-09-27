@@ -18,7 +18,7 @@ export const MAX_HISTORY_TOTAL_BYTES = 5 * 1024 * 1024;
  * @param {Object} entry
  * @returns {Object}
  */
-export function capHistoryEntry(entry) {
+function capHistoryEntry(entry) {
     if (!entry || typeof entry !== 'object') {
         return entry;
     }

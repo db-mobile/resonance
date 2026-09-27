@@ -253,3 +253,38 @@ describe('CookieRepository legacy id migration', () => {
         expect(mockBackendAPI.store.set).not.toHaveBeenCalled();
     });
 });
+
+describe('CookieJarService store traffic', () => {
+    let service;
+    let mockBackendAPI;
+
+    beforeEach(() => {
+        const storeData = { cookieJar: [] };
+        mockBackendAPI = {
+            store: {
+                get: jest.fn(async (key) => storeData[key]),
+                set: jest.fn(async (key, value) => { storeData[key] = value; })
+            }
+        };
+        service = new CookieJarService(new CookieRepository(mockBackendAPI));
+    });
+
+    test('a response with several cookies is saved in one write', async () => {
+        await service.processCookiesFromResponse(
+            ['a=1; Path=/', 'b=2; Path=/', 'gone=x; Path=/; Max-Age=0'],
+            'https://api.example.com/login',
+            'env-dev'
+        );
+
+        expect(mockBackendAPI.store.set).toHaveBeenCalledTimes(1);
+        expect(await service.getCookieHeaderForRequest('https://api.example.com/', 'env-dev')).toBe('a=1; b=2');
+    });
+
+    test('building request cookies neither rewrites the jar nor rereads it', async () => {
+        await service.getCookieHeaderForRequest('https://api.example.com/', 'env-dev');
+        await service.getCookieHeaderForRequest('https://api.example.com/', 'env-dev');
+
+        expect(mockBackendAPI.store.set).not.toHaveBeenCalled();
+        expect(mockBackendAPI.store.get).toHaveBeenCalledTimes(1);
+    });
+});

@@ -223,23 +223,4 @@ describe('VariableRepository', () => {
         });
     });
 
-    describe('getVariable', () => {
-        test('should return single variable value', async () => {
-            mockBackendAPI.collections.getVariables.mockResolvedValue([
-                { key: 'baseUrl', value: 'https://api.example.com' }
-            ]);
-
-            const result = await repository.getVariable('collection_1', 'baseUrl');
-
-            expect(result).toBe('https://api.example.com');
-        });
-
-        test('should return undefined for non-existent variable', async () => {
-            mockBackendAPI.collections.getVariables.mockResolvedValue([]);
-
-            const result = await repository.getVariable('collection_1', 'nonExistent');
-
-            expect(result).toBeUndefined();
-        });
-    });
 });

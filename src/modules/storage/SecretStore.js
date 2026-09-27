@@ -3,7 +3,7 @@
  * @module storage/SecretStore
  */
 
-export class StoreBackend {
+class StoreBackend {
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.STORE_KEY = 'secretValues';
@@ -93,11 +93,12 @@ export class StoreBackend {
     }
 }
 
-export class KeychainBackend {
+class KeychainBackend {
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
         this.INDEX_KEY = 'secretIndex';
         this._index = null;
+        this._values = new Map();
     }
 
     _account(scope, key) {
@@ -151,20 +152,28 @@ export class KeychainBackend {
         if (!index[scope] || !index[scope][key]) {
             return undefined;
         }
-        const value = await this.backendAPI.secrets.get(this._account(scope, key));
+        const value = await this._read(this._account(scope, key));
         return value === null || value === undefined ? undefined : value;
+    }
+
+    async _read(account) {
+        if (!this._values.has(account)) {
+            this._values.set(account, await this.backendAPI.secrets.get(account));
+        }
+        return this._values.get(account);
     }
 
     async getScope(scope) {
         const index = await this._loadIndex();
         const keys = index[scope] ? Object.keys(index[scope]) : [];
+        const values = await Promise.all(keys.map(key => this._read(this._account(scope, key))));
         const result = {};
-        for (const key of keys) {
-            const value = await this.backendAPI.secrets.get(this._account(scope, key));
+        keys.forEach((key, position) => {
+            const value = values[position];
             if (value !== null && value !== undefined) {
                 result[key] = value;
             }
-        }
+        });
         return result;
     }
 
@@ -174,8 +183,17 @@ export class KeychainBackend {
     }
 
     async set(scope, key, value) {
-        await this.backendAPI.secrets.set(this._account(scope, key), value);
+        const account = this._account(scope, key);
         const index = await this._loadIndex();
+        const indexed = Boolean(index[scope] && index[scope][key]);
+        if (indexed && this._values.has(account) && this._values.get(account) === value) {
+            return;
+        }
+        await this.backendAPI.secrets.set(account, value);
+        this._values.set(account, value);
+        if (indexed) {
+            return;
+        }
         if (!index[scope]) {
             index[scope] = {};
         }
@@ -189,6 +207,7 @@ export class KeychainBackend {
             return;
         }
         await this.backendAPI.secrets.delete(this._account(scope, key));
+        this._values.delete(this._account(scope, key));
         delete index[scope][key];
         if (Object.keys(index[scope]).length === 0) {
             delete index[scope];
@@ -215,6 +234,7 @@ export class KeychainBackend {
         }
         for (const key of Object.keys(index[scope])) {
             await this.backendAPI.secrets.delete(this._account(scope, key));
+            this._values.delete(this._account(scope, key));
         }
         delete index[scope];
         await this._persistIndex();
@@ -229,6 +249,7 @@ export class KeychainBackend {
         for (const scope of scopes) {
             for (const key of Object.keys(index[scope])) {
                 await this.backendAPI.secrets.delete(this._account(scope, key));
+                this._values.delete(this._account(scope, key));
             }
             delete index[scope];
         }

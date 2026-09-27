@@ -6,7 +6,7 @@
 import { toast } from '../ui/Toast.js';
 
 /** @type {string} */
-export const PRE_REQUEST_SCRIPT_ERROR = 'PreRequestScriptError';
+const PRE_REQUEST_SCRIPT_ERROR = 'PreRequestScriptError';
 
 /**
  * @param {Array<string>} errors
@@ -41,6 +41,16 @@ export class ScriptController {
         } catch (error) {
             this._showError('Failed to load scripts', error.message);
         }
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {boolean}
+     */
+    isShowingScriptsFor(collectionId, endpointId) {
+        return this.scriptManager?.currentCollectionId === collectionId &&
+            this.scriptManager?.currentEndpointId === endpointId;
     }
 
     /** @returns {Promise<void>} */
@@ -138,15 +148,6 @@ export class ScriptController {
             this._showError('Test script error', error.message);
             return null;
         }
-    }
-
-    /**
-     * @param {string} title
-     * @param {Array<string>|string} errors
-     */
-    _showScriptError(title, errors) {
-        const errorMessage = Array.isArray(errors) ? errors.join('\n') : errors;
-        toast.error(`${title}: ${errorMessage}`);
     }
 
     /**

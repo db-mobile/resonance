@@ -197,7 +197,7 @@ function getUseTls() {
     return grpcTlsCheckbox?.checked || false;
 }
 
-export function setGrpcTls(useTls) {
+function setGrpcTls(useTls) {
     if (grpcTlsCheckbox) {
         grpcTlsCheckbox.checked = !!useTls;
     }
@@ -698,7 +698,7 @@ export async function loadProtoFile(protoPath, includePaths = null) {
     }
 }
 
-export function clearProtoFile() {
+function clearProtoFile() {
     if (activeSource.protoPath) {
         window.backendAPI.grpc.unloadProto(activeSource.protoPath).catch(() => { });
     }

@@ -34,7 +34,6 @@ describe('WorkspaceTabController history entries', () => {
         tabs = [{ id: 'tab-http', request: { protocol: 'http' } }];
 
         const service = {
-            addListener: jest.fn(),
             getAllTabs: jest.fn(() => Promise.resolve(tabs))
         };
 

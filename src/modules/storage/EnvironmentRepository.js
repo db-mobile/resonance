@@ -327,6 +327,43 @@ export class EnvironmentRepository {
 
     /**
      * @param {string} environmentId
+     * @param {Object} changes
+     * @returns {Promise<Object>}
+     */
+    async applyVariableChanges(environmentId, changes) {
+        const env = await this.getEnvironmentById(environmentId);
+        if (!env) {
+            throw new Error(`Environment with ID ${environmentId} not found`);
+        }
+
+        const variables = { ...env.variables };
+        const secretKeys = new Set(Array.isArray(env.secretKeys) ? env.secretKeys : []);
+        const scope = this.secretScope(environmentId);
+
+        for (const [name, value] of Object.entries(changes)) {
+            if (value !== null && secretKeys.has(name)) {
+                if (this.secretStore) {
+                    await this.secretStore.set(scope, name, value);
+                }
+                variables[name] = '';
+                continue;
+            }
+            if (this.secretStore) {
+                await this.secretStore.delete(scope, name);
+            }
+            if (value === null) {
+                delete variables[name];
+                secretKeys.delete(name);
+            } else {
+                variables[name] = value;
+            }
+        }
+
+        return this.updateEnvironment(environmentId, { variables, secretKeys: [...secretKeys] });
+    }
+
+    /**
+     * @param {string} environmentId
      * @param {string} name
      * @returns {Promise<Object|undefined>}
      */

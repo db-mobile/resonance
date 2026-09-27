@@ -245,3 +245,68 @@ describe('request headers', () => {
         }
     });
 });
+
+describe('key-value autosave', () => {
+    beforeEach(() => {
+        jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+        jest.useRealTimers();
+    });
+
+    test('editing two lists in quick succession saves both', () => {
+        const { kv, app, currentEndpoint } = loadKeyValueManager();
+        currentEndpoint.getCurrentEndpoint.mockReturnValue({ collectionId: 'c1', endpointId: 'e1' });
+        app.collectionService = {
+            saveCurrentPathParams: jest.fn().mockResolvedValue(undefined),
+            saveCurrentQueryParams: jest.fn().mockResolvedValue(undefined),
+            saveCurrentHeaders: jest.fn().mockResolvedValue(undefined)
+        };
+        kv.initKeyValueListeners();
+
+        const pathParams = document.getElementById('path-params-list');
+        const headers = document.getElementById('headers-list');
+        kv.addKeyValueRow(pathParams, 'id', '1');
+        kv.addKeyValueRow(headers, 'X-A', 'a');
+
+        pathParams.querySelector('.key-input').dispatchEvent(new window.Event('input', { bubbles: true }));
+        headers.querySelector('.key-input').dispatchEvent(new window.Event('input', { bubbles: true }));
+        jest.advanceTimersByTime(500);
+
+        expect(app.collectionService.saveCurrentPathParams).toHaveBeenCalledTimes(1);
+        expect(app.collectionService.saveCurrentHeaders).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('URL to query-param sync', () => {
+    test('editing the host keeps the existing rows instead of rebuilding them', () => {
+        const { kv } = loadKeyValueManager();
+        const url = document.getElementById('url-input');
+        const list = document.getElementById('query-params-list');
+        url.value = 'https://a.test/items?page=2';
+        kv.updateQueryParamsFromUrl();
+        const row = list.children[0];
+
+        url.value = 'https://b.test/items?page=2';
+        kv.updateQueryParamsFromUrl();
+
+        expect(list.children[0]).toBe(row);
+    });
+
+    test('a changed query string still rebuilds the rows', () => {
+        const { kv } = loadKeyValueManager();
+        const url = document.getElementById('url-input');
+        const list = document.getElementById('query-params-list');
+        url.value = 'https://a.test/items?page=2';
+        kv.updateQueryParamsFromUrl();
+
+        url.value = 'https://a.test/items?page=3&size=10';
+        kv.updateQueryParamsFromUrl();
+
+        expect(kv.parseKeyValueRows(list)).toEqual([
+            { key: 'page', value: '3', enabled: true },
+            { key: 'size', value: '10', enabled: true }
+        ]);
+    });
+});

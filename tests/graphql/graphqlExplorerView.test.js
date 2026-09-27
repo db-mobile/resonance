@@ -142,11 +142,14 @@ describe('GraphQLExplorer view', () => {
   });
 
   test('search filters top-level rows by field name', () => {
+    jest.useFakeTimers();
     const rail = makeRail();
     new GraphQLExplorer(rail).render(schema, '', '', null, {});
     const search = rail.querySelector('.graphql-explorer-search');
     search.value = 'countries';
     search.dispatchEvent(new Event('input'));
+    jest.advanceTimersByTime(150);
+    jest.useRealTimers();
     expect(rootRow(rail, 'countries').closest('.graphql-explorer-item').style.display).not.toBe('none');
     expect(rootRow(rail, 'country').closest('.graphql-explorer-item').style.display).toBe('none');
   });

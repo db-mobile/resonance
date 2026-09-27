@@ -565,12 +565,11 @@ export class WorkspaceTabStateManager {
             clearSchemaValidationBadge();
             clearGraphQLErrorsBadge();
 
-            if (app.inlineScriptManager && endpoint.collectionId && endpoint.endpointId) {
-                await app.inlineScriptManager.loadScripts(endpoint.collectionId, endpoint.endpointId);
-            }
-
-            if (app.schemaController && endpoint.collectionId && endpoint.endpointId) {
-                await app.schemaController.loadSchema(endpoint.collectionId, endpoint.endpointId);
+            if (endpoint.collectionId && endpoint.endpointId) {
+                await Promise.all([
+                    app.inlineScriptManager?.loadScripts(endpoint.collectionId, endpoint.endpointId),
+                    app.schemaController?.loadSchema(endpoint.collectionId, endpoint.endpointId)
+                ]);
             }
             return;
         }

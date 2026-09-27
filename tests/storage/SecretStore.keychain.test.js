@@ -40,6 +40,46 @@ describe('SecretStore keychain backend', () => {
         expect(api.__store.secretIndex).toEqual({ 'env:1': { token: true } });
     });
 
+    test('repeated reads are served from memory after the first keychain hit', async () => {
+        const api = makeBackend({ keychain: true });
+        const store = new SecretStore(api);
+        await store.set('env:1', 'a', '1');
+        await store.set('env:1', 'b', '2');
+        const reader = new SecretStore(api);
+
+        await reader.getScope('env:1');
+        await reader.getScope('env:1');
+        await reader.get('env:1', 'a');
+
+        expect(api.secrets.get).toHaveBeenCalledTimes(2);
+    });
+
+    test('writing an unchanged value touches neither the keychain nor the index', async () => {
+        const api = makeBackend({ keychain: true });
+        const store = new SecretStore(api);
+        await store.set('env:1', 'token', 'same');
+        api.secrets.set.mockClear();
+        api.store.set.mockClear();
+
+        await store.set('env:1', 'token', 'same');
+
+        expect(api.secrets.set).not.toHaveBeenCalled();
+        expect(api.store.set).not.toHaveBeenCalled();
+    });
+
+    test('a deleted secret is not served from memory', async () => {
+        const api = makeBackend({ keychain: true });
+        const store = new SecretStore(api);
+        await store.set('env:1', 'token', 'gone');
+
+        await store.delete('env:1', 'token');
+        await store.set('env:1', 'token', 'new');
+        await store.deleteScope('env:1');
+
+        expect(await store.get('env:1', 'token')).toBeUndefined();
+        expect(await store.getScope('env:1')).toEqual({});
+    });
+
     test('getScope reads all keys from the keychain', async () => {
         const api = makeBackend({ keychain: true });
         const store = new SecretStore(api);

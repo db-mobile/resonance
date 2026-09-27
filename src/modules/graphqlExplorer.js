@@ -588,9 +588,10 @@ export class GraphQLExplorer {
         input.className = 'entry graphql-explorer-search';
         input.placeholder = 'Search fields';
         input.setAttribute('aria-label', 'Search fields');
+        const applyFilter = debounce(() => this._applyFilter(), 150);
         input.addEventListener('input', () => {
             this.searchTerm = input.value.trim().toLowerCase();
-            this._applyFilter();
+            applyFilter();
         });
         return input;
     }

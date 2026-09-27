@@ -122,32 +122,6 @@ describe('VariableService', () => {
         });
     });
 
-    describe('processRequest', () => {
-        test('should process request with variables', async () => {
-            const request = { url: 'https://{{ baseUrl }}/api' };
-            const variables = { baseUrl: 'api.example.com' };
-            const processedRequest = { url: 'https://api.example.com/api' };
-
-            mockRepository.getVariablesForCollection.mockResolvedValue(variables);
-            mockProcessor.processObject.mockReturnValue(processedRequest);
-
-            const result = await service.processRequest(request, 'collection-1');
-
-            expect(result).toEqual(processedRequest);
-            expect(mockRepository.getVariablesForCollection).toHaveBeenCalledWith('collection-1');
-            expect(mockProcessor.processObject).toHaveBeenCalledWith(request, variables);
-        });
-
-        test('should return original request if processing fails', async () => {
-            const request = { url: 'https://{{ baseUrl }}/api' };
-            mockRepository.getVariablesForCollection.mockRejectedValue(new Error('Error'));
-
-            const result = await service.processRequest(request, 'collection-1');
-
-            expect(result).toEqual(request);
-        });
-    });
-
     describe('processTemplate', () => {
         test('should process template with variables', async () => {
             const template = 'Hello {{ name }}!';
@@ -170,44 +144,6 @@ describe('VariableService', () => {
             const result = await service.processTemplate(template, 'collection-1');
 
             expect(result).toBe(template);
-        });
-    });
-
-    describe('getTemplatePreview', () => {
-        test('should get template preview', async () => {
-            const template = 'Hello {{ name }}!';
-            const variables = { name: 'World' };
-            const preview = { preview: 'Hello World!', missingVariables: [], foundVariables: ['name'] };
-
-            mockRepository.getVariablesForCollection.mockResolvedValue(variables);
-            mockProcessor.getPreview.mockReturnValue(preview);
-
-            const result = await service.getTemplatePreview(template, 'collection-1');
-
-            expect(result).toEqual(preview);
-            expect(mockProcessor.getPreview).toHaveBeenCalledWith(template, variables);
-        });
-
-        test('should return default preview if processing fails', async () => {
-            const template = 'Hello {{ name }}!';
-            mockRepository.getVariablesForCollection.mockRejectedValue(new Error('Error'));
-
-            const result = await service.getTemplatePreview(template, 'collection-1');
-
-            expect(result).toEqual({ preview: template, missingVariables: [], foundVariables: [] });
-        });
-    });
-
-    describe('findUsedVariables', () => {
-        test('should find used variables in request', () => {
-            const request = { url: 'https://{{ baseUrl }}/{{ path }}' };
-            const expectedVariables = ['baseUrl', 'path'];
-            mockProcessor.extractVariableNamesFromObject.mockReturnValue(expectedVariables);
-
-            const result = service.findUsedVariables(request);
-
-            expect(result).toEqual(expectedVariables);
-            expect(mockProcessor.extractVariableNamesFromObject).toHaveBeenCalledWith(request);
         });
     });
 

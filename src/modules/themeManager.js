@@ -149,27 +149,4 @@ export class ThemeManager {
         }
         return 'light';
     }
-
-    getEffectiveTheme() {
-        if (this.currentTheme === 'system') {
-            return this.getSystemTheme();
-        }
-        return this.currentTheme;
-    }
-
-    getAvailableThemes() {
-        return [...this.availableThemes];
-    }
-
-    addTheme(themeName) {
-        if (!this.availableThemes.includes(themeName)) {
-            this.availableThemes.push(themeName);
-        }
-    }
-
-    removeTheme(themeName) {
-        if (themeName !== 'light' && themeName !== 'dark' && themeName !== 'system') {
-            this.availableThemes = this.availableThemes.filter(theme => theme !== themeName);
-        }
-    }
 }

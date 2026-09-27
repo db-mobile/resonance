@@ -34,7 +34,6 @@ describe('WorkspaceTabController close paths do not revert the active tab', () =
     beforeEach(() => {
         jest.clearAllMocks();
         service = {
-            addListener: jest.fn(),
             getActiveTabId: jest.fn().mockResolvedValue('tab-A'),
             getAllTabs: jest.fn().mockResolvedValue([
                 { id: 'tab-A', type: 'http' },
@@ -43,6 +42,7 @@ describe('WorkspaceTabController close paths do not revert the active tab', () =
             ]),
             switchTab: jest.fn(async (id) => ({ id, type: 'http' })),
             closeTab: jest.fn(),
+            closeTabs: jest.fn(),
             updateTab: jest.fn().mockResolvedValue(undefined)
         };
         stateManager = {
@@ -77,7 +77,7 @@ describe('WorkspaceTabController close paths do not revert the active tab', () =
     });
 
     test('closeOtherTabs keeping the active tab does not restore it', async () => {
-        service.closeTab.mockResolvedValue({ newActiveTabId: 'tab-A' });
+        service.closeTabs.mockResolvedValue({ newActiveTabId: 'tab-A' });
 
         await controller.closeOtherTabs('tab-A');
 
@@ -85,16 +85,20 @@ describe('WorkspaceTabController close paths do not revert the active tab', () =
     });
 
     test('closeOtherTabs keeping a background tab activates it', async () => {
-        service.closeTab.mockResolvedValue({ newActiveTabId: 'tab-B' });
+        service.closeTabs.mockResolvedValue({ newActiveTabId: 'tab-B' });
+        const allTabs = [
+            { id: 'tab-A', type: 'http' },
+            { id: 'tab-B', type: 'http' },
+            { id: 'tab-C', type: 'http' }
+        ];
         service.getAllTabs
-            .mockResolvedValueOnce([
-                { id: 'tab-A', type: 'http' },
-                { id: 'tab-B', type: 'http' },
-                { id: 'tab-C', type: 'http' }
-            ])
+            .mockResolvedValueOnce(allTabs)
+            .mockResolvedValueOnce(allTabs)
             .mockResolvedValue([{ id: 'tab-B', type: 'http' }]);
 
         await controller.closeOtherTabs('tab-B');
+
+        expect(service.closeTabs).toHaveBeenCalledWith(['tab-A', 'tab-C']);
 
         expect(stateManager.restoreTabState).toHaveBeenCalledTimes(1);
         expect(stateManager.restoreTabState).toHaveBeenCalledWith(

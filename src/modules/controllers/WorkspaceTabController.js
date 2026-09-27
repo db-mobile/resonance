@@ -79,8 +79,6 @@ export class WorkspaceTabController {
         this.tabBar.onCloseOthers = (tabId) => this.closeOtherTabs(tabId);
         this.tabBar.onRunnerTabCreate = () => this.createRunnerTab();
         this.tabBar.onTabReorder = (orderedTabIds) => this.reorderTabs(orderedTabIds);
-
-        this.service.addListener((event, data) => this._handleServiceEvent(event, data));
     }
 
     /**
@@ -469,10 +467,12 @@ export class WorkspaceTabController {
 
             if (app.scriptController) {
                 if (tab.endpoint && tab.endpoint.collectionId && tab.endpoint.endpointId) {
-                    await app.scriptController.loadScriptsForEndpoint(
-                        tab.endpoint.collectionId,
-                        tab.endpoint.endpointId
-                    );
+                    if (!app.scriptController.isShowingScriptsFor(tab.endpoint.collectionId, tab.endpoint.endpointId)) {
+                        await app.scriptController.loadScriptsForEndpoint(
+                            tab.endpoint.collectionId,
+                            tab.endpoint.endpointId
+                        );
+                    }
                 } else {
                     await app.scriptController.clearScripts();
                 }
@@ -610,20 +610,34 @@ export class WorkspaceTabController {
      * @returns {Promise<void>}
      */
     async closeOtherTabs(tabId) {
-        return this._withTabLock(() => this._doCloseOtherTabs(tabId));
+        return this._withTabLock(async () => {
+            const tabs = await this.service.getAllTabs();
+            await this._doCloseTabs(tabs.filter(t => t.id !== tabId).map(t => t.id));
+        });
     }
 
     /**
-     * @param {string} tabId
+     * @param {Array<string>} tabIds
      * @returns {Promise<void>}
      */
-    async _doCloseOtherTabs(tabId) {
+    async closeTabs(tabIds) {
+        return this._withTabLock(() => this._doCloseTabs(tabIds));
+    }
+
+    /**
+     * @param {Array<string>} tabIds
+     * @returns {Promise<void>}
+     */
+    async _doCloseTabs(tabIds) {
         try {
             await flushPendingSaves();
 
-            const previousActiveTabId = await this.service.getActiveTabId();
+            const ids = new Set(tabIds);
             const tabs = await this.service.getAllTabs();
-            const tabsToClose = tabs.filter(t => t.id !== tabId);
+            const tabsToClose = tabs.filter(t => ids.has(t.id));
+            if (tabsToClose.length === 0) {
+                return;
+            }
 
             const modifiedCount = tabsToClose.filter(t => t.isModified).length;
             if (modifiedCount > 0) {
@@ -646,16 +660,23 @@ export class WorkspaceTabController {
 
             for (const tab of tabsToClose) {
                 this._cleanupClosedTabUI(tab.id);
-                await this.service.closeTab(tab.id);
             }
 
-            await this.service.switchTab(tabId);
+            if (tabsToClose.length === tabs.length) {
+                await this._doCreateNewTab();
+            }
+
+            const previousActiveTabId = await this.service.getActiveTabId();
+            const result = await this.service.closeTabs(tabsToClose.map(t => t.id));
+            if (!result) {
+                return;
+            }
 
             const remainingTabs = await this.service.getAllTabs();
-            this.tabBar.render(remainingTabs, tabId);
+            this.tabBar.render(remainingTabs, result.newActiveTabId);
 
-            if (tabId !== previousActiveTabId) {
-                const activeTab = remainingTabs.find(t => t.id === tabId);
+            if (result.newActiveTabId !== previousActiveTabId) {
+                const activeTab = remainingTabs.find(t => t.id === result.newActiveTabId);
                 if (activeTab) {
                     await this._activateTab(activeTab);
                 }
@@ -696,31 +717,6 @@ export class WorkspaceTabController {
                 await this.service.setTabModified(activeTabId, false);
                 this.tabBar.updateTab(activeTabId, { isModified: false });
             }
-        } catch (error) {
-            void error;
-        }
-    }
-
-    /**
-     * @param {string} method
-     * @param {string} url
-     * @returns {Promise<void>}
-     */
-    async updateCurrentTabName(method, url) {
-        try {
-            const activeTabId = await this.service.getActiveTabId();
-            if (!activeTabId) {return;}
-
-            const activeTab = await this.service.getActiveTab();
-            if (!activeTab) {return;}
-
-            if (activeTab.name !== 'New Request' && !activeTab.name.match(/^(GET|POST|PUT|DELETE|PATCH)/)) {
-                return;
-            }
-
-            const newName = this.service.generateTabName(method, url);
-            await this.service.updateTab(activeTabId, { name: newName });
-            this.tabBar.updateTab(activeTabId, { name: newName });
         } catch (error) {
             void error;
         }
@@ -809,6 +805,7 @@ export class WorkspaceTabController {
     /** @returns {Promise<void>} */
     async _saveCurrentTabState() {
         try {
+            this._debouncedPersistState.cancel();
             await flushPendingSaves();
 
             const activeTabId = await this.service.getActiveTabId();
@@ -838,14 +835,6 @@ export class WorkspaceTabController {
         } finally {
             this.isRestoringState = false;
         }
-    }
-
-    /**
-     * @param {string} _event
-     * @param {*} _data
-     * @returns {void}
-     */
-    _handleServiceEvent(_event, _data) {
     }
 
     /**

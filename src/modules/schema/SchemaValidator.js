@@ -338,16 +338,4 @@ export class SchemaValidator {
 
         return schema;
     }
-
-    /**
-     * @param {Array} errors
-     * @returns {string}
-     */
-    formatErrors(errors) {
-        if (!errors || errors.length === 0) {
-            return '';
-        }
-
-        return errors.map(err => `${err.path}: ${err.message}`).join('\n');
-    }
 }

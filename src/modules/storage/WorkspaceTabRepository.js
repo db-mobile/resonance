@@ -19,6 +19,7 @@ export class WorkspaceTabRepository {
         this._tabsCache = null;
         this._activeTabIdCache = undefined;
         this._writeChain = Promise.resolve();
+        this._queuedWrites = new Map();
     }
 
     /**
@@ -27,17 +28,26 @@ export class WorkspaceTabRepository {
      * @returns {Promise<void>}
      */
     _queueStoreWrite(key, value) {
-        const write = this._writeChain
+        const queued = this._queuedWrites.get(key);
+        if (queued) {
+            queued.value = value;
+            return queued.write;
+        }
+        const entry = { value, write: null };
+        entry.write = this._writeChain
             .catch(() => { })
             .then(async () => {
+                this._queuedWrites.delete(key);
+                const latest = entry.value;
                 if (key === this.STORE_KEY && this.secretStore) {
-                    await this._syncTabSecrets(value);
-                    return this.backendAPI.store.set(key, value.map(tab => this._withoutSecrets(tab)));
+                    await this._syncTabSecrets(latest);
+                    return this.backendAPI.store.set(key, latest.map(tab => this._withoutSecrets(tab)));
                 }
-                return this.backendAPI.store.set(key, value);
+                return this.backendAPI.store.set(key, latest);
             });
-        this._writeChain = write;
-        return write;
+        this._queuedWrites.set(key, entry);
+        this._writeChain = entry.write;
+        return entry.write;
     }
 
     /**
@@ -289,8 +299,17 @@ export class WorkspaceTabRepository {
      * @returns {Promise<boolean>}
      */
     async deleteTab(tabId) {
+        return this.deleteTabs([tabId]);
+    }
+
+    /**
+     * @param {Array<string>} tabIds
+     * @returns {Promise<boolean>}
+     */
+    async deleteTabs(tabIds) {
+        const ids = new Set(tabIds);
         const tabs = await this.getTabs();
-        const filteredTabs = tabs.filter(tab => tab.id !== tabId);
+        const filteredTabs = tabs.filter(tab => !ids.has(tab.id));
 
         if (filteredTabs.length === tabs.length) {
             return false;

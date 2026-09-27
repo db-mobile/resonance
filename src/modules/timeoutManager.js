@@ -36,8 +36,4 @@ export class TimeoutManager {
     getCurrentTimeout() {
         return this.currentTimeout;
     }
-
-    getCurrentTimeoutDisplay() {
-        return this.currentTimeout === 0 ? 'No timeout' : `${this.currentTimeout}ms`;
-    }
 }

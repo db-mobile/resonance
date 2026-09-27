@@ -417,6 +417,12 @@ export class MockServerDialog {
                 return;
             }
 
+            const signature = JSON.stringify((logs || []).map(log => [log.timestamp, log.method, log.path, log.responseStatus]));
+            if (container.dataset.logSignature === signature) {
+                return;
+            }
+            container.dataset.logSignature = signature;
+
             if (!logs || logs.length === 0) {
                 const fragment = templateLoader.cloneSync(
                     './src/templates/mockServer/mockServerDialog.html',

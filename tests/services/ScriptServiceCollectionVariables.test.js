@@ -9,8 +9,7 @@ describe('scripts and collection variables', () => {
     beforeEach(() => {
         variableRepository = {
             getVariablesForCollection: jest.fn().mockResolvedValue({ baseUrl: 'https://api.test', retries: 3 }),
-            setVariable: jest.fn().mockResolvedValue(undefined),
-            deleteVariable: jest.fn().mockResolvedValue(undefined)
+            applyVariableChanges: jest.fn().mockResolvedValue(undefined)
         };
         const environmentService = { getActiveEnvironmentVariables: jest.fn().mockResolvedValue({}) };
         service = new ScriptService(null, environmentService, null, variableRepository);
@@ -36,15 +35,14 @@ describe('scripts and collection variables', () => {
 
         const sent = window.backendAPI.scripts.executePreRequest.mock.calls[0][0];
         expect(sent.collectionVariables).toEqual({ baseUrl: 'https://api.test', retries: '3' });
-        expect(variableRepository.setVariable).toHaveBeenCalledWith('c1', 'token', 'abc');
-        expect(variableRepository.deleteVariable).toHaveBeenCalledWith('c1', 'stale');
+        expect(variableRepository.applyVariableChanges).toHaveBeenCalledWith('c1', { token: 'abc', stale: null });
     });
 
     test('without a collection nothing is read or written', async () => {
         await service.executePreRequestScript('1', { url: 'x', method: 'GET' });
 
         expect(window.backendAPI.scripts.executePreRequest.mock.calls[0][0].collectionVariables).toEqual({});
-        expect(variableRepository.setVariable).not.toHaveBeenCalled();
+        expect(variableRepository.applyVariableChanges).not.toHaveBeenCalled();
     });
 });
 

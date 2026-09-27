@@ -358,15 +358,6 @@ describe('CollectionRepository', () => {
             expect(result).toBe('https://api.example.com');
         });
 
-        test('getPersistedAuthConfig should return auth config', async () => {
-            const authConfig = { type: 'bearer', token: 'abc' };
-            mockBackendAPI.collections.getEndpointData.mockResolvedValue({ authConfig });
-
-            const result = await repository.getPersistedAuthConfig('col_1', 'ep_1');
-
-            expect(result).toEqual(authConfig);
-        });
-
         test('getPersistedPathParams should return path params', async () => {
             const pathParams = [{ key: 'id', value: '123' }];
             mockBackendAPI.collections.getEndpointData.mockResolvedValue({ pathParams });

@@ -35,7 +35,6 @@ describe('WorkspaceTabController flushes pending saves before context switches',
     beforeEach(() => {
         jest.clearAllMocks();
         service = {
-            addListener: jest.fn(),
             getActiveTabId: jest.fn().mockResolvedValue('tab-1'),
             getAllTabs: jest.fn().mockResolvedValue([{ id: 'tab-1' }, { id: 'tab-2' }]),
             updateTab: jest.fn().mockResolvedValue(undefined),

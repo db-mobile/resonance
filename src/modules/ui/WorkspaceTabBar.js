@@ -298,6 +298,7 @@ export class WorkspaceTabBar {
         const existingDropdown = document.querySelector('.workspace-tab-new-menu');
         if (existingDropdown) {
             existingDropdown.remove();
+            document.removeEventListener('click', this._closeNewTabMenu);
             return;
         }
 
@@ -343,6 +344,7 @@ export class WorkspaceTabBar {
                 document.removeEventListener('click', closeMenu);
             }
         };
+        this._closeNewTabMenu = closeMenu;
         setTimeout(() => document.addEventListener('click', closeMenu), 0);
     }
 
@@ -367,6 +369,7 @@ export class WorkspaceTabBar {
         const existingDropdown = document.querySelector('.workspace-tab-list-dropdown');
         if (existingDropdown) {
             existingDropdown.remove();
+            document.removeEventListener('click', this._closeTabListDropdown);
             return;
         }
 
@@ -405,6 +408,7 @@ export class WorkspaceTabBar {
                 document.removeEventListener('click', closeDropdown);
             }
         };
+        this._closeTabListDropdown = closeDropdown;
         setTimeout(() => document.addEventListener('click', closeDropdown), 0);
     }
 

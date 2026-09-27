@@ -16,18 +16,14 @@ describe('protocol savers skip the sidebar refresh', () => {
         document.body.innerHTML = '';
         refreshCollections = jest.fn().mockResolvedValue(undefined);
         repository = {
-            savePersistedUrl: jest.fn().mockResolvedValue(undefined),
-            savePersistedQueryParams: jest.fn().mockResolvedValue(undefined),
-            savePersistedHeaders: jest.fn().mockResolvedValue(undefined),
-            savePersistedAuthConfig: jest.fn().mockResolvedValue(undefined),
-            saveGraphQLData: jest.fn().mockResolvedValue(undefined),
+            updateEndpointFields: jest.fn().mockResolvedValue(undefined),
             saveMqttData: jest.fn().mockResolvedValue(undefined),
             saveGrpcData: jest.fn().mockResolvedValue(undefined),
             saveOne: jest.fn().mockResolvedValue(undefined)
         };
         service = new CollectionRequestPersistenceService({
             repository,
-            collectionService: { saveRequestBodyModification: jest.fn().mockResolvedValue(undefined) },
+            collectionService: { captureRequestBodyState: jest.fn(() => null) },
             statusDisplay: { update: jest.fn() },
             refreshCollections
         });

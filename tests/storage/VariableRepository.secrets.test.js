@@ -25,6 +25,20 @@ describe('VariableRepository secret handling', () => {
         repository = new VariableRepository(mockBackendAPI, secretStore);
     });
 
+    test('applyVariableChanges saves every change in one write and keeps secrets out of it', async () => {
+        await repository.setVariablesForCollection('c1', { apiKey: 'old', stale: 'x' }, ['apiKey']);
+        mockBackendAPI.collections.saveVariables.mockClear();
+
+        await repository.applyVariableChanges('c1', { apiKey: 'new', token: 'abc', stale: null });
+
+        expect(mockBackendAPI.collections.saveVariables).toHaveBeenCalledTimes(1);
+        expect(savedVariables).toEqual([
+            { key: 'apiKey', value: '', secret: true },
+            { key: 'token', value: 'abc' }
+        ]);
+        expect(await secretStore.get('collvar:c1', 'apiKey')).toBe('new');
+    });
+
     test('secret values are kept out of the saved (git-friendly) variables array', async () => {
         await repository.setVariablesForCollection(
             'c1',

@@ -31,10 +31,6 @@ describe('CollectionRequestPersistenceService protocol routing', () => {
             readForUpdate: jest.fn().mockResolvedValue(collection),
             saveOne: jest.fn().mockResolvedValue(undefined),
             updateEndpointFields: jest.fn().mockResolvedValue(undefined),
-            savePersistedUrl: jest.fn().mockResolvedValue(undefined),
-            savePersistedQueryParams: jest.fn().mockResolvedValue(undefined),
-            savePersistedHeaders: jest.fn().mockResolvedValue(undefined),
-            savePersistedAuthConfig: jest.fn().mockResolvedValue(undefined),
             saveMqttData: jest.fn().mockResolvedValue(undefined)
         };
 
@@ -57,10 +53,10 @@ describe('CollectionRequestPersistenceService protocol routing', () => {
     test('an SSE endpoint is saved by the SSE path, reading its own url field', async () => {
         await service.saveAllRequestModifications('c1', 'sse1');
 
-        expect(repository.savePersistedUrl).toHaveBeenCalledWith(
+        expect(repository.updateEndpointFields).toHaveBeenCalledWith(
             'c1',
             'sse1',
-            'https://api.example.com/v2/stream'
+            expect.objectContaining({ url: 'https://api.example.com/v2/stream' })
         );
     });
 
@@ -80,16 +76,18 @@ describe('CollectionRequestPersistenceService protocol routing', () => {
         });
 
         await service.saveAllRequestModifications('c1', 'sse1');
-        expect(repository.savePersistedAuthConfig).toHaveBeenCalledWith(
+        expect(repository.updateEndpointFields).toHaveBeenCalledWith(
             'c1',
             'sse1',
-            expect.any(Object)
+            expect.objectContaining({ authConfig: expect.any(Object) })
         );
 
-        repository.savePersistedAuthConfig.mockClear();
+        repository.updateEndpointFields.mockClear();
 
         await service.saveAllRequestModifications('c1', 'ws1');
-        expect(repository.savePersistedAuthConfig).not.toHaveBeenCalled();
+        for (const call of repository.updateEndpointFields.mock.calls) {
+            expect(call[2]).not.toHaveProperty('authConfig');
+        }
     });
 
     const savedEndpoint = (endpointId) => {
@@ -158,10 +156,10 @@ describe('CollectionRequestPersistenceService protocol routing', () => {
         test('stores the broker settings from the MQTT fields', async () => {
             await service.saveAllRequestModifications('c1', 'mqtt1');
 
-            expect(repository.savePersistedUrl).toHaveBeenCalledWith(
+            expect(repository.updateEndpointFields).toHaveBeenCalledWith(
                 'c1',
                 'mqtt1',
-                'mqtt://broker.example.com:8883'
+                expect.objectContaining({ url: 'mqtt://broker.example.com:8883' })
             );
             expect(repository.saveMqttData).toHaveBeenCalledWith('c1', 'mqtt1', {
                 clientId: 'resonance-1',

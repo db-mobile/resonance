@@ -4,7 +4,7 @@
  */
 
 /** @type {Readonly<Object<number, string>>} */
-export const GRPC_STATUS_NAMES = Object.freeze({
+const GRPC_STATUS_NAMES = Object.freeze({
     0: 'OK',
     1: 'CANCELLED',
     2: 'UNKNOWN',

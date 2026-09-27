@@ -92,7 +92,7 @@ export function authSecretScope(collectionId, endpointId) {
 }
 
 /** @type {string} */
-export const COLLECTION_AUTH_SCOPE_ID = '__collection__';
+const COLLECTION_AUTH_SCOPE_ID = '__collection__';
 
 /**
  * @param {string} collectionId

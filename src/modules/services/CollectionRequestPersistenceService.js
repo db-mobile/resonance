@@ -61,9 +61,9 @@ export class CollectionRequestPersistenceService {
                 grpc: () => this.saveGrpcRequest(collectionId, endpointId, endpoint, collection),
                 websocket: () => this.saveWebSocketRequest(collectionId, endpointId, parseKeyValuePairs, parseKeyValueRows),
                 graphql: () => this.saveGraphQLRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows),
-                sse: () => this.saveSseRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows),
+                sse: () => this.saveSseRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows, collection),
                 mqtt: () => this.saveMqttRequest(collectionId, endpointId),
-                http: () => this.saveHttpRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows)
+                http: () => this.saveHttpRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows, collection)
             };
 
             await (savers[descriptor.builder] || savers.http)();
@@ -95,55 +95,71 @@ export class CollectionRequestPersistenceService {
         }
     }
 
-    async saveWebSocketRequest(collectionId, endpointId, parseKeyValuePairs, parseKeyValueRows) {
-        const { urlInput, queryParamsList, headersList, bodyInput } = this.getRequestFormElements(
-            getProtocol('websocket')
-        );
+    /**
+     * @param {Object} elements
+     * @param {Object} parsers
+     * @param {Object|null} [authManager]
+     * @returns {Object}
+     */
+    collectSidecarUpdates({ urlInput, queryParamsList, headersList, bodyInput }, { parseKeyValuePairs, parseKeyValueRows }, authManager = null) {
+        const updates = {};
 
         if (urlInput && urlInput.value) {
-            await this.repository.savePersistedUrl(collectionId, endpointId, urlInput.value);
+            updates.url = urlInput.value;
         }
 
         if (queryParamsList) {
-            const queryParamsArray = readPersistedRows(queryParamsList, parseKeyValuePairs, parseKeyValueRows);
-            await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParamsArray);
+            updates.queryParams = readPersistedRows(queryParamsList, parseKeyValuePairs, parseKeyValueRows);
         }
 
         if (headersList) {
-            const headersArray = readPersistedRows(headersList, parseKeyValuePairs, parseKeyValueRows);
-            await this.repository.savePersistedHeaders(collectionId, endpointId, headersArray);
+            updates.headers = readPersistedRows(headersList, parseKeyValuePairs, parseKeyValueRows);
         }
 
-        if (bodyInput) {
-            await this.collectionService.saveRequestBodyModification(collectionId, endpointId, bodyInput);
+        const authConfig = authManager?.getAuthConfig();
+        if (authConfig) {
+            updates.authConfig = authConfig;
         }
+
+        const bodyState = bodyInput ? this.collectionService.captureRequestBodyState() : null;
+        if (bodyState) {
+            Object.assign(updates, bodyState);
+        }
+
+        return updates;
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} updates
+     * @returns {Promise<void>}
+     */
+    async writeSidecarUpdates(collectionId, endpointId, updates) {
+        if (Object.keys(updates).length > 0) {
+            await this.repository.updateEndpointFields(collectionId, endpointId, updates);
+        }
+    }
+
+    async saveWebSocketRequest(collectionId, endpointId, parseKeyValuePairs, parseKeyValueRows) {
+        const elements = this.getRequestFormElements(getProtocol('websocket'));
+        await this.writeSidecarUpdates(collectionId, endpointId,
+            this.collectSidecarUpdates(elements, { parseKeyValuePairs, parseKeyValueRows }));
     }
 
     async saveGraphQLRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows) {
         const { urlInput, headersList } = this.getRequestFormElements(getProtocol('graphql'));
         const { graphqlBodyManager } = app;
 
-        if (urlInput && urlInput.value) {
-            await this.repository.savePersistedUrl(collectionId, endpointId, urlInput.value);
-        }
-
-        if (headersList) {
-            const headersArray = readPersistedRows(headersList, parseKeyValuePairs, parseKeyValueRows);
-            await this.repository.savePersistedHeaders(collectionId, endpointId, headersArray);
-        }
-
-        const authConfig = authManager.getAuthConfig();
-        if (authConfig) {
-            await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
-        }
-
+        const updates = this.collectSidecarUpdates({ urlInput, headersList }, { parseKeyValuePairs, parseKeyValueRows }, authManager);
         if (graphqlBodyManager) {
-            await this.repository.saveGraphQLData(collectionId, endpointId, {
+            updates.graphqlData = {
                 query: graphqlBodyManager.getGraphQLQuery(),
                 variables: graphqlBodyManager.getGraphQLVariables(),
                 operationName: graphqlBodyManager.getSelectedOperationName?.() || null
-            });
+            };
         }
+        await this.writeSidecarUpdates(collectionId, endpointId, updates);
     }
 
     /**
@@ -153,36 +169,14 @@ export class CollectionRequestPersistenceService {
      * @param {Object} authManager
      * @returns {Promise<void>}
      */
-    async saveSseRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows) {
-        const descriptor = getProtocol('sse');
-        const { urlInput, queryParamsList, headersList, bodyInput } = this.getRequestFormElements(descriptor);
-
-        if (urlInput && urlInput.value) {
-            await this.repository.savePersistedUrl(collectionId, endpointId, urlInput.value);
-        }
-
-        if (queryParamsList) {
-            const queryParamsArray = readPersistedRows(queryParamsList, parseKeyValuePairs, parseKeyValueRows);
-            await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParamsArray);
-        }
-
-        if (headersList) {
-            const headersArray = readPersistedRows(headersList, parseKeyValuePairs, parseKeyValueRows);
-            await this.repository.savePersistedHeaders(collectionId, endpointId, headersArray);
-        }
-
-        const authConfig = authManager.getAuthConfig();
-        if (authConfig) {
-            await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
-        }
-
-        if (bodyInput) {
-            await this.collectionService.saveRequestBodyModification(collectionId, endpointId, bodyInput);
-        }
+    async saveSseRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows, collection = null) {
+        const elements = this.getRequestFormElements(getProtocol('sse'));
+        await this.writeSidecarUpdates(collectionId, endpointId,
+            this.collectSidecarUpdates(elements, { parseKeyValuePairs, parseKeyValueRows }, authManager));
 
         const methodSelect = document.getElementById('method-select');
         if (methodSelect && methodSelect.value) {
-            await this.patchEndpointRecords(collectionId, endpointId, { httpMethod: methodSelect.value });
+            await this.patchEndpointRecords(collectionId, endpointId, { httpMethod: methodSelect.value }, collection);
         }
     }
 
@@ -195,9 +189,8 @@ export class CollectionRequestPersistenceService {
         const descriptor = getProtocol('mqtt');
         const { urlInput, bodyInput } = this.getRequestFormElements(descriptor);
 
-        if (urlInput && urlInput.value) {
-            await this.repository.savePersistedUrl(collectionId, endpointId, urlInput.value);
-        }
+        await this.writeSidecarUpdates(collectionId, endpointId,
+            this.collectSidecarUpdates({ urlInput, bodyInput }, {}));
 
         await this.repository.saveMqttData(collectionId, endpointId, {
             clientId: document.getElementById('mqtt-client-id-input')?.value || '',
@@ -207,20 +200,17 @@ export class CollectionRequestPersistenceService {
             publishTopic: document.getElementById('mqtt-topic-input')?.value || '',
             qos: Number(document.getElementById('mqtt-qos-select')?.value) || 0
         });
-
-        if (bodyInput) {
-            await this.collectionService.saveRequestBodyModification(collectionId, endpointId, bodyInput);
-        }
     }
 
     /**
      * @param {string} collectionId
      * @param {string} endpointId
      * @param {Object} patch
+     * @param {Object|null} [loaded]
      * @returns {Promise<void>}
      */
-    async patchEndpointRecords(collectionId, endpointId, patch) {
-        const collection = await this.repository.readForUpdate(collectionId);
+    async patchEndpointRecords(collectionId, endpointId, patch, loaded = null) {
+        const collection = loaded ?? await this.repository.readForUpdate(collectionId);
         if (!collection) {
             return;
         }
@@ -238,7 +228,7 @@ export class CollectionRequestPersistenceService {
         await this.repository.saveOne(updateRequest(collection, endpointId, patch));
     }
 
-    async saveHttpRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows) {
+    async saveHttpRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows, collection = null) {
         const descriptor = getProtocol('http');
         const { urlInput, pathParamsList, queryParamsList, headersList, bodyInput } =
             this.getRequestFormElements(descriptor);
@@ -273,17 +263,15 @@ export class CollectionRequestPersistenceService {
             Object.assign(updates, bodyState);
         }
 
-        if (Object.keys(updates).length > 0) {
-            await this.repository.updateEndpointFields(collectionId, endpointId, updates);
-        }
-
         const authConfig = authManager.getAuthConfig();
         if (authConfig) {
-            await this.repository.savePersistedAuthConfig(collectionId, endpointId, authConfig);
+            updates.authConfig = authConfig;
         }
 
+        await this.writeSidecarUpdates(collectionId, endpointId, updates);
+
         if (descriptor.rewritePathFromUrl && urlInput && urlInput.value) {
-            await this.updateEndpointPathFromUrl(collectionId, endpointId, urlInput.value);
+            await this.updateEndpointPathFromUrl(collectionId, endpointId, urlInput.value, collection);
         }
 
         await this.syncActiveWorkspaceTab({
@@ -299,10 +287,10 @@ export class CollectionRequestPersistenceService {
         });
     }
 
-    async updateEndpointPathFromUrl(collectionId, endpointId, url) {
+    async updateEndpointPathFromUrl(collectionId, endpointId, url, loaded = null) {
         try {
             const path = this.normalizePath(url);
-            const collection = await this.repository.readForUpdate(collectionId);
+            const collection = loaded ?? await this.repository.readForUpdate(collectionId);
 
             if (!collection) {
                 return;

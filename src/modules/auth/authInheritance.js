@@ -35,10 +35,7 @@ export async function resolveEffectiveAuthWithSource(authConfig, { collectionId,
     if (!collectionId || !repository) {
         return { authConfig: NONE, source: null };
     }
-    const source = typeof repository.getInheritedAuthSource === 'function'
-        ? await repository.getInheritedAuthSource(collectionId, endpointId)
-        : null;
-    const inherited = await repository.getInheritedAuthConfig(collectionId, endpointId);
+    const { authConfig: inherited, source } = await repository.getInheritedAuth(collectionId, endpointId);
     if (!inherited || inherited.type === 'none' || inherited.type === 'inherit') {
         return { authConfig: NONE, source: null };
     }

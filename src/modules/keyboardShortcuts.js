@@ -223,12 +223,6 @@ class KeyboardShortcutsManager {
         return shortcut ? shortcut.displayKey : null;
     }
 
-    getShortcuts() {
-        return Array.from(this.shortcuts.entries()).map(([key, value]) => ({
-            key,
-            ...value
-        }));
-    }
 }
 
 export const keyboardShortcuts = new KeyboardShortcutsManager();

@@ -100,7 +100,6 @@ const environmentService = environment.service;
 const environmentSelector = environment.selector;
 const cookieController = featureRegistry.get('cookie').controller;
 const mockServer = featureRegistry.get('mockServer');
-const mockServerController = mockServer.controller;
 const mockServerDialog = mockServer.dialog;
 const historyController = featureRegistry.get('history').controller;
 const workspaceTab = featureRegistry.get('workspaceTab');
@@ -764,8 +763,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 1000);
 
     scheduleIdleTask(async () => {
-        await mockServerController.initialize();
-
         await initWebSocketHandler();
 
         await initGraphQLSubscriptionHandler();
