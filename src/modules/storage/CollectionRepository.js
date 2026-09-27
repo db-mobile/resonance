@@ -663,20 +663,49 @@ export class CollectionRepository {
      */
     async getInheritedAuthConfig(collectionId, endpointId) {
         try {
-            if (endpointId) {
-                const collection = await this._getByIdFresh(collectionId);
-                const chain = folderChainForRequest(collection, endpointId);
-
-                for (let index = chain.length - 1; index >= 0; index -= 1) {
-                    const folder = chain[index];
-                    if (folder?.authConfig?.type && folder.authConfig.type !== 'inherit') {
-                        return this.getFolderAuthConfig(collectionId, folder.id);
-                    }
-                }
+            const source = await this.getInheritedAuthSource(collectionId, endpointId);
+            if (source.kind === 'folder') {
+                return this.getFolderAuthConfig(collectionId, source.folderId);
             }
             return this.getCollectionAuthConfig(collectionId);
         } catch (error) {
             return null;
+        }
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string|null|undefined} endpointId
+     * @returns {Promise<{kind: string, folderId?: string}>}
+     */
+    async getInheritedAuthSource(collectionId, endpointId) {
+        if (endpointId) {
+            const collection = await this._getByIdFresh(collectionId);
+            const chain = folderChainForRequest(collection, endpointId);
+            for (let index = chain.length - 1; index >= 0; index -= 1) {
+                const folder = chain[index];
+                if (folder?.authConfig?.type && folder.authConfig.type !== 'inherit') {
+                    return { kind: 'folder', folderId: folder.id };
+                }
+            }
+        }
+        return { kind: 'collection' };
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string|null} endpointId
+     * @param {{kind: string, folderId?: string}} source
+     * @param {Object} authConfig
+     * @returns {Promise<void>}
+     */
+    async saveAuthConfigAtSource(collectionId, endpointId, source, authConfig) {
+        if (source?.kind === 'folder') {
+            await this.saveFolderAuthConfig(collectionId, source.folderId, authConfig);
+        } else if (source?.kind === 'collection') {
+            await this.saveCollectionAuthConfig(collectionId, authConfig);
+        } else if (source?.kind === 'request' && endpointId) {
+            await this.savePersistedAuthConfig(collectionId, endpointId, authConfig);
         }
     }
 

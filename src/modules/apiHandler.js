@@ -50,7 +50,8 @@ import { CollectionRepository } from './storage/CollectionRepository.js';
 import { VariableService } from './services/VariableService.js';
 import { StatusDisplayAdapter } from './interfaces/IStatusDisplay.js';
 import { authManager, setOAuthVariableResolver } from './authManager.js';
-import { resolveEffectiveAuthConfig } from './auth/authInheritance.js';
+import { resolveEffectiveAuthWithSource } from './auth/authInheritance.js';
+import { ensureFreshOAuthToken } from './auth/oauthRefresh.js';
 import { resolveAuthConfigVariables } from './auth/authVariables.js';
 import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
 import { createLazyEditorProxy } from './editorLoader.js';
@@ -137,20 +138,61 @@ setOAuthVariableResolver((collectionId) => {
 });
 
 /**
- * @param {{variables?: Object, processor?: Object}} [substitution]
+ * @param {{variables?: Object, processor?: Object, refreshOAuth?: boolean}} [substitution]
  * @returns {Promise<Object>}
  */
-export async function generateEffectiveAuthData({ variables, processor } = {}) {
+export async function generateEffectiveAuthData({ variables, processor, refreshOAuth = true } = {}) {
     const current = getCurrentEndpoint();
-    const resolved = await resolveEffectiveAuthConfig(authManager.getAuthConfig(), {
+    const repository = getCollectionRepository();
+    const { authConfig: resolved, source } = await resolveEffectiveAuthWithSource(authManager.getAuthConfig(), {
         collectionId: current?.collectionId,
         endpointId: current?.endpointId,
-        repository: getCollectionRepository()
+        repository
     });
-    const { authConfig: effective, unresolved } = resolveAuthConfigVariables(resolved, variables, processor);
+    const substituted = resolveAuthConfigVariables(resolved, variables, processor);
+    const { unresolved } = substituted;
+    let effective = substituted.authConfig;
+
+    if (refreshOAuth && source) {
+        const renewal = await ensureFreshOAuthToken({
+            rawAuth: resolved,
+            resolvedAuth: effective,
+            key: oauthRefreshKey(current, source),
+            getToken: (request) => window.backendAPI.oauth2.getToken(request),
+            persist: async (nextRaw, result) => {
+                if (source.kind === 'request') {
+                    authManager.applyTokenResult(result);
+                    scheduleEndpointSave();
+                } else if (current?.collectionId) {
+                    await repository.saveAuthConfigAtSource(current.collectionId, current.endpointId, source, nextRaw);
+                }
+            }
+        });
+        effective = renewal.resolvedAuth;
+        if (renewal.error) {
+            toast.warning(renewal.error);
+        }
+    }
+
     const authData = authManager.generateAuthData(effective);
     authData.unresolvedVariables = unresolved;
     return authData;
+}
+
+/**
+ * @param {{collectionId?: string, endpointId?: string}|null} endpoint
+ * @param {{kind: string, folderId?: string}} source
+ * @returns {string}
+ */
+function oauthRefreshKey(endpoint, source) {
+    const collectionId = endpoint?.collectionId ?? '';
+    if (source.kind === 'folder') {
+        return `${collectionId}|folder|${source.folderId}`;
+    }
+    if (source.kind === 'collection') {
+        return `${collectionId}|collection`;
+    }
+    return `${collectionId}|request|${endpoint?.endpointId ?? 'unsaved'}`;
 }
 
 /**
@@ -1313,7 +1355,7 @@ export async function handleGenerateCurl() {
             getCurrentEndpoint(), headers
         ));
 
-        const authData = await generateEffectiveAuthData({ variables: resolvedVariables, processor });
+        const authData = await generateEffectiveAuthData({ variables: resolvedVariables, processor, refreshOAuth: false });
         builder.mergeAuthData(headers, queryParams, authData);
 
         ({ url } = builder.processRequestComponents({

@@ -18,7 +18,8 @@ import { normalizeFormRows } from '../utils/formDataRows.js';
 import { activeKeyValueRows } from '../utils/keyValueRows.js';
 import { findRequest } from '../collections/collectionTree.js';
 import { buildEndpointUrl, buildMockPath } from '../collections/endpointUrl.js';
-import { resolveEffectiveAuthConfig } from '../auth/authInheritance.js';
+import { resolveEffectiveAuthWithSource } from '../auth/authInheritance.js';
+import { ensureFreshOAuthToken } from '../auth/oauthRefresh.js';
 import { resolveAuthConfigVariables } from '../auth/authVariables.js';
 import { generateAuthData } from '../auth/authData.js';
 import { deriveRequestSettings } from '../state/settingsCache.js';
@@ -693,12 +694,28 @@ export class RunnerService {
         const queryParams = Object.fromEntries(queryRows.map(row => [row.key, row.value]));
 
         const configuredAuth = persistedAuthConfig || endpoint.security || { type: 'inherit', config: {} };
-        const resolvedAuth = withBearerFallback(await resolveEffectiveAuthConfig(configuredAuth, {
+        const { authConfig: inheritedAuth, source: authSource } = await resolveEffectiveAuthWithSource(configuredAuth, {
             collectionId: collection.id,
             endpointId: endpoint.id,
             repository: this.collectionRepository
-        }), effectiveVariables);
-        const { authConfig: substitutedAuth } = resolveAuthConfigVariables(resolvedAuth, effectiveVariables, processor);
+        });
+        const resolvedAuth = withBearerFallback(inheritedAuth, effectiveVariables);
+        let { authConfig: substitutedAuth } = resolveAuthConfigVariables(resolvedAuth, effectiveVariables, processor);
+        if (authSource && resolvedAuth === inheritedAuth) {
+            const renewal = await ensureFreshOAuthToken({
+                rawAuth: resolvedAuth,
+                resolvedAuth: substitutedAuth,
+                key: authSource.kind === 'folder'
+                    ? `${collection.id}|folder|${authSource.folderId}`
+                    : authSource.kind === 'collection' ? `${collection.id}|collection` : `${collection.id}|request|${endpoint.id}`,
+                getToken: (request) => this.backendAPI.oauth2.getToken(request),
+                persist: (nextRaw) => this.collectionRepository.saveAuthConfigAtSource(collection.id, endpoint.id, authSource, nextRaw)
+            });
+            substitutedAuth = renewal.resolvedAuth;
+            if (renewal.error) {
+                this.statusDisplay?.update(renewal.error, null);
+            }
+        }
         const authData = generateAuthData(substitutedAuth);
         this.requestBuilder.mergeAuthData(headers, queryParams, authData);
 

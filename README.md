@@ -57,7 +57,7 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 
 ### Security
 
-- **Auth methods** — Bearer, Basic, API Key, OAuth 2.0, Digest, NTLM, AWS Signature v4 — configurable at request, folder, or collection level
+- **Auth methods** — Bearer, Basic, API Key, OAuth 2.0 (expired tokens are renewed automatically before sending), Digest, NTLM, AWS Signature v4 — configurable at request, folder, or collection level
 - **Client certificates (mTLS)** — per-host PEM certificates with custom CA trust
 - **Keychain-backed secrets** — literal credentials and secret variables are encrypted at rest in the OS credential store and never written to the git-friendly collection files
 - **Proxy support** — HTTP/HTTPS/SOCKS with authentication and bypass lists

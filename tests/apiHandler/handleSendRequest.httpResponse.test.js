@@ -189,3 +189,25 @@ describe('cancelling a unary gRPC call', () => {
     });
 });
 
+describe('OAuth tokens are renewed before sending', () => {
+    test('an expired request-level token is refreshed, sent, and shown in the auth form', async () => {
+        const loaded = await loadApiHandler({ success: true, status: 200, headers: {}, data: 'ok' });
+        const { authManager } = await import('../../src/modules/authManager.js');
+        authManager.currentAuthConfig = {
+            type: 'oauth2',
+            config: { token: 'stale', expiresAt: Date.now() - 1000, refreshToken: 'r1', tokenUrl: 'https://auth.test/token', clientId: 'app' }
+        };
+        window.backendAPI.oauth2 = { getToken: jest.fn().mockResolvedValue({ success: true, accessToken: 'fresh', expiresIn: 60 }) };
+
+        await loaded.handleSendRequest();
+
+        expect(window.backendAPI.oauth2.getToken).toHaveBeenCalledWith(expect.objectContaining({ grantType: 'refresh_token' }));
+        const sent = window.backendAPI.sendApiRequest.mock.calls[0][0];
+        expect(sent.headers.Authorization).toBe('Bearer fresh');
+        expect(authManager.currentAuthConfig.config.token).toBe('fresh');
+        expect(authManager.currentAuthConfig.config.expiresAt).toBeGreaterThan(Date.now());
+        delete loaded.app.workspaceTabController;
+        delete loaded.app.cookieController;
+    });
+});
+

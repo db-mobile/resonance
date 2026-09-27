@@ -776,6 +776,26 @@ describe('RunnerService', () => {
             expect(config.headers['Authorization']).toBe('Bearer resolved-secret');
         });
 
+        test('an expired inherited OAuth token is renewed, sent and saved back to the collection', async () => {
+            service.collectionRepository.getInheritedAuthSource = jest.fn().mockResolvedValue({ kind: 'collection' });
+            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue({
+                type: 'oauth2',
+                config: { token: 'stale', expiresAt: Date.now() - 1000, refreshToken: 'r1', tokenUrl: 'https://{{authHost}}/token', clientId: 'app' }
+            });
+            service.collectionRepository.saveAuthConfigAtSource = jest.fn().mockResolvedValue(undefined);
+            mockBackendAPI.oauth2 = { getToken: jest.fn().mockResolvedValue({ success: true, accessToken: 'fresh', expiresIn: 60 }) };
+
+            const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, { authHost: 'auth.test' });
+
+            expect(mockBackendAPI.oauth2.getToken).toHaveBeenCalledWith(expect.objectContaining({
+                grantType: 'refresh_token', refreshToken: 'r1', tokenUrl: 'https://auth.test/token'
+            }));
+            expect(config.headers['Authorization']).toBe('Bearer fresh');
+            const [collectionId, endpointId, source, saved] = service.collectionRepository.saveAuthConfigAtSource.mock.calls[0];
+            expect([collectionId, endpointId, source]).toEqual(['c1', 'e1', { kind: 'collection' }]);
+            expect(saved.config).toMatchObject({ token: 'fresh', tokenUrl: 'https://{{authHost}}/token' });
+        });
+
         test('inherit with no collection auth sends unauthenticated', async () => {
             const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {});
 

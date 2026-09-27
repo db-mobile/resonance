@@ -652,6 +652,16 @@ export class AuthManager {
 
     /**
      * @param {Object} result
+     * @returns {void}
+     */
+    applyTokenResult(result) {
+        if (this.currentAuthConfig?.type === 'oauth2') {
+            this._handleTokenResponse(result, null, null);
+        }
+    }
+
+    /**
+     * @param {Object} result
      * @param {HTMLElement} errorGroup
      * @param {HTMLElement} errorMessage
      * @returns {void}
@@ -670,11 +680,16 @@ export class AuthManager {
             }
 
             const tokenExpires = this._el('oauth2-token-expires');
-            if (tokenExpires && result.expiresIn) {
+            if (result.expiresIn) {
                 const expiresAt = new Date(Date.now() + result.expiresIn * 1000);
-                tokenExpires.textContent = `Expires: ${expiresAt.toLocaleTimeString()}`;
-                tokenExpires.classList.remove('u-hidden');
                 this.currentAuthConfig.config.expiresAt = expiresAt.getTime();
+                if (tokenExpires) {
+                    tokenExpires.textContent = `Expires: ${expiresAt.toLocaleTimeString()}`;
+                    tokenExpires.classList.remove('u-hidden');
+                }
+            } else {
+                delete this.currentAuthConfig.config.expiresAt;
+                tokenExpires?.classList.add('u-hidden');
             }
 
             if (result.refreshToken) {
