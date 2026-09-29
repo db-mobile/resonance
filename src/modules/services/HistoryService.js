@@ -165,14 +165,6 @@ export class HistoryService {
 
     /**
      * @param {string} id
-     * @returns {Promise<Object|null>}
-     */
-    async getHistoryById(id) {
-        return this.repository.getById(id);
-    }
-
-    /**
-     * @param {string} id
      * @returns {Promise<boolean>}
      */
     async deleteHistoryEntry(id) {
@@ -182,14 +174,6 @@ export class HistoryService {
     /** @returns {Promise<void>} */
     async clearAllHistory() {
         return this.repository.clear();
-    }
-
-    /**
-     * @param {string} collectionId
-     * @returns {Promise<Array<Object>>}
-     */
-    async getHistoryByCollection(collectionId) {
-        return this.repository.getByCollection(collectionId);
     }
 
     /**

@@ -1,14 +1,9 @@
 //! Presenting a v2 collection over IPC in the shape the frontend expects.
 //!
-//! The renderer still walks a flat `endpoints` array plus one level of
-//! `folders[].endpoints`, so a v2 tree is projected back into that shape on the
-//! way out. The duplication is a property of this one response, not of the
-//! files: on disk each request exists exactly once.
-//!
-//! Nested folders are flattened into their nearest top-level ancestor, because
-//! the current renderer cannot draw nesting. `folderPath` carries the full
-//! location so the tree UI can restore it without another format change.
-#![allow(dead_code)]
+//! The renderer walks a flat `endpoints` array alongside a nested `folders`
+//! tree, so every request is listed twice on the way out. The duplication is a
+//! property of this one response, not of the files: on disk each request
+//! exists exactly once.
 
 use serde_json::{Map, Value, json};
 use std::collections::{HashMap, HashSet};
@@ -565,7 +560,7 @@ mod tests {
     use super::*;
     use crate::commands::collections::legacy::v1_to_v2;
     use crate::commands::collections::model::{FORMAT_VERSION, FolderDoc};
-    use crate::commands::collections::read::{Layout, RequestEntry, read_collection_dir};
+    use crate::commands::collections::read::{RequestEntry, read_collection_dir};
     use crate::commands::collections::write::write_collection_dir;
     use std::collections::HashMap;
     use tempfile::TempDir;
@@ -606,7 +601,6 @@ mod tests {
             open_api_spec: None,
             variables: Vec::new(),
             root,
-            layout: Layout::V2,
         }
     }
 
@@ -948,7 +942,7 @@ mod tests {
 mod save_path {
     use super::*;
     use crate::commands::collections::model::{Body, BodyKind, FORMAT_VERSION};
-    use crate::commands::collections::read::{Layout, RequestEntry};
+    use crate::commands::collections::read::RequestEntry;
 
     fn existing_with_state() -> LoadedCollection {
         let mut doc = RequestDoc::new("r1".into(), "Create Pet".into());
@@ -978,7 +972,6 @@ mod save_path {
                 requests: vec![RequestEntry::new(doc)],
                 ..Default::default()
             },
-            layout: Layout::V2,
         }
     }
 

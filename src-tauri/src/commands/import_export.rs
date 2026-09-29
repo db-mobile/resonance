@@ -287,7 +287,7 @@ pub async fn import_postman_environment(app: AppHandle) -> Result<Option<Value>,
     let content =
         std::fs::read_to_string(file_path).map_err(|e| format!("Failed to read file: {}", e))?;
 
-    let env: Value = serde_json::from_str(&content)
+    let env: Value = serde_json::from_str(content.trim_start_matches('\u{feff}'))
         .map_err(|e| format!("Failed to parse Postman environment: {}", e))?;
 
     // Extract variables

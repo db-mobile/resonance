@@ -1,11 +1,9 @@
 use super::api_request::ClientCertConfig;
+use super::tab_sessions::{CommandAck, Session, TabSessions, require_tab_id};
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS, Transport};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
-use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
 /// Maximum MQTT packet size (incoming and outgoing). rumqttc defaults to only
@@ -37,16 +35,16 @@ struct MqttConnection {
     broker: String,
 }
 
-pub struct MqttState {
-    connections: Arc<Mutex<HashMap<String, MqttConnection>>>,
+impl MqttConnection {
+    async fn shutdown(self) {
+        let _ = self.client.disconnect().await;
+        self.poll_handle.abort();
+    }
 }
 
-impl Default for MqttState {
-    fn default() -> Self {
-        Self {
-            connections: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
+#[derive(Default)]
+pub struct MqttState {
+    connections: TabSessions<MqttConnection>,
 }
 
 /// TLS options for `mqtts://` connections. The client identity (mTLS) and
@@ -93,11 +91,6 @@ pub struct MqttPublishRequest {
     pub qos: Option<u8>,
     #[serde(default)]
     pub retain: Option<bool>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct MqttCommandResponse {
-    pub success: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -216,20 +209,8 @@ fn parse_broker(broker: &str) -> Result<(String, u16, bool), String> {
 /// default, so skip-verify, custom CA, and mTLS all flow through the shared
 /// tls.rs builders. No ALPN is set (MQTT is not h2).
 fn build_tls_transport(tls: &MqttTlsOptions) -> Result<Transport, String> {
-    let (cert_path, key_path, ca_path) = match tls.client_cert.as_ref() {
-        Some(cert) => (&cert.cert_path, &cert.key_path, &cert.ca_path),
-        None => (&None, &None, &None),
-    };
-
-    let identity = crate::commands::tls::load_identity_pems(cert_path, key_path)?;
-
-    let config = if tls.skip_verify {
-        crate::commands::tls::build_danger_tls_config(identity)?
-    } else {
-        let ca_pem = crate::commands::tls::load_ca_pem(ca_path)?;
-        crate::commands::tls::build_verifying_tls_config(ca_pem, identity)?
-    };
-
+    let config =
+        crate::commands::tls::build_client_tls_config(!tls.skip_verify, tls.client_cert.as_ref())?;
     Ok(Transport::tls_with_config(config.into()))
 }
 
@@ -259,17 +240,9 @@ fn build_config_key(request: &MqttConnectRequest, host: &str, port: u16, use_tls
     )
 }
 
-async fn remove_connection(
-    state: &Arc<Mutex<HashMap<String, MqttConnection>>>,
-    tab_id: &str,
-) -> Option<MqttConnection> {
-    let mut connections = state.lock().await;
-    connections.remove(tab_id)
-}
-
 async fn establish_connection(
     app: AppHandle,
-    state: Arc<Mutex<HashMap<String, MqttConnection>>>,
+    state: TabSessions<MqttConnection>,
     request: &MqttConnectRequest,
     host: String,
     port: u16,
@@ -300,10 +273,10 @@ async fn establish_connection(
     let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
 
     // Hold the map lock across spawn + insert so the poll task's cleanup
-    // (remove_connection) cannot run before the entry exists. An instantly
-    // failing event loop parks on this lock and then removes the entry
-    // inserted below, instead of racing ahead of the insert and leaving a
-    // dead connection in the map.
+    // cannot run before the entry exists. An instantly failing event loop
+    // parks on this lock and then removes the entry inserted below, instead
+    // of racing ahead of the insert and leaving a dead connection in the map.
+    let generation = state.next_generation();
     let mut connections = state.lock().await;
 
     let poll_app = app.clone();
@@ -348,21 +321,30 @@ async fn establish_connection(
 
         // Emit a single terminal disconnect when the loop ends (broker close or
         // error). On an explicit abort (user disconnect / tab close) this code does
-        // not run — the frontend already handles UI cleanup in those paths.
-        emit_event(
-            &poll_app,
-            MqttEventPayload::disconnect(&poll_tab_id, &poll_broker),
-        );
-        remove_connection(&poll_state, &poll_tab_id).await;
+        // not run — the frontend already handles UI cleanup in those paths. A
+        // loop that was superseded by a reconnect on this tab stays silent.
+        if poll_state
+            .remove_if_current(&poll_tab_id, generation)
+            .await
+            .is_some()
+        {
+            emit_event(
+                &poll_app,
+                MqttEventPayload::disconnect(&poll_tab_id, &poll_broker),
+            );
+        }
     });
 
     connections.insert(
         request.tab_id.clone(),
-        MqttConnection {
-            client: client.clone(),
-            poll_handle,
-            config_key,
-            broker: request.broker.clone(),
+        Session {
+            generation,
+            value: MqttConnection {
+                client: client.clone(),
+                poll_handle,
+                config_key,
+                broker: request.broker.clone(),
+            },
         },
     );
     drop(connections);
@@ -375,10 +357,8 @@ pub async fn mqtt_connect(
     app: AppHandle,
     state: State<'_, MqttState>,
     request: MqttConnectRequest,
-) -> Result<MqttCommandResponse, String> {
-    if request.tab_id.trim().is_empty() {
-        return Err("Tab ID is required".to_string());
-    }
+) -> Result<CommandAck, String> {
+    require_tab_id(&request.tab_id)?;
 
     let (host, port, use_tls) = match parse_broker(&request.broker) {
         Ok(parsed) => parsed,
@@ -398,6 +378,7 @@ pub async fn mqtt_connect(
         let connections = state.connections.lock().await;
         connections
             .get(&request.tab_id)
+            .map(|session| &session.value)
             .filter(|connection| {
                 connection.config_key == config_key && !connection.poll_handle.is_finished()
             })
@@ -407,9 +388,9 @@ pub async fn mqtt_connect(
     let client = if let Some(client) = existing_client {
         client
     } else {
-        if let Some(connection) = remove_connection(&state.connections, &request.tab_id).await {
-            let _ = connection.client.disconnect().await;
-            connection.poll_handle.abort();
+        let previous = state.connections.lock().await.remove(&request.tab_id);
+        if let Some(previous) = previous {
+            previous.value.shutdown().await;
         }
 
         match establish_connection(
@@ -455,7 +436,7 @@ pub async fn mqtt_connect(
         }
     }
 
-    Ok(MqttCommandResponse { success: true })
+    Ok(CommandAck::ok())
 }
 
 #[tauri::command]
@@ -463,7 +444,7 @@ pub async fn mqtt_publish(
     app: AppHandle,
     state: State<'_, MqttState>,
     request: MqttPublishRequest,
-) -> Result<MqttCommandResponse, String> {
+) -> Result<CommandAck, String> {
     if request.topic.trim().is_empty() {
         return Err("Publish topic is required".to_string());
     }
@@ -472,7 +453,7 @@ pub async fn mqtt_publish(
         let connections = state.connections.lock().await;
         connections
             .get(&request.tab_id)
-            .map(|connection| (connection.client.clone(), connection.broker.clone()))
+            .map(|session| (session.value.client.clone(), session.value.broker.clone()))
     };
 
     let (client, broker) =
@@ -499,24 +480,19 @@ pub async fn mqtt_publish(
             message
         })?;
 
-    Ok(MqttCommandResponse { success: true })
+    Ok(CommandAck::ok())
 }
 
 #[tauri::command]
-pub async fn mqtt_close(
-    state: State<'_, MqttState>,
-    tab_id: String,
-) -> Result<MqttCommandResponse, String> {
-    if tab_id.trim().is_empty() {
-        return Err("Tab ID is required".to_string());
+pub async fn mqtt_close(state: State<'_, MqttState>, tab_id: String) -> Result<CommandAck, String> {
+    require_tab_id(&tab_id)?;
+
+    let connection = state.connections.lock().await.remove(&tab_id);
+    if let Some(connection) = connection {
+        connection.value.shutdown().await;
     }
 
-    if let Some(connection) = remove_connection(&state.connections, &tab_id).await {
-        let _ = connection.client.disconnect().await;
-        connection.poll_handle.abort();
-    }
-
-    Ok(MqttCommandResponse { success: true })
+    Ok(CommandAck::ok())
 }
 
 #[cfg(test)]

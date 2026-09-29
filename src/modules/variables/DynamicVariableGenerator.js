@@ -100,11 +100,6 @@ export class DynamicVariableGenerator {
         return `[${name}]`;
     }
 
-    /** @returns {string[]} */
-    getSupportedVariables() {
-        return Object.keys(this.generators);
-    }
-
     /** @returns {string} */
     _generateUUID() {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {

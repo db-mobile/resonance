@@ -126,20 +126,6 @@ export class VariableService {
     }
 
     /**
-     * @param {Object} request
-     * @param {string} collectionId
-     * @returns {Promise<Object>}
-     */
-    async processRequest(request, collectionId) {
-        try {
-            const variables = await this.getVariablesForCollection(collectionId);
-            return this.processor.processObject(request, variables);
-        } catch (error) {
-            return request;
-        }
-    }
-
-    /**
      * @param {string} template
      * @param {string} collectionId
      * @returns {Promise<string>}
@@ -151,28 +137,6 @@ export class VariableService {
         } catch (error) {
             return template;
         }
-    }
-
-    /**
-     * @param {string} template
-     * @param {string} collectionId
-     * @returns {Promise<Object>}
-     */
-    async getTemplatePreview(template, collectionId) {
-        try {
-            const variables = await this.getVariablesForCollection(collectionId);
-            return this.processor.getPreview(template, variables);
-        } catch (error) {
-            return { preview: template, missingVariables: [], foundVariables: [] };
-        }
-    }
-
-    /**
-     * @param {Object} request
-     * @returns {Array<string>}
-     */
-    findUsedVariables(request) {
-        return this.processor.extractVariableNamesFromObject(request);
     }
 
     /**

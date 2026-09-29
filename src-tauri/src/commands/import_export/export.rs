@@ -104,11 +104,18 @@ pub(crate) fn collection_to_openapi(collection: &Collection) -> (Value, Vec<Stri
         }
 
         if let Some(params) = &endpoint.parameters {
-            operation["parameters"] = serde_json::to_value(params).unwrap_or(Value::Array(vec![]));
+            let params = parameters_to_openapi(params);
+            if !params.is_empty() {
+                operation["parameters"] = Value::Array(params);
+            }
         }
 
-        if let Some(body) = &endpoint.request_body {
-            operation["requestBody"] = body.clone();
+        if let Some(body) = endpoint
+            .request_body
+            .as_ref()
+            .and_then(request_body_to_openapi)
+        {
+            operation["requestBody"] = body;
         }
 
         if let Some(responses) = &endpoint.responses {
@@ -140,6 +147,62 @@ pub(crate) fn collection_to_openapi(collection: &Collection) -> (Value, Vec<Stri
     }
 
     (spec, skipped)
+}
+
+/// Flattens the app's `{ path, query, header }` parameter groups into an
+/// OpenAPI `parameters` array.
+fn parameters_to_openapi(params: &Value) -> Vec<Value> {
+    ["path", "query", "header"]
+        .into_iter()
+        .filter_map(|location| Some((location, params.get(location)?.as_object()?)))
+        .flat_map(|(location, group)| {
+            group.iter().map(move |(name, param)| {
+                let required = location == "path"
+                    || param.get("required").and_then(Value::as_bool) == Some(true);
+                let mut parameter = serde_json::json!({
+                    "name": name,
+                    "in": location,
+                    "required": required,
+                    "schema": param
+                        .get("schema")
+                        .cloned()
+                        .unwrap_or_else(|| serde_json::json!({ "type": "string" })),
+                });
+                if let Some(description) = param.get("description") {
+                    parameter["description"] = description.clone();
+                }
+                if let Some(example) = param.get("example").filter(|e| e.as_str() != Some("")) {
+                    parameter["example"] = example.clone();
+                }
+                parameter
+            })
+        })
+        .collect()
+}
+
+/// Converts the app's `{ example, schema? }` body into an OpenAPI
+/// `requestBody`; a non-JSON example is exported as `text/plain`.
+fn request_body_to_openapi(body: &Value) -> Option<Value> {
+    let example = body
+        .get("example")
+        .and_then(Value::as_str)
+        .filter(|e| !e.trim().is_empty());
+    let parsed = example.and_then(|e| serde_json::from_str::<Value>(e).ok());
+    let schema = body.get("schema");
+
+    if schema.is_none() && parsed.is_none() {
+        return example
+            .map(|text| serde_json::json!({ "content": { "text/plain": { "example": text } } }));
+    }
+
+    let mut media = serde_json::Map::new();
+    if let Some(schema) = schema {
+        media.insert("schema".to_string(), schema.clone());
+    }
+    if let Some(parsed) = parsed {
+        media.insert("example".to_string(), parsed);
+    }
+    Some(serde_json::json!({ "content": { "application/json": media } }))
 }
 
 fn endpoint_to_postman_item(collection: &Collection, endpoint: &Endpoint) -> Value {
@@ -256,29 +319,20 @@ fn auth_to_postman(security: &Value) -> Option<Value> {
                 "bearer": [{ "key": "token", "value": token, "type": "string" }]
             }))
         }
-        "basic" => Some(serde_json::json!({
-            "type": "basic",
-            "basic": [
-                { "key": "username", "value": get("username").unwrap_or(""), "type": "string" },
-                { "key": "password", "value": get("password").unwrap_or(""), "type": "string" }
-            ]
-        })),
-        "digest" => Some(serde_json::json!({
-            "type": "digest",
-            "digest": [
-                { "key": "username", "value": get("username").unwrap_or(""), "type": "string" },
-                { "key": "password", "value": get("password").unwrap_or(""), "type": "string" }
-            ]
-        })),
-        "ntlm" => Some(serde_json::json!({
-            "type": "ntlm",
-            "ntlm": [
-                { "key": "username", "value": get("username").unwrap_or(""), "type": "string" },
-                { "key": "password", "value": get("password").unwrap_or(""), "type": "string" },
-                { "key": "domain", "value": get("domain").unwrap_or(""), "type": "string" },
-                { "key": "workstation", "value": get("workstation").unwrap_or(""), "type": "string" }
-            ]
-        })),
+        "basic" | "digest" | "ntlm" => {
+            let keys: &[&str] = if auth_type == "ntlm" {
+                &["username", "password", "domain", "workstation"]
+            } else {
+                &["username", "password"]
+            };
+            let params: Vec<Value> = keys
+                .iter()
+                .map(|key| {
+                    serde_json::json!({ "key": key, "value": get(key).unwrap_or(""), "type": "string" })
+                })
+                .collect();
+            Some(serde_json::json!({ "type": auth_type, (auth_type): params }))
+        }
         "api-key" => {
             let key = get("keyName").or_else(|| get("key")).unwrap_or("");
             let value = get("keyValue").or_else(|| get("value")).unwrap_or("");
@@ -755,5 +809,52 @@ mod tests {
         assert_eq!(config["password"], "{{ntlmPass}}");
         assert_eq!(config["domain"], "CORP");
         assert_eq!(config["workstation"], "DEV-BOX");
+    }
+
+    #[test]
+    fn openapi_export_writes_spec_shaped_parameters_and_bodies() {
+        let mut create = endpoint("Create Item", "POST");
+        create.path = "/items/{id}".to_string();
+        create.parameters = Some(serde_json::json!({
+            "path": { "id": { "example": "7" } },
+            "query": { "dry": { "example": "", "description": "No writes", "required": true } },
+            "header": { "X-Trace": { "example": "abc" } }
+        }));
+        create.request_body = Some(serde_json::json!({ "example": "{\"name\": \"a\"}" }));
+        let mut note = endpoint("Note", "PUT");
+        note.request_body = Some(serde_json::json!({ "example": "plain words" }));
+        let mut empty = endpoint("Empty", "POST");
+        empty.request_body = Some(serde_json::json!({ "example": "" }));
+
+        let collection = Collection {
+            id: "col".to_string(),
+            name: "Spec".to_string(),
+            description: None,
+            base_url: None,
+            endpoints: vec![create, note, empty],
+            folders: Vec::new(),
+            variables: None,
+            auth_config: None,
+        };
+        let (spec, _) = collection_to_openapi(&collection);
+
+        let post = &spec["paths"]["/items/{id}"]["post"];
+        assert_eq!(
+            post["parameters"],
+            serde_json::json!([
+                { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "example": "7" },
+                { "name": "dry", "in": "query", "required": true, "schema": { "type": "string" }, "description": "No writes" },
+                { "name": "X-Trace", "in": "header", "required": false, "schema": { "type": "string" }, "example": "abc" }
+            ])
+        );
+        assert_eq!(
+            post["requestBody"],
+            serde_json::json!({ "content": { "application/json": { "example": { "name": "a" } } } })
+        );
+        assert_eq!(
+            spec["paths"]["/note"]["put"]["requestBody"],
+            serde_json::json!({ "content": { "text/plain": { "example": "plain words" } } })
+        );
+        assert!(spec["paths"]["/empty"]["post"].get("requestBody").is_none());
     }
 }

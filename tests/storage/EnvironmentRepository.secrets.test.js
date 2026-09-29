@@ -40,6 +40,21 @@ describe('EnvironmentRepository secret handling', () => {
         expect(env.secretKeys).toEqual(['baseUrl']);
     });
 
+    test('applyVariableChanges keeps secrets secret, writes plaintext and deletes nulls in one save', async () => {
+        seedEnvironment({ variables: { baseUrl: 'http://localhost', token: '', stale: 'x' }, secretKeys: ['token'] });
+        await repository.getAllEnvironments();
+        mockBackendAPI.store.set.mockClear();
+
+        await repository.applyVariableChanges('env_1', { token: 'fresh-jwt', baseUrl: 'http://staging', stale: null });
+
+        const env = await repository.getEnvironmentById('env_1');
+        expect(env.variables).toEqual({ baseUrl: 'http://staging', token: '' });
+        expect(env.secretKeys).toEqual(['token']);
+        expect(await secretStore.get('env:env_1', 'token')).toBe('fresh-jwt');
+        const environmentWrites = mockBackendAPI.store.set.mock.calls.filter(([key]) => key === 'environments');
+        expect(environmentWrites).toHaveLength(1);
+    });
+
     test('setEnvironmentVariable with isSecret stores value out of band and masks placeholder', async () => {
         seedEnvironment();
         await repository.setEnvironmentVariable('env_1', 'apiKey', 'super-secret', true);

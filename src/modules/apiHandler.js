@@ -33,13 +33,13 @@ const debouncedSaveRequestModifications = debounce((collectionId, endpointId) =>
 }, SAVE_DEBOUNCE_MS);
 
 /** @returns {Promise<void>} */
-export async function flushPendingRequestSave() {
+async function flushPendingRequestSave() {
     await debouncedSaveRequestModifications.flush();
     await inFlightRequestSave;
 }
 
 /** @returns {void} */
-export function cancelPendingRequestSave() {
+function cancelPendingRequestSave() {
     debouncedSaveRequestModifications.cancel();
 }
 
@@ -339,7 +339,7 @@ function globalResponseElements() {
     };
 }
 
-export function initResponseEditor() {
+function initResponseEditor() {
     if (!responseEditor && responseBodyContainer) {
         responseEditor = createLazyEditorProxy('response', responseBodyContainer);
 
@@ -495,7 +495,7 @@ export function displayResponseWithLineNumbersForTab(content, contentType = null
     }
 }
 
-export function clearResponseDisplay() {
+function clearResponseDisplay() {
     return clearResponseDisplayForTab(null);
 }
 
@@ -560,7 +560,7 @@ function setCancelButtonLabel(disconnect) {
 }
 
 /** @returns {Promise<void>} */
-export async function refreshStreamControls() {
+async function refreshStreamControls() {
     if (requestInProgress || !cancelRequestBtn) {
         return;
     }

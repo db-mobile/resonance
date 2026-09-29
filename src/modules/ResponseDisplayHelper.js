@@ -15,7 +15,7 @@ import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanc
  * @param {HTMLElement} [globalElements.performanceDisplay]
  * @returns {{ headersEditor: Object|null, cookiesDisplay: HTMLElement|null, performanceDisplay: HTMLElement|null, isPerTab: boolean }}
  */
-export function getResponseElements(tabId, globalElements = {}) {
+function getResponseElements(tabId, globalElements = {}) {
     const containerElements = tabId
         ? app.responseContainerManager?.getOrCreateContainer(tabId)
         : app.responseContainerManager?.getActiveElements();

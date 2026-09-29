@@ -77,7 +77,7 @@ export class RunnerResultsPanel {
         this._initializeResultsList();
 
         if (app.i18n && app.i18n.updateUI) {
-            app.i18n.updateUI();
+            app.i18n.updateUI(runnerPanel);
         }
     }
 

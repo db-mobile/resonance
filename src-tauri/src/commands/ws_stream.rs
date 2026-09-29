@@ -14,9 +14,8 @@
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
-use tokio::sync::{Mutex, mpsc};
+use tauri::{AppHandle, Emitter, Runtime};
+use tokio::sync::mpsc;
 use tokio_tungstenite::{
     client_async_tls_with_config, connect_async_tls_with_config,
     tungstenite::{client::IntoClientRequest, protocol::Message},
@@ -25,6 +24,7 @@ use tokio_tungstenite::{
 use super::api_request::ClientCertConfig;
 use super::proxy::{ProxySettings, WsProxyAction};
 use super::proxy_tunnel::connect_through_proxy;
+use super::tab_sessions::{CommandAck, Session, TabSessions, require_tab_id};
 use super::tls::{build_ws_connector, ws_uri_is_secure};
 
 /// Everything that differs between the two transports. All fields are static:
@@ -51,17 +51,48 @@ pub(crate) enum WsCommand {
     Close,
 }
 
-#[derive(Clone)]
+/// A live socket. The entry is only ever removed by its own reader task, once
+/// the socket has actually ended, so that task alone reports `close` for the
+/// tab; a closing socket stays registered but is never reused.
 pub(crate) struct WsConnection {
     sender: mpsc::UnboundedSender<WsCommand>,
     url: String,
     headers: HashMap<String, String>,
     verify_ssl: bool,
     client_cert: Option<ClientCertConfig>,
+    closing: bool,
+}
+
+impl WsConnection {
+    /// Ask the writer to send a close frame, at most once.
+    fn begin_close(&mut self) {
+        if !self.closing {
+            let _ = self.sender.send(WsCommand::Close);
+            self.closing = true;
+        }
+    }
+
+    fn is_reusable_for(
+        &self,
+        url: &str,
+        headers: &HashMap<String, String>,
+        verify_ssl: bool,
+        client_cert: &Option<ClientCertConfig>,
+    ) -> bool {
+        // The TLS material is part of the identity of the socket: reusing a
+        // connection opened under different certificate settings would silently
+        // ignore the change the user just made.
+        !self.closing
+            && !self.sender.is_closed()
+            && self.url == url
+            && self.headers == *headers
+            && self.verify_ssl == verify_ssl
+            && self.client_cert == *client_cert
+    }
 }
 
 /// Registry of live sockets, keyed by tab id.
-pub(crate) type WsConnections = Arc<Mutex<HashMap<String, WsConnection>>>;
+pub(crate) type WsConnections = TabSessions<WsConnection>;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -80,11 +111,6 @@ pub struct WsSendRequest {
     pub verify_ssl: Option<bool>,
     #[serde(default)]
     pub client_cert: Option<ClientCertConfig>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct WsCommandResponse {
-    pub success: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -158,20 +184,13 @@ fn target_authority(
     Ok((host, port))
 }
 
-fn emit_event(app: &AppHandle, channel: &WsChannel, payload: WsEventPayload) {
+fn emit_event<R: Runtime>(app: &AppHandle<R>, channel: &WsChannel, payload: WsEventPayload) {
     let _ = app.emit(channel.event_name, payload);
 }
 
-async fn remove_connection_if_current(connections: &WsConnections, tab_id: &str, url: &str) {
-    let mut connections = connections.lock().await;
-    if matches!(connections.get(tab_id), Some(connection) if connection.url == url) {
-        connections.remove(tab_id);
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
-async fn establish_connection(
-    app: AppHandle,
+async fn establish_connection<R: Runtime>(
+    app: AppHandle<R>,
     channel: &'static WsChannel,
     connections: WsConnections,
     tab_id: String,
@@ -278,8 +297,8 @@ async fn establish_connection(
 /// former is tunnelled through a boxed stream, the latter is whatever
 /// tungstenite dialled.
 #[allow(clippy::too_many_arguments)]
-async fn spawn_pumps<S>(
-    app: AppHandle,
+async fn spawn_pumps<R: Runtime, S>(
+    app: AppHandle<R>,
     channel: &'static WsChannel,
     connections: WsConnections,
     tab_id: String,
@@ -294,25 +313,26 @@ where
 {
     let (mut writer, mut reader) = stream.split();
     let (sender, mut receiver) = mpsc::unbounded_channel::<WsCommand>();
+    let generation = connections.next_generation();
 
-    {
-        let mut guard = connections.lock().await;
-        guard.insert(
-            tab_id.clone(),
-            WsConnection {
+    connections.lock().await.insert(
+        tab_id.clone(),
+        Session {
+            generation,
+            value: WsConnection {
                 sender: sender.clone(),
                 url: url.clone(),
-                headers: headers.clone(),
+                headers,
                 verify_ssl,
-                client_cert: client_cert.clone(),
+                client_cert,
+                closing: false,
             },
-        );
-    }
+        },
+    );
 
     emit_event(&app, channel, WsEventPayload::open(&tab_id, &url));
 
     let write_app = app.clone();
-    let write_connections = connections.clone();
     let write_tab_id = tab_id.clone();
     let write_url = url.clone();
     tokio::spawn(async move {
@@ -334,12 +354,9 @@ where
                 }
             }
         }
-
-        remove_connection_if_current(&write_connections, &write_tab_id, &write_url).await;
     });
 
     let read_app = app.clone();
-    let read_connections = connections.clone();
     tokio::spawn(async move {
         let mut close_payload = None;
 
@@ -384,30 +401,31 @@ where
             }
         }
 
-        if let Some(payload) = close_payload {
-            emit_event(&read_app, channel, payload);
-        } else {
-            emit_event(
-                &read_app,
-                channel,
+        // A socket replaced by a reconnect on this tab stays silent, so its
+        // late `close` cannot tear down the successor in the UI.
+        if connections
+            .remove_if_current(&tab_id, generation)
+            .await
+            .is_some()
+        {
+            let payload = close_payload.unwrap_or_else(|| {
                 WsEventPayload::close(
                     &tab_id,
                     &url,
                     Some(1000),
                     Some("Connection closed".to_string()),
-                ),
-            );
+                )
+            });
+            emit_event(&read_app, channel, payload);
         }
-
-        remove_connection_if_current(&read_connections, &tab_id, &url).await;
     });
 
     sender
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn get_or_create_connection(
-    app: AppHandle,
+async fn get_or_create_connection<R: Runtime>(
+    app: AppHandle<R>,
     channel: &'static WsChannel,
     connections: &WsConnections,
     tab_id: &str,
@@ -417,26 +435,15 @@ async fn get_or_create_connection(
     client_cert: &Option<ClientCertConfig>,
     proxy: WsProxyAction,
 ) -> Result<mpsc::UnboundedSender<WsCommand>, String> {
-    let existing = {
-        let guard = connections.lock().await;
-        guard.get(tab_id).cloned()
-    };
-
-    if let Some(connection) = existing {
-        // The TLS material is part of the identity of the socket: reusing a
-        // connection opened under different certificate settings would silently
-        // ignore the change the user just made.
-        if connection.url == url
-            && connection.headers == *headers
-            && connection.verify_ssl == verify_ssl
-            && connection.client_cert == *client_cert
-        {
-            return Ok(connection.sender);
-        }
-
-        let _ = connection.sender.send(WsCommand::Close);
+    {
         let mut guard = connections.lock().await;
-        guard.remove(tab_id);
+        if let Some(session) = guard.get_mut(tab_id) {
+            let connection = &mut session.value;
+            if connection.is_reusable_for(url, headers, verify_ssl, client_cert) {
+                return Ok(connection.sender.clone());
+            }
+            connection.begin_close();
+        }
     }
 
     establish_connection(
@@ -454,16 +461,14 @@ async fn get_or_create_connection(
 }
 
 /// Connect-or-reuse, then send `request.message` if it is non-empty.
-pub(crate) async fn send(
-    app: AppHandle,
+pub(crate) async fn send<R: Runtime>(
+    app: AppHandle<R>,
     channel: &'static WsChannel,
     connections: &WsConnections,
     proxy_settings: &ProxySettings,
     request: WsSendRequest,
-) -> Result<WsCommandResponse, String> {
-    if request.tab_id.trim().is_empty() {
-        return Err("Tab ID is required".to_string());
-    }
+) -> Result<CommandAck, String> {
+    require_tab_id(&request.tab_id)?;
 
     if request.url.trim().is_empty() {
         return Err(channel.url_required_error.to_string());
@@ -503,28 +508,22 @@ pub(crate) async fn send(
             .map_err(|_| channel.send_failed_error.to_string())?;
     }
 
-    Ok(WsCommandResponse { success: true })
+    Ok(CommandAck::ok())
 }
 
-/// Drop the tab's connection from the registry and ask its writer task to close.
+/// Ask the tab's writer task to close. The entry stays until the reader sees
+/// the socket end, which is what lets it emit the terminal `close`.
 pub(crate) async fn close(
     connections: &WsConnections,
     tab_id: String,
-) -> Result<WsCommandResponse, String> {
-    if tab_id.trim().is_empty() {
-        return Err("Tab ID is required".to_string());
+) -> Result<CommandAck, String> {
+    require_tab_id(&tab_id)?;
+
+    if let Some(session) = connections.lock().await.get_mut(&tab_id) {
+        session.value.begin_close();
     }
 
-    let connection = {
-        let mut guard = connections.lock().await;
-        guard.remove(&tab_id)
-    };
-
-    if let Some(connection) = connection {
-        let _ = connection.sender.send(WsCommand::Close);
-    }
-
-    Ok(WsCommandResponse { success: true })
+    Ok(CommandAck::ok())
 }
 
 #[cfg(test)]
@@ -662,5 +661,87 @@ mod tests {
         assert_eq!(json["message"], "hi");
         assert!(json.get("code").is_none());
         assert!(json.get("reason").is_none());
+    }
+
+    /// Replacing a tab's socket (here: new headers) must not let the old
+    /// socket's late close reach the tab, while a user close still reports.
+    #[tokio::test]
+    async fn a_reconnect_on_the_same_tab_does_not_close_its_successor() {
+        use super::super::websocket::WEBSOCKET_CHANNEL;
+        use std::time::Duration;
+        use tauri::Listener;
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (ended_tx, mut ended) = mpsc::unbounded_channel::<()>();
+        tokio::spawn(async move {
+            let mut accepted = 0;
+            while let Ok((tcp, _)) = listener.accept().await {
+                accepted += 1;
+                let slow_close = accepted == 1;
+                let ended_tx = ended_tx.clone();
+                tokio::spawn(async move {
+                    let mut socket = tokio_tungstenite::accept_async(tcp).await.unwrap();
+                    while let Some(Ok(message)) = socket.next().await {
+                        if slow_close && message.is_close() {
+                            tokio::time::sleep(Duration::from_millis(300)).await;
+                        }
+                    }
+                    let _ = ended_tx.send(());
+                });
+            }
+        });
+
+        let app = tauri::test::mock_app();
+        let (event_tx, mut events) = mpsc::unbounded_channel::<String>();
+        app.listen(WEBSOCKET_CHANNEL.event_name, move |event| {
+            let payload: serde_json::Value = serde_json::from_str(event.payload()).unwrap();
+            let _ = event_tx.send(payload["eventType"].as_str().unwrap().to_string());
+        });
+
+        let connections = WsConnections::default();
+        let proxy = ProxySettings::default();
+        let request = |auth: &str| WsSendRequest {
+            tab_id: "tab-1".to_string(),
+            url: format!("ws://{addr}/socket"),
+            headers: Some(HashMap::from([("X-Auth".to_string(), auth.to_string())])),
+            message: None,
+            verify_ssl: None,
+            client_cert: None,
+        };
+        let settle = || tokio::time::sleep(Duration::from_millis(200));
+
+        send(
+            app.handle().clone(),
+            &WEBSOCKET_CHANNEL,
+            &connections,
+            &proxy,
+            request("a"),
+        )
+        .await
+        .unwrap();
+        send(
+            app.handle().clone(),
+            &WEBSOCKET_CHANNEL,
+            &connections,
+            &proxy,
+            request("b"),
+        )
+        .await
+        .unwrap();
+        ended.recv().await.unwrap();
+        settle().await;
+        assert_eq!(connections.lock().await.len(), 1);
+
+        close(&connections, "tab-1".to_string()).await.unwrap();
+        ended.recv().await.unwrap();
+        settle().await;
+
+        let mut seen = Vec::new();
+        while let Ok(event_type) = events.try_recv() {
+            seen.push(event_type);
+        }
+        assert_eq!(seen, ["open", "open", "close"]);
+        assert!(connections.lock().await.is_empty());
     }
 }

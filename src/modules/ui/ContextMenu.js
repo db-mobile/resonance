@@ -42,7 +42,7 @@ export class ContextMenu {
         this.currentMenu = menu;
 
         if (app.i18n && app.i18n.updateUI) {
-            app.i18n.updateUI();
+            app.i18n.updateUI(menu);
         }
 
         this.adjustPosition(menu, event);

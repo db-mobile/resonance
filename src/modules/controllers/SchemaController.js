@@ -226,26 +226,6 @@ export class SchemaController {
         return { ...result, hasSchema: true };
     }
 
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @param {Object} schema
-     */
-    async setSchemaForEndpoint(collectionId, endpointId, schema) {
-        try {
-            await this.repository.saveResponseSchema(collectionId, endpointId, schema);
-            
-            if (this.currentCollectionId === collectionId &&
-                this.currentEndpointId === endpointId &&
-                this.editor) {
-                this.editor.setSchema(schema, { emitChange: false });
-                this._updateValidationStatus();
-            }
-        } catch (error) {
-            console.error('Failed to set schema for endpoint:', error);
-        }
-    }
-
     destroy() {
         this._debouncedSave.cancel();
         if (this.editor) {

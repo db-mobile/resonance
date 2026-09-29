@@ -6,7 +6,7 @@
 import { app } from '../appContext.js';
 import { BaseModal } from './BaseModal.js';
 
-export const ROOT_TARGET = '__root__';
+const ROOT_TARGET = '__root__';
 
 export class MoveRequestDialog extends BaseModal {
     constructor() {

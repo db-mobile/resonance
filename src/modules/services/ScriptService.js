@@ -56,16 +56,10 @@ export class ScriptService {
      * @returns {Promise<void>}
      */
     async _applyCollectionVariableChanges(collectionId, changes) {
-        if (!collectionId || !this.variableRepository || !changes) {
+        if (!collectionId || !this.variableRepository || !changes || Object.keys(changes).length === 0) {
             return;
         }
-        for (const [key, value] of Object.entries(changes)) {
-            if (value === null) {
-                await this.variableRepository.deleteVariable(collectionId, key);
-            } else {
-                await this.variableRepository.setVariable(collectionId, key, value);
-            }
-        }
+        await this.variableRepository.applyVariableChanges(collectionId, changes);
     }
 
     /**
@@ -311,20 +305,7 @@ export class ScriptService {
                 return;
             }
 
-            const secretKeys = Array.isArray(activeEnv.secretKeys) ? activeEnv.secretKeys : [];
-
-            for (const [key, value] of Object.entries(changes)) {
-                if (value === null) {
-                    await this.environmentService.deleteVariable(activeEnv.id, key);
-                } else {
-                    await this.environmentService.setVariable(
-                        activeEnv.id,
-                        key,
-                        value,
-                        secretKeys.includes(key)
-                    );
-                }
-            }
+            await this.environmentService.applyVariableChanges(activeEnv.id, changes);
 
         } catch (error) {
         }

@@ -266,7 +266,7 @@ export class CollectionRepository {
         const data = await this._getEndpointData(collectionId, endpointId);
         return {
             url: data.url || null,
-            authConfig: data.authConfig || null,
+            authConfig: await this._hydrateAuthConfig(authSecretScope(collectionId, endpointId), data.authConfig || null),
             pathParams: data.pathParams || [],
             queryParams: data.queryParams || [],
             headers: data.headers || [],
@@ -364,7 +364,10 @@ export class CollectionRepository {
 
     async updateEndpointFields(collectionId, endpointId, updates) {
         try {
-            await this._updateEndpointFields(collectionId, endpointId, updates);
+            const fields = 'authConfig' in updates
+                ? { ...updates, authConfig: await this._persistAuthSecrets(authSecretScope(collectionId, endpointId), updates.authConfig) }
+                : updates;
+            await this._updateEndpointFields(collectionId, endpointId, fields);
         } catch (error) {
             throw new Error(`Failed to update endpoint fields: ${error.message || error}`, { cause: error });
         }
@@ -503,23 +506,6 @@ export class CollectionRepository {
         }
 
         return redacted;
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @returns {Promise<Object|null>}
-     */
-    async getPersistedAuthConfig(collectionId, endpointId) {
-        try {
-            const data = await this._getEndpointData(collectionId, endpointId);
-            return this._hydrateAuthConfig(
-                authSecretScope(collectionId, endpointId),
-                data.authConfig || null
-            );
-        } catch (error) {
-            return null;
-        }
     }
 
     /**
@@ -669,38 +655,29 @@ export class CollectionRepository {
 
     /**
      * @param {string} collectionId
-     * @param {string} [endpointId]
-     * @returns {Promise<Object|null>}
+     * @param {string|null|undefined} [endpointId]
+     * @returns {Promise<{authConfig: (Object|null), source: ({kind: string, folderId?: string}|null)}>}
      */
-    async getInheritedAuthConfig(collectionId, endpointId) {
+    async getInheritedAuth(collectionId, endpointId) {
         try {
-            const source = await this.getInheritedAuthSource(collectionId, endpointId);
-            if (source.kind === 'folder') {
-                return this.getFolderAuthConfig(collectionId, source.folderId);
-            }
-            return this.getCollectionAuthConfig(collectionId);
-        } catch (error) {
-            return null;
-        }
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string|null|undefined} endpointId
-     * @returns {Promise<{kind: string, folderId?: string}>}
-     */
-    async getInheritedAuthSource(collectionId, endpointId) {
-        if (endpointId) {
             const collection = await this._getByIdFresh(collectionId);
-            const chain = folderChainForRequest(collection, endpointId);
+            const chain = endpointId ? folderChainForRequest(collection, endpointId) : [];
             for (let index = chain.length - 1; index >= 0; index -= 1) {
                 const folder = chain[index];
                 if (folder?.authConfig?.type && folder.authConfig.type !== 'inherit') {
-                    return { kind: 'folder', folderId: folder.id };
+                    return {
+                        authConfig: await this._hydrateAuthConfig(folderAuthSecretScope(collectionId, folder.id), folder.authConfig),
+                        source: { kind: 'folder', folderId: folder.id }
+                    };
                 }
             }
+            return {
+                authConfig: await this._hydrateAuthConfig(collectionAuthSecretScope(collectionId), collection?.authConfig || null),
+                source: { kind: 'collection' }
+            };
+        } catch (error) {
+            return { authConfig: null, source: null };
         }
-        return { kind: 'collection' };
     }
 
     /**

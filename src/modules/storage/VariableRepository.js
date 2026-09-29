@@ -88,25 +88,6 @@ export class VariableRepository {
         return Object.entries(variables || {}).map(([key, value]) => ({ key, value }));
     }
 
-    /** @returns {Promise<Object>} */
-    async getAllVariables() {
-        try {
-            const collectionIds = await this.backendAPI.collections.list();
-            const allVariables = {};
-
-            for (const collectionId of collectionIds) {
-                const vars = await this.getVariablesForCollection(collectionId);
-                if (Object.keys(vars).length > 0) {
-                    allVariables[collectionId] = vars;
-                }
-            }
-
-            return allVariables;
-        } catch (error) {
-            throw new Error(`Failed to load variables: ${error.message}`, { cause: error });
-        }
-    }
-
     /**
      * @param {string} collectionId
      * @returns {Promise<Object>}
@@ -199,6 +180,29 @@ export class VariableRepository {
 
     /**
      * @param {string} collectionId
+     * @param {Object} changes
+     * @returns {Promise<void>}
+     */
+    async applyVariableChanges(collectionId, changes) {
+        try {
+            const variables = await this.getVariablesForCollection(collectionId);
+            const secretKeys = new Set(await this._getSecretKeys(collectionId));
+            for (const [name, value] of Object.entries(changes)) {
+                if (value === null) {
+                    delete variables[name];
+                    secretKeys.delete(name);
+                } else {
+                    variables[name] = value;
+                }
+            }
+            await this.setVariablesForCollection(collectionId, variables, [...secretKeys]);
+        } catch (error) {
+            throw new Error(`Failed to apply variable changes: ${error.message}`, { cause: error });
+        }
+    }
+
+    /**
+     * @param {string} collectionId
      * @param {string} name
      * @param {*} value
      * @returns {Promise<void>}
@@ -243,19 +247,5 @@ export class VariableRepository {
         } catch {
         }
         this._cache.delete(collectionId);
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} name
-     * @returns {Promise<*>}
-     */
-    async getVariable(collectionId, name) {
-        try {
-            const variables = await this.getVariablesForCollection(collectionId);
-            return variables[name];
-        } catch (error) {
-            return undefined;
-        }
     }
 }

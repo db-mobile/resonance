@@ -5,7 +5,6 @@
 //! folder. Ordering comes from each document's `seq`, with the display name as
 //! a stable tiebreak so a hand-edited or merge-duplicated `seq` degrades to
 //! something deterministic rather than to filesystem order.
-#![allow(dead_code)]
 
 use serde_json::Value;
 use std::collections::HashSet;
@@ -83,7 +82,6 @@ pub(crate) struct LoadedCollection {
     pub open_api_spec: Option<Value>,
     pub variables: Vec<Value>,
     pub root: FolderNode,
-    pub layout: Layout,
 }
 
 impl LoadedCollection {
@@ -380,7 +378,6 @@ pub(crate) fn read_collection_dir(dir: &Path) -> Result<LoadedCollection, String
         open_api_spec,
         variables,
         root,
-        layout: Layout::V2,
     })
 }
 

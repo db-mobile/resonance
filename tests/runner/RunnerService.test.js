@@ -3,6 +3,18 @@ import { RunnerService } from '../../src/modules/services/RunnerService.js';
 import { ScriptService } from '../../src/modules/services/ScriptService.js';
 import { app } from '../../src/modules/appContext.js';
 
+function inheritedFromCollection(authConfig) {
+    return { authConfig, source: { kind: 'collection' } };
+}
+
+function withPersistedAuth(service, authConfig) {
+    const loadPersisted = service.collectionRepository.getAllPersistedEndpointData;
+    service.collectionRepository.getAllPersistedEndpointData = jest.fn(async (...args) => ({
+        ...(await loadPersisted(...args)),
+        authConfig
+    }));
+}
+
 describe('RunnerService', () => {
     let service;
     let mockRepository;
@@ -44,7 +56,7 @@ describe('RunnerService', () => {
         mockEnvironmentService = {
             getActiveEnvironment: jest.fn().mockResolvedValue({ id: 'env1', name: 'Dev', secretKeys: [] }),
             getActiveEnvironmentVariables: jest.fn().mockResolvedValue({}),
-            setVariable: jest.fn().mockResolvedValue(undefined),
+            applyVariableChanges: jest.fn().mockResolvedValue(undefined),
             deleteVariable: jest.fn().mockResolvedValue(undefined)
         };
         window.backendAPI = mockBackendAPI;
@@ -399,7 +411,6 @@ describe('RunnerService', () => {
                 queryParams: [{ key: 'persistedQ', value: 'pq' }],
                 pathParams: [{ key: 'userId', value: 'persisted-id' }]
             });
-            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
 
             collection = { id: 'c1', baseUrl: '', defaultHeaders: {} };
             endpoint = { id: 'e1', method: 'POST', path: '{{baseUrl}}/users/{{userId}}' };
@@ -479,7 +490,6 @@ describe('RunnerService', () => {
 
         beforeEach(() => {
             stubPersisted(null);
-            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
 
             collection = { id: 'c1', baseUrl: '', defaultHeaders: {} };
             endpoint = { id: 'e1', method: 'POST', path: 'https://api.test/upload' };
@@ -585,8 +595,7 @@ describe('RunnerService', () => {
 
         beforeEach(() => {
             stubPersisted();
-            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
-            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue(null);
+            service.collectionRepository.getInheritedAuth = jest.fn().mockResolvedValue(inheritedFromCollection(null));
             collection = { id: 'c1', baseUrl: 'https://api.test', defaultHeaders: {} };
         });
 
@@ -661,7 +670,7 @@ describe('RunnerService', () => {
         });
 
         test('adds api-key query auth to the URL', async () => {
-            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue({
+            withPersistedAuth(service, {
                 type: 'api-key',
                 config: { keyName: 'api_key', keyValue: '{{key}}', location: 'query' }
             });
@@ -674,7 +683,7 @@ describe('RunnerService', () => {
         });
 
         test('falls back to the bearerToken variable for an empty bearer token', async () => {
-            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue({
+            withPersistedAuth(service, {
                 type: 'bearer',
                 config: { token: '' }
             });
@@ -686,7 +695,7 @@ describe('RunnerService', () => {
         });
 
         test('interpolates variables into NTLM credentials', async () => {
-            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue({
+            withPersistedAuth(service, {
                 type: 'ntlm',
                 config: { username: '{{u}}', password: '{{p}}', domain: 'CORP', workstation: '' }
             });
@@ -710,34 +719,33 @@ describe('RunnerService', () => {
                 queryParams: [],
                 pathParams: []
             });
-            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
-            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue(null);
+            service.collectionRepository.getInheritedAuth = jest.fn().mockResolvedValue(inheritedFromCollection(null));
 
             collection = { id: 'c1', baseUrl: '', defaultHeaders: {} };
             endpoint = { id: 'e1', method: 'GET', path: 'https://api.test/users' };
         });
 
         test('endpoint without persisted auth inherits the collection auth', async () => {
-            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue({
+            service.collectionRepository.getInheritedAuth = jest.fn().mockResolvedValue(inheritedFromCollection({
                 type: 'bearer',
                 config: { token: 'shared-token' }
-            });
+            }));
 
             const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {});
 
-            expect(service.collectionRepository.getInheritedAuthConfig).toHaveBeenCalledWith('c1', 'e1');
+            expect(service.collectionRepository.getInheritedAuth).toHaveBeenCalledWith('c1', 'e1');
             expect(config.headers['Authorization']).toBe('Bearer shared-token');
         });
 
         test('explicit persisted none opts out of collection auth', async () => {
-            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue({
+            withPersistedAuth(service, {
                 type: 'none',
                 config: {}
             });
-            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue({
+            service.collectionRepository.getInheritedAuth = jest.fn().mockResolvedValue(inheritedFromCollection({
                 type: 'bearer',
                 config: { token: 'shared-token' }
-            });
+            }));
 
             const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {});
 
@@ -745,14 +753,14 @@ describe('RunnerService', () => {
         });
 
         test('persisted endpoint auth wins over collection auth', async () => {
-            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue({
+            withPersistedAuth(service, {
                 type: 'bearer',
                 config: { token: 'endpoint-token' }
             });
-            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue({
+            service.collectionRepository.getInheritedAuth = jest.fn().mockResolvedValue(inheritedFromCollection({
                 type: 'bearer',
                 config: { token: 'shared-token' }
-            });
+            }));
 
             const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {});
 
@@ -760,14 +768,14 @@ describe('RunnerService', () => {
         });
 
         test('persisted inherit resolves to collection auth with variable substitution', async () => {
-            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue({
+            withPersistedAuth(service, {
                 type: 'inherit',
                 config: {}
             });
-            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue({
+            service.collectionRepository.getInheritedAuth = jest.fn().mockResolvedValue(inheritedFromCollection({
                 type: 'bearer',
                 config: { token: '{{apiToken}}' }
-            });
+            }));
 
             const { requestConfig: config } = await service._buildRequestConfig(collection, endpoint, {
                 apiToken: 'resolved-secret'
@@ -777,11 +785,10 @@ describe('RunnerService', () => {
         });
 
         test('an expired inherited OAuth token is renewed, sent and saved back to the collection', async () => {
-            service.collectionRepository.getInheritedAuthSource = jest.fn().mockResolvedValue({ kind: 'collection' });
-            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue({
+            service.collectionRepository.getInheritedAuth = jest.fn().mockResolvedValue(inheritedFromCollection({
                 type: 'oauth2',
                 config: { token: 'stale', expiresAt: Date.now() - 1000, refreshToken: 'r1', tokenUrl: 'https://{{authHost}}/token', clientId: 'app' }
-            });
+            }));
             service.collectionRepository.saveAuthConfigAtSource = jest.fn().mockResolvedValue(undefined);
             mockBackendAPI.oauth2 = { getToken: jest.fn().mockResolvedValue({ success: true, accessToken: 'fresh', expiresIn: 60 }) };
 
@@ -949,8 +956,7 @@ describe('RunnerService', () => {
             service.collectionRepository.getAllPersistedEndpointData = jest.fn().mockResolvedValue({
                 url: null, headers: [], modifiedBody: null, formBodyData: null, graphqlData: null, queryParams: [], pathParams: []
             });
-            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
-            service.collectionRepository.getInheritedAuthConfig = jest.fn().mockResolvedValue(null);
+            service.collectionRepository.getInheritedAuth = jest.fn().mockResolvedValue(inheritedFromCollection(null));
             service.variableRepository.getVariablesForCollection = jest.fn().mockResolvedValue({});
             service.environmentRepository.getActiveEnvironmentVariables = jest.fn().mockResolvedValue({});
             service.certificateService.getItems = jest.fn().mockResolvedValue([]);
@@ -1011,7 +1017,7 @@ describe('RunnerService', () => {
             const scriptsRun = mockBackendAPI.scripts.executeTest.mock.calls.map(([data]) => data.script);
             expect(scriptsRun).toEqual(['endpointTest()', 'runnerTest()']);
             expect(mockBackendAPI.scripts.executeTest.mock.calls[0][0].environment.token).toBe('abc');
-            expect(mockEnvironmentService.setVariable).toHaveBeenCalledWith('env1', 'token', 'abc', false);
+            expect(mockEnvironmentService.applyVariableChanges).toHaveBeenCalledWith('env1', { token: 'abc' });
             expect(result.variablesSet).toEqual({ token: 'abc' });
             expect(result.logs).toEqual([{ level: 'log', message: 'pre ran', timestamp: 1 }]);
         });
@@ -1371,7 +1377,6 @@ describe('RunnerService', () => {
             service.collectionRepository.getAllPersistedEndpointData = jest.fn().mockResolvedValue({
                 headers: [], modifiedBody: null, formBodyData: null, queryParams: [], pathParams: []
             });
-            service.collectionRepository.getPersistedAuthConfig = jest.fn().mockResolvedValue(null);
             service.variableRepository.getVariablesForCollection = jest.fn().mockResolvedValue({});
             service.environmentRepository.getActiveEnvironmentVariables = jest.fn().mockResolvedValue({});
             service.certificateService.getItems = jest.fn().mockResolvedValue([]);

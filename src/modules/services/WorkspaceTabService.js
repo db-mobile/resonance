@@ -4,7 +4,6 @@
  */
 
 import logger from '../logger.js';
-import { ChangeEmitter } from './ChangeEmitter.js';
 
 const log = logger.scope('WorkspaceTabService');
 
@@ -16,7 +15,6 @@ export class WorkspaceTabService {
     constructor(repository, statusDisplay) {
         this.repository = repository;
         this.statusDisplay = statusDisplay;
-        this._events = new ChangeEmitter();
     }
 
     /** @returns {Promise<Object>} */
@@ -68,7 +66,6 @@ export class WorkspaceTabService {
     async createTab(options = {}) {
         try {
             const newTab = await this.repository.addTab(options);
-            this._notifyListeners('tab-created', newTab);
             return newTab;
         } catch (error) {
             this.statusDisplay?.update('Error creating tab', null);
@@ -89,7 +86,6 @@ export class WorkspaceTabService {
             }
 
             await this.repository.setActiveTabId(tabId);
-            this._notifyListeners('tab-switched', tab);
             return tab;
         } catch (error) {
             this.statusDisplay?.update('Error switching tab', null);
@@ -132,8 +128,39 @@ export class WorkspaceTabService {
                 newActiveTabId
             };
 
-            this._notifyListeners('tab-closed', result);
             return result;
+        } catch (error) {
+            this.statusDisplay?.update('Error closing tab', null);
+            throw error;
+        }
+    }
+
+    /**
+     * @param {Array<string>} tabIds
+     * @returns {Promise<{closedTabs: Array<Object>, newActiveTabId: string}|null>}
+     */
+    async closeTabs(tabIds) {
+        try {
+            const ids = new Set(tabIds);
+            const tabs = await this.repository.getTabs();
+            const closedTabs = tabs.filter(t => ids.has(t.id));
+            if (closedTabs.length === 0 || closedTabs.length === tabs.length) {
+                return null;
+            }
+
+            const activeTabId = await this.repository.getActiveTabId();
+            let newActiveTabId = activeTabId;
+            if (ids.has(activeTabId)) {
+                const activeIndex = tabs.findIndex(t => t.id === activeTabId);
+                const successor = tabs.slice(activeIndex + 1).find(t => !ids.has(t.id)) ??
+                    tabs.slice(0, activeIndex).reverse().find(t => !ids.has(t.id));
+                newActiveTabId = successor.id;
+                await this.repository.setActiveTabId(newActiveTabId);
+            }
+
+            await this.repository.deleteTabs([...ids]);
+
+            return { closedTabs, newActiveTabId };
         } catch (error) {
             this.statusDisplay?.update('Error closing tab', null);
             throw error;
@@ -146,11 +173,7 @@ export class WorkspaceTabService {
      * @returns {Promise<Object|null>}
      */
     async updateTab(tabId, updates) {
-        const updatedTab = await this.repository.updateTab(tabId, updates);
-        if (updatedTab) {
-            this._notifyListeners('tab-updated', updatedTab);
-        }
-        return updatedTab;
+        return this.repository.updateTab(tabId, updates);
     }
 
     /**
@@ -160,11 +183,7 @@ export class WorkspaceTabService {
      */
     async renameTab(tabId, newName) {
         try {
-            const updatedTab = await this.repository.updateTab(tabId, { name: newName });
-            if (updatedTab) {
-                this._notifyListeners('tab-renamed', updatedTab);
-            }
-            return updatedTab;
+            return await this.repository.updateTab(tabId, { name: newName });
         } catch (error) {
             this.statusDisplay?.update('Error renaming tab', null);
             throw error;
@@ -191,7 +210,6 @@ export class WorkspaceTabService {
             };
 
             const newTab = await this.repository.addTab(duplicatedTab);
-            this._notifyListeners('tab-duplicated', newTab);
             return newTab;
         } catch (error) {
             this.statusDisplay?.update('Error duplicating tab', null);
@@ -214,7 +232,6 @@ export class WorkspaceTabService {
      */
     async reorderTabs(orderedTabIds) {
         await this.repository.reorderTabs(orderedTabIds);
-        this._notifyListeners('tabs-reordered', orderedTabIds);
     }
 
     /**
@@ -236,36 +253,8 @@ export class WorkspaceTabService {
         }
     }
 
-    /**
-     * @param {Function} listener
-     * @param {string} listener.event
-     * @param {*} listener.data
-     * @returns {void}
-     */
-    addListener(listener) {
-        this._events.add(listener);
-    }
-
-    /**
-     * @param {Function} listener
-     * @returns {void}
-     */
-    removeListener(listener) {
-        this._events.remove(listener);
-    }
-
-    /**
-     * @param {string} event
-     * @param {*} data
-     * @returns {void}
-     */
-    _notifyListeners(event, data) {
-        this._events.emit(event, data);
-    }
-
     /** @returns {Promise<void>} */
     async clearAllTabs() {
         await this.repository.clearAllTabs();
-        this._notifyListeners('tabs-cleared', null);
     }
 }

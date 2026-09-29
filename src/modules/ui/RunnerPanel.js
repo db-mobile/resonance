@@ -83,7 +83,7 @@ export class RunnerPanel {
         }
 
         if (app.i18n && app.i18n.updateUI) {
-            app.i18n.updateUI();
+            app.i18n.updateUI(this.container);
         }
     }
 

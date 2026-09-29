@@ -412,32 +412,6 @@ describe('DynamicVariableGenerator', () => {
         });
     });
 
-    describe('getSupportedVariables', () => {
-        test('should return list of all supported variable names', () => {
-            const supported = generator.getSupportedVariables();
-
-            expect(Array.isArray(supported)).toBe(true);
-            expect(supported).toContain('timestamp');
-            expect(supported).toContain('timestampMs');
-            expect(supported).toContain('isoTimestamp');
-            expect(supported).toContain('uuid');
-            expect(supported).toContain('randomInt');
-            expect(supported).toContain('randomString');
-            expect(supported).toContain('randomEmail');
-            expect(supported).toContain('randomName');
-            expect(supported).toContain('randomBoolean');
-            expect(supported).toContain('randomIPv4');
-            expect(supported).toContain('randomDate');
-            expect(supported).toContain('randomDatePast');
-            expect(supported).toContain('randomDateFuture');
-            expect(supported).toContain('randomUrl');
-            expect(supported).toContain('randomLoremWords');
-            expect(supported).toContain('randomPrice');
-            expect(supported).toContain('randomPhoneNumber');
-            expect(supported.length).toBe(17);
-        });
-    });
-
     describe('generate with unknown variable', () => {
         test('should return null for unknown variable', () => {
             const result = generator.generate('unknownVariable');

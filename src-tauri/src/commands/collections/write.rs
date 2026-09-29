@@ -10,10 +10,8 @@
 //!   exactly the churn this format removes.
 //! - A name collision never deletes. The v1 writer removed the losing file;
 //!   here the loser keeps a numeric suffix and its content.
-#![allow(dead_code)]
 
 use serde::Serialize;
-use serde_json::Value;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -310,18 +308,13 @@ pub(crate) fn write_request_in_place(entry: &RequestEntry) -> Result<bool, Strin
     Ok(true)
 }
 
-/// Serializes variables for a standalone write.
-pub(crate) fn variables_yaml(variables: &[Value]) -> Result<String, String> {
-    to_yaml(&variables)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::commands::collections::model::{
         CollectionDoc, FORMAT_VERSION, FolderDoc, RequestDoc,
     };
-    use crate::commands::collections::read::{Layout, RequestEntry, read_collection_dir};
+    use crate::commands::collections::read::{RequestEntry, read_collection_dir};
     use serde_json::Map;
     use tempfile::TempDir;
 
@@ -365,7 +358,6 @@ mod tests {
                 requests,
                 folders: Vec::new(),
             },
-            layout: Layout::V2,
         }
     }
 

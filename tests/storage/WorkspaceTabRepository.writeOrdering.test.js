@@ -47,6 +47,32 @@ describe('WorkspaceTabRepository write ordering and read resilience', () => {
         expect(started[1][0].name).toBe('Second');
     });
 
+    test('updates queued behind a slow write collapse into one write of the latest state', async () => {
+        await repository.getTabs();
+
+        let releaseFirstWrite;
+        const started = [];
+        mockBackendAPI.store.set
+            .mockImplementationOnce((key, value) => {
+                started.push(value);
+                return new Promise((resolve) => {
+                    releaseFirstWrite = resolve;
+                });
+            })
+            .mockImplementation((key, value) => {
+                started.push(value);
+                return Promise.resolve();
+            });
+
+        await repository.updateTab('tab-1', { name: 'First' });
+        await repository.updateTab('tab-1', { name: 'Second' });
+        await repository.updateTab('tab-1', { name: 'Third' });
+        releaseFirstWrite();
+        await flushMicrotasks();
+
+        expect(started.map(tabs => tabs[0].name)).toEqual(['First', 'Third']);
+    });
+
     test('a transient read failure returns a default tab without overwriting the store', async () => {
         mockBackendAPI.store.get.mockRejectedValueOnce(new Error('store locked'));
 

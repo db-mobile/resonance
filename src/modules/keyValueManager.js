@@ -4,7 +4,9 @@ import { pathParamsList, addPathParamBtn, headersList, addHeaderBtn, queryParams
 import { debounce } from './utils/debounce.js';
 import { notifyUrlUpdated } from './ui/mirroredUrlSection.js';
 
-const debounceAutoSave = debounce((callback) => callback(), 500);
+const debouncedSavePathParams = debounce(autoSavePathParams, 500);
+const debouncedSaveQueryParams = debounce(autoSaveQueryParams, 500);
+const debouncedSaveHeaders = debounce(autoSaveHeaders, 500);
 
 let isUpdatingUrlFromQueryParams = false;
 
@@ -86,7 +88,7 @@ export function addKeyValueRow(listContainer, key = '', value = '', enabled = tr
  * @param {HTMLElement} row
  * @returns {boolean}
  */
-export function isRowEnabled(row) {
+function isRowEnabled(row) {
     return row.querySelector('.row-enabled-checkbox')?.checked !== false;
 }
 
@@ -249,38 +251,67 @@ function restoreDisabledQueryParams(disabledRows) {
     });
 }
 
+/**
+ * @param {string} urlString
+ * @returns {Array<{key: string, value: string}>}
+ */
+function parseUrlQueryPairs(urlString) {
+    const questionMarkIndex = urlString.indexOf('?');
+    const queryString = questionMarkIndex >= 0 ? urlString.substring(questionMarkIndex + 1) : '';
+    const pairs = [];
+
+    for (const pair of queryString.split('&')) {
+        if (!pair.trim()) {
+            continue;
+        }
+
+        const equalIndex = pair.indexOf('=');
+        if (equalIndex >= 0) {
+            pairs.push({
+                key: safeDecodeURIComponent(pair.substring(0, equalIndex)),
+                value: safeDecodeURIComponent(pair.substring(equalIndex + 1))
+            });
+        } else {
+            pairs.push({ key: safeDecodeURIComponent(pair), value: '' });
+        }
+    }
+    return pairs;
+}
+
+/**
+ * @param {Array<{key: string, value: string}>} pairs
+ * @returns {boolean}
+ */
+function queryRowsMatch(pairs) {
+    const expected = pairs
+        .map(({ key, value }) => ({ key: key.trim(), value: value.trim() }))
+        .filter(({ key }) => key);
+    const current = parseKeyValueRows(queryParamsList).filter((row) => row.enabled);
+    return expected.length === current.length &&
+        expected.every((pair, index) => pair.key === current[index].key && pair.value === current[index].value);
+}
+
 export function updateQueryParamsFromUrl() {
     if (isUpdatingUrlFromQueryParams) {
         return;
     }
 
-    const disabledRows = captureDisabledQueryParams();
-
+    let pairs = [];
     try {
-        const urlString = urlInput.value.trim();
-        const questionMarkIndex = urlString.indexOf('?');
-        const queryString = questionMarkIndex >= 0 ? urlString.substring(questionMarkIndex + 1) : '';
-
-        queryParamsList.innerHTML = '';
-
-        for (const pair of queryString.split('&')) {
-            if (!pair.trim()) {
-                continue;
-            }
-
-            const equalIndex = pair.indexOf('=');
-
-            if (equalIndex >= 0) {
-                const key = pair.substring(0, equalIndex);
-                const value = pair.substring(equalIndex + 1);
-
-                addKeyValueRow(queryParamsList, safeDecodeURIComponent(key), safeDecodeURIComponent(value));
-            } else {
-                addKeyValueRow(queryParamsList, safeDecodeURIComponent(pair), '');
-            }
-        }
+        pairs = parseUrlQueryPairs(urlInput.value.trim());
     } catch (error) {
         void error;
+    }
+
+    if (queryParamsList.children.length > 0 && queryRowsMatch(pairs)) {
+        return;
+    }
+
+    const disabledRows = captureDisabledQueryParams();
+
+    queryParamsList.innerHTML = '';
+    for (const { key, value } of pairs) {
+        addKeyValueRow(queryParamsList, key, value);
     }
 
     restoreDisabledQueryParams(disabledRows);
@@ -301,7 +332,7 @@ export function initKeyValueListeners() {
     pathParamsList.addEventListener('input', (event) => {
         if (event.target.classList.contains('key-input') ||
             event.target.classList.contains('value-input')) {
-            debounceAutoSave(() => autoSavePathParams());
+            debouncedSavePathParams();
             if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
                 app.workspaceTabController.markCurrentTabModified();
             }
@@ -312,7 +343,7 @@ export function initKeyValueListeners() {
         if (event.target.classList.contains('key-input') ||
             event.target.classList.contains('value-input')) {
             updateUrlFromQueryParams();
-            debounceAutoSave(() => autoSaveQueryParams());
+            debouncedSaveQueryParams();
             if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
                 app.workspaceTabController.markCurrentTabModified();
             }
@@ -326,7 +357,7 @@ export function initKeyValueListeners() {
 
         event.target.closest('.key-value-row')?.classList.toggle('row-disabled', !event.target.checked);
         updateUrlFromQueryParams();
-        debounceAutoSave(() => autoSaveQueryParams());
+        debouncedSaveQueryParams();
         if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
             app.workspaceTabController.markCurrentTabModified();
         }
@@ -335,7 +366,7 @@ export function initKeyValueListeners() {
     headersList.addEventListener('input', (event) => {
         if (event.target.classList.contains('key-input') ||
             event.target.classList.contains('value-input')) {
-            debounceAutoSave(() => autoSaveHeaders());
+            debouncedSaveHeaders();
             if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
                 app.workspaceTabController.markCurrentTabModified();
             }
@@ -348,7 +379,7 @@ export function initKeyValueListeners() {
         }
 
         event.target.closest('.key-value-row')?.classList.toggle('row-disabled', !event.target.checked);
-        debounceAutoSave(() => autoSaveHeaders());
+        debouncedSaveHeaders();
         if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
             app.workspaceTabController.markCurrentTabModified();
         }
@@ -367,16 +398,16 @@ export function initKeyValueListeners() {
             row.remove();
 
             if (isPathParam) {
-                debounceAutoSave(() => autoSavePathParams());
+                debouncedSavePathParams();
             }
 
             if (isQueryParam) {
                 updateUrlFromQueryParams();
-                debounceAutoSave(() => autoSaveQueryParams());
+                debouncedSaveQueryParams();
             }
 
             if (isHeader) {
-                debounceAutoSave(() => autoSaveHeaders());
+                debouncedSaveHeaders();
             }
         }
     });

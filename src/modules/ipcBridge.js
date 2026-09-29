@@ -149,7 +149,7 @@ if (isTauri) {
             status: () => invoke('mock_server_status'),
             logs: (limit) => invoke('mock_server_logs', { limit }),
             clearLogs: () => invoke('mock_server_clear_logs'),
-            reloadSettings: () => invoke('mock_server_reload_settings')
+            reloadSettings: (settings) => invoke('mock_server_reload_settings', { settings })
         },
         scripts: {
             get: (collectionId, endpointId) => invoke('script_get', { collectionId, endpointId }),
@@ -178,4 +178,4 @@ if (isTauri) {
 }
 
 export default api;
-export { api, isTauri };
+export { api };

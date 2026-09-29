@@ -926,9 +926,9 @@ export class CollectionController {
                 return;
             }
             const tabs = await app.workspaceTabController.service.getAllTabs();
-            for (const tab of tabs.filter(tab => tab.collectionId === collectionId)) {
-                await app.workspaceTabController.closeTab(tab.id);
-            }
+            await app.workspaceTabController.closeTabs(
+                tabs.filter(tab => tab.collectionId === collectionId).map(tab => tab.id)
+            );
         } catch (error) {
             void error;
         }

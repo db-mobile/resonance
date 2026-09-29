@@ -1,4 +1,4 @@
-use prost_reflect::{DescriptorPool, DynamicMessage};
+use prost_reflect::DescriptorPool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -9,9 +9,8 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 use tokio::sync::oneshot;
 
 use super::grpc_reflection::{
-    DynamicMessageCodec, GrpcUnaryRequest, GrpcUnaryState, create_channel, dynamic_message_to_json,
-    generate_message_skeleton, json_to_dynamic_message, metadata_to_json_map,
-    normalize_target_with_tls, resolve_method_types, run_cancellable_unary, strip_leading_dot,
+    GrpcUnaryRequest, GrpcUnaryState, generate_message_skeleton, invoke_unary_with_pool,
+    resolve_method, run_cancellable_unary,
 };
 
 /// State to hold loaded proto file descriptors
@@ -25,6 +24,17 @@ impl Default for ProtoState {
         Self {
             pools: Mutex::new(HashMap::new()),
         }
+    }
+}
+
+impl ProtoState {
+    /// The descriptor pool of a proto file loaded earlier.
+    pub(crate) fn pool(&self, proto_path: &str) -> Result<DescriptorPool, String> {
+        let pools = self.pools.lock().map_err(|e| e.to_string())?;
+        pools
+            .get(proto_path)
+            .cloned()
+            .ok_or_else(|| format!("Proto file not loaded: {}", proto_path))
     }
 }
 
@@ -137,21 +147,9 @@ pub async fn grpc_proto_get_input_skeleton(
     proto_path: String,
     full_method: String,
 ) -> Result<Value, String> {
-    let pool = {
-        let pools = state.pools.lock().map_err(|e| e.to_string())?;
-        pools
-            .get(&proto_path)
-            .cloned()
-            .ok_or_else(|| format!("Proto file not loaded: {}", proto_path))?
-    };
-
-    let (input_type, _) = resolve_method_types(&pool, &full_method)?;
-
-    let input_desc = pool
-        .get_message_by_name(&strip_leading_dot(&input_type))
-        .ok_or_else(|| format!("Input message type not found: {}", input_type))?;
-
-    Ok(generate_message_skeleton(&input_desc))
+    let pool = state.pool(&proto_path)?;
+    let method = resolve_method(&pool, &full_method)?;
+    Ok(generate_message_skeleton(&method.input()))
 }
 
 /// Invoke a gRPC unary call using a loaded proto file for type information
@@ -177,92 +175,8 @@ async fn invoke_unary_proto(
     proto_path: String,
     request: GrpcUnaryRequest,
 ) -> Result<Value, String> {
-    use http::uri::PathAndQuery;
-    use tonic::Request;
-    use tonic::metadata::{MetadataKey, MetadataValue};
-
-    let pool = {
-        let pools = state.pools.lock().map_err(|e| e.to_string())?;
-        pools
-            .get(&proto_path)
-            .cloned()
-            .ok_or_else(|| format!("Proto file not loaded: {}", proto_path))?
-    };
-
-    let target = normalize_target_with_tls(&request.target, request.tls.use_tls);
-    let (input_type, output_type) = resolve_method_types(&pool, &request.full_method)?;
-
-    let input_desc = pool
-        .get_message_by_name(&strip_leading_dot(&input_type))
-        .ok_or_else(|| format!("Input message type not found: {}", input_type))?;
-    let output_desc = pool
-        .get_message_by_name(&strip_leading_dot(&output_type))
-        .ok_or_else(|| format!("Output message type not found: {}", output_type))?;
-
-    let input_msg = json_to_dynamic_message(&request.request_json, input_desc)?;
-
-    let channel = create_channel(&target, &request.tls).await?;
-
-    let mut grpc = tonic::client::Grpc::new(channel);
-    grpc.ready()
-        .await
-        .map_err(|e| format!("gRPC client not ready: {}", e))?;
-
-    let mut req = Request::new(input_msg);
-    for (k, v) in request.metadata {
-        let key = MetadataKey::from_bytes(k.as_bytes())
-            .map_err(|e| format!("Invalid metadata key '{}': {}", k, e))?;
-        let val = MetadataValue::try_from(v)
-            .map_err(|e| format!("Invalid metadata value for '{}': {}", key, e))?;
-        req.metadata_mut().insert(key, val);
-    }
-
-    let path: PathAndQuery = request
-        .full_method
-        .parse()
-        .map_err(|e| format!("Invalid method path: {}", e))?;
-
-    let codec = DynamicMessageCodec::new(output_desc);
-
-    let call_fut = grpc.unary(req, path, codec);
-    let response: Result<tonic::Response<DynamicMessage>, tonic::Status> =
-        if let Some(ms) = request.deadline_ms {
-            match tokio::time::timeout(std::time::Duration::from_millis(ms), call_fut).await {
-                Ok(res) => res,
-                Err(_) => {
-                    return Ok(serde_json::json!({
-                        "success": false,
-                        "status": tonic::Code::DeadlineExceeded as i32,
-                        "statusMessage": "deadline exceeded"
-                    }));
-                }
-            }
-        } else {
-            call_fut.await
-        };
-
-    match response {
-        Ok(resp) => {
-            let headers = metadata_to_json_map(resp.metadata());
-            let msg = resp.into_inner();
-            let data = dynamic_message_to_json(&msg)?;
-
-            Ok(serde_json::json!({
-                "success": true,
-                "data": data,
-                "status": 0,
-                "statusMessage": "OK",
-                "headers": headers,
-                "trailers": {}
-            }))
-        }
-        Err(status) => Ok(serde_json::json!({
-            "success": false,
-            "status": status.code() as i32,
-            "statusMessage": status.message(),
-            "details": status.details()
-        })),
-    }
+    let pool = state.pool(&proto_path)?;
+    invoke_unary_with_pool(&pool, request).await
 }
 
 /// List all loaded proto files

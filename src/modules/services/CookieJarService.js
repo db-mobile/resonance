@@ -143,22 +143,12 @@ export class CookieJarService {
         if (!setCookieHeaders || setCookieHeaders.length === 0) { return; }
 
         const envId = environmentId || 'default';
-        let changed = false;
+        const cookies = setCookieHeaders
+            .map(header => this._parseSetCookie(header, requestUrl, envId))
+            .filter(Boolean);
 
-        for (const header of setCookieHeaders) {
-            const cookie = this._parseSetCookie(header, requestUrl, envId);
-            if (!cookie) { continue; }
-
-            if (cookie.expires !== null && cookie.expires <= Date.now()) {
-                await this.repository.delete(cookie.id);
-            } else {
-                await this.repository.upsert(cookie);
-            }
-            changed = true;
-        }
-
-        if (changed) {
-            await this.repository.deleteExpired();
+        if (cookies.length > 0) {
+            await this.repository.applyResponseCookies(cookies);
             this._notify({ type: 'cookies-updated', environmentId: envId });
         }
     }

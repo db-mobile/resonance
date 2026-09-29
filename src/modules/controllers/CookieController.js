@@ -21,10 +21,6 @@ export class CookieController {
         this._activeEnvironmentName = environmentName || null;
     }
 
-    setActiveEnvironmentId(environmentId) {
-        this._activeEnvironmentId = environmentId || 'default';
-    }
-
     async getCookieHeader(requestUrl) {
         try {
             const settings = app.getApiHandlerSettingsCache?.() ?? await window.backendAPI?.settings?.get();

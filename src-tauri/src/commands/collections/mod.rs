@@ -607,7 +607,6 @@ fn write_v2_collection_seeded(
             .or_else(|| existing.as_ref().and_then(|e| e.open_api_spec.clone())),
         variables: variables.unwrap_or_else(|| existing.map(|e| e.variables).unwrap_or_default()),
         root,
-        layout: Layout::V2,
     };
 
     write::write_collection_dir(dir, &mut loaded)?;

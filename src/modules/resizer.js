@@ -1,7 +1,7 @@
 import { app } from './appContext.js';
 import { debounce } from './utils/debounce.js';
 
-export class Resizer {
+class Resizer {
     constructor() {
         this.isDragging = false;
         this.startY = 0;
@@ -162,7 +162,7 @@ export class Resizer {
     }
 }
 
-export class HorizontalResizer {
+class HorizontalResizer {
     constructor() {
         this.isDragging = false;
         this.startX = 0;
@@ -257,7 +257,7 @@ export class HorizontalResizer {
     }
 }
 
-export class GraphQLEditorResizer {
+class GraphQLEditorResizer {
     constructor() {
         this.isDragging = false;
         this.startY = 0;
@@ -325,7 +325,7 @@ export class GraphQLEditorResizer {
     }
 }
 
-export class GraphQLExplorerResizer {
+class GraphQLExplorerResizer {
     constructor() {
         this.isDragging = false;
         this.startX = 0;

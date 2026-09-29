@@ -136,21 +136,6 @@ export class MockServerRepository {
     /**
      * @param {string} collectionId
      * @param {string} endpointId
-     * @returns {Promise<number>}
-     */
-    async getEndpointDelay(collectionId, endpointId) {
-        try {
-            const settings = await this.getSettings();
-            const key = `${collectionId}_${endpointId}`;
-            return settings.endpointDelays[key] || 0;
-        } catch (error) {
-            return 0;
-        }
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
      * @param {Object|null} response
      * @returns {Promise<Object>}
      */
@@ -242,19 +227,6 @@ export class MockServerRepository {
             return await this.saveSettings(settings);
         } catch (error) {
             throw new Error(`Failed to toggle collection: ${error.message}`, { cause: error });
-        }
-    }
-
-    /**
-     * @param {string} collectionId
-     * @returns {Promise<boolean>}
-     */
-    async isCollectionEnabled(collectionId) {
-        try {
-            const settings = await this.getSettings();
-            return settings.enabledCollections.includes(collectionId);
-        } catch (error) {
-            return false;
         }
     }
 

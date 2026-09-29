@@ -12,6 +12,21 @@ use super::api_request::ClientCertConfig;
 /// PEM bytes of a client identity: (certificate chain, private key).
 pub(crate) type IdentityPems = (Vec<u8>, Vec<u8>);
 
+type ClientAuthStep = rustls::ConfigBuilder<rustls::ClientConfig, rustls::client::WantsClientCert>;
+
+const UNSET: &Option<String> = &None;
+
+/// The (cert, key, CA) paths of an optional certificate config, all unset when
+/// there is none.
+pub(crate) fn cert_paths(
+    cert: Option<&ClientCertConfig>,
+) -> (&Option<String>, &Option<String>, &Option<String>) {
+    match cert {
+        Some(cert) => (&cert.cert_path, &cert.key_path, &cert.ca_path),
+        None => (UNSET, UNSET, UNSET),
+    }
+}
+
 /// Installs ring as the process-wide rustls crypto provider, once.
 ///
 /// reqwest's `rustls-no-provider` feature (chosen so the aws-lc-rs provider
@@ -157,15 +172,7 @@ pub(crate) fn build_danger_tls_config(
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(NoCertVerifier));
 
-    match identity {
-        Some((cert_pem, key_pem)) => {
-            let (certs, key) = parse_identity(&cert_pem, &key_pem)?;
-            builder
-                .with_client_auth_cert(certs, key)
-                .map_err(|e| format!("Client certificate could not be loaded: {}", e))
-        }
-        None => Ok(builder.with_no_client_auth()),
-    }
+    with_identity(builder, identity)
 }
 
 /// Skip-verify config for gRPC channels: ALPN pinned to h2.
@@ -211,6 +218,14 @@ pub(crate) fn build_verifying_tls_config(
         .map_err(|e| format!("TLS protocol configuration error: {}", e))?
         .with_root_certificates(root_store);
 
+    with_identity(builder, identity)
+}
+
+/// Finish a rustls config, presenting the client identity when there is one.
+fn with_identity(
+    builder: ClientAuthStep,
+    identity: Option<IdentityPems>,
+) -> Result<rustls::ClientConfig, String> {
     match identity {
         Some((cert_pem, key_pem)) => {
             let (certs, key) = parse_identity(&cert_pem, &key_pem)?;
@@ -219,6 +234,22 @@ pub(crate) fn build_verifying_tls_config(
                 .map_err(|e| format!("Client certificate could not be loaded: {}", e))
         }
         None => Ok(builder.with_no_client_auth()),
+    }
+}
+
+/// The rustls config for a transport that dials TLS itself: verifying (webpki
+/// roots plus any custom CA) or accept-all, with the optional client identity.
+/// No ALPN is set.
+pub(crate) fn build_client_tls_config(
+    verify: bool,
+    cert: Option<&ClientCertConfig>,
+) -> Result<rustls::ClientConfig, String> {
+    let (cert_path, key_path, ca_path) = cert_paths(cert);
+    let identity = load_identity_pems(cert_path, key_path)?;
+    if verify {
+        build_verifying_tls_config(load_ca_pem(ca_path)?, identity)
+    } else {
+        build_danger_tls_config(identity)
     }
 }
 
@@ -238,20 +269,7 @@ pub(crate) fn build_ws_connector(
     verify_ssl: bool,
     client_cert: Option<&ClientCertConfig>,
 ) -> Result<Connector, String> {
-    let (cert_path, key_path, ca_path) = match client_cert {
-        Some(cert) => (&cert.cert_path, &cert.key_path, &cert.ca_path),
-        None => (&None, &None, &None),
-    };
-
-    let identity = load_identity_pems(cert_path, key_path)?;
-
-    let config = if verify_ssl {
-        let ca_pem = load_ca_pem(ca_path)?;
-        build_verifying_tls_config(ca_pem, identity)?
-    } else {
-        build_danger_tls_config(identity)?
-    };
-
+    let config = build_client_tls_config(verify_ssl, client_cert)?;
     Ok(Connector::Rustls(Arc::new(config)))
 }
 

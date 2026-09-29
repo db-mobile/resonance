@@ -16,17 +16,6 @@ export class MockServerController {
         this.collectionRepository = collectionRepository;
     }
 
-    /** @returns {Promise<void>} */
-    async initialize() {
-        this.service.addChangeListener((event) => {
-            this._handleServiceEvent(event);
-        });
-    }
-
-    /** @param {Object} event */
-    _handleServiceEvent(_event) {
-    }
-
     /** @returns {Promise<Object>} */
     async handleStart() {
         try {

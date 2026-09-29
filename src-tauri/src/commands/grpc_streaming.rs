@@ -1,23 +1,22 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use http::uri::PathAndQuery;
 use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, State};
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::mpsc;
 use tokio::task::AbortHandle;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::Request;
-use tonic::metadata::{MetadataKey, MetadataValue};
 
 use super::grpc_proto::ProtoState;
 use super::grpc_reflection::{
-    DynamicMessageCodec, GrpcTlsOptions, build_descriptor_pool_for_method_with_tls, create_channel,
-    dynamic_message_to_json, json_to_dynamic_message, metadata_to_json_map,
-    normalize_target_with_tls, resolve_method_types, strip_leading_dot,
+    DynamicMessageCodec, GrpcTlsOptions, apply_metadata, build_descriptor_pool_for_method_with_tls,
+    create_channel, dynamic_message_to_json, json_to_dynamic_message, metadata_to_json_map,
+    normalize_target_with_tls, resolve_method,
 };
+use super::tab_sessions::{CommandAck, Session, TabSessions, require_tab_id};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,11 +32,6 @@ pub struct GrpcStreamRequest {
     pub tls: GrpcTlsOptions,
     #[serde(default)]
     pub proto_path: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct GrpcStreamCommandResponse {
-    pub success: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -58,26 +52,21 @@ struct GrpcStreamEventPayload {
     trailers: Option<Value>,
 }
 
+/// A live call. The spawned task removes the entry itself when the call ends,
+/// and only while its generation still owns the tab.
 struct GrpcStreamHandle {
     sender: Option<mpsc::UnboundedSender<DynamicMessage>>,
     input_desc: MessageDescriptor,
     full_method: String,
     abort: AbortHandle,
-    // Client-streaming-only: cancel half-closes (drops sender) so the server can respond
-    // naturally, instead of aborting the spawned task.
+    /// Client-streaming-only: cancel half-closes (drops the sender) so the
+    /// server can still send its single reply, instead of aborting the task.
     client_streaming_only: bool,
 }
 
+#[derive(Default)]
 pub struct GrpcStreamingState {
-    streams: Arc<Mutex<HashMap<String, GrpcStreamHandle>>>,
-}
-
-impl Default for GrpcStreamingState {
-    fn default() -> Self {
-        Self {
-            streams: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
+    streams: TabSessions<GrpcStreamHandle>,
 }
 
 impl GrpcStreamEventPayload {
@@ -157,86 +146,40 @@ fn emit_error_and_close(app: &AppHandle, tab_id: &str, full_method: &str, status
     );
 }
 
-fn apply_metadata<T>(
-    req: &mut Request<T>,
-    metadata: HashMap<String, String>,
-) -> Result<(), String> {
-    for (k, v) in metadata {
-        let key = MetadataKey::from_bytes(k.as_bytes())
-            .map_err(|e| format!("Invalid metadata key '{}': {}", k, e))?;
-        let val = MetadataValue::try_from(v)
-            .map_err(|e| format!("Invalid metadata value for '{}': {}", key, e))?;
-        req.metadata_mut().insert(key, val);
-    }
-    Ok(())
-}
-
-fn resolve_method_streaming(
-    pool: &DescriptorPool,
-    full_method: &str,
-) -> Result<(bool, bool), String> {
-    let trimmed = full_method.trim();
-    let parts: Vec<&str> = trimmed.split('/').filter(|p| !p.is_empty()).collect();
-    if parts.len() != 2 {
-        return Err("fullMethod must be in the form '/package.Service/Method'".to_string());
-    }
-    let service = pool
-        .get_service_by_name(parts[0])
-        .ok_or_else(|| format!("Service not found in descriptors: {}", parts[0]))?;
-    let method = service
-        .methods()
-        .find(|m| m.name() == parts[1])
-        .ok_or_else(|| format!("Method not found: {} on {}", parts[1], parts[0]))?;
-    Ok((method.is_client_streaming(), method.is_server_streaming()))
-}
-
 #[tauri::command]
 pub async fn grpc_stream_start(
     app: AppHandle,
     state: State<'_, GrpcStreamingState>,
     proto_state: State<'_, ProtoState>,
     request: GrpcStreamRequest,
-) -> Result<GrpcStreamCommandResponse, String> {
-    if request.tab_id.trim().is_empty() {
-        return Err("Tab ID is required".to_string());
-    }
+) -> Result<CommandAck, String> {
+    require_tab_id(&request.tab_id)?;
 
-    // Close any existing stream for this tab before opening a new one
-    {
-        let mut streams = state.streams.lock().await;
-        if let Some(handle) = streams.remove(&request.tab_id) {
-            handle.abort.abort();
-            drop(handle.sender);
-        }
+    // Close any existing stream for this tab before opening a new one,
+    // including a half-closed client stream still awaiting its reply.
+    if let Some(previous) = state.streams.lock().await.remove(&request.tab_id) {
+        previous.value.abort.abort();
     }
 
     let target = normalize_target_with_tls(&request.target, request.tls.use_tls);
 
     let pool: DescriptorPool = if let Some(proto_path) = &request.proto_path {
-        let pools = proto_state.pools.lock().map_err(|e| e.to_string())?;
-        pools
-            .get(proto_path)
-            .cloned()
-            .ok_or_else(|| format!("Proto file not loaded: {}", proto_path))?
+        proto_state.pool(proto_path)?
     } else {
         build_descriptor_pool_for_method_with_tls(&target, &request.full_method, &request.tls)
             .await?
     };
 
-    let (input_type, output_type) = resolve_method_types(&pool, &request.full_method)?;
-    let (is_client_streaming, is_server_streaming) =
-        resolve_method_streaming(&pool, &request.full_method)?;
+    let method = resolve_method(&pool, &request.full_method)?;
+    let is_client_streaming = method.is_client_streaming();
+    let is_server_streaming = method.is_server_streaming();
 
     if !is_server_streaming && !is_client_streaming {
         return Err("Use grpc_invoke_unary for unary methods".to_string());
     }
 
-    let input_desc = pool
-        .get_message_by_name(&strip_leading_dot(&input_type))
-        .ok_or_else(|| format!("Input message type not found: {}", input_type))?;
-    let output_desc = pool
-        .get_message_by_name(&strip_leading_dot(&output_type))
-        .ok_or_else(|| format!("Output message type not found: {}", output_type))?;
+    let input_desc = method.input();
+    let output_desc = method.output();
 
     let channel = create_channel(&target, &request.tls).await?;
     let mut grpc = tonic::client::Grpc::new(channel);
@@ -277,6 +220,8 @@ pub async fn grpc_stream_start(
         let read_state = state.streams.clone();
         let read_tab_id = tab_id.clone();
         let read_full_method = full_method.clone();
+        let generation = state.streams.next_generation();
+        let mut streams = state.streams.lock().await;
 
         let join = tokio::spawn(async move {
             match grpc.client_streaming(req, path, codec).await {
@@ -303,27 +248,23 @@ pub async fn grpc_stream_start(
                 }
             }
 
-            let mut streams = read_state.lock().await;
-            if matches!(streams.get(&read_tab_id), Some(h) if h.full_method == read_full_method) {
-                streams.remove(&read_tab_id);
-            }
+            read_state.remove_if_current(&read_tab_id, generation).await;
         });
 
-        let abort = join.abort_handle();
-        {
-            let mut streams = state.streams.lock().await;
-            streams.insert(
-                tab_id,
-                GrpcStreamHandle {
+        streams.insert(
+            tab_id,
+            Session {
+                generation,
+                value: GrpcStreamHandle {
                     sender: Some(tx),
                     input_desc,
                     full_method,
-                    abort,
+                    abort: join.abort_handle(),
                     client_streaming_only: true,
                 },
-            );
-        }
-        return Ok(GrpcStreamCommandResponse { success: true });
+            },
+        );
+        return Ok(CommandAck::ok());
     }
 
     let (sender_opt, mut response_stream, headers) = if is_client_streaming {
@@ -368,6 +309,8 @@ pub async fn grpc_stream_start(
     let read_state = state.streams.clone();
     let read_tab_id = tab_id.clone();
     let read_full_method = full_method.clone();
+    let generation = state.streams.next_generation();
+    let mut streams = state.streams.lock().await;
 
     let join = tokio::spawn(async move {
         loop {
@@ -404,29 +347,24 @@ pub async fn grpc_stream_start(
             }
         }
 
-        let mut streams = read_state.lock().await;
-        if matches!(streams.get(&read_tab_id), Some(h) if h.full_method == read_full_method) {
-            streams.remove(&read_tab_id);
-        }
+        read_state.remove_if_current(&read_tab_id, generation).await;
     });
 
-    let abort = join.abort_handle();
-
-    {
-        let mut streams = state.streams.lock().await;
-        streams.insert(
-            tab_id,
-            GrpcStreamHandle {
+    streams.insert(
+        tab_id,
+        Session {
+            generation,
+            value: GrpcStreamHandle {
                 sender: sender_opt,
                 input_desc,
                 full_method,
-                abort,
+                abort: join.abort_handle(),
                 client_streaming_only: false,
             },
-        );
-    }
+        },
+    );
 
-    Ok(GrpcStreamCommandResponse { success: true })
+    Ok(CommandAck::ok())
 }
 
 #[tauri::command]
@@ -434,14 +372,13 @@ pub async fn grpc_stream_send(
     state: State<'_, GrpcStreamingState>,
     tab_id: String,
     message_json: Value,
-) -> Result<GrpcStreamCommandResponse, String> {
-    if tab_id.trim().is_empty() {
-        return Err("Tab ID is required".to_string());
-    }
+) -> Result<CommandAck, String> {
+    require_tab_id(&tab_id)?;
     let streams = state.streams.lock().await;
-    let handle = streams
+    let handle = &streams
         .get(&tab_id)
-        .ok_or_else(|| "No active gRPC stream for this tab".to_string())?;
+        .ok_or_else(|| "No active gRPC stream for this tab".to_string())?
+        .value;
     let sender = handle
         .sender
         .as_ref()
@@ -450,7 +387,7 @@ pub async fn grpc_stream_send(
     sender
         .send(msg)
         .map_err(|_| "Failed to send: stream is closed".to_string())?;
-    Ok(GrpcStreamCommandResponse { success: true })
+    Ok(CommandAck::ok())
 }
 
 #[tauri::command]
@@ -458,41 +395,33 @@ pub async fn grpc_stream_cancel(
     app: AppHandle,
     state: State<'_, GrpcStreamingState>,
     tab_id: String,
-) -> Result<GrpcStreamCommandResponse, String> {
-    if tab_id.trim().is_empty() {
-        return Err("Tab ID is required".to_string());
-    }
-    let handle = {
-        let mut streams = state.streams.lock().await;
-        streams.remove(&tab_id)
+) -> Result<CommandAck, String> {
+    require_tab_id(&tab_id)?;
+    let mut streams = state.streams.lock().await;
+    let Some(session) = streams.get_mut(&tab_id) else {
+        return Ok(CommandAck::ok());
     };
-    if let Some(handle) = handle {
-        let GrpcStreamHandle {
-            sender,
-            full_method,
-            abort,
-            client_streaming_only,
-            ..
-        } = handle;
-        // Half-close in all cases so the server-side request stream ends.
-        drop(sender);
-        if client_streaming_only {
-            // Let the spawned task await the server's single response and
-            // emit message + close naturally. Don't abort, don't pre-emit close.
-        } else {
-            abort.abort();
-            emit(
-                &app,
-                GrpcStreamEventPayload::close(
-                    &tab_id,
-                    &full_method,
-                    tonic::Code::Cancelled as i32,
-                    "cancelled".to_string(),
-                ),
-            );
-        }
+
+    // A client-streaming-only call stays registered, half-closed: its task
+    // awaits the server's single reply, emits it, and removes itself.
+    if session.value.client_streaming_only {
+        session.value.sender = None;
+        return Ok(CommandAck::ok());
     }
-    Ok(GrpcStreamCommandResponse { success: true })
+
+    if let Some(session) = streams.remove(&tab_id) {
+        session.value.abort.abort();
+        emit(
+            &app,
+            GrpcStreamEventPayload::close(
+                &tab_id,
+                &session.value.full_method,
+                tonic::Code::Cancelled as i32,
+                "cancelled".to_string(),
+            ),
+        );
+    }
+    Ok(CommandAck::ok())
 }
 
 #[cfg(test)]

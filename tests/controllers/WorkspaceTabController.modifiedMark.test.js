@@ -35,7 +35,6 @@ describe('WorkspaceTabController modified marking', () => {
         jest.clearAllMocks();
         jest.useFakeTimers();
         service = {
-            addListener: jest.fn(),
             getActiveTabId: jest.fn().mockResolvedValue('tab-A'),
             setTabModified: jest.fn().mockResolvedValue(undefined),
             updateTab: jest.fn().mockResolvedValue(undefined)

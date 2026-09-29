@@ -43,7 +43,7 @@ function showCopyFeedback(button, success) {
  * @param {HTMLElement} button
  * @param {string} tabId
  */
-export async function handleCopyResponse(button, tabId) {
+async function handleCopyResponse(button, tabId) {
     const { responseContainerManager } = app;
     if (!responseContainerManager) {
         showCopyFeedback(button, false);
@@ -75,7 +75,7 @@ export async function handleCopyResponse(button, tabId) {
  * @param {HTMLElement} button
  * @param {string} tabId
  */
-export async function handleCopyHeaders(button, tabId) {
+async function handleCopyHeaders(button, tabId) {
     const { responseContainerManager } = app;
     if (!responseContainerManager) {
         showCopyFeedback(button, false);

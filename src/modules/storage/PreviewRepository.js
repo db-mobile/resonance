@@ -63,9 +63,4 @@ export class PreviewRepository {
         delete this._modes[tabId];
         this._persist();
     }
-
-    clearAll() {
-        this._modes = {};
-        this._persist();
-    }
 }

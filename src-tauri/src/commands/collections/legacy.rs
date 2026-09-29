@@ -8,7 +8,6 @@
 //! The conversion is pure: it takes parsed v1 data and returns the v2 model,
 //! touching no filesystem and needing no AppHandle, which is what keeps its
 //! tests cheap.
-#![allow(dead_code)]
 
 use serde_json::{Map, Value};
 use std::collections::HashMap;
@@ -16,7 +15,7 @@ use std::collections::HashMap;
 use super::model::{
     Body, BodyKind, CollectionDoc, FORMAT_VERSION, FolderDoc, Params, RequestDoc, Scripts, Spec,
 };
-use super::read::{FolderNode, Layout, LoadedCollection, RequestEntry};
+use super::read::{FolderNode, LoadedCollection, RequestEntry};
 use super::{Collection, EndpointData};
 
 /// Gap between generated `seq` values, matching the writer's step.
@@ -361,7 +360,6 @@ pub(crate) fn v1_to_v2(
         open_api_spec: collection.open_api_spec.clone().filter(|v| !v.is_null()),
         variables: Vec::new(),
         root,
-        layout: Layout::V1,
     }
 }
 

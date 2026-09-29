@@ -9,10 +9,6 @@
 //! what makes it self-correcting: `collections_list` re-registers every
 //! collection it finds in the app's own directory, so an id whose path drifted
 //! back under app ownership would otherwise stay marked linked forever.
-//!
-//! Nothing calls this yet: the commands that open and close a collection land
-//! in a later step, so dead code is expected here until then.
-#![allow(dead_code)]
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

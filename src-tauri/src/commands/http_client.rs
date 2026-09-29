@@ -19,6 +19,7 @@ use std::time::Duration;
 use super::api_request::ClientCertConfig;
 use super::proxy::ProxyAction;
 use super::timing::{TimingLayer, TimingRecorder, TimingResolver};
+use super::tls::{load_ca_pem, load_identity_pems};
 
 /// Everything that varies between the clients this app builds. There is
 /// deliberately no `Default`: each call site spells out every field, so a new
@@ -122,6 +123,7 @@ pub fn build_http_client(
         ProxyAction::Manual(proxy) => {
             builder = builder.proxy(*proxy);
         }
+        ProxyAction::Invalid(message) => return Err(message),
     }
 
     builder
@@ -142,42 +144,21 @@ pub fn apply_client_cert(
     // build_http_client.
     super::tls::ensure_crypto_provider();
 
-    // Client identity (mTLS): requires both a cert chain and a private key.
-    let cert_path = cert.cert_path.as_deref().filter(|p| !p.is_empty());
-    let key_path = cert.key_path.as_deref().filter(|p| !p.is_empty());
-    match (cert_path, key_path) {
-        (Some(cert_path), Some(key_path)) => {
-            let cert_pem = std::fs::read(cert_path).map_err(|e| {
-                format!(
-                    "Client certificate could not be read ({}): {}",
-                    cert_path, e
-                )
-            })?;
-            let key_pem = std::fs::read(key_path)
-                .map_err(|e| format!("Client key could not be read ({}): {}", key_path, e))?;
-            let mut pem = cert_pem;
-            pem.push(b'\n');
-            pem.extend_from_slice(&key_pem);
-            let identity = reqwest::Identity::from_pem(&pem).map_err(|e| {
-                format!(
-                    "Client certificate could not be loaded (expects a PEM cert chain plus an unencrypted private key in PKCS#8, RSA, or SEC1 form): {}",
-                    e
-                )
-            })?;
-            builder = builder.identity(identity);
-        }
-        (Some(_), None) | (None, Some(_)) => {
-            return Err(
-                "Client certificate requires both a certificate and a key file".to_string(),
-            );
-        }
-        (None, None) => {}
+    if let Some((mut pem, key_pem)) = load_identity_pems(&cert.cert_path, &cert.key_path)? {
+        pem.push(b'\n');
+        pem.extend_from_slice(&key_pem);
+        let identity = reqwest::Identity::from_pem(&pem).map_err(|e| {
+            format!(
+                "Client certificate could not be loaded (expects a PEM cert chain plus an unencrypted private key in PKCS#8, RSA, or SEC1 form): {}",
+                e
+            )
+        })?;
+        builder = builder.identity(identity);
     }
 
     // Custom CA trust: add each CA in the bundle to the default roots.
-    if let Some(ca_path) = cert.ca_path.as_deref().filter(|p| !p.is_empty()) {
-        let ca_pem = std::fs::read(ca_path)
-            .map_err(|e| format!("CA certificate could not be read ({}): {}", ca_path, e))?;
+    if let Some(ca_pem) = load_ca_pem(&cert.ca_path)? {
+        let ca_path = cert.ca_path.as_deref().unwrap_or_default();
         let cas = reqwest::Certificate::from_pem_bundle(&ca_pem)
             .map_err(|e| format!("CA certificate could not be parsed ({}): {}", ca_path, e))?;
         for ca in cas {
@@ -211,6 +192,13 @@ mod tests {
     #[test]
     fn builds_a_client_from_default_options() {
         assert!(build_http_client(base_options(), ProxyAction::Disable).is_ok());
+    }
+
+    #[test]
+    fn an_invalid_proxy_fails_the_build() {
+        let err =
+            build_http_client(base_options(), ProxyAction::Invalid("bad".into())).unwrap_err();
+        assert_eq!(err, "bad");
     }
 
     #[test]

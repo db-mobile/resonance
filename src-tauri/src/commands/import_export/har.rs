@@ -5,7 +5,7 @@
 //! calls survive, obvious assets don't), dedupes exact repeats, and reports
 //! both counts so nothing disappears silently.
 
-use super::common::{param_map_entry, unique_folder_id};
+use super::common::{grouped_params, param_map_entry, unique_folder_id};
 use super::{Collection, Endpoint, Folder};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -253,18 +253,7 @@ fn extract_parameters(request: &Value) -> Option<Value> {
         }
     }
 
-    if query_params.is_empty() && header_params.is_empty() {
-        return None;
-    }
-
-    let mut result = serde_json::Map::new();
-    if !query_params.is_empty() {
-        result.insert("query".to_string(), Value::Object(query_params));
-    }
-    if !header_params.is_empty() {
-        result.insert("header".to_string(), Value::Object(header_params));
-    }
-    Some(Value::Object(result))
+    grouped_params(serde_json::Map::new(), query_params, header_params)
 }
 
 fn extract_body(post_data: Option<&Value>) -> Option<Value> {

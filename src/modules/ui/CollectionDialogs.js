@@ -36,7 +36,7 @@ export class CollectionDialogs {
             document.body.appendChild(dialog);
 
             if (app.i18n && app.i18n.updateUI) {
-                app.i18n.updateUI();
+                app.i18n.updateUI(dialog);
             }
 
             const form = dialog.querySelector('#new-collection-form');
@@ -115,7 +115,7 @@ export class CollectionDialogs {
             document.body.appendChild(dialog);
 
             if (app.i18n && app.i18n.updateUI) {
-                app.i18n.updateUI();
+                app.i18n.updateUI(dialog);
             }
 
             const form = dialog.querySelector('#new-request-form');
@@ -250,7 +250,7 @@ export class CollectionDialogs {
             document.body.appendChild(dialog);
 
             if (app.i18n && app.i18n.updateUI) {
-                app.i18n.updateUI();
+                app.i18n.updateUI(dialog);
             }
 
             const form = dialog.querySelector('#save-to-collection-form');
@@ -468,7 +468,7 @@ export class CollectionDialogs {
             document.body.appendChild(dialog);
 
             if (app.i18n && app.i18n.updateUI) {
-                app.i18n.updateUI();
+                app.i18n.updateUI(dialog);
             }
 
             const form = dialog.querySelector('#doc-options-form');

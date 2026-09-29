@@ -51,27 +51,6 @@ export class CollectionService {
     }
 
     /**
-     * @param {Object} collection
-     * @param {string} collection.name
-     * @param {string} [collection.baseUrl]
-     * @param {Array<Object>} [collection.endpoints]
-     * @returns {Promise<Object>}
-     */
-    async importCollection(collection) {
-        try {
-            this.statusDisplay.update('Importing collection...', null);
-            
-            const importedCollection = await this.repository.add(collection);
-            
-            this.statusDisplay.update(`Imported collection: ${collection.name}`, null);
-            return importedCollection;
-        } catch (error) {
-            this.statusDisplay.update(`Import error: ${error.message}`, null);
-            throw error;
-        }
-    }
-
-    /**
      * @param {string} collectionId
      * @param {string} newName
      * @returns {Promise<Object>}
@@ -777,5 +756,4 @@ export class CollectionService {
             container.removeChild(container.firstChild);
         }
     }
-
 }

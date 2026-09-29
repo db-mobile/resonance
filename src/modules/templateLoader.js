@@ -1,4 +1,4 @@
-export class TemplateLoader {
+class TemplateLoader {
     constructor() {
         this.cache = new Map();
     }

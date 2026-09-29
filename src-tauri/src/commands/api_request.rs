@@ -12,7 +12,7 @@ use uuid::Uuid;
 use super::cancel_registry::CancelRegistry;
 use super::http_client::{HttpClientOptions, build_http_client};
 use super::proxy::ProxyState;
-use super::timing::TimingRecorder;
+use super::timing::{TimingRecorder, TimingSnapshot};
 
 /// Digest authentication challenge parsed from WWW-Authenticate header
 #[derive(Debug, Clone)]
@@ -699,6 +699,13 @@ impl RequestTimings {
             connect_count: 0,
         }
     }
+
+    /// Copy in the phases measured on the request's own connection.
+    fn apply_snapshot(&mut self, snapshot: &TimingSnapshot) {
+        self.dns = snapshot.dns;
+        self.connect = snapshot.connect;
+        self.connect_count = snapshot.connect_count;
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -724,6 +731,27 @@ pub struct ApiResponse {
     pub timings: RequestTimings,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cancelled: Option<bool>,
+}
+
+impl ApiResponse {
+    /// A request that ended without an HTTP response to report.
+    fn failure(message: String, timings: RequestTimings) -> Self {
+        Self {
+            success: false,
+            data: None,
+            is_binary: false,
+            body_base64: None,
+            status: None,
+            status_text: None,
+            headers: HashMap::new(),
+            set_cookies: Vec::new(),
+            message: Some(message),
+            ttfb: None,
+            size: None,
+            timings,
+            cancelled: None,
+        }
+    }
 }
 
 /// Extract the `charset` parameter from a Content-Type header value.
@@ -839,21 +867,10 @@ pub async fn send_api_request(
 
     // Validate URL
     if request_options.url.is_empty() {
-        return Ok(ApiResponse {
-            success: false,
-            data: None,
-            is_binary: false,
-            body_base64: None,
-            status: None,
-            status_text: None,
-            headers: HashMap::new(),
-            set_cookies: vec![],
-            message: Some("URL is empty. Please enter a valid URL.".to_string()),
-            ttfb: None,
-            size: None,
+        return Ok(ApiResponse::failure(
+            "URL is empty. Please enter a valid URL.".to_string(),
             timings,
-            cancelled: None,
-        });
+        ));
     }
 
     let proxy_action = proxy_state.get_proxy_config(&request_options.url);
@@ -885,21 +902,7 @@ pub async fn send_api_request(
     let client = match build_http_client(client_options, proxy_action) {
         Ok(client) => client,
         Err(message) => {
-            return Ok(ApiResponse {
-                success: false,
-                data: None,
-                is_binary: false,
-                body_base64: None,
-                status: None,
-                status_text: None,
-                headers: HashMap::new(),
-                set_cookies: vec![],
-                message: Some(message),
-                ttfb: None,
-                size: None,
-                timings,
-                cancelled: None,
-            });
+            return Ok(ApiResponse::failure(message, timings));
         }
     };
 
@@ -1196,25 +1199,12 @@ pub async fn send_api_request(
         Ok(()) = &mut cancel_rx => {
             let mut timings = RequestTimings::unmeasured(start_timestamp);
             timings.total = elapsed_millis(start_time);
-            let snapshot = recorder.snapshot();
-            timings.dns = snapshot.dns;
-            timings.connect = snapshot.connect;
-            timings.connect_count = snapshot.connect_count;
+            timings.apply_snapshot(&recorder.snapshot());
 
             Ok(ApiResponse {
-                success: false,
-                data: None,
-                is_binary: false,
-                body_base64: None,
-                status: None,
                 status_text: Some("Cancelled".to_string()),
-                headers: HashMap::new(),
-                set_cookies: vec![],
-                message: Some("Request was cancelled".to_string()),
-                ttfb: None,
-                size: None,
-                timings,
                 cancelled: Some(true),
+                ..ApiResponse::failure("Request was cancelled".to_string(), timings)
             })
         }
     }
@@ -1232,9 +1222,7 @@ fn apply_connection_phases(timings: &mut RequestTimings, recorder: &TimingRecord
     let snapshot = recorder.snapshot();
     let measured = snapshot.dns.unwrap_or(0.0) + snapshot.connect.unwrap_or(0.0);
 
-    timings.dns = snapshot.dns;
-    timings.connect = snapshot.connect;
-    timings.connect_count = snapshot.connect_count;
+    timings.apply_snapshot(&snapshot);
     timings.waiting = Some((ttfb_ms - measured).max(0.0));
 }
 
@@ -1297,10 +1285,7 @@ async fn process_response(
             timings.total = elapsed_millis(start_time);
             // Whatever phases completed before the failure are still real, but
             // there is no first byte to derive a waiting phase from.
-            let snapshot = recorder.snapshot();
-            timings.dns = snapshot.dns;
-            timings.connect = snapshot.connect;
-            timings.connect_count = snapshot.connect_count;
+            timings.apply_snapshot(&recorder.snapshot());
 
             // Provide specific error messages for common error types
             let message = if e.is_timeout() {
@@ -1320,19 +1305,8 @@ async fn process_response(
             };
 
             Ok(ApiResponse {
-                success: false,
-                data: None,
-                is_binary: false,
-                body_base64: None,
                 status: e.status().map(|s| s.as_u16()),
-                status_text: None,
-                headers: HashMap::new(),
-                set_cookies: vec![],
-                message: Some(message),
-                ttfb: None,
-                size: None,
-                timings: timings.clone(),
-                cancelled: None,
+                ..ApiResponse::failure(message, timings.clone())
             })
         }
     }

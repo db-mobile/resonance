@@ -38,13 +38,8 @@ pub struct UpdateInfo {
     pub body: Option<String>,
 }
 
+#[derive(Default)]
 pub struct PendingUpdate(pub Mutex<Option<Update>>);
-
-impl Default for PendingUpdate {
-    fn default() -> Self {
-        Self(Mutex::new(None))
-    }
-}
 
 #[tauri::command]
 pub async fn updater_check(
@@ -65,25 +60,14 @@ pub async fn updater_check(
         });
     }
 
-    let updater = match app.updater() {
-        Ok(u) => u,
-        Err(e) => {
-            return Err(UpdateError::Updater(format!(
-                "Failed to initialize updater: {}",
-                e
-            )));
-        }
-    };
+    let updater = app
+        .updater()
+        .map_err(|e| UpdateError::Updater(format!("Failed to initialize updater: {}", e)))?;
 
-    let update = match updater.check().await {
-        Ok(u) => u,
-        Err(e) => {
-            return Err(UpdateError::Updater(format!(
-                "Failed to check for updates: {}",
-                e
-            )));
-        }
-    };
+    let update = updater
+        .check()
+        .await
+        .map_err(|e| UpdateError::Updater(format!("Failed to check for updates: {}", e)))?;
 
     let info = match &update {
         Some(u) => UpdateInfo {
@@ -145,75 +129,50 @@ pub struct InstallInfo {
     pub message: Option<String>,
 }
 
+/// What an installation type means for auto-update. Packaged installs are
+/// updated by their package manager; anything unrecognised is a direct install.
+fn install_info(install_type: &str) -> InstallInfo {
+    let manager = match install_type {
+        "flatpak" => Some("Flatpak"),
+        "snap" => Some("Snap"),
+        "system" => Some("your package manager"),
+        "homebrew" => Some("Homebrew"),
+        "scoop" => Some("Scoop"),
+        _ => None,
+    };
+    let install_type = match (install_type, manager) {
+        ("appimage", _) | (_, Some(_)) => install_type,
+        _ => "direct",
+    };
+
+    InstallInfo {
+        auto_update_supported: manager.is_none(),
+        install_type: install_type.to_string(),
+        message: manager.map(|manager| format!("Updates are managed by {}", manager)),
+    }
+}
+
 #[tauri::command]
 pub fn updater_get_install_info() -> InstallInfo {
     // Debug: allow overriding install type via env var for testing
     #[cfg(debug_assertions)]
     if let Ok(override_type) = env::var("RESONANCE_INSTALL_TYPE") {
-        return match override_type.as_str() {
-            "flatpak" => InstallInfo {
-                auto_update_supported: false,
-                install_type: "flatpak".to_string(),
-                message: Some("Updates are managed by Flatpak".to_string()),
-            },
-            "snap" => InstallInfo {
-                auto_update_supported: false,
-                install_type: "snap".to_string(),
-                message: Some("Updates are managed by Snap".to_string()),
-            },
-            "system" => InstallInfo {
-                auto_update_supported: false,
-                install_type: "system".to_string(),
-                message: Some("Updates are managed by your package manager".to_string()),
-            },
-            "homebrew" => InstallInfo {
-                auto_update_supported: false,
-                install_type: "homebrew".to_string(),
-                message: Some("Updates are managed by Homebrew".to_string()),
-            },
-            "scoop" => InstallInfo {
-                auto_update_supported: false,
-                install_type: "scoop".to_string(),
-                message: Some("Updates are managed by Scoop".to_string()),
-            },
-            "appimage" => InstallInfo {
-                auto_update_supported: true,
-                install_type: "appimage".to_string(),
-                message: None,
-            },
-            _ => InstallInfo {
-                auto_update_supported: true,
-                install_type: "direct".to_string(),
-                message: None,
-            },
-        };
+        return install_info(&override_type);
     }
 
     // Check for Flatpak
     if env::var("FLATPAK_ID").is_ok() {
-        return InstallInfo {
-            auto_update_supported: false,
-            install_type: "flatpak".to_string(),
-            message: Some("Updates are managed by Flatpak".to_string()),
-        };
+        return install_info("flatpak");
     }
 
     // Check for Snap
     if env::var("SNAP").is_ok() {
-        return InstallInfo {
-            auto_update_supported: false,
-            install_type: "snap".to_string(),
-            message: Some("Updates are managed by Snap".to_string()),
-        };
+        return install_info("snap");
     }
 
     // Check for AppImage (supports auto-update)
     if env::var("APPIMAGE").is_ok() {
-        return InstallInfo {
-            auto_update_supported: true,
-            install_type: "appimage".to_string(),
-            message: None,
-        };
+        return install_info("appimage");
     }
 
     // Check for Homebrew on macOS
@@ -222,11 +181,7 @@ pub fn updater_get_install_info() -> InstallInfo {
         if let Ok(exe_path) = env::current_exe() {
             let path_str = exe_path.to_string_lossy();
             if path_str.contains("/Caskroom/") || path_str.contains("/Cellar/") {
-                return InstallInfo {
-                    auto_update_supported: false,
-                    install_type: "homebrew".to_string(),
-                    message: Some("Updates are managed by Homebrew".to_string()),
-                };
+                return install_info("homebrew");
             }
         }
     }
@@ -237,11 +192,7 @@ pub fn updater_get_install_info() -> InstallInfo {
         if let Ok(exe_path) = env::current_exe() {
             let path_str = exe_path.to_string_lossy().to_lowercase();
             if path_str.contains("\\scoop\\") {
-                return InstallInfo {
-                    auto_update_supported: false,
-                    install_type: "scoop".to_string(),
-                    message: Some("Updates are managed by Scoop".to_string()),
-                };
+                return install_info("scoop");
             }
         }
     }
@@ -252,19 +203,46 @@ pub fn updater_get_install_info() -> InstallInfo {
         if let Ok(exe_path) = env::current_exe() {
             let path_str = exe_path.to_string_lossy();
             if path_str.starts_with("/usr/") {
-                return InstallInfo {
-                    auto_update_supported: false,
-                    install_type: "system".to_string(),
-                    message: Some("Updates are managed by your package manager".to_string()),
-                };
+                return install_info("system");
             }
         }
     }
 
     // Default: direct installation, auto-update supported
-    InstallInfo {
-        auto_update_supported: true,
-        install_type: "direct".to_string(),
-        message: None,
+    install_info("direct")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn packaged_installs_defer_to_their_package_manager() {
+        let flatpak = install_info("flatpak");
+        assert!(!flatpak.auto_update_supported);
+        assert_eq!(flatpak.install_type, "flatpak");
+        assert_eq!(
+            flatpak.message.as_deref(),
+            Some("Updates are managed by Flatpak")
+        );
+
+        let system = install_info("system");
+        assert_eq!(
+            system.message.as_deref(),
+            Some("Updates are managed by your package manager")
+        );
+    }
+
+    #[test]
+    fn appimage_and_unknown_types_self_update() {
+        let appimage = install_info("appimage");
+        assert!(appimage.auto_update_supported);
+        assert_eq!(appimage.install_type, "appimage");
+        assert!(appimage.message.is_none());
+
+        let unknown = install_info("something-else");
+        assert!(unknown.auto_update_supported);
+        assert_eq!(unknown.install_type, "direct");
+        assert!(unknown.message.is_none());
     }
 }

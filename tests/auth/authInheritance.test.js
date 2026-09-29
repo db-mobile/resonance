@@ -2,7 +2,7 @@ import { resolveEffectiveAuthConfig } from '../../src/modules/auth/authInheritan
 
 describe('resolveEffectiveAuthConfig', () => {
     const repositoryWith = (inheritedAuth) => ({
-        getInheritedAuthConfig: jest.fn(async () => inheritedAuth)
+        getInheritedAuth: jest.fn(async () => ({ authConfig: inheritedAuth, source: { kind: 'collection' } }))
     });
 
     test('null auth config resolves to none', async () => {
@@ -24,7 +24,7 @@ describe('resolveEffectiveAuthConfig', () => {
         });
 
         expect(resolved).toBe(endpointAuth);
-        expect(repository.getInheritedAuthConfig).not.toHaveBeenCalled();
+        expect(repository.getInheritedAuth).not.toHaveBeenCalled();
     });
 
     test('explicit none stays none even when inherited auth exists', async () => {
@@ -46,7 +46,7 @@ describe('resolveEffectiveAuthConfig', () => {
         });
 
         expect(resolved).toBe(inherited);
-        expect(repository.getInheritedAuthConfig).toHaveBeenCalledWith('c1', 'e1');
+        expect(repository.getInheritedAuth).toHaveBeenCalledWith('c1', 'e1');
     });
 
     test('inherit with inherited auth of type none resolves to none', async () => {
@@ -72,7 +72,7 @@ describe('resolveEffectiveAuthConfig', () => {
             repository
         });
         expect(resolved.type).toBe('none');
-        expect(repository.getInheritedAuthConfig).not.toHaveBeenCalled();
+        expect(repository.getInheritedAuth).not.toHaveBeenCalled();
     });
 
     test('inherit without a repository resolves to none', async () => {

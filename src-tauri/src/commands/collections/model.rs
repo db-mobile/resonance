@@ -5,11 +5,6 @@
 //! actually set, and each document keeps an `extra` catch-all so a field
 //! written by a newer build survives a round trip through an older one instead
 //! of being silently dropped on the next save.
-//!
-//! Nothing reads or writes these yet: the reader, writer and v1 conversion
-//! land in later steps. Until then the types are exercised only by their own
-//! round-trip tests, so dead code is expected here.
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};

@@ -119,6 +119,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.2.4" date="2026-09-29">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Stop superseded streaming sessions from closing their successors</li>
+          <li>Fix gRPC, mock server, proxy and import/export bugs</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.2.3" date="2026-09-27">
       <description>
         <p>Feature stabilization release</p>
