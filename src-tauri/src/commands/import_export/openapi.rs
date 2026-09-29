@@ -1,6 +1,6 @@
 //! OpenAPI specification parsing: converts a spec `Value` into a `Collection`.
 
-use super::common::unique_folder_id;
+use super::common::{grouped_params, unique_folder_id};
 use super::{Collection, Endpoint, Folder, VariableEntry};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -638,23 +638,7 @@ fn parse_parameters(params: Option<&Value>, spec: &Value) -> Option<Value> {
         }
     }
 
-    // Only return if we have any parameters
-    if path_params.is_empty() && query_params.is_empty() && header_params.is_empty() {
-        return None;
-    }
-
-    let mut result = serde_json::Map::new();
-    if !path_params.is_empty() {
-        result.insert("path".to_string(), Value::Object(path_params));
-    }
-    if !query_params.is_empty() {
-        result.insert("query".to_string(), Value::Object(query_params));
-    }
-    if !header_params.is_empty() {
-        result.insert("header".to_string(), Value::Object(header_params));
-    }
-
-    Some(Value::Object(result))
+    grouped_params(path_params, query_params, header_params)
 }
 
 /// Extract security configuration from OpenAPI operation
@@ -686,15 +670,8 @@ fn extract_openapi_security(security: Option<&Value>, spec: &Value) -> Option<Va
                         "token": format!("{{{{{}}}}}", BEARER_TOKEN_VARIABLE)
                     }
                 })),
-                "basic" => Some(serde_json::json!({
-                    "type": "basic",
-                    "config": {
-                        "username": format!("{{{{{}}}}}", USERNAME_VARIABLE),
-                        "password": format!("{{{{{}}}}}", PASSWORD_VARIABLE)
-                    }
-                })),
-                "digest" => Some(serde_json::json!({
-                    "type": "digest",
+                "basic" | "digest" => Some(serde_json::json!({
+                    "type": http_scheme,
                     "config": {
                         "username": format!("{{{{{}}}}}", USERNAME_VARIABLE),
                         "password": format!("{{{{{}}}}}", PASSWORD_VARIABLE)
@@ -1197,5 +1174,21 @@ mod tests {
                 ("root", "folder_root")
             ]
         );
+    }
+
+    #[test]
+    fn basic_and_digest_schemes_keep_their_own_type() {
+        for kind in ["basic", "digest"] {
+            let spec = serde_json::json!({
+                "components": { "securitySchemes": { "s": { "type": "http", "scheme": kind } } }
+            });
+            let security = serde_json::json!([{ "s": [] }]);
+            let auth = extract_openapi_security(Some(&security), &spec).unwrap();
+            assert_eq!(auth["type"], kind);
+            assert_eq!(
+                auth["config"]["username"],
+                format!("{{{{{}}}}}", USERNAME_VARIABLE)
+            );
+        }
     }
 }

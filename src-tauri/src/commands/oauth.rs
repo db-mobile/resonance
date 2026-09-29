@@ -41,7 +41,7 @@ pub struct OAuth2Config {
 }
 
 /// OAuth 2.0 Token Response
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OAuth2TokenResponse {
     pub success: bool,
@@ -61,6 +61,16 @@ pub struct OAuth2TokenResponse {
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_description: Option<String>,
+}
+
+impl OAuth2TokenResponse {
+    fn error(error: String, description: Option<String>) -> Self {
+        Self {
+            error: Some(error),
+            error_description: description,
+            ..Self::default()
+        }
+    }
 }
 
 /// PKCE (Proof Key for Code Exchange) parameters
@@ -246,17 +256,10 @@ pub async fn oauth2_get_token(
             if let Some(code) = &config.authorization_code {
                 form_params.insert("code".to_string(), code.clone());
             } else {
-                return Ok(OAuth2TokenResponse {
-                    success: false,
-                    access_token: None,
-                    token_type: None,
-                    expires_in: None,
-                    refresh_token: None,
-                    scope: None,
-                    id_token: None,
-                    error: Some("invalid_request".to_string()),
-                    error_description: Some("Authorization code is required".to_string()),
-                });
+                return Ok(OAuth2TokenResponse::error(
+                    "invalid_request".to_string(),
+                    Some("Authorization code is required".to_string()),
+                ));
             }
 
             if let Some(redirect_uri) = &config.redirect_uri {
@@ -283,31 +286,17 @@ pub async fn oauth2_get_token(
             if let Some(refresh_token) = &config.refresh_token {
                 form_params.insert("refresh_token".to_string(), refresh_token.clone());
             } else {
-                return Ok(OAuth2TokenResponse {
-                    success: false,
-                    access_token: None,
-                    token_type: None,
-                    expires_in: None,
-                    refresh_token: None,
-                    scope: None,
-                    id_token: None,
-                    error: Some("invalid_request".to_string()),
-                    error_description: Some("Refresh token is required".to_string()),
-                });
+                return Ok(OAuth2TokenResponse::error(
+                    "invalid_request".to_string(),
+                    Some("Refresh token is required".to_string()),
+                ));
             }
         }
         _ => {
-            return Ok(OAuth2TokenResponse {
-                success: false,
-                access_token: None,
-                token_type: None,
-                expires_in: None,
-                refresh_token: None,
-                scope: None,
-                id_token: None,
-                error: Some("unsupported_grant_type".to_string()),
-                error_description: Some(format!("Unsupported grant type: {}", config.grant_type)),
-            });
+            return Ok(OAuth2TokenResponse::error(
+                "unsupported_grant_type".to_string(),
+                Some(format!("Unsupported grant type: {}", config.grant_type)),
+            ));
         }
     }
 
@@ -386,52 +375,30 @@ pub async fn oauth2_get_token(
         })
     });
 
+    let text = |key: &str| {
+        token_response
+            .get(key)
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+    };
+
     if status.is_success() {
         Ok(OAuth2TokenResponse {
             success: true,
-            access_token: token_response
-                .get("access_token")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            token_type: token_response
-                .get("token_type")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
+            access_token: text("access_token"),
+            token_type: text("token_type"),
             expires_in: token_response.get("expires_in").and_then(|v| v.as_i64()),
-            refresh_token: token_response
-                .get("refresh_token")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            scope: token_response
-                .get("scope")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            id_token: token_response
-                .get("id_token")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
+            refresh_token: text("refresh_token"),
+            scope: text("scope"),
+            id_token: text("id_token"),
             error: None,
             error_description: None,
         })
     } else {
-        Ok(OAuth2TokenResponse {
-            success: false,
-            access_token: None,
-            token_type: None,
-            expires_in: None,
-            refresh_token: None,
-            scope: None,
-            id_token: None,
-            error: token_response
-                .get("error")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
-                .or_else(|| Some(format!("HTTP {}", status.as_u16()))),
-            error_description: token_response
-                .get("error_description")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-        })
+        Ok(OAuth2TokenResponse::error(
+            text("error").unwrap_or_else(|| format!("HTTP {}", status.as_u16())),
+            text("error_description"),
+        ))
     }
 }
 

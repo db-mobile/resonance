@@ -9,13 +9,12 @@ use tokio::sync::mpsc;
 use tokio::task::AbortHandle;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::Request;
-use tonic::metadata::{MetadataKey, MetadataValue};
 
 use super::grpc_proto::ProtoState;
 use super::grpc_reflection::{
-    DynamicMessageCodec, GrpcTlsOptions, build_descriptor_pool_for_method_with_tls, create_channel,
-    dynamic_message_to_json, json_to_dynamic_message, metadata_to_json_map,
-    normalize_target_with_tls, resolve_method_types, strip_leading_dot,
+    DynamicMessageCodec, GrpcTlsOptions, apply_metadata, build_descriptor_pool_for_method_with_tls,
+    create_channel, dynamic_message_to_json, json_to_dynamic_message, metadata_to_json_map,
+    normalize_target_with_tls, resolve_method,
 };
 use super::tab_sessions::{CommandAck, Session, TabSessions, require_tab_id};
 
@@ -147,39 +146,6 @@ fn emit_error_and_close(app: &AppHandle, tab_id: &str, full_method: &str, status
     );
 }
 
-fn apply_metadata<T>(
-    req: &mut Request<T>,
-    metadata: HashMap<String, String>,
-) -> Result<(), String> {
-    for (k, v) in metadata {
-        let key = MetadataKey::from_bytes(k.as_bytes())
-            .map_err(|e| format!("Invalid metadata key '{}': {}", k, e))?;
-        let val = MetadataValue::try_from(v)
-            .map_err(|e| format!("Invalid metadata value for '{}': {}", key, e))?;
-        req.metadata_mut().insert(key, val);
-    }
-    Ok(())
-}
-
-fn resolve_method_streaming(
-    pool: &DescriptorPool,
-    full_method: &str,
-) -> Result<(bool, bool), String> {
-    let trimmed = full_method.trim();
-    let parts: Vec<&str> = trimmed.split('/').filter(|p| !p.is_empty()).collect();
-    if parts.len() != 2 {
-        return Err("fullMethod must be in the form '/package.Service/Method'".to_string());
-    }
-    let service = pool
-        .get_service_by_name(parts[0])
-        .ok_or_else(|| format!("Service not found in descriptors: {}", parts[0]))?;
-    let method = service
-        .methods()
-        .find(|m| m.name() == parts[1])
-        .ok_or_else(|| format!("Method not found: {} on {}", parts[1], parts[0]))?;
-    Ok((method.is_client_streaming(), method.is_server_streaming()))
-}
-
 #[tauri::command]
 pub async fn grpc_stream_start(
     app: AppHandle,
@@ -198,30 +164,22 @@ pub async fn grpc_stream_start(
     let target = normalize_target_with_tls(&request.target, request.tls.use_tls);
 
     let pool: DescriptorPool = if let Some(proto_path) = &request.proto_path {
-        let pools = proto_state.pools.lock().map_err(|e| e.to_string())?;
-        pools
-            .get(proto_path)
-            .cloned()
-            .ok_or_else(|| format!("Proto file not loaded: {}", proto_path))?
+        proto_state.pool(proto_path)?
     } else {
         build_descriptor_pool_for_method_with_tls(&target, &request.full_method, &request.tls)
             .await?
     };
 
-    let (input_type, output_type) = resolve_method_types(&pool, &request.full_method)?;
-    let (is_client_streaming, is_server_streaming) =
-        resolve_method_streaming(&pool, &request.full_method)?;
+    let method = resolve_method(&pool, &request.full_method)?;
+    let is_client_streaming = method.is_client_streaming();
+    let is_server_streaming = method.is_server_streaming();
 
     if !is_server_streaming && !is_client_streaming {
         return Err("Use grpc_invoke_unary for unary methods".to_string());
     }
 
-    let input_desc = pool
-        .get_message_by_name(&strip_leading_dot(&input_type))
-        .ok_or_else(|| format!("Input message type not found: {}", input_type))?;
-    let output_desc = pool
-        .get_message_by_name(&strip_leading_dot(&output_type))
-        .ok_or_else(|| format!("Output message type not found: {}", output_type))?;
+    let input_desc = method.input();
+    let output_desc = method.output();
 
     let channel = create_channel(&target, &request.tls).await?;
     let mut grpc = tonic::client::Grpc::new(channel);

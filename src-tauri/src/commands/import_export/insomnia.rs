@@ -5,8 +5,10 @@
 //! `collection[]` tree with `children`. The request-level converters (auth,
 //! body, headers, template rewrite) are shared between both walks.
 
-use super::common::{ParsedBody, derive_base_url, param_map_entry, unique_folder_id};
-use super::{Collection, Endpoint, Folder, VariableEntry};
+use super::common::{
+    CollectionBuilder, ParsedBody, derive_base_url, grouped_params, param_map_entry,
+};
+use super::{Collection, Endpoint, VariableEntry};
 use crate::commands::scripts::ScriptData;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -127,9 +129,7 @@ fn parse_v4(doc: &Value) -> Result<InsomniaImport, String> {
         None => ("Imported Insomnia Collection".to_string(), None, ""),
     };
 
-    let mut endpoints = Vec::new();
-    let mut folders = Vec::new();
-    let mut used_folder_ids = HashSet::new();
+    let mut builder = CollectionBuilder::default();
     let mut skipped_requests = 0usize;
 
     collect_v4_items(
@@ -137,9 +137,7 @@ fn parse_v4(doc: &Value) -> Result<InsomniaImport, String> {
         &children,
         &[],
         None,
-        &mut endpoints,
-        &mut folders,
-        &mut used_folder_ids,
+        &mut builder,
         &mut skipped_requests,
     );
     // Resources whose parent is missing from the export (partial exports)
@@ -152,14 +150,12 @@ fn parse_v4(doc: &Value) -> Result<InsomniaImport, String> {
             &children,
             &[],
             None,
-            &mut endpoints,
-            &mut folders,
-            &mut used_folder_ids,
+            &mut builder,
             &mut skipped_requests,
         );
     }
 
-    folders.sort_by(|a, b| a.name.cmp(&b.name));
+    let (endpoints, folders) = builder.finish();
 
     // Base environment (child of the workspace) → collection variables;
     // its own children are the selectable sub-environments.
@@ -220,15 +216,12 @@ fn parse_v4(doc: &Value) -> Result<InsomniaImport, String> {
 /// nested groups flatten to composite-named folders ("Parent / Child"), the
 /// nearest group auth wins, and endpoints land in both the folder and the flat
 /// list.
-#[allow(clippy::too_many_arguments)]
 fn collect_v4_items(
     parent_id: &str,
     children: &HashMap<&str, Vec<&Value>>,
     name_chain: &[String],
     folder_auth: Option<&Value>,
-    endpoints: &mut Vec<Endpoint>,
-    folders: &mut Vec<Folder>,
-    used_folder_ids: &mut HashSet<String>,
+    builder: &mut CollectionBuilder,
     skipped_requests: &mut usize,
 ) {
     for resource in children.get(parent_id).cloned().unwrap_or_default() {
@@ -251,22 +244,12 @@ fn collect_v4_items(
                     children,
                     &chain,
                     child_auth,
-                    endpoints,
-                    folders,
-                    used_folder_ids,
+                    builder,
                     skipped_requests,
                 );
             }
             Some("request") => {
-                let endpoint = convert_request(resource);
-                place_endpoint(
-                    endpoint,
-                    name_chain,
-                    folder_auth,
-                    endpoints,
-                    folders,
-                    used_folder_ids,
-                );
+                builder.place(convert_request(resource), name_chain, folder_auth);
             }
             Some("websocket_request") | Some("grpc_request") => {
                 *skipped_requests += 1;
@@ -292,22 +275,12 @@ fn parse_v5(doc: &Value) -> Result<InsomniaImport, String> {
         .unwrap_or("Imported Insomnia Collection")
         .to_string();
 
-    let mut endpoints = Vec::new();
-    let mut folders = Vec::new();
-    let mut used_folder_ids = HashSet::new();
+    let mut builder = CollectionBuilder::default();
     let mut skipped_requests = 0usize;
 
-    collect_v5_items(
-        items,
-        &[],
-        None,
-        &mut endpoints,
-        &mut folders,
-        &mut used_folder_ids,
-        &mut skipped_requests,
-    );
+    collect_v5_items(items, &[], None, &mut builder, &mut skipped_requests);
 
-    folders.sort_by(|a, b| a.name.cmp(&b.name));
+    let (endpoints, folders) = builder.finish();
 
     let mut variables: Vec<VariableEntry> = Vec::new();
     let mut environments: Vec<ImportedEnvironment> = Vec::new();
@@ -360,9 +333,7 @@ fn collect_v5_items(
     items: &[Value],
     name_chain: &[String],
     folder_auth: Option<&Value>,
-    endpoints: &mut Vec<Endpoint>,
-    folders: &mut Vec<Folder>,
-    used_folder_ids: &mut HashSet<String>,
+    builder: &mut CollectionBuilder,
     skipped_requests: &mut usize,
 ) {
     for item in items {
@@ -378,25 +349,9 @@ fn collect_v5_items(
             let own_auth = convert_auth(item.get("authentication"));
             let child_auth = own_auth.as_ref().or(folder_auth);
 
-            collect_v5_items(
-                nested,
-                &chain,
-                child_auth,
-                endpoints,
-                folders,
-                used_folder_ids,
-                skipped_requests,
-            );
+            collect_v5_items(nested, &chain, child_auth, builder, skipped_requests);
         } else if item.get("method").is_some() {
-            let endpoint = convert_request(item);
-            place_endpoint(
-                endpoint,
-                name_chain,
-                folder_auth,
-                endpoints,
-                folders,
-                used_folder_ids,
-            );
+            builder.place(convert_request(item), name_chain, folder_auth);
         } else if item.get("url").is_some() {
             // A url without an HTTP method is a realtime (WebSocket/gRPC)
             // request; importing it as a GET would misrepresent it.
@@ -408,34 +363,6 @@ fn collect_v5_items(
 // ---------------------------------------------------------------------------
 // Shared request-level converters
 // ---------------------------------------------------------------------------
-
-/// Push an endpoint into the flat list and, when a name chain exists, its
-/// composite-named folder (the storage model expects the duplication).
-fn place_endpoint(
-    endpoint: Endpoint,
-    name_chain: &[String],
-    folder_auth: Option<&Value>,
-    endpoints: &mut Vec<Endpoint>,
-    folders: &mut Vec<Folder>,
-    used_folder_ids: &mut HashSet<String>,
-) {
-    if name_chain.is_empty() {
-        endpoints.push(endpoint);
-        return;
-    }
-    let composite_name = name_chain.join(" / ");
-    endpoints.push(endpoint.clone());
-    if let Some(folder) = folders.iter_mut().find(|f| f.name == composite_name) {
-        folder.endpoints.push(endpoint);
-    } else {
-        folders.push(Folder {
-            id: unique_folder_id(&composite_name, used_folder_ids),
-            name: composite_name,
-            endpoints: vec![endpoint],
-            auth_config: folder_auth.cloned(),
-        });
-    }
-}
 
 fn convert_request(request: &Value) -> Endpoint {
     let name = request
@@ -506,18 +433,7 @@ fn convert_parameters(request: &Value) -> Option<Value> {
     fill(request.get("parameters"), &mut query_params);
     fill(request.get("headers"), &mut header_params);
 
-    if query_params.is_empty() && header_params.is_empty() {
-        return None;
-    }
-
-    let mut result = serde_json::Map::new();
-    if !query_params.is_empty() {
-        result.insert("query".to_string(), Value::Object(query_params));
-    }
-    if !header_params.is_empty() {
-        result.insert("header".to_string(), Value::Object(header_params));
-    }
-    Some(Value::Object(result))
+    grouped_params(serde_json::Map::new(), query_params, header_params)
 }
 
 fn convert_body(body: Option<&Value>) -> ParsedBody {
@@ -636,8 +552,8 @@ fn convert_auth(auth: Option<&Value>) -> Option<Value> {
     let field = |key: &str| string_field(&auth_value, key).unwrap_or_default();
 
     match auth_obj.get("type").and_then(|t| t.as_str())? {
-        "basic" => Some(serde_json::json!({
-            "type": "basic",
+        auth_type @ ("basic" | "digest") => Some(serde_json::json!({
+            "type": auth_type,
             "config": { "username": field("username"), "password": field("password") }
         })),
         "bearer" => Some(serde_json::json!({
@@ -655,10 +571,6 @@ fn convert_auth(auth: Option<&Value>) -> Option<Value> {
                     "header"
                 }
             }
-        })),
-        "digest" => Some(serde_json::json!({
-            "type": "digest",
-            "config": { "username": field("username"), "password": field("password") }
         })),
         "ntlm" => Some(serde_json::json!({
             "type": "ntlm",
@@ -1059,5 +971,16 @@ mod tests {
                 .unwrap_err()
                 .contains("environment export")
         );
+    }
+
+    #[test]
+    fn basic_and_digest_auth_keep_their_own_type() {
+        for kind in ["basic", "digest"] {
+            let auth = json!({ "type": kind, "username": "ada", "password": "pw" });
+            assert_eq!(
+                convert_auth(Some(&auth)).unwrap(),
+                json!({ "type": kind, "config": { "username": "ada", "password": "pw" } })
+            );
+        }
     }
 }

@@ -306,9 +306,8 @@ fn execute_script(
     let console_ctx = ctx.clone();
     setup_console(&mut context, console_ctx)?;
 
-    // Setup Jest-style test framework (test, it, describe, expect, request, response)
-    let jest_ctx = ctx.clone();
-    setup_jest(&mut context, jest_ctx)?;
+    // Setup Jest-style test framework (test, it, describe, expect)
+    setup_jest(&mut context)?;
 
     // Setup pm (Postman-like) object for backward compatibility
     let pm_ctx = ctx.clone();
@@ -385,12 +384,16 @@ fn stringify_request_global(context: &mut Context) -> Result<Option<String>, Str
     }
 }
 
-fn push_warn_log(ctx: &Rc<RefCell<ScriptContext>>, message: String) {
+fn push_log(ctx: &Rc<RefCell<ScriptContext>>, level: &str, message: String) {
     ctx.borrow_mut().logs.push(LogEntry {
-        level: "warn".to_string(),
+        level: level.to_string(),
         message,
         timestamp: chrono::Utc::now().timestamp_millis(),
     });
+}
+
+fn push_warn_log(ctx: &Rc<RefCell<ScriptContext>>, message: String) {
+    push_log(ctx, "warn", message);
 }
 
 /// Read the (possibly mutated) `request` global back into the shared context.
@@ -434,77 +437,27 @@ fn capture_request_mutations(
     }
 }
 
+/// A `console.<level>` function that records its first argument.
+fn console_fn(ctx: Rc<RefCell<ScriptContext>>, level: &'static str) -> NativeFunction {
+    unsafe {
+        NativeFunction::from_closure(move |_, args, _| {
+            let message = args
+                .first()
+                .map(|v| v.display().to_string())
+                .unwrap_or_default();
+            push_log(&ctx, level, message);
+            Ok(JsValue::undefined())
+        })
+    }
+}
+
 /// Setup console.log, console.warn, console.error, console.info
 fn setup_console(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<(), String> {
-    let log_ctx = ctx.clone();
-    let log_fn = unsafe {
-        NativeFunction::from_closure(move |_, args, _| {
-            let message = args
-                .first()
-                .map(|v| v.display().to_string())
-                .unwrap_or_default();
-            log_ctx.borrow_mut().logs.push(LogEntry {
-                level: "log".to_string(),
-                message,
-                timestamp: chrono::Utc::now().timestamp_millis(),
-            });
-            Ok(JsValue::undefined())
-        })
-    };
-
-    let warn_ctx = ctx.clone();
-    let warn_fn = unsafe {
-        NativeFunction::from_closure(move |_, args, _| {
-            let message = args
-                .first()
-                .map(|v| v.display().to_string())
-                .unwrap_or_default();
-            warn_ctx.borrow_mut().logs.push(LogEntry {
-                level: "warn".to_string(),
-                message,
-                timestamp: chrono::Utc::now().timestamp_millis(),
-            });
-            Ok(JsValue::undefined())
-        })
-    };
-
-    let error_ctx = ctx.clone();
-    let error_fn = unsafe {
-        NativeFunction::from_closure(move |_, args, _| {
-            let message = args
-                .first()
-                .map(|v| v.display().to_string())
-                .unwrap_or_default();
-            error_ctx.borrow_mut().logs.push(LogEntry {
-                level: "error".to_string(),
-                message,
-                timestamp: chrono::Utc::now().timestamp_millis(),
-            });
-            Ok(JsValue::undefined())
-        })
-    };
-
-    let info_ctx = ctx.clone();
-    let info_fn = unsafe {
-        NativeFunction::from_closure(move |_, args, _| {
-            let message = args
-                .first()
-                .map(|v| v.display().to_string())
-                .unwrap_or_default();
-            info_ctx.borrow_mut().logs.push(LogEntry {
-                level: "info".to_string(),
-                message,
-                timestamp: chrono::Utc::now().timestamp_millis(),
-            });
-            Ok(JsValue::undefined())
-        })
-    };
-
     let console = ObjectInitializer::new(context)
-        .function(log_fn, js_string!("log"), 1)
-        .function(warn_fn, js_string!("warn"), 1)
-        .function(error_fn, js_string!("error"), 1)
-        .function(info_fn, js_string!("info"), 1)
+        .function(console_fn(ctx.clone(), "log"), js_string!("log"), 1)
+        .function(console_fn(ctx.clone(), "warn"), js_string!("warn"), 1)
+        .function(console_fn(ctx.clone(), "error"), js_string!("error"), 1)
+        .function(console_fn(ctx, "info"), js_string!("info"), 1)
         .build();
 
     context
@@ -514,8 +467,9 @@ fn setup_console(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Resu
     Ok(())
 }
 
-/// Setup Jest-style test framework: test(), describe(), expect(), and response/request globals
-fn setup_jest(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<(), String> {
+/// Setup Jest-style test framework: test(), describe(), expect(). The `request`
+/// and `response` globals it reads are registered by [`setup_pm`].
+fn setup_jest(context: &mut Context) -> Result<(), String> {
     // Define the complete Jest-style test framework
     let jest_code = r#"
         (function() {
@@ -715,39 +669,6 @@ fn setup_jest(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<
                 .map_err(|e| e.to_string())?;
         }
     }
-
-    // Create request and response globals from context
-    let request_json = {
-        let borrowed = ctx.borrow();
-        serde_json::to_string(&borrowed.request).unwrap_or("{}".to_string())
-    };
-
-    let response_json = {
-        let borrowed = ctx.borrow();
-        borrowed
-            .response
-            .as_ref()
-            .map(|r| serde_json::to_string(r).unwrap_or("{}".to_string()))
-            .unwrap_or("{}".to_string())
-    };
-
-    // Register request global
-    let request_str = format!("({})", request_json);
-    let request_source = Source::from_bytes(request_str.as_bytes());
-    let request_obj = context.eval(request_source).unwrap_or(JsValue::undefined());
-    context
-        .register_global_property(js_string!("request"), request_obj, Attribute::all())
-        .map_err(|e| e.to_string())?;
-
-    // Register response global
-    let response_str = format!("({})", response_json);
-    let response_source = Source::from_bytes(response_str.as_bytes());
-    let response_obj = context
-        .eval(response_source)
-        .unwrap_or(JsValue::undefined());
-    context
-        .register_global_property(js_string!("response"), response_obj, Attribute::all())
-        .map_err(|e| e.to_string())?;
 
     Ok(())
 }

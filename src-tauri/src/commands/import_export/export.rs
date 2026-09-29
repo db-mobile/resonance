@@ -319,29 +319,20 @@ fn auth_to_postman(security: &Value) -> Option<Value> {
                 "bearer": [{ "key": "token", "value": token, "type": "string" }]
             }))
         }
-        "basic" => Some(serde_json::json!({
-            "type": "basic",
-            "basic": [
-                { "key": "username", "value": get("username").unwrap_or(""), "type": "string" },
-                { "key": "password", "value": get("password").unwrap_or(""), "type": "string" }
-            ]
-        })),
-        "digest" => Some(serde_json::json!({
-            "type": "digest",
-            "digest": [
-                { "key": "username", "value": get("username").unwrap_or(""), "type": "string" },
-                { "key": "password", "value": get("password").unwrap_or(""), "type": "string" }
-            ]
-        })),
-        "ntlm" => Some(serde_json::json!({
-            "type": "ntlm",
-            "ntlm": [
-                { "key": "username", "value": get("username").unwrap_or(""), "type": "string" },
-                { "key": "password", "value": get("password").unwrap_or(""), "type": "string" },
-                { "key": "domain", "value": get("domain").unwrap_or(""), "type": "string" },
-                { "key": "workstation", "value": get("workstation").unwrap_or(""), "type": "string" }
-            ]
-        })),
+        "basic" | "digest" | "ntlm" => {
+            let keys: &[&str] = if auth_type == "ntlm" {
+                &["username", "password", "domain", "workstation"]
+            } else {
+                &["username", "password"]
+            };
+            let params: Vec<Value> = keys
+                .iter()
+                .map(|key| {
+                    serde_json::json!({ "key": key, "value": get(key).unwrap_or(""), "type": "string" })
+                })
+                .collect();
+            Some(serde_json::json!({ "type": auth_type, (auth_type): params }))
+        }
         "api-key" => {
             let key = get("keyName").or_else(|| get("key")).unwrap_or("");
             let value = get("keyValue").or_else(|| get("value")).unwrap_or("");

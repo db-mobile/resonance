@@ -3,7 +3,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use http::uri::PathAndQuery;
 use prost::Message;
-use prost_reflect::{DescriptorPool, DynamicMessage};
+use prost_reflect::{DescriptorPool, DynamicMessage, MethodDescriptor};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -112,16 +112,18 @@ async fn invoke_unary_reflection(request: GrpcUnaryRequest) -> Result<Value, Str
     let pool =
         build_descriptor_pool_for_method_with_tls(&target, &request.full_method, &request.tls)
             .await?;
-    let (input_type, output_type) = resolve_method_types(&pool, &request.full_method)?;
+    invoke_unary_with_pool(&pool, request).await
+}
 
-    let input_desc = pool
-        .get_message_by_name(&strip_leading_dot(&input_type))
-        .ok_or_else(|| format!("Input message type not found: {}", input_type))?;
-    let output_desc = pool
-        .get_message_by_name(&strip_leading_dot(&output_type))
-        .ok_or_else(|| format!("Output message type not found: {}", output_type))?;
-
-    let input_msg = json_to_dynamic_message(&request.request_json, input_desc)?;
+/// Run one unary call once the method's descriptors are in hand; the reflection
+/// and proto-file commands differ only in where `pool` comes from.
+pub(crate) async fn invoke_unary_with_pool(
+    pool: &DescriptorPool,
+    request: GrpcUnaryRequest,
+) -> Result<Value, String> {
+    let target = normalize_target_with_tls(&request.target, request.tls.use_tls);
+    let method = resolve_method(pool, &request.full_method)?;
+    let input_msg = json_to_dynamic_message(&request.request_json, method.input())?;
 
     let channel = create_channel(&target, &request.tls).await?;
 
@@ -131,20 +133,14 @@ async fn invoke_unary_reflection(request: GrpcUnaryRequest) -> Result<Value, Str
         .map_err(|e| format!("gRPC client not ready: {}", e))?;
 
     let mut req = Request::new(input_msg);
-    for (k, v) in request.metadata {
-        let key = MetadataKey::from_bytes(k.as_bytes())
-            .map_err(|e| format!("Invalid metadata key '{}': {}", k, e))?;
-        let val = MetadataValue::try_from(v)
-            .map_err(|e| format!("Invalid metadata value for '{}': {}", key, e))?;
-        req.metadata_mut().insert(key, val);
-    }
+    apply_metadata(&mut req, request.metadata)?;
 
     let path: PathAndQuery = request
         .full_method
         .parse()
         .map_err(|e| format!("Invalid method path: {}", e))?;
 
-    let codec = DynamicMessageCodec::new(output_desc);
+    let codec = DynamicMessageCodec::new(method.output());
 
     let call_fut = grpc.unary(req, path, codec);
     let response = if let Some(ms) = request.deadline_ms {
@@ -184,6 +180,21 @@ async fn invoke_unary_reflection(request: GrpcUnaryRequest) -> Result<Value, Str
             "details": status.details()
         })),
     }
+}
+
+/// Copy caller-supplied metadata onto a request, rejecting invalid names or values.
+pub(crate) fn apply_metadata<T>(
+    req: &mut Request<T>,
+    metadata: HashMap<String, String>,
+) -> Result<(), String> {
+    for (k, v) in metadata {
+        let key = MetadataKey::from_bytes(k.as_bytes())
+            .map_err(|e| format!("Invalid metadata key '{}': {}", k, e))?;
+        let val = MetadataValue::try_from(v)
+            .map_err(|e| format!("Invalid metadata value for '{}': {}", key, e))?;
+        req.metadata_mut().insert(key, val);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -469,10 +480,7 @@ pub(crate) async fn create_channel(target: &str, tls: &GrpcTlsOptions) -> Result
             .map_err(|e| format!("Connection failed: {}", e));
     }
 
-    let (cert_path, key_path, ca_path) = match &tls.client_cert {
-        Some(cert) => (&cert.cert_path, &cert.key_path, &cert.ca_path),
-        None => (&None, &None, &None),
-    };
+    let (cert_path, key_path, ca_path) = crate::commands::tls::cert_paths(tls.client_cert.as_ref());
     let identity_pems = crate::commands::tls::load_identity_pems(cert_path, key_path)?;
 
     if tls.skip_verify {
@@ -535,10 +543,6 @@ async fn connect_skip_verify(
         .map_err(|e| format!("Connection failed: {}", e))
 }
 
-pub(crate) fn strip_leading_dot(name: &str) -> String {
-    name.strip_prefix('.').unwrap_or(name).to_string()
-}
-
 pub(crate) fn metadata_to_json_map(meta: &tonic::metadata::MetadataMap) -> Value {
     let mut map = serde_json::Map::new();
     for kv in meta.iter() {
@@ -562,10 +566,11 @@ pub(crate) fn metadata_to_json_map(meta: &tonic::metadata::MetadataMap) -> Value
     Value::Object(map)
 }
 
-pub(crate) fn resolve_method_types(
+/// Look up `/package.Service/Method` in the pool.
+pub(crate) fn resolve_method(
     pool: &DescriptorPool,
     full_method: &str,
-) -> Result<(String, String), String> {
+) -> Result<MethodDescriptor, String> {
     let trimmed = full_method.trim();
     if !trimmed.starts_with('/') {
         return Err("fullMethod must start with '/'".to_string());
@@ -583,15 +588,10 @@ pub(crate) fn resolve_method_types(
         .get_service_by_name(service_name)
         .ok_or_else(|| format!("Service not found in descriptors: {}", service_name))?;
 
-    let method = service
+    service
         .methods()
         .find(|m| m.name() == method_name)
-        .ok_or_else(|| format!("Method not found: {} on {}", method_name, service_name))?;
-
-    Ok((
-        method.input().full_name().to_string(),
-        method.output().full_name().to_string(),
-    ))
+        .ok_or_else(|| format!("Method not found: {} on {}", method_name, service_name))
 }
 
 pub(crate) fn json_to_dynamic_message(
@@ -619,14 +619,8 @@ pub async fn grpc_get_input_skeleton(
     let target = normalize_target_with_tls(&target, tls.use_tls);
 
     let pool = build_descriptor_pool_for_method_with_tls(&target, &full_method, &tls).await?;
-    let (input_type, _) = resolve_method_types(&pool, &full_method)?;
-
-    let input_desc = pool
-        .get_message_by_name(&strip_leading_dot(&input_type))
-        .ok_or_else(|| format!("Input message type not found: {}", input_type))?;
-
-    let skeleton = generate_message_skeleton(&input_desc);
-    Ok(skeleton)
+    let method = resolve_method(&pool, &full_method)?;
+    Ok(generate_message_skeleton(&method.input()))
 }
 
 pub(crate) fn generate_message_skeleton(desc: &prost_reflect::MessageDescriptor) -> Value {

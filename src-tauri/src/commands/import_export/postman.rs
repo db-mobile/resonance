@@ -1,10 +1,11 @@
 //! Postman collection parsing: converts a Postman export `Value` into a `Collection`.
 
-use super::common::{ParsedBody, derive_base_url, param_map_entry, unique_folder_id};
-use super::{Collection, Endpoint, Folder, VariableEntry};
+use super::common::{
+    CollectionBuilder, ParsedBody, derive_base_url, grouped_params, param_map_entry,
+};
+use super::{Collection, Endpoint, VariableEntry};
 use crate::commands::scripts::ScriptData;
 use serde_json::Value;
-use std::collections::HashSet;
 use std::sync::LazyLock;
 
 /// Script blocks inherited from the Postman collection and ancestor folders,
@@ -54,23 +55,11 @@ pub(crate) fn parse_postman_collection(postman: Value) -> Result<Collection, Str
     let mut inherited = InheritedScripts::default();
     inherited.push_labeled(&postman, "collection-level");
 
-    let mut endpoints = Vec::new();
-    let mut folders = Vec::new();
-    let mut used_folder_ids = HashSet::new();
-
+    let mut builder = CollectionBuilder::default();
     if let Some(items) = postman.get("item").and_then(|i| i.as_array()) {
-        collect_items(
-            items,
-            &[],
-            &inherited,
-            None,
-            &mut endpoints,
-            &mut folders,
-            &mut used_folder_ids,
-        );
+        collect_items(items, &[], &inherited, None, &mut builder);
     }
-
-    folders.sort_by(|a, b| a.name.cmp(&b.name));
+    let (endpoints, folders) = builder.finish();
 
     let base_url = extract_postman_base_url(&postman, &endpoints);
     let variables = extract_postman_variables(&postman, base_url.as_deref());
@@ -96,9 +85,7 @@ fn collect_items(
     name_chain: &[String],
     inherited: &InheritedScripts,
     folder_auth: Option<&Value>,
-    endpoints: &mut Vec<Endpoint>,
-    folders: &mut Vec<Folder>,
-    used_folder_ids: &mut HashSet<String>,
+    builder: &mut CollectionBuilder,
 ) {
     for item in items {
         if let Some(nested_items) = item.get("item").and_then(|i| i.as_array()) {
@@ -120,34 +107,11 @@ fn collect_items(
             let own_auth = extract_postman_auth(item.get("auth"));
             let child_auth = own_auth.as_ref().or(folder_auth);
 
-            collect_items(
-                nested_items,
-                &chain,
-                &child_inherited,
-                child_auth,
-                endpoints,
-                folders,
-                used_folder_ids,
-            );
+            collect_items(nested_items, &chain, &child_inherited, child_auth, builder);
         } else if let Some(request) = item.get("request")
             && let Some(endpoint) = parse_postman_request(item, request, inherited)
         {
-            if name_chain.is_empty() {
-                endpoints.push(endpoint);
-            } else {
-                let composite_name = name_chain.join(" / ");
-                endpoints.push(endpoint.clone());
-                if let Some(folder) = folders.iter_mut().find(|f| f.name == composite_name) {
-                    folder.endpoints.push(endpoint);
-                } else {
-                    folders.push(Folder {
-                        id: unique_folder_id(&composite_name, used_folder_ids),
-                        name: composite_name,
-                        endpoints: vec![endpoint],
-                        auth_config: folder_auth.cloned(),
-                    });
-                }
-            }
+            builder.place(endpoint, name_chain, folder_auth);
         }
     }
 }
@@ -370,10 +334,10 @@ fn extract_postman_auth(auth: Option<&Value>) -> Option<Value> {
                 }
             }))
         }
-        "basic" => {
-            let params = auth_obj.get("basic").and_then(|b| b.as_array());
+        "basic" | "digest" => {
+            let params = auth_obj.get(auth_type).and_then(|b| b.as_array());
             Some(serde_json::json!({
-                "type": "basic",
+                "type": auth_type,
                 "config": {
                     "username": auth_param(params, "username").unwrap_or_default(),
                     "password": auth_param(params, "password").unwrap_or_default()
@@ -388,16 +352,6 @@ fn extract_postman_auth(auth: Option<&Value>) -> Option<Value> {
                     "keyName": auth_param(params, "key").unwrap_or_default(),
                     "keyValue": auth_param(params, "value").unwrap_or_default(),
                     "location": auth_param(params, "in").unwrap_or("header")
-                }
-            }))
-        }
-        "digest" => {
-            let params = auth_obj.get("digest").and_then(|d| d.as_array());
-            Some(serde_json::json!({
-                "type": "digest",
-                "config": {
-                    "username": auth_param(params, "username").unwrap_or_default(),
-                    "password": auth_param(params, "password").unwrap_or_default()
                 }
             }))
         }
@@ -674,28 +628,13 @@ fn extract_postman_parameters(url: Option<&Value>, request: &Value) -> Option<Va
         }
     }
 
-    // Only return if we have any parameters
-    if path_params.is_empty() && query_params.is_empty() && header_params.is_empty() {
-        return None;
-    }
-
-    let mut result = serde_json::Map::new();
-    if !path_params.is_empty() {
-        result.insert("path".to_string(), Value::Object(path_params));
-    }
-    if !query_params.is_empty() {
-        result.insert("query".to_string(), Value::Object(query_params));
-    }
-    if !header_params.is_empty() {
-        result.insert("header".to_string(), Value::Object(header_params));
-    }
-
-    Some(Value::Object(result))
+    grouped_params(path_params, query_params, header_params)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     const FIXTURE: &str = r#"{
         "info": {
@@ -952,5 +891,25 @@ mod tests {
         let query = params["query"].as_object().unwrap();
         assert!(query.contains_key("on"));
         assert!(!query.contains_key("off"));
+    }
+
+    #[test]
+    fn basic_and_digest_auth_keep_their_own_type() {
+        for kind in ["basic", "digest"] {
+            let auth = serde_json::json!({
+                "type": kind,
+                (kind): [
+                    { "key": "username", "value": "ada" },
+                    { "key": "password", "value": "pw" }
+                ]
+            });
+            assert_eq!(
+                extract_postman_auth(Some(&auth)).unwrap(),
+                serde_json::json!({
+                    "type": kind,
+                    "config": { "username": "ada", "password": "pw" }
+                })
+            );
+        }
     }
 }

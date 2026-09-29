@@ -209,20 +209,8 @@ fn parse_broker(broker: &str) -> Result<(String, u16, bool), String> {
 /// default, so skip-verify, custom CA, and mTLS all flow through the shared
 /// tls.rs builders. No ALPN is set (MQTT is not h2).
 fn build_tls_transport(tls: &MqttTlsOptions) -> Result<Transport, String> {
-    let (cert_path, key_path, ca_path) = match tls.client_cert.as_ref() {
-        Some(cert) => (&cert.cert_path, &cert.key_path, &cert.ca_path),
-        None => (&None, &None, &None),
-    };
-
-    let identity = crate::commands::tls::load_identity_pems(cert_path, key_path)?;
-
-    let config = if tls.skip_verify {
-        crate::commands::tls::build_danger_tls_config(identity)?
-    } else {
-        let ca_pem = crate::commands::tls::load_ca_pem(ca_path)?;
-        crate::commands::tls::build_verifying_tls_config(ca_pem, identity)?
-    };
-
+    let config =
+        crate::commands::tls::build_client_tls_config(!tls.skip_verify, tls.client_cert.as_ref())?;
     Ok(Transport::tls_with_config(config.into()))
 }
 
