@@ -6,7 +6,8 @@
 use tauri::{AppHandle, State};
 
 use super::proxy::ProxyState;
-use super::ws_stream::{self, WsChannel, WsCommandResponse, WsConnections, WsSendRequest};
+use super::tab_sessions::CommandAck;
+use super::ws_stream::{self, WsChannel, WsConnections, WsSendRequest};
 
 pub(crate) static SUBSCRIPTION_CHANNEL: WsChannel = WsChannel {
     event_name: "graphql-subscription-event",
@@ -28,7 +29,7 @@ pub async fn graphql_subscription_send(
     state: State<'_, GraphqlSubscriptionState>,
     proxy_state: State<'_, ProxyState>,
     request: WsSendRequest,
-) -> Result<WsCommandResponse, String> {
+) -> Result<CommandAck, String> {
     ws_stream::send(
         app,
         &SUBSCRIPTION_CHANNEL,
@@ -43,6 +44,6 @@ pub async fn graphql_subscription_send(
 pub async fn graphql_subscription_close(
     state: State<'_, GraphqlSubscriptionState>,
     tab_id: String,
-) -> Result<WsCommandResponse, String> {
+) -> Result<CommandAck, String> {
     ws_stream::close(&state.connections, tab_id).await
 }

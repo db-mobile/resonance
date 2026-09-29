@@ -118,6 +118,8 @@ keyring = { version = "3", default-features = false, features = ["windows-native
 # Temp dirs that clean themselves up even when a test panics, which the
 # hand-rolled temp_dir().join(Uuid) pattern in fs_secure.rs does not.
 tempfile = "3"
+# Mock runtime, so transports that emit events can be driven end to end.
+tauri = { version = "2.12", features = ["test"] }
 
 [features]
 default = ["custom-protocol"]

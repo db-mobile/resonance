@@ -5,7 +5,8 @@
 use tauri::{AppHandle, State};
 
 use super::proxy::ProxyState;
-use super::ws_stream::{self, WsChannel, WsCommandResponse, WsConnections, WsSendRequest};
+use super::tab_sessions::CommandAck;
+use super::ws_stream::{self, WsChannel, WsConnections, WsSendRequest};
 
 pub(crate) static WEBSOCKET_CHANNEL: WsChannel = WsChannel {
     event_name: "websocket-event",
@@ -27,7 +28,7 @@ pub async fn websocket_send(
     state: State<'_, WebSocketState>,
     proxy_state: State<'_, ProxyState>,
     request: WsSendRequest,
-) -> Result<WsCommandResponse, String> {
+) -> Result<CommandAck, String> {
     ws_stream::send(
         app,
         &WEBSOCKET_CHANNEL,
@@ -42,6 +43,6 @@ pub async fn websocket_send(
 pub async fn websocket_close(
     state: State<'_, WebSocketState>,
     tab_id: String,
-) -> Result<WsCommandResponse, String> {
+) -> Result<CommandAck, String> {
     ws_stream::close(&state.connections, tab_id).await
 }

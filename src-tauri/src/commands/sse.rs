@@ -2,15 +2,14 @@ use reqwest::Method;
 use reqwest::header::{ACCEPT, CACHE_CONTROL, HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
-use tokio::sync::{Mutex, oneshot};
+use tokio::sync::oneshot;
 
 use super::api_request::ClientCertConfig;
 use super::http_client::{HttpClientOptions, build_http_client};
 use super::proxy::{ProxyAction, ProxyState};
+use super::tab_sessions::{CommandAck, Session, TabSessions, require_tab_id};
 
 /// Reconnection delay used until the server sends its own `retry:` field.
 const DEFAULT_RETRY_MS: u64 = 3000;
@@ -28,29 +27,17 @@ const MAX_SILENT_RECONNECTS: u32 = 10;
 /// expected to stay open indefinitely.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
-type Connections = Arc<Mutex<HashMap<String, SseConnection>>>;
+type Connections = TabSessions<SseConnection>;
 
-/// A live stream, keyed by tab. `id` distinguishes generations so a task that
-/// has already been replaced cannot clean up (or emit `close` for) its
-/// successor. Shutdown is cooperative: the task selects on the receiver, so it
-/// unwinds normally and still emits its terminal event.
+/// A live stream, keyed by tab. Shutdown is cooperative: the task selects on
+/// the receiver, so it unwinds normally and still emits its terminal event.
 struct SseConnection {
-    id: u64,
     shutdown: Option<oneshot::Sender<()>>,
 }
 
+#[derive(Default)]
 pub struct SseState {
     connections: Connections,
-    next_id: AtomicU64,
-}
-
-impl Default for SseState {
-    fn default() -> Self {
-        Self {
-            connections: Arc::new(Mutex::new(HashMap::new())),
-            next_id: AtomicU64::new(1),
-        }
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -77,11 +64,6 @@ pub struct SseConnectRequest {
     /// serializes it and sets the matching Content-Type header.
     #[serde(default)]
     pub body: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct SseCommandResponse {
-    pub success: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -127,17 +109,6 @@ fn emit_error(app: &AppHandle, tab_id: &str, url: &str, status: Option<u16>, mes
     event.status = status;
     event.message = Some(message);
     emit(app, event);
-}
-
-/// Remove this tab's entry only when it still belongs to generation `id`.
-/// Returns whether the caller was still the current connection.
-async fn remove_connection_if_current(connections: &Connections, tab_id: &str, id: u64) -> bool {
-    let mut connections = connections.lock().await;
-    if matches!(connections.get(tab_id), Some(connection) if connection.id == id) {
-        connections.remove(tab_id);
-        return true;
-    }
-    false
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -532,7 +503,11 @@ async fn run_stream(
 
     // Only the generation that still owns the tab reports the close, so a
     // stream that was superseded by a newer connect stays silent.
-    if remove_connection_if_current(&connections, &target.tab_id, id).await {
+    if connections
+        .remove_if_current(&target.tab_id, id)
+        .await
+        .is_some()
+    {
         emit(&app, payload(&target.tab_id, &target.url, "close"));
     }
 }
@@ -569,10 +544,8 @@ pub async fn sse_connect(
     state: State<'_, SseState>,
     proxy_state: State<'_, ProxyState>,
     mut request: SseConnectRequest,
-) -> Result<SseCommandResponse, String> {
-    if request.tab_id.trim().is_empty() {
-        return Err("Tab ID is required".to_string());
-    }
+) -> Result<CommandAck, String> {
+    require_tab_id(&request.tab_id)?;
     if request.url.trim().is_empty() {
         return Err("SSE URL is required".to_string());
     }
@@ -591,14 +564,14 @@ pub async fn sse_connect(
     let client = build_sse_client(&request, proxy_action)?;
 
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
-    let id = state.next_id.fetch_add(1, Ordering::Relaxed);
+    let id = state.connections.next_generation();
 
     // Hold the lock across signal + spawn + insert so a concurrent connect on
     // the same tab cannot interleave and leave the older stream registered.
     let mut connections = state.connections.lock().await;
 
     if let Some(previous) = connections.get_mut(&request.tab_id)
-        && let Some(shutdown) = previous.shutdown.take()
+        && let Some(shutdown) = previous.value.shutdown.take()
     {
         let _ = shutdown.send(());
     }
@@ -621,34 +594,31 @@ pub async fn sse_connect(
 
     connections.insert(
         request.tab_id,
-        SseConnection {
-            id,
-            shutdown: Some(shutdown_tx),
+        Session {
+            generation: id,
+            value: SseConnection {
+                shutdown: Some(shutdown_tx),
+            },
         },
     );
 
-    Ok(SseCommandResponse { success: true })
+    Ok(CommandAck::ok())
 }
 
 #[tauri::command]
-pub async fn sse_close(
-    state: State<'_, SseState>,
-    tab_id: String,
-) -> Result<SseCommandResponse, String> {
-    if tab_id.trim().is_empty() {
-        return Err("Tab ID is required".to_string());
-    }
+pub async fn sse_close(state: State<'_, SseState>, tab_id: String) -> Result<CommandAck, String> {
+    require_tab_id(&tab_id)?;
 
     // The entry stays in place: the task removes itself once it has unwound,
     // which is what lets it emit the terminal `close` for this tab.
     let mut connections = state.connections.lock().await;
     if let Some(connection) = connections.get_mut(&tab_id)
-        && let Some(shutdown) = connection.shutdown.take()
+        && let Some(shutdown) = connection.value.shutdown.take()
     {
         let _ = shutdown.send(());
     }
 
-    Ok(SseCommandResponse { success: true })
+    Ok(CommandAck::ok())
 }
 
 #[cfg(test)]
