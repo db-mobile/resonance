@@ -38,7 +38,7 @@ rumqttc = { version = "0.25", default-features = false, features = ["use-rustls-
 tonic = { version = "0.13", default-features = false, features = ["codegen", "prost", "channel", "tls-ring", "tls-native-roots"] }
 prost = "0.13"
 prost-types = "0.13"
-tokio-stream = { version = "0.1", features = ["sync"] }
+tokio-stream = "0.1"
 prost-reflect = { version = "0.15", features = ["serde"] }
 bytes = "1"
 http = "1"
@@ -62,7 +62,7 @@ webpki-roots = "0.26"
 
 # Utilities
 uuid = { version = "1", features = ["v4"] }
-chrono = { version = "0.4", features = ["serde"] }
+chrono = "0.4"
 # Legacy charset decoding for response bodies (WHATWG labels, pure Rust)
 encoding_rs = "0.8"
 thiserror = "2"

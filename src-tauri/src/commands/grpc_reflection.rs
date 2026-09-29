@@ -1,7 +1,6 @@
 use super::api_request::ClientCertConfig;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use bytes::Buf;
 use http::uri::PathAndQuery;
 use prost::Message;
 use prost_reflect::{DescriptorPool, DynamicMessage};
@@ -769,10 +768,6 @@ impl Decoder for DynamicMessageDecoder {
     type Error = Status;
 
     fn decode(&mut self, src: &mut DecodeBuf<'_>) -> Result<Option<Self::Item>, Self::Error> {
-        if src.remaining() == 0 {
-            return Ok(None);
-        }
-
         let mut msg = DynamicMessage::new(self.desc.clone());
         msg.merge(src)
             .map_err(|e| Status::internal(format!("decode error: {}", e)))?;
@@ -922,5 +917,21 @@ mod tests {
         .unwrap();
         assert_eq!(value["success"], serde_json::json!(true));
         assert!(!state.cancels.cancel("r1"));
+    }
+
+    #[tokio::test]
+    async fn an_empty_response_message_is_still_yielded() {
+        let desc = prost_reflect::DescriptorPool::global()
+            .get_message_by_name("google.protobuf.Empty")
+            .unwrap();
+        let frame = bytes::Bytes::from_static(&[0, 0, 0, 0, 0]);
+        let mut stream = tonic::Streaming::new_response(
+            DynamicMessageDecoder { desc },
+            axum::body::Body::from(frame),
+            axum::http::StatusCode::OK,
+            None,
+            None,
+        );
+        assert!(stream.message().await.unwrap().is_some());
     }
 }

@@ -333,7 +333,7 @@ export class MockServerService {
         try {
             const status = await this.getStatus();
             if (status.running) {
-                await window.backendAPI.mockServer.reloadSettings();
+                await window.backendAPI.mockServer.reloadSettings(await this.repository.getSettings());
             }
         } catch (error) {
         }

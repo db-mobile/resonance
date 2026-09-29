@@ -639,6 +639,9 @@ fn extract_postman_parameters(url: Option<&Value>, request: &Value) -> Option<Va
                 if key.is_empty() {
                     continue;
                 }
+                if q_param.get("disabled").and_then(|d| d.as_bool()) == Some(true) {
+                    continue;
+                }
                 let value = q_param
                     .get("value")
                     .and_then(|v| v.as_str())
@@ -934,5 +937,20 @@ mod tests {
         assert_eq!(config["scope"], "read write");
         assert_eq!(config["clientAuthMethod"], "header");
         assert!(config.get("clientSecret").is_none());
+    }
+
+    #[test]
+    fn disabled_query_params_are_skipped() {
+        let url = serde_json::json!({
+            "raw": "https://api.example.com/items?on=1",
+            "query": [
+                { "key": "on", "value": "1" },
+                { "key": "off", "value": "2", "disabled": true }
+            ]
+        });
+        let params = extract_postman_parameters(Some(&url), &serde_json::json!({})).unwrap();
+        let query = params["query"].as_object().unwrap();
+        assert!(query.contains_key("on"));
+        assert!(!query.contains_key("off"));
     }
 }

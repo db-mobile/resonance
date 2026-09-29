@@ -31,8 +31,6 @@ pub struct MockServerSettings {
 pub struct MockEndpoint {
     pub method: String,
     pub path_regex: Regex,
-    #[allow(dead_code)] // Stored for debugging/future use
-    pub path_pattern: String,
     pub param_names: Vec<String>,
     pub endpoint: Value,
     pub collection_id: String,
@@ -222,13 +220,23 @@ pub async fn mock_server_clear_logs() -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub async fn mock_server_reload_settings() -> Result<Value, String> {
-    // Settings are stored in the state, would need to reload from store
-    // For now, just return success
-    Ok(serde_json::json!({
-        "success": true,
-        "message": "Settings reloaded successfully"
-    }))
+pub async fn mock_server_reload_settings(settings: MockServerSettings) -> Result<Value, String> {
+    let handle = get_server_handle().read().unwrap();
+
+    if let Some(server) = handle.as_ref() {
+        apply_settings(&server.state, settings, server.port);
+        Ok(serde_json::json!({
+            "success": true,
+            "message": "Settings reloaded successfully"
+        }))
+    } else {
+        Ok(serde_json::json!({ "success": false, "message": "Server is not running" }))
+    }
+}
+
+/// Swaps in new per-endpoint settings; the bound port can't change while running.
+fn apply_settings(state: &MockServerState, settings: MockServerSettings, port: u16) {
+    *state.settings.write().unwrap() = MockServerSettings { port, ..settings };
 }
 
 const MAX_LOGS: usize = 100;
@@ -361,7 +369,6 @@ fn build_routing_table(collections: &[Value]) -> Vec<MockEndpoint> {
                     MockEndpoint {
                         method,
                         path_regex,
-                        path_pattern: path,
                         param_names: compiled.param_names,
                         endpoint: ep.clone(),
                         collection_id: collection_id.clone(),
@@ -1155,5 +1162,27 @@ mod tests {
     fn encoded_path_params_are_decoded() {
         assert_eq!(percent_decode("a%20b"), "a b");
         assert_eq!(percent_decode("a+b"), "a+b");
+    }
+
+    #[tokio::test]
+    async fn reloaded_settings_apply_to_the_running_router() {
+        let state = state_with(vec![endpoint("e1", "GET", "/items")]);
+        let (before, _) = call(&state, "GET", "/items").await;
+        assert_eq!(before, StatusCode::OK);
+
+        apply_settings(
+            &state,
+            MockServerSettings {
+                port: 9999,
+                endpoint_delays: HashMap::new(),
+                custom_responses: HashMap::new(),
+                custom_status_codes: HashMap::from([("c1_e1".to_string(), 418)]),
+            },
+            4000,
+        );
+
+        let (after, _) = call(&state, "GET", "/items").await;
+        assert_eq!(after, StatusCode::IM_A_TEAPOT);
+        assert_eq!(state.settings.read().unwrap().port, 4000);
     }
 }

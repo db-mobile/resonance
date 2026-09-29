@@ -1,8 +1,9 @@
 //! OpenAPI specification parsing: converts a spec `Value` into a `Collection`.
 
+use super::common::unique_folder_id;
 use super::{Collection, Endpoint, Folder, VariableEntry};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Collection variables the imported auth configs reference, so a credential the
 /// spec only declares the shape of is filled once per collection rather than
@@ -104,7 +105,7 @@ pub(crate) fn parse_openapi_spec(spec: Value) -> Result<Collection, String> {
         .map(|s| s.to_string());
 
     // Group endpoints by base path (first segment of the path)
-    let mut grouped_endpoints: HashMap<String, Vec<Endpoint>> = HashMap::new();
+    let mut grouped_endpoints: BTreeMap<String, Vec<Endpoint>> = BTreeMap::new();
 
     if let Some(paths_obj) = paths.as_object() {
         for (path, methods) in paths_obj {
@@ -152,22 +153,16 @@ pub(crate) fn parse_openapi_spec(spec: Value) -> Result<Collection, String> {
         }
     }
 
-    // Create folders from grouped endpoints
-    let mut folders: Vec<Folder> = grouped_endpoints
+    let mut used_folder_ids = HashSet::new();
+    let folders: Vec<Folder> = grouped_endpoints
         .into_iter()
         .map(|(base_path, endpoints)| Folder {
-            id: format!(
-                "folder_{}",
-                base_path.replace(|c: char| !c.is_alphanumeric(), "_")
-            ),
+            id: unique_folder_id(&base_path, &mut used_folder_ids),
             name: base_path,
             endpoints,
             auth_config: None,
         })
         .collect();
-
-    // Sort folders by name for consistent ordering
-    folders.sort_by(|a, b| a.name.cmp(&b.name));
 
     // Flatten all endpoints for the endpoints array
     let all_endpoints: Vec<Endpoint> = folders.iter().flat_map(|f| f.endpoints.clone()).collect();
@@ -248,29 +243,29 @@ fn seed_variables<'a>(
 
 /// Extract the base path (first segment) from a full path for folder grouping
 fn extract_base_path(path: &str) -> String {
-    let clean_path = path.trim_start_matches('/');
-    let segments: Vec<&str> = clean_path.split('/').collect();
-    segments.first().unwrap_or(&"root").to_string()
+    path.trim_start_matches('/')
+        .split('/')
+        .next()
+        .filter(|segment| !segment.is_empty())
+        .unwrap_or("root")
+        .to_string()
 }
 
 /// Extract and process OpenAPI requestBody into format expected by frontend
 fn extract_openapi_request_body(request_body: Option<&Value>, spec: &Value) -> Option<Value> {
     let rb = request_body?;
 
-    // Get schema from content.application/json.schema
-    let schema = rb
-        .pointer("/content/application/json/schema")
-        .or_else(|| rb.pointer("/content/application~1json/schema")) // Handle escaped slash
-        .cloned();
+    let json_content = rb.get("content").and_then(|c| c.get("application/json"));
+    let schema = json_content.and_then(|c| c.get("schema")).cloned();
 
     // Check for example at various levels: a direct media-type `example`, or
     // the first entry of the media-type `examples` map ({ name: { value } }).
-    let example = rb
-        .pointer("/content/application/json/example")
-        .or_else(|| rb.pointer("/content/application~1json/example"))
+    let example = json_content
+        .and_then(|c| c.get("example"))
         .cloned()
         .or_else(|| {
-            rb.pointer("/content/application~1json/examples")
+            json_content
+                .and_then(|c| c.get("examples"))
                 .and_then(|ex| ex.as_object())
                 .and_then(|map| map.values().next())
                 .and_then(|first| first.get("value").cloned())
@@ -1175,5 +1170,32 @@ mod tests {
             "https://auth.example.com/token"
         );
         assert_eq!(security["config"]["scope"], "read write");
+    }
+
+    #[test]
+    fn colliding_and_root_base_paths_get_distinct_folders() {
+        let spec = serde_json::json!({
+            "openapi": "3.0.0",
+            "info": { "title": "T", "version": "1" },
+            "paths": {
+                "/": { "get": { "responses": {} } },
+                "/a-b": { "get": { "responses": {} } },
+                "/a_b": { "get": { "responses": {} } }
+            }
+        });
+        let collection = parse_openapi_spec(spec).unwrap();
+        let folders: Vec<(&str, &str)> = collection
+            .folders
+            .iter()
+            .map(|f| (f.name.as_str(), f.id.as_str()))
+            .collect();
+        assert_eq!(
+            folders,
+            vec![
+                ("a-b", "folder_a_b"),
+                ("a_b", "folder_a_b_2"),
+                ("root", "folder_root")
+            ]
+        );
     }
 }

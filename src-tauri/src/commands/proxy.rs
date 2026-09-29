@@ -103,10 +103,13 @@ pub fn hydrate_from_store(app: &AppHandle) {
 ///   `HTTP(S)_PROXY` env vars and platform settings.
 /// - `UseSystem`: leave the client alone so reqwest's default detection runs.
 /// - `Manual`: apply this specific proxy.
+/// - `Invalid`: a manual host was entered but can't be built into a proxy —
+///   callers MUST fail rather than fall back to a direct connection.
 pub enum ProxyAction {
     Disable,
     UseSystem,
     Manual(Box<Proxy>),
+    Invalid(String),
 }
 
 /// Scheme of a proxy a caller must dial itself.
@@ -202,11 +205,15 @@ impl ProxySettings {
             return ProxyAction::UseSystem;
         }
 
+        if self.host.trim().is_empty() {
+            return ProxyAction::Disable;
+        }
+
         let proxy_url = format!("{}://{}:{}", self.proxy_type, self.host, self.port);
 
         let mut proxy = match Proxy::all(&proxy_url) {
             Ok(p) => p,
-            Err(_) => return ProxyAction::Disable,
+            Err(e) => return ProxyAction::Invalid(format!("Invalid proxy {}: {}", proxy_url, e)),
         };
 
         if self.auth.enabled && !self.auth.username.is_empty() {
@@ -707,6 +714,18 @@ mod tests {
         assert!(matches!(
             settings.proxy_action("https://example.com"),
             ProxyAction::Manual(_)
+        ));
+    }
+
+    #[test]
+    fn an_unparseable_manual_proxy_is_invalid_not_direct() {
+        let settings = ProxySettings {
+            host: "bad host".to_string(),
+            ..enabled_manual()
+        };
+        assert!(matches!(
+            settings.proxy_action("https://example.com"),
+            ProxyAction::Invalid(_)
         ));
     }
 

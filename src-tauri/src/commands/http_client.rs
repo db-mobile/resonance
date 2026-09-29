@@ -122,6 +122,7 @@ pub fn build_http_client(
         ProxyAction::Manual(proxy) => {
             builder = builder.proxy(*proxy);
         }
+        ProxyAction::Invalid(message) => return Err(message),
     }
 
     builder
@@ -211,6 +212,13 @@ mod tests {
     #[test]
     fn builds_a_client_from_default_options() {
         assert!(build_http_client(base_options(), ProxyAction::Disable).is_ok());
+    }
+
+    #[test]
+    fn an_invalid_proxy_fails_the_build() {
+        let err =
+            build_http_client(base_options(), ProxyAction::Invalid("bad".into())).unwrap_err();
+        assert_eq!(err, "bad");
     }
 
     #[test]
