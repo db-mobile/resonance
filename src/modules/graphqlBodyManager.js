@@ -36,6 +36,7 @@ export class GraphQLBodyManager {
         this.graphqlPanel = document.getElementById('body-graphql-section');
         this.graphqlEditorContainer = document.getElementById('graphql-query-editor');
         this.formatBtn = document.getElementById('graphql-format-btn');
+        this.jsonFormatBtn = document.getElementById('body-format-btn');
         this.fetchSchemaBtn = document.getElementById('graphql-fetch-schema-btn');
         this.operationSelect = document.getElementById('graphql-operation-select');
         this.docsToggle = document.getElementById('graphql-docs-toggle');
@@ -72,6 +73,12 @@ export class GraphQLBodyManager {
                         toast.error(`Cannot format invalid GraphQL: ${error.message}`);
                     }
                 }
+            });
+        }
+
+        if (this.jsonFormatBtn) {
+            this.jsonFormatBtn.addEventListener('click', () => {
+                app.requestBodyEditor?.formatJSONWithFeedback();
             });
         }
 
@@ -448,6 +455,10 @@ export class GraphQLBodyManager {
         const modeSelect = document.getElementById('body-mode-select');
         if (modeSelect && modeSelect.value !== mode) {
             modeSelect.value = mode;
+        }
+
+        if (this.jsonFormatBtn) {
+            this.jsonFormatBtn.hidden = mode !== 'json';
         }
 
         document.querySelectorAll('.body-mode-panel').forEach(panel => {

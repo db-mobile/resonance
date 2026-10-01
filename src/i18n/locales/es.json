@@ -618,5 +618,9 @@
   },
   "grpc": {
     "add_import_path": "Añadir ruta de importación"
+  },
+  "body_editor": {
+    "format": "Formatear",
+    "format_title": "Formatear JSON (Mayús+Alt+F)"
   }
 }

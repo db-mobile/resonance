@@ -626,5 +626,9 @@
   },
   "grpc": {
     "add_import_path": "Add import path"
+  },
+  "body_editor": {
+    "format": "Format",
+    "format_title": "Format JSON (Shift+Alt+F)"
   }
 }

@@ -600,7 +600,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 changeCallback = cb;
                 if (instance) { instance.onChange(cb); }
             },
-            formatJSON() { return instance ? instance.formatJSON() : true; },
+            formatJSONWithFeedback() { instance?.formatJSONWithFeedback(); },
             focus() {
                 if (instance) { instance.focus(); }
                 else { ensure(); }

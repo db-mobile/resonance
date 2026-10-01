@@ -1,6 +1,8 @@
 import { EditorView } from '@codemirror/view';
 import { json } from '@codemirror/lang-json';
 import { BaseCodeEditor } from './editors/BaseCodeEditor.js';
+import { formatJsonBody } from './utils/formatJson.js';
+import { toast } from './ui/Toast.js';
 
 export class RequestBodyEditor extends BaseCodeEditor {
     /** @returns {Array} */
@@ -19,22 +21,34 @@ export class RequestBodyEditor extends BaseCodeEditor {
         return this.options.language === 'plain' ? 'plain' : 'json';
     }
 
-    /** @returns {boolean} */
+    /** @returns {Array} */
+    getKeymaps() {
+        return [
+            { key: 'Shift-Alt-f', run: () => { this.formatJSONWithFeedback(); return true; } },
+            ...super.getKeymaps()
+        ];
+    }
+
+    /** @returns {Error|null} */
     formatJSON() {
         if (this.language !== 'json') {
-            return true;
+            return null;
         }
-        try {
-            const content = this.getContent().trim();
-            if (!content) {
-                return true;
-            }
-            const parsed = JSON.parse(content);
-            const formatted = JSON.stringify(parsed, null, 2);
-            this.setContent(formatted);
-            return true;
-        } catch {
-            return false;
+        const content = this.getContent();
+        const result = formatJsonBody(content);
+        if (!result.ok) {
+            return result.error;
+        }
+        if (result.text !== content) {
+            this.setContent(result.text);
+        }
+        return null;
+    }
+
+    formatJSONWithFeedback() {
+        const error = this.formatJSON();
+        if (error) {
+            toast.error(`Cannot format invalid JSON: ${error.message}`);
         }
     }
 }

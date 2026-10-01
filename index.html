@@ -296,15 +296,18 @@
                 <div class="tab-content" id="body" role="tabpanel">
                     <div class="body-header u-flex u-items-center u-justify-between">
                         <span class="heading" data-i18n="tabs.body">Body</span>
-                        <div class="body-mode-selector-container select-wrap">
-                            <select id="body-mode-select" class="select-base compact body-mode-select" aria-label="Body Mode">
-                                <option value="json">JSON</option>
-                                <option value="formdata">Form Data</option>
-                                <option value="urlencoded">URL Encoded</option>
-                                <option value="text">Text</option>
-                                <option value="binary">Binary File</option>
-                            </select>
-                            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                        <div class="u-flex u-items-center u-gap-2">
+                            <button id="body-format-btn" class="button flat small" data-i18n="body_editor.format" data-i18n-title="body_editor.format_title" title="Format JSON (Shift+Alt+F)">Format</button>
+                            <div class="body-mode-selector-container select-wrap">
+                                <select id="body-mode-select" class="select-base compact body-mode-select" aria-label="Body Mode">
+                                    <option value="json">JSON</option>
+                                    <option value="formdata">Form Data</option>
+                                    <option value="urlencoded">URL Encoded</option>
+                                    <option value="text">Text</option>
+                                    <option value="binary">Binary File</option>
+                                </select>
+                                <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                            </div>
                         </div>
                     </div>
 
