@@ -35,7 +35,6 @@ export class HistoryService {
     /** @param {Object} backendAPI */
     constructor(backendAPI) {
         this.repository = HistoryRepository.shared(backendAPI);
-        this.maxHistoryItems = 100;
     }
 
     /** @returns {string} */

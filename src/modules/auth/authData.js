@@ -25,8 +25,6 @@ export function generateAuthData(authConfig) {
         case 'bearer':
             if (config.token) {
                 authData.headers['Authorization'] = `Bearer ${config.token}`;
-            } else {
-                void config;
             }
             break;
 

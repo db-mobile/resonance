@@ -28,7 +28,4 @@ export const cookieFeature = {
         return { repository, service, dialog, controller };
     },
     globals: { cookieController: 'controller' },
-    init({ controller }) {
-        controller.initialize();
-    },
 };

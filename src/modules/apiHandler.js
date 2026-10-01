@@ -92,8 +92,6 @@ let _variableService = null;
 let _mockServerService = null;
 let _collectionRepository = null;
 
-export { invalidateSettingsCache, getSettingsCache } from './state/settingsCache.js';
-
 export function invalidateEnvironmentCache() {
     if (_variableService?.environmentRepository) {
         _variableService.environmentRepository._cache = null;

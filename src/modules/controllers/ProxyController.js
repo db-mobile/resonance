@@ -9,26 +9,6 @@ export class ProxyController {
         this.service = proxyService;
     }
 
-    /** @returns {Promise<void>} */
-    async initialize() {
-        this.service.addChangeListener((event) => {
-            this.handleProxyChange(event);
-        });
-    }
-
-    /**
-     * @param {Object} event
-     * @param {string} event.type
-     * @returns {void}
-     */
-    handleProxyChange(event) {
-        switch (event.type) {
-            case 'proxy-settings-updated':
-            case 'proxy-settings-reset':
-                break;
-        }
-    }
-
     /** @returns {Promise<Object>} */
     async getSettings() {
         return this.service.getSettings();
@@ -50,11 +30,6 @@ export class ProxyController {
     }
 
     /** @returns {Promise<Object>} */
-    async resetToDefaults() {
-        return this.service.resetToDefaults();
-    }
-
-    /** @returns {Promise<Object>} */
     async testConnection() {
         const settings = await this.service.getSettings();
 
@@ -72,34 +47,5 @@ export class ProxyController {
         }
 
         return window.backendAPI.proxySettings.test();
-    }
-
-    /** @returns {Promise<boolean>} */
-    async isEnabled() {
-        try {
-            return await this.service.isEnabled();
-        } catch (error) {
-            return false;
-        }
-    }
-
-    /**
-     * @param {Object} settings
-     * @returns {Array<string>}
-     */
-    validateSettings(settings) {
-        return this.service.validateSettings(settings);
-    }
-
-    /**
-     * @param {string} url
-     * @returns {Promise<Object|null>}
-     */
-    async getAxiosProxyConfig(url) {
-        try {
-            return await this.service.getAxiosProxyConfig(url);
-        } catch (error) {
-            return null;
-        }
     }
 }

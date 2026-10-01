@@ -15,7 +15,6 @@ import { CollectionService } from '../services/CollectionService.js';
 import { CollectionEndpointLoaderService } from '../services/CollectionEndpointLoaderService.js';
 import { CollectionImportExportService } from '../services/CollectionImportExportService.js';
 import { CollectionRequestPersistenceService } from '../services/CollectionRequestPersistenceService.js';
-import { CollectionVariableApplicationService } from '../services/CollectionVariableApplicationService.js';
 import { VariableService } from '../services/VariableService.js';
 import { CollectionRenderer } from '../ui/CollectionRenderer.js';
 import { ContextMenu } from '../ui/ContextMenu.js';
@@ -91,9 +90,6 @@ export class CollectionController {
             refreshCollections: (preserveExpansionState = false) => preserveExpansionState
                 ? this.loadCollectionsWithExpansionState()
                 : this.loadCollections()
-        });
-        this.variableApplicationService = new CollectionVariableApplicationService({
-            variableService: this.variableService
         });
         this.requestPersistenceService = new CollectionRequestPersistenceService({
             repository: this.repository,
@@ -1240,17 +1236,6 @@ export class CollectionController {
             await this._debouncedSaveBody.flush();
         }
         await this._inFlightBodySave;
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {Object} formElements
-     * @returns {Promise<void>}
-     */
-    async processFormVariables(collectionId, formElements) {
-        await this.variableApplicationService.processFormVariables(collectionId, formElements, {
-            includeUrl: true
-        });
     }
 
     /** @returns {Object} */

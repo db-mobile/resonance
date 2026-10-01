@@ -13,9 +13,6 @@ export class CookieController {
         this._activeEnvironmentName = null;
     }
 
-    initialize() {
-    }
-
     setActiveEnvironment(environmentId, environmentName) {
         this._activeEnvironmentId = environmentId || 'default';
         this._activeEnvironmentName = environmentName || null;

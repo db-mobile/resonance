@@ -3,24 +3,9 @@
  * @module services/CookieJarService
  */
 
-import { ChangeEmitter } from './ChangeEmitter.js';
-
 export class CookieJarService {
     constructor(cookieRepository) {
         this.repository = cookieRepository;
-        this._events = new ChangeEmitter();
-    }
-
-    addChangeListener(callback) {
-        this._events.add(callback);
-    }
-
-    removeChangeListener(callback) {
-        this._events.remove(callback);
-    }
-
-    _notify(event) {
-        this._events.emit(event);
     }
 
     _canonicalizeDomain(domain) {
@@ -149,7 +134,6 @@ export class CookieJarService {
 
         if (cookies.length > 0) {
             await this.repository.applyResponseCookies(cookies);
-            this._notify({ type: 'cookies-updated', environmentId: envId });
         }
     }
 
@@ -266,7 +250,6 @@ export class CookieJarService {
             updatedAt: Date.now()
         };
         await this.repository.upsert(stored);
-        this._notify({ type: 'cookies-updated', environmentId: envId });
         return stored;
     }
 
@@ -276,17 +259,14 @@ export class CookieJarService {
 
     async delete(id) {
         await this.repository.delete(id);
-        this._notify({ type: 'cookies-updated' });
     }
 
     async deleteAll(environmentId) {
         await this.repository.deleteAll(environmentId || 'default');
-        this._notify({ type: 'cookies-cleared', environmentId: environmentId || 'default' });
     }
 
     async deleteByDomain(domain, environmentId) {
         await this.repository.deleteByDomain(domain, environmentId || 'default');
-        this._notify({ type: 'cookies-updated', environmentId: environmentId || 'default' });
     }
 
     async deleteSessionCookies(environmentId) {
@@ -297,6 +277,5 @@ export class CookieJarService {
                 await this.repository.delete(c.id);
             }
         }
-        this._notify({ type: 'cookies-updated', environmentId: envId });
     }
 }

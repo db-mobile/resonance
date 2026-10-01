@@ -48,14 +48,6 @@ export class EnvironmentService {
     }
 
     /**
-     * @param {Function} callback
-     * @returns {void}
-     */
-    removeChangeListener(callback) {
-        this._events.remove(callback);
-    }
-
-    /**
      * @param {Object} event
      * @returns {void}
      */

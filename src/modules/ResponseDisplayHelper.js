@@ -159,9 +159,9 @@ export function renderGrpcPanes(containerElements, { metadata, trailers }) {
         return;
     }
     if (containerElements.metadataDisplay) {
-        containerElements.metadataDisplay.textContent = JSON.stringify(metadata || {}, null, 2) || 'No metadata.';
+        containerElements.metadataDisplay.textContent = JSON.stringify(metadata || {}, null, 2);
     }
     if (containerElements.trailersDisplay) {
-        containerElements.trailersDisplay.textContent = JSON.stringify(trailers || {}, null, 2) || 'No trailers.';
+        containerElements.trailersDisplay.textContent = JSON.stringify(trailers || {}, null, 2);
     }
 }

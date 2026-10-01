@@ -17,7 +17,6 @@ export class HistoryRenderer {
     constructor(backendAPI, onHistorySelect) {
         this.service = new HistoryService(backendAPI);
         this.onHistorySelect = onHistorySelect;
-        this.historyRepository = this.service.repository;
         this.historyItems = [];
         this.container = document.getElementById('history-list');
         this.searchInput = document.getElementById('history-search-input');

@@ -71,16 +71,6 @@ export class ProxyRepository {
         }
     }
 
-    /** @returns {Promise<boolean>} */
-    async isProxyEnabled() {
-        try {
-            const settings = await this.getProxySettings();
-            return settings.enabled === true;
-        } catch (error) {
-            return false;
-        }
-    }
-
     /**
      * @param {Object} settings
      * @returns {Object}

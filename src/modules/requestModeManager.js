@@ -106,21 +106,6 @@ export function isGrpcMode() {
 }
 
 /** @returns {boolean} */
-export function isWebSocketMode() {
-    return currentMode === RequestMode.WEBSOCKET;
-}
-
-/** @returns {boolean} */
-export function isSseMode() {
-    return currentMode === RequestMode.SSE;
-}
-
-/** @returns {boolean} */
-export function isMqttMode() {
-    return currentMode === RequestMode.MQTT;
-}
-
-/** @returns {boolean} */
 export function isGraphQLMode() {
     return currentMode === RequestMode.GRAPHQL;
 }

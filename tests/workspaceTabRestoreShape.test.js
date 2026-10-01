@@ -52,9 +52,6 @@ async function loadHarness() {
                 });
             }),
             isGrpcMode: () => false,
-            isWebSocketMode: () => false,
-            isSseMode: () => false,
-            isMqttMode: () => false,
             isGraphQLMode: () => false,
             getCurrentMode: () => 'http'
         };

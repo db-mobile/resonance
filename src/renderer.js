@@ -13,7 +13,8 @@ import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl } from 
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
-import { handleSendRequest, handleCancelRequest, handleGenerateCurl, invalidateSettingsCache, getSettingsCache, invalidateEnvironmentCache } from './modules/apiHandler.js';
+import { handleSendRequest, handleCancelRequest, handleGenerateCurl, invalidateEnvironmentCache } from './modules/apiHandler.js';
+import { getSettingsCache } from './modules/state/settingsCache.js';
 import { applyGrpcState, captureGrpcState, initGrpcUI } from './modules/grpcHandler.js';
 import { initRequestModeManager } from './modules/requestModeManager.js';
 import { initWebSocketHandler } from './modules/websocketHandler.js';
@@ -21,11 +22,10 @@ import { initGraphQLSubscriptionHandler } from './modules/graphqlSubscriptionHan
 import { initSseHandler } from './modules/sseHandler.js';
 import { initMqttHandler, handleMqttCancel } from './modules/mqttHandler.js';
 import { initGrpcStreamHandler } from './modules/grpcStreamHandler.js';
-import { loadCollections, importCollectionFile, importPostmanEnvironment, importCurl, openExistingCollection, initializeBodyTracking } from './modules/collectionManager.js';
+import { loadCollections, importCollectionFile, importPostmanEnvironment, importCurl, openExistingCollection, initializeBodyTracking, saveAllRequestModifications, saveRequestToCollection } from './modules/collectionManager.js';
 import { initResizer } from './modules/resizer.js';
 import { i18n } from './i18n/I18nManager.js';
 import { authManager } from './modules/authManager.js';
-import { initializeCopyHandler } from './modules/copyHandler.js';
 import { SecretStore } from './modules/storage/SecretStore.js';
 import { StatusBar } from './modules/ui/StatusBar.js';
 import { ContextMenu } from './modules/ui/ContextMenu.js';
@@ -49,7 +49,6 @@ import { loadEditor, warmEditors } from './modules/editorLoader.js';
 import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
 import { toast } from './modules/ui/Toast.js';
 
-app.invalidateApiHandlerSettingsCache = invalidateSettingsCache;
 app.getApiHandlerSettingsCache = getSettingsCache;
 app.invalidateApiHandlerEnvironmentCache = invalidateEnvironmentCache;
 
@@ -108,7 +107,6 @@ const workspaceTabService = workspaceTab.service;
 const workspaceTabStateManager = workspaceTab.stateManager;
 const settingsModal = featureRegistry.get('settings').modal;
 
-/** @returns {void} */
 /** @returns {Promise<void>} */
 async function handleSaveShortcut() {
     const controller = app.workspaceTabController;
@@ -125,7 +123,6 @@ async function handleSaveShortcut() {
 
     try {
         if (endpoint) {
-            const { saveAllRequestModifications } = await import('./modules/collectionManager.js');
             await saveAllRequestModifications(endpoint.collectionId, endpoint.endpointId);
 
             if (controller) {
@@ -139,7 +136,6 @@ async function handleSaveShortcut() {
             return;
         }
 
-        const { saveRequestToCollection } = await import('./modules/collectionManager.js');
         const state = await controller.stateManager.captureCurrentState();
         const requestData = {
             name: activeTab.name,
@@ -705,7 +701,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     initKeyValueListeners();
     initializeBodyTracking();
     initResizer();
-    initializeCopyHandler();
     initKeyboardShortcuts();
     applyShortcutHints();
 

@@ -6,7 +6,7 @@ import { displayResponseWithLineNumbersForTab, clearResponseDisplayForTab, clear
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
-import { formatCookiesAsHtml } from './cookieParser.js';
+import { renderCookies } from './cookieParser.js';
 import { renderGrpcPanes } from './ResponseDisplayHelper.js';
 import { activateTab } from './tabManager.js';
 import { setRequestBodyContent, getRequestBodyContent } from './requestBodyHelper.js';
@@ -684,13 +684,7 @@ export class WorkspaceTabStateManager {
             }
         }
 
-        if (containerElements?.cookiesDisplay) {
-            if (response.cookies && response.cookies.length > 0) {
-                containerElements.cookiesDisplay.innerHTML = formatCookiesAsHtml(response.cookies);
-            } else {
-                containerElements.cookiesDisplay.innerHTML = '<div class="cookies-empty">No cookies in response</div>';
-            }
-        }
+        renderCookies(containerElements?.cookiesDisplay, response.cookies);
 
         if (containerElements?.performanceDisplay) {
             if (response.performanceHTML) {

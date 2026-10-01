@@ -643,38 +643,6 @@ export class CollectionService {
     /**
      * @param {string} collectionId
      * @param {string} endpointId
-     * @param {string} query
-     * @param {string} variables
-     * @returns {Promise<void>}
-     */
-    async saveGraphQLData(collectionId, endpointId, query, variables) {
-        try {
-            await this.repository.saveGraphQLData(collectionId, endpointId, {
-                mode: 'graphql',
-                query,
-                variables
-            });
-        } catch (error) {
-            void error;
-        }
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @returns {Promise<Object|null>}
-     */
-    async getGraphQLData(collectionId, endpointId) {
-        try {
-            return await this.repository.getGraphQLData(collectionId, endpointId);
-        } catch (error) {
-            return null;
-        }
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
      * @param {Object} formElements
      * @returns {Promise<void>}
      */

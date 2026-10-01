@@ -126,6 +126,3 @@ export function attachHeadersCopyHandler(button, tabId) {
         });
     }
 }
-
-export function initializeCopyHandler() {
-}
