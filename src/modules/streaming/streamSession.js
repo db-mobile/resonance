@@ -24,6 +24,20 @@ export async function isTabCurrentlyActive(tabId) {
 }
 
 /**
+ * @param {string|null} tabId
+ * @param {string} text
+ * @param {number|null} [status]
+ * @returns {Promise<void>}
+ */
+export async function showStatusIfActive(tabId, text, status = null) {
+    if (await isTabCurrentlyActive(tabId)) {
+        updateStatusDisplay(text, status);
+        updateResponseTime(null);
+        updateResponseSize(null);
+    }
+}
+
+/**
  * @param {string} eventName
  * @param {() => boolean} isBackendAvailable
  * @param {(event: object) => void} handler
@@ -86,6 +100,16 @@ export class StreamSession {
         return this._entries.get(tabId) || null;
     }
 
+    /**
+     * @param {string} tabId
+     * @param {Object} current
+     * @param {Object} patch
+     * @returns {void}
+     */
+    transition(tabId, current, patch) {
+        this.set(tabId, { ...current, ...patch, transcript: current.transcript || '' });
+    }
+
     set(tabId, entry) {
         const previousState = this._entries.get(tabId)?.state;
         this._entries.set(tabId, entry);
@@ -111,11 +135,7 @@ export class StreamSession {
     }
 
     async updateStatus(tabId, text, status = null) {
-        if (await isTabCurrentlyActive(tabId)) {
-            updateStatusDisplay(text, status);
-            updateResponseTime(null);
-            updateResponseSize(null);
-        }
+        await showStatusIfActive(tabId, text, status);
     }
 
     /**

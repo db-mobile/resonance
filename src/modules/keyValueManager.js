@@ -2,6 +2,7 @@ import { getCurrentEndpoint } from './state/currentEndpoint.js';
 import { app } from './appContext.js';
 import { pathParamsList, addPathParamBtn, headersList, addHeaderBtn, queryParamsList, addQueryParamBtn, urlInput } from './domElements.js';
 import { debounce } from './utils/debounce.js';
+import { markTabModified } from './state/tabModified.js';
 import { notifyUrlUpdated } from './ui/mirroredUrlSection.js';
 
 const debouncedSavePathParams = debounce(autoSavePathParams, 500);
@@ -333,9 +334,7 @@ export function initKeyValueListeners() {
         if (event.target.classList.contains('key-input') ||
             event.target.classList.contains('value-input')) {
             debouncedSavePathParams();
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
+            markTabModified();
         }
     });
 
@@ -344,9 +343,7 @@ export function initKeyValueListeners() {
             event.target.classList.contains('value-input')) {
             updateUrlFromQueryParams();
             debouncedSaveQueryParams();
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
+            markTabModified();
         }
     });
 
@@ -358,18 +355,14 @@ export function initKeyValueListeners() {
         event.target.closest('.key-value-row')?.classList.toggle('row-disabled', !event.target.checked);
         updateUrlFromQueryParams();
         debouncedSaveQueryParams();
-        if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-            app.workspaceTabController.markCurrentTabModified();
-        }
+        markTabModified();
     });
 
     headersList.addEventListener('input', (event) => {
         if (event.target.classList.contains('key-input') ||
             event.target.classList.contains('value-input')) {
             debouncedSaveHeaders();
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
+            markTabModified();
         }
     });
 
@@ -380,9 +373,7 @@ export function initKeyValueListeners() {
 
         event.target.closest('.key-value-row')?.classList.toggle('row-disabled', !event.target.checked);
         debouncedSaveHeaders();
-        if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-            app.workspaceTabController.markCurrentTabModified();
-        }
+        markTabModified();
     });
 
     document.addEventListener('click', (event) => {

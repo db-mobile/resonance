@@ -11,6 +11,7 @@ import {
     createBackendEventListener,
     getActiveTabId
 } from './streaming/streamSession.js';
+import { isStaleEvent } from './streaming/streamState.js';
 import {
     normalizeSubscriptionUrl,
     buildConnectionInit,
@@ -102,7 +103,7 @@ async function handleBackendEvent(event) {
         return;
     }
 
-    if (current.url && url && current.url !== url && payload.eventType !== 'open') {
+    if (isStaleEvent(current, url, payload.eventType)) {
         return;
     }
 

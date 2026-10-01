@@ -4,7 +4,7 @@ import { resolveTlsOptions } from './tlsOptions.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
 import { StreamSession, createBackendEventListener, getActiveTabId } from './streaming/streamSession.js';
-import { isLiveEntry } from './streaming/streamState.js';
+import { isLiveEntry, isStaleEvent } from './streaming/streamState.js';
 
 const session = new StreamSession({
     buildResponseMeta: (entry, transcript, state) => ({
@@ -53,17 +53,12 @@ async function handleBackendEvent(event) {
         return;
     }
 
-    if (current.url && url && current.url !== url && payload.eventType !== 'open') {
+    if (isStaleEvent(current, url, payload.eventType)) {
         return;
     }
 
     if (payload.eventType === 'open') {
-        session.set(tabId, {
-            ...current,
-            url,
-            state: 'open',
-            transcript: current.transcript || ''
-        });
+        session.transition(tabId, current, { url, state: 'open' });
         await session.updateStatus(tabId, 'WebSocket connected', 101);
         await session.append(tabId, `CONNECTED ${url}`);
         return;
@@ -76,12 +71,7 @@ async function handleBackendEvent(event) {
     }
 
     if (payload.eventType === 'close') {
-        session.set(tabId, {
-            ...current,
-            url,
-            state: 'closed',
-            transcript: current.transcript || ''
-        });
+        session.transition(tabId, current, { url, state: 'closed' });
         await session.updateStatus(
             tabId,
             `WebSocket closed (${payload.code || 1000})`,
@@ -95,12 +85,7 @@ async function handleBackendEvent(event) {
     }
 
     if (payload.eventType === 'error') {
-        session.set(tabId, {
-            ...current,
-            url,
-            state: current.state || 'closed',
-            transcript: current.transcript || ''
-        });
+        session.transition(tabId, current, { url, state: current.state || 'closed' });
         await session.updateStatus(
             tabId,
             `WebSocket error${payload.message ? `: ${payload.message}` : ''}`,

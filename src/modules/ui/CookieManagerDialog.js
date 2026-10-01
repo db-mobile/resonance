@@ -9,6 +9,7 @@ import { toast } from './Toast.js';
 import { pushEscapeHandler } from './modalEscape.js';
 import { BaseModal } from './BaseModal.js';
 import { updateSetting } from '../state/settingsCache.js';
+import { translate } from '../utils/translate.js';
 
 export class CookieManagerDialog extends BaseModal {
     constructor(cookieJarService, environmentService) {
@@ -24,16 +25,6 @@ export class CookieManagerDialog extends BaseModal {
         this._envDropdownOpen = false;
         this._editorOpen = false;
         this._editorOriginalId = null;
-    }
-
-    /**
-     * @param {string} key
-     * @param {string} fallback
-     * @returns {string}
-     */
-    _t(key, fallback) {
-        const translated = app.i18n?.t?.(key);
-        return translated && translated !== key ? translated : fallback;
     }
 
     show(environmentId, environmentName) {
@@ -230,7 +221,7 @@ export class CookieManagerDialog extends BaseModal {
 
             const expiresTd = document.createElement('td');
             if (cookie.expires === null) {
-                expiresTd.textContent = this._t('cookies.session', 'Session');
+                expiresTd.textContent = translate('cookies.session', 'Session');
             } else {
                 expiresTd.textContent = new Date(cookie.expires).toLocaleString();
             }
@@ -249,7 +240,7 @@ export class CookieManagerDialog extends BaseModal {
 
             const editBtn = document.createElement('button');
             editBtn.className = 'btn-xs btn-outline';
-            editBtn.textContent = this._t('cookies.edit', 'Edit');
+            editBtn.textContent = translate('cookies.edit', 'Edit');
             editBtn.addEventListener('click', () => {
                 this._openEditor(content, cookie);
             });
@@ -257,7 +248,7 @@ export class CookieManagerDialog extends BaseModal {
 
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'btn-xs btn-outline';
-            deleteBtn.textContent = this._t('cookies.delete', 'Delete');
+            deleteBtn.textContent = translate('cookies.delete', 'Delete');
             deleteBtn.addEventListener('click', async () => {
                 await this.service.delete(cookie.id);
                 await this._loadCookies();
@@ -320,8 +311,8 @@ export class CookieManagerDialog extends BaseModal {
 
         this._editorOriginalId = cookie?.id || null;
         title.textContent = cookie
-            ? this._t('cookies.editor_title_edit', 'Edit Cookie')
-            : this._t('cookies.editor_title_add', 'Add Cookie');
+            ? translate('cookies.editor_title_edit', 'Edit Cookie')
+            : translate('cookies.editor_title_add', 'Add Cookie');
 
         content.querySelector('#cookie-editor-name').value = cookie?.name || '';
         content.querySelector('#cookie-editor-value').value = cookie?.value || '';
@@ -361,7 +352,7 @@ export class CookieManagerDialog extends BaseModal {
             path_invalid: 'Path must start with "/"',
             expires_invalid: 'Expires must be a valid date or empty for a session cookie'
         };
-        return this._t(`cookies.error_${code}`, fallbacks[code] || code);
+        return translate(`cookies.error_${code}`, fallbacks[code] || code);
     }
 
     _readEditor(content) {
@@ -399,7 +390,7 @@ export class CookieManagerDialog extends BaseModal {
     async _exportCookies() {
         const cookies = await this.service.getAll(this._environmentId);
         if (cookies.length === 0) {
-            toast.info(this._t('cookies.export_empty', 'No cookies to export for this environment'));
+            toast.info(translate('cookies.export_empty', 'No cookies to export for this environment'));
             return;
         }
         const content = JSON.stringify(
@@ -410,7 +401,7 @@ export class CookieManagerDialog extends BaseModal {
         const safeName = (this._environmentName || this._environmentId).replace(/[^a-zA-Z0-9]/g, '_');
         const result = await window.backendAPI.environments.saveJsonExport(`cookies_${safeName}.json`, content);
         if (result?.success) {
-            toast.success(this._t('cookies.export_success', 'Cookies exported'));
+            toast.success(translate('cookies.export_success', 'Cookies exported'));
         }
     }
 
@@ -425,7 +416,7 @@ export class CookieManagerDialog extends BaseModal {
         if (!doc) { return; }
 
         if (doc.format !== 'resonance-cookie-jar' || !Array.isArray(doc.cookies)) {
-            toast.error(this._t(
+            toast.error(translate(
                 'cookies.import_invalid',
                 'Not a Resonance cookie export (expected { "format": "resonance-cookie-jar", "cookies": [...] })'
             ));
@@ -456,8 +447,8 @@ export class CookieManagerDialog extends BaseModal {
 
         await this._loadCookies();
         const summary = skipped > 0
-            ? `${this._t('cookies.import_success', 'Cookies imported')}: ${imported} (${skipped} ${this._t('cookies.import_skipped', 'skipped')})`
-            : `${this._t('cookies.import_success', 'Cookies imported')}: ${imported}`;
+            ? `${translate('cookies.import_success', 'Cookies imported')}: ${imported} (${skipped} ${translate('cookies.import_skipped', 'skipped')})`
+            : `${translate('cookies.import_success', 'Cookies imported')}: ${imported}`;
         toast.success(summary);
     }
 

@@ -3,6 +3,7 @@ import {
     applyTokenResult,
     buildRenewalRequest,
     ensureFreshOAuthToken,
+    oauthRefreshKey,
     tokenNeedsRefresh
 } from '../../src/modules/auth/oauthRefresh.js';
 
@@ -109,5 +110,19 @@ describe('ensureFreshOAuthToken', () => {
         const auth = expired({ grantType: 'authorization_code' });
         const outcome = await ensureFreshOAuthToken({ rawAuth: auth, resolvedAuth: auth, key: 'k5', getToken: jest.fn(), persist: jest.fn() });
         expect(outcome.error).toContain('cannot renew');
+    });
+});
+
+describe('oauthRefreshKey', () => {
+    const endpoint = { collectionId: 'c1', endpointId: 'e1' };
+
+    test('keys a renewal by where the token is stored', () => {
+        expect(oauthRefreshKey(endpoint, { kind: 'folder', folderId: 'f1' })).toBe('c1|folder|f1');
+        expect(oauthRefreshKey(endpoint, { kind: 'collection' })).toBe('c1|collection');
+        expect(oauthRefreshKey(endpoint, { kind: 'request' })).toBe('c1|request|e1');
+    });
+
+    test('an unsaved request still gets a stable key', () => {
+        expect(oauthRefreshKey(null, { kind: 'request' })).toBe('|request|unsaved');
     });
 });

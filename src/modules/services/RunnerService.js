@@ -14,12 +14,12 @@ import { CertificateService } from './CertificateService.js';
 import { MockServerService } from './MockServerService.js';
 import { RequestBuilderService } from './RequestBuilderService.js';
 import { ChangeEmitter } from './ChangeEmitter.js';
-import { normalizeFormRows } from '../utils/formDataRows.js';
+import { normalizeFormRows, processFormRows } from '../utils/formDataRows.js';
 import { activeKeyValueRows } from '../utils/keyValueRows.js';
 import { findRequest } from '../collections/collectionTree.js';
 import { buildEndpointUrl, buildMockPath } from '../collections/endpointUrl.js';
 import { resolveEffectiveAuthWithSource } from '../auth/authInheritance.js';
-import { ensureFreshOAuthToken } from '../auth/oauthRefresh.js';
+import { ensureFreshOAuthToken, oauthRefreshKey } from '../auth/oauthRefresh.js';
 import { resolveAuthConfigVariables } from '../auth/authVariables.js';
 import { generateAuthData } from '../auth/authData.js';
 import { deriveRequestSettings } from '../state/settingsCache.js';
@@ -714,9 +714,7 @@ export class RunnerService {
             const renewal = await ensureFreshOAuthToken({
                 rawAuth: resolvedAuth,
                 resolvedAuth: substitutedAuth,
-                key: authSource.kind === 'folder'
-                    ? `${collection.id}|folder|${authSource.folderId}`
-                    : authSource.kind === 'collection' ? `${collection.id}|collection` : `${collection.id}|request|${endpoint.id}`,
+                key: oauthRefreshKey({ collectionId: collection.id, endpointId: endpoint.id }, authSource),
                 getToken: (request) => this.backendAPI.oauth2.getToken(request),
                 persist: (nextRaw) => this.collectionRepository.saveAuthConfigAtSource(collection.id, endpoint.id, authSource, nextRaw)
             });
@@ -876,15 +874,7 @@ export class RunnerService {
         }
 
         if (!overrideBody && (form?.mode === 'formdata' || form?.mode === 'urlencoded')) {
-            const processed = normalizeFormRows(form.fields)
-                .filter((row) => row.enabled !== false)
-                .map((row) => ({
-                    key: process(row.key),
-                    value: row.type === 'file' ? '' : process(row.value || ''),
-                    type: row.type || 'text',
-                    filePath: row.filePath ? process(row.filePath) : undefined,
-                    contentType: row.contentType || undefined
-                }));
+            const processed = processFormRows(normalizeFormRows(form.fields), process);
             return { body: processed.length > 0 ? processed : undefined, bodyType: form.mode };
         }
 

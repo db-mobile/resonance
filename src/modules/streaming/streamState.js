@@ -20,3 +20,13 @@ export function notifyStreamStateChanged() {
 export function isLiveEntry(entry) {
     return Boolean(entry?.state) && entry.state !== 'closed';
 }
+
+/**
+ * @param {Object} current
+ * @param {string} url
+ * @param {string} eventType
+ * @returns {boolean}
+ */
+export function isStaleEvent(current, url, eventType) {
+    return Boolean(current.url && url && current.url !== url && eventType !== 'open');
+}

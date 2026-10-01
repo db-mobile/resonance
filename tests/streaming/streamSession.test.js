@@ -11,6 +11,7 @@ jest.mock('../../src/modules/statusDisplay.js', () => ({
 import { app } from '../../src/modules/appContext.js';
 import { displayResponseWithLineNumbersForTab } from '../../src/modules/apiHandler.js';
 import { StreamSession } from '../../src/modules/streaming/streamSession.js';
+import { isStaleEvent } from '../../src/modules/streaming/streamState.js';
 
 const TAB = 'tab-1';
 
@@ -181,5 +182,32 @@ describe('StreamSession persistence', () => {
 
         expect(updateTab).not.toHaveBeenCalled();
         expect(transient.get(TAB).transcript).toContain('data: 1');
+    });
+});
+
+describe('StreamSession.transition', () => {
+    test('merges the patch over the current entry and keeps the transcript', () => {
+        const session = new StreamSession();
+        session.transition(TAB, { url: 'wss://a', state: 'connecting', transcript: 'log', extra: 1 }, { state: 'open' });
+        expect(session.get(TAB)).toEqual({ url: 'wss://a', state: 'open', transcript: 'log', extra: 1 });
+    });
+
+    test('defaults a missing transcript to empty', () => {
+        const session = new StreamSession();
+        session.transition(TAB, {}, { url: 'wss://a', state: 'closed' });
+        expect(session.get(TAB)).toEqual({ url: 'wss://a', state: 'closed', transcript: '' });
+    });
+});
+
+describe('isStaleEvent', () => {
+    test('ignores non-open events for a URL the tab has moved away from', () => {
+        expect(isStaleEvent({ url: 'wss://new' }, 'wss://old', 'message')).toBe(true);
+    });
+
+    test('accepts open events, matching URLs and entries without a URL', () => {
+        expect(isStaleEvent({ url: 'wss://new' }, 'wss://old', 'open')).toBe(false);
+        expect(isStaleEvent({ url: 'wss://a' }, 'wss://a', 'close')).toBe(false);
+        expect(isStaleEvent({}, 'wss://a', 'close')).toBe(false);
+        expect(isStaleEvent({ url: 'wss://a' }, '', 'close')).toBe(false);
     });
 });

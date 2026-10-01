@@ -42,3 +42,20 @@ export function isMeaningfulRow(row) {
         (row.filePath && row.filePath.trim())
     );
 }
+
+/**
+ * @param {Array<{key: string, value?: string, type?: string, filePath?: string, contentType?: string, enabled?: boolean}>} rows
+ * @param {function(string): string} process
+ * @returns {Array<{key: string, value: string, type: string, filePath: (string|undefined), contentType: (string|undefined)}>}
+ */
+export function processFormRows(rows, process) {
+    return rows
+        .filter((row) => row.enabled !== false)
+        .map((row) => ({
+            key: process(row.key),
+            value: row.type === 'file' ? '' : process(row.value || ''),
+            type: row.type || 'text',
+            filePath: row.filePath ? process(row.filePath) : undefined,
+            contentType: row.contentType || undefined
+        }));
+}

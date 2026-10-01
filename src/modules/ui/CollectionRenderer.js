@@ -8,6 +8,7 @@ import { templateLoader } from '../templateLoader.js';
 import { flattenRequests, rootRequests, topLevelFolders } from '../collections/collectionTree.js';
 import { el } from '../htmlUtils.js';
 import { translate } from '../utils/translate.js';
+import { fileNameFromPath } from '../utils/fileName.js';
 
 export class CollectionRenderer {
     /**
@@ -203,7 +204,7 @@ export class CollectionRenderer {
         const toggle = el('span', 'pinned-section-toggle', '▶');
 
         const label = document.createElement('span');
-        label.textContent = (app.i18n && app.i18n.t('sidebar.pinned')) || 'Pinned';
+        label.textContent = translate('sidebar.pinned', 'Pinned');
 
         header.appendChild(toggle);
         header.appendChild(label);
@@ -286,7 +287,7 @@ export class CollectionRenderer {
 
             const icon = el('span', 'icon icon-16 icon-alert-circle collection-load-error-icon');
             const text = el('div', 'collection-load-error-text');
-            const name = error.path.split(/[\\/]/).filter(Boolean).pop() || error.path;
+            const name = fileNameFromPath(error.path);
             text.appendChild(el('span', 'collection-load-error-name', name));
             text.appendChild(el('span', 'collection-load-error-message', error.message));
 

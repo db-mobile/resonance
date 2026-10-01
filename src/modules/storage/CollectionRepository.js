@@ -36,6 +36,17 @@ function mqttSecretScope(collectionId, endpointId) {
     return `mqtt:${collectionId}:${endpointId}`;
 }
 
+/** @type {ReadonlyArray<function(string, string): string>} */
+const ENDPOINT_SECRET_SCOPES = Object.freeze([authSecretScope, mqttSecretScope]);
+
+/**
+ * @param {string} collectionId
+ * @returns {string[]}
+ */
+function collectionSecretPrefixes(collectionId) {
+    return ENDPOINT_SECRET_SCOPES.map((scopeOf) => scopeOf(collectionId, ''));
+}
+
 export class CollectionRepository {
     static MAX_CACHE_SIZE = 20;
 
@@ -202,8 +213,9 @@ export class CollectionRepository {
             await this.backendAPI.collections.delete(id);
             this._byIdCache.delete(id);
             if (this.secretStore) {
-                await this.secretStore.deleteScopePrefix(`auth:${id}:`);
-                await this.secretStore.deleteScopePrefix(`mqtt:${id}:`);
+                for (const prefix of collectionSecretPrefixes(id)) {
+                    await this.secretStore.deleteScopePrefix(prefix);
+                }
             }
             return true;
         } catch (error) {
@@ -773,8 +785,7 @@ export class CollectionRepository {
         if (this.secretStore) {
             await this.secretStore.deleteScope(folderAuthSecretScope(collectionId, folderId));
             for (const endpointId of removed ?? []) {
-                await this.secretStore.deleteScope(authSecretScope(collectionId, endpointId));
-                await this.secretStore.deleteScope(mqttSecretScope(collectionId, endpointId));
+                await this._deleteEndpointSecrets(collectionId, endpointId);
             }
         }
         return removed ?? [];
@@ -794,7 +805,7 @@ export class CollectionRepository {
         if (!this.secretStore) {
             return;
         }
-        for (const scopeOf of [authSecretScope, mqttSecretScope]) {
+        for (const scopeOf of ENDPOINT_SECRET_SCOPES) {
             const secrets = await this.secretStore.getScope(scopeOf(collectionId, sourceId));
             for (const [key, value] of Object.entries(secrets)) {
                 await this.secretStore.set(scopeOf(collectionId, targetId), key, value);
@@ -807,12 +818,22 @@ export class CollectionRepository {
      * @param {string} endpointId
      * @returns {Promise<void>}
      */
+    async _deleteEndpointSecrets(collectionId, endpointId) {
+        for (const scopeOf of ENDPOINT_SECRET_SCOPES) {
+            await this.secretStore.deleteScope(scopeOf(collectionId, endpointId));
+        }
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<void>}
+     */
     async deletePersistedEndpointData(collectionId, endpointId) {
         try {
             await this.backendAPI.collections.deleteEndpointData(collectionId, endpointId);
             if (this.secretStore) {
-                await this.secretStore.deleteScope(authSecretScope(collectionId, endpointId));
-                await this.secretStore.deleteScope(mqttSecretScope(collectionId, endpointId));
+                await this._deleteEndpointSecrets(collectionId, endpointId);
             }
         } catch (error) {
             throw new Error(`Failed to delete persisted endpoint data: ${error.message || error}`, { cause: error });

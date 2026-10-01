@@ -3,10 +3,10 @@
  * @module ui/SettingsModal
  */
 
-import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { pushEscapeHandler } from './modalEscape.js';
 import { updateSetting } from '../state/settingsCache.js';
+import { translate } from '../utils/translate.js';
 
 export class SettingsModal {
     constructor(themeManager, i18nManager = null, httpVersionManager = null, timeoutManager = null, proxyController = null, certificateController = null) {
@@ -606,7 +606,7 @@ export class SettingsModal {
                         messageContent.className = 'row-content';
                         const messageTitle = document.createElement('span');
                         messageTitle.className = 'title';
-                        messageTitle.textContent = installInfo.message || app.i18n?.t('settings.updates_managed_externally') || 'Updates are managed by your package manager';
+                        messageTitle.textContent = installInfo.message || translate('settings.updates_managed_externally', 'Updates are managed by your package manager');
                         messageContent.appendChild(messageTitle);
                         messageRow.appendChild(messageContent);
                         versionRow.parentElement.insertBefore(messageRow, versionRow);
@@ -617,12 +617,12 @@ export class SettingsModal {
 
             checkUpdatesBtn.addEventListener('click', async () => {
                 checkUpdatesBtn.disabled = true;
-                updateStatus.textContent = app.i18n?.t('settings.checking_updates') || 'Checking...';
+                updateStatus.textContent = translate('settings.checking_updates', 'Checking...');
                 updateStatus.className = 'update-status';
 
                 try {
                     if (!window.backendAPI?.updater?.check) {
-                        updateStatus.textContent = app.i18n?.t('settings.updates_not_available') || 'Updates not available in this build';
+                        updateStatus.textContent = translate('settings.updates_not_available', 'Updates not available in this build');
                         updateStatus.className = 'update-status info';
                         return;
                     }
@@ -630,34 +630,34 @@ export class SettingsModal {
                     const update = await window.backendAPI.updater.check();
                     
                     if (update?.available) {
-                        updateStatus.textContent = app.i18n?.t('settings.update_available', { version: update.version }) || `Update available: v${update.version}`;
+                        updateStatus.textContent = translate('settings.update_available', 'Update available: v{{version}}', { version: update.version });
                         updateStatus.className = 'update-status success';
                         
                         const installBtn = document.createElement('button');
                         installBtn.className = 'btn btn-primary btn-sm';
                         installBtn.style.marginLeft = '8px';
-                        installBtn.textContent = app.i18n?.t('settings.install_update') || 'Install & Restart';
+                        installBtn.textContent = translate('settings.install_update', 'Install & Restart');
                         installBtn.addEventListener('click', async () => {
                             installBtn.disabled = true;
                             installBtn.remove();
-                            updateStatus.textContent = app.i18n?.t('settings.downloading_update') || 'Downloading...';
+                            updateStatus.textContent = translate('settings.downloading_update', 'Downloading...');
                             updateStatus.className = 'update-status';
                             try {
                                 await window.backendAPI.updater.downloadAndInstall(update);
-                                updateStatus.textContent = app.i18n?.t('settings.update_installed') || 'Update installed! Restart to apply.';
+                                updateStatus.textContent = translate('settings.update_installed', 'Update installed! Restart to apply.');
                                 updateStatus.className = 'update-status success';
                             } catch (err) {
                                 const errMsg = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
                                 updateStatus.textContent = `Error: ${errMsg}`;
                                 updateStatus.className = 'update-status error';
                                 installBtn.disabled = false;
-                                installBtn.textContent = app.i18n?.t('settings.retry_update') || 'Retry';
+                                installBtn.textContent = translate('settings.retry_update', 'Retry');
                                 updateStatus.appendChild(installBtn);
                             }
                         });
                         updateStatus.appendChild(installBtn);
                     } else {
-                        updateStatus.textContent = app.i18n?.t('settings.up_to_date') || 'You are up to date!';
+                        updateStatus.textContent = translate('settings.up_to_date', 'You are up to date!');
                         updateStatus.className = 'update-status success';
                     }
                 } catch (error) {

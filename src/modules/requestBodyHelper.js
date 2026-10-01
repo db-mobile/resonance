@@ -4,6 +4,7 @@
  */
 
 import { app } from './appContext.js';
+import { processFormRows } from './utils/formDataRows.js';
 
 /** @returns {string} */
 export function getRequestBodyContent() {
@@ -23,15 +24,7 @@ export function captureSnippetBody({ bodyMode, formBodyManager, requestBodyTextE
         const rows = bodyMode === 'formdata'
             ? formBodyManager.getFormDataRows()
             : formBodyManager.getUrlencodedRows();
-        const processed = rows
-            .filter((row) => row.enabled !== false)
-            .map((row) => ({
-                key: processor.processTemplate(row.key, variables),
-                value: row.type === 'file' ? '' : processor.processTemplate(row.value || '', variables),
-                type: row.type || 'text',
-                filePath: row.filePath ? processor.processTemplate(row.filePath, variables) : undefined,
-                contentType: row.contentType || undefined
-            }));
+        const processed = processFormRows(rows, (text) => processor.processTemplate(text, variables));
         if (processed.length === 0) {
             return {};
         }
@@ -82,4 +75,27 @@ export function setRequestBodyContent(content) {
     if (app.requestBodyEditor) {
         app.requestBodyEditor.setContent(content);
     }
+}
+
+/**
+ * @param {string} bodyMode
+ * @returns {Object|null}
+ */
+export function captureFormBody(bodyMode) {
+    if (bodyMode === 'formdata' && app.formBodyManager) {
+        return { mode: 'formdata', fields: app.formBodyManager.getFormDataRows() };
+    }
+    if (bodyMode === 'urlencoded' && app.formBodyManager) {
+        return { mode: 'urlencoded', fields: app.formBodyManager.getUrlencodedRows() };
+    }
+    if (bodyMode === 'binary' && app.formBodyManager) {
+        return { mode: 'binary', ...app.formBodyManager.getBinaryBody() };
+    }
+    if (bodyMode === 'text') {
+        return {
+            mode: 'text',
+            content: app.requestBodyTextEditor ? app.requestBodyTextEditor.getContent() : ''
+        };
+    }
+    return null;
 }

@@ -1,4 +1,4 @@
-import { methodCarriesBody } from '../../src/modules/utils/bodyMethods.js';
+import { methodCarriesBody, requestSendsBody } from '../../src/modules/utils/bodyMethods.js';
 import { generateCode } from '../../src/modules/codeGenerator.js';
 import { RunnerService } from '../../src/modules/services/RunnerService.js';
 
@@ -9,6 +9,18 @@ describe('methodCarriesBody', () => {
 
     test.each(['GET', 'HEAD', 'get', undefined])('%s does not', (method) => {
         expect(methodCarriesBody(method)).toBe(false);
+    });
+});
+
+describe('requestSendsBody', () => {
+    test.each(['formdata', 'urlencoded', 'binary'])('a %s body is sent even with GET', (bodyMode) => {
+        expect(requestSendsBody('GET', bodyMode)).toBe(true);
+    });
+
+    test('a json or text body follows the method', () => {
+        expect(requestSendsBody('GET', 'json')).toBe(false);
+        expect(requestSendsBody('HEAD', 'text')).toBe(false);
+        expect(requestSendsBody('POST', 'json')).toBe(true);
     });
 });
 

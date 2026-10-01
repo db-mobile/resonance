@@ -9,6 +9,16 @@ import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanc
 
 /**
  * @param {string|null} tabId
+ * @returns {Object|null|undefined}
+ */
+export function responseContainerFor(tabId) {
+    return tabId
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
+}
+
+/**
+ * @param {string|null} tabId
  * @param {Object} globalElements
  * @param {HTMLElement} [globalElements.headersDisplay]
  * @param {HTMLElement} [globalElements.cookiesDisplay]
@@ -16,9 +26,7 @@ import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanc
  * @returns {{ headersEditor: Object|null, cookiesDisplay: HTMLElement|null, performanceDisplay: HTMLElement|null, isPerTab: boolean }}
  */
 function getResponseElements(tabId, globalElements = {}) {
-    const containerElements = tabId
-        ? app.responseContainerManager?.getOrCreateContainer(tabId)
-        : app.responseContainerManager?.getActiveElements();
+    const containerElements = responseContainerFor(tabId);
 
     if (containerElements) {
         containerElements.renderedResponse = null;

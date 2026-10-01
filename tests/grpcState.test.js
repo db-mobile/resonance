@@ -34,7 +34,6 @@ async function loadGrpcHandler(markup = GRPC_MARKUP) {
         displayResponseWithLineNumbersForTab: jest.fn(),
         generateEffectiveAuthData: jest.fn(async () => ({ headers: {}, queryParams: {} })),
         getRequestBuilderService: jest.fn(),
-        isTabCurrentlyActive: jest.fn(async () => true),
         setRequestInProgress: jest.fn(),
         warnUnresolvedVariables: jest.fn()
     }));
@@ -64,7 +63,6 @@ async function loadGrpcHandlerForSend({ variables = {}, authData = { headers: {}
         displayResponseWithLineNumbersForTab: jest.fn(),
         generateEffectiveAuthData: jest.fn(async () => authData),
         getRequestBuilderService: jest.fn(() => builder),
-        isTabCurrentlyActive: jest.fn(async () => true),
         setRequestInProgress: jest.fn(),
         warnUnresolvedVariables: jest.fn()
     }));
@@ -120,7 +118,6 @@ describe('gRPC send path', () => {
             getActiveTabId.mockResolvedValue('tab-other');
             return { success: true, data: { ok: 1 }, headers: { h: '1' }, trailers: { t: '2' } };
         });
-        apiHandler.isTabCurrentlyActive.mockImplementation(async (id) => id === 'tab-other');
 
         module.applyGrpcState({
             target: 'localhost:50051',

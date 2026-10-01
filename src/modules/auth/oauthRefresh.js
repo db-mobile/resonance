@@ -70,6 +70,22 @@ export function applyTokenResult(config, result, now = Date.now()) {
 }
 
 /**
+ * @param {{collectionId?: string, endpointId?: string}|null} endpoint
+ * @param {{kind: string, folderId?: string}} source
+ * @returns {string}
+ */
+export function oauthRefreshKey(endpoint, source) {
+    const collectionId = endpoint?.collectionId ?? '';
+    if (source.kind === 'folder') {
+        return `${collectionId}|folder|${source.folderId}`;
+    }
+    if (source.kind === 'collection') {
+        return `${collectionId}|collection`;
+    }
+    return `${collectionId}|request|${endpoint?.endpointId ?? 'unsaved'}`;
+}
+
+/**
  * @param {Object} options
  * @param {Object} options.rawAuth
  * @param {Object} options.resolvedAuth

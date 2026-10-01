@@ -3,11 +3,11 @@
  * @module ui/HistoryRenderer
  */
 
-import { app } from '../appContext.js';
 import { HistoryService } from '../services/HistoryService.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
 import { templateLoader } from '../templateLoader.js';
 import { debounce } from '../utils/debounce.js';
+import { translate } from '../utils/translate.js';
 
 export class HistoryRenderer {
     /**
@@ -56,21 +56,13 @@ export class HistoryRenderer {
     }
 
     async handleClearAll() {
-        const confirmMessage = app.i18n ?
-            app.i18n.t('history.confirm_clear') || 'Are you sure you want to clear all request history?\n\nThis action cannot be undone.' :
-            'Are you sure you want to clear all request history?\n\nThis action cannot be undone.';
+        const confirmMessage = translate('history.confirm_clear', 'Are you sure you want to clear all request history?\n\nThis action cannot be undone.');
 
-        const title = app.i18n ?
-            app.i18n.t('history.clear_all_title') || 'Clear All History' :
-            'Clear All History';
+        const title = translate('history.clear_all_title', 'Clear All History');
 
-        const confirmText = app.i18n ?
-            app.i18n.t('common.delete') || 'Clear' :
-            'Clear';
+        const confirmText = translate('common.delete', 'Clear');
 
-        const cancelText = app.i18n ?
-            app.i18n.t('common.cancel') || 'Cancel' :
-            'Cancel';
+        const cancelText = translate('common.cancel', 'Cancel');
 
         const confirmed = await this.confirmDialog.show(confirmMessage, {
             title,

@@ -15,6 +15,7 @@ import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest, handleCancelRequest, handleGenerateCurl, invalidateEnvironmentCache } from './modules/apiHandler.js';
 import { getSettingsCache } from './modules/state/settingsCache.js';
+import { markTabModified } from './modules/state/tabModified.js';
 import { applyGrpcState, captureGrpcState, initGrpcUI } from './modules/grpcHandler.js';
 import { initRequestModeManager } from './modules/requestModeManager.js';
 import { initWebSocketHandler } from './modules/websocketHandler.js';
@@ -635,10 +636,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (bodyInput) {
                 bodyInput.value = content;
             }
-            if (app.workspaceTabController &&
-                !isInitializingEditor &&
-                !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
+            if (!isInitializingEditor) {
+                markTabModified();
             }
         });
         app.requestBodyEditor = requestBodyEditor;
@@ -649,10 +648,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             bodyTextEditorContainer,
             { language: 'plain' },
             (_content) => {
-                if (app.workspaceTabController &&
-                    !app.workspaceTabController.isRestoringState) {
-                    app.workspaceTabController.markCurrentTabModified();
-                }
+                markTabModified();
             }
         );
     }
@@ -663,10 +659,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (grpcBodyInput) {
                 grpcBodyInput.value = content;
             }
-            if (app.workspaceTabController &&
-                !isInitializingGrpcEditor &&
-                !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
+            if (!isInitializingGrpcEditor) {
+                markTabModified();
             }
         });
         app.grpcBodyEditor = grpcBodyEditor;
@@ -706,25 +700,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (urlInput) {
         urlInput.addEventListener('input', () => {
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
+            markTabModified();
         });
     }
 
     if (bodyInput) {
         bodyInput.addEventListener('input', () => {
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
+            markTabModified();
         });
     }
 
     if (methodSelect) {
         methodSelect.addEventListener('change', () => {
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
+            markTabModified();
         });
     }
 
