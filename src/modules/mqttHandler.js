@@ -73,11 +73,12 @@ async function updateMqttUiIfActive(tabId, flash = false) {
     }
 }
 
-/** @param {string} tabId */
-export async function refreshMqttConnectionUi(tabId) {
-    if (await isTabCurrentlyActive(tabId)) {
-        renderMqttStatus(session.get(tabId));
-    }
+/**
+ * @param {string} tabId
+ * @returns {Promise<void>}
+ */
+export function refreshMqttConnectionUi(tabId) {
+    return updateMqttUiIfActive(tabId);
 }
 
 function normalizeMqttBroker(broker) {

@@ -18,10 +18,15 @@ export class CookieController {
         this._activeEnvironmentName = environmentName || null;
     }
 
+    /** @returns {Promise<boolean>} */
+    async _isJarEnabled() {
+        const settings = app.getApiHandlerSettingsCache?.() ?? await window.backendAPI?.settings?.get();
+        return settings?.cookieJarEnabled !== false;
+    }
+
     async getCookieHeader(requestUrl) {
         try {
-            const settings = app.getApiHandlerSettingsCache?.() ?? await window.backendAPI?.settings?.get();
-            if (settings?.cookieJarEnabled === false) { return null; }
+            if (!(await this._isJarEnabled())) { return null; }
             return await this.service.getCookieHeaderForRequest(requestUrl, this._activeEnvironmentId);
         } catch (_e) {
             return null;
@@ -34,8 +39,7 @@ export class CookieController {
      */
     async handleCookiesFromResponse(setCookieHeaders, requestUrl) {
         try {
-            const settings = app.getApiHandlerSettingsCache?.() ?? await window.backendAPI?.settings?.get();
-            if (settings?.cookieJarEnabled === false) { return; }
+            if (!(await this._isJarEnabled())) { return; }
             await this.service.processCookiesFromResponse(setCookieHeaders, requestUrl, this._activeEnvironmentId);
         } catch (_e) {
         }

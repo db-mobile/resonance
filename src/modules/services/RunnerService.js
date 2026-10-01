@@ -411,7 +411,7 @@ export class RunnerService {
                 ));
             }
 
-            const endpoint = this._findEndpoint(collection, request.endpointId);
+            const endpoint = findRequest(collection, request.endpointId);
             if (!endpoint) {
                 throw new Error(translate(
                     'runner.error_endpoint_missing',
@@ -643,15 +643,6 @@ export class RunnerService {
         const collection = await this.collectionRepository.getById(collectionId);
         runContext?.collections.set(collectionId, collection);
         return collection;
-    }
-
-    /**
-     * @param {Object} collection
-     * @param {string} endpointId
-     * @returns {Object|null}
-     */
-    _findEndpoint(collection, endpointId) {
-        return findRequest(collection, endpointId);
     }
 
     /**

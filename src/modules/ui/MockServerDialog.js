@@ -6,9 +6,10 @@
 import { templateLoader } from '../templateLoader.js';
 import { SchemaProcessor } from '../schema/SchemaProcessor.js';
 import { pushEscapeHandler } from './modalEscape.js';
-import { flattenRequests } from '../collections/collectionTree.js';
+import { flattenRequests, endpointKey } from '../collections/collectionTree.js';
 import { el } from '../htmlUtils.js';
 import { translate } from '../utils/translate.js';
+import { extractResponseSchema } from '../controllers/MockServerController.js';
 
 export class MockServerDialog {
     /** @param {MockServerController} controller */
@@ -323,17 +324,22 @@ export class MockServerDialog {
         }
     }
 
+    /** @returns {Promise<void>} */
+    async _refreshCollections() {
+        const [settings, collections] = await Promise.all([
+            this.controller.getSettings(),
+            this.controller.getCollections()
+        ]);
+        await this.renderCollections(collections, settings);
+    }
+
     /** @param {string} collectionId */
     async handleToggleCollection(collectionId) {
         try {
             const result = await this.controller.handleToggleCollection(collectionId);
 
             if (result.success) {
-                const [settings, collections] = await Promise.all([
-                    this.controller.getSettings(),
-                    this.controller.getCollections()
-                ]);
-                await this.renderCollections(collections, settings);
+                await this._refreshCollections();
             }
         } catch (error) {
             void error;
@@ -536,7 +542,7 @@ export class MockServerDialog {
         const hasCustomResponse = customResponse !== null;
 
         const settings = await this.controller.getSettings();
-        const delayKey = `${collection.id}_${endpoint.id}`;
+        const delayKey = endpointKey(collection.id, endpoint.id);
         const currentDelay = settings.endpointDelays[delayKey] || 0;
 
         const customStatusCode = await this.controller.getCustomStatusCode(collection.id, endpoint.id);
@@ -624,7 +630,6 @@ export class MockServerDialog {
         const saveBtn = dialog.querySelector('#response-editor-save');
         const cancelBtn = dialog.querySelector('#response-editor-cancel');
         const resetBtn = dialog.querySelector('#response-editor-reset');
-        const _closeBtn = dialog.querySelector('#response-editor-close');
 
         if (delayInput) {
             delayInput.value = String(currentDelay);
@@ -682,11 +687,7 @@ export class MockServerDialog {
 
                 if (responseResult.success && delayResult.success && statusCodeResult.success) {
                     cleanup();
-                    const [updatedSettings, collections] = await Promise.all([
-                        this.controller.getSettings(),
-                        this.controller.getCollections()
-                    ]);
-                    await this.renderCollections(collections, updatedSettings);
+                    await this._refreshCollections();
                 } else {
                     errorDiv.textContent = responseResult.message || delayResult.message || statusCodeResult.message;
                 }
@@ -701,17 +702,13 @@ export class MockServerDialog {
             const responseResult = await this.controller.handleSetCustomResponse(collection.id, endpoint.id, null);
             if (responseResult.success && delayResult.success && statusCodeResult.success) {
                 cleanup();
-                const [updatedSettings, collections] = await Promise.all([
-                    this.controller.getSettings(),
-                    this.controller.getCollections()
-                ]);
-                await this.renderCollections(collections, updatedSettings);
+                await this._refreshCollections();
             }
         });
 
         const closeHandler = () => cleanup();
         cancelBtn.addEventListener('click', closeHandler);
-        _closeBtn.addEventListener('click', closeHandler);
+        closeBtn.addEventListener('click', closeHandler);
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
                 closeHandler();
@@ -724,22 +721,7 @@ export class MockServerDialog {
      * @returns {Object}
      */
     generateDefaultResponse(endpoint) {
-        const method = endpoint.method?.toUpperCase();
-        const { responses } = endpoint;
-
-        let schema = null;
-        if (responses?.['200']?.content?.['application/json']?.schema) {
-            ({ schema } = responses['200'].content['application/json']);
-        } else if (['POST', 'PUT'].includes(method) && responses?.['201']?.content?.['application/json']?.schema) {
-            ({ schema } = responses['201'].content['application/json']);
-        } else if (responses) {
-            for (const code of Object.keys(responses)) {
-                if (code.startsWith('2') && responses[code]?.content?.['application/json']?.schema) {
-                    ({ schema } = responses[code].content['application/json']);
-                    break;
-                }
-            }
-        }
+        const schema = extractResponseSchema(endpoint);
 
         if (!schema) {
             return { message: 'Success', data: {} };

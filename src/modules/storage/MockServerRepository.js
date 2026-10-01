@@ -3,6 +3,8 @@
  * @module storage/MockServerRepository
  */
 
+import { endpointKey } from '../collections/collectionTree.js';
+
 export class MockServerRepository {
     /** @param {Object} backendAPI */
     constructor(backendAPI) {
@@ -107,6 +109,25 @@ export class MockServerRepository {
     }
 
     /**
+     * @param {'endpointDelays'|'customResponses'|'customStatusCodes'} mapName
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {*} value
+     * @param {boolean} clear
+     * @returns {Promise<Object>}
+     */
+    async _setKeyed(mapName, collectionId, endpointId, value, clear) {
+        const settings = await this.getSettings();
+        const key = endpointKey(collectionId, endpointId);
+        if (clear) {
+            delete settings[mapName][key];
+        } else {
+            settings[mapName][key] = value;
+        }
+        return this.saveSettings(settings);
+    }
+
+    /**
      * @param {string} collectionId
      * @param {string} endpointId
      * @param {number} delayMs
@@ -118,16 +139,7 @@ export class MockServerRepository {
                 throw new Error('Delay must be between 0 and 30000 milliseconds');
             }
 
-            const settings = await this.getSettings();
-            const key = `${collectionId}_${endpointId}`;
-
-            if (delayMs === 0) {
-                delete settings.endpointDelays[key];
-            } else {
-                settings.endpointDelays[key] = delayMs;
-            }
-
-            return await this.saveSettings(settings);
+            return await this._setKeyed('endpointDelays', collectionId, endpointId, delayMs, delayMs === 0);
         } catch (error) {
             throw new Error(`Failed to set endpoint delay: ${error.message}`, { cause: error });
         }
@@ -141,16 +153,7 @@ export class MockServerRepository {
      */
     async setCustomResponse(collectionId, endpointId, response) {
         try {
-            const settings = await this.getSettings();
-            const key = `${collectionId}_${endpointId}`;
-
-            if (response === null) {
-                delete settings.customResponses[key];
-            } else {
-                settings.customResponses[key] = response;
-            }
-
-            return await this.saveSettings(settings);
+            return await this._setKeyed('customResponses', collectionId, endpointId, response, response === null);
         } catch (error) {
             throw new Error(`Failed to set custom response: ${error.message}`, { cause: error });
         }
@@ -164,8 +167,7 @@ export class MockServerRepository {
     async getCustomResponse(collectionId, endpointId) {
         try {
             const settings = await this.getSettings();
-            const key = `${collectionId}_${endpointId}`;
-            return settings.customResponses[key] || null;
+            return settings.customResponses[endpointKey(collectionId, endpointId)] || null;
         } catch (error) {
             return null;
         }
@@ -179,16 +181,7 @@ export class MockServerRepository {
      */
     async setCustomStatusCode(collectionId, endpointId, statusCode) {
         try {
-            const settings = await this.getSettings();
-            const key = `${collectionId}_${endpointId}`;
-
-            if (statusCode === null) {
-                delete settings.customStatusCodes[key];
-            } else {
-                settings.customStatusCodes[key] = statusCode;
-            }
-
-            return await this.saveSettings(settings);
+            return await this._setKeyed('customStatusCodes', collectionId, endpointId, statusCode, statusCode === null);
         } catch (error) {
             throw new Error(`Failed to set custom status code: ${error.message}`, { cause: error });
         }
@@ -202,8 +195,7 @@ export class MockServerRepository {
     async getCustomStatusCode(collectionId, endpointId) {
         try {
             const settings = await this.getSettings();
-            const key = `${collectionId}_${endpointId}`;
-            return settings.customStatusCodes[key] || null;
+            return settings.customStatusCodes[endpointKey(collectionId, endpointId)] || null;
         } catch (error) {
             return null;
         }

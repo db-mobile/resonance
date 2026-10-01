@@ -4,7 +4,6 @@
  */
 
 import { app } from '../appContext.js';
-import { findRequest } from '../collections/collectionTree.js';
 import {
     getProtocol,
     projectPersistedData,
@@ -86,14 +85,5 @@ export class CollectionEndpointLoaderService {
         };
 
         await app.workspaceTabController.loadEndpoint(endpointData, false);
-    }
-
-    /**
-     * @param {Object} collection
-     * @param {string} endpointId
-     * @returns {Object|null}
-     */
-    findEndpointInCollection(collection, endpointId) {
-        return findRequest(collection, endpointId);
     }
 }

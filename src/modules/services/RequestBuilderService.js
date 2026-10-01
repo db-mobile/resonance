@@ -6,6 +6,25 @@
 import { VariableProcessor } from '../variables/VariableProcessor.js';
 import { buildMockPath } from '../collections/endpointUrl.js';
 
+/** @type {RegExp} */
+const URL_SCHEME = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//;
+
+/**
+ * @param {string} url
+ * @returns {string}
+ */
+function ensureScheme(url) {
+    return url && !URL_SCHEME.test(url) ? `https://${url}` : url;
+}
+
+/**
+ * @param {string} text
+ * @returns {string}
+ */
+function encodeUnlessEncoded(text) {
+    return text.includes('%') ? text : encodeURIComponent(text);
+}
+
 export class RequestBuilderService {
     /**
      * @param {Function} getVariableService
@@ -65,11 +84,7 @@ export class RequestBuilderService {
         }
 
         const combinedVariables = { ...variables, ...processedPathParams };
-        let resolvedUrl = processor.processTemplate(url, combinedVariables);
-
-        if (resolvedUrl && !resolvedUrl.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {
-            resolvedUrl = `https://${resolvedUrl}`;
-        }
+        let resolvedUrl = ensureScheme(processor.processTemplate(url, combinedVariables));
 
         this._processKeyValuePairs(headers, variables, processor);
 
@@ -100,9 +115,7 @@ export class RequestBuilderService {
                 continue;
             }
             const value = processor.processTemplate(row.value || '', variables);
-            const encodedKey = key.includes('%') ? key : encodeURIComponent(key);
-            const encodedValue = value.includes('%') ? value : encodeURIComponent(value);
-            queryPairs.push(`${encodedKey}=${encodedValue}`);
+            queryPairs.push(`${encodeUnlessEncoded(key)}=${encodeUnlessEncoded(value)}`);
         }
         return queryPairs.join('&');
     }
@@ -136,10 +149,7 @@ export class RequestBuilderService {
             if (mockRewrite) {
                 base = `${mockRewrite.baseUrl}${buildMockPath(mockRewrite.pathTemplate, pathParams)}`;
             } else {
-                base = processor.processTemplate(rawUrl, { ...variables, ...pathParams });
-                if (base && !base.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {
-                    base = `https://${base}`;
-                }
+                base = ensureScheme(processor.processTemplate(rawUrl, { ...variables, ...pathParams }));
             }
         } else {
             base = requestConfig.url;
@@ -261,9 +271,7 @@ export class RequestBuilderService {
                 continue;
             }
             const stringValue = value === null || value === undefined ? '' : String(value);
-            const encodedKey = key.includes('%') ? key : encodeURIComponent(key);
-            const encodedValue = stringValue.includes('%') ? stringValue : encodeURIComponent(stringValue);
-            queryPairs.push(`${encodedKey}=${encodedValue}`);
+            queryPairs.push(`${encodeUnlessEncoded(key)}=${encodeUnlessEncoded(stringValue)}`);
         }
         return queryPairs.join('&');
     }

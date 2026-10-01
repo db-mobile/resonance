@@ -5,9 +5,9 @@ import { debounce } from './utils/debounce.js';
 import { markTabModified } from './state/tabModified.js';
 import { notifyUrlUpdated } from './ui/mirroredUrlSection.js';
 
-const debouncedSavePathParams = debounce(autoSavePathParams, 500);
-const debouncedSaveQueryParams = debounce(autoSaveQueryParams, 500);
-const debouncedSaveHeaders = debounce(autoSaveHeaders, 500);
+const debouncedSavePathParams = debounce(autoSaver('saveCurrentPathParams', 'pathParamsList', pathParamsList), 500);
+const debouncedSaveQueryParams = debounce(autoSaver('saveCurrentQueryParams', 'queryParamsList', queryParamsList), 500);
+const debouncedSaveHeaders = debounce(autoSaver('saveCurrentHeaders', 'headersList', headersList), 500);
 
 let isUpdatingUrlFromQueryParams = false;
 
@@ -404,42 +404,17 @@ export function initKeyValueListeners() {
     });
 }
 
-
-async function autoSavePathParams() {
-    if (getCurrentEndpoint() && app.collectionService) {
-        const formElements = {
-            pathParamsList: pathParamsList
-        };
-        await app.collectionService.saveCurrentPathParams(
-            getCurrentEndpoint().collectionId,
-            getCurrentEndpoint().endpointId,
-            formElements
-        );
-    }
-}
-
-async function autoSaveQueryParams() {
-    if (getCurrentEndpoint() && app.collectionService) {
-        const formElements = {
-            queryParamsList: queryParamsList
-        };
-        await app.collectionService.saveCurrentQueryParams(
-            getCurrentEndpoint().collectionId,
-            getCurrentEndpoint().endpointId,
-            formElements
-        );
-    }
-}
-
-async function autoSaveHeaders() {
-    if (getCurrentEndpoint() && app.collectionService) {
-        const formElements = {
-            headersList: headersList
-        };
-        await app.collectionService.saveCurrentHeaders(
-            getCurrentEndpoint().collectionId,
-            getCurrentEndpoint().endpointId,
-            formElements
-        );
-    }
+/**
+ * @param {'saveCurrentPathParams'|'saveCurrentQueryParams'|'saveCurrentHeaders'} saveMethod
+ * @param {string} listKey
+ * @param {HTMLElement|null} list
+ * @returns {function(): Promise<void>}
+ */
+function autoSaver(saveMethod, listKey, list) {
+    return async () => {
+        const endpoint = getCurrentEndpoint();
+        if (endpoint && app.collectionService) {
+            await app.collectionService[saveMethod](endpoint.collectionId, endpoint.endpointId, { [listKey]: list });
+        }
+    };
 }

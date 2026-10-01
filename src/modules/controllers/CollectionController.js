@@ -28,7 +28,7 @@ import { toast } from '../ui/Toast.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { setRequestBodyContent } from '../requestBodyHelper.js';
 import { ChangeEmitter } from '../services/ChangeEmitter.js';
-import { flattenRequests, requestsInFolder, folderChainForRequest, folderOutline } from '../collections/collectionTree.js';
+import { flattenRequests, requestsInFolder, folderChainForRequest, folderOutline, endpointKey } from '../collections/collectionTree.js';
 import { MoveRequestDialog } from '../ui/MoveRequestDialog.js';
 import { isRunnable } from '../utils/runnableRequests.js';
 import { translate } from '../utils/translate.js';
@@ -184,23 +184,23 @@ export class CollectionController {
 
     /** @returns {Promise<Array<Object>>} */
     async loadCollections() {
-        try {
-            this.allCollections = await this.service.loadCollections();
-            await this._refreshLoadErrors();
-            await this.renderCollections(this.allCollections);
-            this._collectionEvents.emit(this.allCollections);
-            return this.allCollections;
-        } catch (error) {
-            return [];
-        }
+        return this._reload(false);
     }
 
     /** @returns {Promise<Array<Object>>} */
     async loadCollectionsWithExpansionState() {
+        return this._reload(true);
+    }
+
+    /**
+     * @param {boolean} preserveExpansionState
+     * @returns {Promise<Array<Object>>}
+     */
+    async _reload(preserveExpansionState) {
         try {
             this.allCollections = await this.service.loadCollections();
             await this._refreshLoadErrors();
-            await this.renderCollections(this.allCollections, true);
+            await this.renderCollections(this.allCollections, preserveExpansionState);
             this._collectionEvents.emit(this.allCollections);
             return this.allCollections;
         } catch (error) {
@@ -442,7 +442,7 @@ export class CollectionController {
      */
     async handleEndpointContextMenu(event, collection, endpoint) {
         const pinned = await this._getPinnedRequestsCached();
-        const isPinned = !!pinned[`${collection.id}_${endpoint.id}`];
+        const isPinned = !!pinned[endpointKey(collection.id, endpoint.id)];
         const menuItems = [
             {
                 label: isPinned ? 'Unpin Request' : 'Pin Request',
@@ -484,7 +484,7 @@ export class CollectionController {
         const isPinned = await this.repository.togglePinnedRequest(collection.id, endpoint.id);
 
         const pinned = await this._getPinnedRequestsCached();
-        const key = `${collection.id}_${endpoint.id}`;
+        const key = endpointKey(collection.id, endpoint.id);
         if (isPinned) {
             pinned[key] = true;
         } else {

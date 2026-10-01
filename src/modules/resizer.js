@@ -47,14 +47,7 @@ class Resizer {
 
     /** @param {number} fraction */
     setRequestBias(fraction) {
-        const mainContentHeight = this.mainContentArea.clientHeight;
-        const requestBuilder = document.querySelector('.request-builder');
-        const requestBuilderHeight = requestBuilder ? requestBuilder.offsetHeight : 0;
-        const resizerHeight = this.resizerHandle.offsetHeight;
-        const tabBar = document.getElementById('workspace-tab-bar-container');
-        const tabBarHeight = tabBar ? tabBar.offsetHeight : 0;
-
-        const availableHeight = mainContentHeight - tabBarHeight - requestBuilderHeight - resizerHeight;
+        const availableHeight = this._availableHeight();
 
         if (availableHeight < this.minHeight * 2) {
             return;
@@ -63,10 +56,30 @@ class Resizer {
         const initialRequestHeight = Math.max(this.minHeight, Math.floor(availableHeight * fraction));
         const initialResponseHeight = Math.max(this.minHeight, availableHeight - initialRequestHeight);
 
-        this.requestConfig.style.height = `${initialRequestHeight}px`;
-        this.requestConfig.style.flex = `0 0 ${initialRequestHeight}px`;
-        this.responseArea.style.height = `${initialResponseHeight}px`;
-        this.responseArea.style.flex = `0 0 ${initialResponseHeight}px`;
+        this._applyHeights(initialRequestHeight, initialResponseHeight);
+    }
+
+    /** @returns {number} */
+    _availableHeight() {
+        const mainContentHeight = this.mainContentArea.clientHeight;
+        const requestBuilder = document.querySelector('.request-builder');
+        const requestBuilderHeight = requestBuilder ? requestBuilder.offsetHeight : 0;
+        const resizerHeight = this.resizerHandle.offsetHeight;
+        const tabBar = document.getElementById('workspace-tab-bar-container');
+        const tabBarHeight = tabBar ? tabBar.offsetHeight : 0;
+        return mainContentHeight - tabBarHeight - requestBuilderHeight - resizerHeight;
+    }
+
+    /**
+     * @param {number} requestHeight
+     * @param {number} responseHeight
+     * @returns {void}
+     */
+    _applyHeights(requestHeight, responseHeight) {
+        this.requestConfig.style.height = `${requestHeight}px`;
+        this.requestConfig.style.flex = `0 0 ${requestHeight}px`;
+        this.responseArea.style.height = `${responseHeight}px`;
+        this.responseArea.style.flex = `0 0 ${responseHeight}px`;
     }
 
     handleWindowResize() {
@@ -82,13 +95,7 @@ class Resizer {
                 return;
             }
 
-            const mainContentHeight = this.mainContentArea.clientHeight;
-            const requestBuilder = document.querySelector('.request-builder');
-            const requestBuilderHeight = requestBuilder ? requestBuilder.offsetHeight : 0;
-            const resizerHeight = this.resizerHandle.offsetHeight;
-            const tabBar = document.getElementById('workspace-tab-bar-container');
-            const tabBarHeight = tabBar ? tabBar.offsetHeight : 0;
-            const availableHeight = mainContentHeight - tabBarHeight - requestBuilderHeight - resizerHeight;
+            const availableHeight = this._availableHeight();
 
             const totalCurrentHeight = currentRequestHeight + currentResponseHeight;
             const requestProportion = currentRequestHeight / totalCurrentHeight;
@@ -96,10 +103,7 @@ class Resizer {
             const newRequestHeight = Math.max(this.minHeight, Math.floor(availableHeight * requestProportion));
             const newResponseHeight = Math.max(this.minHeight, availableHeight - newRequestHeight);
 
-            this.requestConfig.style.height = `${newRequestHeight}px`;
-            this.requestConfig.style.flex = `0 0 ${newRequestHeight}px`;
-            this.responseArea.style.height = `${newResponseHeight}px`;
-            this.responseArea.style.flex = `0 0 ${newResponseHeight}px`;
+            this._applyHeights(newRequestHeight, newResponseHeight);
         }, 100);
     }
 
@@ -137,10 +141,7 @@ class Resizer {
             return;
         }
 
-        this.requestConfig.style.height = `${newRequestHeight}px`;
-        this.requestConfig.style.flex = `0 0 ${newRequestHeight}px`;
-        this.responseArea.style.height = `${newResponseHeight}px`;
-        this.responseArea.style.flex = `0 0 ${newResponseHeight}px`;
+        this._applyHeights(newRequestHeight, newResponseHeight);
 
         e.preventDefault();
     }

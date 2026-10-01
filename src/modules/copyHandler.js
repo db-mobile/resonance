@@ -42,8 +42,11 @@ function showCopyFeedback(button, success) {
 /**
  * @param {HTMLElement} button
  * @param {string} tabId
+ * @param {'editor'|'headersEditor'} editorKey
+ * @param {string|null} placeholderText
+ * @returns {Promise<void>}
  */
-async function handleCopyResponse(button, tabId) {
+async function handleCopy(button, tabId, editorKey, placeholderText) {
     const { responseContainerManager } = app;
     if (!responseContainerManager) {
         showCopyFeedback(button, false);
@@ -56,13 +59,10 @@ async function handleCopyResponse(button, tabId) {
         return;
     }
 
-    const { editor } = containerElements;
-    let textToCopy = '';
-    if (editor) {
-        textToCopy = editor.getContent();
-    }
+    const editor = containerElements[editorKey];
+    const textToCopy = editor ? editor.getContent() : '';
 
-    if (!textToCopy || textToCopy.trim() === '') {
+    if (!textToCopy || textToCopy.trim() === '' || textToCopy === placeholderText) {
         showCopyFeedback(button, false);
         return;
     }
@@ -74,33 +74,16 @@ async function handleCopyResponse(button, tabId) {
 /**
  * @param {HTMLElement} button
  * @param {string} tabId
+ * @param {'editor'|'headersEditor'} editorKey
+ * @param {string|null} placeholderText
+ * @returns {void}
  */
-async function handleCopyHeaders(button, tabId) {
-    const { responseContainerManager } = app;
-    if (!responseContainerManager) {
-        showCopyFeedback(button, false);
-        return;
+function attach(button, tabId, editorKey, placeholderText) {
+    if (button) {
+        button.addEventListener('click', () => {
+            handleCopy(button, tabId, editorKey, placeholderText);
+        });
     }
-
-    const containerElements = responseContainerManager.getOrCreateContainer(tabId);
-    if (!containerElements) {
-        showCopyFeedback(button, false);
-        return;
-    }
-
-    const { headersEditor } = containerElements;
-    let textToCopy = '';
-    if (headersEditor) {
-        textToCopy = headersEditor.getContent();
-    }
-
-    if (!textToCopy || textToCopy.trim() === '' || textToCopy === 'No response headers.') {
-        showCopyFeedback(button, false);
-        return;
-    }
-
-    const success = await copyToClipboard(textToCopy);
-    showCopyFeedback(button, success);
 }
 
 /**
@@ -108,11 +91,7 @@ async function handleCopyHeaders(button, tabId) {
  * @param {string} tabId
  */
 export function attachCopyHandler(button, tabId) {
-    if (button) {
-        button.addEventListener('click', () => {
-            handleCopyResponse(button, tabId);
-        });
-    }
+    attach(button, tabId, 'editor', null);
 }
 
 /**
@@ -120,9 +99,5 @@ export function attachCopyHandler(button, tabId) {
  * @param {string} tabId
  */
 export function attachHeadersCopyHandler(button, tabId) {
-    if (button) {
-        button.addEventListener('click', () => {
-            handleCopyHeaders(button, tabId);
-        });
-    }
+    attach(button, tabId, 'headersEditor', 'No response headers.');
 }

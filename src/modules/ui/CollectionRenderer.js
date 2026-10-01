@@ -5,7 +5,7 @@
 
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
-import { flattenRequests, rootRequests, topLevelFolders } from '../collections/collectionTree.js';
+import { flattenRequests, rootRequests, topLevelFolders, endpointKey } from '../collections/collectionTree.js';
 import { el } from '../htmlUtils.js';
 import { translate } from '../utils/translate.js';
 import { fileNameFromPath } from '../utils/fileName.js';
@@ -187,7 +187,7 @@ export class CollectionRenderer {
         const pinnedEntries = [];
         collections.forEach(collection => {
             flattenRequests(collection).forEach(endpoint => {
-                if (pinnedRequests[`${collection.id}_${endpoint.id}`]) {
+                if (pinnedRequests[endpointKey(collection.id, endpoint.id)]) {
                     pinnedEntries.push({ collection, endpoint });
                 }
             });
@@ -305,15 +305,14 @@ export class CollectionRenderer {
                 });
                 buttons.appendChild(button);
             };
-            if (error.removable) {
-                if (error.kind === 'missing' || error.kind === 'not_a_collection') {
-                    addButton('sidebar.load_errors.locate', 'Locate…', actions.onLocate);
-                } else {
-                    addButton('sidebar.load_errors.retry', 'Retry', actions.onRetry);
-                }
-                addButton('sidebar.load_errors.remove', 'Remove from list', actions.onRemove);
+            const relocatable = error.removable && (error.kind === 'missing' || error.kind === 'not_a_collection');
+            if (relocatable) {
+                addButton('sidebar.load_errors.locate', 'Locate…', actions.onLocate);
             } else {
                 addButton('sidebar.load_errors.retry', 'Retry', actions.onRetry);
+            }
+            if (error.removable) {
+                addButton('sidebar.load_errors.remove', 'Remove from list', actions.onRemove);
             }
             if (buttons.childElementCount > 0) {
                 text.appendChild(buttons);
@@ -416,7 +415,7 @@ export class CollectionRenderer {
         const endpointsDiv = el('div', 'collection-endpoints');
 
         rootRequests(collection).forEach(endpoint => {
-            const isPinned = !!pinnedRequests[`${collection.id}_${endpoint.id}`];
+            const isPinned = !!pinnedRequests[endpointKey(collection.id, endpoint.id)];
             const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers, isPinned);
             endpointsDiv.appendChild(endpointDiv);
         });
@@ -464,7 +463,7 @@ export class CollectionRenderer {
         const folderEndpoints = el('div', 'folder-endpoints');
 
         (folder.endpoints || []).forEach(endpoint => {
-            const isPinned = !!pinnedRequests[`${collection.id}_${endpoint.id}`];
+            const isPinned = !!pinnedRequests[endpointKey(collection.id, endpoint.id)];
             const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers, isPinned);
             folderEndpoints.appendChild(endpointDiv);
         });

@@ -5,7 +5,7 @@
 
 import { app } from '../appContext.js';
 import { toast } from '../ui/Toast.js';
-import { flattenRequests } from '../collections/collectionTree.js';
+import { findRequest, flattenRequests } from '../collections/collectionTree.js';
 import { translate } from '../utils/translate.js';
 
 export class CollectionImportExportService {
@@ -294,10 +294,7 @@ export class CollectionImportExportService {
             return;
         }
 
-        const endpoint = app.collectionController.endpointLoaderService.findEndpointInCollection(
-            collection,
-            endpointId
-        );
+        const endpoint = findRequest(collection, endpointId);
         if (!endpoint) {
             return;
         }

@@ -519,6 +519,31 @@ function setCancelButtonLabel(disconnect) {
     cancelRequestBtn.setAttribute('aria-label', label);
 }
 
+/**
+ * @param {Object} processedPathParams
+ * @param {string} queryString
+ * @returns {Promise<{rewrite: {baseUrl: string, pathTemplate: string}, url: string}|null>}
+ */
+async function resolveMockRewrite(processedPathParams, queryString) {
+    const { shouldUseMock, mockBaseUrl } = await getMockServerService().shouldUseMockServer(getCurrentEndpoint().collectionId);
+    if (!shouldUseMock || !mockBaseUrl) {
+        return null;
+    }
+    const collection = await getCollectionRepository().getById(getCurrentEndpoint().collectionId);
+    if (!collection) {
+        return null;
+    }
+    const endpoint = findRequest(collection, getCurrentEndpoint().endpointId);
+    if (!endpoint?.path) {
+        return null;
+    }
+    const mockPath = buildMockPath(endpoint.path, processedPathParams);
+    return {
+        rewrite: { baseUrl: mockBaseUrl, pathTemplate: endpoint.path },
+        url: queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`
+    };
+}
+
 /** @returns {Promise<void>} */
 async function refreshStreamControls() {
     if (requestInProgress || !cancelRequestBtn) {
@@ -529,7 +554,7 @@ async function refreshStreamControls() {
     if (requestInProgress) {
         return;
     }
-    const live = Boolean(isLive && isLive(tabId));
+    const live = Boolean(isLive?.(tabId));
     cancelRequestBtn.style.display = live ? 'inline-block' : 'none';
     setCancelButtonLabel(live);
 }
@@ -962,22 +987,9 @@ export async function handleSendRequest() {
     let mockRewrite = null;
     if (getCurrentEndpoint()) {
         try {
-            const mockServerService = getMockServerService();
-            const { shouldUseMock, mockBaseUrl } = await mockServerService.shouldUseMockServer(getCurrentEndpoint().collectionId);
-            
-            if (shouldUseMock && mockBaseUrl) {
-                const collection = await getCollectionRepository().getById(getCurrentEndpoint().collectionId);
-                
-                if (collection) {
-                    const endpoint = findRequest(collection, getCurrentEndpoint().endpointId);
-
-                    if (endpoint && endpoint.path) {
-                        const mockPath = buildMockPath(endpoint.path, processedPathParams);
-
-                        mockRewrite = { baseUrl: mockBaseUrl, pathTemplate: endpoint.path };
-                        url = queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`;
-                    }
-                }
+            const mock = await resolveMockRewrite(processedPathParams, queryString);
+            if (mock) {
+                ({ rewrite: mockRewrite, url } = mock);
             }
         } catch (error) {
             console.warn('Mock server check failed, sending to the real URL:', error);

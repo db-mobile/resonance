@@ -171,19 +171,26 @@ async function handleSaveShortcut() {
     }
 }
 
-function toggleHistorySidebar() {
+/**
+ * @param {boolean} [show]
+ * @returns {void}
+ */
+function setHistoryVisible(show) {
     const historySidebar = document.getElementById('history-sidebar');
     const historyResizerHandle = document.getElementById('history-resizer-handle');
     const historyToggleBtn = document.getElementById('history-toggle-btn');
     if (!historySidebar || !historyResizerHandle) {
         return;
     }
-    const isVisible = historySidebar.classList.contains('visible');
-    historySidebar.classList.toggle('visible', !isVisible);
-    historyResizerHandle.classList.toggle('visible', !isVisible);
-    if (historyToggleBtn) {
-        historyToggleBtn.classList.toggle('active', !isVisible);
-    }
+    const visible = show ?? !historySidebar.classList.contains('visible');
+    historySidebar.classList.toggle('visible', visible);
+    historyResizerHandle.classList.toggle('visible', visible);
+    historyToggleBtn?.classList.toggle('active', visible);
+}
+
+/** @returns {void} */
+function toggleHistorySidebar() {
+    setHistoryVisible();
 }
 
 /** @param {number} delta */
@@ -488,35 +495,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    const historyToggleBtn = document.getElementById('history-toggle-btn');
-    const historySidebar = document.getElementById('history-sidebar');
-    const historyResizerHandle = document.getElementById('history-resizer-handle');
-    const closeHistoryBtn = document.getElementById('close-history-btn');
-
-    const toggleHistory = (show) => {
-        if (show) {
-            historySidebar.classList.add('visible');
-            historyResizerHandle.classList.add('visible');
-            historyToggleBtn.classList.add('active');
-        } else {
-            historySidebar.classList.remove('visible');
-            historyResizerHandle.classList.remove('visible');
-            historyToggleBtn.classList.remove('active');
-        }
-    };
-
-    if (historyToggleBtn && historySidebar && historyResizerHandle) {
-        historyToggleBtn.addEventListener('click', () => {
-            const isVisible = historySidebar.classList.contains('visible');
-            toggleHistory(!isVisible);
-        });
-    }
-
-    if (closeHistoryBtn) {
-        closeHistoryBtn.addEventListener('click', () => {
-            toggleHistory(false);
-        });
-    }
+    document.getElementById('history-toggle-btn')?.addEventListener('click', toggleHistorySidebar);
+    document.getElementById('close-history-btn')?.addEventListener('click', () => setHistoryVisible(false));
 
     const cookieJarBtn = document.getElementById('cookie-jar-btn');
     if (cookieJarBtn) {

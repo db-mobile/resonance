@@ -4,7 +4,7 @@
  */
 
 import { splitAuthSecrets, mergeAuthSecrets, authSecretScope, collectionAuthSecretScope, folderAuthSecretScope } from '../auth/authSecrets.js';
-import { findFolder, folderChainForRequest, updateFolder } from '../collections/collectionTree.js';
+import { findFolder, folderChainForRequest, updateFolder, endpointKey } from '../collections/collectionTree.js';
 import { fromWire, toWire, listFromWire } from './collectionMapper.js';
 
 const METADATA_FIELDS = Object.freeze([
@@ -132,15 +132,7 @@ export class CollectionRepository {
             this._byIdCache.set(id, cached);
             return cached;
         }
-        try {
-            const collection = fromWire(await this.backendAPI.collections.get(id));
-            if (collection) {
-                this._addToCache(id, collection);
-            }
-            return collection ?? undefined;
-        } catch (error) {
-            return undefined;
-        }
+        return this._getByIdFresh(id);
     }
 
     /**
@@ -324,17 +316,6 @@ export class CollectionRepository {
         }
     }
 
-    async _updateEndpointField(collectionId, endpointId, field, value) {
-        await this._withEndpointWrite(collectionId, endpointId, async () => {
-            const data = await this._getEndpointDataForUpdate(collectionId, endpointId);
-            if (sameFieldValues(data, { [field]: value })) {
-                return;
-            }
-            data[field] = value;
-            await this._saveEndpointData(collectionId, endpointId, data);
-        });
-    }
-
     async _updateEndpointFields(collectionId, endpointId, updates) {
         await this._withEndpointWrite(collectionId, endpointId, async () => {
             const data = await this._getEndpointDataForUpdate(collectionId, endpointId);
@@ -368,7 +349,7 @@ export class CollectionRepository {
      */
     async _writeSidecar(collectionId, endpointId, field, value, label) {
         try {
-            await this._updateEndpointField(collectionId, endpointId, field, value);
+            await this._updateEndpointFields(collectionId, endpointId, { [field]: value });
         } catch (error) {
             throw new Error(`Failed to save ${label}: ${error.message || error}`, { cause: error });
         }
@@ -532,7 +513,7 @@ export class CollectionRepository {
                 authSecretScope(collectionId, endpointId),
                 authConfig
             );
-            await this._updateEndpointField(collectionId, endpointId, 'authConfig', toPersist);
+            await this._updateEndpointFields(collectionId, endpointId, { authConfig: toPersist });
         } catch (error) {
             throw new Error(`Failed to save persisted auth config: ${error.message || error}`, { cause: error });
         }
@@ -762,7 +743,7 @@ export class CollectionRepository {
     async togglePinnedRequest(collectionId, endpointId) {
         try {
             const pinned = await this.getPinnedRequests();
-            const key = `${collectionId}_${endpointId}`;
+            const key = endpointKey(collectionId, endpointId);
             pinned[key] = !pinned[key];
             if (!pinned[key]) {
                 delete pinned[key];

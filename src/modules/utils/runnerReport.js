@@ -108,12 +108,19 @@ function testCasesFor(request) {
  * @returns {string}
  */
 export function toJunitXml(summary) {
-    const suites = summary.requests.map(request => {
+    const scored = summary.requests.map(request => {
+        const cases = testCasesFor(request);
+        return {
+            request,
+            cases,
+            failures: cases.filter(testCase => testCase.failure !== null).length,
+            skipped: cases.filter(testCase => testCase.skipped !== null).length
+        };
+    });
+
+    const suites = scored.map(({ request, cases, failures, skipped }) => {
         const label = `${request.method} ${request.name}`.trim();
         const name = summary.iterations > 1 ? `Iteration ${request.iteration} › ${label}` : label;
-        const cases = testCasesFor(request);
-        const failures = cases.filter(testCase => testCase.failure !== null).length;
-        const skipped = cases.filter(testCase => testCase.skipped !== null).length;
         const caseTime = seconds(cases.length > 0 ? (request.time || 0) / cases.length : 0);
 
         const body = cases.map(testCase => {
@@ -130,11 +137,10 @@ export function toJunitXml(summary) {
         return `  <testsuite name="${xml(name)}" tests="${cases.length}" failures="${failures}" errors="0" skipped="${skipped}" time="${seconds(request.time)}">\n${body}\n  </testsuite>`;
     });
 
-    const totals = summary.requests.reduce((acc, request) => {
-        const cases = testCasesFor(request);
+    const totals = scored.reduce((acc, { cases, failures, skipped }) => {
         acc.tests += cases.length;
-        acc.failures += cases.filter(testCase => testCase.failure !== null).length;
-        acc.skipped += cases.filter(testCase => testCase.skipped !== null).length;
+        acc.failures += failures;
+        acc.skipped += skipped;
         return acc;
     }, { tests: 0, failures: 0, skipped: 0 });
 

@@ -243,8 +243,8 @@ export class WorkspaceTabEndpointLoaderService {
             url: endpoint.persistedUrl || endpoint.path || '',
             method: endpoint.method || 'GET',
             pathParams: {},
-            queryParams: this.arrayEntriesToRows(endpoint.persistedQueryParams),
-            headers: this.arrayEntriesToRows(endpoint.persistedHeaders),
+            queryParams: normalizeKeyValueRows(endpoint.persistedQueryParams),
+            headers: normalizeKeyValueRows(endpoint.persistedHeaders),
             body: {
                 mode,
                 content: endpoint.persistedBody || ''
@@ -316,8 +316,8 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     createWebSocketTabUpdate(endpoint) {
-        const queryParams = this.arrayEntriesToRows(endpoint.persistedQueryParams);
-        const headers = this.arrayEntriesToRows(endpoint.persistedHeaders);
+        const queryParams = normalizeKeyValueRows(endpoint.persistedQueryParams);
+        const headers = normalizeKeyValueRows(endpoint.persistedHeaders);
         const tabName = endpoint.name || 'WebSocket Request';
 
         return this._tabUpdate(endpoint, 'websocket', tabName, {
@@ -340,7 +340,7 @@ export class WorkspaceTabEndpointLoaderService {
         const { authType, authConfig } = this.buildHttpAuth(endpoint);
 
         return this._tabUpdate(endpoint, 'http', tabName, {
-            url: this.buildHttpUrl(endpoint),
+            url: buildEndpointUrl(endpoint),
             method: endpoint.method,
             pathParams: this.buildHttpPathParams(endpoint),
             queryParams: this.buildHttpQueryParams(endpoint),
@@ -349,10 +349,6 @@ export class WorkspaceTabEndpointLoaderService {
             authType,
             authConfig
         });
-    }
-
-    buildHttpUrl(endpoint) {
-        return buildEndpointUrl(endpoint);
     }
 
     buildHttpPathParams(endpoint) {
@@ -371,7 +367,7 @@ export class WorkspaceTabEndpointLoaderService {
 
     buildHttpQueryParams(endpoint) {
         if (endpoint.persistedQueryParams && endpoint.persistedQueryParams.length > 0) {
-            return this.arrayEntriesToRows(endpoint.persistedQueryParams);
+            return normalizeKeyValueRows(endpoint.persistedQueryParams);
         }
 
         const queryParams = {};
@@ -385,7 +381,7 @@ export class WorkspaceTabEndpointLoaderService {
 
     buildHttpHeaders(endpoint) {
         if (endpoint.persistedHeaders && endpoint.persistedHeaders.length > 0) {
-            return this.arrayEntriesToRows(endpoint.persistedHeaders);
+            return normalizeKeyValueRows(endpoint.persistedHeaders);
         }
 
         const headers = {};
@@ -499,14 +495,6 @@ export class WorkspaceTabEndpointLoaderService {
             authType: 'inherit',
             authConfig: {}
         };
-    }
-
-    /**
-     * @param {Array<Object>} entries
-     * @returns {Array<Object>}
-     */
-    arrayEntriesToRows(entries = []) {
-        return normalizeKeyValueRows(entries);
     }
 
     arrayEntriesToObject(entries = []) {

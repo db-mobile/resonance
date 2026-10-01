@@ -5,6 +5,19 @@
 
 import { ChangeEmitter } from './ChangeEmitter.js';
 
+/**
+ * @param {{name: string, variables: Object, secretKeys?: string[], color?: string|null}} environment
+ * @returns {{name: string, variables: Object, secretKeys: string[], color: string|null}}
+ */
+function toExportShape(environment) {
+    return {
+        name: environment.name,
+        variables: environment.variables,
+        secretKeys: Array.isArray(environment.secretKeys) ? environment.secretKeys : [],
+        color: environment.color || null
+    };
+}
+
 export class EnvironmentService {
     /**
      * @param {EnvironmentRepository} environmentRepository
@@ -299,12 +312,7 @@ export class EnvironmentService {
                 throw new Error('Environment not found');
             }
 
-            return {
-                name: environment.name,
-                variables: environment.variables,
-                secretKeys: Array.isArray(environment.secretKeys) ? environment.secretKeys : [],
-                color: environment.color || null
-            };
+            return toExportShape(environment);
         } catch (error) {
             this.statusDisplay.update(`Error exporting environment: ${error.message}`, null);
             throw error;
@@ -316,12 +324,7 @@ export class EnvironmentService {
             const data = await this.repository.exportEnvironments();
             return {
                 version: '1.0',
-                environments: data.items.map(env => ({
-                    name: env.name,
-                    variables: env.variables,
-                    secretKeys: Array.isArray(env.secretKeys) ? env.secretKeys : [],
-                    color: env.color || null
-                }))
+                environments: data.items.map(toExportShape)
             };
         } catch (error) {
             this.statusDisplay.update(`Error exporting environments: ${error.message}`, null);

@@ -270,36 +270,33 @@ export class AuthManager {
                 break;
 
             case 'bearer':
-                this.renderBearerTokenFields();
-                break;
-
             case 'basic':
-                this.renderBasicAuthFields();
-                break;
-
             case 'api-key':
-                this.renderApiKeyFields();
+            case 'digest':
+            case 'ntlm':
+            case 'aws-v4':
+                this._renderSimpleFields(authType);
                 break;
 
             case 'oauth2':
                 this.renderOAuth2Fields();
                 break;
 
-            case 'digest':
-                this.renderDigestAuthFields();
-                break;
-
-            case 'ntlm':
-                this.renderNtlmFields();
-                break;
-
-            case 'aws-v4':
-                this.renderAwsV4Fields();
-                break;
-
             default:
                 break;
         }
+    }
+
+    /**
+     * @param {'bearer'|'basic'|'api-key'|'digest'|'ntlm'|'aws-v4'} authType
+     * @returns {void}
+     */
+    _renderSimpleFields(authType) {
+        const fragment = this._cloneAuthTemplate(`tpl-auth-${authType}`);
+        this.authFieldsContainer.innerHTML = '';
+        this.authFieldsContainer.appendChild(fragment);
+
+        this._bindFields(authType);
     }
 
     /** @returns {void} */
@@ -363,33 +360,6 @@ export class AuthManager {
             'aws-v4': 'AWS Signature'
         };
         return labels[type] || type;
-    }
-
-    /** @returns {void} */
-    renderBearerTokenFields() {
-        const fragment = this._cloneAuthTemplate('tpl-auth-bearer');
-        this.authFieldsContainer.innerHTML = '';
-        this.authFieldsContainer.appendChild(fragment);
-
-        this._bindFields('bearer');
-    }
-
-    /** @returns {void} */
-    renderBasicAuthFields() {
-        const fragment = this._cloneAuthTemplate('tpl-auth-basic');
-        this.authFieldsContainer.innerHTML = '';
-        this.authFieldsContainer.appendChild(fragment);
-
-        this._bindFields('basic');
-    }
-
-    /** @returns {void} */
-    renderApiKeyFields() {
-        const fragment = this._cloneAuthTemplate('tpl-auth-api-key');
-        this.authFieldsContainer.innerHTML = '';
-        this.authFieldsContainer.appendChild(fragment);
-
-        this._bindFields('api-key');
     }
 
     /** @returns {void} */
@@ -719,33 +689,6 @@ export class AuthManager {
             errorMessage.className = 'alert alert-error';
             errorMessage.textContent = message;
         }
-    }
-
-    /** @returns {void} */
-    renderDigestAuthFields() {
-        const fragment = this._cloneAuthTemplate('tpl-auth-digest');
-        this.authFieldsContainer.innerHTML = '';
-        this.authFieldsContainer.appendChild(fragment);
-
-        this._bindFields('digest');
-    }
-
-    /** @returns {void} */
-    renderNtlmFields() {
-        const fragment = this._cloneAuthTemplate('tpl-auth-ntlm');
-        this.authFieldsContainer.innerHTML = '';
-        this.authFieldsContainer.appendChild(fragment);
-
-        this._bindFields('ntlm');
-    }
-
-    /** @returns {void} */
-    renderAwsV4Fields() {
-        const fragment = this._cloneAuthTemplate('tpl-auth-aws-v4');
-        this.authFieldsContainer.innerHTML = '';
-        this.authFieldsContainer.appendChild(fragment);
-
-        this._bindFields('aws-v4');
     }
 
     /**

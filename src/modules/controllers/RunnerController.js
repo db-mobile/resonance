@@ -125,14 +125,26 @@ export class RunnerController {
         }
     }
 
+    /**
+     * @param {string} runnerId
+     * @returns {Promise<Object|null>}
+     */
+    async _applyRunner(runnerId) {
+        const { runner, missing } = await this._prepareRunner(await this.service.getRunner(runnerId));
+        if (!runner) {
+            return null;
+        }
+        this.currentRunnerId = runnerId;
+        this.panel?.loadRunner(runner, missing);
+        this._checkDataFile(runner.options?.dataFile);
+        return runner;
+    }
+
     /** @param {string} runnerId */
     async _handleRunnerSelect(runnerId) {
         try {
-            const { runner, missing } = await this._prepareRunner(await this.service.getRunner(runnerId));
+            const runner = await this._applyRunner(runnerId);
             if (runner) {
-                this.currentRunnerId = runnerId;
-                this.panel?.loadRunner(runner, missing);
-                this._checkDataFile(runner.options?.dataFile);
                 await this._saveLastRunnerId(runnerId);
                 updateStatusDisplay(translate('runner.loaded', 'Loaded runner: {{name}}', { name: runner.name }), null);
             }
@@ -189,19 +201,12 @@ export class RunnerController {
                 this.currentRunnerId = runnerId;
             }
 
+            const onProgress = (index, total, result) => {
+                this.panel?.updateResultWithResponse(index, result);
+            };
             const results = runnerId
-                ? await this.service.executeRunner(
-                    runnerId,
-                    (index, total, result) => {
-                        this.panel?.updateResultWithResponse(index, result);
-                    }
-                )
-                : await this.service.executeRunnerData(
-                    runnerData,
-                    (index, total, result) => {
-                        this.panel?.updateResultWithResponse(index, result);
-                    }
-                );
+                ? await this.service.executeRunner(runnerId, onProgress)
+                : await this.service.executeRunnerData(runnerData, onProgress);
 
             this.panel?.showResults(results);
 
@@ -239,25 +244,17 @@ export class RunnerController {
                 this.panel?.markRequestRunning?.(data.index);
                 break;
 
-            case 'request-completed':
-                if (data.result.status === 'success') {
-                    updateStatusDisplay(
-                        translate('runner.request_status', 'Request {{number}}: {{detail}}', {
-                            number: data.index + 1,
-                            detail: data.result.statusCode
-                        }),
-                        data.result.statusCode
-                    );
-                } else {
-                    updateStatusDisplay(
-                        translate('runner.request_status', 'Request {{number}}: {{detail}}', {
-                            number: data.index + 1,
-                            detail: data.result.error
-                        }),
-                        null
-                    );
-                }
+            case 'request-completed': {
+                const succeeded = data.result.status === 'success';
+                updateStatusDisplay(
+                    translate('runner.request_status', 'Request {{number}}: {{detail}}', {
+                        number: data.index + 1,
+                        detail: succeeded ? data.result.statusCode : data.result.error
+                    }),
+                    succeeded ? data.result.statusCode : null
+                );
                 break;
+            }
 
             case 'run-completed':
                 updateStatusDisplay(
@@ -281,12 +278,7 @@ export class RunnerController {
         try {
             const lastRunnerId = settings?.lastRunnerId;
             if (lastRunnerId) {
-                const { runner, missing } = await this._prepareRunner(await this.service.getRunner(lastRunnerId));
-                if (runner) {
-                    this.currentRunnerId = lastRunnerId;
-                    this.panel?.loadRunner(runner, missing);
-                    this._checkDataFile(runner.options?.dataFile);
-                }
+                await this._applyRunner(lastRunnerId);
             }
         } catch (error) {
         }
