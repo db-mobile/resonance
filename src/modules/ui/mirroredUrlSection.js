@@ -1,16 +1,10 @@
-import { app } from '../appContext.js';
+import { markTabModified } from '../state/tabModified.js';
 
 export const URL_UPDATED_EVENT = 'url-updated';
 
 /** @param {HTMLInputElement|null} peerInput */
 export function notifyUrlUpdated(peerInput) {
     peerInput?.dispatchEvent(new CustomEvent(URL_UPDATED_EVENT));
-}
-
-function markTabModified() {
-    if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-        app.workspaceTabController.markCurrentTabModified();
-    }
 }
 
 /**

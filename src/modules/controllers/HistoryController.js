@@ -11,7 +11,6 @@ export class HistoryController {
     /** @param {Object} backendAPI */
     constructor(backendAPI) {
         this.service = new HistoryService(backendAPI);
-        this.repository = this.service.repository;
         this.renderer = new HistoryRenderer(backendAPI, this.handleHistorySelect.bind(this));
     }
 
@@ -52,10 +51,5 @@ export class HistoryController {
         } catch (error) {
             void error;
         }
-    }
-
-    /** @returns {Promise<void>} */
-    async refresh() {
-        await this.renderer.refresh();
     }
 }

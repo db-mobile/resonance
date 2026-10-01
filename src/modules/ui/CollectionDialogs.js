@@ -9,6 +9,8 @@ import { DocGeneratorService } from '../services/DocGeneratorService.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
 import { pushEscapeHandler } from './modalEscape.js';
 import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
+import { fileNameFromPath } from '../utils/fileName.js';
+import { translate } from '../utils/translate.js';
 
 export class CollectionDialogs {
     /**
@@ -293,7 +295,7 @@ export class CollectionDialogs {
 
             const newCollectionOption = document.createElement('option');
             newCollectionOption.value = '__new__';
-            newCollectionOption.textContent = app.i18n?.t('save_to_collection.create_new') || '+ Create new collection';
+            newCollectionOption.textContent = translate('save_to_collection.create_new', '+ Create new collection');
             collectionSelect.appendChild(newCollectionOption);
 
             nameInput.focus();
@@ -593,7 +595,6 @@ export class CollectionDialogs {
                 errorMessage.classList.remove('is-hidden');
             };
 
-            const fileNameFromPath = (path) => path.split(/[/\\]/).filter(Boolean).pop() || path;
             const setSourceFile = (path) => {
                 selectedFilePath = path;
                 sourceFileInput.textContent = path ? fileNameFromPath(path) : t('import_dialog.no_file_selected', 'No file selected');

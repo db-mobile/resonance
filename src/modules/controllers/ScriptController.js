@@ -68,11 +68,7 @@ export class ScriptController {
             await this.scriptManager.flushPendingSave();
         }
 
-        if (
-            this.scriptManager?.currentCollectionId === collectionId &&
-            this.scriptManager?.currentEndpointId === endpointId &&
-            this.scriptManager?.getCurrentScripts
-        ) {
+        if (this.isShowingScriptsFor(collectionId, endpointId) && this.scriptManager?.getCurrentScripts) {
             return this.scriptManager.getCurrentScripts();
         }
         return this.service.getScripts(collectionId, endpointId);

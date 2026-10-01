@@ -29,12 +29,7 @@ async function handleBackendEvent(event) {
     const current = session.get(tabId) || {};
 
     if (eventType === 'open') {
-        session.set(tabId, {
-            ...current,
-            fullMethod,
-            state: 'open',
-            transcript: current.transcript || ''
-        });
+        session.transition(tabId, current, { fullMethod, state: 'open' });
         await session.updateStatus(tabId, 'gRPC stream open');
         await session.append(tabId, `OPEN ${fullMethod}`);
         return;
@@ -57,12 +52,7 @@ async function handleBackendEvent(event) {
     }
 
     if (eventType === 'close') {
-        session.set(tabId, {
-            ...current,
-            fullMethod,
-            state: 'closed',
-            transcript: current.transcript || ''
-        });
+        session.transition(tabId, current, { fullMethod, state: 'closed' });
         const trailerStr = payload.trailers ? `\n${JSON.stringify(payload.trailers, null, 2)}` : '';
         await session.updateStatus(
             tabId,

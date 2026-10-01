@@ -1,6 +1,3 @@
-
-import { escapeHtml } from './htmlUtils.js';
-
 /**
  * @param {string} cookieString
  * @returns {Object}
@@ -181,45 +178,4 @@ export function renderCookies(container, cookies) {
 
     table.appendChild(tbody);
     container.appendChild(table);
-}
-
-/**
- * @param {Array} cookies
- * @returns {string}
- */
-export function formatCookiesAsHtml(cookies) {
-    if (!cookies || cookies.length === 0) {
-        return '<div class="cookies-empty">No cookies in response</div>';
-    }
-
-    let html = '<table class="cookies-table"><thead><tr>';
-    html += '<th>Name</th>';
-    html += '<th>Value</th>';
-    html += '<th>Domain</th>';
-    html += '<th>Path</th>';
-    html += '<th>Expires</th>';
-    html += '<th>Max-Age</th>';
-    html += '<th>Flags</th>';
-    html += '</tr></thead><tbody>';
-
-    cookies.forEach(cookie => {
-        html += '<tr>';
-        html += `<td class="cookie-name">${escapeHtml(cookie.name)}</td>`;
-        html += `<td class="cookie-value">${escapeHtml(cookie.value)}</td>`;
-        html += `<td>${cookie.domain ? escapeHtml(cookie.domain) : '-'}</td>`;
-        html += `<td>${cookie.path ? escapeHtml(cookie.path) : '-'}</td>`;
-        html += `<td>${cookie.expires ? escapeHtml(cookie.expires) : '-'}</td>`;
-        html += `<td>${cookie.maxAge ? escapeHtml(cookie.maxAge) : '-'}</td>`;
-
-        const flags = [];
-        if (cookie.httpOnly) {flags.push('HttpOnly');}
-        if (cookie.secure) {flags.push('Secure');}
-        if (cookie.sameSite) {flags.push(`SameSite=${cookie.sameSite}`);}
-
-        html += `<td>${flags.length > 0 ? escapeHtml(flags.join(', ')) : '-'}</td>`;
-        html += '</tr>';
-    });
-
-    html += '</tbody></table>';
-    return html;
 }

@@ -574,3 +574,11 @@ export function folderOutline(collection) {
     return out;
 }
 
+/**
+ * @param {string} collectionId
+ * @param {string} endpointId
+ * @returns {string}
+ */
+export function endpointKey(collectionId, endpointId) {
+    return `${collectionId}_${endpointId}`;
+}

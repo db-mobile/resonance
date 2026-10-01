@@ -7,6 +7,7 @@ import { app } from './appContext.js';
 import { loadEditor } from './editorLoader.js';
 import { toast } from './ui/Toast.js';
 import { debounce } from './utils/debounce.js';
+import { markTabModified } from './state/tabModified.js';
 import { fetchGraphQLIntrospection, buildSchemaFromIntrospection } from './apiHandler.js';
 import { GraphQLExplorer } from './graphqlExplorer.js';
 
@@ -35,6 +36,7 @@ export class GraphQLBodyManager {
         this.graphqlPanel = document.getElementById('body-graphql-section');
         this.graphqlEditorContainer = document.getElementById('graphql-query-editor');
         this.formatBtn = document.getElementById('graphql-format-btn');
+        this.jsonFormatBtn = document.getElementById('body-format-btn');
         this.fetchSchemaBtn = document.getElementById('graphql-fetch-schema-btn');
         this.operationSelect = document.getElementById('graphql-operation-select');
         this.docsToggle = document.getElementById('graphql-docs-toggle');
@@ -59,9 +61,7 @@ export class GraphQLBodyManager {
             modeSelect.addEventListener('change', (e) => {
                 const mode = e.target.value;
                 this.switchMode(mode);
-                if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                    app.workspaceTabController.markCurrentTabModified();
-                }
+                markTabModified();
             });
         }
 
@@ -73,6 +73,12 @@ export class GraphQLBodyManager {
                         toast.error(`Cannot format invalid GraphQL: ${error.message}`);
                     }
                 }
+            });
+        }
+
+        if (this.jsonFormatBtn) {
+            this.jsonFormatBtn.addEventListener('click', () => {
+                app.requestBodyEditor?.formatJSONWithFeedback();
             });
         }
 
@@ -161,7 +167,7 @@ export class GraphQLBodyManager {
     /** @param {string} text */
     _onExplorerQueryChange(text) {
         this.setGraphQLQuery(text);
-        this._markTabModified();
+        markTabModified();
     }
 
     /** @param {string} json */
@@ -451,6 +457,10 @@ export class GraphQLBodyManager {
             modeSelect.value = mode;
         }
 
+        if (this.jsonFormatBtn) {
+            this.jsonFormatBtn.hidden = mode !== 'json';
+        }
+
         document.querySelectorAll('.body-mode-panel').forEach(panel => {
             const panelMode = panel.getAttribute('data-mode');
             if (panelMode === mode) {
@@ -498,7 +508,7 @@ export class GraphQLBodyManager {
                 }
                 this.graphqlEditor.onChange((content) => {
                     this.updateOperationPicker();
-                    this._markTabModified();
+                    markTabModified();
                     if (this.isDocsRailOpen()) {
                         this._debouncedRefreshExplorer(content);
                     }
@@ -532,7 +542,7 @@ export class GraphQLBodyManager {
             return;
         }
         this._variablesString = content;
-        this._markTabModified();
+        markTabModified();
     }
 
     /** @returns {string} */
@@ -562,11 +572,6 @@ export class GraphQLBodyManager {
         return this.currentMode === 'graphql';
     }
 
-    _markTabModified() {
-        if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-            app.workspaceTabController.markCurrentTabModified();
-        }
-    }
 
     clear() {
         this._pendingQuery = null;

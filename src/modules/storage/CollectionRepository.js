@@ -4,7 +4,7 @@
  */
 
 import { splitAuthSecrets, mergeAuthSecrets, authSecretScope, collectionAuthSecretScope, folderAuthSecretScope } from '../auth/authSecrets.js';
-import { findFolder, folderChainForRequest, updateFolder } from '../collections/collectionTree.js';
+import { findFolder, folderChainForRequest, updateFolder, endpointKey } from '../collections/collectionTree.js';
 import { fromWire, toWire, listFromWire } from './collectionMapper.js';
 
 const METADATA_FIELDS = Object.freeze([
@@ -34,6 +34,17 @@ function sameFieldValues(data, updates) {
  */
 function mqttSecretScope(collectionId, endpointId) {
     return `mqtt:${collectionId}:${endpointId}`;
+}
+
+/** @type {ReadonlyArray<function(string, string): string>} */
+const ENDPOINT_SECRET_SCOPES = Object.freeze([authSecretScope, mqttSecretScope]);
+
+/**
+ * @param {string} collectionId
+ * @returns {string[]}
+ */
+function collectionSecretPrefixes(collectionId) {
+    return ENDPOINT_SECRET_SCOPES.map((scopeOf) => scopeOf(collectionId, ''));
 }
 
 export class CollectionRepository {
@@ -121,15 +132,7 @@ export class CollectionRepository {
             this._byIdCache.set(id, cached);
             return cached;
         }
-        try {
-            const collection = fromWire(await this.backendAPI.collections.get(id));
-            if (collection) {
-                this._addToCache(id, collection);
-            }
-            return collection ?? undefined;
-        } catch (error) {
-            return undefined;
-        }
+        return this._getByIdFresh(id);
     }
 
     /**
@@ -202,8 +205,9 @@ export class CollectionRepository {
             await this.backendAPI.collections.delete(id);
             this._byIdCache.delete(id);
             if (this.secretStore) {
-                await this.secretStore.deleteScopePrefix(`auth:${id}:`);
-                await this.secretStore.deleteScopePrefix(`mqtt:${id}:`);
+                for (const prefix of collectionSecretPrefixes(id)) {
+                    await this.secretStore.deleteScopePrefix(prefix);
+                }
             }
             return true;
         } catch (error) {
@@ -312,17 +316,6 @@ export class CollectionRepository {
         }
     }
 
-    async _updateEndpointField(collectionId, endpointId, field, value) {
-        await this._withEndpointWrite(collectionId, endpointId, async () => {
-            const data = await this._getEndpointDataForUpdate(collectionId, endpointId);
-            if (sameFieldValues(data, { [field]: value })) {
-                return;
-            }
-            data[field] = value;
-            await this._saveEndpointData(collectionId, endpointId, data);
-        });
-    }
-
     async _updateEndpointFields(collectionId, endpointId, updates) {
         await this._withEndpointWrite(collectionId, endpointId, async () => {
             const data = await this._getEndpointDataForUpdate(collectionId, endpointId);
@@ -356,7 +349,7 @@ export class CollectionRepository {
      */
     async _writeSidecar(collectionId, endpointId, field, value, label) {
         try {
-            await this._updateEndpointField(collectionId, endpointId, field, value);
+            await this._updateEndpointFields(collectionId, endpointId, { [field]: value });
         } catch (error) {
             throw new Error(`Failed to save ${label}: ${error.message || error}`, { cause: error });
         }
@@ -520,7 +513,7 @@ export class CollectionRepository {
                 authSecretScope(collectionId, endpointId),
                 authConfig
             );
-            await this._updateEndpointField(collectionId, endpointId, 'authConfig', toPersist);
+            await this._updateEndpointFields(collectionId, endpointId, { authConfig: toPersist });
         } catch (error) {
             throw new Error(`Failed to save persisted auth config: ${error.message || error}`, { cause: error });
         }
@@ -750,7 +743,7 @@ export class CollectionRepository {
     async togglePinnedRequest(collectionId, endpointId) {
         try {
             const pinned = await this.getPinnedRequests();
-            const key = `${collectionId}_${endpointId}`;
+            const key = endpointKey(collectionId, endpointId);
             pinned[key] = !pinned[key];
             if (!pinned[key]) {
                 delete pinned[key];
@@ -773,8 +766,7 @@ export class CollectionRepository {
         if (this.secretStore) {
             await this.secretStore.deleteScope(folderAuthSecretScope(collectionId, folderId));
             for (const endpointId of removed ?? []) {
-                await this.secretStore.deleteScope(authSecretScope(collectionId, endpointId));
-                await this.secretStore.deleteScope(mqttSecretScope(collectionId, endpointId));
+                await this._deleteEndpointSecrets(collectionId, endpointId);
             }
         }
         return removed ?? [];
@@ -794,7 +786,7 @@ export class CollectionRepository {
         if (!this.secretStore) {
             return;
         }
-        for (const scopeOf of [authSecretScope, mqttSecretScope]) {
+        for (const scopeOf of ENDPOINT_SECRET_SCOPES) {
             const secrets = await this.secretStore.getScope(scopeOf(collectionId, sourceId));
             for (const [key, value] of Object.entries(secrets)) {
                 await this.secretStore.set(scopeOf(collectionId, targetId), key, value);
@@ -807,12 +799,22 @@ export class CollectionRepository {
      * @param {string} endpointId
      * @returns {Promise<void>}
      */
+    async _deleteEndpointSecrets(collectionId, endpointId) {
+        for (const scopeOf of ENDPOINT_SECRET_SCOPES) {
+            await this.secretStore.deleteScope(scopeOf(collectionId, endpointId));
+        }
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<void>}
+     */
     async deletePersistedEndpointData(collectionId, endpointId) {
         try {
             await this.backendAPI.collections.deleteEndpointData(collectionId, endpointId);
             if (this.secretStore) {
-                await this.secretStore.deleteScope(authSecretScope(collectionId, endpointId));
-                await this.secretStore.deleteScope(mqttSecretScope(collectionId, endpointId));
+                await this._deleteEndpointSecrets(collectionId, endpointId);
             }
         } catch (error) {
             throw new Error(`Failed to delete persisted endpoint data: ${error.message || error}`, { cause: error });

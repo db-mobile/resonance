@@ -6,6 +6,7 @@
 import { app } from '../appContext.js';
 import { CurlParser } from '../CurlParser.js';
 import { BaseModal } from './BaseModal.js';
+import { translate } from '../utils/translate.js';
 
 /** @augments */
 export class CurlImportDialog extends BaseModal {
@@ -65,9 +66,7 @@ export class CurlImportDialog extends BaseModal {
 
         const newCollectionOption = document.createElement('option');
         newCollectionOption.value = '__new__';
-        newCollectionOption.textContent = app.i18n ?
-            app.i18n.t('curl_import.new_collection') :
-            'Create New Collection';
+        newCollectionOption.textContent = translate('curl_import.new_collection', 'Create New Collection');
         select.appendChild(newCollectionOption);
 
         collections.forEach(collection => {

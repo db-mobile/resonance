@@ -13,7 +13,9 @@ import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl } from 
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
-import { handleSendRequest, handleCancelRequest, handleGenerateCurl, invalidateSettingsCache, getSettingsCache, invalidateEnvironmentCache } from './modules/apiHandler.js';
+import { handleSendRequest, handleCancelRequest, handleGenerateCurl, invalidateEnvironmentCache } from './modules/apiHandler.js';
+import { getSettingsCache } from './modules/state/settingsCache.js';
+import { markTabModified } from './modules/state/tabModified.js';
 import { applyGrpcState, captureGrpcState, initGrpcUI } from './modules/grpcHandler.js';
 import { initRequestModeManager } from './modules/requestModeManager.js';
 import { initWebSocketHandler } from './modules/websocketHandler.js';
@@ -21,11 +23,10 @@ import { initGraphQLSubscriptionHandler } from './modules/graphqlSubscriptionHan
 import { initSseHandler } from './modules/sseHandler.js';
 import { initMqttHandler, handleMqttCancel } from './modules/mqttHandler.js';
 import { initGrpcStreamHandler } from './modules/grpcStreamHandler.js';
-import { loadCollections, importCollectionFile, importPostmanEnvironment, importCurl, openExistingCollection, initializeBodyTracking } from './modules/collectionManager.js';
+import { loadCollections, importCollectionFile, importPostmanEnvironment, importCurl, openExistingCollection, initializeBodyTracking, saveAllRequestModifications, saveRequestToCollection } from './modules/collectionManager.js';
 import { initResizer } from './modules/resizer.js';
 import { i18n } from './i18n/I18nManager.js';
 import { authManager } from './modules/authManager.js';
-import { initializeCopyHandler } from './modules/copyHandler.js';
 import { SecretStore } from './modules/storage/SecretStore.js';
 import { StatusBar } from './modules/ui/StatusBar.js';
 import { ContextMenu } from './modules/ui/ContextMenu.js';
@@ -49,7 +50,6 @@ import { loadEditor, warmEditors } from './modules/editorLoader.js';
 import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
 import { toast } from './modules/ui/Toast.js';
 
-app.invalidateApiHandlerSettingsCache = invalidateSettingsCache;
 app.getApiHandlerSettingsCache = getSettingsCache;
 app.invalidateApiHandlerEnvironmentCache = invalidateEnvironmentCache;
 
@@ -108,7 +108,6 @@ const workspaceTabService = workspaceTab.service;
 const workspaceTabStateManager = workspaceTab.stateManager;
 const settingsModal = featureRegistry.get('settings').modal;
 
-/** @returns {void} */
 /** @returns {Promise<void>} */
 async function handleSaveShortcut() {
     const controller = app.workspaceTabController;
@@ -125,7 +124,6 @@ async function handleSaveShortcut() {
 
     try {
         if (endpoint) {
-            const { saveAllRequestModifications } = await import('./modules/collectionManager.js');
             await saveAllRequestModifications(endpoint.collectionId, endpoint.endpointId);
 
             if (controller) {
@@ -139,7 +137,6 @@ async function handleSaveShortcut() {
             return;
         }
 
-        const { saveRequestToCollection } = await import('./modules/collectionManager.js');
         const state = await controller.stateManager.captureCurrentState();
         const requestData = {
             name: activeTab.name,
@@ -174,19 +171,26 @@ async function handleSaveShortcut() {
     }
 }
 
-function toggleHistorySidebar() {
+/**
+ * @param {boolean} [show]
+ * @returns {void}
+ */
+function setHistoryVisible(show) {
     const historySidebar = document.getElementById('history-sidebar');
     const historyResizerHandle = document.getElementById('history-resizer-handle');
     const historyToggleBtn = document.getElementById('history-toggle-btn');
     if (!historySidebar || !historyResizerHandle) {
         return;
     }
-    const isVisible = historySidebar.classList.contains('visible');
-    historySidebar.classList.toggle('visible', !isVisible);
-    historyResizerHandle.classList.toggle('visible', !isVisible);
-    if (historyToggleBtn) {
-        historyToggleBtn.classList.toggle('active', !isVisible);
-    }
+    const visible = show ?? !historySidebar.classList.contains('visible');
+    historySidebar.classList.toggle('visible', visible);
+    historyResizerHandle.classList.toggle('visible', visible);
+    historyToggleBtn?.classList.toggle('active', visible);
+}
+
+/** @returns {void} */
+function toggleHistorySidebar() {
+    setHistoryVisible();
 }
 
 /** @param {number} delta */
@@ -491,35 +495,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    const historyToggleBtn = document.getElementById('history-toggle-btn');
-    const historySidebar = document.getElementById('history-sidebar');
-    const historyResizerHandle = document.getElementById('history-resizer-handle');
-    const closeHistoryBtn = document.getElementById('close-history-btn');
-
-    const toggleHistory = (show) => {
-        if (show) {
-            historySidebar.classList.add('visible');
-            historyResizerHandle.classList.add('visible');
-            historyToggleBtn.classList.add('active');
-        } else {
-            historySidebar.classList.remove('visible');
-            historyResizerHandle.classList.remove('visible');
-            historyToggleBtn.classList.remove('active');
-        }
-    };
-
-    if (historyToggleBtn && historySidebar && historyResizerHandle) {
-        historyToggleBtn.addEventListener('click', () => {
-            const isVisible = historySidebar.classList.contains('visible');
-            toggleHistory(!isVisible);
-        });
-    }
-
-    if (closeHistoryBtn) {
-        closeHistoryBtn.addEventListener('click', () => {
-            toggleHistory(false);
-        });
-    }
+    document.getElementById('history-toggle-btn')?.addEventListener('click', toggleHistorySidebar);
+    document.getElementById('close-history-btn')?.addEventListener('click', () => setHistoryVisible(false));
 
     const cookieJarBtn = document.getElementById('cookie-jar-btn');
     if (cookieJarBtn) {
@@ -623,7 +600,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 changeCallback = cb;
                 if (instance) { instance.onChange(cb); }
             },
-            formatJSON() { return instance ? instance.formatJSON() : true; },
+            formatJSONWithFeedback() { instance?.formatJSONWithFeedback(); },
             focus() {
                 if (instance) { instance.focus(); }
                 else { ensure(); }
@@ -639,10 +616,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (bodyInput) {
                 bodyInput.value = content;
             }
-            if (app.workspaceTabController &&
-                !isInitializingEditor &&
-                !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
+            if (!isInitializingEditor) {
+                markTabModified();
             }
         });
         app.requestBodyEditor = requestBodyEditor;
@@ -653,10 +628,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             bodyTextEditorContainer,
             { language: 'plain' },
             (_content) => {
-                if (app.workspaceTabController &&
-                    !app.workspaceTabController.isRestoringState) {
-                    app.workspaceTabController.markCurrentTabModified();
-                }
+                markTabModified();
             }
         );
     }
@@ -667,10 +639,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (grpcBodyInput) {
                 grpcBodyInput.value = content;
             }
-            if (app.workspaceTabController &&
-                !isInitializingGrpcEditor &&
-                !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
+            if (!isInitializingGrpcEditor) {
+                markTabModified();
             }
         });
         app.grpcBodyEditor = grpcBodyEditor;
@@ -705,31 +675,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     initKeyValueListeners();
     initializeBodyTracking();
     initResizer();
-    initializeCopyHandler();
     initKeyboardShortcuts();
     applyShortcutHints();
 
     if (urlInput) {
         urlInput.addEventListener('input', () => {
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
+            markTabModified();
         });
     }
 
     if (bodyInput) {
         bodyInput.addEventListener('input', () => {
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
+            markTabModified();
         });
     }
 
     if (methodSelect) {
         methodSelect.addEventListener('change', () => {
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
+            markTabModified();
         });
     }
 

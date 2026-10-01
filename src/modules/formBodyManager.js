@@ -3,8 +3,8 @@
  * @module formBodyManager
  */
 
-import { app } from './appContext.js';
 import { normalizeFormRows, isMeaningfulRow } from './utils/formDataRows.js';
+import { markTabModified } from './state/tabModified.js';
 
 export class FormBodyManager {
     constructor() {
@@ -25,20 +25,20 @@ export class FormBodyManager {
             const path = await window.backendAPI.pickUploadFile();
             if (path && this.binaryFilePathInput) {
                 this.binaryFilePathInput.value = path;
-                this._markTabModified();
+                markTabModified();
             }
         });
         document.getElementById('binary-clear-btn')?.addEventListener('click', () => {
             this.setBinaryBody({});
-            this._markTabModified();
+            markTabModified();
         });
 
         [this.formdataList, this.urlencodedList].forEach((list) => {
-            list?.addEventListener('input', () => this._markTabModified());
-            list?.addEventListener('change', () => this._markTabModified());
+            list?.addEventListener('input', () => markTabModified());
+            list?.addEventListener('change', () => markTabModified());
         });
         [this.binaryFilePathInput, this.binaryContentTypeInput].forEach((input) => {
-            input?.addEventListener('input', () => this._markTabModified());
+            input?.addEventListener('input', () => markTabModified());
         });
 
         this._addRow(this.formdataList, {}, true);
@@ -179,7 +179,7 @@ export class FormBodyManager {
                 if (path) {
                     filePathInput.value = path;
                     filePathInput.title = path;
-                    this._markTabModified();
+                    markTabModified();
                 }
             });
             fileCell.appendChild(browseButton);
@@ -217,9 +217,4 @@ export class FormBodyManager {
         return rowEl;
     }
 
-    _markTabModified() {
-        if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-            app.workspaceTabController.markCurrentTabModified();
-        }
-    }
 }

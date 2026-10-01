@@ -264,50 +264,6 @@ describe('RunnerService', () => {
         });
     });
 
-    describe('_findEndpoint', () => {
-        test('should find endpoint in top-level endpoints', () => {
-            const collection = {
-                endpoints: [
-                    { id: 'endpoint_1', name: 'Endpoint 1' },
-                    { id: 'endpoint_2', name: 'Endpoint 2' }
-                ]
-            };
-
-            const result = service._findEndpoint(collection, 'endpoint_2');
-
-            expect(result).toEqual({ id: 'endpoint_2', name: 'Endpoint 2' });
-        });
-
-        test('should find endpoint in folders', () => {
-            const collection = {
-                endpoints: [],
-                folders: [
-                    {
-                        name: 'Folder 1',
-                        endpoints: [
-                            { id: 'endpoint_1', name: 'Endpoint 1' }
-                        ]
-                    }
-                ]
-            };
-
-            const result = service._findEndpoint(collection, 'endpoint_1');
-
-            expect(result).toEqual({ id: 'endpoint_1', name: 'Endpoint 1' });
-        });
-
-        test('should return null for non-existent endpoint', () => {
-            const collection = {
-                endpoints: [{ id: 'endpoint_1' }],
-                folders: []
-            };
-
-            const result = service._findEndpoint(collection, 'non_existent');
-
-            expect(result).toBeNull();
-        });
-    });
-
     describe('_delay', () => {
         test('should delay for specified milliseconds', async () => {
             const start = Date.now();

@@ -6,6 +6,29 @@
 import { SchemaProcessor } from '../schema/SchemaProcessor.js';
 import { findRequest } from '../collections/collectionTree.js';
 
+/**
+ * @param {{method?: string, responses?: Object}} endpoint
+ * @returns {Object|null}
+ */
+export function extractResponseSchema(endpoint) {
+    const method = endpoint.method?.toUpperCase();
+    const { responses } = endpoint;
+    if (!responses) {return null;}
+
+    if (responses['200']?.content?.['application/json']?.schema) {
+        return responses['200'].content['application/json'].schema;
+    }
+    if (['POST', 'PUT'].includes(method) && responses['201']?.content?.['application/json']?.schema) {
+        return responses['201'].content['application/json'].schema;
+    }
+    for (const code of Object.keys(responses)) {
+        if (code.startsWith('2') && responses[code]?.content?.['application/json']?.schema) {
+            return responses[code].content['application/json'].schema;
+        }
+    }
+    return null;
+}
+
 export class MockServerController {
     /**
      * @param {MockServerService} service
@@ -190,10 +213,10 @@ export class MockServerController {
             const collection = await this.collectionRepository.getById(collectionId);
             if (!collection) {return null;}
 
-            const endpoint = this._findEndpoint(collection, endpointId);
+            const endpoint = findRequest(collection, endpointId);
             if (!endpoint) {return null;}
 
-            const schema = this._extractResponseSchema(endpoint);
+            const schema = extractResponseSchema(endpoint);
             if (!schema) {return null;}
 
             const schemaProcessor = new SchemaProcessor();
@@ -211,29 +234,6 @@ export class MockServerController {
         } catch (error) {
             return null;
         }
-    }
-
-    _findEndpoint(collection, endpointId) {
-        return findRequest(collection, endpointId);
-    }
-
-    _extractResponseSchema(endpoint) {
-        const method = endpoint.method?.toUpperCase();
-        const { responses } = endpoint;
-        if (!responses) {return null;}
-
-        if (responses['200']?.content?.['application/json']?.schema) {
-            return responses['200'].content['application/json'].schema;
-        }
-        if (['POST', 'PUT'].includes(method) && responses['201']?.content?.['application/json']?.schema) {
-            return responses['201'].content['application/json'].schema;
-        }
-        for (const code of Object.keys(responses)) {
-            if (code.startsWith('2') && responses[code]?.content?.['application/json']?.schema) {
-                return responses[code].content['application/json'].schema;
-            }
-        }
-        return null;
     }
 
     /**

@@ -24,7 +24,7 @@ import {
     deriveMethod,
     deriveHttpMethod
 } from '../protocols/protocolRegistry.js';
-import { getRequestBodyContent } from '../requestBodyHelper.js';
+import { captureFormBody, getRequestBodyContent } from '../requestBodyHelper.js';
 import { toast } from '../ui/Toast.js';
 
 export class CollectionService {
@@ -595,28 +595,9 @@ export class CollectionService {
 
         const state = { modifiedBody: null, formBodyData: null, graphqlData: null };
 
-        if (bodyMode === 'formdata' && app.formBodyManager) {
-            state.formBodyData = {
-                mode: 'formdata',
-                fields: app.formBodyManager.getFormDataRows()
-            };
-        } else if (bodyMode === 'urlencoded' && app.formBodyManager) {
-            state.formBodyData = {
-                mode: 'urlencoded',
-                fields: app.formBodyManager.getUrlencodedRows()
-            };
-        } else if (bodyMode === 'binary' && app.formBodyManager) {
-            state.formBodyData = {
-                mode: 'binary',
-                ...app.formBodyManager.getBinaryBody()
-            };
-        } else if (bodyMode === 'text') {
-            state.formBodyData = {
-                mode: 'text',
-                content: app.requestBodyTextEditor
-                    ? app.requestBodyTextEditor.getContent()
-                    : ''
-            };
+        const formBody = captureFormBody(bodyMode);
+        if (formBody) {
+            state.formBodyData = formBody;
         } else if (app.graphqlBodyManager && app.graphqlBodyManager.isGraphQLMode()) {
             state.graphqlData = {
                 mode: 'graphql',
@@ -637,38 +618,6 @@ export class CollectionService {
             await this.repository.saveBodyState(collectionId, endpointId, state);
         } catch (error) {
             void error;
-        }
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @param {string} query
-     * @param {string} variables
-     * @returns {Promise<void>}
-     */
-    async saveGraphQLData(collectionId, endpointId, query, variables) {
-        try {
-            await this.repository.saveGraphQLData(collectionId, endpointId, {
-                mode: 'graphql',
-                query,
-                variables
-            });
-        } catch (error) {
-            void error;
-        }
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @returns {Promise<Object|null>}
-     */
-    async getGraphQLData(collectionId, endpointId) {
-        try {
-            return await this.repository.getGraphQLData(collectionId, endpointId);
-        } catch (error) {
-            return null;
         }
     }
 

@@ -8,7 +8,8 @@ import { saveAllRequestModifications } from './collectionManager.js';
 import { debounce } from './utils/debounce.js';
 import { findRequest } from './collections/collectionTree.js';
 import { buildMockPath } from './collections/endpointUrl.js';
-import { methodCarriesBody } from './utils/bodyMethods.js';
+import { methodCarriesBody, requestSendsBody } from './utils/bodyMethods.js';
+import { processFormRows } from './utils/formDataRows.js';
 import { inFlightRequestFor, newRequestId, trackInFlight } from './state/inFlightRequests.js';
 import { registerPendingSave } from './state/pendingSaves.js';
 import { resolveRequestSettings } from './state/settingsCache.js';
@@ -52,7 +53,7 @@ import { VariableService } from './services/VariableService.js';
 import { StatusDisplayAdapter } from './interfaces/IStatusDisplay.js';
 import { authManager, setOAuthVariableResolver } from './authManager.js';
 import { resolveEffectiveAuthWithSource } from './auth/authInheritance.js';
-import { ensureFreshOAuthToken } from './auth/oauthRefresh.js';
+import { ensureFreshOAuthToken, oauthRefreshKey } from './auth/oauthRefresh.js';
 import { resolveAuthConfigVariables } from './auth/authVariables.js';
 import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
 import { createLazyEditorProxy } from './editorLoader.js';
@@ -74,9 +75,10 @@ import {
 import { selectActiveOperationType } from './graphqlTransportWs.js';
 import { cancelStream as cancelGrpcStream, hasActiveStream as hasActiveGrpcStream, isGrpcStreamLive } from './grpcStreamHandler.js';
 import { STREAM_STATE_EVENT } from './streaming/streamState.js';
+import { getActiveTabId, isTabCurrentlyActive, showStatusIfActive } from './streaming/streamSession.js';
 import { translate } from './utils/translate.js';
 import { RequestBuilderService } from './services/RequestBuilderService.js';
-import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes } from './ResponseDisplayHelper.js';
+import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes, responseContainerFor } from './ResponseDisplayHelper.js';
 import { setResponseMeta, suggestedFileName } from './responseSaver.js';
 import { getIntrospectionQuery, buildClientSchema } from 'graphql';
 
@@ -91,8 +93,6 @@ export function setGraphQLBodyManager(manager) {
 let _variableService = null;
 let _mockServerService = null;
 let _collectionRepository = null;
-
-export { invalidateSettingsCache, getSettingsCache } from './state/settingsCache.js';
 
 export function invalidateEnvironmentCache() {
     if (_variableService?.environmentRepository) {
@@ -180,22 +180,6 @@ export async function generateEffectiveAuthData({ variables, processor, refreshO
     const authData = authManager.generateAuthData(effective);
     authData.unresolvedVariables = unresolved;
     return authData;
-}
-
-/**
- * @param {{collectionId?: string, endpointId?: string}|null} endpoint
- * @param {{kind: string, folderId?: string}} source
- * @returns {string}
- */
-function oauthRefreshKey(endpoint, source) {
-    const collectionId = endpoint?.collectionId ?? '';
-    if (source.kind === 'folder') {
-        return `${collectionId}|folder|${source.folderId}`;
-    }
-    if (source.kind === 'collection') {
-        return `${collectionId}|collection`;
-    }
-    return `${collectionId}|request|${endpoint?.endpointId ?? 'unsaved'}`;
 }
 
 /**
@@ -360,23 +344,15 @@ function initResponseEditor() {
 
 /**
  * @param {string|null} tabId
- * @returns {Promise<boolean>}
+ * @returns {HTMLElement|null}
  */
-export async function isTabCurrentlyActive(tabId) {
-    if (!tabId || !app.workspaceTabController) {
-        return true;
-    }
-    const activeTabId = await app.workspaceTabController.service.getActiveTabId();
-    return activeTabId === tabId;
+function statusContainerFor(tabId) {
+    return responseContainerFor(tabId)?.statusContainer || document.querySelector('.status-info-container');
 }
 
 /** @param {string|null} tabId */
 export function clearSchemaValidationBadge(tabId = null) {
-    const containerElements = tabId
-        ? app.responseContainerManager?.getOrCreateContainer(tabId)
-        : app.responseContainerManager?.getActiveElements();
-
-    const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
+    const statusContainer = statusContainerFor(tabId);
     if (!statusContainer) {
         return;
     }
@@ -398,11 +374,7 @@ function displaySchemaValidationResult(validationResult, tabId = null) {
         return;
     }
 
-    const containerElements = tabId
-        ? app.responseContainerManager?.getOrCreateContainer(tabId)
-        : app.responseContainerManager?.getActiveElements();
-
-    const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
+    const statusContainer = statusContainerFor(tabId);
     if (!statusContainer) {
         return;
     }
@@ -420,11 +392,7 @@ function displaySchemaValidationResult(validationResult, tabId = null) {
 
 /** @param {string|null} tabId */
 export function clearGraphQLErrorsBadge(tabId = null) {
-    const containerElements = tabId
-        ? app.responseContainerManager?.getOrCreateContainer(tabId)
-        : app.responseContainerManager?.getActiveElements();
-
-    const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
+    const statusContainer = statusContainerFor(tabId);
     const existingBadge = statusContainer?.querySelector('.graphql-errors-badge');
     if (existingBadge) {
         existingBadge.remove();
@@ -448,11 +416,7 @@ function displayGraphQLErrorsBadge(result, tabId = null) {
         return;
     }
 
-    const containerElements = tabId
-        ? app.responseContainerManager?.getOrCreateContainer(tabId)
-        : app.responseContainerManager?.getActiveElements();
-
-    const statusContainer = containerElements?.statusContainer || document.querySelector('.status-info-container');
+    const statusContainer = statusContainerFor(tabId);
     if (!statusContainer) {
         return;
     }
@@ -468,9 +432,7 @@ function displayGraphQLErrorsBadge(result, tabId = null) {
 }
 
 export function displayResponseWithLineNumbersForTab(content, contentType = null, tabId = null, languageHint = undefined) {
-    const containerElements = tabId
-        ? app.responseContainerManager?.getOrCreateContainer(tabId)
-        : app.responseContainerManager?.getActiveElements();
+    const containerElements = responseContainerFor(tabId);
 
     if (containerElements && containerElements.editor) {
         containerElements.renderedResponse = null;
@@ -500,9 +462,7 @@ function clearResponseDisplay() {
 }
 
 export function clearResponseDisplayForTab(tabId = null) {
-    const containerElements = tabId
-        ? app.responseContainerManager?.getOrCreateContainer(tabId)
-        : app.responseContainerManager?.getActiveElements();
+    const containerElements = responseContainerFor(tabId);
 
     if (containerElements && containerElements.editor) {
         containerElements.renderedResponse = null;
@@ -559,19 +519,42 @@ function setCancelButtonLabel(disconnect) {
     cancelRequestBtn.setAttribute('aria-label', label);
 }
 
+/**
+ * @param {Object} processedPathParams
+ * @param {string} queryString
+ * @returns {Promise<{rewrite: {baseUrl: string, pathTemplate: string}, url: string}|null>}
+ */
+async function resolveMockRewrite(processedPathParams, queryString) {
+    const { shouldUseMock, mockBaseUrl } = await getMockServerService().shouldUseMockServer(getCurrentEndpoint().collectionId);
+    if (!shouldUseMock || !mockBaseUrl) {
+        return null;
+    }
+    const collection = await getCollectionRepository().getById(getCurrentEndpoint().collectionId);
+    if (!collection) {
+        return null;
+    }
+    const endpoint = findRequest(collection, getCurrentEndpoint().endpointId);
+    if (!endpoint?.path) {
+        return null;
+    }
+    const mockPath = buildMockPath(endpoint.path, processedPathParams);
+    return {
+        rewrite: { baseUrl: mockBaseUrl, pathTemplate: endpoint.path },
+        url: queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`
+    };
+}
+
 /** @returns {Promise<void>} */
 async function refreshStreamControls() {
     if (requestInProgress || !cancelRequestBtn) {
         return;
     }
     const isLive = LIVE_STREAM_CHECKS[getCurrentMode()];
-    const tabId = app.workspaceTabController
-        ? await app.workspaceTabController.service.getActiveTabId()
-        : null;
+    const tabId = await getActiveTabId();
     if (requestInProgress) {
         return;
     }
-    const live = Boolean(isLive && isLive(tabId));
+    const live = Boolean(isLive?.(tabId));
     cancelRequestBtn.style.display = live ? 'inline-block' : 'none';
     setCancelButtonLabel(live);
 }
@@ -598,9 +581,7 @@ export async function handleCancelRequest() {
     }
 
     if (isGrpcMode()) {
-        const tabId = app.workspaceTabController
-            ? await app.workspaceTabController.service.getActiveTabId()
-            : null;
+        const tabId = await getActiveTabId();
         if (tabId && hasActiveGrpcStream(tabId)) {
             await cancelGrpcStream(tabId);
             setRequestInProgress(false);
@@ -614,9 +595,7 @@ export async function handleCancelRequest() {
     }
 
     try {
-        const requestTabId = app.workspaceTabController
-            ? await app.workspaceTabController.service.getActiveTabId()
-            : null;
+        const requestTabId = await getActiveTabId();
 
         const requestId = inFlightRequestFor(requestTabId);
         if (!requestId) {
@@ -625,11 +604,7 @@ export async function handleCancelRequest() {
         const result = await window.backendAPI.cancelApiRequest(requestId);
 
         if (result.success) {
-            if (await isTabCurrentlyActive(requestTabId)) {
-                updateStatusDisplay('Request cancelled', null);
-                updateResponseTime(null);
-                updateResponseSize(null);
-            }
+            await showStatusIfActive(requestTabId, 'Request cancelled');
             displayResponseWithLineNumbersForTab('Request was cancelled by user', null, requestTabId);
             clearResponsePanes(requestTabId, globalResponseElements());
         }
@@ -653,9 +628,7 @@ function getActiveGraphQLOperationType() {
 }
 
 async function handleGraphQLSubscriptionRequest() {
-    const tabId = app.workspaceTabController
-        ? await app.workspaceTabController.service.getActiveTabId()
-        : null;
+    const tabId = await getActiveTabId();
 
     if (tabId && isSubscriptionActive(tabId)) {
         await handleGraphQLSubscriptionCancel();
@@ -723,7 +696,7 @@ function setDefaultHeader(headers, name, value) {
  * @returns {string|null}
  */
 function buildSseBody(method, headers, variables, processor) {
-    if (method === 'GET' || method === 'HEAD') {
+    if (!methodCarriesBody(method)) {
         return null;
     }
 
@@ -941,9 +914,7 @@ export async function handleSendRequest() {
     }
 
     if (isGraphQLMode()) {
-        const gqlTabId = app.workspaceTabController
-            ? await app.workspaceTabController.service.getActiveTabId()
-            : null;
+        const gqlTabId = await getActiveTabId();
         if ((gqlTabId && isSubscriptionActive(gqlTabId))
             || getActiveGraphQLOperationType() === 'subscription') {
             return handleGraphQLSubscriptionRequest();
@@ -1016,22 +987,9 @@ export async function handleSendRequest() {
     let mockRewrite = null;
     if (getCurrentEndpoint()) {
         try {
-            const mockServerService = getMockServerService();
-            const { shouldUseMock, mockBaseUrl } = await mockServerService.shouldUseMockServer(getCurrentEndpoint().collectionId);
-            
-            if (shouldUseMock && mockBaseUrl) {
-                const collection = await getCollectionRepository().getById(getCurrentEndpoint().collectionId);
-                
-                if (collection) {
-                    const endpoint = findRequest(collection, getCurrentEndpoint().endpointId);
-
-                    if (endpoint && endpoint.path) {
-                        const mockPath = buildMockPath(endpoint.path, processedPathParams);
-
-                        mockRewrite = { baseUrl: mockBaseUrl, pathTemplate: endpoint.path };
-                        url = queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`;
-                    }
-                }
+            const mock = await resolveMockRewrite(processedPathParams, queryString);
+            if (mock) {
+                ({ rewrite: mockRewrite, url } = mock);
             }
         } catch (error) {
             console.warn('Mock server check failed, sending to the real URL:', error);
@@ -1039,7 +997,7 @@ export async function handleSendRequest() {
     }
 
     const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
-    if (methodCarriesBody(method) || bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'binary') {
+    if (requestSendsBody(method, bodyMode)) {
         try {
             const variables = _resolvedVariables;
 
@@ -1075,19 +1033,7 @@ export async function handleSendRequest() {
                 const rows = bodyMode === 'formdata'
                     ? app.formBodyManager.getFormDataRows()
                     : app.formBodyManager.getUrlencodedRows();
-                const processed = rows
-                    .filter((row) => row.enabled !== false)
-                    .map((row) => ({
-                        key: processor.processTemplate(row.key, variables),
-                        value: row.type === 'file'
-                            ? ''
-                            : processor.processTemplate(row.value || '', variables),
-                        type: row.type || 'text',
-                        filePath: row.filePath
-                            ? processor.processTemplate(row.filePath, variables)
-                            : undefined,
-                        contentType: row.contentType || undefined
-                    }));
+                const processed = processFormRows(rows, (text) => processor.processTemplate(text, variables));
                 if (processed.length > 0) {
                     body = processed;
                 }
@@ -1150,9 +1096,7 @@ export async function handleSendRequest() {
         followRedirects
     };
 
-    const requestTabId = app.workspaceTabController
-        ? await app.workspaceTabController.service.getActiveTabId()
-        : null;
+    const requestTabId = await getActiveTabId();
     let untrackRequest = null;
 
     try {
@@ -1190,11 +1134,7 @@ export async function handleSendRequest() {
                 const message = `Pre-request script error: ${error.message}`;
                 displayResponseWithLineNumbersForTab(`${message}\n\nThe request was not sent.`, null, requestTabId);
                 clearResponsePanes(requestTabId, globalResponseElements());
-                if (await isTabCurrentlyActive(requestTabId)) {
-                    updateStatusDisplay(message, null);
-                    updateResponseTime(null);
-                    updateResponseSize(null);
-                }
+                await showStatusIfActive(requestTabId, message);
                 toast.error(message);
                 return;
             }
@@ -1244,11 +1184,7 @@ export async function handleSendRequest() {
         const result = await window.backendAPI.sendApiRequest(requestConfig);
 
         if (result.cancelled) {
-            if (await isTabCurrentlyActive(requestTabId)) {
-                updateStatusDisplay('Request cancelled', null);
-                updateResponseTime(null);
-                updateResponseSize(null);
-            }
+            await showStatusIfActive(requestTabId, 'Request cancelled');
             displayResponseWithLineNumbersForTab('Request was cancelled', null, requestTabId);
             clearResponsePanes(requestTabId, globalResponseElements());
             clearGraphQLErrorsBadge(requestTabId);
@@ -1438,8 +1374,7 @@ export async function handleGenerateCurl() {
     const bodyMode = bodyModeSelect?.value || 'json';
     let bodyType;
 
-    if (methodCarriesBody(method) ||
-        ['formdata', 'urlencoded', 'binary'].includes(bodyMode)) {
+    if (requestSendsBody(method, bodyMode)) {
         const captured = captureSnippetBody({
             bodyMode,
             formBodyManager: app.formBodyManager,

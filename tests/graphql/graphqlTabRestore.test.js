@@ -35,7 +35,7 @@ jest.mock('../../src/modules/performanceMetrics.js', () => ({
     displayPerformanceMetrics: jest.fn(),
     clearPerformanceMetrics: jest.fn()
 }));
-jest.mock('../../src/modules/cookieParser.js', () => ({ formatCookiesAsHtml: jest.fn(() => '') }));
+jest.mock('../../src/modules/cookieParser.js', () => ({ renderCookies: jest.fn() }));
 jest.mock('../../src/modules/tabManager.js', () => ({ activateTab: jest.fn() }));
 jest.mock('../../src/modules/requestBodyHelper.js', () => ({
     setRequestBodyContent: jest.fn(),

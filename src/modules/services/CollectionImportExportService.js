@@ -5,7 +5,8 @@
 
 import { app } from '../appContext.js';
 import { toast } from '../ui/Toast.js';
-import { flattenRequests } from '../collections/collectionTree.js';
+import { findRequest, flattenRequests } from '../collections/collectionTree.js';
+import { translate } from '../utils/translate.js';
 
 export class CollectionImportExportService {
     /**
@@ -66,7 +67,7 @@ export class CollectionImportExportService {
     async handleGenerateDocumentation(collection) {
         try {
             if (!this.docGeneratorService.hasHttpEndpoints(collection)) {
-                toast.error(app.i18n?.t('docs.no_http_endpoints') || 'This collection has no HTTP requests to document');
+                toast.error(translate('docs.no_http_endpoints', 'This collection has no HTTP requests to document'));
                 return;
             }
 
@@ -101,9 +102,9 @@ export class CollectionImportExportService {
             const result = await this.backendAPI.docs.save(defaultFileName, content, mimeType);
 
             if (result && result.success) {
-                toast.success(app.i18n?.t('docs.success') || 'Documentation generated successfully');
+                toast.success(translate('docs.success', 'Documentation generated successfully'));
             } else if (result && !result.cancelled) {
-                toast.error(app.i18n?.t('docs.error') || 'Failed to generate documentation');
+                toast.error(translate('docs.error', 'Failed to generate documentation'));
             }
 
             this.statusDisplay.update('', null);
@@ -293,10 +294,7 @@ export class CollectionImportExportService {
             return;
         }
 
-        const endpoint = app.collectionController.endpointLoaderService.findEndpointInCollection(
-            collection,
-            endpointId
-        );
+        const endpoint = findRequest(collection, endpointId);
         if (!endpoint) {
             return;
         }

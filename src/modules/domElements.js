@@ -54,17 +54,7 @@ export const responsePerformanceDisplay = document.getElementById('response-perf
 
 export const languageSelector = document.getElementById('language-selector');
 
-export const requestTabButtons = document.querySelectorAll('.request-config .tab-button');
-
-export const requestTabContents = document.querySelectorAll('.request-config .tab-content');
-
-export const responseTabButtons = document.querySelectorAll('.response-tabs .tab-button');
-
 export const importCollectionBtn = document.getElementById('import-collection-btn');
-
-export const authTypeSelect = document.getElementById('auth-type-select');
-
-export const authFieldsContainer = document.getElementById('auth-fields-container');
 
 export const grpcTargetInput = document.getElementById('grpc-target-input');
 export const grpcTlsCheckbox = document.getElementById('grpc-tls-checkbox');

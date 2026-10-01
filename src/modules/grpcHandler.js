@@ -19,21 +19,23 @@ import {
 
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
+import { markTabModified } from './state/tabModified.js';
 import {
     displayResponseWithLineNumbersForTab,
     generateEffectiveAuthData,
     getRequestBuilderService,
-    isTabCurrentlyActive,
     setRequestInProgress,
     warnUnresolvedVariables
 } from './apiHandler.js';
 import { getSettings, resolveRequestSettings } from './state/settingsCache.js';
 import { newRequestId, trackInFlight } from './state/inFlightRequests.js';
 import { renderGrpcPanes } from './ResponseDisplayHelper.js';
+import { getActiveTabId, isTabCurrentlyActive } from './streaming/streamSession.js';
 import { startOrSend as grpcStreamStartOrSend } from './grpcStreamHandler.js';
 import { recordGrpcHistory } from './grpcHistory.js';
 import { createKeyValueRow } from './keyValueManager.js';
 import { getCurrentEndpoint } from './state/currentEndpoint.js';
+import { fileNameFromPath } from './utils/fileName.js';
 
 let methodsCache = new Map();
 const methodFlagsCache = new Map();
@@ -73,15 +75,6 @@ function addMetadataRow(key = '', value = '') {
     grpcMetadataList.appendChild(createKeyValueRow(key, value));
 }
 
-function clearMetadataList() {
-    if (!grpcMetadataList) {
-        return;
-    }
-    while (grpcMetadataList.firstChild) {
-        grpcMetadataList.removeChild(grpcMetadataList.firstChild);
-    }
-}
-
 /** @returns {Object<string, string>} */
 export function getGrpcMetadata() {
     const metadata = {};
@@ -99,7 +92,7 @@ export function getGrpcMetadata() {
 }
 
 export function setGrpcMetadata(metadataObj) {
-    clearMetadataList();
+    clearChildren(grpcMetadataList);
     if (metadataObj && typeof metadataObj === 'object') {
         Object.entries(metadataObj).forEach(([k, v]) => addMetadataRow(k, v));
     }
@@ -117,12 +110,24 @@ function setGrpcStatus(text, state = null) {
     }
 }
 
-function clearSelect(select) {
-    if (!select) {
+/**
+ * @param {string[]|null|undefined} includePaths
+ * @returns {string[]|null}
+ */
+function includePathsArg(includePaths) {
+    return includePaths?.length ? includePaths : null;
+}
+
+/**
+ * @param {HTMLElement|null} element
+ * @returns {void}
+ */
+function clearChildren(element) {
+    if (!element) {
         return;
     }
-    while (select.firstChild) {
-        select.removeChild(select.firstChild);
+    while (element.firstChild) {
+        element.removeChild(element.firstChild);
     }
 }
 
@@ -180,7 +185,7 @@ function updateMethodKindBadge(fullMethod) {
 }
 
 function populateMethodOptions(methods) {
-    clearSelect(grpcMethodSelect);
+    clearChildren(grpcMethodSelect);
     methodFlagsCache.clear();
     methods.forEach(m => {
         const label = `${m.name} (${m.inputType} → ${m.outputType})`;
@@ -243,8 +248,8 @@ export function applyGrpcState(grpcData) {
 
     methodsCache = new Map();
     methodFlagsCache.clear();
-    clearSelect(grpcServiceSelect);
-    clearSelect(grpcMethodSelect);
+    clearChildren(grpcServiceSelect);
+    clearChildren(grpcMethodSelect);
 
     ensureOption(grpcServiceSelect, data.service, data.service);
     ensureOption(grpcMethodSelect, data.fullMethod, data.fullMethod);
@@ -303,7 +308,7 @@ async function buildTlsOptions(target) {
 async function loadServices(target) {
     const tls = await buildTlsOptions(target);
     const services = await window.backendAPI.grpc.listServices(target, tls);
-    clearSelect(grpcServiceSelect);
+    clearChildren(grpcServiceSelect);
     services.forEach(svc => addOption(grpcServiceSelect, svc, svc));
     return services;
 }
@@ -470,7 +475,7 @@ async function ensureProtoLoaded() {
         if (Array.isArray(loaded) && loaded.includes(protoPath)) {
             return true;
         }
-        await window.backendAPI.grpc.parseProtoFile(protoPath, activeSource.includePaths.length ? activeSource.includePaths : null);
+        await window.backendAPI.grpc.parseProtoFile(protoPath, includePathsArg(activeSource.includePaths));
         return true;
     } catch (error) {
         const msg = error.message || String(error);
@@ -559,9 +564,7 @@ export async function handleGrpcSend() {
     }
 
     const startedAt = Date.now();
-    const requestTabId = app.workspaceTabController
-        ? await app.workspaceTabController.service.getActiveTabId()
-        : null;
+    const requestTabId = await getActiveTabId();
     const requestId = newRequestId();
     const untrack = trackInFlight(requestTabId, requestId);
     const { timeout } = await resolveRequestSettings();
@@ -667,13 +670,13 @@ export async function loadProtoFile(protoPath, includePaths = null) {
         }
         updateStatusDisplay('Parsing proto file...', null);
 
-        const protoInfo = await window.backendAPI.grpc.parseProtoFile(protoPath, includePaths?.length ? includePaths : null);
+        const protoInfo = await window.backendAPI.grpc.parseProtoFile(protoPath, includePathsArg(includePaths));
 
         setActiveSource('proto', protoPath, includePaths || []);
         setGrpcStatus('', 'idle');
         methodsCache = new Map();
 
-        clearSelect(grpcServiceSelect);
+        clearChildren(grpcServiceSelect);
         protoInfo.services.forEach(svc => addOption(grpcServiceSelect, svc.fullName, svc.name));
 
         if (protoInfo.services.length > 0) {
@@ -707,8 +710,8 @@ function clearProtoFile() {
     setActiveSource('none', null);
     methodsCache = new Map();
     methodFlagsCache.clear();
-    clearSelect(grpcServiceSelect);
-    clearSelect(grpcMethodSelect);
+    clearChildren(grpcServiceSelect);
+    clearChildren(grpcMethodSelect);
     updateMethodKindBadge(null);
     updateStatusDisplay('Proto file cleared', null);
 }
@@ -745,17 +748,13 @@ export function initGrpcUI() {
 
     if (grpcTlsCheckbox) {
         grpcTlsCheckbox.addEventListener('change', () => {
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
+            markTabModified();
         });
     }
 
     if (grpcTargetInput) {
         grpcTargetInput.addEventListener('input', () => {
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
+            markTabModified();
         });
         if (!grpcTargetInput.value) {
             grpcTargetInput.value = 'grpcb.in:9000';
@@ -764,34 +763,28 @@ export function initGrpcUI() {
 
     if (grpcServiceSelect) {
         grpcServiceSelect.addEventListener('change', () => {
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
+            markTabModified();
         });
     }
 
     if (grpcMethodSelect) {
         grpcMethodSelect.addEventListener('change', () => {
             updateMethodKindBadge(grpcMethodSelect.value);
-            if (app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
-            }
+            markTabModified();
         });
     }
 
     const grpcMetadataList = document.getElementById('grpc-metadata-list');
     if (grpcMetadataList) {
         grpcMetadataList.addEventListener('input', (event) => {
-            if ((event.target.classList.contains('key-input') || event.target.classList.contains('value-input')) &&
-                app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
+            if (event.target.classList.contains('key-input') || event.target.classList.contains('value-input')) {
+                markTabModified();
             }
         });
 
         grpcMetadataList.addEventListener('click', (event) => {
-            if (event.target.closest('.remove-row-btn')
-                && app.workspaceTabController && !app.workspaceTabController.isRestoringState) {
-                app.workspaceTabController.markCurrentTabModified();
+            if (event.target.closest('.remove-row-btn')) {
+                markTabModified();
             }
         });
     }
@@ -902,7 +895,7 @@ function renderIncludePaths(includePaths, visible) {
     }
     list.hidden = includePaths.length === 0;
     list.textContent = includePaths.length
-        ? `Import paths: ${includePaths.map(p => p.split(/[/\\]/).filter(Boolean).pop() || p).join(', ')}`
+        ? `Import paths: ${includePaths.map(fileNameFromPath).join(', ')}`
         : '';
     list.title = includePaths.join('\n');
 }

@@ -3,8 +3,6 @@
  * @module services/ProxyService
  */
 
-import { ChangeEmitter } from './ChangeEmitter.js';
-
 export class ProxyService {
     /**
      * @param {ProxyRepository} proxyRepository
@@ -13,33 +11,6 @@ export class ProxyService {
     constructor(proxyRepository, statusDisplay) {
         this.repository = proxyRepository;
         this.statusDisplay = statusDisplay;
-        this._events = new ChangeEmitter();
-    }
-
-    /**
-     * @param {Function} callback
-     * @param {Object} callback.event
-     * @param {string} callback.event.type
-     * @returns {void}
-     */
-    addChangeListener(callback) {
-        this._events.add(callback);
-    }
-
-    /**
-     * @param {Function} callback
-     * @returns {void}
-     */
-    removeChangeListener(callback) {
-        this._events.remove(callback);
-    }
-
-    /**
-     * @param {Object} event
-     * @returns {void}
-     */
-    _notifyListeners(event) {
-        this._events.emit(event);
     }
 
     /** @returns {Promise<Object>} */
@@ -67,95 +38,7 @@ export class ProxyService {
             throw new Error(validationErrors.join('; '));
         }
 
-        const updatedSettings = await this.repository.saveProxySettings(settings);
-
-        this._notifyListeners({
-            type: 'proxy-settings-updated',
-            settings: updatedSettings
-        });
-
-        return updatedSettings;
-    }
-
-    async resetToDefaults() {
-        const defaultSettings = await this.repository.resetToDefaults();
-
-        this._notifyListeners({
-            type: 'proxy-settings-reset',
-            settings: defaultSettings
-        });
-
-        return defaultSettings;
-    }
-
-    async isEnabled() {
-        try {
-            return await this.repository.isProxyEnabled();
-        } catch (error) {
-            return false;
-        }
-    }
-
-    shouldBypassProxy(url, bypassList) {
-        if (!url || !Array.isArray(bypassList) || bypassList.length === 0) {
-            return false;
-        }
-
-        try {
-            const urlObj = new URL(url);
-            const {hostname} = urlObj;
-
-            return bypassList.some(pattern => {
-                const cleanPattern = pattern.trim();
-                if (!cleanPattern) {return false;}
-
-                if (cleanPattern === hostname) {return true;}
-
-                if (cleanPattern.startsWith('*.')) {
-                    const domain = cleanPattern.substring(2);
-                    return hostname.endsWith(domain);
-                }
-
-                if (cleanPattern.startsWith('.')) {
-                    return hostname.endsWith(cleanPattern);
-                }
-
-                return false;
-            });
-        } catch (error) {
-            return false;
-        }
-    }
-
-    async getAxiosProxyConfig(requestUrl) {
-        try {
-            const settings = await this.repository.getProxySettings();
-
-            if (!settings.enabled) {
-                return null;
-            }
-
-            if (this.shouldBypassProxy(requestUrl, settings.bypassList)) {
-                return null;
-            }
-
-            const proxyConfig = {
-                protocol: settings.type,
-                host: settings.host,
-                port: settings.port
-            };
-
-            if (settings.auth.enabled && settings.auth.username) {
-                proxyConfig.auth = {
-                    username: settings.auth.username,
-                    password: settings.auth.password || ''
-                };
-            }
-
-            return proxyConfig;
-        } catch (error) {
-            return null;
-        }
+        return this.repository.saveProxySettings(settings);
     }
 
     validateSettings(settings) {

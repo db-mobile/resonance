@@ -9,24 +9,31 @@ import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanc
 
 /**
  * @param {string|null} tabId
+ * @returns {Object|null|undefined}
+ */
+export function responseContainerFor(tabId) {
+    return tabId
+        ? app.responseContainerManager?.getOrCreateContainer(tabId)
+        : app.responseContainerManager?.getActiveElements();
+}
+
+/**
+ * @param {string|null} tabId
  * @param {Object} globalElements
  * @param {HTMLElement} [globalElements.headersDisplay]
  * @param {HTMLElement} [globalElements.cookiesDisplay]
  * @param {HTMLElement} [globalElements.performanceDisplay]
- * @returns {{ headersEditor: Object|null, cookiesDisplay: HTMLElement|null, performanceDisplay: HTMLElement|null, isPerTab: boolean }}
+ * @returns {{ headersEditor: Object|null, cookiesDisplay: HTMLElement|null, performanceDisplay: HTMLElement|null, _headersDisplayFallback?: HTMLElement|null }}
  */
 function getResponseElements(tabId, globalElements = {}) {
-    const containerElements = tabId
-        ? app.responseContainerManager?.getOrCreateContainer(tabId)
-        : app.responseContainerManager?.getActiveElements();
+    const containerElements = responseContainerFor(tabId);
 
     if (containerElements) {
         containerElements.renderedResponse = null;
         return {
             headersEditor: containerElements.headersEditor || null,
             cookiesDisplay: containerElements.cookiesDisplay || null,
-            performanceDisplay: containerElements.performanceDisplay || null,
-            isPerTab: true
+            performanceDisplay: containerElements.performanceDisplay || null
         };
     }
 
@@ -34,9 +41,38 @@ function getResponseElements(tabId, globalElements = {}) {
         headersEditor: null,
         cookiesDisplay: globalElements.cookiesDisplay || null,
         performanceDisplay: globalElements.performanceDisplay || null,
-        _headersDisplayFallback: globalElements.headersDisplay || null,
-        isPerTab: false
+        _headersDisplayFallback: globalElements.headersDisplay || null
     };
+}
+
+/**
+ * @param {Object} els
+ * @param {string} text
+ * @returns {void}
+ */
+function writeHeadersText(els, text) {
+    if (els.headersEditor) {
+        els.headersEditor.setContent(text, 'application/json');
+    } else if (els._headersDisplayFallback) {
+        els._headersDisplayFallback.textContent = text;
+    }
+}
+
+/**
+ * @param {Object} els
+ * @param {Object|null|undefined} timings
+ * @param {number|null|undefined} size
+ * @returns {void}
+ */
+function writePerformance(els, timings, size) {
+    if (!els.performanceDisplay) {
+        return;
+    }
+    if (timings) {
+        displayPerformanceMetrics(els.performanceDisplay, timings, size);
+    } else {
+        clearPerformanceMetrics(els.performanceDisplay);
+    }
 }
 
 /**
@@ -46,15 +82,9 @@ function getResponseElements(tabId, globalElements = {}) {
 export function clearResponsePanes(tabId, globalElements = {}) {
     const els = getResponseElements(tabId, globalElements);
 
-    if (els.isPerTab) {
-        if (els.headersEditor) { els.headersEditor.setContent('', 'application/json'); }
-        if (els.cookiesDisplay) { renderCookies(els.cookiesDisplay, []); }
-        if (els.performanceDisplay) { clearPerformanceMetrics(els.performanceDisplay); }
-    } else {
-        if (els._headersDisplayFallback) { els._headersDisplayFallback.textContent = ''; }
-        if (els.cookiesDisplay) { renderCookies(els.cookiesDisplay, []); }
-        if (els.performanceDisplay) { clearPerformanceMetrics(els.performanceDisplay); }
-    }
+    writeHeadersText(els, '');
+    if (els.cookiesDisplay) { renderCookies(els.cookiesDisplay, []); }
+    if (els.performanceDisplay) { clearPerformanceMetrics(els.performanceDisplay); }
 }
 
 /**
@@ -73,26 +103,14 @@ export function displayResponsePanes(tabId, globalElements, { headers, timings, 
         ? JSON.stringify(headers, null, 2)
         : '';
 
-    if (els.isPerTab) {
-        if (els.headersEditor) {
-            els.headersEditor.setContent(headersString || 'No response headers.', 'application/json');
-        }
-    } else if (els._headersDisplayFallback) {
-        els._headersDisplayFallback.textContent = headersString || 'No response headers.';
-    }
+    writeHeadersText(els, headersString || 'No response headers.');
 
     const cookies = responseCookies({ headers, setCookies });
     if (els.cookiesDisplay) {
         renderCookies(els.cookiesDisplay, cookies);
     }
 
-    if (timings) {
-        if (els.performanceDisplay) {
-            displayPerformanceMetrics(els.performanceDisplay, timings, size);
-        }
-    } else if (els.performanceDisplay) {
-        clearPerformanceMetrics(els.performanceDisplay);
-    }
+    writePerformance(els, timings, size);
 }
 
 /**
@@ -108,19 +126,9 @@ export function displayErrorResponsePanes(tabId, globalElements, error) {
 
     if (error.headers && Object.keys(error.headers).length > 0) {
         try {
-            const headersText = JSON.stringify(error.headers, null, 2);
-            if (els.isPerTab && els.headersEditor) {
-                els.headersEditor.setContent(headersText, 'application/json');
-            } else if (els._headersDisplayFallback) {
-                els._headersDisplayFallback.textContent = headersText;
-            }
+            writeHeadersText(els, JSON.stringify(error.headers, null, 2));
         } catch {
-            const fallbackText = 'Error parsing response headers.';
-            if (els.isPerTab && els.headersEditor) {
-                els.headersEditor.setContent(fallbackText, 'application/json');
-            } else if (els._headersDisplayFallback) {
-                els._headersDisplayFallback.textContent = fallbackText;
-            }
+            writeHeadersText(els, 'Error parsing response headers.');
         }
 
         const cookies = responseCookies(error);
@@ -128,25 +136,14 @@ export function displayErrorResponsePanes(tabId, globalElements, error) {
             renderCookies(els.cookiesDisplay, cookies);
         }
     } else {
-        const noHeadersText = 'No headers available for error response.';
-        if (els.isPerTab && els.headersEditor) {
-            els.headersEditor.setContent(noHeadersText, 'application/json');
-        } else if (els._headersDisplayFallback) {
-            els._headersDisplayFallback.textContent = noHeadersText;
-        }
+        writeHeadersText(els, 'No headers available for error response.');
 
         if (els.cookiesDisplay) {
             renderCookies(els.cookiesDisplay, []);
         }
     }
 
-    if (error.timings) {
-        if (els.performanceDisplay) {
-            displayPerformanceMetrics(els.performanceDisplay, error.timings, error.size);
-        }
-    } else if (els.performanceDisplay) {
-        clearPerformanceMetrics(els.performanceDisplay);
-    }
+    writePerformance(els, error.timings, error.size);
 }
 
 /**
@@ -159,9 +156,9 @@ export function renderGrpcPanes(containerElements, { metadata, trailers }) {
         return;
     }
     if (containerElements.metadataDisplay) {
-        containerElements.metadataDisplay.textContent = JSON.stringify(metadata || {}, null, 2) || 'No metadata.';
+        containerElements.metadataDisplay.textContent = JSON.stringify(metadata || {}, null, 2);
     }
     if (containerElements.trailersDisplay) {
-        containerElements.trailersDisplay.textContent = JSON.stringify(trailers || {}, null, 2) || 'No trailers.';
+        containerElements.trailersDisplay.textContent = JSON.stringify(trailers || {}, null, 2);
     }
 }

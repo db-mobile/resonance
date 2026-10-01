@@ -216,15 +216,6 @@ export class MockServerService {
     }
 
     /**
-     * @param {string} _collectionId
-     * @param {string} _endpointId
-     * @returns {Promise<Object|null>}
-     */
-    async getDefaultResponse(_collectionId, _endpointId) {
-        return null;
-    }
-
-    /**
      * @param {string} collectionId
      * @param {string} endpointId
      * @param {number|null} statusCode

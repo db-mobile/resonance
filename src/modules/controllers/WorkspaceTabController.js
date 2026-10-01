@@ -33,6 +33,93 @@ const DEFAULT_GRAPHQL_VARIABLES = `{
   "code": "DE"
 }`;
 
+/** @type {ReadonlyArray<string>} */
+const REQUEST_PANEL_SELECTORS = Object.freeze(['.request-builder', '.request-config', '.resizer-handle', '.response-area']);
+
+/**
+ * @param {HTMLElement} mainContentArea
+ * @param {boolean} hidden
+ * @returns {void}
+ */
+function setRequestPanelsHidden(mainContentArea, hidden) {
+    for (const selector of REQUEST_PANEL_SELECTORS) {
+        mainContentArea.querySelector(selector)?.classList.toggle('is-hidden', hidden);
+    }
+}
+
+/**
+ * @param {'websocket'|'sse'} protocol
+ * @param {string} method
+ * @returns {Object}
+ */
+function streamTabRequest(protocol, method) {
+    return {
+        protocol,
+        url: '',
+        method,
+        pathParams: {},
+        queryParams: {},
+        headers: {},
+        body: { mode: 'json', content: '' },
+        authType: 'none',
+        authConfig: {}
+    };
+}
+
+/** @type {ReadonlyMap<string, {name: string, request: function(): Object}>} */
+const NEW_TAB_DEFAULTS = new Map([
+    ['websocket', { name: 'New WebSocket', request: () => streamTabRequest('websocket', 'WS') }],
+    ['sse', { name: 'New SSE', request: () => streamTabRequest('sse', 'GET') }],
+    ['grpc', {
+        name: 'New gRPC',
+        request: () => ({
+            protocol: 'grpc',
+            grpc: {
+                target: '',
+                service: '',
+                fullMethod: '',
+                requestJson: '{}',
+                metadata: {},
+                useTls: false,
+                protoPath: null,
+                clientStreaming: false,
+                serverStreaming: false
+            }
+        })
+    }],
+    ['graphql', {
+        name: 'New GraphQL',
+        request: () => ({
+            protocol: 'graphql',
+            url: DEFAULT_GRAPHQL_URL,
+            method: 'POST',
+            query: DEFAULT_GRAPHQL_QUERY,
+            variables: DEFAULT_GRAPHQL_VARIABLES,
+            operationName: null,
+            headers: {},
+            authType: 'none',
+            authConfig: {}
+        })
+    }],
+    ['mqtt', {
+        name: 'New MQTT',
+        request: () => ({
+            protocol: 'mqtt',
+            broker: '',
+            method: 'MQTT',
+            clientId: '',
+            username: '',
+            password: '',
+            subscribeTopic: '',
+            publishTopic: '',
+            qos: 0,
+            body: { mode: 'json', content: '' },
+            authType: 'none',
+            authConfig: {}
+        })
+    }]
+]);
+
 export class WorkspaceTabController {
     /**
      * @param {WorkspaceTabService} service
@@ -129,14 +216,7 @@ export class WorkspaceTabController {
             if (activeTabId) {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab) {
-                    this._updateUIForTabType(activeTab);
-
-                    if (activeTab.type === 'runner') {
-                        await this._initializeRunnerTab(activeTabId);
-                    } else {
-                        this.responseContainerManager.showContainer(activeTabId);
-                        await this._restoreTabStateSafely(activeTab);
-                    }
+                    await this._activateTab(activeTab);
                 }
             }
         } catch (error) {
@@ -163,77 +243,10 @@ export class WorkspaceTabController {
 
             const { protocol = 'http', ...tabOptions } = options;
 
-            if (protocol === 'websocket') {
-                tabOptions.name = tabOptions.name || 'New WebSocket';
-                tabOptions.request = {
-                    protocol: 'websocket',
-                    url: '',
-                    method: 'WS',
-                    pathParams: {},
-                    queryParams: {},
-                    headers: {},
-                    body: { mode: 'json', content: '' },
-                    authType: 'none',
-                    authConfig: {}
-                };
-            } else if (protocol === 'sse') {
-                tabOptions.name = tabOptions.name || 'New SSE';
-                tabOptions.request = {
-                    protocol: 'sse',
-                    url: '',
-                    method: 'GET',
-                    pathParams: {},
-                    queryParams: {},
-                    headers: {},
-                    body: { mode: 'json', content: '' },
-                    authType: 'none',
-                    authConfig: {}
-                };
-            } else if (protocol === 'grpc') {
-                tabOptions.name = tabOptions.name || 'New gRPC';
-                tabOptions.request = {
-                    protocol: 'grpc',
-                    grpc: {
-                        target: '',
-                        service: '',
-                        fullMethod: '',
-                        requestJson: '{}',
-                        metadata: {},
-                        useTls: false,
-                        protoPath: null,
-                        clientStreaming: false,
-                        serverStreaming: false
-                    }
-                };
-            } else if (protocol === 'graphql') {
-                tabOptions.name = tabOptions.name || 'New GraphQL';
-                tabOptions.request = {
-                    protocol: 'graphql',
-                    url: DEFAULT_GRAPHQL_URL,
-                    method: 'POST',
-                    query: DEFAULT_GRAPHQL_QUERY,
-                    variables: DEFAULT_GRAPHQL_VARIABLES,
-                    operationName: null,
-                    headers: {},
-                    authType: 'none',
-                    authConfig: {}
-                };
-            } else if (protocol === 'mqtt') {
-                tabOptions.name = tabOptions.name || 'New MQTT';
-                tabOptions.request = {
-                    protocol: 'mqtt',
-                    broker: '',
-                    method: 'MQTT',
-                    clientId: '',
-                    username: '',
-                    password: '',
-                    subscribeTopic: '',
-                    publishTopic: '',
-                    qos: 0,
-                    body: { mode: 'json', content: '' },
-                    authType: 'none',
-                    authConfig: {}
-                };
+            const defaults = NEW_TAB_DEFAULTS.get(protocol);
+            if (defaults) {
+                tabOptions.name = tabOptions.name || defaults.name;
+                tabOptions.request = defaults.request();
             }
 
             const newTab = await this.service.createTab(tabOptions);
@@ -299,15 +312,7 @@ export class WorkspaceTabController {
         const mainContentArea = document.getElementById('main-content-area');
         if (!mainContentArea) {return;}
 
-        const requestBuilder = mainContentArea.querySelector('.request-builder');
-        const requestConfig = mainContentArea.querySelector('.request-config');
-        const resizerHandle = mainContentArea.querySelector('.resizer-handle');
-        const responseArea = mainContentArea.querySelector('.response-area');
-
-        if (requestBuilder) {requestBuilder.classList.add('is-hidden');}
-        if (requestConfig) {requestConfig.classList.add('is-hidden');}
-        if (resizerHandle) {resizerHandle.classList.add('is-hidden');}
-        if (responseArea) {responseArea.classList.add('is-hidden');}
+        setRequestPanelsHidden(mainContentArea, true);
 
         let runnerContainer = document.getElementById(`runner-container-${tabId}`);
         if (!runnerContainer) {
@@ -386,29 +391,13 @@ export class WorkspaceTabController {
         const mainContentArea = document.getElementById('main-content-area');
         if (!mainContentArea) {return;}
 
-        const requestBuilder = mainContentArea.querySelector('.request-builder');
-        const requestConfig = mainContentArea.querySelector('.request-config');
-        const resizerHandle = mainContentArea.querySelector('.resizer-handle');
-        const responseArea = mainContentArea.querySelector('.response-area');
-
         const runnerContainers = mainContentArea.querySelectorAll('[id^="runner-container-"]');
         runnerContainers.forEach(c => c.classList.add('is-hidden'));
 
-        if (tab.type === 'runner') {
-            if (requestBuilder) {requestBuilder.classList.add('is-hidden');}
-            if (requestConfig) {requestConfig.classList.add('is-hidden');}
-            if (resizerHandle) {resizerHandle.classList.add('is-hidden');}
-            if (responseArea) {responseArea.classList.add('is-hidden');}
-
-            const runnerContainer = document.getElementById(`runner-container-${tab.id}`);
-            if (runnerContainer) {
-                runnerContainer.classList.remove('is-hidden');
-            }
-        } else {
-            if (requestBuilder) {requestBuilder.classList.remove('is-hidden');}
-            if (requestConfig) {requestConfig.classList.remove('is-hidden');}
-            if (resizerHandle) {resizerHandle.classList.remove('is-hidden');}
-            if (responseArea) {responseArea.classList.remove('is-hidden');}
+        const isRunner = tab.type === 'runner';
+        setRequestPanelsHidden(mainContentArea, isRunner);
+        if (isRunner) {
+            document.getElementById(`runner-container-${tab.id}`)?.classList.remove('is-hidden');
         }
     }
 

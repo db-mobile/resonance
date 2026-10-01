@@ -53,6 +53,24 @@ describe('CollectionRepository.close', () => {
         await repository.delete('c1');
 
         expect(secretStore.deleteScopePrefix).toHaveBeenCalledWith('auth:c1:');
+        expect(secretStore.deleteScopePrefix).toHaveBeenCalledWith('mqtt:c1:');
+    });
+
+    test('deleting a request or folder purges its auth and MQTT secrets', async () => {
+        secretStore.deleteScope = jest.fn().mockResolvedValue(undefined);
+        backendAPI.collections.deleteEndpointData = jest.fn().mockResolvedValue(undefined);
+        backendAPI.collections.deleteFolder = jest.fn().mockResolvedValue(['e2']);
+
+        await repository.deletePersistedEndpointData('c1', 'e1');
+        await repository.deleteFolder('c1', 'f1');
+
+        expect(secretStore.deleteScope.mock.calls.map(([scope]) => scope)).toEqual([
+            'auth:c1:e1',
+            'mqtt:c1:e1',
+            expect.stringContaining('c1'),
+            'auth:c1:e2',
+            'mqtt:c1:e2'
+        ]);
     });
 
     test('openExisting passes the picked path straight through', async () => {

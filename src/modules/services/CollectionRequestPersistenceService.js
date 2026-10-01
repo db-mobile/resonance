@@ -4,7 +4,7 @@
  */
 
 import { app } from '../appContext.js';
-import { getRequestBodyContent } from '../requestBodyHelper.js';
+import { captureFormBody, getRequestBodyContent } from '../requestBodyHelper.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
 import { findRequest, updateRequest } from '../collections/collectionTree.js';
 
@@ -353,34 +353,10 @@ export class CollectionRequestPersistenceService {
 
         if (bodyInput) {
             const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
-            if (bodyMode === 'formdata' && app.formBodyManager) {
-                updatedRequest.body = {
-                    mode: 'formdata',
-                    fields: app.formBodyManager.getFormDataRows()
-                };
-            } else if (bodyMode === 'urlencoded' && app.formBodyManager) {
-                updatedRequest.body = {
-                    mode: 'urlencoded',
-                    fields: app.formBodyManager.getUrlencodedRows()
-                };
-            } else if (bodyMode === 'binary' && app.formBodyManager) {
-                updatedRequest.body = {
-                    mode: 'binary',
-                    ...app.formBodyManager.getBinaryBody()
-                };
-            } else if (bodyMode === 'text') {
-                updatedRequest.body = {
-                    mode: 'text',
-                    content: app.requestBodyTextEditor
-                        ? app.requestBodyTextEditor.getContent()
-                        : ''
-                };
-            } else {
-                updatedRequest.body = {
-                    mode: 'json',
-                    content: getRequestBodyContent()
-                };
-            }
+            updatedRequest.body = captureFormBody(bodyMode) ?? {
+                mode: 'json',
+                content: getRequestBodyContent()
+            };
             hasChanges = true;
         }
 

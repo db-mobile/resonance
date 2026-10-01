@@ -6,10 +6,10 @@ import { displayResponseWithLineNumbersForTab, clearResponseDisplayForTab, clear
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
-import { formatCookiesAsHtml } from './cookieParser.js';
+import { renderCookies } from './cookieParser.js';
 import { renderGrpcPanes } from './ResponseDisplayHelper.js';
 import { activateTab } from './tabManager.js';
-import { setRequestBodyContent, getRequestBodyContent } from './requestBodyHelper.js';
+import { captureFormBody, setRequestBodyContent, getRequestBodyContent } from './requestBodyHelper.js';
 import { setRequestMode, RequestMode, getCurrentMode } from './requestModeManager.js';
 import { getProtocol, resolveProtocolId } from './protocols/protocolRegistry.js';
 
@@ -199,23 +199,7 @@ export class WorkspaceTabStateManager {
     /** @returns {Object} */
     _captureHttpBody() {
         const currentBodyMode = document.getElementById('body-mode-select')?.value || 'json';
-
-        if (currentBodyMode === 'formdata' && app.formBodyManager) {
-            return { mode: 'formdata', fields: app.formBodyManager.getFormDataRows() };
-        }
-        if (currentBodyMode === 'urlencoded' && app.formBodyManager) {
-            return { mode: 'urlencoded', fields: app.formBodyManager.getUrlencodedRows() };
-        }
-        if (currentBodyMode === 'binary' && app.formBodyManager) {
-            return { mode: 'binary', ...app.formBodyManager.getBinaryBody() };
-        }
-        if (currentBodyMode === 'text') {
-            return {
-                mode: 'text',
-                content: app.requestBodyTextEditor ? app.requestBodyTextEditor.getContent() : ''
-            };
-        }
-        return { mode: 'json', content: getRequestBodyContent() || '' };
+        return captureFormBody(currentBodyMode) ?? { mode: 'json', content: getRequestBodyContent() || '' };
     }
 
     /** @returns {Object} */
@@ -684,13 +668,7 @@ export class WorkspaceTabStateManager {
             }
         }
 
-        if (containerElements?.cookiesDisplay) {
-            if (response.cookies && response.cookies.length > 0) {
-                containerElements.cookiesDisplay.innerHTML = formatCookiesAsHtml(response.cookies);
-            } else {
-                containerElements.cookiesDisplay.innerHTML = '<div class="cookies-empty">No cookies in response</div>';
-            }
-        }
+        renderCookies(containerElements?.cookiesDisplay, response.cookies);
 
         if (containerElements?.performanceDisplay) {
             if (response.performanceHTML) {

@@ -15,7 +15,6 @@ import { CollectionService } from '../services/CollectionService.js';
 import { CollectionEndpointLoaderService } from '../services/CollectionEndpointLoaderService.js';
 import { CollectionImportExportService } from '../services/CollectionImportExportService.js';
 import { CollectionRequestPersistenceService } from '../services/CollectionRequestPersistenceService.js';
-import { CollectionVariableApplicationService } from '../services/CollectionVariableApplicationService.js';
 import { VariableService } from '../services/VariableService.js';
 import { CollectionRenderer } from '../ui/CollectionRenderer.js';
 import { ContextMenu } from '../ui/ContextMenu.js';
@@ -29,7 +28,7 @@ import { toast } from '../ui/Toast.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { setRequestBodyContent } from '../requestBodyHelper.js';
 import { ChangeEmitter } from '../services/ChangeEmitter.js';
-import { flattenRequests, requestsInFolder, folderChainForRequest, folderOutline } from '../collections/collectionTree.js';
+import { flattenRequests, requestsInFolder, folderChainForRequest, folderOutline, endpointKey } from '../collections/collectionTree.js';
 import { MoveRequestDialog } from '../ui/MoveRequestDialog.js';
 import { isRunnable } from '../utils/runnableRequests.js';
 import { translate } from '../utils/translate.js';
@@ -91,9 +90,6 @@ export class CollectionController {
             refreshCollections: (preserveExpansionState = false) => preserveExpansionState
                 ? this.loadCollectionsWithExpansionState()
                 : this.loadCollections()
-        });
-        this.variableApplicationService = new CollectionVariableApplicationService({
-            variableService: this.variableService
         });
         this.requestPersistenceService = new CollectionRequestPersistenceService({
             repository: this.repository,
@@ -188,23 +184,23 @@ export class CollectionController {
 
     /** @returns {Promise<Array<Object>>} */
     async loadCollections() {
-        try {
-            this.allCollections = await this.service.loadCollections();
-            await this._refreshLoadErrors();
-            await this.renderCollections(this.allCollections);
-            this._collectionEvents.emit(this.allCollections);
-            return this.allCollections;
-        } catch (error) {
-            return [];
-        }
+        return this._reload(false);
     }
 
     /** @returns {Promise<Array<Object>>} */
     async loadCollectionsWithExpansionState() {
+        return this._reload(true);
+    }
+
+    /**
+     * @param {boolean} preserveExpansionState
+     * @returns {Promise<Array<Object>>}
+     */
+    async _reload(preserveExpansionState) {
         try {
             this.allCollections = await this.service.loadCollections();
             await this._refreshLoadErrors();
-            await this.renderCollections(this.allCollections, true);
+            await this.renderCollections(this.allCollections, preserveExpansionState);
             this._collectionEvents.emit(this.allCollections);
             return this.allCollections;
         } catch (error) {
@@ -446,7 +442,7 @@ export class CollectionController {
      */
     async handleEndpointContextMenu(event, collection, endpoint) {
         const pinned = await this._getPinnedRequestsCached();
-        const isPinned = !!pinned[`${collection.id}_${endpoint.id}`];
+        const isPinned = !!pinned[endpointKey(collection.id, endpoint.id)];
         const menuItems = [
             {
                 label: isPinned ? 'Unpin Request' : 'Pin Request',
@@ -488,7 +484,7 @@ export class CollectionController {
         const isPinned = await this.repository.togglePinnedRequest(collection.id, endpoint.id);
 
         const pinned = await this._getPinnedRequestsCached();
-        const key = `${collection.id}_${endpoint.id}`;
+        const key = endpointKey(collection.id, endpoint.id);
         if (isPinned) {
             pinned[key] = true;
         } else {
@@ -880,21 +876,17 @@ export class CollectionController {
      * @returns {Promise<void>}
      */
     async handleClose(collection) {
-        const confirmMessage = app.i18n ?
-            app.i18n.t('collection.confirm_close', { name: collection.name }) :
-            `Remove "${collection.name}" from the list?\n\nThe folder and its files stay on disk, and stored credentials are kept. You can open it again later.`;
+        const confirmMessage = translate(
+            'collection.confirm_close',
+            'Remove "{{name}}" from the list?\n\nThe folder and its files stay on disk, and stored credentials are kept. You can open it again later.',
+            { name: collection.name }
+        );
 
-        const title = app.i18n ?
-            app.i18n.t('collection.close_title') || 'Close Collection' :
-            'Close Collection';
+        const title = translate('collection.close_title', 'Close Collection');
 
-        const confirmText = app.i18n ?
-            app.i18n.t('common.close') || 'Close' :
-            'Close';
+        const confirmText = translate('common.close', 'Close');
 
-        const cancelText = app.i18n ?
-            app.i18n.t('common.cancel') || 'Cancel' :
-            'Cancel';
+        const cancelText = translate('common.cancel', 'Cancel');
 
         const confirmed = await this.confirmDialog.show(confirmMessage, {
             title,
@@ -1006,21 +998,17 @@ export class CollectionController {
      * @returns {Promise<void>}
      */
     async handleDelete(collection) {
-        const confirmMessage = app.i18n ?
-            app.i18n.t('collection.confirm_delete', { name: collection.name }) :
-            `Are you sure you want to delete the collection "${collection.name}"?\n\nThis action cannot be undone.`;
+        const confirmMessage = translate(
+            'collection.confirm_delete',
+            'Are you sure you want to delete the collection "{{name}}"?\n\nThis action cannot be undone.',
+            { name: collection.name }
+        );
 
-        const title = app.i18n ?
-            app.i18n.t('collection.delete_title') || 'Delete Collection' :
-            'Delete Collection';
+        const title = translate('collection.delete_title', 'Delete Collection');
 
-        const confirmText = app.i18n ?
-            app.i18n.t('common.delete') || 'Delete' :
-            'Delete';
+        const confirmText = translate('common.delete', 'Delete');
 
-        const cancelText = app.i18n ?
-            app.i18n.t('common.cancel') || 'Cancel' :
-            'Cancel';
+        const cancelText = translate('common.cancel', 'Cancel');
 
         const confirmed = await this.confirmDialog.show(confirmMessage, {
             title,
@@ -1076,17 +1064,11 @@ export class CollectionController {
      */
     async handleRenameRequest(collection, endpoint) {
         try {
-            const title = app.i18n ?
-                app.i18n.t('endpoint.rename_title') || 'Rename Request' :
-                'Rename Request';
+            const title = translate('endpoint.rename_title', 'Rename Request');
 
-            const label = app.i18n ?
-                app.i18n.t('endpoint.rename_label') || 'Request Name:' :
-                'Request Name:';
+            const label = translate('endpoint.rename_label', 'Request Name:');
 
-            const confirmText = app.i18n ?
-                app.i18n.t('common.rename') || 'Rename' :
-                'Rename';
+            const confirmText = translate('common.rename', 'Rename');
 
             const currentName = endpoint.name || endpoint.path;
             const newName = await this.renameDialog.show(currentName, {
@@ -1125,21 +1107,17 @@ export class CollectionController {
      * @returns {Promise<void>}
      */
     async handleDeleteRequest(collection, endpoint) {
-        const confirmMessage = app.i18n ?
-            app.i18n.t('endpoint.confirm_delete', { name: endpoint.name || endpoint.path }) :
-            `Are you sure you want to delete the request "${endpoint.name || endpoint.path}"?\n\nThis action cannot be undone.`;
+        const confirmMessage = translate(
+            'endpoint.confirm_delete',
+            'Are you sure you want to delete the request "{{name}}"?\n\nThis action cannot be undone.',
+            { name: endpoint.name || endpoint.path }
+        );
 
-        const title = app.i18n ?
-            app.i18n.t('endpoint.delete_title') || 'Delete Request' :
-            'Delete Request';
+        const title = translate('endpoint.delete_title', 'Delete Request');
 
-        const confirmText = app.i18n ?
-            app.i18n.t('common.delete') || 'Delete' :
-            'Delete';
+        const confirmText = translate('common.delete', 'Delete');
 
-        const cancelText = app.i18n ?
-            app.i18n.t('common.cancel') || 'Cancel' :
-            'Cancel';
+        const cancelText = translate('common.cancel', 'Cancel');
 
         const confirmed = await this.confirmDialog.show(confirmMessage, {
             title,
@@ -1240,17 +1218,6 @@ export class CollectionController {
             await this._debouncedSaveBody.flush();
         }
         await this._inFlightBodySave;
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {Object} formElements
-     * @returns {Promise<void>}
-     */
-    async processFormVariables(collectionId, formElements) {
-        await this.variableApplicationService.processFormVariables(collectionId, formElements, {
-            includeUrl: true
-        });
     }
 
     /** @returns {Object} */

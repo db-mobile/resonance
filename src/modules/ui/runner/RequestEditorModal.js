@@ -9,6 +9,7 @@ import { ScriptEditor } from '../../scriptEditor.bundle.js';
 import { JSONEditor } from '../../jsonEditor.bundle.js';
 import { pushEscapeHandler } from '../modalEscape.js';
 import { endpointDefaults, effectiveOverrides, stripUnchangedOverrides } from '../../utils/requestOverrides.js';
+import { translate } from '../../utils/translate.js';
 
 export class RequestEditorModal {
     constructor() {
@@ -170,11 +171,11 @@ export class RequestEditorModal {
         const valueInput = row.querySelector('[data-role="kv-value"]');
         if (keyInput) {
             keyInput.value = key;
-            keyInput.placeholder = app.i18n?.t('runner.key') || 'Key';
+            keyInput.placeholder = translate('runner.key', 'Key');
         }
         if (valueInput) {
             valueInput.value = value;
-            valueInput.placeholder = app.i18n?.t('runner.value') || 'Value';
+            valueInput.placeholder = translate('runner.value', 'Value');
         }
 
         row.querySelector('[data-action="remove-kv"]')?.addEventListener('click', () => {

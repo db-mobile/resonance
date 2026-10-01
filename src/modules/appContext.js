@@ -24,7 +24,6 @@
  * @property {*} [i18n]
  * @property {Function} [captureGrpcState]
  * @property {Function} [applyGrpcState]
- * @property {Function} [invalidateApiHandlerSettingsCache]
  * @property {Function} [invalidateApiHandlerEnvironmentCache]
  * @property {Function} [getApiHandlerSettingsCache]
  */

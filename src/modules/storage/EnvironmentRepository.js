@@ -73,14 +73,7 @@ export class EnvironmentRepository {
         try {
             const data = await this.backendAPI.store.get(this.ENVIRONMENTS_KEY);
 
-            if (!data || typeof data !== 'object') {
-                const defaultData = this._getDefaultEnvironments();
-                await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, defaultData);
-                this._cache = defaultData;
-                return defaultData;
-            }
-
-            if (!Array.isArray(data.items)) {
+            if (!data || typeof data !== 'object' || !Array.isArray(data.items)) {
                 const defaultData = this._getDefaultEnvironments();
                 await this.backendAPI.store.set(this.ENVIRONMENTS_KEY, defaultData);
                 this._cache = defaultData;

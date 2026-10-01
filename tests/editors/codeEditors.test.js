@@ -82,7 +82,7 @@ describe('RequestBodyEditor', () => {
     test('formatJSON pretty-prints valid JSON', () => {
         const editor = new RequestBodyEditor(mount());
         editor.setContent('{"a":1,"b":[1,2]}');
-        expect(editor.formatJSON()).toBe(true);
+        expect(editor.formatJSON()).toBeNull();
         expect(editor.getContent()).toBe('{\n  "a": 1,\n  "b": [\n    1,\n    2\n  ]\n}');
         editor.destroy();
     });
@@ -90,7 +90,7 @@ describe('RequestBodyEditor', () => {
     test('formatJSON reports failure on invalid JSON and leaves content alone', () => {
         const editor = new RequestBodyEditor(mount());
         editor.setContent('{nope');
-        expect(editor.formatJSON()).toBe(false);
+        expect(editor.formatJSON()).toBeInstanceOf(Error);
         expect(editor.getContent()).toBe('{nope');
         editor.destroy();
     });
@@ -98,14 +98,22 @@ describe('RequestBodyEditor', () => {
     test('formatJSON is a no-op in plain mode', () => {
         const editor = new RequestBodyEditor(mount(), { language: 'plain' });
         editor.setContent('{nope');
-        expect(editor.formatJSON()).toBe(true);
+        expect(editor.formatJSON()).toBeNull();
         expect(editor.getContent()).toBe('{nope');
         editor.destroy();
     });
 
     test('empty content formats as success', () => {
         const editor = new RequestBodyEditor(mount());
-        expect(editor.formatJSON()).toBe(true);
+        expect(editor.formatJSON()).toBeNull();
+        editor.destroy();
+    });
+
+    test('formatJSON keeps unquoted placeholders', () => {
+        const editor = new RequestBodyEditor(mount());
+        editor.setContent('{"id":{{userId}}}');
+        expect(editor.formatJSON()).toBeNull();
+        expect(editor.getContent()).toBe('{\n  "id": {{userId}}\n}');
         editor.destroy();
     });
 });

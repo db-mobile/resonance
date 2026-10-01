@@ -1,4 +1,4 @@
-import { normalizeFormRows, isMeaningfulRow } from '../src/modules/utils/formDataRows.js';
+import { normalizeFormRows, isMeaningfulRow, processFormRows } from '../src/modules/utils/formDataRows.js';
 
 describe('normalizeFormRows', () => {
     test('converts legacy flat objects to enabled text rows', () => {
@@ -61,5 +61,26 @@ describe('isMeaningfulRow', () => {
         expect(isMeaningfulRow({ key: '', value: '', filePath: '' })).toBe(false);
         expect(isMeaningfulRow({ key: '  ', value: ' ', filePath: '' })).toBe(false);
         expect(isMeaningfulRow({})).toBe(false);
+    });
+});
+
+describe('processFormRows', () => {
+    const upper = (text) => text.toUpperCase();
+
+    test('drops disabled rows and templates key, value and file path', () => {
+        expect(processFormRows([
+            { key: 'a', value: 'v', type: 'text', enabled: true },
+            { key: 'off', value: 'x', enabled: false },
+            { key: 'f', value: 'ignored', type: 'file', filePath: '/tmp/f', contentType: 'image/png' }
+        ], upper)).toEqual([
+            { key: 'A', value: 'V', type: 'text', filePath: undefined, contentType: undefined },
+            { key: 'F', value: '', type: 'file', filePath: '/TMP/F', contentType: 'image/png' }
+        ]);
+    });
+
+    test('defaults a missing type to text and a missing value to empty', () => {
+        expect(processFormRows([{ key: 'k' }], upper)).toEqual([
+            { key: 'K', value: '', type: 'text', filePath: undefined, contentType: undefined }
+        ]);
     });
 });

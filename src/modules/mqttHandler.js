@@ -73,11 +73,12 @@ async function updateMqttUiIfActive(tabId, flash = false) {
     }
 }
 
-/** @param {string} tabId */
-export async function refreshMqttConnectionUi(tabId) {
-    if (await isTabCurrentlyActive(tabId)) {
-        renderMqttStatus(session.get(tabId));
-    }
+/**
+ * @param {string} tabId
+ * @returns {Promise<void>}
+ */
+export function refreshMqttConnectionUi(tabId) {
+    return updateMqttUiIfActive(tabId);
 }
 
 function normalizeMqttBroker(broker) {
@@ -166,12 +167,7 @@ async function handleBackendEvent(event) {
     }
 
     if (payload.eventType === 'connect') {
-        session.set(tabId, {
-            ...current,
-            broker,
-            state: 'open',
-            transcript: current.transcript || ''
-        });
+        session.transition(tabId, current, { broker, state: 'open' });
         await session.updateStatus(tabId, 'MQTT connected', 101);
         await session.append(tabId, `CONNECTED ${broker}`);
         await updateMqttUiIfActive(tabId);
@@ -179,12 +175,10 @@ async function handleBackendEvent(event) {
     }
 
     if (payload.eventType === 'message') {
-        session.set(tabId, {
-            ...current,
+        session.transition(tabId, current, {
             broker: current.broker || broker,
             state: 'open',
-            messageCount: (current.messageCount || 0) + 1,
-            transcript: current.transcript || ''
+            messageCount: (current.messageCount || 0) + 1
         });
         const topic = payload.topic ? ` ${payload.topic}` : '';
         await session.updateStatus(tabId, 'MQTT message received', 101);
@@ -194,12 +188,7 @@ async function handleBackendEvent(event) {
     }
 
     if (payload.eventType === 'disconnect') {
-        session.set(tabId, {
-            ...current,
-            broker,
-            state: 'closed',
-            transcript: current.transcript || ''
-        });
+        session.transition(tabId, current, { broker, state: 'closed' });
         await session.updateStatus(tabId, 'MQTT disconnected', null);
         await session.append(tabId, 'DISCONNECTED');
         await updateMqttUiIfActive(tabId);
@@ -207,12 +196,7 @@ async function handleBackendEvent(event) {
     }
 
     if (payload.eventType === 'error') {
-        session.set(tabId, {
-            ...current,
-            broker,
-            state: current.state || 'closed',
-            transcript: current.transcript || ''
-        });
+        session.transition(tabId, current, { broker, state: current.state || 'closed' });
         await session.updateStatus(
             tabId,
             `MQTT error${payload.message ? `: ${payload.message}` : ''}`,
