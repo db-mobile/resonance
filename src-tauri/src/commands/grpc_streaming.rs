@@ -146,6 +146,54 @@ fn emit_error_and_close(app: &AppHandle, tab_id: &str, full_method: &str, status
     );
 }
 
+/// The request side of a client- or bidi-streaming call, with the optional
+/// initial message already queued.
+fn client_request_stream(
+    initial: Option<&Value>,
+    input_desc: &MessageDescriptor,
+    metadata: HashMap<String, String>,
+) -> Result<
+    (
+        mpsc::UnboundedSender<DynamicMessage>,
+        Request<UnboundedReceiverStream<DynamicMessage>>,
+    ),
+    String,
+> {
+    let (tx, rx) = mpsc::unbounded_channel::<DynamicMessage>();
+    if let Some(initial) = initial {
+        let _ = tx.send(json_to_dynamic_message(initial, input_desc.clone())?);
+    }
+    let mut req = Request::new(UnboundedReceiverStream::new(rx));
+    apply_metadata(&mut req, metadata)?;
+    Ok((tx, req))
+}
+
+/// Spawns `call` and registers it under the tab. The lock is held across
+/// spawn + insert so a call that ends at once still finds its entry, and the
+/// task only removes that entry while its generation still owns the tab.
+async fn register_call(
+    streams: &TabSessions<GrpcStreamHandle>,
+    tab_id: String,
+    call: impl Future<Output = ()> + Send + 'static,
+    handle: impl FnOnce(AbortHandle) -> GrpcStreamHandle,
+) {
+    let generation = streams.next_generation();
+    let mut entries = streams.lock().await;
+    let own_streams = streams.clone();
+    let own_tab_id = tab_id.clone();
+    let join = tokio::spawn(async move {
+        call.await;
+        own_streams.remove_if_current(&own_tab_id, generation).await;
+    });
+    entries.insert(
+        tab_id,
+        Session {
+            generation,
+            value: handle(join.abort_handle()),
+        },
+    );
+}
+
 #[tauri::command]
 pub async fn grpc_stream_start(
     app: AppHandle,
@@ -202,81 +250,60 @@ pub async fn grpc_stream_start(
     // it here — spawn a task that awaits and emits message + close when the
     // server replies.
     if is_client_streaming && !is_server_streaming {
-        let (tx, rx) = mpsc::unbounded_channel::<DynamicMessage>();
-        let request_stream = UnboundedReceiverStream::new(rx);
-        if let Some(initial) = &request.request_json {
-            let msg = json_to_dynamic_message(initial, input_desc.clone())?;
-            let _ = tx.send(msg);
-        }
-        let mut req = Request::new(request_stream);
-        apply_metadata(&mut req, metadata)?;
+        let (tx, req) =
+            client_request_stream(request.request_json.as_ref(), &input_desc, metadata)?;
 
         emit(
             &app,
             GrpcStreamEventPayload::open(&tab_id, &full_method, None),
         );
 
-        let read_app = app.clone();
-        let read_state = state.streams.clone();
-        let read_tab_id = tab_id.clone();
-        let read_full_method = full_method.clone();
-        let generation = state.streams.next_generation();
-        let mut streams = state.streams.lock().await;
-
-        let join = tokio::spawn(async move {
-            match grpc.client_streaming(req, path, codec).await {
-                Ok(response) => {
-                    let headers = metadata_to_json_map(response.metadata());
-                    let msg = response.into_inner();
-                    let data = dynamic_message_to_json(&msg).unwrap_or(Value::Null);
-                    emit(
-                        &read_app,
-                        GrpcStreamEventPayload::message(
-                            &read_tab_id,
-                            &read_full_method,
-                            data,
-                            Some(headers),
-                        ),
-                    );
-                    emit(
-                        &read_app,
-                        GrpcStreamEventPayload::close_ok(&read_tab_id, &read_full_method, None),
-                    );
-                }
-                Err(status) => {
-                    emit_error_and_close(&read_app, &read_tab_id, &read_full_method, &status);
+        let call = {
+            let app = app.clone();
+            let tab_id = tab_id.clone();
+            let full_method = full_method.clone();
+            async move {
+                match grpc.client_streaming(req, path, codec).await {
+                    Ok(response) => {
+                        let headers = metadata_to_json_map(response.metadata());
+                        let msg = response.into_inner();
+                        let data = dynamic_message_to_json(&msg).unwrap_or(Value::Null);
+                        emit(
+                            &app,
+                            GrpcStreamEventPayload::message(
+                                &tab_id,
+                                &full_method,
+                                data,
+                                Some(headers),
+                            ),
+                        );
+                        emit(
+                            &app,
+                            GrpcStreamEventPayload::close_ok(&tab_id, &full_method, None),
+                        );
+                    }
+                    Err(status) => {
+                        emit_error_and_close(&app, &tab_id, &full_method, &status);
+                    }
                 }
             }
+        };
 
-            read_state.remove_if_current(&read_tab_id, generation).await;
-        });
-
-        streams.insert(
-            tab_id,
-            Session {
-                generation,
-                value: GrpcStreamHandle {
-                    sender: Some(tx),
-                    input_desc,
-                    full_method,
-                    abort: join.abort_handle(),
-                    client_streaming_only: true,
-                },
-            },
-        );
+        register_call(&state.streams, tab_id, call, |abort| GrpcStreamHandle {
+            sender: Some(tx),
+            input_desc,
+            full_method,
+            abort,
+            client_streaming_only: true,
+        })
+        .await;
         return Ok(CommandAck::ok());
     }
 
     let (sender_opt, mut response_stream, headers) = if is_client_streaming {
         // Bidirectional
-        let (tx, rx) = mpsc::unbounded_channel::<DynamicMessage>();
-        let request_stream = UnboundedReceiverStream::new(rx);
-        if let Some(initial) = &request.request_json {
-            let msg = json_to_dynamic_message(initial, input_desc.clone())?;
-            let _ = tx.send(msg);
-        }
-        let mut req = Request::new(request_stream);
-        apply_metadata(&mut req, metadata)?;
+        let (tx, req) =
+            client_request_stream(request.request_json.as_ref(), &input_desc, metadata)?;
         let response = grpc
             .streaming(req, path, codec)
             .await
@@ -305,64 +332,50 @@ pub async fn grpc_stream_start(
         GrpcStreamEventPayload::open(&tab_id, &full_method, Some(headers)),
     );
 
-    let read_app = app.clone();
-    let read_state = state.streams.clone();
-    let read_tab_id = tab_id.clone();
-    let read_full_method = full_method.clone();
-    let generation = state.streams.next_generation();
-    let mut streams = state.streams.lock().await;
-
-    let join = tokio::spawn(async move {
-        loop {
-            match response_stream.message().await {
-                Ok(Some(msg)) => {
-                    let data = dynamic_message_to_json(&msg).unwrap_or(Value::Null);
-                    emit(
-                        &read_app,
-                        GrpcStreamEventPayload::message(
-                            &read_tab_id,
-                            &read_full_method,
-                            data,
-                            None,
-                        ),
-                    );
-                }
-                Ok(None) => {
-                    let trailers = response_stream
-                        .trailers()
-                        .await
-                        .ok()
-                        .flatten()
-                        .map(|m| metadata_to_json_map(&m));
-                    emit(
-                        &read_app,
-                        GrpcStreamEventPayload::close_ok(&read_tab_id, &read_full_method, trailers),
-                    );
-                    break;
-                }
-                Err(status) => {
-                    emit_error_and_close(&read_app, &read_tab_id, &read_full_method, &status);
-                    break;
+    let call = {
+        let app = app.clone();
+        let tab_id = tab_id.clone();
+        let full_method = full_method.clone();
+        async move {
+            loop {
+                match response_stream.message().await {
+                    Ok(Some(msg)) => {
+                        let data = dynamic_message_to_json(&msg).unwrap_or(Value::Null);
+                        emit(
+                            &app,
+                            GrpcStreamEventPayload::message(&tab_id, &full_method, data, None),
+                        );
+                    }
+                    Ok(None) => {
+                        let trailers = response_stream
+                            .trailers()
+                            .await
+                            .ok()
+                            .flatten()
+                            .map(|m| metadata_to_json_map(&m));
+                        emit(
+                            &app,
+                            GrpcStreamEventPayload::close_ok(&tab_id, &full_method, trailers),
+                        );
+                        break;
+                    }
+                    Err(status) => {
+                        emit_error_and_close(&app, &tab_id, &full_method, &status);
+                        break;
+                    }
                 }
             }
         }
+    };
 
-        read_state.remove_if_current(&read_tab_id, generation).await;
-    });
-
-    streams.insert(
-        tab_id,
-        Session {
-            generation,
-            value: GrpcStreamHandle {
-                sender: sender_opt,
-                input_desc,
-                full_method,
-                abort: join.abort_handle(),
-                client_streaming_only: false,
-            },
-        },
-    );
+    register_call(&state.streams, tab_id, call, |abort| GrpcStreamHandle {
+        sender: sender_opt,
+        input_desc,
+        full_method,
+        abort,
+        client_streaming_only: false,
+    })
+    .await;
 
     Ok(CommandAck::ok())
 }
