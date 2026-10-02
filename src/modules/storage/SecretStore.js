@@ -309,6 +309,12 @@ export class SecretStore {
         return this._backend;
     }
 
+    /** @returns {Promise<boolean>} */
+    async isUsingKeychain() {
+        await this._init();
+        return this.usingKeychain === true;
+    }
+
     /** @param {string} scope */
     async get(scope, key) {
         return (await this._init()).get(scope, key);

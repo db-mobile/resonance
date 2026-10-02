@@ -19,7 +19,10 @@ export class SettingsModal {
         this.isOpen = false;
     }
 
-    async show() {
+    /**
+     * @param {{tab?: string}} [options]
+     */
+    async show({ tab = null } = {}) {
         if (this.isOpen) {return;}
 
         this.isOpen = true;
@@ -42,6 +45,13 @@ export class SettingsModal {
             } catch (error) {
                 void error;
             }
+        }
+
+        const tabButton = tab ? modal.querySelector(`.settings-tab[data-tab="${tab}"]`) : null;
+        if (tabButton) {
+            tabButton.click();
+            tabButton.focus();
+            return;
         }
 
         const firstSelect = modal.querySelector('select[name="theme"]');

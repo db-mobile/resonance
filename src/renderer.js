@@ -713,7 +713,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 500);
 
     scheduleIdleTask(async () => {
-        const statusBar = new StatusBar(environmentService);
+        const statusBar = new StatusBar({
+            mockServer,
+            proxyService: featureRegistry.get('proxy').service,
+            secretStore,
+            settingsModal,
+            httpVersionManager: featureRegistry.get('settings').httpVersionManager
+        });
         statusBar.initialize();
         app.statusBar = statusBar;
 

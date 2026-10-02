@@ -3,6 +3,8 @@
  * @module services/MockServerService
  */
 
+import { ChangeEmitter } from './ChangeEmitter.js';
+
 export class MockServerService {
     /**
      * @param {MockServerRepository} repository
@@ -11,6 +13,15 @@ export class MockServerService {
     constructor(repository, statusDisplay) {
         this.repository = repository;
         this.statusDisplay = statusDisplay;
+        this._events = new ChangeEmitter();
+    }
+
+    /**
+     * @param {(status: {running: boolean, port: number|null}) => void} callback
+     * @returns {void}
+     */
+    addChangeListener(callback) {
+        this._events.add(callback);
     }
 
     /**
@@ -35,6 +46,7 @@ export class MockServerService {
 
             if (result.success) {
                 this.statusDisplay.update(`Mock server started on port ${result.port}`, null);
+                this._events.emit({ running: true, port: result.port });
             } else {
                 this.statusDisplay.update(`Failed to start mock server: ${result.message}`, null);
             }
@@ -54,6 +66,7 @@ export class MockServerService {
 
             if (result.success) {
                 this.statusDisplay.update('Mock server stopped', null);
+                this._events.emit({ running: false, port: null });
             } else {
                 this.statusDisplay.update(`Failed to stop mock server: ${result.message}`, null);
             }

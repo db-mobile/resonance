@@ -630,5 +630,19 @@
   "body_editor": {
     "format": "Format",
     "format_title": "Format JSON (Shift+Alt+F)"
+  },
+  "status_bar": {
+    "http_auto": "HTTP auto",
+    "http_hint": "HTTP version used for requests. Click to change.",
+    "mock_running": "Mock :{{port}}",
+    "mock_hint": "Mock server running. Click to manage.",
+    "proxy_host": "Proxy {{host}}:{{port}}",
+    "proxy_system": "System proxy",
+    "proxy_hint": "All requests go through this proxy. Click to configure.",
+    "live_connections_one": "{{count}} live connection",
+    "live_connections_other": "{{count}} live connections",
+    "live_hint": "Open streaming connections. Click to jump to a tab.",
+    "keychain_unavailable": "Secrets unencrypted",
+    "keychain_hint": "No OS keychain available. Secrets are stored locally without encryption at rest."
   }
 }

@@ -743,14 +743,28 @@
         <!-- Status Bar -->
         <footer class="statusbar status-bar" id="status-bar-container">
             <div class="status-bar-left">
-                <span class="status-bar-item" id="status-bar-env">
-                    <span id="status-bar-env-dot" class="status-bar-env-dot"></span>
-                    <span class="icon icon-14 icon-globe"></span>
-                    <span id="status-bar-env-name">No Environment</span>
-                </span>
+                <button type="button" class="status-bar-item status-bar-button" id="status-bar-http">
+                    <span data-role="label">HTTP auto</span>
+                </button>
                 <span class="status-bar-item status-bar-request" id="status-bar-request" hidden>
                     <span class="status-bar-request-spinner spinner"></span>
                     <span id="status-bar-request-time" class="numeric">0.0s</span>
+                </span>
+                <button type="button" class="status-bar-item status-bar-button" id="status-bar-mock" hidden>
+                    <span class="icon icon-14 icon-mock-server"></span>
+                    <span data-role="label"></span>
+                </button>
+                <button type="button" class="status-bar-item status-bar-button" id="status-bar-proxy" hidden>
+                    <span class="icon icon-14 icon-globe"></span>
+                    <span data-role="label"></span>
+                </button>
+                <button type="button" class="status-bar-item status-bar-button" id="status-bar-live" hidden>
+                    <span class="status-bar-dot"></span>
+                    <span data-role="label"></span>
+                </button>
+                <span class="status-bar-item status-bar-warning" id="status-bar-keychain" hidden>
+                    <span class="icon icon-14 icon-alert-circle"></span>
+                    <span data-role="label"></span>
                 </span>
             </div>
             <div class="status-bar-right">

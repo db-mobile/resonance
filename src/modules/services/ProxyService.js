@@ -3,6 +3,8 @@
  * @module services/ProxyService
  */
 
+import { ChangeEmitter } from './ChangeEmitter.js';
+
 export class ProxyService {
     /**
      * @param {ProxyRepository} proxyRepository
@@ -11,6 +13,15 @@ export class ProxyService {
     constructor(proxyRepository, statusDisplay) {
         this.repository = proxyRepository;
         this.statusDisplay = statusDisplay;
+        this._events = new ChangeEmitter();
+    }
+
+    /**
+     * @param {(settings: Object) => void} callback
+     * @returns {void}
+     */
+    addChangeListener(callback) {
+        this._events.add(callback);
     }
 
     /** @returns {Promise<Object>} */
@@ -38,7 +49,9 @@ export class ProxyService {
             throw new Error(validationErrors.join('; '));
         }
 
-        return this.repository.saveProxySettings(settings);
+        const result = await this.repository.saveProxySettings(settings);
+        this._events.emit(settings);
+        return result;
     }
 
     validateSettings(settings) {

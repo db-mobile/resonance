@@ -7,6 +7,7 @@ import { StreamSession, createBackendEventListener, getActiveTabId } from './str
 import { isLiveEntry, isStaleEvent } from './streaming/streamState.js';
 
 const session = new StreamSession({
+    protocol: 'WebSocket',
     buildResponseMeta: (entry, transcript, state) => ({
         data: transcript,
         headers: {},

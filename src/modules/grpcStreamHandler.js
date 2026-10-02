@@ -4,7 +4,7 @@ import { toast } from './ui/Toast.js';
 import { StreamSession, createBackendEventListener, getActiveTabId } from './streaming/streamSession.js';
 import { isLiveEntry } from './streaming/streamState.js';
 
-const session = new StreamSession();
+const session = new StreamSession({ protocol: 'gRPC' });
 
 function formatMessage(message) {
     if (message === null || message === undefined) {
