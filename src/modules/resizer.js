@@ -1,34 +1,103 @@
 import { app } from './appContext.js';
 import { debounce } from './utils/debounce.js';
 
+const SPLIT_LAYOUTS = Object.freeze({
+    stacked: { axis: 'y', minSize: 100, defaultRatio: 0.4 },
+    'side-by-side': { axis: 'x', minSize: 360, defaultRatio: 0.5 }
+});
+
+/**
+ * @param {string} layout
+ * @param {number} width
+ * @param {number} handleSize
+ * @returns {string}
+ */
+export function effectiveLayout(layout, width, handleSize) {
+    if (layout !== 'side-by-side') {
+        return 'stacked';
+    }
+    return width >= SPLIT_LAYOUTS['side-by-side'].minSize * 2 + handleSize ? 'side-by-side' : 'stacked';
+}
+
+/**
+ * @param {number} available
+ * @param {number} ratio
+ * @param {number} minSize
+ * @returns {{request: number, response: number}|null}
+ */
+export function splitSizes(available, ratio, minSize) {
+    if (available < minSize * 2) {
+        return null;
+    }
+    const request = Math.min(available - minSize, Math.max(minSize, Math.floor(available * ratio)));
+    return { request, response: available - request };
+}
+
+let activeResizer = null;
+let requestBiasOverride = null;
+
+/** @param {number} fraction */
+export function setRequestBias(fraction) {
+    requestBiasOverride = fraction;
+    activeResizer?._applyRatio(fraction);
+}
+
+export function resetRequestBias() {
+    requestBiasOverride = null;
+    activeResizer?._applyRatio(activeResizer._savedRatio());
+}
+
 class Resizer {
-    constructor() {
+    /** @param {import('./layoutManager.js').LayoutManager|null} layoutManager */
+    constructor(layoutManager = null) {
+        this.layoutManager = layoutManager;
         this.isDragging = false;
-        this.startY = 0;
-        this.startRequestHeight = 0;
-        this.startResponseHeight = 0;
-        this.minHeight = 100;
+        this.startPos = 0;
+        this.startRequestSize = 0;
+        this.startResponseSize = 0;
+        this.effective = null;
+        this.ratios = {};
         this.resizeTimeout = null;
+        this._debouncedSave = debounce((ratios) => {
+            window.backendAPI.store.set('requestSplit', ratios).catch((error) => void error);
+        }, 300);
 
         this.init();
     }
 
     init() {
         this.resizerHandle = document.getElementById('resizer-handle');
+        this.split = document.getElementById('request-split');
         this.requestConfig = document.querySelector('.request-config');
         this.responseArea = document.querySelector('.response-area');
-        this.mainContentArea = document.querySelector('.main-content-area');
 
-        if (!this.resizerHandle || !this.requestConfig || !this.responseArea || !this.mainContentArea) {
+        if (!this.resizerHandle || !this.split || !this.requestConfig || !this.responseArea) {
             return;
         }
 
+        activeResizer = this;
         this.setupEventListeners();
-        requestAnimationFrame(() => {
+        this.layoutManager?.addChangeListener(() => this.applyLayout());
+        Promise.all([this._restoreRatios(), this.layoutManager?.ready]).finally(() => {
             requestAnimationFrame(() => {
-                this.setInitialHeights();
+                requestAnimationFrame(() => this.applyLayout());
             });
         });
+    }
+
+    async _restoreRatios() {
+        try {
+            const saved = await window.backendAPI.store.get('requestSplit');
+            if (saved && typeof saved === 'object') {
+                for (const layout of Object.keys(SPLIT_LAYOUTS)) {
+                    if (typeof saved[layout] === 'number' && saved[layout] > 0 && saved[layout] < 1) {
+                        this.ratios[layout] = saved[layout];
+                    }
+                }
+            }
+        } catch (error) {
+            void error;
+        }
     }
 
     setupEventListeners() {
@@ -41,45 +110,73 @@ class Resizer {
         window.addEventListener('resize', this.handleWindowResize.bind(this));
     }
 
-    setInitialHeights() {
-        this.setRequestBias(0.4);
-    }
-
-    /** @param {number} fraction */
-    setRequestBias(fraction) {
-        const availableHeight = this._availableHeight();
-
-        if (availableHeight < this.minHeight * 2) {
-            return;
-        }
-
-        const initialRequestHeight = Math.max(this.minHeight, Math.floor(availableHeight * fraction));
-        const initialResponseHeight = Math.max(this.minHeight, availableHeight - initialRequestHeight);
-
-        this._applyHeights(initialRequestHeight, initialResponseHeight);
+    /** @returns {{axis: string, minSize: number, defaultRatio: number}} */
+    _config() {
+        return SPLIT_LAYOUTS[this.effective ?? 'stacked'];
     }
 
     /** @returns {number} */
-    _availableHeight() {
-        const mainContentHeight = this.mainContentArea.clientHeight;
-        const requestBuilder = document.querySelector('.request-builder');
-        const requestBuilderHeight = requestBuilder ? requestBuilder.offsetHeight : 0;
-        const resizerHeight = this.resizerHandle.offsetHeight;
-        const tabBar = document.getElementById('workspace-tab-bar-container');
-        const tabBarHeight = tabBar ? tabBar.offsetHeight : 0;
-        return mainContentHeight - tabBarHeight - requestBuilderHeight - resizerHeight;
+    _savedRatio() {
+        return this.ratios[this.effective] ?? this._config().defaultRatio;
+    }
+
+    /** @returns {number} */
+    _targetRatio() {
+        return requestBiasOverride ?? this._savedRatio();
+    }
+
+    applyLayout() {
+        const preferred = this.layoutManager?.getLayout() ?? 'stacked';
+        const handleThickness = Math.min(this.resizerHandle.offsetWidth, this.resizerHandle.offsetHeight);
+        const next = effectiveLayout(preferred, this.split.clientWidth, handleThickness);
+        if (next !== this.effective) {
+            this.effective = next;
+            this.split.dataset.layoutEffective = next;
+            const horizontal = next === 'side-by-side';
+            this.resizerHandle.classList.toggle('pane-resizer-col', horizontal);
+            this.resizerHandle.classList.toggle('pane-resizer-row', !horizontal);
+            for (const pane of [this.requestConfig, this.responseArea]) {
+                pane.style.height = '';
+                pane.style.width = '';
+                pane.style.flex = '';
+            }
+        }
+        this._applyRatio(this._targetRatio());
+    }
+
+    /** @param {number} fraction */
+    _applyRatio(fraction) {
+        const sizes = splitSizes(this._availableSize(), fraction, this._config().minSize);
+        if (sizes) {
+            this._applySizes(sizes.request, sizes.response);
+        }
+    }
+
+    /** @returns {number} */
+    _availableSize() {
+        return this._config().axis === 'x'
+            ? this.split.clientWidth - this.resizerHandle.offsetWidth
+            : this.split.clientHeight - this.resizerHandle.offsetHeight;
+    }
+
+    /** @returns {[number, number]} */
+    _currentSizes() {
+        return this._config().axis === 'x'
+            ? [this.requestConfig.offsetWidth, this.responseArea.offsetWidth]
+            : [this.requestConfig.offsetHeight, this.responseArea.offsetHeight];
     }
 
     /**
-     * @param {number} requestHeight
-     * @param {number} responseHeight
+     * @param {number} requestSize
+     * @param {number} responseSize
      * @returns {void}
      */
-    _applyHeights(requestHeight, responseHeight) {
-        this.requestConfig.style.height = `${requestHeight}px`;
-        this.requestConfig.style.flex = `0 0 ${requestHeight}px`;
-        this.responseArea.style.height = `${responseHeight}px`;
-        this.responseArea.style.flex = `0 0 ${responseHeight}px`;
+    _applySizes(requestSize, responseSize) {
+        const prop = this._config().axis === 'x' ? 'width' : 'height';
+        this.requestConfig.style[prop] = `${requestSize}px`;
+        this.requestConfig.style.flex = `0 0 ${requestSize}px`;
+        this.responseArea.style[prop] = `${responseSize}px`;
+        this.responseArea.style.flex = `0 0 ${responseSize}px`;
     }
 
     handleWindowResize() {
@@ -88,44 +185,28 @@ class Resizer {
         }
 
         this.resizeTimeout = setTimeout(() => {
-            const currentRequestHeight = this.requestConfig.offsetHeight;
-            const currentResponseHeight = this.responseArea.offsetHeight;
-
-            if (currentRequestHeight === 0 || currentResponseHeight === 0) {
-                return;
+            const before = this.effective;
+            const [request, response] = this._currentSizes();
+            this.applyLayout();
+            if (before === this.effective && request > 0 && response > 0) {
+                this._applyRatio(request / (request + response));
             }
-
-            const availableHeight = this._availableHeight();
-
-            const totalCurrentHeight = currentRequestHeight + currentResponseHeight;
-            const requestProportion = currentRequestHeight / totalCurrentHeight;
-
-            const newRequestHeight = Math.max(this.minHeight, Math.floor(availableHeight * requestProportion));
-            const newResponseHeight = Math.max(this.minHeight, availableHeight - newRequestHeight);
-
-            this._applyHeights(newRequestHeight, newResponseHeight);
         }, 100);
     }
 
     startDrag(e) {
-        const currentRequestHeight = this.requestConfig.offsetHeight;
-        const currentResponseHeight = this.responseArea.offsetHeight;
-
-        if (currentRequestHeight === 0 || currentResponseHeight === 0) {
-            this.setInitialHeights();
-            this.startRequestHeight = this.requestConfig.offsetHeight;
-            this.startResponseHeight = this.responseArea.offsetHeight;
-        } else {
-            this.startRequestHeight = currentRequestHeight;
-            this.startResponseHeight = currentResponseHeight;
+        const [request, response] = this._currentSizes();
+        if (request === 0 || response === 0) {
+            this._applyRatio(this._targetRatio());
         }
+        [this.startRequestSize, this.startResponseSize] = this._currentSizes();
 
         this.isDragging = true;
-        this.startY = e.clientY;
+        this.startPos = this._config().axis === 'x' ? e.clientX : e.clientY;
 
         this.resizerHandle.classList.add('dragging');
         document.body.style.userSelect = 'none';
-        document.body.style.cursor = 'row-resize';
+        document.body.style.cursor = this._config().axis === 'x' ? 'col-resize' : 'row-resize';
 
         e.preventDefault();
     }
@@ -133,33 +214,38 @@ class Resizer {
     drag(e) {
         if (!this.isDragging) {return;}
 
-        const deltaY = e.clientY - this.startY;
-        const newRequestHeight = this.startRequestHeight + deltaY;
-        const newResponseHeight = this.startResponseHeight - deltaY;
+        const delta = (this._config().axis === 'x' ? e.clientX : e.clientY) - this.startPos;
+        const newRequestSize = this.startRequestSize + delta;
+        const newResponseSize = this.startResponseSize - delta;
+        const { minSize } = this._config();
 
-        if (newRequestHeight < this.minHeight || newResponseHeight < this.minHeight) {
+        if (newRequestSize < minSize || newResponseSize < minSize) {
             return;
         }
 
-        this._applyHeights(newRequestHeight, newResponseHeight);
+        this._applySizes(newRequestSize, newResponseSize);
 
         e.preventDefault();
     }
 
     endDrag() {
         if (!this.isDragging) {return;}
-        
+
         this.isDragging = false;
         this.resizerHandle.classList.remove('dragging');
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
-    }
 
-    reset() {
-        this.requestConfig.style.height = '';
-        this.requestConfig.style.flexShrink = '';
-        this.responseArea.style.height = '';
-        this.responseArea.style.flex = '1';
+        const [request, response] = this._currentSizes();
+        if (request > 0 && response > 0) {
+            const ratio = request / (request + response);
+            if (requestBiasOverride !== null) {
+                requestBiasOverride = ratio;
+            } else {
+                this.ratios[this.effective] = ratio;
+                this._debouncedSave({ ...this.ratios });
+            }
+        }
     }
 }
 
@@ -406,11 +492,11 @@ class GraphQLExplorerResizer {
     }
 }
 
-export function initResizer() {
-    const verticalResizer = new Resizer();
+/** @param {import('./layoutManager.js').LayoutManager|null} [layoutManager] */
+export function initResizer(layoutManager = null) {
+    const verticalResizer = new Resizer(layoutManager);
     const horizontalResizer = new HorizontalResizer();
     const graphqlEditorResizer = new GraphQLEditorResizer();
     const graphqlExplorerResizer = new GraphQLExplorerResizer();
-    window.__verticalResizer = verticalResizer;
     return { verticalResizer, horizontalResizer, graphqlEditorResizer, graphqlExplorerResizer };
 }

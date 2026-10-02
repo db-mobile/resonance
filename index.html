@@ -49,6 +49,12 @@
                             <span class="icon icon-16 icon-cookie"></span>
                             <span>Cookie Jar</span>
                         </button>
+                        <button id="layout-toggle-btn" class="menu-item" title="Side-by-side layout (Ctrl+\)"
+                                role="menuitemcheckbox" aria-checked="false">
+                            <span class="icon icon-16 icon-view-dual"></span>
+                            <span>Side-by-side layout</span>
+                            <span class="menu-item-accel">Ctrl+\</span>
+                        </button>
                         <div class="menu-separator"></div>
                         <button id="keyboard-shortcuts-btn" class="menu-item" title="Keyboard Shortcuts (Ctrl+/)">
                             <span class="icon icon-16 icon-keyboard"></span>
@@ -202,6 +208,7 @@
                 </div>
             </section>
 
+            <div class="request-split" id="request-split">
             <!-- Request Configuration -->
             <section class="request-config">
                 <nav class="tab-nav view-switcher flat" role="tablist" aria-label="Request Configuration">
@@ -295,8 +302,24 @@
 
                 <div class="tab-content" id="body" role="tabpanel">
                     <div class="body-header u-flex u-items-center u-justify-between">
-                        <span class="heading" data-i18n="tabs.body">Body</span>
+                        <div class="u-flex u-items-center u-gap-3">
+                            <span class="heading" data-i18n="tabs.body">Body</span>
+                            <div id="graphql-editor-actions" class="u-flex u-items-center u-gap-2" hidden>
+                                <select id="graphql-operation-select" class="select-base compact" aria-label="Operation to run" title="Operation to run" style="display: none;"></select>
+                                <button id="graphql-format-btn" class="button flat small" title="Format Query">
+                                    Format
+                                </button>
+                            </div>
+                        </div>
                         <div class="u-flex u-items-center u-gap-2">
+                            <div id="graphql-header-actions" class="u-flex u-items-center u-gap-2" hidden>
+                                <button id="graphql-fetch-schema-btn" class="button flat small" title="Fetch schema via introspection">
+                                    Schema
+                                </button>
+                                <button id="graphql-docs-toggle" class="button flat small" title="Schema explorer (click-build query)" aria-pressed="false">
+                                    Explorer
+                                </button>
+                            </div>
                             <button id="body-format-btn" class="button flat small" data-i18n="body_editor.format" data-i18n-title="body_editor.format_title" title="Format JSON (Shift+Alt+F)">Format</button>
                             <div class="body-mode-selector-container select-wrap">
                                 <select id="body-mode-select" class="select-base compact body-mode-select" aria-label="Body Mode">
@@ -352,23 +375,6 @@
                     </div>
 
                     <div class="body-mode-panel graphql-body-container" id="body-graphql-section" data-mode="graphql">
-                        <div class="graphql-toolbar u-flex u-items-center u-justify-between">
-                            <div class="graphql-toolbar-left u-flex u-items-center">
-                                <select id="graphql-operation-select" class="select-base compact" aria-label="Operation to run" title="Operation to run" style="display: none;"></select>
-                            </div>
-                            <div class="graphql-toolbar-right u-flex u-items-center u-gap-2">
-                                <button id="graphql-fetch-schema-btn" class="button flat small" title="Fetch schema via introspection">
-                                    Schema
-                                </button>
-                                <button id="graphql-format-btn" class="button flat small" title="Format Query">
-                                    Format
-                                </button>
-                                <button id="graphql-docs-toggle" class="button flat small" title="Schema explorer (click-build query)" aria-pressed="false">
-                                    Explorer
-                                </button>
-                            </div>
-                        </div>
-
                         <div class="graphql-workbench-body u-flex">
                             <div class="graphql-main u-flex u-flex-col">
                                 <div class="graphql-query-section u-flex u-flex-col">
@@ -736,6 +742,7 @@
                     <div class="response-display u-flex u-flex-col" id="workspace-response-container"></div>
                 </div>
             </section>
+            </div>
         </main>
 
         </div><!-- /.app-body -->

@@ -34,7 +34,7 @@ const DEFAULT_GRAPHQL_VARIABLES = `{
 }`;
 
 /** @type {ReadonlyArray<string>} */
-const REQUEST_PANEL_SELECTORS = Object.freeze(['.request-builder', '.request-config', '.resizer-handle', '.response-area']);
+const REQUEST_PANEL_SELECTORS = Object.freeze(['.request-builder', '.request-split']);
 
 /**
  * @param {HTMLElement} mainContentArea

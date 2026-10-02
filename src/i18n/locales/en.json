@@ -306,6 +306,8 @@
     "history_limit_unit": "entries",
     "history_limit_description": "Maximum number of requests stored in history",
     "accent_color": "Accent Color",
+    "layout": "Layout",
+    "layout_description": "Where the response appears relative to the request.",
     "proxy": "Proxy Configuration",
     "proxy_enabled": "Enable Proxy",
     "proxy_use_system": "Use System Proxy",
@@ -344,6 +346,10 @@
     "dark": "Dark",
     "system": "System",
     "black": "Black (OLED)"
+  },
+  "layout": {
+    "stacked": "Stacked",
+    "side_by_side": "Side by side"
   },
   "http_version": {
     "auto": "Auto",

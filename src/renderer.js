@@ -107,6 +107,7 @@ const workspaceTabController = workspaceTab.controller;
 const workspaceTabService = workspaceTab.service;
 const workspaceTabStateManager = workspaceTab.stateManager;
 const settingsModal = featureRegistry.get('settings').modal;
+const { layoutManager } = featureRegistry.get('settings');
 
 /** @returns {Promise<void>} */
 async function handleSaveShortcut() {
@@ -300,6 +301,10 @@ const SHORTCUTS = [
         }
     },
     {
+        key: 'Backslash', ctrl: true, category: 'View', description: 'Toggle side-by-side layout',
+        handler: () => layoutManager.toggle()
+    },
+    {
         key: 'Slash', ctrl: true, category: 'Help', description: 'Show keyboard shortcuts',
         handler: () => keyboardShortcuts.showHelp()
     }
@@ -470,6 +475,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 primaryMenu.open = false;
             }
         });
+    }
+
+    const layoutToggleBtn = document.getElementById('layout-toggle-btn');
+    if (layoutToggleBtn) {
+        const syncLayoutToggle = (layout) => {
+            layoutToggleBtn.setAttribute('aria-checked', String(layout === 'side-by-side'));
+        };
+        syncLayoutToggle(layoutManager.getLayout());
+        layoutManager.addChangeListener(syncLayoutToggle);
+        layoutToggleBtn.addEventListener('click', () => layoutManager.toggle());
     }
 
     const settingsBtn = document.getElementById('settings-btn');
@@ -674,7 +689,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     initKeyValueListeners();
     initializeBodyTracking();
-    initResizer();
+    initResizer(layoutManager);
     initKeyboardShortcuts();
     applyShortcutHints();
 
@@ -695,8 +710,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             markTabModified();
         });
     }
-
-    activateTab('request', 'path-params');
 
     const pathParamsList = document.getElementById('path-params-list');
     const headersList = document.getElementById('headers-list');
