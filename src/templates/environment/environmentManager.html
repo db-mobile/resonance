@@ -8,7 +8,10 @@
         <div class="env-manager-sidebar">
             <div class="env-manager-sidebar-header">
                 <h4 class="manager-section-title">ENVIRONMENTS</h4>
-                <button id="env-create-btn" class="btn btn-sm btn-outline-primary" title="Create New Environment">+</button>
+                <button id="env-create-btn" class="btn btn-sm btn-outline-primary" title="Create New Environment" aria-label="Create New Environment">
+                    <span class="icon icon-14 icon-plus"></span>
+                    <span>New</span>
+                </button>
             </div>
             <div id="env-list" class="env-manager-list"></div>
             <div class="env-manager-sidebar-footer">
@@ -35,52 +38,81 @@
 </template>
 
 <template id="tpl-environment-manager-details">
-    <div class="u-flex u-flex-col u-gap-3">
-        <div class="u-flex u-flex-col u-gap-3 u-mb-4">
-            <input type="text" id="env-name-input" class="input-base env-manager-name-input" />
-            <div class="env-manager-color-row">
-                <label for="env-color-input" class="env-manager-color-label">Color</label>
-                <div class="env-manager-color-controls">
-                    <input type="color" id="env-color-input" class="env-manager-color-input" value="#4F46E5" />
+    <div class="env-manager-details u-flex u-flex-col">
+        <p class="list-group-title">Properties</p>
+        <div class="boxed-list">
+            <div class="row">
+                <div class="row-content">
+                    <label for="env-name-input" class="title">Name</label>
+                </div>
+                <div class="suffix env-manager-name-suffix">
+                    <input type="text" id="env-name-input" class="input-base env-manager-name-input u-flex-1" />
+                </div>
+            </div>
+            <div class="row">
+                <div class="row-content">
+                    <label for="env-color-input" class="title">Color</label>
+                    <span class="subtitle">Shown next to the environment name</span>
+                </div>
+                <div class="suffix">
                     <span id="env-color-value" class="env-manager-color-value">None</span>
+                    <input type="color" id="env-color-input" class="env-manager-color-input" value="#4F46E5" />
                     <button id="env-color-clear-btn" type="button" class="btn btn-xs btn-outline">Clear</button>
                 </div>
             </div>
-            <div class="env-manager-details-actions u-flex">
-                <button id="env-set-active-btn" class="btn btn-xs btn-outline" title="Set as Active">
-                    <span class="icon icon-14 icon-check"></span>
-                    <span>Active</span>
-                </button>
-                <span class="env-manager-active-badge is-hidden">
-                    <span class="icon icon-14 icon-check"></span>
-                    <span>ACTIVE</span>
-                </span>
-                <button id="env-duplicate-btn" class="btn btn-xs btn-outline" title="Duplicate Environment">
-                    <span class="icon icon-14 icon-duplicate"></span>
-                </button>
-                <button id="env-export-btn" class="btn btn-xs btn-outline" title="Export Environment">
-                    <span class="icon icon-14 icon-export"></span>
-                </button>
-                <button id="env-delete-btn" class="btn btn-xs btn-outline-danger" title="Delete Environment">
-                    <span class="icon icon-14 icon-trash"></span>
-                </button>
+            <div class="row">
+                <div class="row-content">
+                    <span class="title">Active environment</span>
+                    <span class="subtitle">Its variables resolve in every request</span>
+                </div>
+                <div class="suffix">
+                    <button id="env-set-active-btn" class="btn btn-sm btn-outline-primary" title="Set as Active">
+                        <span class="icon icon-14 icon-check"></span>
+                        <span>Set active</span>
+                    </button>
+                    <span class="env-manager-active-badge status-pill is-hidden" data-state="loaded">Active</span>
+                </div>
             </div>
         </div>
 
-        <div class="variable-manager-usage">
-            <p class="variable-manager-usage-text">
-                <strong>Usage:</strong> Use these variables in your requests with <code>{{ variableName }}</code> syntax.
-                Values can reference other variables, including dynamic ones like <code>{{$uuid}}</code>.
-            </p>
-            <button type="button" id="env-dynamic-vars-btn" class="btn btn-xs btn-outline">Dynamic variables…</button>
+        <div class="env-manager-group-header u-flex u-items-center u-justify-between u-gap-3">
+            <p class="list-group-title">Variables</p>
+            <div class="u-flex u-gap-2">
+                <button type="button" id="env-dynamic-vars-btn" class="btn btn-sm btn-outline">Dynamic variables…</button>
+                <button id="env-add-variable-btn" class="btn btn-sm btn-outline-primary" title="Add Variable" aria-label="Add Variable">
+                    <span class="icon icon-14 icon-plus"></span>
+                    <span>Add</span>
+                </button>
+            </div>
         </div>
-
-        <div class="u-mb-4">
-            <div class="env-manager-variables-header u-flex u-items-center u-justify-between">
-                <h4 class="manager-section-title">VARIABLES</h4>
-                <button id="env-add-variable-btn" class="btn btn-sm btn-outline-primary" title="Add Variable">+ Add</button>
+        <p class="list-group-description">
+            Reference with <code>{{name}}</code>. Values can reference other variables, including dynamic ones like <code>{{$uuid}}</code>.
+        </p>
+        <div class="boxed-list env-variables-list">
+            <div class="env-variables-head manager-section-title u-flex u-items-center u-gap-2" aria-hidden="true">
+                <span class="env-variables-head-name">Name</span>
+                <span class="env-variables-head-value u-flex-1">Value</span>
+                <span class="env-variables-head-secret">Secret</span>
             </div>
             <div id="env-variables-container"></div>
+            <div class="env-variables-empty empty-state-base is-hidden">No variables yet</div>
+        </div>
+
+        <div class="env-manager-footer u-flex u-items-center u-justify-between u-gap-2">
+            <div class="u-flex u-gap-2">
+                <button id="env-duplicate-btn" class="btn btn-sm btn-outline" title="Duplicate Environment">
+                    <span class="icon icon-14 icon-duplicate"></span>
+                    <span>Duplicate</span>
+                </button>
+                <button id="env-export-btn" class="btn btn-sm btn-outline" title="Export Environment">
+                    <span class="icon icon-14 icon-export"></span>
+                    <span>Export</span>
+                </button>
+            </div>
+            <button id="env-delete-btn" class="btn btn-sm btn-outline-danger" title="Delete Environment">
+                <span class="icon icon-14 icon-trash"></span>
+                <span>Delete</span>
+            </button>
         </div>
     </div>
 </template>
@@ -94,10 +126,10 @@
                 <span class="icon icon-14 icon-eye"></span>
             </button>
         </div>
-        <button type="button" class="btn btn-icon var-secret-btn" title="Mark as secret (kept out of collection files and exports)">
+        <button type="button" class="btn btn-icon var-secret-btn" title="Secret: stored in the OS keychain, kept out of collection files and exports" aria-label="Secret" aria-pressed="false">
             <span class="icon icon-14 icon-lock"></span>
         </button>
-        <button class="btn-delete var-delete-btn">×</button>
+        <button type="button" class="btn-delete var-delete-btn" title="Delete variable" aria-label="Delete variable">×</button>
     </div>
 </template>
 
