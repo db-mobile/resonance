@@ -10,6 +10,7 @@ import { debounce } from './utils/debounce.js';
 import { markTabModified } from './state/tabModified.js';
 import { fetchGraphQLIntrospection, buildSchemaFromIntrospection } from './apiHandler.js';
 import { GraphQLExplorer } from './graphqlExplorer.js';
+import { resetRequestBias, setRequestBias } from './resizer.js';
 
 const SCHEMA_STORE_KEY = 'graphqlSchemaCache';
 const SCHEMA_STORE_LIMIT = 50;
@@ -40,6 +41,8 @@ export class GraphQLBodyManager {
         this.fetchSchemaBtn = document.getElementById('graphql-fetch-schema-btn');
         this.operationSelect = document.getElementById('graphql-operation-select');
         this.docsToggle = document.getElementById('graphql-docs-toggle');
+        this.headerActions = document.getElementById('graphql-header-actions');
+        this.editorActions = document.getElementById('graphql-editor-actions');
         this.docsRail = document.getElementById('graphql-docs-rail');
         this.explorerResizerHandle = document.getElementById('graphql-explorer-resizer-handle');
         this.explorer = null;
@@ -195,7 +198,7 @@ export class GraphQLBodyManager {
             if (this.runnerBtn) {
                 this.runnerBtn.style.display = 'none';
             }
-            window.__verticalResizer?.setRequestBias(0.6);
+            setRequestBias(0.6);
             if (this.docsRail) {
                 this.docsRail.style.display = '';
                 this.docsToggle?.setAttribute('aria-pressed', 'true');
@@ -216,7 +219,7 @@ export class GraphQLBodyManager {
             if (this.runnerBtn) {
                 this.runnerBtn.style.display = '';
             }
-            window.__verticalResizer?.setRequestBias(0.4);
+            resetRequestBias();
             if (this.docsRail) {
                 this.docsRail.style.display = 'none';
                 this.docsToggle?.setAttribute('aria-pressed', 'false');
@@ -459,6 +462,12 @@ export class GraphQLBodyManager {
 
         if (this.jsonFormatBtn) {
             this.jsonFormatBtn.hidden = mode !== 'json';
+        }
+        if (this.headerActions) {
+            this.headerActions.hidden = mode !== 'graphql';
+        }
+        if (this.editorActions) {
+            this.editorActions.hidden = mode !== 'graphql';
         }
 
         document.querySelectorAll('.body-mode-panel').forEach(panel => {

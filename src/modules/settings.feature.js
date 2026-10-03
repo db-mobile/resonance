@@ -4,6 +4,7 @@
  */
 
 import { ThemeManager } from './themeManager.js';
+import { LayoutManager } from './layoutManager.js';
 import { HttpVersionManager } from './httpVersionManager.js';
 import { TimeoutManager } from './timeoutManager.js';
 import { SettingsModal } from './ui/SettingsModal.js';
@@ -14,6 +15,7 @@ export const settingsFeature = {
     name: 'settings',
     create(ctx) {
         const themeManager = new ThemeManager();
+        const layoutManager = new LayoutManager();
         const httpVersionManager = new HttpVersionManager();
         const timeoutManager = new TimeoutManager();
 
@@ -23,10 +25,11 @@ export const settingsFeature = {
             httpVersionManager,
             timeoutManager,
             ctx.get('proxyController'),
-            ctx.get('certificateController')
+            ctx.get('certificateController'),
+            layoutManager
         );
 
-        return { themeManager, httpVersionManager, timeoutManager, modal };
+        return { themeManager, layoutManager, httpVersionManager, timeoutManager, modal };
     },
     globals: { settingsModal: 'modal' },
 };

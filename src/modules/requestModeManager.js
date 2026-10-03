@@ -5,7 +5,7 @@
 
 import { app } from './appContext.js';
 import { PROTOCOLS, RequestMode, getProtocol, listProtocolIds, resolveProtocolId } from './protocols/protocolRegistry.js';
-import { setResponseTabsForProtocol } from './tabManager.js';
+import { activateTab, setResponseTabsForProtocol } from './tabManager.js';
 import { notifyStreamStateChanged } from './streaming/streamState.js';
 import { createMirroredUrlSection, syncMirroredUrlInput } from './ui/mirroredUrlSection.js';
 
@@ -197,7 +197,7 @@ function setDisplay(element, show) {
  * @returns {void}
  */
 function activateRequestTab(tabId) {
-    document.querySelector(`.request-config .tab-nav .tab-button[data-tab="${tabId}"]`)?.click();
+    activateTab('request', tabId);
 }
 
 /** @type {{value: string, text: string}[]|null} */

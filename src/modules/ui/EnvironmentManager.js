@@ -108,15 +108,17 @@ export class EnvironmentManager {
         nameSpan.className = 'env-list-item-name';
         nameSpan.textContent = environment.name;
 
-        if (isActive) {
-            const badge = document.createElement('span');
-            badge.textContent = '✓';
-            badge.className = 'env-list-item-active-badge';
-            nameSpan.appendChild(badge);
-        }
-
         item.appendChild(colorIndicator);
         item.appendChild(nameSpan);
+
+        if (isActive) {
+            const badge = document.createElement('span');
+            badge.className = 'env-list-item-active-badge icon icon-14 icon-check';
+            badge.title = 'Active environment';
+            badge.setAttribute('role', 'img');
+            badge.setAttribute('aria-label', 'Active environment');
+            item.appendChild(badge);
+        }
 
         item.addEventListener('click', () => this.selectEnvironment(environment.id));
 
@@ -342,8 +344,9 @@ export class EnvironmentManager {
         }
 
         if (addVariableBtn) {
-            addVariableBtn.addEventListener('click', () => {
-                this.addVariableRow({});
+            addVariableBtn.addEventListener('click', async () => {
+                const row = await this.addVariableRow({});
+                row?.querySelector('.var-name-input')?.focus();
             });
         }
     }
@@ -363,19 +366,24 @@ export class EnvironmentManager {
                 : value;
             return { name, value: resolvedValue, isSecret };
         }));
-        for (const row of rows) {
-            this.addVariableRow(row, container);
-        }
-
-        this.addVariableRow({}, container);
+        await Promise.all(rows.map(row => this.addVariableRow(row, container)));
+        this.updateVariablesEmptyState();
     }
 
+    updateVariablesEmptyState() {
+        const container = this.dialog.querySelector('#env-variables-container');
+        const emptyState = this.dialog.querySelector('.env-variables-empty');
+        if (!container || !emptyState) {return;}
+        emptyState.classList.toggle('is-hidden', container.childElementCount > 0);
+    }
+
+    /** @returns {Promise<HTMLElement|null>} */
     addVariableRow({ name = '', value = '', isSecret = false }, container = null) {
         if (!container) {
             container = this.dialog.querySelector('#env-variables-container');
         }
 
-        templateLoader
+        return templateLoader
             .clone('./src/templates/environment/environmentManager.html', 'tpl-environment-manager-variable-row')
             .then((fragment) => {
                 const row = fragment.firstElementChild;
@@ -389,9 +397,12 @@ export class EnvironmentManager {
                 this.applySecretState(row, isSecret);
 
                 this.setupVariableRowListeners(row, name);
+                this.updateVariablesEmptyState();
+                return row;
             })
             .catch((error) => {
                 void error;
+                return null;
             });
     }
 
@@ -405,7 +416,10 @@ export class EnvironmentManager {
         const revealBtn = row.querySelector('.var-reveal-btn');
 
         row.dataset.secret = isSecret ? 'true' : 'false';
-        if (secretBtn) {secretBtn.classList.toggle('is-secret', isSecret);}
+        if (secretBtn) {
+            secretBtn.classList.toggle('is-secret', isSecret);
+            secretBtn.setAttribute('aria-pressed', String(isSecret));
+        }
         if (revealBtn) {revealBtn.classList.toggle('is-hidden', !isSecret);}
         if (valueInput) {
             valueInput.type = isSecret ? 'password' : 'text';
@@ -428,23 +442,26 @@ export class EnvironmentManager {
         const revealBtn = row.querySelector('.var-reveal-btn');
 
         const isSecret = () => row.dataset.secret === 'true';
+        let currentName = originalName;
 
         const saveVariable = async () => {
             const name = nameInput.value.trim();
             const value = valueInput.value.trim();
 
             if (!name) {
-                if (originalName) {
-                    await this.deleteVariable(originalName);
+                if (currentName) {
+                    await this.deleteVariable(currentName);
+                    currentName = '';
                 }
                 return;
             }
 
-            if (name !== originalName && originalName) {
-                await this.deleteVariable(originalName);
+            if (currentName && name !== currentName) {
+                await this.deleteVariable(currentName);
             }
 
             await this.setVariable(name, value, isSecret());
+            currentName = name;
         };
 
         nameInput.addEventListener('blur', saveVariable);
@@ -483,10 +500,11 @@ export class EnvironmentManager {
         }
 
         deleteBtn.addEventListener('click', async () => {
-            if (originalName) {
-                await this.deleteVariable(originalName);
+            if (currentName) {
+                await this.deleteVariable(currentName);
             }
             row.remove();
+            this.updateVariablesEmptyState();
         });
     }
 

@@ -172,6 +172,11 @@
   mask-image: url("../../assets/ui/menu.svg");
 }
 
+.icon-view-dual {
+  -webkit-mask-image: url("../../assets/ui/view-dual.svg");
+  mask-image: url("../../assets/ui/view-dual.svg");
+}
+
 .icon-mock-server {
   -webkit-mask-image: url("../../assets/ui/mock-server.svg");
   mask-image: url("../../assets/ui/mock-server.svg");

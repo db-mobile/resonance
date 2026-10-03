@@ -41,6 +41,7 @@
   display: flex;
   flex-direction: column;
   flex: 0 0 220px;
+  min-width: 0;
   min-height: 0;
   border-right: 1px solid var(--border-color);
   padding-right: var(--space-4);
@@ -87,12 +88,6 @@
   gap: var(--space-2);
 }
 
-.env-manager-active-badge {
-  font-size: var(--font-size-caption);
-  font-weight: 700;
-  color: var(--accent-color);
-}
-
 .env-list-item {
   display: flex;
   align-items: center;
@@ -121,20 +116,28 @@
 }
 
 .env-list-item-active-badge {
-  color: var(--accent-color);
   flex-shrink: 0;
+  color: var(--accent-color);
 }
 
-.env-manager-color-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
+.env-manager-details {
+  min-height: 100%;
 }
 
-.env-manager-color-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+.env-manager-details > .list-group-title:first-child {
+  margin-top: 0;
+}
+
+.env-manager-group-header {
+  margin: var(--space-6) 0 var(--space-2);
+}
+
+.env-manager-group-header > .list-group-title {
+  margin: 0;
+}
+
+.env-manager-name-suffix {
+  flex: 0 1 60%;
 }
 
 .env-manager-color-input {
@@ -153,12 +156,54 @@
   opacity: var(--dim-opacity);
 }
 
-.env-manager-details-actions {
-  gap: var(--space-2);
+.env-variables-head,
+.env-variables-list .env-variable-row {
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
 }
 
-.env-manager-variables-header {
-  margin-top: var(--space-4);
+.env-variables-head {
+  min-height: 32px;
+  border-bottom: 1px solid var(--card-shade-color);
+}
+
+.env-variables-head-name,
+.env-variables-head-value {
+  padding-left: var(--space-3);
+}
+
+.env-variables-head-name {
+  flex: 0 0 34%;
+}
+
+.env-variables-head-secret {
+  flex: 0 0 calc(2 * var(--control-height-small) + var(--space-2));
+}
+
+.env-variables-list .env-variable-row + .env-variable-row {
+  border-top: 1px solid var(--card-shade-color);
+}
+
+.env-variables-list .input-base {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.env-variables-list .input-base:hover {
+  background-color: var(--shade-color);
+}
+
+.var-secret-btn {
+  opacity: 0.4;
+}
+
+.var-secret-btn.is-secret {
+  color: var(--accent-color);
+  opacity: 1;
+}
+
+.env-manager-footer {
+  margin-top: auto;
+  padding-top: var(--space-4);
 }
 
 .env-variable-row,

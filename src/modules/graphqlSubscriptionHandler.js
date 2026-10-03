@@ -23,6 +23,7 @@ import {
 const SUB_ID = '1';
 
 const session = new StreamSession({
+    protocol: 'GraphQL',
     buildResponseMeta: (entry, transcript, state) => ({
         data: transcript,
         headers: {},

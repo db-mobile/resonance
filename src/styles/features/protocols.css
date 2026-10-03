@@ -206,10 +206,6 @@
   gap: var(--space-2);
 }
 
-.graphql-toolbar {
-  flex-shrink: 0;
-}
-
 .graphql-workbench-body {
   flex: 1;
   min-height: 0;
@@ -235,6 +231,7 @@
 
 .graphql-docs-rail {
   flex: 0 0 320px;
+  max-width: 50%;
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-3);

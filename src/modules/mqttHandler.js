@@ -12,6 +12,7 @@ import {
 } from './streaming/streamSession.js';
 
 const session = new StreamSession({
+    protocol: 'MQTT',
     buildResponseMeta: (entry, transcript, state) => ({
         data: transcript,
         headers: {},

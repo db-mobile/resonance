@@ -2,7 +2,7 @@ import { app } from '../appContext.js';
 import { displayResponseWithLineNumbersForTab } from '../apiHandler.js';
 import { updateResponseSize, updateResponseTime, updateStatusDisplay } from '../statusDisplay.js';
 import { debounce } from '../utils/debounce.js';
-import { notifyStreamStateChanged } from './streamState.js';
+import { notifyStreamStateChanged, registerStreamSource } from './streamState.js';
 
 /** @returns {Promise<string|null>} */
 export async function getActiveTabId() {
@@ -86,10 +86,14 @@ function droppedNotice(count) {
 export class StreamSession {
     /**
      * @param {object} [options]
+     * @param {string} [options.protocol]
      * @param {(entry: object, transcript: string, state: string) => (object|null)} [options.buildResponseMeta]
      */
-    constructor({ buildResponseMeta = null } = {}) {
+    constructor({ protocol = null, buildResponseMeta = null } = {}) {
         this._entries = new Map();
+        if (protocol) {
+            registerStreamSource(protocol, () => this._entries.entries());
+        }
         this._buffers = new Map();
         this._persisters = new Map();
         this._renderStates = new Map();

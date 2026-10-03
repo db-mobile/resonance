@@ -119,6 +119,16 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.3.0" date="2026-10-03">
+      <description>
+        <p>New features introduced</p>
+        <ul>
+          <li>Add side-by-side request/response layout</li>
+          <li>Replace status bar environment echo with request-relevant state</li>
+          <li>Restructure Manage Environments dialog</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.2.5" date="2026-10-01">
       <description>
         <p>Feature stabilization release</p>

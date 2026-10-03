@@ -9,8 +9,9 @@ import { updateSetting } from '../state/settingsCache.js';
 import { translate } from '../utils/translate.js';
 
 export class SettingsModal {
-    constructor(themeManager, i18nManager = null, httpVersionManager = null, timeoutManager = null, proxyController = null, certificateController = null) {
+    constructor(themeManager, i18nManager = null, httpVersionManager = null, timeoutManager = null, proxyController = null, certificateController = null, layoutManager = null) {
         this.themeManager = themeManager;
+        this.layoutManager = layoutManager;
         this.i18nManager = i18nManager;
         this.httpVersionManager = httpVersionManager;
         this.timeoutManager = timeoutManager;
@@ -19,7 +20,10 @@ export class SettingsModal {
         this.isOpen = false;
     }
 
-    async show() {
+    /**
+     * @param {{tab?: string}} [options]
+     */
+    async show({ tab = null } = {}) {
         if (this.isOpen) {return;}
 
         this.isOpen = true;
@@ -42,6 +46,13 @@ export class SettingsModal {
             } catch (error) {
                 void error;
             }
+        }
+
+        const tabButton = tab ? modal.querySelector(`.settings-tab[data-tab="${tab}"]`) : null;
+        if (tabButton) {
+            tabButton.click();
+            tabButton.focus();
+            return;
         }
 
         const firstSelect = modal.querySelector('select[name="theme"]');
@@ -75,6 +86,11 @@ export class SettingsModal {
         const themeSelect = overlay.querySelector('select[name="theme"]');
         if (themeSelect) {
             themeSelect.value = this.themeManager.getCurrentTheme();
+        }
+
+        const layoutSelect = overlay.querySelector('select[name="layout"]');
+        if (layoutSelect && this.layoutManager) {
+            layoutSelect.value = this.layoutManager.getLayout();
         }
 
         const httpVersionSelect = overlay.querySelector('select[name="httpVersion"]');
@@ -508,6 +524,13 @@ export class SettingsModal {
         if (themeSelect) {
             themeSelect.addEventListener('change', async (e) => {
                 await this.themeManager.setTheme(e.target.value);
+            });
+        }
+
+        const layoutSelect = overlay.querySelector('select[name="layout"]');
+        if (layoutSelect && this.layoutManager) {
+            layoutSelect.addEventListener('change', async (e) => {
+                await this.layoutManager.setLayout(e.target.value);
             });
         }
 

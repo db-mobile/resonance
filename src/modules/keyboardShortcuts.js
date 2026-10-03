@@ -79,6 +79,8 @@ class KeyboardShortcutsManager {
             displayKey = '/';
         } else if (key === 'Comma') {
             displayKey = ',';
+        } else if (key === 'Backslash') {
+            displayKey = '\\';
         }
 
         parts.push(displayKey);

@@ -306,6 +306,8 @@
     "history_limit_unit": "entries",
     "history_limit_description": "Maximum number of requests stored in history",
     "accent_color": "Accent Color",
+    "layout": "Layout",
+    "layout_description": "Where the response appears relative to the request.",
     "proxy": "Proxy Configuration",
     "proxy_enabled": "Enable Proxy",
     "proxy_use_system": "Use System Proxy",
@@ -344,6 +346,10 @@
     "dark": "Dark",
     "system": "System",
     "black": "Black (OLED)"
+  },
+  "layout": {
+    "stacked": "Stacked",
+    "side_by_side": "Side by side"
   },
   "http_version": {
     "auto": "Auto",
@@ -630,5 +636,19 @@
   "body_editor": {
     "format": "Format",
     "format_title": "Format JSON (Shift+Alt+F)"
+  },
+  "status_bar": {
+    "http_auto": "HTTP auto",
+    "http_hint": "HTTP version used for requests. Click to change.",
+    "mock_running": "Mock :{{port}}",
+    "mock_hint": "Mock server running. Click to manage.",
+    "proxy_host": "Proxy {{host}}:{{port}}",
+    "proxy_system": "System proxy",
+    "proxy_hint": "All requests go through this proxy. Click to configure.",
+    "live_connections_one": "{{count}} live connection",
+    "live_connections_other": "{{count}} live connections",
+    "live_hint": "Open streaming connections. Click to jump to a tab.",
+    "keychain_unavailable": "Secrets unencrypted",
+    "keychain_hint": "No OS keychain available. Secrets are stored locally without encryption at rest."
   }
 }
