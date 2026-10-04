@@ -127,9 +127,7 @@ async function buildMqttTlsOptions(normalizedBroker) {
     try {
         const settings = await getSettings();
         skipVerify = settings?.verifySsl === false;
-    } catch (_e) {
-        void _e;
-    }
+    } catch {}
 
     const tls = { skipVerify };
     if (app.certificateController) {

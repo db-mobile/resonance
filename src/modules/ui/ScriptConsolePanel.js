@@ -6,11 +6,29 @@
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 
+const TEMPLATE_PATH = './src/templates/scripts/scriptConsolePanel.html';
+
+/** @type {Readonly<Object<string, {icon: string, className: string}>>} */
+const ENTRY_LEVELS = Object.freeze({
+    error: { icon: '✗', className: 'is-error' },
+    warn: { icon: '⚠', className: 'is-warn' },
+    info: { icon: 'ℹ', className: 'is-info' }
+});
+
+const DEFAULT_ENTRY_LEVEL = Object.freeze({ icon: 'ℹ', className: 'is-default' });
+
+/**
+ * @param {string} templateId
+ * @returns {DocumentFragment}
+ */
+function cloneTemplate(templateId) {
+    return templateLoader.cloneSync(TEMPLATE_PATH, templateId);
+}
+
 export class ScriptConsolePanel {
     /** @param {HTMLElement} container */
     constructor(container) {
         this.container = container;
-        this.isVisible = false;
         this.initialize();
     }
 
@@ -41,12 +59,8 @@ export class ScriptConsolePanel {
 
         container.classList.add('script-console-container');
 
-        const fragment = templateLoader.cloneSync(
-            './src/templates/scripts/scriptConsolePanel.html',
-            'tpl-script-console-panel'
-        );
         container.innerHTML = '';
-        container.appendChild(fragment);
+        container.appendChild(cloneTemplate('tpl-script-console-panel'));
 
         const clearBtn = container.querySelector('.clear-console-btn');
         if (clearBtn) {
@@ -56,24 +70,33 @@ export class ScriptConsolePanel {
         this._showEmptyStateInContainer(container);
     }
 
-    /**
-     * @param {Array} logs
-     * @param {Array} errors
-     */
-    show(logs, errors) {
+    /** @returns {HTMLElement|null} */
+    _resetContent() {
         const container = this._getActiveContainer();
         if (!container) {
-            return;
+            return null;
         }
 
         this.initialize();
 
         const content = container.querySelector('.script-console-content');
         if (!content) {
-            return;
+            return null;
         }
 
         content.innerHTML = '';
+        return content;
+    }
+
+    /**
+     * @param {Array} logs
+     * @param {Array} errors
+     */
+    show(logs, errors) {
+        const content = this._resetContent();
+        if (!content) {
+            return;
+        }
 
         if (errors && errors.length > 0) {
             errors.forEach(error => {
@@ -94,120 +117,105 @@ export class ScriptConsolePanel {
 
     /** @param {Object} result */
     showTestResults(result) {
-        const container = this._getActiveContainer();
-        if (!container) {
-            return;
-        }
-
-        this.initialize();
-
-        const content = container.querySelector('.script-console-content');
+        const content = this._resetContent();
         if (!content) {
             return;
         }
 
-        content.innerHTML = '';
-
-        const passed = result.testResults.filter(t => t.passed).length;
-        const failed = result.testResults.filter(t => !t.passed).length;
-        const total = passed + failed;
-
-        const summaryFragment = templateLoader.cloneSync(
-            './src/templates/scripts/scriptConsolePanel.html',
-            'tpl-script-console-summary'
-        );
-        const summary = summaryFragment.firstElementChild;
-        const summarySlot = summary.querySelector('[data-role="summary"]');
-        if (summarySlot) {
-            if (total === 0) {
-                summarySlot.textContent = 'No tests run';
-            } else if (failed === 0) {
-                const allPassedFragment = templateLoader.cloneSync(
-                    './src/templates/scripts/scriptConsolePanel.html',
-                    'tpl-script-console-summary-all-passed'
-                );
-                const allPassedEl = allPassedFragment.firstElementChild;
-                const allPassedTextEl = allPassedEl.querySelector('[data-role="text"]');
-                if (allPassedTextEl) {
-                    allPassedTextEl.textContent = `✓ All tests passed (${total})`;
-                }
-                summarySlot.appendChild(allPassedEl);
-            } else {
-                const mixedFragment = templateLoader.cloneSync(
-                    './src/templates/scripts/scriptConsolePanel.html',
-                    'tpl-script-console-summary-mixed'
-                );
-                const mixedEl = mixedFragment;
-                const passedEl = mixedEl.querySelector('[data-role="passed"]');
-                const failedEl = mixedEl.querySelector('[data-role="failed"]');
-                if (passedEl) {passedEl.textContent = `${passed} passed`;}
-                if (failedEl) {failedEl.textContent = `${failed} failed`;}
-                summarySlot.appendChild(mixedEl);
-            }
-        }
-
-        content.appendChild(summary);
+        content.appendChild(this._createSummary(result.testResults));
 
         if (result.testResults && result.testResults.length > 0) {
-            const testListFragment = templateLoader.cloneSync(
-                './src/templates/scripts/scriptConsolePanel.html',
-                'tpl-script-console-test-list'
-            );
-            const testList = testListFragment.firstElementChild;
-
-            result.testResults.forEach(test => {
-                const testItemFragment = templateLoader.cloneSync(
-                    './src/templates/scripts/scriptConsolePanel.html',
-                    'tpl-script-console-test-item'
-                );
-                const testItem = testItemFragment.firstElementChild;
-                testItem.style.setProperty('--script-console-accent', test.passed ? 'var(--color-success, #10b981)' : 'var(--color-error, #ef4444)');
-
-                testItem.classList.toggle('is-passed', test.passed);
-                testItem.classList.toggle('is-failed', !test.passed);
-
-                const icon = test.passed ? '✓' : '✗';
-                const iconEl = testItem.querySelector('[data-role="icon"]');
-                const messageEl = testItem.querySelector('[data-role="message"]');
-                if (iconEl) {iconEl.textContent = icon;}
-                if (messageEl) {messageEl.textContent = test.message;}
-
-                testList.appendChild(testItem);
-            });
-
-            content.appendChild(testList);
+            content.appendChild(this._createTestList(result.testResults));
         }
 
         if (result.logs && result.logs.length > 0) {
-            const sepFragment = templateLoader.cloneSync(
-                './src/templates/scripts/scriptConsolePanel.html',
-                'tpl-script-console-separator'
-            );
-            const separator = sepFragment.firstElementChild;
-            const textEl = separator.querySelector('[data-role="text"]');
-            if (textEl) {textEl.textContent = 'Console Output';}
-            content.appendChild(separator);
-
-            result.logs.forEach(log => {
-                this.appendEntry(content, log.level, log.message, log.timestamp);
-            });
+            this._appendSection(content, 'Console Output', null, result.logs.map(log => [log.level, log.message, log.timestamp]));
         }
 
         if (result.errors && result.errors.length > 0) {
-            const sepFragment = templateLoader.cloneSync(
-                './src/templates/scripts/scriptConsolePanel.html',
-                'tpl-script-console-separator'
-            );
-            const separator = sepFragment.firstElementChild;
-            separator.classList.add('script-console-separator--error');
-            const textEl = separator.querySelector('[data-role="text"]');
-            if (textEl) {textEl.textContent = 'Errors';}
-            content.appendChild(separator);
-
-            result.errors.forEach(error => {
-                this.appendEntry(content, 'error', error, Date.now());
-            });
+            this._appendSection(content, 'Errors', 'script-console-separator--error', result.errors.map(error => ['error', error, Date.now()]));
         }
+    }
+
+    /**
+     * @param {Array<{passed: boolean}>} testResults
+     * @returns {HTMLElement}
+     */
+    _createSummary(testResults) {
+        const passed = testResults.filter(t => t.passed).length;
+        const failed = testResults.filter(t => !t.passed).length;
+        const total = passed + failed;
+
+        const summary = cloneTemplate('tpl-script-console-summary').firstElementChild;
+        const summarySlot = summary.querySelector('[data-role="summary"]');
+        if (!summarySlot) {
+            return summary;
+        }
+
+        if (total === 0) {
+            summarySlot.textContent = 'No tests run';
+        } else if (failed === 0) {
+            const allPassedEl = cloneTemplate('tpl-script-console-summary-all-passed').firstElementChild;
+            const allPassedTextEl = allPassedEl.querySelector('[data-role="text"]');
+            if (allPassedTextEl) {
+                allPassedTextEl.textContent = `✓ All tests passed (${total})`;
+            }
+            summarySlot.appendChild(allPassedEl);
+        } else {
+            const mixedFragment = cloneTemplate('tpl-script-console-summary-mixed');
+            const passedEl = mixedFragment.querySelector('[data-role="passed"]');
+            const failedEl = mixedFragment.querySelector('[data-role="failed"]');
+            if (passedEl) {passedEl.textContent = `${passed} passed`;}
+            if (failedEl) {failedEl.textContent = `${failed} failed`;}
+            summarySlot.appendChild(mixedFragment);
+        }
+        return summary;
+    }
+
+    /**
+     * @param {Array<{passed: boolean, message: string}>} testResults
+     * @returns {HTMLElement}
+     */
+    _createTestList(testResults) {
+        const testList = cloneTemplate('tpl-script-console-test-list').firstElementChild;
+
+        testResults.forEach(test => {
+            const testItem = cloneTemplate('tpl-script-console-test-item').firstElementChild;
+            testItem.style.setProperty('--script-console-accent', test.passed ? 'var(--color-success, #10b981)' : 'var(--color-error, #ef4444)');
+
+            testItem.classList.toggle('is-passed', test.passed);
+            testItem.classList.toggle('is-failed', !test.passed);
+
+            const iconEl = testItem.querySelector('[data-role="icon"]');
+            const messageEl = testItem.querySelector('[data-role="message"]');
+            if (iconEl) {iconEl.textContent = test.passed ? '✓' : '✗';}
+            if (messageEl) {messageEl.textContent = test.message;}
+
+            testList.appendChild(testItem);
+        });
+
+        return testList;
+    }
+
+    /**
+     * @param {HTMLElement} content
+     * @param {string} title
+     * @param {string|null} separatorClass
+     * @param {Array<[string, string, number]>} entries
+     * @returns {void}
+     */
+    _appendSection(content, title, separatorClass, entries) {
+        const separator = cloneTemplate('tpl-script-console-separator').firstElementChild;
+        if (separatorClass) {
+            separator.classList.add(separatorClass);
+        }
+        const textEl = separator.querySelector('[data-role="text"]');
+        if (textEl) {textEl.textContent = title;}
+        content.appendChild(separator);
+
+        entries.forEach(([level, message, timestamp]) => {
+            this.appendEntry(content, level, message, timestamp);
+        });
     }
 
     /**
@@ -217,27 +225,10 @@ export class ScriptConsolePanel {
      * @param {number} timestamp
      */
     appendEntry(content, level, message, timestamp) {
-        const fragment = templateLoader.cloneSync(
-            './src/templates/scripts/scriptConsolePanel.html',
-            'tpl-script-console-entry'
-        );
-        const entry = fragment.firstElementChild;
+        const entry = cloneTemplate('tpl-script-console-entry').firstElementChild;
+        const { icon, className } = ENTRY_LEVELS[level] ?? DEFAULT_ENTRY_LEVEL;
 
-        let icon = 'ℹ';
-        let levelClass = 'is-default';
-
-        if (level === 'error') {
-            icon = '✗';
-            levelClass = 'is-error';
-        } else if (level === 'warn') {
-            icon = '⚠';
-            levelClass = 'is-warn';
-        } else if (level === 'info') {
-            icon = 'ℹ';
-            levelClass = 'is-info';
-        }
-
-        entry.classList.add(levelClass);
+        entry.classList.add(className);
 
         const timeStr = new Date(timestamp).toLocaleTimeString('en-US', {
             hour12: false,
@@ -271,11 +262,7 @@ export class ScriptConsolePanel {
             return;
         }
 
-        const fragment = templateLoader.cloneSync(
-            './src/templates/scripts/scriptConsolePanel.html',
-            'tpl-script-console-empty'
-        );
-        const emptyEl = fragment.firstElementChild;
+        const emptyEl = cloneTemplate('tpl-script-console-empty').firstElementChild;
         const messageEl = emptyEl.querySelector('[data-role="message"]');
         if (messageEl) {
             messageEl.textContent = 'No script output yet. Console logs and test results will appear here.';
@@ -286,10 +273,5 @@ export class ScriptConsolePanel {
 
     clear() {
         this.showEmptyState();
-    }
-
-    toggle() {
-        this.isVisible = !this.isVisible;
-        this.container.classList.toggle('is-hidden', !this.isVisible);
     }
 }

@@ -25,6 +25,20 @@ export class MockServerService {
     }
 
     /**
+     * @param {string} label
+     * @param {function(): Promise<*>} work
+     * @returns {Promise<*>}
+     */
+    async _reporting(label, work) {
+        try {
+            return await work();
+        } catch (error) {
+            this.statusDisplay.update(`${label}: ${error.message}`, null);
+            throw error;
+        }
+    }
+
+    /**
      * @param {Array} collections
      * @returns {Promise<Object>}
      */
@@ -139,12 +153,7 @@ export class MockServerService {
 
     /** @returns {Promise<Object>} */
     async getSettings() {
-        try {
-            return await this.repository.getSettings();
-        } catch (error) {
-            this.statusDisplay.update(`Error loading mock server settings: ${error.message}`, null);
-            throw error;
-        }
+        return this._reporting('Error loading mock server settings', () => this.repository.getSettings());
     }
 
     /**
@@ -152,7 +161,7 @@ export class MockServerService {
      * @returns {Promise<Object>}
      */
     async updateSettings(updates) {
-        try {
+        return this._reporting('Error updating mock server settings', async () => {
             const status = await this.getStatus();
             const requiresRestart = status.running && updates.port !== undefined;
 
@@ -160,16 +169,12 @@ export class MockServerService {
 
             this.statusDisplay.update('Mock server settings updated', null);
 
-
             if (requiresRestart) {
                 this.statusDisplay.update('Port changed. Please restart the mock server for changes to take effect.', null);
             }
 
             return updatedSettings;
-        } catch (error) {
-            this.statusDisplay.update(`Error updating mock server settings: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -179,7 +184,7 @@ export class MockServerService {
      * @returns {Promise<Object>}
      */
     async setEndpointDelay(collectionId, endpointId, delayMs) {
-        try {
+        return this._reporting('Error setting endpoint delay', async () => {
             const errors = this.validateDelay(delayMs);
             if (errors.length > 0) {
                 throw new Error(errors.join(', '));
@@ -190,10 +195,7 @@ export class MockServerService {
             await this._reloadServerSettings();
 
             return result;
-        } catch (error) {
-            this.statusDisplay.update(`Error setting endpoint delay: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -203,16 +205,13 @@ export class MockServerService {
      * @returns {Promise<Object>}
      */
     async setCustomResponse(collectionId, endpointId, response) {
-        try {
+        return this._reporting('Error setting custom response', async () => {
             const result = await this.repository.setCustomResponse(collectionId, endpointId, response);
 
             await this._reloadServerSettings();
 
             return result;
-        } catch (error) {
-            this.statusDisplay.update(`Error setting custom response: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -235,16 +234,13 @@ export class MockServerService {
      * @returns {Promise<Object>}
      */
     async setCustomStatusCode(collectionId, endpointId, statusCode) {
-        try {
+        return this._reporting('Error setting custom status code', async () => {
             const result = await this.repository.setCustomStatusCode(collectionId, endpointId, statusCode);
 
             await this._reloadServerSettings();
 
             return result;
-        } catch (error) {
-            this.statusDisplay.update(`Error setting custom status code: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -265,16 +261,10 @@ export class MockServerService {
      * @returns {Promise<boolean>}
      */
     async toggleCollectionEnabled(collectionId) {
-        try {
+        return this._reporting('Error toggling collection', async () => {
             const settings = await this.repository.toggleCollectionEnabled(collectionId);
-            const isEnabled = settings.enabledCollections.includes(collectionId);
-
-
-            return isEnabled;
-        } catch (error) {
-            this.statusDisplay.update(`Error toggling collection: ${error.message}`, null);
-            throw error;
-        }
+            return settings.enabledCollections.includes(collectionId);
+        });
     }
 
     /**
@@ -339,7 +329,7 @@ export class MockServerService {
             if (status.running) {
                 await window.backendAPI.mockServer.reloadSettings(await this.repository.getSettings());
             }
-        } catch (error) {
+        } catch {
         }
     }
 }

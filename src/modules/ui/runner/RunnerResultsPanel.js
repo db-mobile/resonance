@@ -5,9 +5,11 @@
 
 import { app } from '../../appContext.js';
 import { templateLoader } from '../../templateLoader.js';
-import { escapeHtml, getStatusCodeClass, getStatusText } from './runnerDomUtils.js';
+import { getStatusCodeClass, getStatusText } from './runnerDomUtils.js';
+import { el } from '../../htmlUtils.js';
 import { translate } from '../../utils/translate.js';
 import { pushEscapeHandler } from '../modalEscape.js';
+import { startDragSession } from '../dragSession.js';
 
 /** @type {Readonly<Object<string, string>>} */
 const STATUS_CLASSES = Object.freeze({
@@ -304,38 +306,28 @@ export class RunnerResultsPanel {
             const startHeight = this.panel.offsetHeight;
             const startMainHeight = runnerMain.offsetHeight;
 
-            this.resizer.classList.add('is-dragging');
-            document.body.style.userSelect = 'none';
-            document.body.style.cursor = 'row-resize';
+            startDragSession({
+                handle: this.resizer,
+                cursor: 'row-resize',
+                draggingClass: 'is-dragging',
+                onMove: (moveEvent) => {
+                    const deltaY = startY - moveEvent.clientY;
+                    const newResultsHeight = startHeight + deltaY;
+                    const newMainHeight = startMainHeight - deltaY;
 
-            const onMove = (moveEvent) => {
-                const deltaY = startY - moveEvent.clientY;
-                const newResultsHeight = startHeight + deltaY;
-                const newMainHeight = startMainHeight - deltaY;
+                    const minResultsHeight = 150;
+                    const maxResultsHeight = window.innerHeight * 0.7;
+                    const minMainHeight = 200;
 
-                const minResultsHeight = 150;
-                const maxResultsHeight = window.innerHeight * 0.7;
-                const minMainHeight = 200;
+                    if (newResultsHeight < minResultsHeight || newResultsHeight > maxResultsHeight) {return;}
+                    if (newMainHeight < minMainHeight) {return;}
 
-                if (newResultsHeight < minResultsHeight || newResultsHeight > maxResultsHeight) {return;}
-                if (newMainHeight < minMainHeight) {return;}
+                    this.panel.style.height = `${newResultsHeight}px`;
+                    runnerMain.style.flex = `0 0 ${newMainHeight}px`;
 
-                this.panel.style.height = `${newResultsHeight}px`;
-                runnerMain.style.flex = `0 0 ${newMainHeight}px`;
-
-                moveEvent.preventDefault();
-            };
-
-            const onUp = () => {
-                this.resizer?.classList.remove('is-dragging');
-                document.body.style.userSelect = '';
-                document.body.style.cursor = '';
-                document.removeEventListener('mousemove', onMove);
-                document.removeEventListener('mouseup', onUp);
-            };
-
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp);
+                    moveEvent.preventDefault();
+                }
+            });
 
             e.preventDefault();
         });
@@ -519,61 +511,70 @@ export class RunnerResultsPanel {
         }
 
         if (this.dom.bodyContent) {
-            let bodyText = '';
-            if (result.body != null) {
-                if (typeof result.body === 'object') {
-                    try {
-                        bodyText = JSON.stringify(result.body, null, 2);
-                    } catch {
-                        bodyText = String(result.body);
-                    }
-                } else {
+            this.dom.bodyContent.textContent = this._formatBody(result);
+        }
+
+        this._renderHeaders(result.headers || {});
+        this._renderCookies(result.cookies || []);
+    }
+
+    /**
+     * @param {Object} result
+     * @returns {string}
+     */
+    _formatBody(result) {
+        let bodyText = '';
+        if (result.body != null) {
+            if (typeof result.body === 'object') {
+                try {
+                    bodyText = JSON.stringify(result.body, null, 2);
+                } catch {
                     bodyText = String(result.body);
                 }
-            }
-            this.dom.bodyContent.textContent = bodyText || (result.fromHistory
-                ? translate('runner.history_no_body', 'Response bodies, headers and cookies are not kept in run history')
-                : translate('runner.no_response_body', '(No response body)'));
-        }
-
-        if (this.dom.headersBody) {
-            this.dom.headersBody.innerHTML = '';
-            const headers = result.headers || {};
-            const headerEntries = Object.entries(headers);
-
-            if (headerEntries.length > 0) {
-                headerEntries.forEach(([name, value]) => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `<td>${escapeHtml(name)}</td><td>${escapeHtml(String(value))}</td>`;
-                    this.dom.headersBody.appendChild(row);
-                });
             } else {
-                const row = document.createElement('tr');
-                row.innerHTML = `<td colspan="2" class="runner-table-empty-cell">${escapeHtml(translate('runner.no_headers', 'No headers'))}</td>`;
-                this.dom.headersBody.appendChild(row);
+                bodyText = String(result.body);
             }
         }
+        return bodyText || (result.fromHistory
+            ? translate('runner.history_no_body', 'Response bodies, headers and cookies are not kept in run history')
+            : translate('runner.no_response_body', '(No response body)'));
+    }
 
-        if (this.dom.cookiesBody && this.dom.noCookies) {
-            this.dom.cookiesBody.innerHTML = '';
-            const cookies = result.cookies || [];
+    /** @param {Object<string, *>} headers */
+    _renderHeaders(headers) {
+        if (!this.dom.headersBody) {return;}
+        this.dom.headersBody.innerHTML = '';
+        const headerEntries = Object.entries(headers);
 
-            if (cookies.length > 0) {
-                this.dom.noCookies.classList.add('is-hidden');
-                cookies.forEach(cookie => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${escapeHtml(cookie.name || '')}</td>
-                        <td>${escapeHtml(cookie.value || '')}</td>
-                        <td>${escapeHtml(cookie.domain || '')}</td>
-                        <td>${escapeHtml(cookie.path || '/')}</td>
-                    `;
-                    this.dom.cookiesBody.appendChild(row);
-                });
-            } else {
-                this.dom.noCookies.classList.remove('is-hidden');
-            }
+        if (headerEntries.length === 0) {
+            const cell = el('td', 'runner-table-empty-cell', translate('runner.no_headers', 'No headers'));
+            cell.setAttribute('colspan', '2');
+            this.dom.headersBody.appendChild(el('tr')).appendChild(cell);
+            return;
         }
+
+        headerEntries.forEach(([name, value]) => {
+            const row = el('tr');
+            row.appendChild(el('td', undefined, name));
+            row.appendChild(el('td', undefined, String(value)));
+            this.dom.headersBody.appendChild(row);
+        });
+    }
+
+    /** @param {Array<Object>} cookies */
+    _renderCookies(cookies) {
+        if (!this.dom.cookiesBody || !this.dom.noCookies) {return;}
+        this.dom.cookiesBody.innerHTML = '';
+        this.dom.noCookies.classList.toggle('is-hidden', cookies.length > 0);
+
+        cookies.forEach(cookie => {
+            const row = el('tr');
+            row.appendChild(el('td', undefined, cookie.name || ''));
+            row.appendChild(el('td', undefined, cookie.value || ''));
+            row.appendChild(el('td', undefined, cookie.domain || ''));
+            row.appendChild(el('td', undefined, cookie.path || '/'));
+            this.dom.cookiesBody.appendChild(row);
+        });
     }
 
     /**

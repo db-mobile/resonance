@@ -20,8 +20,7 @@ export class PreviewRepository {
                 });
             }
             this._modes = modes;
-        } catch (error) {
-            void error;
+        } catch {
             this._modes = {};
         }
     }

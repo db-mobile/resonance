@@ -17,17 +17,27 @@ export class VariableService {
         this.environmentRepository = environmentRepository;
     }
 
+    /**
+     * @param {string} label
+     * @param {function(): Promise<*>} work
+     * @returns {Promise<*>}
+     */
+    async _reporting(label, work) {
+        try {
+            return await work();
+        } catch (error) {
+            this.statusDisplay.update(`${label}: ${error.message}`, null);
+            throw error;
+        }
+    }
+
     /** @returns {Promise<Object>} */
     async getVariables() {
-        try {
-            if (this.environmentRepository) {
-                return await this.environmentRepository.getActiveEnvironmentVariables();
-            }
-
-            return {};
-        } catch (error) {
-            return {};
+        if (this.environmentRepository) {
+            return this.environmentRepository.getActiveEnvironmentVariables();
         }
+
+        return {};
     }
 
     /**
@@ -35,11 +45,9 @@ export class VariableService {
      * @returns {Promise<Object>}
      */
     async getVariablesForCollection(collectionId) {
-        try {
-            let variables = {};
-
+        return this._reporting('Error loading variables', async () => {
             const collectionVariables = await this.repository.getVariablesForCollection(collectionId);
-            variables = { ...collectionVariables };
+            let variables = { ...collectionVariables };
 
             if (this.environmentRepository) {
                 const environmentVariables = await this.environmentRepository.getActiveEnvironmentVariables();
@@ -47,10 +55,7 @@ export class VariableService {
             }
 
             return variables;
-        } catch (error) {
-            this.statusDisplay.update(`Error loading variables: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -60,7 +65,7 @@ export class VariableService {
      * @returns {Promise<boolean>}
      */
     async setVariable(collectionId, name, value) {
-        try {
+        return this._reporting('Error saving variable', async () => {
             if (!this.processor.isValidVariableName(name)) {
                 throw new Error(`Invalid variable name: ${name}. Variable names must start with a letter, digit, or underscore, followed by letters, digits, underscores, hyphens, or dots.`);
             }
@@ -68,10 +73,7 @@ export class VariableService {
             await this.repository.setVariable(collectionId, name, value);
             this.statusDisplay.update(`Variable "${name}" saved`, null);
             return true;
-        } catch (error) {
-            this.statusDisplay.update(`Error saving variable: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -80,14 +82,11 @@ export class VariableService {
      * @returns {Promise<boolean>}
      */
     async deleteVariable(collectionId, name) {
-        try {
+        return this._reporting('Error deleting variable', async () => {
             await this.repository.deleteVariable(collectionId, name);
             this.statusDisplay.update(`Variable "${name}" deleted`, null);
             return true;
-        } catch (error) {
-            this.statusDisplay.update(`Error deleting variable: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -97,7 +96,7 @@ export class VariableService {
      * @returns {Promise<boolean>}
      */
     async setMultipleVariables(collectionId, variables, secretKeys = []) {
-        try {
+        return this._reporting('Error saving variables', async () => {
             for (const name of Object.keys(variables)) {
                 if (!this.processor.isValidVariableName(name)) {
                     throw new Error(`Invalid variable name: ${name}`);
@@ -107,10 +106,7 @@ export class VariableService {
             await this.repository.setVariablesForCollection(collectionId, variables, secretKeys);
             this.statusDisplay.update('Variables saved successfully', null);
             return true;
-        } catch (error) {
-            this.statusDisplay.update(`Error saving variables: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -166,9 +162,9 @@ export class VariableService {
      * @returns {Promise<boolean>}
      */
     async importVariables(collectionId, variables, merge = false) {
-        try {
+        return this._reporting('Error importing variables', async () => {
             let finalVariables = variables;
-            
+
             if (merge) {
                 const existingVariables = await this.getVariablesForCollection(collectionId);
                 finalVariables = { ...existingVariables, ...variables };
@@ -176,9 +172,6 @@ export class VariableService {
 
             await this.setMultipleVariables(collectionId, finalVariables);
             return true;
-        } catch (error) {
-            this.statusDisplay.update(`Error importing variables: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 }

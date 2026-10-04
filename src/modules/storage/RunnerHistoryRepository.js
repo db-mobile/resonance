@@ -3,18 +3,12 @@
  * @module storage/RunnerHistoryRepository
  */
 
+import { clone } from '../utils/clone.js';
+
 export const MAX_RUNS_PER_RUNNER = 20;
 
 /** @type {RunnerHistoryRepository|null} */
 let sharedRepository = null;
-
-/**
- * @param {*} value
- * @returns {*}
- */
-function clone(value) {
-    return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
-}
 
 export class RunnerHistoryRepository {
     /**
@@ -42,8 +36,7 @@ export class RunnerHistoryRepository {
             try {
                 const stored = await this.backendAPI.store.get(this.KEY);
                 this._cache = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
-            } catch (error) {
-                void error;
+            } catch {
                 return {};
             }
         }

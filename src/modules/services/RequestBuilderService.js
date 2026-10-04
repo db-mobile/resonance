@@ -9,6 +9,9 @@ import { buildMockPath } from '../collections/endpointUrl.js';
 /** @type {RegExp} */
 const URL_SCHEME = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//;
 
+/** @type {Readonly<Object<string, string>>} */
+const DEFAULT_PORTS = Object.freeze({ 'https:': '443', 'http:': '80' });
+
 /**
  * @param {string} url
  * @returns {string}
@@ -243,8 +246,7 @@ export class RequestBuilderService {
     _sameOrigin(a, b) {
         try {
             return this._originKey(a) === this._originKey(b);
-        } catch (e) {
-            void e;
+        } catch {
             return false;
         }
     }
@@ -255,8 +257,7 @@ export class RequestBuilderService {
      */
     _originKey(url) {
         const parsed = new URL(url);
-        const defaultPort = parsed.protocol === 'https:' ? '443' : parsed.protocol === 'http:' ? '80' : '';
-        const port = parsed.port || defaultPort;
+        const port = parsed.port || DEFAULT_PORTS[parsed.protocol] || '';
         return `${parsed.protocol}//${parsed.hostname}:${port}`;
     }
 

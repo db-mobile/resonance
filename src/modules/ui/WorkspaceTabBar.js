@@ -102,25 +102,19 @@ export class WorkspaceTabBar {
 
         closeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (this.onTabClose) {
-                this.onTabClose(tab.id);
-            }
+            this.onTabClose?.(tab.id);
         });
 
         tabEl.appendChild(closeBtn);
 
         tabEl.addEventListener('click', () => {
-            if (this.onTabSwitch) {
-                this.onTabSwitch(tab.id);
-            }
+            this.onTabSwitch?.(tab.id);
         });
 
         tabEl.addEventListener('mousedown', (e) => {
             if (e.button === 1) {
                 e.preventDefault();
-                if (this.onTabClose) {
-                    this.onTabClose(tab.id);
-                }
+                this.onTabClose?.(tab.id);
             }
         });
 
@@ -196,9 +190,7 @@ export class WorkspaceTabBar {
             this.tabs = newOrder.map(id => tabMap.get(id)).filter(Boolean);
         }
 
-        if (this.onTabReorder) {
-            this.onTabReorder(newOrder);
-        }
+        this.onTabReorder?.(newOrder);
     }
 
     _setDragPreview(event, tab) {
@@ -230,17 +222,8 @@ export class WorkspaceTabBar {
     _createScrollButton(direction) {
         const btn = el('button', `workspace-tab-scroll-button ${direction}`);
         btn.setAttribute('aria-label', `Scroll ${direction}`);
-
-        if (direction === 'left') {
-            const iconEl = el('span', 'icon icon-12 icon-chevron-left');
-            btn.appendChild(iconEl);
-            btn.addEventListener('click', () => this._scrollTabs(-200));
-        } else {
-            const iconEl = el('span', 'icon icon-12 icon-chevron-right');
-            btn.appendChild(iconEl);
-            btn.addEventListener('click', () => this._scrollTabs(200));
-        }
-
+        btn.appendChild(el('span', `icon icon-12 icon-chevron-${direction}`));
+        btn.addEventListener('click', () => this._scrollTabs(direction === 'left' ? -200 : 200));
         return btn;
     }
 
@@ -256,25 +239,10 @@ export class WorkspaceTabBar {
         const { scrollLeft, scrollWidth, clientWidth } = this.tabBar;
         const hasOverflow = scrollWidth > clientWidth;
 
-        if (hasOverflow) {
-            this.leftScrollBtn.classList.add('visible');
-            this.rightScrollBtn.classList.add('visible');
-        } else {
-            this.leftScrollBtn.classList.remove('visible');
-            this.rightScrollBtn.classList.remove('visible');
-        }
-
-        if (scrollLeft <= 0) {
-            this.leftScrollBtn.disabled = true;
-        } else {
-            this.leftScrollBtn.disabled = false;
-        }
-
-        if (scrollLeft + clientWidth >= scrollWidth - 1) {
-            this.rightScrollBtn.disabled = true;
-        } else {
-            this.rightScrollBtn.disabled = false;
-        }
+        this.leftScrollBtn.classList.toggle('visible', hasOverflow);
+        this.rightScrollBtn.classList.toggle('visible', hasOverflow);
+        this.leftScrollBtn.disabled = scrollLeft <= 0;
+        this.rightScrollBtn.disabled = scrollLeft + clientWidth >= scrollWidth - 1;
     }
 
     _createNewTabButton() {
@@ -328,9 +296,7 @@ export class WorkspaceTabBar {
 
             item.addEventListener('click', () => {
                 menu.remove();
-                if (this.onTabCreate) {
-                    this.onTabCreate(protocol);
-                }
+                this.onTabCreate?.(protocol);
             });
 
             menu.appendChild(item);
@@ -391,9 +357,7 @@ export class WorkspaceTabBar {
             item.appendChild(name);
 
             item.addEventListener('click', () => {
-                if (this.onTabSwitch) {
-                    this.onTabSwitch(tab.id);
-                }
+                this.onTabSwitch?.(tab.id);
                 dropdown.remove();
             });
 
@@ -452,6 +416,62 @@ export class WorkspaceTabBar {
         input.select();
     }
 
+    /**
+     * @param {Object} tab
+     * @returns {Promise<void>}
+     */
+    async _saveTab(tab) {
+        try {
+            if (tab.endpoint && tab.endpoint.collectionId && tab.endpoint.endpointId) {
+                const { saveAllRequestModifications } = await import('../collectionManager.js');
+                await saveAllRequestModifications(tab.endpoint.collectionId, tab.endpoint.endpointId);
+                if (app.workspaceTabController) {
+                    await app.workspaceTabController.markCurrentTabUnmodified();
+                }
+                toast.success(tab.name ? `Saved "${tab.name}"` : 'Request saved');
+                return;
+            }
+
+            if (!app.workspaceTabController || tab.type === 'runner') {
+                return;
+            }
+
+            const { saveRequestToCollection } = await import('../collectionManager.js');
+            const state = await app.workspaceTabController.stateManager.captureCurrentState();
+            const requestData = {
+                name: tab.name,
+                ...state.request
+            };
+            const result = await saveRequestToCollection(requestData);
+            if (!result) {
+                return;
+            }
+
+            setCurrentEndpoint({
+                collectionId: result.collectionId,
+                endpointId: result.endpointId
+            });
+            await app.workspaceTabController.service.updateTab(tab.id, {
+                name: result.name,
+                endpoint: {
+                    collectionId: result.collectionId,
+                    endpointId: result.endpointId,
+                    protocol: state.request.protocol || 'http'
+                }
+            });
+            await app.workspaceTabController.markCurrentTabUnmodified();
+            const tabs = await app.workspaceTabController.service.getAllTabs();
+            const activeTabId = await app.workspaceTabController.service.getActiveTabId();
+            this.render(tabs, activeTabId);
+
+            toast.success(result.collectionName
+                ? `Saved "${result.name}" to ${result.collectionName}`
+                : `Saved "${result.name}"`);
+        } catch (error) {
+            toast.error(`Save failed: ${error.message || String(error)}`);
+        }
+    }
+
     _showContextMenu(event, tab) {
         const existingMenu = document.querySelector('.workspace-tab-context-menu');
         if (existingMenu) {
@@ -502,65 +522,13 @@ export class WorkspaceTabBar {
                 label: 'Duplicate',
                 iconClass: 'icon-duplicate',
                 action: () => {
-                    if (this.onTabDuplicate) {
-                        this.onTabDuplicate(tab.id);
-                    }
+                    this.onTabDuplicate?.(tab.id);
                 }
             },
             {
                 label: 'Save',
                 iconClass: 'icon-save',
-                action: async () => {
-                    try {
-                        if (tab.endpoint && tab.endpoint.collectionId && tab.endpoint.endpointId) {
-                            const { saveAllRequestModifications } = await import('../collectionManager.js');
-                            await saveAllRequestModifications(tab.endpoint.collectionId, tab.endpoint.endpointId);
-                            if (app.workspaceTabController) {
-                                await app.workspaceTabController.markCurrentTabUnmodified();
-                            }
-                            toast.success(tab.name ? `Saved "${tab.name}"` : 'Request saved');
-                            return;
-                        }
-
-                        if (!app.workspaceTabController || tab.type === 'runner') {
-                            return;
-                        }
-
-                        const { saveRequestToCollection } = await import('../collectionManager.js');
-                        const state = await app.workspaceTabController.stateManager.captureCurrentState();
-                        const requestData = {
-                            name: tab.name,
-                            ...state.request
-                        };
-                        const result = await saveRequestToCollection(requestData);
-                        if (!result) {
-                            return;
-                        }
-
-                        setCurrentEndpoint({
-                            collectionId: result.collectionId,
-                            endpointId: result.endpointId
-                        });
-                        await app.workspaceTabController.service.updateTab(tab.id, {
-                            name: result.name,
-                            endpoint: {
-                                collectionId: result.collectionId,
-                                endpointId: result.endpointId,
-                                protocol: state.request.protocol || 'http'
-                            }
-                        });
-                        await app.workspaceTabController.markCurrentTabUnmodified();
-                        const tabs = await app.workspaceTabController.service.getAllTabs();
-                        const activeTabId = await app.workspaceTabController.service.getActiveTabId();
-                        this.render(tabs, activeTabId);
-
-                        toast.success(result.collectionName
-                            ? `Saved "${result.name}" to ${result.collectionName}`
-                            : `Saved "${result.name}"`);
-                    } catch (error) {
-                        toast.error(`Save failed: ${error.message || String(error)}`);
-                    }
-                },
+                action: () => this._saveTab(tab),
                 disabled: tab.type === 'runner'
             },
             { divider: true },
@@ -568,18 +536,14 @@ export class WorkspaceTabBar {
                 label: 'Close',
                 iconClass: 'icon-x',
                 action: () => {
-                    if (this.onTabClose) {
-                        this.onTabClose(tab.id);
-                    }
+                    this.onTabClose?.(tab.id);
                 }
             },
             {
                 label: 'Close Others',
                 iconClass: 'icon-x',
                 action: () => {
-                    if (this.onCloseOthers) {
-                        this.onCloseOthers(tab.id);
-                    }
+                    this.onCloseOthers?.(tab.id);
                 }
             }
         ];

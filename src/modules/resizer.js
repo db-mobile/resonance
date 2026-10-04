@@ -1,5 +1,6 @@
 import { app } from './appContext.js';
 import { debounce } from './utils/debounce.js';
+import { startDragSession } from './ui/dragSession.js';
 
 const SPLIT_LAYOUTS = Object.freeze({
     stacked: { axis: 'y', minSize: 100, defaultRatio: 0.4 },
@@ -51,16 +52,15 @@ class Resizer {
     /** @param {import('./layoutManager.js').LayoutManager|null} layoutManager */
     constructor(layoutManager = null) {
         this.layoutManager = layoutManager;
-        this.isDragging = false;
         this.startPos = 0;
         this.startRequestSize = 0;
         this.startResponseSize = 0;
         this.effective = null;
         this.ratios = {};
-        this.resizeTimeout = null;
         this._debouncedSave = debounce((ratios) => {
-            window.backendAPI.store.set('requestSplit', ratios).catch((error) => void error);
+            window.backendAPI.store.set('requestSplit', ratios).catch(() => {});
         }, 300);
+        this.handleWindowResize = debounce(() => this._refitToWindow(), 100);
 
         this.init();
     }
@@ -95,19 +95,14 @@ class Resizer {
                     }
                 }
             }
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     setupEventListeners() {
         this.resizerHandle.addEventListener('mousedown', this.startDrag.bind(this));
-        document.addEventListener('mousemove', this.drag.bind(this));
-        document.addEventListener('mouseup', this.endDrag.bind(this));
-
         this.resizerHandle.addEventListener('selectstart', (e) => e.preventDefault());
 
-        window.addEventListener('resize', this.handleWindowResize.bind(this));
+        window.addEventListener('resize', this.handleWindowResize);
     }
 
     /** @returns {{axis: string, minSize: number, defaultRatio: number}} */
@@ -179,19 +174,13 @@ class Resizer {
         this.responseArea.style.flex = `0 0 ${responseSize}px`;
     }
 
-    handleWindowResize() {
-        if (this.resizeTimeout) {
-            clearTimeout(this.resizeTimeout);
+    _refitToWindow() {
+        const before = this.effective;
+        const [request, response] = this._currentSizes();
+        this.applyLayout();
+        if (before === this.effective && request > 0 && response > 0) {
+            this._applyRatio(request / (request + response));
         }
-
-        this.resizeTimeout = setTimeout(() => {
-            const before = this.effective;
-            const [request, response] = this._currentSizes();
-            this.applyLayout();
-            if (before === this.effective && request > 0 && response > 0) {
-                this._applyRatio(request / (request + response));
-            }
-        }, 100);
     }
 
     startDrag(e) {
@@ -200,20 +189,19 @@ class Resizer {
             this._applyRatio(this._targetRatio());
         }
         [this.startRequestSize, this.startResponseSize] = this._currentSizes();
-
-        this.isDragging = true;
         this.startPos = this._config().axis === 'x' ? e.clientX : e.clientY;
 
-        this.resizerHandle.classList.add('dragging');
-        document.body.style.userSelect = 'none';
-        document.body.style.cursor = this._config().axis === 'x' ? 'col-resize' : 'row-resize';
+        startDragSession({
+            handle: this.resizerHandle,
+            cursor: this._config().axis === 'x' ? 'col-resize' : 'row-resize',
+            onMove: (event) => this.drag(event),
+            onEnd: () => this.endDrag()
+        });
 
         e.preventDefault();
     }
 
     drag(e) {
-        if (!this.isDragging) {return;}
-
         const delta = (this._config().axis === 'x' ? e.clientX : e.clientY) - this.startPos;
         const newRequestSize = this.startRequestSize + delta;
         const newResponseSize = this.startResponseSize - delta;
@@ -229,13 +217,6 @@ class Resizer {
     }
 
     endDrag() {
-        if (!this.isDragging) {return;}
-
-        this.isDragging = false;
-        this.resizerHandle.classList.remove('dragging');
-        document.body.style.userSelect = '';
-        document.body.style.cursor = '';
-
         const [request, response] = this._currentSizes();
         if (request > 0 && response > 0) {
             const ratio = request / (request + response);
@@ -251,13 +232,12 @@ class Resizer {
 
 class HorizontalResizer {
     constructor() {
-        this.isDragging = false;
         this.startX = 0;
         this.startSidebarWidth = 0;
         this.minWidth = 200;
         this.maxWidth = 600;
         this._debouncedSave = debounce((width) => {
-            window.backendAPI.store.set('sidebarWidth', width).catch((error) => void error);
+            window.backendAPI.store.set('sidebarWidth', width).catch(() => {});
         }, 300);
 
         this.init();
@@ -282,38 +262,29 @@ class HorizontalResizer {
                 this.sidebar.style.width = `${saved}px`;
                 this.sidebar.style.flex = `0 0 ${saved}px`;
             }
-        } catch (error) {
-            void error;
-        }
-    }
-
-    _saveWidth(width) {
-        this._debouncedSave(width);
+        } catch {}
     }
 
     setupEventListeners() {
         this.horizontalResizerHandle.addEventListener('mousedown', this.startDrag.bind(this));
-        document.addEventListener('mousemove', this.drag.bind(this));
-        document.addEventListener('mouseup', this.endDrag.bind(this));
-
         this.horizontalResizerHandle.addEventListener('selectstart', (e) => e.preventDefault());
     }
 
     startDrag(e) {
-        this.isDragging = true;
         this.startX = e.clientX;
         this.startSidebarWidth = this.sidebar.offsetWidth;
 
-        this.horizontalResizerHandle.classList.add('dragging');
-        document.body.style.userSelect = 'none';
-        document.body.style.cursor = 'col-resize';
+        startDragSession({
+            handle: this.horizontalResizerHandle,
+            cursor: 'col-resize',
+            onMove: (event) => this.drag(event),
+            onEnd: () => this._debouncedSave(this.sidebar.offsetWidth)
+        });
 
         e.preventDefault();
     }
 
     drag(e) {
-        if (!this.isDragging) {return;}
-
         const deltaX = e.clientX - this.startX;
         const newSidebarWidth = this.startSidebarWidth + deltaX;
 
@@ -326,101 +297,16 @@ class HorizontalResizer {
 
         e.preventDefault();
     }
-
-    endDrag() {
-        if (!this.isDragging) {return;}
-
-        this.isDragging = false;
-        this.horizontalResizerHandle.classList.remove('dragging');
-        document.body.style.userSelect = '';
-        document.body.style.cursor = '';
-
-        this._saveWidth(this.sidebar.offsetWidth);
-    }
-
-    reset() {
-        this.sidebar.style.width = '';
-        this.sidebar.style.flex = '';
-    }
-}
-
-class GraphQLEditorResizer {
-    constructor() {
-        this.isDragging = false;
-        this.startY = 0;
-        this.startVariablesHeight = 0;
-        this.minSize = 60;
-
-        this.init();
-    }
-
-    init() {
-        this.handle = document.getElementById('graphql-resizer-handle');
-        this.querySection = document.querySelector('.graphql-query-section');
-        this.variablesSection = document.querySelector('.graphql-variables-section');
-
-        if (!this.handle || !this.querySection || !this.variablesSection) {
-            return;
-        }
-
-        this.handle.addEventListener('mousedown', this.startDrag.bind(this));
-        document.addEventListener('mousemove', this.drag.bind(this));
-        document.addEventListener('mouseup', this.endDrag.bind(this));
-        this.handle.addEventListener('selectstart', (e) => e.preventDefault());
-    }
-
-    startDrag(e) {
-        this.isDragging = true;
-        this.startY = e.clientY;
-        this.startVariablesHeight = this.variablesSection.offsetHeight;
-
-        this.handle.classList.add('dragging');
-        document.body.style.userSelect = 'none';
-        document.body.style.cursor = 'row-resize';
-
-        e.preventDefault();
-    }
-
-    drag(e) {
-        if (!this.isDragging) {return;}
-
-        const deltaY = e.clientY - this.startY;
-        const newVariablesHeight = this.startVariablesHeight - deltaY;
-
-        const container = this.variablesSection.parentElement;
-        const maxHeight = container.clientHeight - this.handle.offsetHeight - this.minSize;
-
-        if (newVariablesHeight < this.minSize || newVariablesHeight > maxHeight) {
-            return;
-        }
-
-        this.variablesSection.style.flex = `0 0 ${newVariablesHeight}px`;
-
-        e.preventDefault();
-    }
-
-    endDrag() {
-        if (!this.isDragging) {return;}
-
-        this.isDragging = false;
-        this.handle.classList.remove('dragging');
-        document.body.style.userSelect = '';
-        document.body.style.cursor = '';
-
-        app.graphqlBodyManager?.graphqlEditor?.view?.requestMeasure?.();
-        app.graphqlBodyManager?.variablesEditor?.view?.requestMeasure?.();
-    }
 }
 
 class GraphQLExplorerResizer {
     constructor() {
-        this.isDragging = false;
         this.startX = 0;
         this.startWidth = 0;
         this.minWidth = 240;
         this.maxWidth = 600;
         this._debouncedSave = debounce((width) => {
-            window.backendAPI.store.set('graphqlExplorerWidth', width).catch((error) => void error);
+            window.backendAPI.store.set('graphqlExplorerWidth', width).catch(() => {});
         }, 300);
 
         this.init();
@@ -435,8 +321,6 @@ class GraphQLExplorerResizer {
         }
 
         this.handle.addEventListener('mousedown', this.startDrag.bind(this));
-        document.addEventListener('mousemove', this.drag.bind(this));
-        document.addEventListener('mouseup', this.endDrag.bind(this));
         this.handle.addEventListener('selectstart', (e) => e.preventDefault());
         this._restoreWidth();
     }
@@ -447,26 +331,24 @@ class GraphQLExplorerResizer {
             if (saved && saved >= this.minWidth && saved <= this.maxWidth) {
                 this.rail.style.flex = `0 0 ${saved}px`;
             }
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     startDrag(e) {
-        this.isDragging = true;
         this.startX = e.clientX;
         this.startWidth = this.rail.offsetWidth;
 
-        this.handle.classList.add('dragging');
-        document.body.style.userSelect = 'none';
-        document.body.style.cursor = 'col-resize';
+        startDragSession({
+            handle: this.handle,
+            cursor: 'col-resize',
+            onMove: (event) => this.drag(event),
+            onEnd: () => this.endDrag()
+        });
 
         e.preventDefault();
     }
 
     drag(e) {
-        if (!this.isDragging) {return;}
-
         const deltaX = e.clientX - this.startX;
         const newWidth = this.startWidth - deltaX;
 
@@ -480,13 +362,6 @@ class GraphQLExplorerResizer {
     }
 
     endDrag() {
-        if (!this.isDragging) {return;}
-
-        this.isDragging = false;
-        this.handle.classList.remove('dragging');
-        document.body.style.userSelect = '';
-        document.body.style.cursor = '';
-
         this._debouncedSave(this.rail.offsetWidth);
         app.graphqlBodyManager?.graphqlEditor?.view?.requestMeasure?.();
     }
@@ -494,9 +369,7 @@ class GraphQLExplorerResizer {
 
 /** @param {import('./layoutManager.js').LayoutManager|null} [layoutManager] */
 export function initResizer(layoutManager = null) {
-    const verticalResizer = new Resizer(layoutManager);
-    const horizontalResizer = new HorizontalResizer();
-    const graphqlEditorResizer = new GraphQLEditorResizer();
-    const graphqlExplorerResizer = new GraphQLExplorerResizer();
-    return { verticalResizer, horizontalResizer, graphqlEditorResizer, graphqlExplorerResizer };
+    new Resizer(layoutManager);
+    new HorizontalResizer();
+    new GraphQLExplorerResizer();
 }

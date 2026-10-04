@@ -14,14 +14,6 @@ describe('CollectionRepository endpoint sidecar accessors', () => {
             label: 'Failed to save modified request body'
         },
         {
-            field: 'formBodyData',
-            getter: 'getFormBodyData',
-            setter: 'saveFormBodyData',
-            empty: null,
-            stored: { rows: [] },
-            label: 'Failed to save form body data'
-        },
-        {
             field: 'pathParams',
             getter: 'getPersistedPathParams',
             setter: 'savePersistedPathParams',
@@ -47,7 +39,6 @@ describe('CollectionRepository endpoint sidecar accessors', () => {
         },
         {
             field: 'url',
-            getter: 'getPersistedUrl',
             setter: 'savePersistedUrl',
             empty: null,
             stored: 'https://api.example.com/v1',
@@ -55,7 +46,6 @@ describe('CollectionRepository endpoint sidecar accessors', () => {
         },
         {
             field: 'graphqlData',
-            getter: 'getGraphQLData',
             setter: 'saveGraphQLData',
             empty: null,
             stored: { query: '{ me }' },
@@ -63,7 +53,6 @@ describe('CollectionRepository endpoint sidecar accessors', () => {
         },
         {
             field: 'grpcData',
-            getter: 'getGrpcData',
             setter: 'saveGrpcData',
             empty: null,
             stored: { fullMethod: '/pkg.Svc/M' },
@@ -71,7 +60,6 @@ describe('CollectionRepository endpoint sidecar accessors', () => {
         },
         {
             field: 'mqttData',
-            getter: 'getMqttData',
             setter: 'saveMqttData',
             empty: null,
             stored: { qos: 1 },
@@ -98,28 +86,31 @@ describe('CollectionRepository endpoint sidecar accessors', () => {
     });
 
     describe.each(CASES)('$field', ({ field, getter, setter, empty, stored, label }) => {
-        test('exposes both accessors', () => {
-            expect(typeof repository[getter]).toBe('function');
+        const read = () => (getter
+            ? repository[getter]('c1', 'e1')
+            : repository.getAllPersistedEndpointData('c1', 'e1').then((data) => data[field]));
+
+        test('exposes the setter', () => {
             expect(typeof repository[setter]).toBe('function');
         });
 
         test('returns the stored value', async () => {
             backendAPI.collections.getEndpointData.mockResolvedValue({ [field]: stored });
 
-            await expect(repository[getter]('c1', 'e1')).resolves.toEqual(stored);
+            await expect(read()).resolves.toEqual(stored);
             expect(backendAPI.collections.getEndpointData).toHaveBeenCalledWith('c1', 'e1');
         });
 
         test('returns the empty default when the field is absent', async () => {
             backendAPI.collections.getEndpointData.mockResolvedValue({});
 
-            await expect(repository[getter]('c1', 'e1')).resolves.toEqual(empty);
+            await expect(read()).resolves.toEqual(empty);
         });
 
         test('returns the empty default when the read fails', async () => {
             backendAPI.collections.getEndpointData.mockRejectedValue(new Error('unreadable'));
 
-            await expect(repository[getter]('c1', 'e1')).resolves.toEqual(empty);
+            await expect(read()).resolves.toEqual(empty);
         });
 
         test('writes the field without disturbing its siblings', async () => {

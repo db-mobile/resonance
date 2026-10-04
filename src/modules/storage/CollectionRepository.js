@@ -28,6 +28,15 @@ function sameFieldValues(data, updates) {
 }
 
 /**
+ * @param {string} label
+ * @param {*} error
+ * @returns {Error}
+ */
+function wrapFailure(label, error) {
+    return new Error(`Failed to ${label}: ${error.message || error}`, { cause: error });
+}
+
+/**
  * @param {string} collectionId
  * @param {string} endpointId
  * @returns {string}
@@ -79,7 +88,7 @@ export class CollectionRepository {
             const collections = await this.backendAPI.collections.getAll();
             return listFromWire(collections);
         } catch (error) {
-            throw new Error(`Failed to load collections: ${error.message || error}`, { cause: error });
+            throw wrapFailure('load collections', error);
         }
     }
 
@@ -88,8 +97,7 @@ export class CollectionRepository {
         try {
             const errors = await this.backendAPI.collections.loadErrors();
             return Array.isArray(errors) ? errors : [];
-        } catch (error) {
-            void error;
+        } catch {
             return [];
         }
     }
@@ -117,7 +125,7 @@ export class CollectionRepository {
                 this._addToCache(collection.id, collection);
             }
         } catch (error) {
-            throw new Error(`Failed to save collection: ${error.message || error}`, { cause: error });
+            throw wrapFailure('save collection', error);
         }
     }
 
@@ -128,8 +136,7 @@ export class CollectionRepository {
     async getById(id) {
         if (this._byIdCache.has(id)) {
             const cached = this._byIdCache.get(id);
-            this._byIdCache.delete(id);
-            this._byIdCache.set(id, cached);
+            this._addToCache(id, cached);
             return cached;
         }
         return this._getByIdFresh(id);
@@ -211,7 +218,7 @@ export class CollectionRepository {
             }
             return true;
         } catch (error) {
-            throw new Error(`Failed to delete collection: ${error.message || error}`, { cause: error });
+            throw wrapFailure('delete collection', error);
         }
     }
 
@@ -225,7 +232,7 @@ export class CollectionRepository {
             this._byIdCache.delete(id);
             return true;
         } catch (error) {
-            throw new Error(`Failed to close collection: ${error.message || error}`, { cause: error });
+            throw wrapFailure('close collection', error);
         }
     }
 
@@ -342,17 +349,28 @@ export class CollectionRepository {
     /**
      * @param {string} collectionId
      * @param {string} endpointId
+     * @param {Object} updates
+     * @param {string} label
+     * @returns {Promise<void>}
+     */
+    async _writeFields(collectionId, endpointId, updates, label) {
+        try {
+            await this._updateEndpointFields(collectionId, endpointId, updates);
+        } catch (error) {
+            throw wrapFailure(`save ${label}`, error);
+        }
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
      * @param {string} field
      * @param {*} value
      * @param {string} label
      * @returns {Promise<void>}
      */
     async _writeSidecar(collectionId, endpointId, field, value, label) {
-        try {
-            await this._updateEndpointFields(collectionId, endpointId, { [field]: value });
-        } catch (error) {
-            throw new Error(`Failed to save ${label}: ${error.message || error}`, { cause: error });
-        }
+        return this._writeFields(collectionId, endpointId, { [field]: value }, label);
     }
 
     async updateEndpointFields(collectionId, endpointId, updates) {
@@ -362,20 +380,16 @@ export class CollectionRepository {
                 : updates;
             await this._updateEndpointFields(collectionId, endpointId, fields);
         } catch (error) {
-            throw new Error(`Failed to update endpoint fields: ${error.message || error}`, { cause: error });
+            throw wrapFailure('update endpoint fields', error);
         }
     }
 
     async saveBodyState(collectionId, endpointId, { modifiedBody = null, formBodyData = null, graphqlData = null } = {}) {
-        try {
-            await this._updateEndpointFields(collectionId, endpointId, {
-                modifiedBody,
-                formBodyData,
-                graphqlData
-            });
-        } catch (error) {
-            throw new Error(`Failed to save body state: ${error.message || error}`, { cause: error });
-        }
+        return this._writeFields(collectionId, endpointId, {
+            modifiedBody,
+            formBodyData,
+            graphqlData
+        }, 'body state');
     }
 
     /**
@@ -395,14 +409,6 @@ export class CollectionRepository {
      */
     async saveModifiedRequestBody(collectionId, endpointId, body) {
         return this._writeSidecar(collectionId, endpointId, 'modifiedBody', body, 'modified request body');
-    }
-
-    async getFormBodyData(collectionId, endpointId) {
-        return this._readSidecar(collectionId, endpointId, 'formBodyData', null);
-    }
-
-    async saveFormBodyData(collectionId, endpointId, data) {
-        return this._writeSidecar(collectionId, endpointId, 'formBodyData', data, 'form body data');
     }
 
     /**
@@ -515,7 +521,7 @@ export class CollectionRepository {
             );
             await this._updateEndpointFields(collectionId, endpointId, { authConfig: toPersist });
         } catch (error) {
-            throw new Error(`Failed to save persisted auth config: ${error.message || error}`, { cause: error });
+            throw wrapFailure('save persisted auth config', error);
         }
     }
 
@@ -552,7 +558,7 @@ export class CollectionRepository {
             }
             await this.updateMetadata(collectionId, { authConfig: toPersist });
         } catch (error) {
-            throw new Error(`Failed to save collection auth config: ${error.message || error}`, { cause: error });
+            throw wrapFailure('save collection auth config', error);
         }
     }
 
@@ -642,7 +648,7 @@ export class CollectionRepository {
             }
             await this.saveTree(collectionId, updated);
         } catch (error) {
-            throw new Error(`Failed to save folder auth config: ${error.message || error}`, { cause: error });
+            throw wrapFailure('save folder auth config', error);
         }
     }
 
@@ -693,15 +699,6 @@ export class CollectionRepository {
     /**
      * @param {string} collectionId
      * @param {string} endpointId
-     * @returns {Promise<string|null>}
-     */
-    async getPersistedUrl(collectionId, endpointId) {
-        return this._readSidecar(collectionId, endpointId, 'url', null);
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
      * @param {string} url
      * @returns {Promise<void>}
      */
@@ -727,7 +724,7 @@ export class CollectionRepository {
         try {
             await this.backendAPI.store.set('collectionExpansionStates', expansionStates);
         } catch (error) {
-            throw new Error(`Failed to save collection expansion states: ${error.message || error}`, { cause: error });
+            throw wrapFailure('save collection expansion states', error);
         }
     }
 
@@ -751,7 +748,7 @@ export class CollectionRepository {
             await this.backendAPI.store.set('pinnedRequests', pinned);
             return !!pinned[key];
         } catch (error) {
-            throw new Error(`Failed to toggle pinned request: ${error.message || error}`, { cause: error });
+            throw wrapFailure('toggle pinned request', error);
         }
     }
 
@@ -817,7 +814,7 @@ export class CollectionRepository {
                 await this._deleteEndpointSecrets(collectionId, endpointId);
             }
         } catch (error) {
-            throw new Error(`Failed to delete persisted endpoint data: ${error.message || error}`, { cause: error });
+            throw wrapFailure('delete persisted endpoint data', error);
         }
     }
 
@@ -832,8 +829,7 @@ export class CollectionRepository {
                 collectionId,
                 endpointId
             });
-        } catch (error) {
-            void error;
+        } catch {
         }
     }
 
@@ -842,7 +838,7 @@ export class CollectionRepository {
         try {
             await this.backendAPI.store.set('lastSelectedRequest', null);
         } catch (error) {
-            throw new Error(`Failed to clear last selected request: ${error.message || error}`, { cause: error });
+            throw wrapFailure('clear last selected request', error);
         }
     }
 
@@ -856,21 +852,8 @@ export class CollectionRepository {
         return this._writeSidecar(collectionId, endpointId, 'graphqlData', data, 'GraphQL data');
     }
 
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @returns {Promise<Object|null>}
-     */
-    async getGraphQLData(collectionId, endpointId) {
-        return this._readSidecar(collectionId, endpointId, 'graphqlData', null);
-    }
-
     async saveGrpcData(collectionId, endpointId, data) {
         return this._writeSidecar(collectionId, endpointId, 'grpcData', data, 'gRPC data');
-    }
-
-    async getGrpcData(collectionId, endpointId) {
-        return this._readSidecar(collectionId, endpointId, 'grpcData', null);
     }
 
     /**
@@ -907,16 +890,6 @@ export class CollectionRepository {
         }
         const password = await this.secretStore.get(mqttSecretScope(collectionId, endpointId), 'password');
         return password ? { ...mqttData, password } : mqttData;
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @returns {Promise<Object|null>}
-     */
-    async getMqttData(collectionId, endpointId) {
-        const data = await this._readSidecar(collectionId, endpointId, 'mqttData', null);
-        return this._hydrateMqttData(collectionId, endpointId, data);
     }
 
     /**

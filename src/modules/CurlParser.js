@@ -3,6 +3,66 @@
  * @module CurlParser
  */
 
+/**
+ * @param {Object} request
+ * @param {string} chunk
+ * @returns {void}
+ */
+function appendBody(request, chunk) {
+    request.body = request.body ? `${request.body}&${chunk}` : chunk;
+    if (request.method === 'GET') {
+        request.method = 'POST';
+    }
+}
+
+/**
+ * @param {string} headerName
+ * @returns {(request: Object, value: string) => void}
+ */
+function setHeader(headerName) {
+    return (request, value) => {
+        request.headers[headerName] = value;
+    };
+}
+
+/** @type {Object<string, (request: Object, value: string, parser: typeof CurlParser) => void>} */
+const VALUE_OPTIONS = {
+    '-X': (request, value) => { request.method = value.toUpperCase(); },
+    '-H': (request, value, parser) => {
+        const header = parser.parseHeader(value);
+        if (header) {
+            request.headers[header.key] = header.value;
+        }
+    },
+    '-d': appendBody,
+    '--data-raw': appendBody,
+    '--data-binary': appendBody,
+    '--data-urlencode': (request, value, parser) => appendBody(request, parser.encodeDataUrlencodeToken(value)),
+    '-u': (request, value) => {
+        const [username, password] = value.split(':');
+        request.auth = {
+            type: 'basic',
+            username: username || '',
+            password: password || ''
+        };
+    },
+    '-A': setHeader('User-Agent'),
+    '-e': setHeader('Referer'),
+    '-b': setHeader('Cookie'),
+    '-o': () => {},
+    '--url': (request, value) => { request.url = value; }
+};
+VALUE_OPTIONS['--request'] = VALUE_OPTIONS['-X'];
+VALUE_OPTIONS['--header'] = VALUE_OPTIONS['-H'];
+VALUE_OPTIONS['--data'] = VALUE_OPTIONS['-d'];
+VALUE_OPTIONS['--user'] = VALUE_OPTIONS['-u'];
+VALUE_OPTIONS['--user-agent'] = VALUE_OPTIONS['-A'];
+VALUE_OPTIONS['--referer'] = VALUE_OPTIONS['-e'];
+VALUE_OPTIONS['--cookie'] = VALUE_OPTIONS['-b'];
+VALUE_OPTIONS['--output'] = VALUE_OPTIONS['-o'];
+
+const IGNORED_FLAGS = new Set(['curl', '-L', '--location', '-k', '--insecure', '-s', '--silent', '-v', '--verbose']);
+
 export class CurlParser {
     /**
      * @param {string} curlCommand
@@ -16,7 +76,7 @@ export class CurlParser {
         const normalized = this.normalizeCommand(curlCommand);
         const tokens = this.tokenize(normalized);
 
-        const result = {
+        const request = {
             method: 'GET',
             url: '',
             headers: {},
@@ -30,135 +90,24 @@ export class CurlParser {
         while (i < tokens.length) {
             const token = tokens[i];
 
-            if (token === 'curl') {
-                i++;
-                continue;
-            }
-
-            if (token === '-X' || token === '--request') {
-                i++;
-                if (i < tokens.length) {
-                    result.method = tokens[i].toUpperCase();
-                }
-                i++;
-                continue;
-            }
-
-            if (token === '-H' || token === '--header') {
-                i++;
-                if (i < tokens.length) {
-                    const header = this.parseHeader(tokens[i]);
-                    if (header) {
-                        result.headers[header.key] = header.value;
-                    }
-                }
-                i++;
-                continue;
-            }
-
-            if (token === '-d' || token === '--data' || token === '--data-raw' || token === '--data-binary') {
-                i++;
-                if (i < tokens.length) {
-                    result.body = result.body ? `${result.body}&${tokens[i]}` : tokens[i];
-                    if (result.method === 'GET') {
-                        result.method = 'POST';
-                    }
-                }
-                i++;
-                continue;
-            }
-
-            if (token === '--data-urlencode') {
-                i++;
-                if (i < tokens.length) {
-                    const encoded = this.encodeDataUrlencodeToken(tokens[i]);
-                    result.body = result.body ? `${result.body}&${encoded}` : encoded;
-                    if (result.method === 'GET') {
-                        result.method = 'POST';
-                    }
-                }
-                i++;
-                continue;
-            }
-
-            if (token === '-u' || token === '--user') {
-                i++;
-                if (i < tokens.length) {
-                    const [username, password] = tokens[i].split(':');
-                    result.auth = {
-                        type: 'basic',
-                        username: username || '',
-                        password: password || ''
-                    };
-                }
-                i++;
-                continue;
-            }
-
-            if (token === '-A' || token === '--user-agent') {
-                i++;
-                if (i < tokens.length) {
-                    result.headers['User-Agent'] = tokens[i];
-                }
-                i++;
-                continue;
-            }
-
-            if (token === '-e' || token === '--referer') {
-                i++;
-                if (i < tokens.length) {
-                    result.headers['Referer'] = tokens[i];
-                }
-                i++;
-                continue;
-            }
-
-            if (token === '-b' || token === '--cookie') {
-                i++;
-                if (i < tokens.length) {
-                    result.headers['Cookie'] = tokens[i];
-                }
+            if (IGNORED_FLAGS.has(token)) {
                 i++;
                 continue;
             }
 
             if (token === '--compressed') {
-                if (!result.headers['Accept-Encoding']) {
-                    result.headers['Accept-Encoding'] = 'gzip, deflate';
+                if (!request.headers['Accept-Encoding']) {
+                    request.headers['Accept-Encoding'] = 'gzip, deflate';
                 }
                 i++;
                 continue;
             }
 
-            if (token === '-L' || token === '--location') {
-                i++;
-                continue;
-            }
-
-            if (token === '-k' || token === '--insecure') {
-                i++;
-                continue;
-            }
-
-            if (token === '-s' || token === '--silent') {
-                i++;
-                continue;
-            }
-
-            if (token === '-v' || token === '--verbose') {
-                i++;
-                continue;
-            }
-
-            if (token === '-o' || token === '--output') {
-                i += 2;
-                continue;
-            }
-
-            if (token === '--url') {
+            const applyOption = VALUE_OPTIONS[token];
+            if (applyOption) {
                 i++;
                 if (i < tokens.length) {
-                    result.url = tokens[i];
+                    applyOption(request, tokens[i], this);
                 }
                 i++;
                 continue;
@@ -169,31 +118,31 @@ export class CurlParser {
                 if (
                     i < tokens.length &&
                     !tokens[i].startsWith('-') &&
-                    !(!result.url && this.isUrl(tokens[i]))
+                    !(!request.url && this.isUrl(tokens[i]))
                 ) {
                     i++;
                 }
                 continue;
             }
 
-            if (!result.url && this.isUrl(token)) {
-                result.url = token;
+            if (!request.url && this.isUrl(token)) {
+                request.url = token;
             }
 
             i++;
         }
 
-        if (!result.url) {
+        if (!request.url) {
             throw new Error('No URL found in cURL command');
         }
 
-        const urlParts = this.parseUrl(result.url);
-        result.url = urlParts.baseUrl;
-        result.queryParams = urlParts.queryParams;
+        const urlParts = this.parseUrl(request.url);
+        request.url = urlParts.baseUrl;
+        request.queryParams = urlParts.queryParams;
 
-        result.name = this.generateRequestName(result.url, result.method);
+        request.name = this.generateRequestName(request.url, request.method);
 
-        return result;
+        return request;
     }
 
     /**

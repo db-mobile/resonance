@@ -190,9 +190,7 @@ export class WorkspaceTabController {
         try {
             const currentState = await this.stateManager.captureCurrentState();
             await this.service.updateTab(tabId, currentState);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /** @returns {Promise<void>} */
@@ -219,9 +217,7 @@ export class WorkspaceTabController {
                     await this._activateTab(activeTab);
                 }
             }
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /**
@@ -437,37 +433,61 @@ export class WorkspaceTabController {
                 return;
             }
 
-            this._updateUIForTabType(tab);
+            this.tabBar.setActiveTab(tabId);
+            await this._activateTab(tab);
 
             if (tab.type !== 'runner') {
-                this.responseContainerManager.showContainer(tabId);
+                await this._syncScriptsForTab(tab);
             }
+        } catch {}
+    }
 
-            this.tabBar.setActiveTab(tabId);
+    /**
+     * @param {Object} tab
+     * @returns {Promise<void>}
+     */
+    async _syncScriptsForTab(tab) {
+        if (!app.scriptController) {
+            return;
+        }
+        const { endpoint } = tab;
+        if (!endpoint || !endpoint.collectionId || !endpoint.endpointId) {
+            await app.scriptController.clearScripts();
+            return;
+        }
+        if (!app.scriptController.isShowingScriptsFor(endpoint.collectionId, endpoint.endpointId)) {
+            await app.scriptController.loadScriptsForEndpoint(endpoint.collectionId, endpoint.endpointId);
+        }
+    }
 
-            if (tab.type === 'runner') {
-                if (!this.runnerControllers.has(tabId)) {
-                    await this._initializeRunnerTab(tabId);
-                }
-                return;
+    /**
+     * @param {string} message
+     * @param {string} confirmText
+     * @returns {Promise<boolean>}
+     */
+    async _confirmUnsavedClose(message, confirmText) {
+        return new ConfirmDialog().show(message, {
+            title: 'Unsaved Changes',
+            confirmText,
+            cancelText: 'Keep Open',
+            dangerous: true
+        });
+    }
+
+    /**
+     * @param {Array<Object>} remainingTabs
+     * @param {string} newActiveTabId
+     * @param {string|null} previousActiveTabId
+     * @returns {Promise<void>}
+     */
+    async _showRemainingTabs(remainingTabs, newActiveTabId, previousActiveTabId) {
+        this.tabBar.render(remainingTabs, newActiveTabId);
+
+        if (newActiveTabId !== previousActiveTabId) {
+            const activeTab = remainingTabs.find(t => t.id === newActiveTabId);
+            if (activeTab) {
+                await this._activateTab(activeTab);
             }
-
-            await this._restoreTabStateSafely(tab);
-
-            if (app.scriptController) {
-                if (tab.endpoint && tab.endpoint.collectionId && tab.endpoint.endpointId) {
-                    if (!app.scriptController.isShowingScriptsFor(tab.endpoint.collectionId, tab.endpoint.endpointId)) {
-                        await app.scriptController.loadScriptsForEndpoint(
-                            tab.endpoint.collectionId,
-                            tab.endpoint.endpointId
-                        );
-                    }
-                } else {
-                    await app.scriptController.clearScripts();
-                }
-            }
-        } catch (error) {
-            void error;
         }
     }
 
@@ -491,16 +511,7 @@ export class WorkspaceTabController {
             const allTabs = await this.service.getAllTabs();
             const tab = allTabs.find(t => t.id === tabId);
             if (tab?.isModified) {
-                const dialog = new ConfirmDialog();
-                const confirmed = await dialog.show(
-                    `"${tab.name}" has unsaved changes. Close anyway?`,
-                    {
-                        title: 'Unsaved Changes',
-                        confirmText: 'Close',
-                        cancelText: 'Keep Open',
-                        dangerous: true
-                    }
-                );
+                const confirmed = await this._confirmUnsavedClose(`"${tab.name}" has unsaved changes. Close anyway?`, 'Close');
                 if (!confirmed) {
                     return;
                 }
@@ -523,18 +534,8 @@ export class WorkspaceTabController {
                 return;
             }
 
-            const remainingTabs = allTabs.filter(t => t.id !== tabId);
-            this.tabBar.render(remainingTabs, result.newActiveTabId);
-
-            if (result.newActiveTabId !== previousActiveTabId) {
-                const newActiveTab = remainingTabs.find(t => t.id === result.newActiveTabId);
-                if (newActiveTab) {
-                    await this._activateTab(newActiveTab);
-                }
-            }
-        } catch (error) {
-            void error;
-        }
+            await this._showRemainingTabs(allTabs.filter(t => t.id !== tabId), result.newActiveTabId, previousActiveTabId);
+        } catch {}
     }
 
     /** @param {Object} tab */
@@ -560,9 +561,7 @@ export class WorkspaceTabController {
         try {
             await this.service.renameTab(tabId, newName);
             this.tabBar.updateTab(tabId, { name: newName });
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /**
@@ -589,9 +588,7 @@ export class WorkspaceTabController {
                 const tabs = await this.service.getAllTabs();
                 this.tabBar.render(tabs, activeTabId);
             }
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /**
@@ -630,17 +627,11 @@ export class WorkspaceTabController {
 
             const modifiedCount = tabsToClose.filter(t => t.isModified).length;
             if (modifiedCount > 0) {
-                const dialog = new ConfirmDialog();
-                const confirmed = await dialog.show(
+                const confirmed = await this._confirmUnsavedClose(
                     modifiedCount === 1
                         ? '1 tab has unsaved changes. Close anyway?'
                         : `${modifiedCount} tabs have unsaved changes. Close anyway?`,
-                    {
-                        title: 'Unsaved Changes',
-                        confirmText: 'Close All',
-                        cancelText: 'Keep Open',
-                        dangerous: true
-                    }
+                    'Close All'
                 );
                 if (!confirmed) {
                     return;
@@ -661,18 +652,8 @@ export class WorkspaceTabController {
                 return;
             }
 
-            const remainingTabs = await this.service.getAllTabs();
-            this.tabBar.render(remainingTabs, result.newActiveTabId);
-
-            if (result.newActiveTabId !== previousActiveTabId) {
-                const activeTab = remainingTabs.find(t => t.id === result.newActiveTabId);
-                if (activeTab) {
-                    await this._activateTab(activeTab);
-                }
-            }
-        } catch (error) {
-            void error;
-        }
+            await this._showRemainingTabs(await this.service.getAllTabs(), result.newActiveTabId, previousActiveTabId);
+        } catch {}
     }
 
     /** @returns {Promise<void>} */
@@ -692,9 +673,7 @@ export class WorkspaceTabController {
 
             await this.service.setTabModified(activeTabId, true);
             this.tabBar.updateTab(activeTabId, { isModified: true });
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /** @returns {Promise<void>} */
@@ -706,9 +685,7 @@ export class WorkspaceTabController {
                 await this.service.setTabModified(activeTabId, false);
                 this.tabBar.updateTab(activeTabId, { isModified: false });
             }
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /**
@@ -749,9 +726,7 @@ export class WorkspaceTabController {
             }
 
             await this.endpointLoader.loadEndpoint(endpoint, targetTabId);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /**
@@ -786,9 +761,7 @@ export class WorkspaceTabController {
             const newTab = await this._doCreateNewTab({ protocol });
 
             await this.endpointLoader.loadHistoryEntry(historyEntry, newTab.id);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /** @returns {Promise<void>} */
@@ -812,9 +785,7 @@ export class WorkspaceTabController {
                     ep.endpointId
                 );
             }
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     async _restoreTabStateSafely(tab) {
@@ -833,9 +804,7 @@ export class WorkspaceTabController {
     async reorderTabs(orderedTabIds) {
         try {
             await this.service.reorderTabs(orderedTabIds);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /** @returns {Promise<Object|null>} */

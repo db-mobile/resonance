@@ -16,14 +16,12 @@ export class CollectionEndpointLoaderService {
      * @param {CollectionRepository} options.repository
      * @param {CollectionService} options.collectionService
      * @param {SchemaProcessor} options.schemaProcessor
-     * @param {Function} options.getFormElements
      * @param {Function} options.setActiveEndpoint
      */
-    constructor({ repository, collectionService, schemaProcessor, getFormElements, setActiveEndpoint }) {
+    constructor({ repository, collectionService, schemaProcessor, setActiveEndpoint }) {
         this.repository = repository;
         this.collectionService = collectionService;
         this.schemaProcessor = schemaProcessor;
-        this.getFormElements = getFormElements;
         this.setActiveEndpoint = setActiveEndpoint;
     }
 
@@ -33,8 +31,7 @@ export class CollectionEndpointLoaderService {
 
             await this.repository.saveLastSelectedRequest(collection.id, endpoint.id);
             this.setActiveEndpoint?.(collection.id, endpoint.id);
-        } catch (error) {
-            void error;
+        } catch {
         }
     }
 

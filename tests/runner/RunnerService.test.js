@@ -222,20 +222,6 @@ describe('RunnerService', () => {
         });
     });
 
-    describe('isExecuting', () => {
-        test('should return true when running', () => {
-            service.isRunning = true;
-
-            expect(service.isExecuting()).toBe(true);
-        });
-
-        test('should return false when not running', () => {
-            service.isRunning = false;
-
-            expect(service.isExecuting()).toBe(false);
-        });
-    });
-
     describe('_markRemainingAsSkipped', () => {
         test('should mark remaining requests as skipped', () => {
             const requests = [
@@ -281,15 +267,6 @@ describe('RunnerService', () => {
             service.addListener(listener);
 
             expect(service.listeners).toContain(listener);
-        });
-
-        test('should remove listener', () => {
-            const listener = jest.fn();
-            service.addListener(listener);
-
-            service.removeListener(listener);
-
-            expect(service.listeners).not.toContain(listener);
         });
 
         test('should notify all listeners', () => {
@@ -1112,7 +1089,7 @@ describe('RunnerService', () => {
                 requests: [{}],
                 options: { dataFile: { path: '/x/users.csv', name: 'users.csv' } }
             })).rejects.toThrow('Data file users.csv: Cannot read data file /x: No such file');
-            expect(service.isExecuting()).toBe(false);
+            expect(service.isRunning).toBe(false);
         });
 
         test('rejects a data file without rows', async () => {
@@ -1172,7 +1149,7 @@ describe('RunnerService', () => {
             const results = await run;
 
             expect(results.skipped).toBe(2);
-            expect(service.isExecuting()).toBe(false);
+            expect(service.isRunning).toBe(false);
         });
 
         test('a failing request reports progress before stop-on-error halts the run', async () => {

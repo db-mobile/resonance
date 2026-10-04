@@ -4,6 +4,7 @@
  */
 
 import { ChangeEmitter } from './ChangeEmitter.js';
+import { isValidProxyType, isValidPort, isValidTimeout } from '../utils/proxyValidation.js';
 
 export class ProxyService {
     /**
@@ -96,8 +97,7 @@ export class ProxyService {
     }
 
     isValidProxyType(type) {
-        const validTypes = ['http', 'https', 'socks4', 'socks5'];
-        return validTypes.includes(type);
+        return isValidProxyType(type);
     }
 
     isValidHost(host) {
@@ -115,13 +115,11 @@ export class ProxyService {
     }
 
     isValidPort(port) {
-        const portNum = parseInt(port, 10);
-        return !isNaN(portNum) && portNum >= 1 && portNum <= 65535;
+        return isValidPort(port);
     }
 
     isValidTimeout(timeout) {
-        const timeoutNum = parseInt(timeout, 10);
-        return !isNaN(timeoutNum) && timeoutNum >= 0 && timeoutNum <= 300000;
+        return isValidTimeout(timeout);
     }
 
 }

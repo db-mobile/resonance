@@ -39,13 +39,12 @@ export class ScriptService {
         }
         try {
             const values = await this.variableRepository.getVariablesForCollection(collectionId);
-            const out = {};
+            const normalized = {};
             for (const [key, value] of Object.entries(values || {})) {
-                out[key] = value === null || value === undefined ? '' : String(value);
+                normalized[key] = value === null || value === undefined ? '' : String(value);
             }
-            return out;
-        } catch (error) {
-            void error;
+            return normalized;
+        } catch {
             return {};
         }
     }
@@ -95,13 +94,85 @@ export class ScriptService {
     /**
      * @param {string} script
      * @param {Object} requestConfig
+     * @param {Object} options
+     * @param {Object} [options.environment]
+     * @param {Object} [options.iteration]
+     * @param {string} [options.collectionId]
+     * @param {Object} [extra]
+     * @returns {Promise<Object>}
+     */
+    async _scriptPayload(script, requestConfig, { environment, iteration, collectionId }, extra = {}) {
+        const environmentVariables = environment ?? await this.environmentService.getActiveEnvironmentVariables();
+
+        return {
+            script,
+            request: {
+                url: requestConfig.url,
+                method: requestConfig.method,
+                headers: requestConfig.headers || {},
+                body: requestConfig.body,
+                queryParams: requestConfig.queryParams || {},
+                pathParams: requestConfig.pathParams || {}
+            },
+            ...extra,
+            environment: environmentVariables || {},
+            collectionVariables: await this._readCollectionVariables(collectionId),
+            cookies: await this._readCookieJar(),
+            ...(iteration ? { iteration } : {})
+        };
+    }
+
+    /**
+     * @param {Object} response
+     * @returns {Object}
+     */
+    _scriptResponse(response) {
+        return {
+            status: response?.status ?? response?.statusCode ?? response?.status_code ?? null,
+            statusText: response?.statusText ?? response?.status_text ?? response?.statusMessage ?? '',
+            headers: response?.headers || {},
+            body: response?.data ?? response?.body ?? null,
+            timings: response?.timings || {},
+            cookies: response?.cookies || []
+        };
+    }
+
+    /**
+     * @param {Object} result
+     * @param {string|undefined} collectionId
+     * @returns {Promise<void>}
+     */
+    async _applyScriptSideEffects(result, collectionId) {
+        if (result.modifiedEnvironment && Object.keys(result.modifiedEnvironment).length > 0) {
+            await this._applyEnvironmentChanges(result.modifiedEnvironment);
+        }
+        await this._applyCollectionVariableChanges(collectionId, result.modifiedCollectionVariables);
+        await this._applyCookieChanges(result.cookieChanges);
+    }
+
+    /**
+     * @param {Error} error
+     * @returns {{success: boolean, logs: Array, errors: string[], testResults: Array}}
+     */
+    _scriptFailure(error) {
+        return {
+            success: false,
+            logs: [],
+            errors: [error.message],
+            testResults: []
+        };
+    }
+
+    /**
+     * @param {string} script
+     * @param {Object} requestConfig
      * @param {Object} [options]
      * @param {Object} [options.environment]
      * @param {Object} [options.iteration]
      * @param {string} [options.collectionId]
      * @returns {Promise<Object>}
      */
-    async executePreRequestScript(script, requestConfig, { environment, iteration, collectionId } = {}) {
+    async executePreRequestScript(script, requestConfig, options = {}) {
         if (!script || script.trim() === '') {
             return {
                 modifiedRequest: requestConfig,
@@ -110,46 +181,18 @@ export class ScriptService {
         }
 
         try {
-            const environmentVariables = environment ?? await this.environmentService.getActiveEnvironmentVariables();
-
-            const scriptData = {
-                script,
-                request: {
-                    url: requestConfig.url,
-                    method: requestConfig.method,
-                    headers: requestConfig.headers || {},
-                    body: requestConfig.body,
-                    queryParams: requestConfig.queryParams || {},
-                    pathParams: requestConfig.pathParams || {}
-                },
-                environment: environmentVariables || {},
-                collectionVariables: await this._readCollectionVariables(collectionId),
-                cookies: await this._readCookieJar(),
-                ...(iteration ? { iteration } : {})
-            };
-
+            const scriptData = await this._scriptPayload(script, requestConfig, options);
             const result = await window.backendAPI.scripts.executePreRequest(scriptData);
-
-            if (result.modifiedEnvironment && Object.keys(result.modifiedEnvironment).length > 0) {
-                await this._applyEnvironmentChanges(result.modifiedEnvironment);
-            }
-            await this._applyCollectionVariableChanges(collectionId, result.modifiedCollectionVariables);
-            await this._applyCookieChanges(result.cookieChanges);
+            await this._applyScriptSideEffects(result, options.collectionId);
 
             return {
                 modifiedRequest: this._mergeModifiedRequest(requestConfig, result.modifiedRequest),
                 result
             };
-
         } catch (error) {
             return {
                 modifiedRequest: requestConfig,
-                result: {
-                    success: false,
-                    logs: [],
-                    errors: [error.message],
-                    testResults: []
-                }
+                result: this._scriptFailure(error)
             };
         }
     }
@@ -164,7 +207,7 @@ export class ScriptService {
      * @param {string} [options.collectionId]
      * @returns {Promise<Object>}
      */
-    async executeTestScript(script, requestConfig, response, { environment, iteration, collectionId } = {}) {
+    async executeTestScript(script, requestConfig, response, options = {}) {
         if (!script || script.trim() === '') {
             return {
                 success: true,
@@ -175,56 +218,15 @@ export class ScriptService {
         }
 
         try {
-            const environmentVariables = environment ?? await this.environmentService.getActiveEnvironmentVariables();
-
-            const status = response?.status ?? response?.statusCode ?? response?.status_code ?? null;
-            const statusText = response?.statusText ?? response?.status_text ?? response?.statusMessage ?? '';
-            const headers = response?.headers || {};
-            const body = response?.data ?? response?.body ?? null;
-            const timings = response?.timings || {};
-            const cookies = response?.cookies || [];
-
-            const scriptData = {
-                script,
-                request: {
-                    url: requestConfig.url,
-                    method: requestConfig.method,
-                    headers: requestConfig.headers || {},
-                    body: requestConfig.body,
-                    queryParams: requestConfig.queryParams || {},
-                    pathParams: requestConfig.pathParams || {}
-                },
-                response: {
-                    status,
-                    statusText,
-                    headers,
-                    body,
-                    timings,
-                    cookies
-                },
-                environment: environmentVariables || {},
-                collectionVariables: await this._readCollectionVariables(collectionId),
-                cookies: await this._readCookieJar(),
-                ...(iteration ? { iteration } : {})
-            };
-
+            const scriptData = await this._scriptPayload(script, requestConfig, options, {
+                response: this._scriptResponse(response)
+            });
             const result = await window.backendAPI.scripts.executeTest(scriptData);
-
-            if (result.modifiedEnvironment && Object.keys(result.modifiedEnvironment).length > 0) {
-                await this._applyEnvironmentChanges(result.modifiedEnvironment);
-            }
-            await this._applyCollectionVariableChanges(collectionId, result.modifiedCollectionVariables);
-            await this._applyCookieChanges(result.cookieChanges);
+            await this._applyScriptSideEffects(result, options.collectionId);
 
             return result;
-
         } catch (error) {
-            return {
-                success: false,
-                logs: [],
-                errors: [error.message],
-                testResults: []
-            };
+            return this._scriptFailure(error);
         }
     }
 
@@ -257,7 +259,7 @@ export class ScriptService {
             if (settings?.cookieJarEnabled === false) {
                 return null;
             }
-        } catch (_e) {
+        } catch {
             return null;
         }
         return controller;
@@ -271,7 +273,7 @@ export class ScriptService {
                 return [];
             }
             return await controller.getCookiesForScripts();
-        } catch (_e) {
+        } catch {
             return [];
         }
     }
@@ -290,7 +292,7 @@ export class ScriptService {
                 return;
             }
             await controller.applyScriptCookieChanges(changes);
-        } catch (_e) {
+        } catch {
         }
     }
 
@@ -306,8 +308,7 @@ export class ScriptService {
             }
 
             await this.environmentService.applyVariableChanges(activeEnv.id, changes);
-
-        } catch (error) {
+        } catch {
         }
     }
 }

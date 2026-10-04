@@ -10,6 +10,16 @@ import { el } from '../htmlUtils.js';
 import { translate } from '../utils/translate.js';
 import { fileNameFromPath } from '../utils/fileName.js';
 
+/**
+ * @param {Object} pinnedRequests
+ * @param {{id: string}} collection
+ * @param {{id: string}} endpoint
+ * @returns {boolean}
+ */
+function isPinned(pinnedRequests, collection, endpoint) {
+    return Boolean(pinnedRequests[endpointKey(collection.id, endpoint.id)]);
+}
+
 export class CollectionRenderer {
     /**
      * @param {string} containerId
@@ -57,10 +67,12 @@ export class CollectionRenderer {
      * @param {Function} [eventHandlers.onEndpointContextMenu]
      * @param {Function} [eventHandlers.onContextMenu]
      * @param {Function} [eventHandlers.onEmptySpaceContextMenu]
+     * @param {Object} [eventHandlers.onEmptyStateActions]
      * @param {boolean} [preserveExpansionState=false]
      * @param {Object} [options={}]
      * @param {boolean} [options.showSearchEmptyState=false]
-     * @param {boolean} [options.forceExpandAll=false]
+     * @param {boolean} [options.expandSearchResults=false]
+     * @param {Object} [pinnedRequests={}]
      * @returns {Promise<void>}
      */
     async renderCollections(collections, eventHandlers = {}, preserveExpansionState = false, options = {}, pinnedRequests = {}) {
@@ -78,13 +90,7 @@ export class CollectionRenderer {
             if (app.i18n && app.i18n.updateUI) {
                 app.i18n.updateUI(this.container);
             }
-            if (eventHandlers.onEmptySpaceContextMenu) {
-                this.emptySpaceContextMenuHandler = (e) => {
-                    e.preventDefault();
-                    eventHandlers.onEmptySpaceContextMenu(e);
-                };
-                this.container.addEventListener('contextmenu', this.emptySpaceContextMenuHandler);
-            }
+            this._attachEmptySpaceContextMenu(eventHandlers, false);
             return;
         }
 
@@ -114,15 +120,7 @@ export class CollectionRenderer {
             this.container.appendChild(collectionElement);
         });
 
-        if (eventHandlers.onEmptySpaceContextMenu) {
-            this.emptySpaceContextMenuHandler = (e) => {
-                if (e.target === this.container) {
-                    e.preventDefault();
-                    eventHandlers.onEmptySpaceContextMenu(e);
-                }
-            };
-            this.container.addEventListener('contextmenu', this.emptySpaceContextMenuHandler);
-        }
+        this._attachEmptySpaceContextMenu(eventHandlers, true);
 
         if (options.expandSearchResults) {
             this.expandSearchResults(collections);
@@ -139,6 +137,25 @@ export class CollectionRenderer {
         if (app.i18n && app.i18n.updateUI) {
             app.i18n.updateUI(this.container);
         }
+    }
+
+    /**
+     * @param {Object} eventHandlers
+     * @param {boolean} onlyOnContainer
+     * @returns {void}
+     */
+    _attachEmptySpaceContextMenu(eventHandlers, onlyOnContainer) {
+        if (!eventHandlers.onEmptySpaceContextMenu) {
+            return;
+        }
+        this.emptySpaceContextMenuHandler = (e) => {
+            if (onlyOnContainer && e.target !== this.container) {
+                return;
+            }
+            e.preventDefault();
+            eventHandlers.onEmptySpaceContextMenu(e);
+        };
+        this.container.addEventListener('contextmenu', this.emptySpaceContextMenuHandler);
     }
 
     expandSearchResults(collections) {
@@ -170,13 +187,10 @@ export class CollectionRenderer {
     }
 
     /**
-     * @param {Object} collection
-     * @param {string} collection.id
-     * @param {string} collection.name
-     * @param {Array} collection.endpoints
-     * @param {Array} [collection.folders]
+     * @param {Array<Object>} collections
+     * @param {Object} pinnedRequests
      * @param {Object} eventHandlers
-     * @returns {HTMLDivElement}
+     * @returns {HTMLDivElement|null}
      */
     createPinnedSection(collections, pinnedRequests, eventHandlers) {
         const pinnedKeys = Object.keys(pinnedRequests);
@@ -187,7 +201,7 @@ export class CollectionRenderer {
         const pinnedEntries = [];
         collections.forEach(collection => {
             flattenRequests(collection).forEach(endpoint => {
-                if (pinnedRequests[endpointKey(collection.id, endpoint.id)]) {
+                if (isPinned(pinnedRequests, collection, endpoint)) {
                     pinnedEntries.push({ collection, endpoint });
                 }
             });
@@ -413,19 +427,29 @@ export class CollectionRenderer {
      */
     createEndpointsContainer(collection, eventHandlers, pinnedRequests = {}) {
         const endpointsDiv = el('div', 'collection-endpoints');
-
-        rootRequests(collection).forEach(endpoint => {
-            const isPinned = !!pinnedRequests[endpointKey(collection.id, endpoint.id)];
-            const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers, isPinned);
-            endpointsDiv.appendChild(endpointDiv);
-        });
-
-        topLevelFolders(collection).forEach(folder => {
-            const folderDiv = this.createFolderElement(folder, collection, eventHandlers, pinnedRequests);
-            endpointsDiv.appendChild(folderDiv);
-        });
-
+        this._appendTreeChildren(endpointsDiv, rootRequests(collection), topLevelFolders(collection), collection, eventHandlers, pinnedRequests);
         return endpointsDiv;
+    }
+
+    /**
+     * @param {HTMLElement} parent
+     * @param {Array<Object>} endpoints
+     * @param {Array<Object>} folders
+     * @param {Object} collection
+     * @param {Object} eventHandlers
+     * @param {Object} pinnedRequests
+     * @returns {void}
+     */
+    _appendTreeChildren(parent, endpoints, folders, collection, eventHandlers, pinnedRequests) {
+        endpoints.forEach(endpoint => {
+            const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers, isPinned(pinnedRequests, collection, endpoint));
+            parent.appendChild(endpointDiv);
+        });
+
+        folders.forEach(folder => {
+            const folderDiv = this.createFolderElement(folder, collection, eventHandlers, pinnedRequests);
+            parent.appendChild(folderDiv);
+        });
     }
 
     /**
@@ -461,17 +485,7 @@ export class CollectionRenderer {
         }
 
         const folderEndpoints = el('div', 'folder-endpoints');
-
-        (folder.endpoints || []).forEach(endpoint => {
-            const isPinned = !!pinnedRequests[endpointKey(collection.id, endpoint.id)];
-            const endpointDiv = this.createEndpointElement(endpoint, collection, eventHandlers, isPinned);
-            folderEndpoints.appendChild(endpointDiv);
-        });
-
-        (folder.folders || []).forEach(child => {
-            const childDiv = this.createFolderElement(child, collection, eventHandlers, pinnedRequests);
-            folderEndpoints.appendChild(childDiv);
-        });
+        this._appendTreeChildren(folderEndpoints, folder.endpoints || [], folder.folders || [], collection, eventHandlers, pinnedRequests);
 
         folderDiv.appendChild(folderHeader);
         folderDiv.appendChild(folderEndpoints);
@@ -492,9 +506,10 @@ export class CollectionRenderer {
      * @param {string} endpoint.path
      * @param {Object} collection
      * @param {Object} eventHandlers
+     * @param {boolean} [pinned=false]
      * @returns {HTMLDivElement}
      */
-    createEndpointElement(endpoint, collection, eventHandlers, isPinned = false) {
+    createEndpointElement(endpoint, collection, eventHandlers, pinned = false) {
         const endpointDiv = el('div', 'endpoint-item u-flex u-items-center');
         endpointDiv.dataset.endpointId = endpoint.id;
         endpointDiv.dataset.collectionId = collection.id;
@@ -507,13 +522,11 @@ export class CollectionRenderer {
         const displayName = endpoint.name || endpoint.path.replace(/^\{\{baseUrl\}\}/, '').split('?')[0] || 'Unnamed Request';
         pathSpan.textContent = displayName;
 
-        const pinBtn = el('span', `icon icon-14 icon-star endpoint-pin-btn${isPinned ? ' is-pinned' : ''}`);
-        pinBtn.title = isPinned ? 'Unpin request' : 'Pin request';
+        const pinBtn = el('span', `icon icon-14 icon-star endpoint-pin-btn${pinned ? ' is-pinned' : ''}`);
+        pinBtn.title = pinned ? 'Unpin request' : 'Pin request';
         pinBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (eventHandlers.onTogglePinned) {
-                eventHandlers.onTogglePinned(collection, endpoint);
-            }
+            eventHandlers.onTogglePinned?.(collection, endpoint);
         });
 
         endpointDiv.appendChild(methodSpan);
@@ -568,23 +581,21 @@ export class CollectionRenderer {
     /** @returns {Object} */
     getExpansionState() {
         const state = {};
-        const collectionElements = this.container.querySelectorAll('.collection-item');
-        collectionElements.forEach(element => {
+        this.container.querySelectorAll('.collection-item').forEach(element => {
             const {collectionId} = element.dataset;
-            if (collectionId) {
-                state[collectionId] = {
-                    expanded: element.classList.contains('expanded'),
-                    folders: {}
-                };
-                
-                const folderElements = element.querySelectorAll('.folder-item');
-                folderElements.forEach(folderElement => {
-                    const {folderId} = folderElement.dataset;
-                    if (folderId) {
-                        state[collectionId].folders[folderId] = folderElement.classList.contains('expanded');
-                    }
-                });
+            if (!collectionId) {
+                return;
             }
+            state[collectionId] = {
+                expanded: element.classList.contains('expanded'),
+                folders: {}
+            };
+            element.querySelectorAll('.folder-item').forEach(folderElement => {
+                const {folderId} = folderElement.dataset;
+                if (folderId) {
+                    state[collectionId].folders[folderId] = folderElement.classList.contains('expanded');
+                }
+            });
         });
         return state;
     }
@@ -594,22 +605,18 @@ export class CollectionRenderer {
      * @returns {void}
      */
     restoreExpansionState(expansionState) {
-        const collectionElements = this.container.querySelectorAll('.collection-item');
-        collectionElements.forEach(element => {
-            const {collectionId} = element.dataset;
-            const state = expansionState[collectionId];
-            
-            if (state && state.expanded) {
-                element.classList.add('expanded');
-                
-                const folderElements = element.querySelectorAll('.folder-item');
-                folderElements.forEach(folderElement => {
-                    const {folderId} = folderElement.dataset;
-                    if (folderId && state.folders[folderId]) {
-                        folderElement.classList.add('expanded');
-                    }
-                });
+        this.container.querySelectorAll('.collection-item').forEach(element => {
+            const state = expansionState[element.dataset.collectionId];
+            if (!state?.expanded) {
+                return;
             }
+            element.classList.add('expanded');
+            element.querySelectorAll('.folder-item').forEach(folderElement => {
+                const {folderId} = folderElement.dataset;
+                if (folderId && state.folders[folderId]) {
+                    folderElement.classList.add('expanded');
+                }
+            });
         });
     }
 
@@ -622,9 +629,7 @@ export class CollectionRenderer {
         try {
             const currentState = this.getExpansionState();
             await this.repository.saveCollectionExpansionStates(currentState);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /** @returns {Promise<void>} */
@@ -636,9 +641,7 @@ export class CollectionRenderer {
         try {
             const savedState = await this.repository.getCollectionExpansionStates();
             this.restoreExpansionState(savedState);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /**
@@ -647,8 +650,7 @@ export class CollectionRenderer {
      * @returns {void}
      */
     setActiveEndpoint(collectionId, endpointId) {
-        const allEndpoints = this.container.querySelectorAll('.endpoint-item');
-        allEndpoints.forEach(endpoint => endpoint.classList.remove('active'));
+        this.clearActiveEndpoint();
 
         const activeEndpoint = this.container.querySelector(
             `.endpoint-item[data-endpoint-id="${endpointId}"][data-collection-id="${collectionId}"]`

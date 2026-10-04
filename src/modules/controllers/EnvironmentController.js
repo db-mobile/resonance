@@ -33,9 +33,7 @@ export class EnvironmentController {
             if (activeEnvironment) {
                 this.selector.setActiveEnvironment(activeEnvironment);
             }
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /**
@@ -65,9 +63,7 @@ export class EnvironmentController {
             if (environment) {
                 this.selector.setActiveEnvironment(environment);
             }
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /** @returns {Promise<void>} */
@@ -79,9 +75,7 @@ export class EnvironmentController {
                 this.selector.setActiveEnvironment(activeEnvironment);
             }
             await this.selector.refresh();
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /**
@@ -100,13 +94,9 @@ export class EnvironmentController {
     /** @returns {Promise<void>} */
     async openEnvironmentManager() {
         try {
-            const result = await this.manager.show();
-            if (result) {
-                await this.onEnvironmentsChanged();
-            }
-        } catch (error) {
-            void error;
-        }
+            await this.manager.show();
+            await this.onEnvironmentsChanged();
+        } catch {}
     }
 
     /**

@@ -348,11 +348,11 @@ export class WorkspaceTabStateManager {
      * @param {Object} request
      * @returns {void}
      */
-    _restorePlainJsonBody(request) {
+    _restorePlainJsonBody(content) {
         if (this.graphqlBodyManager) {
             this.graphqlBodyManager.setGraphQLModeEnabled(false);
         }
-        setRequestBodyContent(request.body?.content || '');
+        setRequestBodyContent(content || '');
     }
 
     /**
@@ -426,7 +426,7 @@ export class WorkspaceTabStateManager {
         setRequestMode(RequestMode.WEBSOCKET);
 
         this._restoreUrlInputs('websocket', request.url);
-        this._restorePlainJsonBody(request);
+        this._restorePlainJsonBody(request.body?.content);
 
         this._restoreKeyValueList(this.dom.queryParamsList, request.queryParams, {
             onPopulated: updateUrlFromQueryParams
@@ -490,7 +490,7 @@ export class WorkspaceTabStateManager {
         setFieldValue('mqtt-topic-input', request.publishTopic || '');
         setFieldValue('mqtt-qos-select', String(request.qos ?? 0));
 
-        this._restorePlainJsonBody(request);
+        this._restorePlainJsonBody(request.body?.content);
 
         await this._restoreResponseState(tab);
 
@@ -505,10 +505,7 @@ export class WorkspaceTabStateManager {
      */
     _restoreHttpBody(request) {
         if (!(request.body && typeof request.body === 'object' && request.body.mode)) {
-            if (this.graphqlBodyManager) {
-                this.graphqlBodyManager.setGraphQLModeEnabled(false);
-            }
-            setRequestBodyContent(typeof request.body === 'string' ? request.body : '');
+            this._restorePlainJsonBody(typeof request.body === 'string' ? request.body : '');
             return;
         }
 
@@ -529,10 +526,7 @@ export class WorkspaceTabStateManager {
                 app.requestBodyTextEditor.setContent(request.body.content || '');
             }
         } else {
-            if (this.graphqlBodyManager) {
-                this.graphqlBodyManager.setGraphQLModeEnabled(false);
-            }
-            setRequestBodyContent(request.body.content || '');
+            this._restorePlainJsonBody(request.body.content);
         }
     }
 

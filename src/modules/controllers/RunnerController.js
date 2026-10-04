@@ -296,9 +296,7 @@ export class RunnerController {
         let collections = [];
         try {
             collections = await this.getCollections() || [];
-        } catch (error) {
-            void error;
-        }
+        } catch {}
 
         const links = resolveRequestLinks(runner.requests, collections);
         let { requests } = links;
@@ -312,8 +310,7 @@ export class RunnerController {
                 try {
                     const config = await this.service.getEndpointRequestConfig(request.collectionId, request.endpointId);
                     return { ...request, overrides: stripUnchangedOverrides(request.overrides, endpointDefaults(config)) };
-                } catch (error) {
-                    void error;
+                } catch {
                     return request;
                 }
             }));
@@ -322,9 +319,7 @@ export class RunnerController {
         if (needsMigration || links.relinked > 0) {
             try {
                 await this.repository.update(runner.id, { requests, overridesVersion: OVERRIDES_VERSION });
-            } catch (error) {
-                void error;
-            }
+            } catch {}
         }
 
         if (links.relinked > 0) {

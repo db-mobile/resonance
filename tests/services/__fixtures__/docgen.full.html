@@ -1,0 +1,234 @@
+<title>Golden &amp; API</title><h1>Golden &amp; API</h1><p class="description">Covers &lt;every&gt; markdown branch</p><p class="base-url"><strong>Base URL:</strong> <code>https://api.example.com</code></p><nav><ul><li><a href="#get-health"><span class="method method-get">GET</span> Health</a></li><li><a href="#users">Users</a><ul><li><a href="#get-list-users"><span class="method method-get">GET</span> List users</a></li><li><a href="#put-users-id-roles-role"><span class="method method-put">PUT</span> /users/{id}/roles/{{role}}</a></li></ul></li><li><a href="#users-admin">Users / Admin</a><ul><li><a href="#post-create-admin"><span class="method method-post">POST</span> Create admin</a></li><li><a href="#patch-patch-admin"><span class="method method-patch">PATCH</span> Patch admin</a></li></ul></li></ul></nav><main><article class="endpoint" id="get-health">
+<h3><span class="method method-get">GET</span> Health</h3>
+<p class="endpoint-description">Liveness probe</p>
+<p class="endpoint-url"><strong>URL:</strong> <code>https://api.example.com/health</code></p>
+<div class="params-section">
+<h4>Headers</h4>
+<table><thead><tr><th>Name</th><th>Value</th><th>Description</th></tr></thead><tbody><tr><td><code>X-Tenant</code></td><td>acme</td><td>-</td></tr><tr><td><code>Accept</code></td><td>application/json</td><td>-</td></tr></tbody></table>
+</div>
+<div class="code-samples">
+<h4>Code Samples</h4>
+<div class="code-tabs">
+<div class="tab-buttons">
+<button class="tab-btn active" data-lang="curl">cURL</button>
+<button class="tab-btn" data-lang="javascript-fetch">JavaScript</button>
+</div>
+<div class="tab-content active" data-lang="curl">
+<pre><code class="language-bash">curl \
+  -H &#039;X-Tenant: acme&#039; \
+  -H &#039;Accept: application/json&#039; \
+  &#039;https://api.example.com/health&#039;</code></pre>
+</div>
+<div class="tab-content" data-lang="javascript-fetch">
+<pre><code class="language-javascript">fetch(`https://api.example.com/health`, {
+  method: &#039;GET&#039;,
+  headers: {
+    &#039;X-Tenant&#039;: &#039;acme&#039;,
+    &#039;Accept&#039;: &#039;application/json&#039;
+  },
+})
+  .then(response =&gt; response.text())
+  .then(data =&gt; console.log(data))
+  .catch(error =&gt; console.error(&#039;Error:&#039;, error));</code></pre>
+</div>
+</div>
+</div>
+</article>
+<section class="folder" id="users">
+<h2>Users</h2>
+<article class="endpoint" id="get-list-users">
+<h3><span class="method method-get">GET</span> List users</h3>
+<p class="endpoint-description">Paged list</p>
+<p class="endpoint-url"><strong>URL:</strong> <code>https://api.example.com/users</code></p>
+<div class="params-section">
+<h4>Query Parameters</h4>
+<table><thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code>page</code></td><td>integer</td><td>Yes</td><td>Page number</td></tr><tr><td><code>q</code></td><td>string</td><td>No</td><td>-</td></tr></tbody></table>
+</div>
+<div class="params-section">
+<h4>Headers</h4>
+<table><thead><tr><th>Name</th><th>Value</th><th>Description</th></tr></thead><tbody><tr><td><code>Accept</code></td><td>application/xml</td><td>-</td></tr><tr><td><code>X-Trace</code></td><td>-</td><td>Trace id</td></tr><tr><td><code>X-Tenant</code></td><td>acme</td><td>-</td></tr></tbody></table>
+</div>
+<details class="schema-section">
+<summary><h4>Response Schema</h4></summary>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;array&quot;,
+  &quot;items&quot;: {
+    &quot;type&quot;: &quot;object&quot;
+  }
+}</code></pre>
+</details>
+<div class="code-samples">
+<h4>Code Samples</h4>
+<div class="code-tabs">
+<div class="tab-buttons">
+<button class="tab-btn active" data-lang="curl">cURL</button>
+<button class="tab-btn" data-lang="javascript-fetch">JavaScript</button>
+</div>
+<div class="tab-content active" data-lang="curl">
+<pre><code class="language-bash">curl \
+  -H &#039;Accept: application/xml&#039; \
+  -H &#039;X-Tenant: acme&#039; \
+  &#039;https://api.example.com/users&#039;</code></pre>
+</div>
+<div class="tab-content" data-lang="javascript-fetch">
+<pre><code class="language-javascript">fetch(`https://api.example.com/users`, {
+  method: &#039;GET&#039;,
+  headers: {
+    &#039;Accept&#039;: &#039;application/xml&#039;,
+    &#039;X-Tenant&#039;: &#039;acme&#039;
+  },
+})
+  .then(response =&gt; response.text())
+  .then(data =&gt; console.log(data))
+  .catch(error =&gt; console.error(&#039;Error:&#039;, error));</code></pre>
+</div>
+</div>
+</div>
+</article>
+<article class="endpoint" id="put-users-id-roles-role">
+<h3><span class="method method-put">PUT</span> /users/{id}/roles/{{role}}</h3>
+<p class="endpoint-url"><strong>URL:</strong> <code>https://api.example.com/users/{id}/roles/{{role}}</code></p>
+<div class="params-section">
+<h4>Path Parameters</h4>
+<table><thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>string</td><td>Yes</td><td>User id</td></tr><tr><td><code>role</code></td><td>string</td><td>No</td><td>-</td></tr></tbody></table>
+</div>
+<div class="params-section">
+<h4>Headers</h4>
+<table><thead><tr><th>Name</th><th>Value</th><th>Description</th></tr></thead><tbody><tr><td><code>X-Tenant</code></td><td>acme</td><td>-</td></tr><tr><td><code>Accept</code></td><td>application/json</td><td>-</td></tr></tbody></table>
+</div>
+<div class="body-section">
+<h4>Request Body</h4>
+<p><strong>Content-Type:</strong> <code>application/json</code></p>
+<pre><code class="language-json">{&quot;role&quot;:&quot;owner&quot;}</code></pre>
+</div>
+<div class="code-samples">
+<h4>Code Samples</h4>
+<div class="code-tabs">
+<div class="tab-buttons">
+<button class="tab-btn active" data-lang="curl">cURL</button>
+<button class="tab-btn" data-lang="javascript-fetch">JavaScript</button>
+</div>
+<div class="tab-content active" data-lang="curl">
+<pre><code class="language-bash">curl \
+  -X PUT \
+  -H &#039;X-Tenant: acme&#039; \
+  -H &#039;Accept: application/json&#039; \
+  -d &#039;{&quot;role&quot;:&quot;owner&quot;}&#039; \
+  &#039;https://api.example.com/users/7/roles/{role}&#039;</code></pre>
+</div>
+<div class="tab-content" data-lang="javascript-fetch">
+<pre><code class="language-javascript">fetch(`https://api.example.com/users/7/roles/{role}`, {
+  method: &#039;PUT&#039;,
+  headers: {
+    &#039;X-Tenant&#039;: &#039;acme&#039;,
+    &#039;Accept&#039;: &#039;application/json&#039;
+  },
+  body: `{
+  &quot;role&quot;: &quot;owner&quot;
+}`
+})
+  .then(response =&gt; response.text())
+  .then(data =&gt; console.log(data))
+  .catch(error =&gt; console.error(&#039;Error:&#039;, error));</code></pre>
+</div>
+</div>
+</div>
+</article>
+</section>
+<section class="folder" id="users-admin">
+<h2>Users / Admin</h2>
+<article class="endpoint" id="post-create-admin">
+<h3><span class="method method-post">POST</span> Create admin</h3>
+<p class="endpoint-url"><strong>URL:</strong> <code>https://api.example.com/admins</code></p>
+<div class="params-section">
+<h4>Headers</h4>
+<table><thead><tr><th>Name</th><th>Value</th><th>Description</th></tr></thead><tbody><tr><td><code>X-Tenant</code></td><td>acme</td><td>-</td></tr><tr><td><code>Accept</code></td><td>application/json</td><td>-</td></tr></tbody></table>
+</div>
+<div class="body-section">
+<h4>Request Body</h4>
+<p><strong>Content-Type:</strong> <code>application/json</code></p>
+<pre><code class="language-json">not json</code></pre>
+</div>
+<div class="code-samples">
+<h4>Code Samples</h4>
+<div class="code-tabs">
+<div class="tab-buttons">
+<button class="tab-btn active" data-lang="curl">cURL</button>
+<button class="tab-btn" data-lang="javascript-fetch">JavaScript</button>
+</div>
+<div class="tab-content active" data-lang="curl">
+<pre><code class="language-bash">curl \
+  -X POST \
+  -H &#039;X-Tenant: acme&#039; \
+  -H &#039;Accept: application/json&#039; \
+  -d &#039;not json&#039; \
+  &#039;https://api.example.com/admins&#039;</code></pre>
+</div>
+<div class="tab-content" data-lang="javascript-fetch">
+<pre><code class="language-javascript">fetch(`https://api.example.com/admins`, {
+  method: &#039;POST&#039;,
+  headers: {
+    &#039;X-Tenant&#039;: &#039;acme&#039;,
+    &#039;Accept&#039;: &#039;application/json&#039;
+  },
+  body: `not json`
+})
+  .then(response =&gt; response.text())
+  .then(data =&gt; console.log(data))
+  .catch(error =&gt; console.error(&#039;Error:&#039;, error));</code></pre>
+</div>
+</div>
+</div>
+</article>
+<article class="endpoint" id="patch-patch-admin">
+<h3><span class="method method-patch">PATCH</span> Patch admin</h3>
+<p class="endpoint-url"><strong>URL:</strong> <code>https://api.example.com/admins/{id}</code></p>
+<div class="params-section">
+<h4>Headers</h4>
+<table><thead><tr><th>Name</th><th>Value</th><th>Description</th></tr></thead><tbody><tr><td><code>X-Tenant</code></td><td>acme</td><td>-</td></tr><tr><td><code>Accept</code></td><td>application/json</td><td>-</td></tr></tbody></table>
+</div>
+<div class="body-section">
+<h4>Request Body</h4>
+<p><strong>Content-Type:</strong> <code>application/json</code></p>
+<pre><code class="language-json">{&quot;patched&quot;:true}</code></pre>
+</div>
+<details class="schema-section">
+<summary><h4>Response Schema</h4></summary>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;object&quot;
+}</code></pre>
+</details>
+<div class="code-samples">
+<h4>Code Samples</h4>
+<div class="code-tabs">
+<div class="tab-buttons">
+<button class="tab-btn active" data-lang="curl">cURL</button>
+<button class="tab-btn" data-lang="javascript-fetch">JavaScript</button>
+</div>
+<div class="tab-content active" data-lang="curl">
+<pre><code class="language-bash">curl \
+  -X PATCH \
+  -H &#039;X-Tenant: acme&#039; \
+  -H &#039;Accept: application/json&#039; \
+  -d &#039;{&quot;patched&quot;:true}&#039; \
+  &#039;https://api.example.com/admins/{id}&#039;</code></pre>
+</div>
+<div class="tab-content" data-lang="javascript-fetch">
+<pre><code class="language-javascript">fetch(`https://api.example.com/admins/{id}`, {
+  method: &#039;PATCH&#039;,
+  headers: {
+    &#039;X-Tenant&#039;: &#039;acme&#039;,
+    &#039;Accept&#039;: &#039;application/json&#039;
+  },
+  body: `{
+  &quot;patched&quot;: true
+}`
+})
+  .then(response =&gt; response.text())
+  .then(data =&gt; console.log(data))
+  .catch(error =&gt; console.error(&#039;Error:&#039;, error));</code></pre>
+</div>
+</div>
+</div>
+</article>
+</section></main><footer>Generated on DATE</footer>

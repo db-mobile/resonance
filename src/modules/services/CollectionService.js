@@ -26,6 +26,7 @@ import {
 } from '../protocols/protocolRegistry.js';
 import { captureFormBody, getRequestBodyContent } from '../requestBodyHelper.js';
 import { toast } from '../ui/Toast.js';
+import { generateId } from '../utils/ids.js';
 
 export class CollectionService {
     /**
@@ -37,6 +38,20 @@ export class CollectionService {
         this.repository = repository;
         this.schemaProcessor = schemaProcessor;
         this.statusDisplay = statusDisplay;
+    }
+
+    /**
+     * @param {string} label
+     * @param {function(): Promise<*>} work
+     * @returns {Promise<*>}
+     */
+    async _reporting(label, work) {
+        try {
+            return await work();
+        } catch (error) {
+            this.statusDisplay.update(`${label}: ${error.message}`, null);
+            throw error;
+        }
     }
 
     /** @returns {Promise<Array<Object>>} */
@@ -56,17 +71,14 @@ export class CollectionService {
      * @returns {Promise<Object>}
      */
     async renameCollection(collectionId, newName) {
-        try {
+        return this._reporting('Error renaming collection', async () => {
             this.statusDisplay.update('Renaming collection...', null);
 
             const updatedCollection = await this.repository.updateMetadata(collectionId, { name: newName });
 
             this.statusDisplay.update(`Collection renamed to "${newName}"`, null);
             return updatedCollection;
-        } catch (error) {
-            this.statusDisplay.update(`Error renaming collection: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -86,14 +98,14 @@ export class CollectionService {
         try {
             this.statusDisplay.update('Opening collection...', null);
 
-            const result = await this.repository.openExisting(path);
+            const outcome = await this.repository.openExisting(path);
 
-            const count = result.opened.length;
+            const count = outcome.opened.length;
             this.statusDisplay.update(
                 count > 0 ? `Opened ${count} collection${count === 1 ? '' : 's'}` : '',
                 null
             );
-            return result;
+            return outcome;
         } catch (error) {
             const message = typeof error === 'string' ? error : (error.message || 'Unknown error');
             this.statusDisplay.update('', null);
@@ -120,15 +132,15 @@ export class CollectionService {
     }
 
     /**
-     * @param {string} collectionId
-     * @param {string} format
+     * @param {string} successLabel
+     * @param {function(): Promise<Object>} exportCall
      * @returns {Promise<Object>}
      */
-    async exportCollectionAsOpenApi(collectionId, format) {
+    async _runExport(successLabel, exportCall) {
         try {
             this.statusDisplay.update('Exporting collection...', null);
 
-            const result = await window.backendAPI.collections.exportOpenApi(collectionId, format);
+            const result = await exportCall();
 
             if (result.cancelled) {
                 this.statusDisplay.update('Export cancelled', null);
@@ -136,34 +148,7 @@ export class CollectionService {
             }
 
             if (result.success) {
-                let message = `Collection exported successfully to ${format.toUpperCase()}`;
-                if (result.skipped && result.skipped.count > 0) {
-                    message = `${message} (${result.skipped.count} items skipped)`;
-                }
-                this.statusDisplay.update(message, null);
-                return result;
-            }
-
-            throw new Error('Export failed');
-        } catch (error) {
-            this.statusDisplay.update(`Export error: ${error.message}`, null);
-            throw error;
-        }
-    }
-
-    async exportCollectionAsPostman(collectionId) {
-        try {
-            this.statusDisplay.update('Exporting collection...', null);
-
-            const result = await window.backendAPI.collections.exportPostman(collectionId);
-
-            if (result.cancelled) {
-                this.statusDisplay.update('Export cancelled', null);
-                return { success: false, cancelled: true };
-            }
-
-            if (result.success) {
-                let message = 'Collection exported successfully to Postman';
+                let message = successLabel;
                 if (result.skipped && result.skipped.count > 0) {
                     message = `${message} (${result.skipped.count} items skipped)`;
                 }
@@ -179,11 +164,34 @@ export class CollectionService {
     }
 
     /**
-     * @param {string} name
+     * @param {string} collectionId
+     * @param {string} format
+     * @returns {Promise<Object>}
+     */
+    async exportCollectionAsOpenApi(collectionId, format) {
+        return this._runExport(
+            `Collection exported successfully to ${format.toUpperCase()}`,
+            () => window.backendAPI.collections.exportOpenApi(collectionId, format)
+        );
+    }
+
+    /**
+     * @param {string} collectionId
+     * @returns {Promise<Object>}
+     */
+    async exportCollectionAsPostman(collectionId) {
+        return this._runExport(
+            'Collection exported successfully to Postman',
+            () => window.backendAPI.collections.exportPostman(collectionId)
+        );
+    }
+
+    /**
+     * @param {string|{name: string, storageParentPath?: string}} nameOrOptions
      * @returns {Promise<Object>}
      */
     async createCollection(nameOrOptions) {
-        try {
+        return this._reporting('Error creating collection', async () => {
             const options = typeof nameOrOptions === 'string'
                 ? { name: nameOrOptions }
                 : (nameOrOptions || {});
@@ -211,15 +219,12 @@ export class CollectionService {
 
             toast.success(`Collection "${name}" created`);
             return createdCollection;
-        } catch (error) {
-            this.statusDisplay.update(`Error creating collection: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /** @returns {string} */
     generateCollectionId() {
-        return `collection_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        return generateId('collection');
     }
 
     /**
@@ -242,13 +247,10 @@ export class CollectionService {
      * @returns {Promise<Object>}
      */
     async addRequestToCollection(collectionId, requestData) {
-        try {
+        return this._reporting('Error adding request', async () => {
             this.statusDisplay.update('Adding new request...', null);
 
-            const collection = await this._readFresh(collectionId);
-            if (!collection) {
-                throw new Error(`Collection with id ${collectionId} not found`);
-            }
+            const collection = await this._requireFresh(collectionId);
 
             const descriptor = getProtocol(requestData.protocol);
             const httpMethod = deriveHttpMethod(descriptor, requestData);
@@ -310,10 +312,7 @@ export class CollectionService {
 
             this.statusDisplay.update(`Added new request: ${requestData.name}`, null);
             return newEndpoint;
-        } catch (error) {
-            this.statusDisplay.update(`Error adding request: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -369,9 +368,9 @@ export class CollectionService {
     generateEndpointId(collection) {
         const existingIds = new Set(flattenRequests(collection).map(endpoint => endpoint.id));
 
-        let newId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        let newId = generateId('req');
         while (existingIds.has(newId)) {
-            newId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            newId = generateId('req');
         }
 
         return newId;
@@ -504,13 +503,10 @@ export class CollectionService {
      * @returns {Promise<Object>}
      */
     async renameRequest(collectionId, endpointId, newName) {
-        try {
+        return this._reporting('Error renaming request', async () => {
             this.statusDisplay.update('Renaming request...', null);
 
-            const collection = await this._readFresh(collectionId);
-            if (!collection) {
-                throw new Error(`Collection with id ${collectionId} not found`);
-            }
+            const collection = await this._requireFresh(collectionId);
 
             const renamed = updateRequest(collection, endpointId, { name: newName });
             if (!renamed) {
@@ -523,10 +519,7 @@ export class CollectionService {
 
             this.statusDisplay.update(`Request renamed to "${newName}"`, null);
             return updatedEndpoint;
-        } catch (error) {
-            this.statusDisplay.update(`Error renaming request: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -535,13 +528,10 @@ export class CollectionService {
      * @returns {Promise<boolean>}
      */
     async deleteRequestFromCollection(collectionId, endpointId) {
-        try {
+        return this._reporting('Error deleting request', async () => {
             this.statusDisplay.update('Deleting request...', null);
 
-            const collection = await this._readFresh(collectionId);
-            if (!collection) {
-                throw new Error(`Collection with id ${collectionId} not found`);
-            }
+            const collection = await this._requireFresh(collectionId);
 
             const reduced = removeRequest(collection, endpointId) ?? collection;
 
@@ -551,13 +541,10 @@ export class CollectionService {
 
             this.statusDisplay.update('Request deleted successfully', null);
             return true;
-        } catch (error) {
-            this.statusDisplay.update(`Error deleting request: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
-    async saveRequestBodyModification(collectionId, endpointId, _bodyInput) {
+    async saveRequestBodyModification(collectionId, endpointId) {
         await this.saveModifiedRequestBody(collectionId, endpointId);
     }
 
@@ -616,8 +603,23 @@ export class CollectionService {
         try {
             const state = this.captureRequestBodyState();
             await this.repository.saveBodyState(collectionId, endpointId, state);
-        } catch (error) {
-            void error;
+        } catch {
+        }
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} formElements
+     * @param {string} listKey
+     * @param {string} repositoryMethod
+     * @returns {Promise<void>}
+     */
+    async _saveRows(collectionId, endpointId, formElements, listKey, repositoryMethod) {
+        try {
+            const rows = this.parseKeyValuePairs(formElements[listKey]);
+            await this.repository[repositoryMethod](collectionId, endpointId, rows);
+        } catch {
         }
     }
 
@@ -628,12 +630,7 @@ export class CollectionService {
      * @returns {Promise<void>}
      */
     async saveCurrentPathParams(collectionId, endpointId, formElements) {
-        try {
-            const pathParams = this.parseKeyValuePairs(formElements.pathParamsList);
-            await this.repository.savePersistedPathParams(collectionId, endpointId, pathParams);
-        } catch (error) {
-            void error;
-        }
+        await this._saveRows(collectionId, endpointId, formElements, 'pathParamsList', 'savePersistedPathParams');
     }
 
     /**
@@ -643,12 +640,7 @@ export class CollectionService {
      * @returns {Promise<void>}
      */
     async saveCurrentQueryParams(collectionId, endpointId, formElements) {
-        try {
-            const queryParams = this.parseKeyValuePairs(formElements.queryParamsList);
-            await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParams);
-        } catch (error) {
-            void error;
-        }
+        await this._saveRows(collectionId, endpointId, formElements, 'queryParamsList', 'savePersistedQueryParams');
     }
 
     /**
@@ -658,12 +650,7 @@ export class CollectionService {
      * @returns {Promise<void>}
      */
     async saveCurrentHeaders(collectionId, endpointId, formElements) {
-        try {
-            const headers = this.parseKeyValuePairs(formElements.headersList);
-            await this.repository.savePersistedHeaders(collectionId, endpointId, headers);
-        } catch (error) {
-            void error;
-        }
+        await this._saveRows(collectionId, endpointId, formElements, 'headersList', 'savePersistedHeaders');
     }
 
     /**

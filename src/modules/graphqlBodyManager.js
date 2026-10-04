@@ -15,6 +15,15 @@ import { resetRequestBias, setRequestBias } from './resizer.js';
 const SCHEMA_STORE_KEY = 'graphqlSchemaCache';
 const SCHEMA_STORE_LIMIT = 50;
 
+/**
+ * @param {Event} e
+ * @returns {boolean}
+ */
+function isGraphQLUrlEvent(e) {
+    const id = e.target?.id;
+    return id === 'url-input' || id === 'graphql-url-input';
+}
+
 export class GraphQLBodyManager {
     constructor(domElements) {
         this.dom = domElements;
@@ -105,22 +114,14 @@ export class GraphQLBodyManager {
         }
 
         document.addEventListener('input', (e) => {
-            const id = e.target?.id;
-            if (id !== 'url-input' && id !== 'graphql-url-input') {
-                return;
-            }
-            if (!this.isGraphQLMode()) {
+            if (!isGraphQLUrlEvent(e) || !this.isGraphQLMode()) {
                 return;
             }
             this._debouncedApplySchema();
         });
 
         document.addEventListener('change', (e) => {
-            const id = e.target?.id;
-            if (id !== 'url-input' && id !== 'graphql-url-input') {
-                return;
-            }
-            if (!this.isGraphQLMode()) {
+            if (!isGraphQLUrlEvent(e) || !this.isGraphQLMode()) {
                 return;
             }
             this._debouncedApplySchema.cancel();
@@ -132,12 +133,19 @@ export class GraphQLBodyManager {
         if (!this.docsRail) {
             return;
         }
-        const show = this.docsRail.style.display === 'none';
-        this.docsRail.style.display = show ? '' : 'none';
-        if (this.explorerResizerHandle) {
-            this.explorerResizerHandle.style.display = show ? '' : 'none';
+        this._setDocsRailVisible(this.docsRail.style.display === 'none');
+    }
+
+    /** @param {boolean} show */
+    _setDocsRailVisible(show) {
+        const display = show ? '' : 'none';
+        if (this.docsRail) {
+            this.docsRail.style.display = display;
+            this.docsToggle?.setAttribute('aria-pressed', String(show));
         }
-        this.docsToggle?.setAttribute('aria-pressed', String(show));
+        if (this.explorerResizerHandle) {
+            this.explorerResizerHandle.style.display = display;
+        }
         if (show) {
             this.renderDocsRail();
         }
@@ -199,14 +207,7 @@ export class GraphQLBodyManager {
                 this.runnerBtn.style.display = 'none';
             }
             setRequestBias(0.6);
-            if (this.docsRail) {
-                this.docsRail.style.display = '';
-                this.docsToggle?.setAttribute('aria-pressed', 'true');
-            }
-            if (this.explorerResizerHandle) {
-                this.explorerResizerHandle.style.display = '';
-            }
-            this.renderDocsRail();
+            this._setDocsRailVisible(true);
         } else {
             const methodSelect = document.getElementById('method-select');
             if (methodSelect && this.savedMethod !== null) {
@@ -220,13 +221,7 @@ export class GraphQLBodyManager {
                 this.runnerBtn.style.display = '';
             }
             resetRequestBias();
-            if (this.docsRail) {
-                this.docsRail.style.display = 'none';
-                this.docsToggle?.setAttribute('aria-pressed', 'false');
-            }
-            if (this.explorerResizerHandle) {
-                this.explorerResizerHandle.style.display = 'none';
-            }
+            this._setDocsRailVisible(false);
         }
 
         requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -234,53 +229,51 @@ export class GraphQLBodyManager {
         }));
     }
 
+    /** @returns {{names: string[], selected: string|null}|null} */
+    _resolveNamedOperations() {
+        const operations = this.graphqlEditor ? this.graphqlEditor.getOperations() : [];
+        if (!operations) {
+            return null;
+        }
+        const names = operations.filter(op => op.name).map(op => op.name);
+        if (names.length === 0) {
+            return { names, selected: null };
+        }
+        if (names.length === 1 || !names.includes(this.selectedOperationName)) {
+            return { names, selected: names[0] };
+        }
+        return { names, selected: this.selectedOperationName };
+    }
+
     updateOperationPicker() {
         if (!this.operationSelect) {
             return;
         }
 
-        const operations = this.graphqlEditor ? this.graphqlEditor.getOperations() : [];
-        if (operations === null) {
+        const resolved = this._resolveNamedOperations();
+        if (!resolved) {
             return;
         }
 
-        const named = operations.filter(op => op.name);
+        const { names, selected } = resolved;
+        this.selectedOperationName = selected;
 
-        if (named.length <= 1) {
+        if (names.length <= 1) {
             this.operationSelect.style.display = 'none';
             this.operationSelect.innerHTML = '';
-            this.selectedOperationName = named.length === 1 ? named[0].name : null;
             return;
-        }
-
-        const names = named.map(op => op.name);
-        if (!names.includes(this.selectedOperationName)) {
-            this.selectedOperationName = names[0];
         }
 
         this.operationSelect.innerHTML = names
             .map(name => `<option value="${name}">${name}</option>`)
             .join('');
-        this.operationSelect.value = this.selectedOperationName;
+        this.operationSelect.value = selected;
         this.operationSelect.style.display = '';
     }
 
     /** @returns {string|null} */
     getSelectedOperationName() {
-        const operations = this.graphqlEditor ? this.graphqlEditor.getOperations() : [];
-        if (!operations || operations.length === 0) {
-            return null;
-        }
-        const named = operations.filter(op => op.name);
-        if (named.length === 0) {
-            return null;
-        }
-        if (named.length === 1) {
-            return named[0].name;
-        }
-        return named.some(op => op.name === this.selectedOperationName)
-            ? this.selectedOperationName
-            : named[0].name;
+        return this._resolveNamedOperations()?.selected ?? null;
     }
 
     async fetchSchema() {
@@ -302,15 +295,7 @@ export class GraphQLBodyManager {
             if (cacheKey && this._getCurrentUrl() !== cacheKey) {
                 return;
             }
-            this.currentSchema = schema;
-            if (cacheKey) {
-                this.schemaCache.set(cacheKey, schema);
-                this._autoFetchedUrls.add(cacheKey);
-                if (introspection) {
-                    this._saveSchemaToStore(cacheKey, introspection);
-                }
-            }
-            this.applySchemaToEditor();
+            this._adoptSchema(cacheKey, schema, introspection, true);
             toast.success('Schema loaded');
         } catch (e) {
             toast.error(`Failed to fetch schema: ${e.message || e}`);
@@ -320,6 +305,27 @@ export class GraphQLBodyManager {
                 this.fetchSchemaBtn.disabled = false;
             }
         }
+    }
+
+    /**
+     * @param {string} url
+     * @param {Object} schema
+     * @param {Object|null} [introspection]
+     * @param {boolean} [fetched]
+     * @returns {void}
+     */
+    _adoptSchema(url, schema, introspection = null, fetched = false) {
+        this.currentSchema = schema;
+        if (url) {
+            this.schemaCache.set(url, schema);
+            if (fetched) {
+                this._autoFetchedUrls.add(url);
+            }
+            if (introspection) {
+                this._saveSchemaToStore(url, introspection);
+            }
+        }
+        this.applySchemaToEditor();
     }
 
     applySchemaToEditor() {
@@ -371,16 +377,11 @@ export class GraphQLBodyManager {
             const keys = Object.keys(store);
             let toSave = store;
             if (keys.length > SCHEMA_STORE_LIMIT) {
-                toSave = {};
-                keys.slice(keys.length - SCHEMA_STORE_LIMIT).forEach((k) => {
-                    toSave[k] = store[k];
-                });
+                toSave = Object.fromEntries(keys.slice(keys.length - SCHEMA_STORE_LIMIT).map((k) => [k, store[k]]));
             }
             await window.backendAPI.store.set(SCHEMA_STORE_KEY, toSave);
             this._schemaStorePromise = Promise.resolve(toSave);
-        } catch (_e) {
-            void _e;
-        }
+        } catch {}
     }
 
     /**
@@ -405,9 +406,7 @@ export class GraphQLBodyManager {
         if (introspection) {
             const schema = buildSchemaFromIntrospection(introspection);
             if (schema) {
-                this.schemaCache.set(targetUrl, schema);
-                this.currentSchema = schema;
-                this.applySchemaToEditor();
+                this._adoptSchema(targetUrl, schema);
                 return;
             }
         }
@@ -437,16 +436,8 @@ export class GraphQLBodyManager {
             if (this._getCurrentUrl() !== targetUrl) {
                 return;
             }
-            this.schemaCache.set(targetUrl, schema);
-            this.currentSchema = schema;
-            if (introspection) {
-                this._saveSchemaToStore(targetUrl, introspection);
-            }
-            this.applySchemaToEditor();
-            this._autoFetchedUrls.add(targetUrl);
-        } catch (_e) {
-            void _e;
-        } finally {
+            this._adoptSchema(targetUrl, schema, introspection, true);
+        } catch {} finally {
             this.isFetchingSchema = false;
         }
     }
@@ -471,12 +462,7 @@ export class GraphQLBodyManager {
         }
 
         document.querySelectorAll('.body-mode-panel').forEach(panel => {
-            const panelMode = panel.getAttribute('data-mode');
-            if (panelMode === mode) {
-                panel.classList.add('active');
-            } else {
-                panel.classList.remove('active');
-            }
+            panel.classList.toggle('active', panel.getAttribute('data-mode') === mode);
         });
 
         if (mode === 'graphql' && !this.graphqlEditor) {
@@ -524,9 +510,7 @@ export class GraphQLBodyManager {
                 });
 
                 this.applySchemaToEditor();
-            } catch (error) {
-                void error;
-            }
+            } catch {}
         })();
 
         return this._initializingGql;
@@ -569,11 +553,7 @@ export class GraphQLBodyManager {
 
     /** @param {boolean} enable */
     setGraphQLModeEnabled(enable) {
-        if (enable) {
-            this.switchMode('graphql');
-        } else {
-            this.switchMode('json');
-        }
+        this.switchMode(enable ? 'graphql' : 'json');
     }
 
     /** @returns {boolean} */

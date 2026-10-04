@@ -10,9 +10,7 @@ export async function resolveTlsOptions(url) {
     try {
         const settings = await getSettings();
         verifySsl = settings?.verifySsl !== false;
-    } catch (_e) {
-        void _e;
-    }
+    } catch {}
 
     const tls = { verifySsl };
     try {

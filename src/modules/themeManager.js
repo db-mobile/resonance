@@ -41,17 +41,13 @@ export class ThemeManager {
     async saveTheme(theme) {
         try {
             await window.backendAPI.store.set('theme', theme);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     async saveAccent(accent) {
         try {
             await window.backendAPI.store.set('accent', accent);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     applyAccent(accent) {

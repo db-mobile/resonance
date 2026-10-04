@@ -106,9 +106,7 @@ export class HistoryRenderer {
             const element = this.container.querySelector(`[data-history-id="${entry.id}"]`);
             if (element) {
                 element.addEventListener('click', () => {
-                    if (this.onHistorySelect) {
-                        this.onHistorySelect(entry);
-                    }
+                    this.onHistorySelect?.(entry);
                 });
 
                 const deleteBtn = element.querySelector('.history-item-delete');

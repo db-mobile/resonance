@@ -8,6 +8,26 @@ import { getProtocol } from '../protocols/protocolRegistry.js';
 import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
 import { buildEndpointUrl } from '../collections/endpointUrl.js';
 
+/**
+ * @param {Object} headers
+ * @returns {string|undefined}
+ */
+function findHeaderKey(headers) {
+    return Object.keys(headers).find(name => name.toLowerCase() === 'content-type');
+}
+
+/**
+ * @param {Object|undefined} params
+ * @returns {Object}
+ */
+function examplesToObject(params) {
+    const values = {};
+    Object.entries(params || {}).forEach(([key, param]) => {
+        values[key] = param.example || '';
+    });
+    return values;
+}
+
 export class WorkspaceTabEndpointLoaderService {
     /**
      * @param {Object} options
@@ -44,8 +64,7 @@ export class WorkspaceTabEndpointLoaderService {
             }
 
             await this.loadScriptsForEndpoint(endpoint);
-        } catch (error) {
-            void error;
+        } catch {
         }
     }
 
@@ -62,8 +81,7 @@ export class WorkspaceTabEndpointLoaderService {
             if (tab) {
                 await this.activateLoadedTab(tab, targetTabId, tabUpdate.name);
             }
-        } catch (error) {
-            void error;
+        } catch {
         }
     }
 
@@ -167,8 +185,7 @@ export class WorkspaceTabEndpointLoaderService {
             parsed.searchParams.forEach((value, key) => {
                 queryParams[key] = value;
             });
-        } catch (error) {
-            void error;
+        } catch {
         }
 
         return queryParams;
@@ -232,12 +249,19 @@ export class WorkspaceTabEndpointLoaderService {
 
     /**
      * @param {Object} endpoint
+     * @returns {'text'|'json'}
+     */
+    _bodyMode(endpoint) {
+        const contentType = this.resolveBodyContentType(endpoint);
+        return contentType && !contentType.toLowerCase().includes('json') ? 'text' : 'json';
+    }
+
+    /**
+     * @param {Object} endpoint
      * @returns {Object}
      */
     createSseTabUpdate(endpoint) {
         const { authType, authConfig } = this.buildHttpAuth(endpoint);
-        const contentType = this.resolveBodyContentType(endpoint);
-        const mode = contentType && !contentType.toLowerCase().includes('json') ? 'text' : 'json';
 
         return this._tabUpdate(endpoint, 'sse', endpoint.name || 'SSE Request', {
             url: endpoint.persistedUrl || endpoint.path || '',
@@ -246,7 +270,7 @@ export class WorkspaceTabEndpointLoaderService {
             queryParams: normalizeKeyValueRows(endpoint.persistedQueryParams),
             headers: normalizeKeyValueRows(endpoint.persistedHeaders),
             body: {
-                mode,
+                mode: this._bodyMode(endpoint),
                 content: endpoint.persistedBody || ''
             },
             authType,
@@ -356,13 +380,7 @@ export class WorkspaceTabEndpointLoaderService {
             return this.arrayEntriesToObject(endpoint.persistedPathParams);
         }
 
-        const pathParams = {};
-        if (endpoint.parameters?.path) {
-            Object.entries(endpoint.parameters.path).forEach(([key, param]) => {
-                pathParams[key] = param.example || '';
-            });
-        }
-        return pathParams;
+        return examplesToObject(endpoint.parameters?.path);
     }
 
     buildHttpQueryParams(endpoint) {
@@ -370,13 +388,7 @@ export class WorkspaceTabEndpointLoaderService {
             return normalizeKeyValueRows(endpoint.persistedQueryParams);
         }
 
-        const queryParams = {};
-        if (endpoint.parameters?.query) {
-            Object.entries(endpoint.parameters.query).forEach(([key, param]) => {
-                queryParams[key] = param.example || '';
-            });
-        }
-        return queryParams;
+        return examplesToObject(endpoint.parameters?.query);
     }
 
     buildHttpHeaders(endpoint) {
@@ -384,19 +396,10 @@ export class WorkspaceTabEndpointLoaderService {
             return normalizeKeyValueRows(endpoint.persistedHeaders);
         }
 
-        const headers = {};
-
-        if (endpoint.collectionDefaultHeaders) {
-            Object.entries(endpoint.collectionDefaultHeaders).forEach(([key, value]) => {
-                headers[key] = value;
-            });
-        }
-
-        if (endpoint.parameters?.header) {
-            Object.entries(endpoint.parameters.header).forEach(([key, param]) => {
-                headers[key] = param.example || '';
-            });
-        }
+        const headers = {
+            ...endpoint.collectionDefaultHeaders,
+            ...examplesToObject(endpoint.parameters?.header)
+        };
 
         if (['POST', 'PUT', 'PATCH'].includes(endpoint.method) && !headers['Content-Type']) {
             headers['Content-Type'] = endpoint.requestBody?.contentType || 'application/json';
@@ -439,10 +442,7 @@ export class WorkspaceTabEndpointLoaderService {
             content = '';
         }
 
-        const contentType = this.resolveBodyContentType(endpoint);
-        const mode = contentType && !contentType.toLowerCase().includes('json') ? 'text' : 'json';
-
-        return { mode, content };
+        return { mode: this._bodyMode(endpoint), content };
     }
 
     resolveBodyContentType(endpoint) {
@@ -456,18 +456,14 @@ export class WorkspaceTabEndpointLoaderService {
         }
 
         if (endpoint.collectionDefaultHeaders) {
-            const key = Object.keys(endpoint.collectionDefaultHeaders).find(
-                name => name.toLowerCase() === 'content-type'
-            );
+            const key = findHeaderKey(endpoint.collectionDefaultHeaders);
             if (key) {
                 return endpoint.collectionDefaultHeaders[key] || '';
             }
         }
 
         if (endpoint.parameters?.header) {
-            const key = Object.keys(endpoint.parameters.header).find(
-                name => name.toLowerCase() === 'content-type'
-            );
+            const key = findHeaderKey(endpoint.parameters.header);
             if (key) {
                 return endpoint.parameters.header[key]?.example || '';
             }
@@ -498,11 +494,7 @@ export class WorkspaceTabEndpointLoaderService {
     }
 
     arrayEntriesToObject(entries = []) {
-        const result = {};
-        entries.forEach(entry => {
-            result[entry.key] = entry.value;
-        });
-        return result;
+        return Object.fromEntries(entries.map(entry => [entry.key, entry.value]));
     }
 
     async activateLoadedTab(tab, tabId, tabName) {

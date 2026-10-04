@@ -47,7 +47,7 @@ export class CurlImportDialog extends BaseModal {
         }
 
         this.populateCollections(dialog, collections, options.targetCollectionId);
-        this.setupEventListeners(dialog, collections);
+        this.setupEventListeners(dialog);
         this.focusInput(dialog);
     }
 
@@ -98,11 +98,8 @@ export class CurlImportDialog extends BaseModal {
         }
     }
 
-    /**
-     * @param {HTMLElement} dialog
-     * @param {Array<Object>} collections
-     */
-    setupEventListeners(dialog, collections) {
+    /** @param {HTMLElement} dialog */
+    setupEventListeners(dialog) {
         const curlInput = dialog.querySelector('#curl-input');
         const collectionSelect = dialog.querySelector('#curl-import-collection');
         const cancelBtn = dialog.querySelector('#curl-import-cancel-btn');
@@ -146,7 +143,7 @@ export class CurlImportDialog extends BaseModal {
         }
 
         if (importBtn) {
-            importBtn.addEventListener('click', () => this.handleImport(dialog, collections));
+            importBtn.addEventListener('click', () => this.handleImport(dialog));
         }
     }
 
@@ -231,11 +228,8 @@ export class CurlImportDialog extends BaseModal {
         }
     }
 
-    /**
-     * @param {HTMLElement} dialog
-     * @param {Array<Object>} _collections
-     */
-    handleImport(dialog, _collections) {
+    /** @param {HTMLElement} dialog */
+    handleImport(dialog) {
         if (!this.parsedRequest) {
             return;
         }

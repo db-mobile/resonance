@@ -1,21 +1,9 @@
 /**
- * @fileoverview Resolves the effective auth config for a request, mapping the
+ * @fileoverview Resolves the effective auth config for a request, following 'inherit' up to the owning folder or collection.
  * @module auth/authInheritance
  */
 
 const NONE = Object.freeze({ type: 'none', config: Object.freeze({}) });
-
-/**
- * @param {Object|null} authConfig
- * @param {Object} context
- * @param {string|null|undefined} context.collectionId
- * @param {string|null|undefined} [context.endpointId]
- * @param {Object|null} context.repository
- * @returns {Promise<Object>}
- */
-export async function resolveEffectiveAuthConfig(authConfig, context = {}) {
-    return (await resolveEffectiveAuthWithSource(authConfig, context)).authConfig;
-}
 
 /**
  * @param {Object|null} authConfig

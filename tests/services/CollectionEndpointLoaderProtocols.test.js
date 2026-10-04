@@ -31,7 +31,6 @@ describe('CollectionEndpointLoaderService protocol handling', () => {
             repository,
             collectionService: { generateRequestBody: jest.fn(() => '') },
             schemaProcessor: { setOpenApiSpec: jest.fn() },
-            getFormElements: jest.fn(),
             setActiveEndpoint: jest.fn()
         });
         loadEndpoint = jest.fn().mockResolvedValue(undefined);
@@ -167,7 +166,6 @@ describe('CollectionEndpointLoaderService OpenAPI spec resolution', () => {
             repository,
             collectionService: { generateRequestBody: jest.fn(() => '') },
             schemaProcessor,
-            getFormElements: jest.fn(),
             setActiveEndpoint: jest.fn()
         });
         app.workspaceTabController = { loadEndpoint: jest.fn().mockResolvedValue(undefined) };

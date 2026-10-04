@@ -114,16 +114,6 @@ describe('SecretStore keychain backend', () => {
         expect(api.__chain.has('auth:c2:e1|token')).toBe(true);
     });
 
-    test('rename moves the value to a new key', async () => {
-        const api = makeBackend({ keychain: true });
-        const store = new SecretStore(api);
-        await store.set('env:1', 'old', 'v');
-        await store.rename('env:1', 'old', 'new');
-
-        expect(await store.get('env:1', 'old')).toBeUndefined();
-        expect(await store.get('env:1', 'new')).toBe('v');
-    });
-
     test('migrates pre-existing plaintext secrets into the keychain then clears them', async () => {
         const api = makeBackend({
             keychain: true,

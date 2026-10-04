@@ -8,6 +8,16 @@ import { pushEscapeHandler } from './modalEscape.js';
 import { updateSetting } from '../state/settingsCache.js';
 import { translate } from '../utils/translate.js';
 
+const TEMPLATE_PATH = './src/templates/settings/settingsModal.html';
+
+/**
+ * @param {*} error
+ * @returns {string}
+ */
+function formatUpdateError(error) {
+    return typeof error === 'string' ? error : (error?.message || JSON.stringify(error));
+}
+
 export class SettingsModal {
     constructor(themeManager, i18nManager = null, httpVersionManager = null, timeoutManager = null, proxyController = null, certificateController = null, layoutManager = null) {
         this.themeManager = themeManager;
@@ -43,9 +53,7 @@ export class SettingsModal {
                 if (version) {
                     appVersionDisplay.textContent = `v${version}`;
                 }
-            } catch (error) {
-                void error;
-            }
+            } catch {}
         }
 
         const tabButton = tab ? modal.querySelector(`.settings-tab[data-tab="${tab}"]`) : null;
@@ -61,7 +69,7 @@ export class SettingsModal {
 
     async createModal() {
         const fragment = templateLoader.cloneSync(
-            './src/templates/settings/settingsModal.html',
+            TEMPLATE_PATH,
             'tpl-settings-modal'
         );
         const overlay = fragment.firstElementChild;
@@ -79,49 +87,16 @@ export class SettingsModal {
             currentFollowRedirects = settings.followRedirects !== false;
             currentHistoryLimit = settings.historyLimit || 100;
             currentCheckUpdatesOnLaunch = settings.checkUpdatesOnLaunch === true;
-        } catch (e) {
-            void e;
-        }
+        } catch {}
 
-        const themeSelect = overlay.querySelector('select[name="theme"]');
-        if (themeSelect) {
-            themeSelect.value = this.themeManager.getCurrentTheme();
-        }
-
-        const layoutSelect = overlay.querySelector('select[name="layout"]');
-        if (layoutSelect && this.layoutManager) {
-            layoutSelect.value = this.layoutManager.getLayout();
-        }
-
-        const httpVersionSelect = overlay.querySelector('select[name="httpVersion"]');
-        if (httpVersionSelect) {
-            httpVersionSelect.value = currentHttpVersion;
-        }
-
-        const timeoutInput = overlay.querySelector('input[name="requestTimeout"]');
-        if (timeoutInput) {
-            timeoutInput.value = currentTimeout;
-        }
-
-        const verifySslCheckbox = overlay.querySelector('input[name="verifySsl"]');
-        if (verifySslCheckbox) {
-            verifySslCheckbox.checked = currentVerifySsl;
-        }
-
-        const followRedirectsCheckbox = overlay.querySelector('input[name="followRedirects"]');
-        if (followRedirectsCheckbox) {
-            followRedirectsCheckbox.checked = currentFollowRedirects;
-        }
-
-        const historyLimitInput = overlay.querySelector('input[name="historyLimit"]');
-        if (historyLimitInput) {
-            historyLimitInput.value = currentHistoryLimit;
-        }
-
-        const checkUpdatesOnLaunchCheckbox = overlay.querySelector('input[name="checkUpdatesOnLaunch"]');
-        if (checkUpdatesOnLaunchCheckbox) {
-            checkUpdatesOnLaunchCheckbox.checked = currentCheckUpdatesOnLaunch;
-        }
+        this._populateGeneralFields(overlay, {
+            httpVersion: currentHttpVersion,
+            timeout: currentTimeout,
+            verifySsl: currentVerifySsl,
+            followRedirects: currentFollowRedirects,
+            historyLimit: currentHistoryLimit,
+            checkUpdatesOnLaunch: currentCheckUpdatesOnLaunch
+        });
 
         const currentVersionSpan = overlay.querySelector('#settings-current-version');
         if (currentVersionSpan && window.backendAPI?.app?.getVersion) {
@@ -132,17 +107,11 @@ export class SettingsModal {
             });
         }
 
-        if (this.i18nManager) {
-            const languagePlaceholder = overlay.querySelector('[data-role="language-section"]');
-            if (languagePlaceholder) {
-                const langSection = this.createLanguageSectionDOM();
-                languagePlaceholder.replaceWith(langSection);
-            }
-        } else {
-            const languagePlaceholder = overlay.querySelector('[data-role="language-section"]');
-            if (languagePlaceholder) {
-                languagePlaceholder.remove();
-            }
+        const languagePlaceholder = overlay.querySelector('[data-role="language-section"]');
+        if (languagePlaceholder && this.i18nManager) {
+            languagePlaceholder.replaceWith(this.createLanguageSectionDOM());
+        } else if (languagePlaceholder) {
+            languagePlaceholder.remove();
         }
 
         const accentGrid = overlay.querySelector('[data-role="accent-grid"]');
@@ -151,58 +120,66 @@ export class SettingsModal {
         }
 
         if (this.proxyController) {
-            const tabsContainer = overlay.querySelector('.settings-tabs');
-            const proxyTabFragment = templateLoader.cloneSync(
-                './src/templates/settings/settingsModal.html',
-                'tpl-settings-proxy-tab'
-            );
-            tabsContainer.appendChild(proxyTabFragment);
-
-            const contentContainer = overlay.querySelector('.settings-content');
-            const proxyContentFragment = templateLoader.cloneSync(
-                './src/templates/settings/settingsModal.html',
-                'tpl-settings-proxy-content'
-            );
-            const proxyContent = proxyContentFragment.firstElementChild;
-            const proxySection = await this.createProxySectionDOM();
-            proxyContent.appendChild(proxySection);
-            contentContainer.appendChild(proxyContent);
+            this._appendOptionalTab(overlay, 'tpl-settings-proxy-tab', 'tpl-settings-proxy-content', await this.createProxySectionDOM());
         }
 
         if (this.certificateController) {
-            const tabsContainer = overlay.querySelector('.settings-tabs');
-            const certsTabFragment = templateLoader.cloneSync(
-                './src/templates/settings/settingsModal.html',
-                'tpl-settings-certs-tab'
-            );
-            tabsContainer.appendChild(certsTabFragment);
-
-            const contentContainer = overlay.querySelector('.settings-content');
-            const certsContentFragment = templateLoader.cloneSync(
-                './src/templates/settings/settingsModal.html',
-                'tpl-settings-certs-content'
-            );
-            const certsContent = certsContentFragment.firstElementChild;
-            const certsSection = await this.createCertsSectionDOM();
-            certsContent.appendChild(certsSection);
-            contentContainer.appendChild(certsContent);
+            this._appendOptionalTab(overlay, 'tpl-settings-certs-tab', 'tpl-settings-certs-content', await this.createCertsSectionDOM());
         }
 
-        const tabsContainer = overlay.querySelector('.settings-tabs');
-        const updatesTabFragment = templateLoader.cloneSync(
-            './src/templates/settings/settingsModal.html',
-            'tpl-settings-updates-tab'
-        );
-        tabsContainer.appendChild(updatesTabFragment);
+        overlay.querySelector('.settings-tabs').appendChild(templateLoader.cloneSync(TEMPLATE_PATH, 'tpl-settings-updates-tab'));
 
         this.i18nManager?.updateUI(overlay);
         this.attachEventListeners(overlay);
         return overlay;
     }
 
+    /**
+     * @param {HTMLElement} overlay
+     * @param {{httpVersion: string, timeout: number, verifySsl: boolean, followRedirects: boolean, historyLimit: number, checkUpdatesOnLaunch: boolean}} current
+     * @returns {void}
+     */
+    _populateGeneralFields(overlay, current) {
+        const fields = [
+            ['select[name="theme"]', 'value', () => this.themeManager.getCurrentTheme()],
+            ['select[name="layout"]', 'value', () => this.layoutManager?.getLayout()],
+            ['select[name="httpVersion"]', 'value', () => current.httpVersion],
+            ['input[name="requestTimeout"]', 'value', () => current.timeout],
+            ['input[name="verifySsl"]', 'checked', () => current.verifySsl],
+            ['input[name="followRedirects"]', 'checked', () => current.followRedirects],
+            ['input[name="historyLimit"]', 'value', () => current.historyLimit],
+            ['input[name="checkUpdatesOnLaunch"]', 'checked', () => current.checkUpdatesOnLaunch]
+        ];
+        for (const [selector, property, read] of fields) {
+            const field = overlay.querySelector(selector);
+            if (!field) {
+                continue;
+            }
+            const value = read();
+            if (value !== undefined) {
+                field[property] = value;
+            }
+        }
+    }
+
+    /**
+     * @param {HTMLElement} overlay
+     * @param {string} tabTemplateId
+     * @param {string} contentTemplateId
+     * @param {HTMLElement} section
+     * @returns {void}
+     */
+    _appendOptionalTab(overlay, tabTemplateId, contentTemplateId, section) {
+        overlay.querySelector('.settings-tabs').appendChild(templateLoader.cloneSync(TEMPLATE_PATH, tabTemplateId));
+
+        const content = templateLoader.cloneSync(TEMPLATE_PATH, contentTemplateId).firstElementChild;
+        content.appendChild(section);
+        overlay.querySelector('.settings-content').appendChild(content);
+    }
+
     createLanguageSectionDOM() {
         const fragment = templateLoader.cloneSync(
-            './src/templates/settings/settingsModal.html',
+            TEMPLATE_PATH,
             'tpl-language-section'
         );
         const section = fragment.firstElementChild;
@@ -257,7 +234,7 @@ export class SettingsModal {
 
     async createProxySectionDOM() {
         const fragment = templateLoader.cloneSync(
-            './src/templates/settings/settingsModal.html',
+            TEMPLATE_PATH,
             'tpl-proxy-section'
         );
         const section = fragment.firstElementChild;
@@ -327,7 +304,7 @@ export class SettingsModal {
 
     async createCertsSectionDOM() {
         const fragment = templateLoader.cloneSync(
-            './src/templates/settings/settingsModal.html',
+            TEMPLATE_PATH,
             'tpl-certs-section'
         );
         const section = fragment.firstElementChild;
@@ -336,9 +313,7 @@ export class SettingsModal {
         let items = [];
         try {
             items = await this.certificateController.getItems();
-        } catch (error) {
-            void error;
-        }
+        } catch {}
 
         items.forEach(item => this._certsListEl.appendChild(this._renderCertEntry(item)));
         this._updateCertsEmpty(section);
@@ -362,7 +337,7 @@ export class SettingsModal {
 
     _renderCertEntry(item) {
         const fragment = templateLoader.cloneSync(
-            './src/templates/settings/settingsModal.html',
+            TEMPLATE_PATH,
             'tpl-cert-entry'
         );
         const row = fragment.firstElementChild;
@@ -393,9 +368,7 @@ export class SettingsModal {
                         this._validateRow(row);
                         this._saveCerts();
                     }
-                } catch (error) {
-                    void error;
-                }
+                } catch {}
             });
         });
 
@@ -420,17 +393,25 @@ export class SettingsModal {
         return row;
     }
 
+    /**
+     * @param {HTMLElement} row
+     * @returns {{host: string, certPath: string, keyPath: string, caPath: string}}
+     */
+    _readCertRow(row) {
+        return {
+            host: row.querySelector('input[name="certHost"]').value,
+            certPath: row.querySelector('input[name="certCertPath"]').value,
+            keyPath: row.querySelector('input[name="certKeyPath"]').value,
+            caPath: row.querySelector('input[name="certCaPath"]').value
+        };
+    }
+
     _validateRow(row) {
         const errorEl = row.querySelector('[data-role="cert-error"]');
         if (!errorEl || !this.certificateController) {
             return;
         }
-        const errors = this.certificateController.validateEntry({
-            host: row.querySelector('input[name="certHost"]').value,
-            certPath: row.querySelector('input[name="certCertPath"]').value,
-            keyPath: row.querySelector('input[name="certKeyPath"]').value,
-            caPath: row.querySelector('input[name="certCaPath"]').value
-        });
+        const errors = this.certificateController.validateEntry(this._readCertRow(row));
         const pairing = errors.find(e => e.toLowerCase().includes('key file'));
         if (pairing) {
             errorEl.textContent = pairing;
@@ -445,13 +426,16 @@ export class SettingsModal {
         if (!this._certsListEl) {
             return [];
         }
-        return Array.from(this._certsListEl.querySelectorAll('.cert-entry')).map(row => ({
-            host: row.querySelector('input[name="certHost"]').value.trim(),
-            certPath: row.querySelector('input[name="certCertPath"]').value.trim(),
-            keyPath: row.querySelector('input[name="certKeyPath"]').value.trim(),
-            caPath: row.querySelector('input[name="certCaPath"]').value.trim(),
-            enabled: row.querySelector('input[name="certEnabled"]').checked
-        }));
+        return Array.from(this._certsListEl.querySelectorAll('.cert-entry')).map(row => {
+            const raw = this._readCertRow(row);
+            return {
+                host: raw.host.trim(),
+                certPath: raw.certPath.trim(),
+                keyPath: raw.keyPath.trim(),
+                caPath: raw.caPath.trim(),
+                enabled: row.querySelector('input[name="certEnabled"]').checked
+            };
+        });
     }
 
     async _saveCerts() {
@@ -460,9 +444,7 @@ export class SettingsModal {
         }
         try {
             await this.certificateController.saveItems(this._collectCertItems());
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     _updateCertsEmpty(section) {
@@ -603,96 +585,103 @@ export class SettingsModal {
     _attachUpdateChecker(overlay, checkUpdatesOnLaunchCheckbox) {
         const checkUpdatesBtn = overlay.querySelector('#check-for-updates-btn');
         const updateStatus = overlay.querySelector('#update-status');
-        if (checkUpdatesBtn && updateStatus) {
-            (async () => {
-                try {
-                    if (window.backendAPI?.updater?.getInstallInfo) {
-                        const installInfo = await window.backendAPI.updater.getInstallInfo();
-                        if (installInfo.autoUpdateSupported) {
-                            return;
-                        }
-                        const autoUpdateRow = checkUpdatesOnLaunchCheckbox?.closest('.row');
-                        if (autoUpdateRow) {
-                            autoUpdateRow.style.display = 'none';
-                        }
-                        const manualUpdateRow = checkUpdatesBtn.closest('.row');
-                        if (manualUpdateRow) {
-                            manualUpdateRow.style.display = 'none';
-                        }
-                        const versionRow = overlay.querySelector('#settings-current-version')?.closest('.row');
-                        if (!versionRow) {
-                            return;
-                        }
-                        const messageRow = document.createElement('div');
-                        messageRow.className = 'row property';
-                        const messageContent = document.createElement('div');
-                        messageContent.className = 'row-content';
-                        const messageTitle = document.createElement('span');
-                        messageTitle.className = 'title';
-                        messageTitle.textContent = installInfo.message || translate('settings.updates_managed_externally', 'Updates are managed by your package manager');
-                        messageContent.appendChild(messageTitle);
-                        messageRow.appendChild(messageContent);
-                        versionRow.parentElement.insertBefore(messageRow, versionRow);
-                    }
-                } catch (e) {
-                }
-            })();
-
-            checkUpdatesBtn.addEventListener('click', async () => {
-                checkUpdatesBtn.disabled = true;
-                updateStatus.textContent = translate('settings.checking_updates', 'Checking...');
-                updateStatus.className = 'update-status';
-
-                try {
-                    if (!window.backendAPI?.updater?.check) {
-                        updateStatus.textContent = translate('settings.updates_not_available', 'Updates not available in this build');
-                        updateStatus.className = 'update-status info';
-                        return;
-                    }
-
-                    const update = await window.backendAPI.updater.check();
-                    
-                    if (update?.available) {
-                        updateStatus.textContent = translate('settings.update_available', 'Update available: v{{version}}', { version: update.version });
-                        updateStatus.className = 'update-status success';
-                        
-                        const installBtn = document.createElement('button');
-                        installBtn.className = 'btn btn-primary btn-sm';
-                        installBtn.style.marginLeft = '8px';
-                        installBtn.textContent = translate('settings.install_update', 'Install & Restart');
-                        installBtn.addEventListener('click', async () => {
-                            installBtn.disabled = true;
-                            installBtn.remove();
-                            updateStatus.textContent = translate('settings.downloading_update', 'Downloading...');
-                            updateStatus.className = 'update-status';
-                            try {
-                                await window.backendAPI.updater.downloadAndInstall(update);
-                                updateStatus.textContent = translate('settings.update_installed', 'Update installed! Restart to apply.');
-                                updateStatus.className = 'update-status success';
-                            } catch (err) {
-                                const errMsg = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
-                                updateStatus.textContent = `Error: ${errMsg}`;
-                                updateStatus.className = 'update-status error';
-                                installBtn.disabled = false;
-                                installBtn.textContent = translate('settings.retry_update', 'Retry');
-                                updateStatus.appendChild(installBtn);
-                            }
-                        });
-                        updateStatus.appendChild(installBtn);
-                    } else {
-                        updateStatus.textContent = translate('settings.up_to_date', 'You are up to date!');
-                        updateStatus.className = 'update-status success';
-                    }
-                } catch (error) {
-                    const errorMsg = typeof error === 'string' ? error : (error?.message || JSON.stringify(error));
-                    updateStatus.textContent = `Error: ${errorMsg}`;
-                    updateStatus.className = 'update-status error';
-                } finally {
-                    checkUpdatesBtn.disabled = false;
-                }
-            });
+        if (!checkUpdatesBtn || !updateStatus) {
+            return;
         }
+
+        this._applyInstallInfo(overlay, checkUpdatesBtn, checkUpdatesOnLaunchCheckbox);
+
+        const setStatus = (text, kind = '') => {
+            updateStatus.textContent = text;
+            updateStatus.className = kind ? `update-status ${kind}` : 'update-status';
+        };
+
+        checkUpdatesBtn.addEventListener('click', async () => {
+            checkUpdatesBtn.disabled = true;
+            setStatus(translate('settings.checking_updates', 'Checking...'));
+
+            try {
+                if (!window.backendAPI?.updater?.check) {
+                    setStatus(translate('settings.updates_not_available', 'Updates not available in this build'), 'info');
+                    return;
+                }
+
+                const update = await window.backendAPI.updater.check();
+
+                if (!update?.available) {
+                    setStatus(translate('settings.up_to_date', 'You are up to date!'), 'success');
+                    return;
+                }
+
+                setStatus(translate('settings.update_available', 'Update available: v{{version}}', { version: update.version }), 'success');
+
+                const installBtn = document.createElement('button');
+                installBtn.className = 'btn btn-primary btn-sm';
+                installBtn.style.marginLeft = '8px';
+                installBtn.textContent = translate('settings.install_update', 'Install & Restart');
+                installBtn.addEventListener('click', async () => {
+                    installBtn.disabled = true;
+                    installBtn.remove();
+                    setStatus(translate('settings.downloading_update', 'Downloading...'));
+                    try {
+                        await window.backendAPI.updater.downloadAndInstall(update);
+                        setStatus(translate('settings.update_installed', 'Update installed! Restart to apply.'), 'success');
+                    } catch (err) {
+                        setStatus(`Error: ${formatUpdateError(err)}`, 'error');
+                        installBtn.disabled = false;
+                        installBtn.textContent = translate('settings.retry_update', 'Retry');
+                        updateStatus.appendChild(installBtn);
+                    }
+                });
+                updateStatus.appendChild(installBtn);
+            } catch (error) {
+                setStatus(`Error: ${formatUpdateError(error)}`, 'error');
+            } finally {
+                checkUpdatesBtn.disabled = false;
+            }
+        });
     }
+
+    /**
+     * @param {HTMLElement} overlay
+     * @param {HTMLElement} checkUpdatesBtn
+     * @param {HTMLElement|null} checkUpdatesOnLaunchCheckbox
+     * @returns {Promise<void>}
+     */
+    async _applyInstallInfo(overlay, checkUpdatesBtn, checkUpdatesOnLaunchCheckbox) {
+        try {
+            if (!window.backendAPI?.updater?.getInstallInfo) {
+                return;
+            }
+            const installInfo = await window.backendAPI.updater.getInstallInfo();
+            if (installInfo.autoUpdateSupported) {
+                return;
+            }
+            const autoUpdateRow = checkUpdatesOnLaunchCheckbox?.closest('.row');
+            if (autoUpdateRow) {
+                autoUpdateRow.style.display = 'none';
+            }
+            const manualUpdateRow = checkUpdatesBtn.closest('.row');
+            if (manualUpdateRow) {
+                manualUpdateRow.style.display = 'none';
+            }
+            const versionRow = overlay.querySelector('#settings-current-version')?.closest('.row');
+            if (!versionRow) {
+                return;
+            }
+            const messageRow = document.createElement('div');
+            messageRow.className = 'row property';
+            const messageContent = document.createElement('div');
+            messageContent.className = 'row-content';
+            const messageTitle = document.createElement('span');
+            messageTitle.className = 'title';
+            messageTitle.textContent = installInfo.message || translate('settings.updates_managed_externally', 'Updates are managed by your package manager');
+            messageContent.appendChild(messageTitle);
+            messageRow.appendChild(messageContent);
+            versionRow.parentElement.insertBefore(messageRow, versionRow);
+        } catch {}
+    }
+
     attachProxyEventListeners(overlay) {
         const proxyEnabled = overlay.querySelector('input[name="proxyEnabled"]');
         const proxyContent = overlay.querySelector('.proxy-settings-content');
@@ -805,9 +794,7 @@ export class SettingsModal {
             };
 
             await this.proxyController.updateSettings(settings);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     hide(overlay) {

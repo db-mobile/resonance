@@ -1,6 +1,6 @@
 import { ChangeEmitter } from './services/ChangeEmitter.js';
 
-export const LAYOUTS = Object.freeze(['stacked', 'side-by-side']);
+const LAYOUTS = Object.freeze(['stacked', 'side-by-side']);
 
 export class LayoutManager {
     constructor() {
@@ -15,9 +15,7 @@ export class LayoutManager {
             if (LAYOUTS.includes(saved)) {
                 this.currentLayout = saved;
             }
-        } catch (error) {
-            void error;
-        }
+        } catch {}
         this._events.emit(this.currentLayout);
     }
 
@@ -43,9 +41,7 @@ export class LayoutManager {
         this._events.emit(layout);
         try {
             await window.backendAPI.store.set('layout', layout);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     async toggle() {

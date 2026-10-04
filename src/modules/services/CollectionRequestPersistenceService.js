@@ -40,7 +40,7 @@ export class CollectionRequestPersistenceService {
     async saveRequestBodyModification(collectionId, endpointId) {
         const bodyInput = document.getElementById('body-input');
         if (bodyInput) {
-            await this.collectionService.saveRequestBodyModification(collectionId, endpointId, bodyInput);
+            await this.collectionService.saveRequestBodyModification(collectionId, endpointId);
         }
     }
 
@@ -303,8 +303,7 @@ export class CollectionRequestPersistenceService {
 
             await this.repository.saveOne(updateRequest(collection, endpointId, { path }));
             await this.refreshCollections();
-        } catch (error) {
-            void error;
+        } catch {
         }
     }
 

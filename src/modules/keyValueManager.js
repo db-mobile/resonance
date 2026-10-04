@@ -12,6 +12,57 @@ const debouncedSaveHeaders = debounce(autoSaver('saveCurrentHeaders', 'headersLi
 let isUpdatingUrlFromQueryParams = false;
 
 /**
+ * @param {string} className
+ * @param {string} placeholder
+ * @param {string} value
+ * @returns {HTMLInputElement}
+ */
+export function createTextInput(className, placeholder, value) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.classList.add(className);
+    input.placeholder = placeholder;
+    input.value = value;
+    return input;
+}
+
+/**
+ * @param {boolean} checked
+ * @param {string} label
+ * @returns {HTMLInputElement}
+ */
+export function createEnabledCheckbox(checked, label) {
+    const enabledInput = document.createElement('input');
+    enabledInput.type = 'checkbox';
+    enabledInput.classList.add('check', 'row-enabled-checkbox');
+    enabledInput.checked = checked;
+    enabledInput.setAttribute('aria-label', label);
+    enabledInput.title = label;
+    return enabledInput;
+}
+
+/** @returns {HTMLButtonElement} */
+export function createRemoveRowButton() {
+    const removeButton = document.createElement('button');
+    removeButton.classList.add('remove-row-btn');
+    removeButton.setAttribute('aria-label', 'Remove row');
+    removeButton.title = 'Remove row';
+
+    const removeIcon = document.createElement('span');
+    removeIcon.classList.add('icon', 'icon-14', 'icon-x');
+    removeButton.appendChild(removeIcon);
+    return removeButton;
+}
+
+/**
+ * @param {EventTarget|null} target
+ * @returns {boolean}
+ */
+export function isKeyValueInput(target) {
+    return target.classList.contains('key-input') || target.classList.contains('value-input');
+}
+
+/**
  * @param {string} key
  * @param {string} value
  * @param {Object} [options]
@@ -24,40 +75,13 @@ export function createKeyValueRow(key = '', value = '', options = {}) {
     row.classList.add('key-value-row');
 
     if (options.toggleable) {
-        const enabledInput = document.createElement('input');
-        enabledInput.type = 'checkbox';
-        enabledInput.classList.add('check', 'row-enabled-checkbox');
-        enabledInput.checked = options.enabled !== false;
-        enabledInput.setAttribute('aria-label', 'Enable parameter');
-        enabledInput.title = 'Enable parameter';
-        row.appendChild(enabledInput);
+        row.appendChild(createEnabledCheckbox(options.enabled !== false, 'Enable parameter'));
         row.classList.toggle('row-disabled', options.enabled === false);
     }
 
-    const keyInput = document.createElement('input');
-    keyInput.type = 'text';
-    keyInput.classList.add('key-input');
-    keyInput.placeholder = 'Key';
-    keyInput.value = key;
-
-    const valueInput = document.createElement('input');
-    valueInput.type = 'text';
-    valueInput.classList.add('value-input');
-    valueInput.placeholder = 'Value';
-    valueInput.value = value;
-
-    const removeButton = document.createElement('button');
-    removeButton.classList.add('remove-row-btn');
-    removeButton.setAttribute('aria-label', 'Remove row');
-    removeButton.title = 'Remove row';
-
-    const removeIcon = document.createElement('span');
-    removeIcon.classList.add('icon', 'icon-14', 'icon-x');
-    removeButton.appendChild(removeIcon);
-
-    row.appendChild(keyInput);
-    row.appendChild(valueInput);
-    row.appendChild(removeButton);
+    row.appendChild(createTextInput('key-input', 'Key', key));
+    row.appendChild(createTextInput('value-input', 'Value', value));
+    row.appendChild(createRemoveRowButton());
 
     return row;
 }
@@ -217,8 +241,7 @@ export function updateUrlFromQueryParams() {
 function safeDecodeURIComponent(component) {
     try {
         return decodeURIComponent(component);
-    } catch (error) {
-        void error;
+    } catch {
         return component;
     }
 }
@@ -300,9 +323,7 @@ export function updateQueryParamsFromUrl() {
     let pairs = [];
     try {
         pairs = parseUrlQueryPairs(urlInput.value.trim());
-    } catch (error) {
-        void error;
-    }
+    } catch {}
 
     if (queryParamsList.children.length > 0 && queryRowsMatch(pairs)) {
         return;
@@ -331,16 +352,14 @@ export function initKeyValueListeners() {
     urlInput.addEventListener('blur', updateQueryParamsFromUrl);
 
     pathParamsList.addEventListener('input', (event) => {
-        if (event.target.classList.contains('key-input') ||
-            event.target.classList.contains('value-input')) {
+        if (isKeyValueInput(event.target)) {
             debouncedSavePathParams();
             markTabModified();
         }
     });
 
     queryParamsList.addEventListener('input', (event) => {
-        if (event.target.classList.contains('key-input') ||
-            event.target.classList.contains('value-input')) {
+        if (isKeyValueInput(event.target)) {
             updateUrlFromQueryParams();
             debouncedSaveQueryParams();
             markTabModified();
@@ -359,8 +378,7 @@ export function initKeyValueListeners() {
     });
 
     headersList.addEventListener('input', (event) => {
-        if (event.target.classList.contains('key-input') ||
-            event.target.classList.contains('value-input')) {
+        if (isKeyValueInput(event.target)) {
             debouncedSaveHeaders();
             markTabModified();
         }
@@ -378,28 +396,26 @@ export function initKeyValueListeners() {
 
     document.addEventListener('click', (event) => {
         const removeBtn = event.target.closest('.remove-row-btn');
-        if (removeBtn) {
-            const isPathParam = removeBtn.closest('#path-params-list');
-            const isQueryParam = removeBtn.closest('#query-params-list');
-            const isHeader = removeBtn.closest('#headers-list');
-            const row = removeBtn.closest('.key-value-row');
-            if (!row) {
-                return;
-            }
-            row.remove();
+        const row = removeBtn?.closest('.key-value-row');
+        if (!row) {
+            return;
+        }
+        const isPathParam = removeBtn.closest('#path-params-list');
+        const isQueryParam = removeBtn.closest('#query-params-list');
+        const isHeader = removeBtn.closest('#headers-list');
+        row.remove();
 
-            if (isPathParam) {
-                debouncedSavePathParams();
-            }
+        if (isPathParam) {
+            debouncedSavePathParams();
+        }
 
-            if (isQueryParam) {
-                updateUrlFromQueryParams();
-                debouncedSaveQueryParams();
-            }
+        if (isQueryParam) {
+            updateUrlFromQueryParams();
+            debouncedSaveQueryParams();
+        }
 
-            if (isHeader) {
-                debouncedSaveHeaders();
-            }
+        if (isHeader) {
+            debouncedSaveHeaders();
         }
     });
 }

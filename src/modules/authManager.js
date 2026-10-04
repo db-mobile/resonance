@@ -82,6 +82,49 @@ const AUTH_FIELDS = {
     ]
 };
 
+const AUTH_TYPE_LABELS = {
+    none: 'No Auth',
+    inherit: 'Inherit from Parent',
+    bearer: 'Bearer Token',
+    basic: 'Basic Auth',
+    'api-key': 'API Key',
+    oauth2: 'OAuth 2.0',
+    digest: 'Digest Auth',
+    ntlm: 'NTLM',
+    'aws-v4': 'AWS Signature'
+};
+
+/**
+ * @param {{authType?: string, folderName?: string, collectionName?: string}} info
+ * @returns {string}
+ */
+function inheritSummaryText(info) {
+    if (info.authType && info.authType !== 'none') {
+        return `Inheriting ${AUTH_TYPE_LABELS[info.authType] || info.authType} from ${inheritSourceText(info)}.`;
+    }
+    if (info.folderName) {
+        return `Folder "${info.folderName}" opts out of collection auth — this request is sent unauthenticated.`;
+    }
+    if (info.collectionName) {
+        return `Collection "${info.collectionName}" has no auth configured — this request is sent unauthenticated.`;
+    }
+    return 'The collection has no auth configured — this request is sent unauthenticated.';
+}
+
+/**
+ * @param {{folderName?: string, collectionName?: string}} info
+ * @returns {string}
+ */
+function inheritSourceText(info) {
+    if (info.folderName) {
+        return `folder "${info.folderName}"`;
+    }
+    if (info.collectionName) {
+        return `collection "${info.collectionName}"`;
+    }
+    return 'the collection';
+}
+
 export class AuthManager {
     /**
      * @param {Object} [options]
@@ -233,6 +276,16 @@ export class AuthManager {
         return fragment;
     }
 
+    /**
+     * @param {string} templateId
+     * @returns {void}
+     */
+    _mountTemplate(templateId) {
+        const fragment = this._cloneAuthTemplate(templateId);
+        this.authFieldsContainer.innerHTML = '';
+        this.authFieldsContainer.appendChild(fragment);
+    }
+
     /** @returns {void} */
     initializeEventListeners() {
         if (this.authTypeSelect) {
@@ -292,18 +345,13 @@ export class AuthManager {
      * @returns {void}
      */
     _renderSimpleFields(authType) {
-        const fragment = this._cloneAuthTemplate(`tpl-auth-${authType}`);
-        this.authFieldsContainer.innerHTML = '';
-        this.authFieldsContainer.appendChild(fragment);
-
+        this._mountTemplate(`tpl-auth-${authType}`);
         this._bindFields(authType);
     }
 
     /** @returns {void} */
     renderInheritFields() {
-        const fragment = this._cloneAuthTemplate('tpl-auth-inherit');
-        this.authFieldsContainer.innerHTML = '';
-        this.authFieldsContainer.appendChild(fragment);
+        this._mountTemplate('tpl-auth-inherit');
 
         const summary = this._el('inherit-auth-summary');
         const editButton = this._el('inherit-edit-collection-auth');
@@ -320,18 +368,7 @@ export class AuthManager {
                 if (info === null) {
                     return;
                 }
-                const source = info.folderName
-                    ? `folder "${info.folderName}"`
-                    : (info.collectionName ? `collection "${info.collectionName}"` : 'the collection');
-                if (!info.authType || info.authType === 'none') {
-                    summary.textContent = info.folderName
-                        ? `Folder "${info.folderName}" opts out of collection auth — this request is sent unauthenticated.`
-                        : (info.collectionName
-                            ? `Collection "${info.collectionName}" has no auth configured — this request is sent unauthenticated.`
-                            : 'The collection has no auth configured — this request is sent unauthenticated.');
-                } else {
-                    summary.textContent = `Inheriting ${this.getAuthTypeLabel(info.authType)} from ${source}.`;
-                }
+                summary.textContent = inheritSummaryText(info);
                 if (editButton && typeof this.onOpenCollectionAuth === 'function' && info.collectionId) {
                     editButton.hidden = false;
                     editButton.textContent = info.folderName ? 'Edit folder auth' : 'Edit collection auth';
@@ -348,25 +385,12 @@ export class AuthManager {
      * @returns {string}
      */
     getAuthTypeLabel(type) {
-        const labels = {
-            none: 'No Auth',
-            inherit: 'Inherit from Parent',
-            bearer: 'Bearer Token',
-            basic: 'Basic Auth',
-            'api-key': 'API Key',
-            oauth2: 'OAuth 2.0',
-            digest: 'Digest Auth',
-            ntlm: 'NTLM',
-            'aws-v4': 'AWS Signature'
-        };
-        return labels[type] || type;
+        return AUTH_TYPE_LABELS[type] || type;
     }
 
     /** @returns {void} */
     renderOAuth2Fields() {
-        const fragment = this._cloneAuthTemplate('tpl-auth-oauth2');
-        this.authFieldsContainer.innerHTML = '';
-        this.authFieldsContainer.appendChild(fragment);
+        this._mountTemplate('tpl-auth-oauth2');
 
         const tokenInput = this._el('oauth2-token');
         const getTokenBtn = this._el('oauth2-get-token-btn');
@@ -385,48 +409,29 @@ export class AuthManager {
         const errorGroup = this._el('oauth2-error-group');
         const errorMessage = this._el('oauth2-error-message');
 
+        const authCodeGroups = [authUrlGroup, redirectUriGroup, pkceGroup];
+        const tokenEndpointGroups = [tokenUrlGroup, credentialsPairGroup, scopeGroup, audienceGroup, clientAuthGroup, getTokenGroup];
         const updateGrantTypeUI = (grantType) => {
-            [authUrlGroup, usernamePasswordPairGroup, redirectUriGroup, pkceGroup].forEach(g => {
-                if (g) {g.classList.add('u-hidden');}
-            });
-
-            if (grantType === 'authorization_code') {
-                if (authUrlGroup) {authUrlGroup.classList.remove('u-hidden');}
-                if (redirectUriGroup) {redirectUriGroup.classList.remove('u-hidden');}
-                if (pkceGroup) {pkceGroup.classList.remove('u-hidden');}
-            } else if (grantType === 'password') {
-                if (usernamePasswordPairGroup) {usernamePasswordPairGroup.classList.remove('u-hidden');}
-            } else if (grantType === 'manual') {
-                [tokenUrlGroup, credentialsPairGroup, scopeGroup,
-                 audienceGroup, clientAuthGroup, getTokenGroup].forEach(g => {
-                    if (g) {g.classList.add('u-hidden');}
-                });
-                if (tokenInput) {tokenInput.removeAttribute('readonly');}
+            const isManual = grantType === 'manual';
+            authCodeGroups.forEach(g => g?.classList.toggle('u-hidden', grantType !== 'authorization_code'));
+            usernamePasswordPairGroup?.classList.toggle('u-hidden', grantType !== 'password');
+            tokenEndpointGroups.forEach(g => g?.classList.toggle('u-hidden', isManual));
+            if (!tokenInput) {
                 return;
             }
-
-            [tokenUrlGroup, credentialsPairGroup, scopeGroup,
-             audienceGroup, clientAuthGroup, getTokenGroup].forEach(g => {
-                if (g) {g.classList.remove('u-hidden');}
-            });
-            if (tokenInput) {tokenInput.setAttribute('readonly', 'readonly');}
+            if (isManual) {
+                tokenInput.removeAttribute('readonly');
+            } else {
+                tokenInput.setAttribute('readonly', 'readonly');
+            }
         };
 
         this._bindFields('oauth2', {
             'oauth2-grant-type': (grantType) => updateGrantTypeUI(grantType)
         });
 
-        if (getTokenBtn) {
-            getTokenBtn.addEventListener('click', async () => {
-                await this._handleGetToken(errorGroup, errorMessage);
-            });
-        }
-
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', async () => {
-                await this._handleRefreshToken(errorGroup, errorMessage);
-            });
-        }
+        getTokenBtn?.addEventListener('click', () => this._handleGetToken(errorGroup, errorMessage));
+        refreshBtn?.addEventListener('click', () => this._handleRefreshToken(errorGroup, errorMessage));
     }
 
     /** @returns {Promise<Object>} */

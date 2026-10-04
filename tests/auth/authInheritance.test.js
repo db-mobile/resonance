@@ -1,9 +1,11 @@
-import { resolveEffectiveAuthConfig } from '../../src/modules/auth/authInheritance.js';
+import { resolveEffectiveAuthWithSource } from '../../src/modules/auth/authInheritance.js';
 
-describe('resolveEffectiveAuthConfig', () => {
+describe('resolveEffectiveAuthWithSource', () => {
     const repositoryWith = (inheritedAuth) => ({
         getInheritedAuth: jest.fn(async () => ({ authConfig: inheritedAuth, source: { kind: 'collection' } }))
     });
+    const resolveEffectiveAuthConfig = async (authConfig, context) =>
+        (await resolveEffectiveAuthWithSource(authConfig, context)).authConfig;
 
     test('null auth config resolves to none', async () => {
         const resolved = await resolveEffectiveAuthConfig(null, {

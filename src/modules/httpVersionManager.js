@@ -6,11 +6,7 @@ export class HttpVersionManager {
         this.currentVersion = 'auto';
         this.availableVersions = ['auto', 'http1', 'http2'];
         this._events = new ChangeEmitter();
-        this.ready = this.init();
-    }
-
-    async init() {
-        await this.loadSavedVersion();
+        this.ready = this.loadSavedVersion();
     }
 
     async loadSavedVersion() {
@@ -29,17 +25,13 @@ export class HttpVersionManager {
         this._events.add(callback);
     }
 
-    async saveVersion(version) {
-        await updateSetting('httpVersion', version);
-    }
-
     async setVersion(version) {
         if (!this.availableVersions.includes(version)) {
             return;
         }
 
         this.currentVersion = version;
-        await this.saveVersion(version);
+        await updateSetting('httpVersion', version);
         this._events.emit(version);
     }
 

@@ -66,9 +66,7 @@ export class InlineScriptManager {
             if (this.testScriptEditor) {
                 this.testScriptEditor.setContent(scripts.testScript || '', { emitChange: false });
             }
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     async clear() {
@@ -119,9 +117,7 @@ export class InlineScriptManager {
 
         try {
             await window.backendAPI.scripts.save(collectionId, endpointId, scripts);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /** @returns {Object} */

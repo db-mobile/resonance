@@ -48,13 +48,6 @@ describe('SecretStore', () => {
         expect(backing.secretValues['env:1']).toBeUndefined();
     });
 
-    test('rename preserves the value under a new key', async () => {
-        await store.set('env:1', 'old', 'v');
-        await store.rename('env:1', 'old', 'new');
-        expect(await store.get('env:1', 'old')).toBeUndefined();
-        expect(await store.get('env:1', 'new')).toBe('v');
-    });
-
     test('deleteScope removes the whole scope', async () => {
         await store.set('env:1', 'a', '1');
         await store.set('env:2', 'b', '2');

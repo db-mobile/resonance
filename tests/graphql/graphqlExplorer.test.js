@@ -1,7 +1,6 @@
 import {
   toggleFieldInQuery,
   getSelectedPaths,
-  getDeclaredVariables,
   getDeclaredVariableDefs,
   setArgumentValue,
   getArgumentValue
@@ -123,18 +122,6 @@ describe('toggleFieldInQuery default scalar selection', () => {
   });
 });
 
-describe('getDeclaredVariables', () => {
-  test('lists declared variable names', () => {
-    expect(getDeclaredVariables('query Q($a: ID!, $b: Int) { x }')).toEqual(['a', 'b']);
-  });
-
-  test('returns an empty array for no variables, empty, or invalid input', () => {
-    expect(getDeclaredVariables('{ x }')).toEqual([]);
-    expect(getDeclaredVariables('')).toEqual([]);
-    expect(getDeclaredVariables('{ unclosed')).toEqual([]);
-  });
-});
-
 describe('getDeclaredVariableDefs', () => {
   test('returns names, printed types, and required flags', () => {
     expect(getDeclaredVariableDefs('query Q($code: ID!, $n: Int, $l: [String!]) { x }')).toEqual([
@@ -144,7 +131,12 @@ describe('getDeclaredVariableDefs', () => {
     ]);
   });
 
-  test('returns an empty array for empty or invalid input', () => {
+  test('lists declared variables in declaration order', () => {
+    expect(getDeclaredVariableDefs('query Q($a: ID!, $b: Int) { x }').map(def => def.name)).toEqual(['a', 'b']);
+  });
+
+  test('returns an empty array for no variables, empty, or invalid input', () => {
+    expect(getDeclaredVariableDefs('{ x }')).toEqual([]);
     expect(getDeclaredVariableDefs('')).toEqual([]);
     expect(getDeclaredVariableDefs('{ unclosed')).toEqual([]);
   });

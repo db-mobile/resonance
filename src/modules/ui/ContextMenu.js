@@ -16,7 +16,6 @@ export class ContextMenu {
     /**
      * @param {MouseEvent} event
      * @param {Array<Object>} menuItems
-     * @param {string} menuItems
      * @param {string} [menuItems[].translationKey]
      * @param {string} [menuItems[].icon]
      * @param {string} [menuItems[].className]

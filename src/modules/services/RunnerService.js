@@ -138,9 +138,7 @@ export class RunnerService {
      * @returns {Promise<Object>}
      */
     async executeRunner(runnerId, onProgress) {
-        if (this.isRunning) {
-            throw new Error(translate('runner.error_already_running', 'A runner is already executing'));
-        }
+        this._assertIdle();
 
         const runner = await this.repository.getById(runnerId);
         if (!runner) {
@@ -161,15 +159,20 @@ export class RunnerService {
      * @returns {Promise<Object>}
      */
     async executeRunnerData(runnerData, onProgress) {
-        if (this.isRunning) {
-            throw new Error(translate('runner.error_already_running', 'A runner is already executing'));
-        }
+        this._assertIdle();
 
         return this._execute(runnerData, {
             runnerId: null,
             runnerName: runnerData.name || translate('runner.untitled', 'Untitled Runner'),
             onProgress
         });
+    }
+
+    /** @returns {void} */
+    _assertIdle() {
+        if (this.isRunning) {
+            throw new Error(translate('runner.error_already_running', 'A runner is already executing'));
+        }
     }
 
     /**
@@ -307,11 +310,6 @@ export class RunnerService {
         }
     }
 
-    /** @returns {boolean} */
-    isExecuting() {
-        return this.isRunning;
-    }
-
     /**
      * @param {Promise<Object>} work
      * @returns {Promise<Object|null>}
@@ -403,31 +401,7 @@ export class RunnerService {
                 requestName: request.name || null
             };
 
-            const collection = await this._getCollectionForRun(request.collectionId, runContext);
-            if (!collection) {
-                throw new Error(translate(
-                    'runner.error_collection_missing',
-                    'The collection this request came from is not open. Remove the request and add it again from Available Requests.'
-                ));
-            }
-
-            const endpoint = findRequest(collection, request.endpointId);
-            if (!endpoint) {
-                throw new Error(translate(
-                    'runner.error_endpoint_missing',
-                    '"{{name}}" no longer exists in {{collection}}. Remove it and add it again from Available Requests.',
-                    { name: request.name, collection: collection.name }
-                ));
-            }
-
-            const protocol = endpoint.protocol || 'http';
-            if (!RUNNABLE_PROTOCOLS.has(protocol)) {
-                throw new Error(translate(
-                    'runner.error_protocol',
-                    '{{protocol}} requests cannot be run by the collection runner',
-                    { protocol }
-                ));
-            }
+            const { collection, endpoint } = await this._resolveRunTarget(request, runContext);
 
             const scripts = await this._getEndpointScripts(collection.id, endpoint.id);
             const prepared = await this._buildRequestConfig(collection, endpoint, variables, request.overrides, runContext);
@@ -453,37 +427,13 @@ export class RunnerService {
                 return result;
             }
 
-            await this._attachClientCert(requestConfig, runContext);
-            await this._attachCookies(requestConfig);
-
-            requestConfig.requestId = newRequestId();
-            this._inFlightRequestId = requestConfig.requestId;
-            let response;
-            try {
-                response = await this.backendAPI.sendApiRequest(requestConfig);
-            } finally {
-                if (this._inFlightRequestId === requestConfig.requestId) {
-                    this._inFlightRequestId = null;
-                }
-            }
+            const response = await this._sendTracked(requestConfig, runContext);
 
             if (this.shouldStop || response.cancelled) {
                 return result;
             }
 
-            result.statusCode = response.status || null;
-            result.responseTime = Date.now() - startTime;
-            result.time = result.responseTime;
-            result.httpSuccess = Boolean(response.success);
-            result.body = response.data ?? null;
-            result.headers = response.headers || {};
-            result.cookies = responseCookies(response);
-            result.response = {
-                status: response.status,
-                statusText: response.statusText,
-                headers: response.headers,
-                body: response.data
-            };
+            this._captureResponse(result, response, startTime);
 
             await this._storeResponseCookies(response, requestConfig.url);
             this._recordHistory(requestConfig, response, collection.id, endpoint.id, prepared.authData, runContext);
@@ -495,26 +445,7 @@ export class RunnerService {
                 }
             }
 
-            result.variablesSet = outcome.variablesSet;
-            result.logs = outcome.logs;
-            result.testResults = outcome.testResults;
-            if (outcome.errors.length > 0) {
-                result.scriptError = outcome.errors.join('; ');
-            }
-
-            const failureSummary = this._summarizePostScriptFailure(outcome.testResults, result.scriptError || null);
-            if (failureSummary) {
-                result.status = 'error';
-                result.error = failureSummary;
-            } else if (outcome.testResults.length > 0 || response.success) {
-                result.status = 'success';
-            } else {
-                result.status = 'error';
-                result.error = response.message
-                    || (response.status
-                        ? `${response.status} ${response.statusText || ''}`.trim()
-                        : translate('runner.error_request_failed', 'Request failed'));
-            }
+            this._finalizeStatus(result, response, outcome);
         } catch (error) {
             result.status = 'error';
             result.error = error.message;
@@ -523,6 +454,109 @@ export class RunnerService {
         }
 
         return result;
+    }
+
+    /**
+     * @param {Object} request
+     * @param {Object|null} runContext
+     * @returns {Promise<{collection: Object, endpoint: Object}>}
+     */
+    async _resolveRunTarget(request, runContext) {
+        const collection = await this._getCollectionForRun(request.collectionId, runContext);
+        if (!collection) {
+            throw new Error(translate(
+                'runner.error_collection_missing',
+                'The collection this request came from is not open. Remove the request and add it again from Available Requests.'
+            ));
+        }
+
+        const endpoint = findRequest(collection, request.endpointId);
+        if (!endpoint) {
+            throw new Error(translate(
+                'runner.error_endpoint_missing',
+                '"{{name}}" no longer exists in {{collection}}. Remove it and add it again from Available Requests.',
+                { name: request.name, collection: collection.name }
+            ));
+        }
+
+        const protocol = endpoint.protocol || 'http';
+        if (!RUNNABLE_PROTOCOLS.has(protocol)) {
+            throw new Error(translate(
+                'runner.error_protocol',
+                '{{protocol}} requests cannot be run by the collection runner',
+                { protocol }
+            ));
+        }
+
+        return { collection, endpoint };
+    }
+
+    /**
+     * @param {Object} requestConfig
+     * @param {Object|null} runContext
+     * @returns {Promise<Object>}
+     */
+    async _sendTracked(requestConfig, runContext) {
+        await this._attachClientCert(requestConfig, runContext);
+        await this._attachCookies(requestConfig);
+
+        requestConfig.requestId = newRequestId();
+        this._inFlightRequestId = requestConfig.requestId;
+        try {
+            return await this.backendAPI.sendApiRequest(requestConfig);
+        } finally {
+            if (this._inFlightRequestId === requestConfig.requestId) {
+                this._inFlightRequestId = null;
+            }
+        }
+    }
+
+    /**
+     * @param {Object} result
+     * @param {Object} response
+     * @param {number} startTime
+     * @returns {void}
+     */
+    _captureResponse(result, response, startTime) {
+        result.statusCode = response.status || null;
+        result.responseTime = Date.now() - startTime;
+        result.time = result.responseTime;
+        result.httpSuccess = Boolean(response.success);
+        result.body = response.data ?? null;
+        result.headers = response.headers || {};
+        result.cookies = responseCookies(response);
+        result.response = {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+            body: response.data
+        };
+    }
+
+    /**
+     * @param {Object} result
+     * @param {Object} response
+     * @param {{variablesSet: Object, logs: Array, testResults: Array, errors: Array<string>}} outcome
+     * @returns {void}
+     */
+    _finalizeStatus(result, response, outcome) {
+        result.variablesSet = outcome.variablesSet;
+        result.logs = outcome.logs;
+        result.testResults = outcome.testResults;
+        if (outcome.errors.length > 0) {
+            result.scriptError = outcome.errors.join('; ');
+        }
+
+        const failureSummary = this._summarizePostScriptFailure(outcome.testResults, result.scriptError || null);
+        if (failureSummary) {
+            result.status = 'error';
+            result.error = failureSummary;
+        } else if (outcome.testResults.length > 0 || response.success) {
+            result.status = 'success';
+        } else {
+            result.status = 'error';
+            result.error = response.message || describeFailedResponse(response);
+        }
     }
 
     /**
@@ -568,8 +602,7 @@ export class RunnerService {
                 runContext?.collectionVars.set(collectionId, collectionVars);
             }
             variables = { ...variables, ...collectionVars };
-        } catch (e) {
-            void e;
+        } catch {
         }
 
         try {
@@ -577,8 +610,7 @@ export class RunnerService {
                 ? runContext.envVars
                 : await this.environmentRepository.getActiveEnvironmentVariables();
             variables = { ...variables, ...envVars };
-        } catch (e) {
-            void e;
+        } catch {
         }
 
         return { ...mergeVariables(variables, runtimeVariables), ...dataRow };
@@ -600,22 +632,19 @@ export class RunnerService {
 
         try {
             context.envVars = await this.environmentRepository.getActiveEnvironmentVariables();
-        } catch (e) {
-            void e;
+        } catch {
         }
 
         try {
             const activeEnvironment = await app.environmentController?.service?.getActiveEnvironment();
             context.environmentName = activeEnvironment?.name || null;
-        } catch (e) {
-            void e;
+        } catch {
         }
 
         try {
             await this.certificateService.getItems();
             context.certificatesLoaded = true;
-        } catch (e) {
-            void e;
+        } catch {
         }
 
         return context;
@@ -625,8 +654,7 @@ export class RunnerService {
     async _loadSettings() {
         try {
             return await this.backendAPI.settings.get();
-        } catch (e) {
-            void e;
+        } catch {
             return null;
         }
     }
@@ -657,8 +685,7 @@ export class RunnerService {
                 preRequestScript: scripts?.preRequestScript || '',
                 testScript: scripts?.testScript || ''
             };
-        } catch (e) {
-            void e;
+        } catch {
             return { preRequestScript: '', testScript: '' };
         }
     }
@@ -693,28 +720,7 @@ export class RunnerService {
         const queryRows = this._effectiveQueryRows(endpoint, overrides, persisted);
         const queryParams = Object.fromEntries(queryRows.map(row => [row.key, row.value]));
 
-        const configuredAuth = persisted.authConfig || endpoint.security || { type: 'inherit', config: {} };
-        const { authConfig: inheritedAuth, source: authSource } = await resolveEffectiveAuthWithSource(configuredAuth, {
-            collectionId: collection.id,
-            endpointId: endpoint.id,
-            repository: this.collectionRepository
-        });
-        const resolvedAuth = withBearerFallback(inheritedAuth, effectiveVariables);
-        let { authConfig: substitutedAuth } = resolveAuthConfigVariables(resolvedAuth, effectiveVariables, processor);
-        if (authSource && resolvedAuth === inheritedAuth) {
-            const renewal = await ensureFreshOAuthToken({
-                rawAuth: resolvedAuth,
-                resolvedAuth: substitutedAuth,
-                key: oauthRefreshKey({ collectionId: collection.id, endpointId: endpoint.id }, authSource),
-                getToken: (request) => this.backendAPI.oauth2.getToken(request),
-                persist: (nextRaw) => this.collectionRepository.saveAuthConfigAtSource(collection.id, endpoint.id, authSource, nextRaw)
-            });
-            substitutedAuth = renewal.resolvedAuth;
-            if (renewal.error) {
-                this.statusDisplay?.update(renewal.error, null);
-            }
-        }
-        const authData = generateAuthData(substitutedAuth);
+        const authData = await this._resolveAuthData(collection, endpoint, persisted, effectiveVariables);
         this.requestBuilder.mergeAuthData(headers, queryParams, authData);
 
         const rowKeys = new Set(queryRows.map(row => row.key));
@@ -734,14 +740,14 @@ export class RunnerService {
             processor
         });
 
-        let url = resolvedUrl;
-        let mockRewrite = null;
-        const mockBaseUrl = await this._mockBaseUrlFor(collection.id, runContext);
-        if (mockBaseUrl && endpoint.path) {
-            const mockPath = buildMockPath(endpoint.path, processedPathParams);
-            mockRewrite = { baseUrl: mockBaseUrl, pathTemplate: endpoint.path };
-            url = queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`;
-        }
+        const { url, mockRewrite } = await this._applyMockRewrite({
+            collection,
+            endpoint,
+            url: resolvedUrl,
+            queryString,
+            pathParams: processedPathParams,
+            runContext
+        });
 
         const { body, bodyType } = this._buildBody({
             endpoint,
@@ -776,6 +782,61 @@ export class RunnerService {
             rawUrl,
             authData,
             mockRewrite
+        };
+    }
+
+    /**
+     * @param {Object} collection
+     * @param {Object} endpoint
+     * @param {Object} persisted
+     * @param {Object} effectiveVariables
+     * @returns {Promise<Object>}
+     */
+    async _resolveAuthData(collection, endpoint, persisted, effectiveVariables) {
+        const configuredAuth = persisted.authConfig || endpoint.security || { type: 'inherit', config: {} };
+        const { authConfig: inheritedAuth, source: authSource } = await resolveEffectiveAuthWithSource(configuredAuth, {
+            collectionId: collection.id,
+            endpointId: endpoint.id,
+            repository: this.collectionRepository
+        });
+        const resolvedAuth = withBearerFallback(inheritedAuth, effectiveVariables);
+        let { authConfig: substitutedAuth } = resolveAuthConfigVariables(resolvedAuth, effectiveVariables, this.variableProcessor);
+        if (authSource && resolvedAuth === inheritedAuth) {
+            const renewal = await ensureFreshOAuthToken({
+                rawAuth: resolvedAuth,
+                resolvedAuth: substitutedAuth,
+                key: oauthRefreshKey({ collectionId: collection.id, endpointId: endpoint.id }, authSource),
+                getToken: (request) => this.backendAPI.oauth2.getToken(request),
+                persist: (nextRaw) => this.collectionRepository.saveAuthConfigAtSource(collection.id, endpoint.id, authSource, nextRaw)
+            });
+            substitutedAuth = renewal.resolvedAuth;
+            if (renewal.error) {
+                this.statusDisplay?.update(renewal.error, null);
+            }
+        }
+        return generateAuthData(substitutedAuth);
+    }
+
+    /**
+     * @param {Object} opts
+     * @param {Object} opts.collection
+     * @param {Object} opts.endpoint
+     * @param {string} opts.url
+     * @param {string} opts.queryString
+     * @param {Object} opts.pathParams
+     * @param {Object|null} opts.runContext
+     * @returns {Promise<{url: string, mockRewrite: Object|null}>}
+     */
+    async _applyMockRewrite({ collection, endpoint, url, queryString, pathParams, runContext }) {
+        const mockBaseUrl = await this._mockBaseUrlFor(collection.id, runContext);
+        if (!mockBaseUrl || !endpoint.path) {
+            return { url, mockRewrite: null };
+        }
+
+        const mockPath = buildMockPath(endpoint.path, pathParams);
+        return {
+            url: queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`,
+            mockRewrite: { baseUrl: mockBaseUrl, pathTemplate: endpoint.path }
         };
     }
 
@@ -860,27 +921,29 @@ export class RunnerService {
         const overrideBody = hasBodyOverride && overrides.body.trim() !== '' ? overrides.body : null;
         const form = persisted.formBodyData;
 
-        if (isGraphQL && !overrideBody && persisted.graphqlData) {
-            return { body: this._buildGraphQLBody(persisted.graphqlData, process), bodyType: undefined };
-        }
-
-        if (!overrideBody && (form?.mode === 'formdata' || form?.mode === 'urlencoded')) {
-            const processed = processFormRows(normalizeFormRows(form.fields), process);
-            return { body: processed.length > 0 ? processed : undefined, bodyType: form.mode };
-        }
-
-        if (!overrideBody && form?.mode === 'binary') {
-            if (!form.filePath) {
-                throw new Error(translate('runner.error_no_binary_file', 'No file selected for binary body'));
+        if (!overrideBody) {
+            if (isGraphQL && persisted.graphqlData) {
+                return { body: this._buildGraphQLBody(persisted.graphqlData, process), bodyType: undefined };
             }
-            return {
-                body: { filePath: process(form.filePath), contentType: form.contentType || undefined },
-                bodyType: 'binary'
-            };
-        }
 
-        if (!overrideBody && !methodCarriesBody(method)) {
-            return { body: undefined, bodyType: undefined };
+            if (form?.mode === 'formdata' || form?.mode === 'urlencoded') {
+                const processed = processFormRows(normalizeFormRows(form.fields), process);
+                return { body: processed.length > 0 ? processed : undefined, bodyType: form.mode };
+            }
+
+            if (form?.mode === 'binary') {
+                if (!form.filePath) {
+                    throw new Error(translate('runner.error_no_binary_file', 'No file selected for binary body'));
+                }
+                return {
+                    body: { filePath: process(form.filePath), contentType: form.contentType || undefined },
+                    bodyType: 'binary'
+                };
+            }
+
+            if (!methodCarriesBody(method)) {
+                return { body: undefined, bodyType: undefined };
+            }
         }
 
         if (form?.mode === 'text') {
@@ -951,8 +1014,7 @@ export class RunnerService {
         try {
             const { shouldUseMock, mockBaseUrl: base } = await this.mockServerService.shouldUseMockServer(collectionId);
             mockBaseUrl = shouldUseMock && base ? base : null;
-        } catch (e) {
-            void e;
+        } catch {
         }
         runContext?.mockBaseUrls.set(collectionId, mockBaseUrl);
         return mockBaseUrl;
@@ -969,8 +1031,7 @@ export class RunnerService {
                 await this.certificateService.getItems();
             }
             requestConfig.clientCert = this.certificateService.getForHost(new URL(requestConfig.url).host) || null;
-        } catch (e) {
-            void e;
+        } catch {
         }
     }
 
@@ -1136,11 +1197,6 @@ export class RunnerService {
         this._events.add(listener);
     }
 
-    /** @param {Function} listener */
-    removeListener(listener) {
-        this._events.remove(listener);
-    }
-
     /**
      * @param {string} event
      * @param {*} data
@@ -1168,6 +1224,17 @@ function clampIterations(value) {
 function describeDataRow(row) {
     const [first] = Object.entries(row);
     return first ? `${first[0]}=${first[1]}` : '';
+}
+
+/**
+ * @param {Object} response
+ * @returns {string}
+ */
+function describeFailedResponse(response) {
+    if (response.status) {
+        return `${response.status} ${response.statusText || ''}`.trim();
+    }
+    return translate('runner.error_request_failed', 'Request failed');
 }
 
 /**
