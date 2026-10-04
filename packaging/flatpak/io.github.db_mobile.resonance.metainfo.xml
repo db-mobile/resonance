@@ -119,6 +119,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.3.1" date="2026-10-05">
+      <description>
+        <p>Maintenance Release</p>
+        <ul>
+          <li>Simplify JS across src with shared helpers and dead-code removal</li>
+          <li>Run data migrations as a versioned startup chain</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.3.0" date="2026-10-03">
       <description>
         <p>New features introduced</p>
