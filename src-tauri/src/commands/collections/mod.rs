@@ -20,6 +20,7 @@ mod link;
 mod model;
 mod read;
 mod secrets;
+mod startup;
 mod write;
 
 use cache::{CollectionCache, read_collection_dir_cached};
@@ -30,6 +31,7 @@ use read::Layout;
 pub(crate) use layout::{desired_endpoint_file_name, find_endpoint_data_file};
 use layout::{find_available_dir, slugify};
 use secrets::redact_auth_secrets;
+pub(crate) use startup::{absorb_store_scripts, convert_v1_dir};
 
 /// The process-wide parsed-collection cache.
 ///
@@ -44,7 +46,7 @@ fn collection_cache() -> &'static CollectionCache {
 }
 
 use super::store_files::MAIN_STORE as STORE_FILE;
-const COLLECTIONS_DIR: &str = "collections";
+pub(crate) const COLLECTIONS_DIR: &str = "collections";
 const COLLECTION_INDEX_KEY: &str = "collectionIndex";
 const LAST_COLLECTION_DIR_KEY: &str = "lastCollectionDirectory";
 
@@ -113,23 +115,6 @@ pub struct EndpointData {
     pub mqtt_data: Option<Value>,
     #[serde(default)]
     pub response_schema: Option<Value>,
-}
-
-impl EndpointData {
-    /// True when the legacy store held anything worth writing to an endpoint
-    /// file. Only the fields the migration populates are considered; the rest
-    /// are always `None` on this path.
-    fn has_migrated_content(&self) -> bool {
-        self.modified_body.is_some()
-            || !self.path_params.is_empty()
-            || !self.query_params.is_empty()
-            || !self.headers.is_empty()
-            || self.auth_config.is_some()
-            || self.url.is_some()
-            || self.scripts.is_some()
-            || self.graphql_data.is_some()
-            || self.grpc_data.is_some()
-    }
 }
 
 fn get_default_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -1552,173 +1537,6 @@ pub async fn collection_save_variables(
 }
 
 #[tauri::command]
-pub async fn collections_needs_migration(app: AppHandle) -> Result<bool, String> {
-    let collections_dir = get_default_collections_dir(&app)?;
-
-    if collections_dir.exists() {
-        let entries = fs::read_dir(&collections_dir)
-            .map_err(|e| format!("Failed to read collections dir: {}", e))?;
-        if entries.count() > 0 {
-            return Ok(false);
-        }
-    }
-
-    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
-    let old_collections = store.get("collections").unwrap_or(Value::Null);
-
-    match old_collections {
-        Value::Array(arr) => Ok(!arr.is_empty()),
-        _ => Ok(false),
-    }
-}
-
-#[tauri::command]
-pub async fn collections_migrate(app: AppHandle) -> Result<u32, String> {
-    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
-
-    let old_collections = store.get("collections").unwrap_or(Value::Null);
-    let collections: Vec<Value> = match old_collections {
-        Value::Array(arr) => arr,
-        _ => return Ok(0),
-    };
-
-    let mut migrated_count = 0;
-
-    for collection_value in collections {
-        let collection: Collection = serde_json::from_value(collection_value.clone())
-            .map_err(|e| format!("Failed to parse collection: {}", e))?;
-
-        let collection_id = collection.id.clone();
-
-        // Gathered before the write so everything lands as one v2 tree; the
-        // old code wrote v1 files afterwards, which the next save deleted.
-        let endpoint_data = collect_legacy_endpoint_data(&store, &collection_id);
-        let variables = collect_legacy_variables(&store, &collection_id);
-
-        persist_imported_collection(&app, collection, variables, endpoint_data)?;
-
-        migrated_count += 1;
-    }
-
-    if migrated_count > 0 {
-        let backup_collections = store.get("collections").unwrap_or(Value::Null);
-        store.set("_backup_collections".to_string(), backup_collections);
-        store.set("collections".to_string(), serde_json::json!([]));
-        store.save().map_err(|e| e.to_string())?;
-    }
-
-    Ok(migrated_count)
-}
-
-/// Read one of the legacy global-store maps, defaulting to an empty object so a
-/// key that was never written behaves like one holding nothing.
-fn legacy_map(store: &tauri_plugin_store::Store<tauri::Wry>, key: &str) -> Value {
-    store
-        .get(key)
-        .unwrap_or(Value::Object(serde_json::Map::new()))
-}
-
-fn legacy_string(map: &Value, key: &str) -> Option<String> {
-    map.get(key).and_then(|v| v.as_str()).map(str::to_string)
-}
-
-fn legacy_array(map: &Value, key: &str) -> Vec<Value> {
-    map.get(key)
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default()
-}
-
-/// Collects a collection's per-endpoint state out of the legacy global store.
-///
-/// Pure: the caller writes the result as part of one v2 tree. Writing these as
-/// v1 files beside a v2 tree would leave artifacts the next save deletes.
-///
-/// @param store - The legacy store
-/// @param collection_id - The collection being migrated
-/// @returns Per-endpoint state keyed by endpoint id
-fn collect_legacy_endpoint_data(
-    store: &tauri_plugin_store::Store<tauri::Wry>,
-    collection_id: &str,
-) -> HashMap<String, EndpointData> {
-    let modified_bodies = legacy_map(store, "modifiedRequestBodies");
-    let path_params = legacy_map(store, "persistedPathParams");
-    let query_params = legacy_map(store, "persistedQueryParams");
-    let headers = legacy_map(store, "persistedHeaders");
-    let auth_configs = legacy_map(store, "persistedAuthConfigs");
-    let urls = legacy_map(store, "persistedUrls");
-    let scripts = legacy_map(store, "persistedScripts");
-    let graphql_data = legacy_map(store, "graphqlData");
-    let grpc_data = legacy_map(store, "grpcData");
-
-    let prefix = format!("{}_", collection_id);
-    let mut endpoint_ids: HashSet<String> = HashSet::new();
-
-    for store_data in [
-        &modified_bodies,
-        &path_params,
-        &query_params,
-        &headers,
-        &auth_configs,
-        &urls,
-        &scripts,
-        &graphql_data,
-        &grpc_data,
-    ] {
-        if let Value::Object(map) = store_data {
-            for key in map.keys() {
-                if let Some(endpoint_id) = key.strip_prefix(&prefix) {
-                    endpoint_ids.insert(endpoint_id.to_string());
-                }
-            }
-        }
-    }
-
-    let mut collected = HashMap::new();
-
-    for endpoint_id in endpoint_ids {
-        let key = format!("{}_{}", collection_id, endpoint_id);
-
-        let mut endpoint_data = EndpointData {
-            modified_body: legacy_string(&modified_bodies, &key),
-            path_params: legacy_array(&path_params, &key),
-            query_params: legacy_array(&query_params, &key),
-            headers: legacy_array(&headers, &key),
-            auth_config: auth_configs.get(&key).cloned(),
-            url: legacy_string(&urls, &key),
-            scripts: scripts.get(&key).cloned(),
-            graphql_data: graphql_data.get(&key).cloned(),
-            form_body_data: None,
-            grpc_data: grpc_data.get(&key).cloned(),
-            mqtt_data: None,
-            response_schema: None,
-        };
-
-        if !endpoint_data.has_migrated_content() {
-            continue;
-        }
-
-        if let Some(auth) = endpoint_data.auth_config.as_mut() {
-            redact_auth_secrets(auth);
-        }
-        collected.insert(endpoint_id, endpoint_data);
-    }
-
-    collected
-}
-
-/// Collects a collection's variables out of the legacy global store.
-fn collect_legacy_variables(
-    store: &tauri_plugin_store::Store<tauri::Wry>,
-    collection_id: &str,
-) -> Vec<Value> {
-    match store.get(format!("{}Variables", collection_id)) {
-        Some(Value::Array(vars)) => vars,
-        _ => Vec::new(),
-    }
-}
-
-#[tauri::command]
 pub async fn collections_get_path(app: AppHandle) -> Result<String, String> {
     let path = get_default_collections_dir(&app)?;
     Ok(path.to_string_lossy().to_string())
@@ -2026,66 +1844,6 @@ mod convert_on_save {
     /// Import writes a v2 tree directly. Writing its variables and per-request
     /// payloads as v1 files beside it would leave artifacts the next save
     /// deletes, taking the imported scripts and GraphQL bodies with them.
-    /// The legacy store migration (v0 -> v2) used to write its endpoint data
-    /// and variables as v1 files *after* the collection had already been
-    /// written as a v2 tree, so the next save's cleanup deleted them. This
-    /// pins that everything lands in one tree.
-    #[test]
-    fn a_store_migration_lands_entirely_in_the_v2_tree() {
-        let temp = TempDir::new().unwrap();
-
-        let incoming = Collection {
-            id: "c1".into(),
-            name: "Legacy".into(),
-            base_url: String::new(),
-            endpoints: vec![json!({"id": "custom_1", "name": "Health", "method": "GET"})],
-            folders: vec![],
-            default_headers: Value::Null,
-            auth_config: None,
-            open_api_spec: None,
-            storage_path: None,
-            storage_parent_path: None,
-            linked: false,
-            git_branch: None,
-        };
-
-        let mut seed = HashMap::new();
-        seed.insert(
-            "custom_1".to_string(),
-            EndpointData {
-                modified_body: Some("{\"legacy\": true}".into()),
-                headers: vec![json!({"key": "X-Legacy", "value": "1"})],
-                url: Some("https://legacy.example.com".into()),
-                ..Default::default()
-            },
-        );
-
-        write_v2_collection_seeded(
-            temp.path(),
-            &incoming,
-            Some(vec![json!({"key": "legacyVar", "value": "kept"})]),
-            &seed,
-            None,
-        )
-        .unwrap();
-
-        // Nothing v1-shaped was left behind for a later save to delete.
-        assert!(!temp.path().join("variables.json").exists());
-        assert!(!temp.path().join("requests").exists());
-
-        // A second save must not lose anything.
-        let reread = ipc_from_disk(temp.path());
-        write_v2_collection(temp.path(), &reread).unwrap();
-
-        let loaded = read_collection_dir(temp.path()).unwrap();
-        assert_eq!(loaded.variables.len(), 1, "variables were lost");
-
-        let data = ipc::request_to_endpoint_data(ipc::find_request(&loaded, "custom_1").unwrap());
-        assert_eq!(data.modified_body.as_deref(), Some("{\"legacy\": true}"));
-        assert_eq!(data.headers.len(), 1, "headers were lost");
-        assert_eq!(data.url.as_deref(), Some("https://legacy.example.com"));
-    }
-
     #[test]
     fn a_seeded_write_leaves_no_v1_artifacts() {
         let temp = TempDir::new().unwrap();

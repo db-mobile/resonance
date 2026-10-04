@@ -62,7 +62,7 @@ pub fn store_file_for(key: &str) -> &'static str {
 
 /// Reads a store file into its key-value map, treating a missing or unreadable
 /// file as empty so a first run and a corrupt file behave the same.
-fn read_store(path: &Path) -> Map<String, Value> {
+pub(crate) fn read_store(path: &Path) -> Map<String, Value> {
     fs::read_to_string(path)
         .ok()
         .and_then(|source| serde_json::from_str::<Value>(&source).ok())
@@ -75,7 +75,7 @@ fn read_store(path: &Path) -> Map<String, Value> {
 
 /// Writes a store file atomically, so an interrupted migration cannot leave a
 /// half-written store behind.
-fn write_store(path: &Path, map: &Map<String, Value>) -> Result<(), String> {
+pub(crate) fn write_store(path: &Path, map: &Map<String, Value>) -> Result<(), String> {
     let contents = serde_json::to_string(map)
         .map_err(|e| format!("Failed to serialize {}: {}", path.display(), e))?;
 

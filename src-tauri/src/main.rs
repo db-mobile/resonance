@@ -14,9 +14,9 @@ use commands::{
         collection_get_variables, collection_relocate, collection_save,
         collection_save_endpoint_data, collection_save_variables, collections_get_all,
         collections_get_path, collections_git_branches, collections_list, collections_load_errors,
-        collections_migrate, collections_needs_migration, collections_open_existing,
-        collections_pick_directory,
+        collections_open_existing, collections_pick_directory,
     },
+    data_migrations::{MigrationStatus, data_migration_status},
     graphql_subscription::{
         GraphqlSubscriptionState, graphql_subscription_close, graphql_subscription_send,
     },
@@ -84,19 +84,17 @@ fn main() {
         .manage(MqttState::default())
         .manage(PendingUpdate::default())
         .manage(OAuth2State::default())
+        .manage(MigrationStatus::default())
         .setup(|app| {
             use tauri::Manager;
             if let Ok(dir) = app.path().app_data_dir() {
                 let _ = std::fs::create_dir_all(&dir);
                 commands::fs_secure::restrict_dir(&dir);
 
-                // Split the legacy single-file store before anything reads it.
-                // The webview loads theme, tabs and collections during boot, so
-                // this cannot wait for an idle task in the frontend the way the
-                // collection format migration does.
-                if let Err(message) = commands::store_files::migrate_store_split(&dir) {
-                    eprintln!("store split migration failed: {}", message);
-                }
+                // Data migrations run before anything reads the store: the
+                // webview loads theme, tabs and collections during boot.
+                let issues = commands::data_migrations::run(&dir);
+                *app.state::<MigrationStatus>().0.lock().unwrap() = issues;
 
                 for file in commands::store_files::ALL_STORES {
                     commands::fs_secure::restrict_file(&dir.join(file));
@@ -108,6 +106,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             // App
             app_get_version,
+            data_migration_status,
             // Store
             store_get,
             store_set,
@@ -207,8 +206,6 @@ fn main() {
             collection_delete_endpoint_data,
             collection_get_variables,
             collection_save_variables,
-            collections_needs_migration,
-            collections_migrate,
             collections_get_path,
             collections_git_branches,
             collections_pick_directory,

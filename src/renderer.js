@@ -49,6 +49,7 @@ import { CollectionRepository } from './modules/storage/CollectionRepository.js'
 import { loadEditor, warmEditors } from './modules/editorLoader.js';
 import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
 import { toast } from './modules/ui/Toast.js';
+import { showDataMigrationIssues } from './modules/ui/MigrationNoticeDialog.js';
 
 app.getApiHandlerSettingsCache = getSettingsCache;
 app.invalidateApiHandlerEnvironmentCache = invalidateEnvironmentCache;
@@ -755,7 +756,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await initGrpcStreamHandler();
 
         try {
-            await runCollectionMigration();
+            await showDataMigrationIssues();
         } catch (error) {
             toast.error(`Migration check failed: ${error.message}`);
         }
@@ -775,21 +776,6 @@ window.addEventListener('beforeunload', async (_e) => {
         }
     } catch {}
 });
-
-/** @returns {Promise<void>} */
-async function runCollectionMigration() {
-    if (!window.backendAPI?.collections?.needsMigration) {
-        return;
-    }
-    if (!(await window.backendAPI.collections.needsMigration())) {
-        return;
-    }
-    updateStatusDisplay('Migrating collections to new format...', null);
-    const migratedCount = await window.backendAPI.collections.migrate();
-    if (migratedCount > 0) {
-        updateStatusDisplay(`Migrated ${migratedCount} collection(s) to new format`, null);
-    }
-}
 
 async function checkForUpdatesOnLaunch() {
     try {

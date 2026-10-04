@@ -3,6 +3,7 @@ pub mod app;
 pub mod cancel_registry;
 pub mod certificates;
 pub mod collections;
+pub mod data_migrations;
 pub mod fs_secure;
 pub mod graphql_subscription;
 pub mod grpc_proto;

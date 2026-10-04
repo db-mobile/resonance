@@ -622,5 +622,12 @@
   "body_editor": {
     "format": "Formatta",
     "format_title": "Formatta JSON (Maiusc+Alt+F)"
+  },
+  "data_migration": {
+    "title": "Conversione dei dati",
+    "failed": "La conversione dei tuoi dati nel formato attuale non è riuscita al passaggio \"{{step}}\": {{message}}. Non è stato rimosso nulla e la conversione verrà ripetuta al prossimo avvio di Resonance.",
+    "too_old": "I tuoi dati sono stati salvati da una versione di Resonance che questa versione non può più convertire, quindi non sono stati modificati. Installa Resonance {{release}}, avvialo una volta e poi aggiorna di nuovo.",
+    "global_store_collections": "Le tue impostazioni contengono ancora collezioni salvate da una versione di Resonance precedente a marzo 2026. Questa versione non può più convertirle, quindi non sono state modificate. Installa Resonance {{release}}, avvialo una volta e poi aggiorna di nuovo.",
+    "unknown": "Non è stato possibile convertire completamente i tuoi dati nel formato attuale."
   }
 }
