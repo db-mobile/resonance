@@ -13,9 +13,7 @@ export class CertificateController {
     async initialize() {
         try {
             await this.service.getItems();
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /** @returns {Promise<Array<Object>>} */

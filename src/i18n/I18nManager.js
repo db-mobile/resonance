@@ -36,9 +36,7 @@ export class I18nManager {
             const settings = await window.backendAPI.settings.get() || {};
             settings.language = language;
             await window.backendAPI.settings.set(settings);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     async fetchLocale(language) {
@@ -53,9 +51,7 @@ export class I18nManager {
         if (Object.keys(this.fallbackTranslations).length > 0) {return;}
         try {
             this.fallbackTranslations = await this.fetchLocale(this.fallbackLanguage);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     async loadLanguage(language) {

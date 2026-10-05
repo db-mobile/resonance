@@ -12,6 +12,7 @@ import { RequestQueue } from './runner/RequestQueue.js';
 import { RunnerSelectorMenu } from './runner/RunnerSelectorMenu.js';
 import { OVERRIDES_VERSION } from '../utils/requestOverrides.js';
 import { translate, translateCount } from '../utils/translate.js';
+import { startDragSession } from './dragSession.js';
 import { pushEscapeHandler } from './modalEscape.js';
 
 export class RunnerPanel {
@@ -167,32 +168,19 @@ export class RunnerPanel {
         const minWidth = 160;
         const maxWidth = 820;
 
-        const onMouseDown = (e) => {
+        resizer.addEventListener('mousedown', (e) => {
             e.preventDefault();
-            resizer.classList.add('dragging');
-            document.body.style.userSelect = 'none';
-            document.body.style.cursor = 'col-resize';
-
-            const onMove = (moveEvent) => {
-                const mainRect = main.getBoundingClientRect();
-                const raw = mainRect.right - moveEvent.clientX;
-                const width = Math.min(maxWidth, Math.max(minWidth, raw));
-                main.style.setProperty('--runner-selected-width', `${width}px`);
-            };
-
-            const onUp = () => {
-                resizer.classList.remove('dragging');
-                document.body.style.userSelect = '';
-                document.body.style.cursor = '';
-                document.removeEventListener('mousemove', onMove);
-                document.removeEventListener('mouseup', onUp);
-            };
-
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp);
-        };
-
-        resizer.addEventListener('mousedown', onMouseDown);
+            startDragSession({
+                handle: resizer,
+                cursor: 'col-resize',
+                onMove: (moveEvent) => {
+                    const mainRect = main.getBoundingClientRect();
+                    const raw = mainRect.right - moveEvent.clientX;
+                    const width = Math.min(maxWidth, Math.max(minWidth, raw));
+                    main.style.setProperty('--runner-selected-width', `${width}px`);
+                }
+            });
+        });
     }
 
     /** @param {number} index */
@@ -222,9 +210,7 @@ export class RunnerPanel {
     _handleSave() {
         const runnerData = this.getRunnerData();
 
-        if (this.onRunnerSave) {
-            this.onRunnerSave(runnerData);
-        }
+        this.onRunnerSave?.(runnerData);
     }
 
     startNewRunner() {
@@ -239,9 +225,7 @@ export class RunnerPanel {
             this.dom.nameInput.value = '';
         }
 
-        if (this.onNewRunner) {
-            this.onNewRunner();
-        }
+        this.onNewRunner?.();
     }
 
     _handleDelete() {
@@ -249,9 +233,7 @@ export class RunnerPanel {
             return;
         }
 
-        if (this.onRunnerDelete) {
-            this.onRunnerDelete(this.currentRunnerId);
-        }
+        this.onRunnerDelete?.(this.currentRunnerId);
     }
 
     _handleRun() {
@@ -263,15 +245,11 @@ export class RunnerPanel {
 
         this.showResultsPanel();
 
-        if (this.onRun) {
-            this.onRun(this.getRunnerData());
-        }
+        this.onRun?.(this.getRunnerData());
     }
 
     _handleStop() {
-        if (this.onStop) {
-            this.onStop();
-        }
+        this.onStop?.();
     }
 
     /** @param {boolean} isRunning */

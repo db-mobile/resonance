@@ -4,6 +4,7 @@
  */
 
 import { truncateBody } from '../utils/truncateBody.js';
+import { generateId } from '../utils/ids.js';
 
 export class WorkspaceTabRepository {
     /**
@@ -141,8 +142,7 @@ export class WorkspaceTabRepository {
             let hydrated = data;
             try {
                 hydrated = await this._hydrateTabSecrets(data);
-            } catch (error) {
-                void error;
+            } catch {
             }
             this._tabsCache = hydrated;
             if (this.secretStore && data.some(tab => tab?.request?.password)) {
@@ -369,13 +369,6 @@ export class WorkspaceTabRepository {
 
     /** @returns {string} */
     _generateTabId() {
-        return `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    }
-
-    /** @returns {Promise<void>} */
-    async clearAllTabs() {
-        const defaultTabs = [this._createDefaultTab()];
-        await this.saveTabs(defaultTabs);
-        await this.setActiveTabId(defaultTabs[0].id);
+        return generateId('tab', { length: 9, separator: '-' });
     }
 }

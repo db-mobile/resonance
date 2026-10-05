@@ -25,8 +25,7 @@ jest.mock('../../src/modules/services/RunnerService.js', () => ({
         executeRunner: jest.fn(),
         executeRunnerData: jest.fn(),
         stopExecution: jest.fn(),
-        addListener: jest.fn(),
-        removeListener: jest.fn()
+        addListener: jest.fn()
     }))
 }));
 

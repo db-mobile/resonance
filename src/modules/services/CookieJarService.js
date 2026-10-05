@@ -3,6 +3,8 @@
  * @module services/CookieJarService
  */
 
+import { cookieEnvironmentId, cookieId } from '../utils/cookieId.js';
+
 export class CookieJarService {
     constructor(cookieRepository) {
         this.repository = cookieRepository;
@@ -15,18 +17,67 @@ export class CookieJarService {
 
     _matchesDomain(cookieDomain, requestHost, hostOnly) {
         const host = requestHost.toLowerCase();
-        const cd = cookieDomain.toLowerCase();
+        const cookieHost = cookieDomain.toLowerCase();
         if (hostOnly) {
-            return host === cd;
+            return host === cookieHost;
         }
-        return host === cd || host.endsWith(`.${ cd}`);
+        return host === cookieHost || host.endsWith(`.${cookieHost}`);
     }
 
     _matchesPath(cookiePath, requestPath) {
-        if (cookiePath === '/') { return true; }
-        if (requestPath === cookiePath) { return true; }
-        if (requestPath.startsWith(`${cookiePath  }/`)) { return true; }
-        return false;
+        return cookiePath === '/' || requestPath === cookiePath || requestPath.startsWith(`${cookiePath}/`);
+    }
+
+    /**
+     * @param {string[]} attrs
+     * @returns {{domain: (string|null), path: string, expires: (number|null), maxAge: (number|null), httpOnly: boolean, secure: boolean, sameSite: (string|null), hasDomainAttr: boolean}}
+     */
+    _parseAttributes(attrs) {
+        const parsed = {
+            domain: null,
+            path: '/',
+            expires: null,
+            maxAge: null,
+            httpOnly: false,
+            secure: false,
+            sameSite: null,
+            hasDomainAttr: false
+        };
+
+        for (const attr of attrs) {
+            const eqPos = attr.indexOf('=');
+            const attrKey = (eqPos >= 0 ? attr.slice(0, eqPos) : attr).trim().toLowerCase();
+            const attrVal = eqPos >= 0 ? attr.slice(eqPos + 1).trim() : '';
+
+            switch (attrKey) {
+                case 'domain':
+                    parsed.domain = this._canonicalizeDomain(attrVal);
+                    parsed.hasDomainAttr = true;
+                    break;
+                case 'path':
+                    parsed.path = attrVal || '/';
+                    break;
+                case 'expires': {
+                    const ts = Date.parse(attrVal);
+                    if (!isNaN(ts)) { parsed.expires = ts; }
+                    break;
+                }
+                case 'max-age':
+                    parsed.maxAge = parseInt(attrVal, 10);
+                    break;
+                case 'httponly':
+                    parsed.httpOnly = true;
+                    break;
+                case 'secure':
+                    parsed.secure = true;
+                    break;
+                case 'samesite':
+                    parsed.sameSite = attrVal || 'None';
+                    break;
+            }
+        }
+
+        return parsed;
     }
 
     _parseSetCookie(setCookieStr, requestUrl, environmentId) {
@@ -38,81 +89,34 @@ export class CookieJarService {
         const value = nameValue.slice(eqIdx + 1).trim();
         if (!name) { return null; }
 
-        let domain = null;
-        let path = '/';
-        let expires = null;
-        let maxAge = null;
-        let httpOnly = false;
-        let secure = false;
-        let sameSite = null;
-        let hasDomainAttr = false;
-
-        for (const attr of attrs) {
-            const eqPos = attr.indexOf('=');
-            const attrKey = (eqPos >= 0 ? attr.slice(0, eqPos) : attr).trim().toLowerCase();
-            const attrVal = eqPos >= 0 ? attr.slice(eqPos + 1).trim() : '';
-
-            switch (attrKey) {
-                case 'domain':
-                    domain = this._canonicalizeDomain(attrVal);
-                    hasDomainAttr = true;
-                    break;
-                case 'path':
-                    path = attrVal || '/';
-                    break;
-                case 'expires':
-                    try {
-                        const ts = Date.parse(attrVal);
-                        if (!isNaN(ts)) { expires = ts; }
-                    } catch (_e) { }
-                    break;
-                case 'max-age':
-                    maxAge = parseInt(attrVal, 10);
-                    break;
-                case 'httponly':
-                    httpOnly = true;
-                    break;
-                case 'secure':
-                    secure = true;
-                    break;
-                case 'samesite':
-                    sameSite = attrVal || 'None';
-                    break;
-            }
-        }
+        const attributes = this._parseAttributes(attrs);
 
         let requestHost;
         try {
             requestHost = new URL(requestUrl).hostname.toLowerCase();
-        } catch (_e) { return null; }
+        } catch { return null; }
 
-        const hostOnly = !hasDomainAttr;
-        if (!domain) {
-            domain = requestHost;
+        const hostOnly = !attributes.hasDomainAttr;
+        const domain = attributes.domain || requestHost;
+
+        let { expires } = attributes;
+        if (attributes.maxAge !== null) {
+            expires = attributes.maxAge <= 0 ? 0 : Date.now() + attributes.maxAge * 1000;
         }
 
-        if (maxAge !== null) {
-            if (maxAge <= 0) {
-                expires = 0;
-            } else {
-                expires = Date.now() + maxAge * 1000;
-            }
-        }
-
-        const envId = environmentId || 'default';
-        const id = `${envId}|${domain}|${path}|${name}`;
+        const envId = cookieEnvironmentId(environmentId);
 
         return {
-            id,
+            id: cookieId(envId, domain, attributes.path, name),
             environmentId: envId,
             name,
             value,
             domain,
-            path,
-            expires: expires,
-            httpOnly,
-            secure,
-            sameSite,
+            path: attributes.path,
+            expires,
+            httpOnly: attributes.httpOnly,
+            secure: attributes.secure,
+            sameSite: attributes.sameSite,
             hostOnly,
             createdAt: Date.now(),
             updatedAt: Date.now()
@@ -127,7 +131,7 @@ export class CookieJarService {
     async processCookiesFromResponse(setCookieHeaders, requestUrl, environmentId) {
         if (!setCookieHeaders || setCookieHeaders.length === 0) { return; }
 
-        const envId = environmentId || 'default';
+        const envId = cookieEnvironmentId(environmentId);
         const cookies = setCookieHeaders
             .map(header => this._parseSetCookie(header, requestUrl, envId))
             .filter(Boolean);
@@ -145,8 +149,7 @@ export class CookieJarService {
     async getCookieHeaderForRequest(requestUrl, environmentId) {
         await this.repository.deleteExpired();
 
-        const envId = environmentId || 'default';
-        const allCookies = await this.repository.getAll(envId);
+        const allCookies = await this.repository.getAll(cookieEnvironmentId(environmentId));
 
         let requestHost = '';
         let requestPath = '/';
@@ -156,16 +159,15 @@ export class CookieJarService {
             requestHost = parsed.hostname.toLowerCase();
             requestPath = parsed.pathname || '/';
             isHttps = parsed.protocol === 'https:';
-        } catch (_e) {
+        } catch {
             return null;
         }
 
-        const matching = allCookies.filter(cookie => {
-            if (cookie.secure && !isHttps) { return false; }
-            if (!this._matchesDomain(cookie.domain, requestHost, cookie.hostOnly)) { return false; }
-            if (!this._matchesPath(cookie.path, requestPath)) { return false; }
-            return true;
-        });
+        const matching = allCookies.filter(cookie =>
+            (!cookie.secure || isHttps)
+            && this._matchesDomain(cookie.domain, requestHost, cookie.hostOnly)
+            && this._matchesPath(cookie.path, requestPath)
+        );
 
         if (matching.length === 0) { return null; }
 
@@ -219,11 +221,11 @@ export class CookieJarService {
             throw new Error(validationError);
         }
 
-        const envId = environmentId || 'default';
+        const envId = cookieEnvironmentId(environmentId);
         const domain = this._canonicalizeDomain(cookie.domain);
         const path = cookie.path || '/';
         const name = cookie.name.trim();
-        const id = `${envId}|${domain}|${path}|${name}`;
+        const id = cookieId(envId, domain, path, name);
 
         let expires = null;
         if (cookie.expires !== null && cookie.expires !== undefined) {
@@ -254,7 +256,7 @@ export class CookieJarService {
     }
 
     async getAll(environmentId) {
-        return this.repository.getAll(environmentId || 'default');
+        return this.repository.getAll(cookieEnvironmentId(environmentId));
     }
 
     async delete(id) {
@@ -262,16 +264,11 @@ export class CookieJarService {
     }
 
     async deleteAll(environmentId) {
-        await this.repository.deleteAll(environmentId || 'default');
-    }
-
-    async deleteByDomain(domain, environmentId) {
-        await this.repository.deleteByDomain(domain, environmentId || 'default');
+        await this.repository.deleteAll(cookieEnvironmentId(environmentId));
     }
 
     async deleteSessionCookies(environmentId) {
-        const envId = environmentId || 'default';
-        const all = await this.repository.getAll(envId);
+        const all = await this.repository.getAll(cookieEnvironmentId(environmentId));
         for (const c of all) {
             if (c.expires === null) {
                 await this.repository.delete(c.id);

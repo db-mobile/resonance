@@ -253,12 +253,26 @@ function generateCurl(config) {
 }
 
 /**
+ * @param {string[]} lines
+ * @param {string} open
+ * @param {string[]} entries
+ * @param {string} close
+ * @returns {void}
+ */
+function pushBlock(lines, open, entries, close) {
+    lines.push(open);
+    lines.push(entries.join(',\n'));
+    lines.push(close);
+    lines.push('');
+}
+
+/**
  * @param {RequestConfig} config
  * @returns {string}
  */
 function generatePythonRequests(config) {
     const { method, url, headers, body } = config;
-    const hdrs = validHeaders(headers);
+    const headerEntries = validHeaders(headers);
     const lines = [];
 
     lines.push('import requests');
@@ -267,17 +281,14 @@ function generatePythonRequests(config) {
     lines.push(`url = "${escapePythonString(url)}"`);
     lines.push('');
 
-    if (hdrs.length > 0) {
-        lines.push('headers = {');
-        lines.push(hdrs.map(([key, value]) => `    "${escapePythonString(key)}": "${escapePythonString(value)}"`).join(',\n'));
-        lines.push('}');
-        lines.push('');
+    if (headerEntries.length > 0) {
+        pushBlock(lines, 'headers = {', headerEntries.map(([key, value]) => `    "${escapePythonString(key)}": "${escapePythonString(value)}"`), '}');
     }
 
     const methodLower = (method || 'GET').toLowerCase();
     const requestParts = [`requests.${methodLower}(url`];
 
-    if (hdrs.length > 0) {
+    if (headerEntries.length > 0) {
         requestParts.push('headers=headers');
     }
 
@@ -286,29 +297,20 @@ function generatePythonRequests(config) {
         const fileRows = rows.filter((row) => row.type === 'file');
         const textRows = rows.filter((row) => row.type !== 'file');
         if (fileRows.length > 0) {
-            lines.push('files = {');
-            lines.push(fileRows.map((row) => {
+            pushBlock(lines, 'files = {', fileRows.map((row) => {
                 const mime = row.contentType
                     ? `, "${escapePythonString(row.contentType)}"`
                     : '';
                 return `    "${escapePythonString(row.key)}": ("${escapePythonString(baseName(row.filePath))}", open("${escapePythonString(row.filePath || '')}", "rb")${mime})`;
-            }).join(',\n'));
-            lines.push('}');
-            lines.push('');
+            }), '}');
             requestParts.push('files=files');
         }
         if (textRows.length > 0) {
-            lines.push('data = {');
-            lines.push(textRows.map((row) => `    "${escapePythonString(row.key)}": "${escapePythonString(row.value || '')}"`).join(',\n'));
-            lines.push('}');
-            lines.push('');
+            pushBlock(lines, 'data = {', textRows.map((row) => `    "${escapePythonString(row.key)}": "${escapePythonString(row.value || '')}"`), '}');
             requestParts.push('data=data');
         }
     } else if (isUrlencodedBody(config)) {
-        lines.push('data = [');
-        lines.push(bodyRows(body).map((row) => `    ("${escapePythonString(row.key)}", "${escapePythonString(row.value || '')}")`).join(',\n'));
-        lines.push(']');
-        lines.push('');
+        pushBlock(lines, 'data = [', bodyRows(body).map((row) => `    ("${escapePythonString(row.key)}", "${escapePythonString(row.value || '')}")`), ']');
         requestParts.push('data=data');
     } else if (isBinaryBody(config)) {
         lines.push(`data = open("${escapePythonString(body.filePath)}", "rb")`);
@@ -334,15 +336,15 @@ function generatePythonRequests(config) {
  */
 function generateJavaScriptFetch(config) {
     const { method, url, headers } = config;
-    const hdrs = validHeaders(headers);
+    const headerEntries = validHeaders(headers);
     const lines = [];
 
     lines.push(`fetch(\`${escapeJavaScriptString(url)}\`, {`);
     lines.push(`  method: '${method || 'GET'}',`);
 
-    if (hdrs.length > 0) {
+    if (headerEntries.length > 0) {
         lines.push('  headers: {');
-        lines.push(hdrs.map(([key, value]) => `    '${escapeJsSingleQuoted(key)}': '${escapeJsSingleQuoted(value)}'`).join(',\n'));
+        lines.push(headerEntries.map(([key, value]) => `    '${escapeJsSingleQuoted(key)}': '${escapeJsSingleQuoted(value)}'`).join(',\n'));
         lines.push('  },');
     }
 
@@ -367,7 +369,7 @@ function generateJavaScriptFetch(config) {
  */
 function generateJavaScriptAxios(config) {
     const { method, url, headers } = config;
-    const hdrs = validHeaders(headers);
+    const headerEntries = validHeaders(headers);
     const lines = [];
 
     lines.push('const axios = require(\'axios\');');
@@ -377,9 +379,9 @@ function generateJavaScriptAxios(config) {
     lines.push(`  method: '${(method || 'GET').toLowerCase()}',`);
     lines.push(`  url: \`${escapeJavaScriptString(url)}\`,`);
 
-    if (hdrs.length > 0) {
+    if (headerEntries.length > 0) {
         lines.push('  headers: {');
-        lines.push(hdrs.map(([key, value]) => `    '${escapeJsSingleQuoted(key)}': '${escapeJsSingleQuoted(value)}'`).join(',\n'));
+        lines.push(headerEntries.map(([key, value]) => `    '${escapeJsSingleQuoted(key)}': '${escapeJsSingleQuoted(value)}'`).join(',\n'));
         lines.push('  },');
     }
 
@@ -407,7 +409,7 @@ function generateGo(config) {
     const { method, url, headers } = config;
     const bodyInfo = resolveSnippetBody(config);
     const includeBody = bodyInfo.text !== null;
-    const hdrs = validHeaders(headers);
+    const headerEntries = validHeaders(headers);
     const lines = [];
 
     lines.push('package main');
@@ -439,8 +441,8 @@ function generateGo(config) {
     lines.push('    }');
     lines.push('');
 
-    if (hdrs.length > 0) {
-        for (const [key, value] of hdrs) {
+    if (headerEntries.length > 0) {
+        for (const [key, value] of headerEntries) {
             lines.push(`    req.Header.Add("${escapeGoString(key)}", "${escapeGoString(value)}")`);
         }
         lines.push('');
@@ -472,7 +474,7 @@ function generateGo(config) {
  */
 function generateNodeJs(config) {
     const { method, url, headers } = config;
-    const hdrs = validHeaders(headers);
+    const headerEntries = validHeaders(headers);
     const lines = [];
 
     const urlObj = new URL(url);
@@ -490,9 +492,9 @@ function generateNodeJs(config) {
     lines.push(`  path: '${escapeJsSingleQuoted(urlObj.pathname + urlObj.search)}',`);
     lines.push(`  method: '${method || 'GET'}',`);
 
-    if (hdrs.length > 0) {
+    if (headerEntries.length > 0) {
         lines.push('  headers: {');
-        lines.push(hdrs.map(([key, value]) => `    '${escapeJsSingleQuoted(key)}': '${escapeJsSingleQuoted(value)}'`).join(',\n'));
+        lines.push(headerEntries.map(([key, value]) => `    '${escapeJsSingleQuoted(key)}': '${escapeJsSingleQuoted(value)}'`).join(',\n'));
         lines.push('  }');
     }
 
@@ -534,7 +536,7 @@ function generateNodeJs(config) {
  */
 function generatePhp(config) {
     const { method, url, headers } = config;
-    const hdrs = validHeaders(headers);
+    const headerEntries = validHeaders(headers);
     const lines = [];
 
     lines.push('<?php');
@@ -557,9 +559,9 @@ function generatePhp(config) {
         lines.push(`  // ${bodyInfo.comment}`);
     }
 
-    if (hdrs.length > 0) {
+    if (headerEntries.length > 0) {
         lines.push('  CURLOPT_HTTPHEADER => [');
-        lines.push(hdrs.map(([key, value]) => `    "${escapePhpDoubleQuoted(key)}: ${escapePhpDoubleQuoted(value)}"`).join(',\n'));
+        lines.push(headerEntries.map(([key, value]) => `    "${escapePhpDoubleQuoted(key)}: ${escapePhpDoubleQuoted(value)}"`).join(',\n'));
         lines.push('  ],');
     }
 

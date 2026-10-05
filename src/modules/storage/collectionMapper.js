@@ -1,5 +1,5 @@
 /**
- * @fileoverview The single translation point between a collection as the
+ * @fileoverview The single translation point between a collection as the UI tree sees it and its stored on-disk shape.
  * @module storage/collectionMapper
  */
 

@@ -71,18 +71,6 @@ describe('ProxyRepository', () => {
         });
     });
 
-    describe('resetToDefaults', () => {
-        test('writes the defaults through proxy_set', async () => {
-            const result = await repository.resetToDefaults();
-
-            expect(mockBackendAPI.proxySettings.set).toHaveBeenCalledTimes(1);
-            expect(mockBackendAPI.store.set).not.toHaveBeenCalled();
-            expect(result).toEqual(
-                expect.objectContaining({ enabled: false, type: 'http', port: 8080 })
-            );
-        });
-    });
-
     describe('getProxySettings', () => {
         test('seeds defaults through proxy_set when storage is empty', async () => {
             mockBackendAPI.store.get.mockResolvedValue(null);

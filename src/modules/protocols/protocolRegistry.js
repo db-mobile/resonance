@@ -263,22 +263,6 @@ export function getProtocol(protocol) {
     return PROTOCOLS[resolveProtocolId(protocol)];
 }
 
-/**
- * @param {*} methodLabel
- * @returns {?string}
- */
-export function protocolIdFromMethodLabel(methodLabel) {
-    if (typeof methodLabel !== 'string') {
-        return null;
-    }
-
-    const match = Object.values(PROTOCOLS).find(
-        descriptor => descriptor.methodLabel === methodLabel
-    );
-
-    return match ? match.id : null;
-}
-
 /** @returns {string[]} */
 export function listProtocolIds() {
     return Object.keys(PROTOCOLS);

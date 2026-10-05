@@ -8,6 +8,13 @@ import { toast } from './Toast.js';
 import { DynamicVariablesReferenceDialog } from './DynamicVariablesReferenceDialog.js';
 import { pushEscapeHandler } from './modalEscape.js';
 import { BaseModal } from './BaseModal.js';
+import { applySecretState, toggleRevealed } from './secretToggle.js';
+
+const SECRET_ROW_SELECTORS = Object.freeze({
+    valueInput: '.variable-value',
+    secretBtn: '.variable-secret-btn',
+    revealBtn: '.variable-reveal-btn'
+});
 
 export class VariableManager extends BaseModal {
     constructor() {
@@ -112,22 +119,7 @@ export class VariableManager extends BaseModal {
     }
 
     _applySecretState(row, isSecret) {
-        const valueInput = row.querySelector('.variable-value');
-        const secretBtn = row.querySelector('.variable-secret-btn');
-        const revealBtn = row.querySelector('.variable-reveal-btn');
-
-        row.dataset.secret = isSecret ? 'true' : 'false';
-        if (secretBtn) {secretBtn.classList.toggle('is-secret', isSecret);}
-        if (revealBtn) {revealBtn.classList.toggle('is-hidden', !isSecret);}
-        if (valueInput) {valueInput.type = isSecret ? 'password' : 'text';}
-        if (revealBtn) {
-            const icon = revealBtn.querySelector('.icon');
-            if (icon) {
-                icon.classList.toggle('icon-eye', true);
-                icon.classList.toggle('icon-eye-off', false);
-            }
-            revealBtn.title = 'Show value';
-        }
+        applySecretState(row, isSecret, SECRET_ROW_SELECTORS);
     }
 
     _setupSecretControls(row) {
@@ -142,16 +134,7 @@ export class VariableManager extends BaseModal {
         }
 
         if (revealBtn) {
-            revealBtn.addEventListener('click', () => {
-                const showing = valueInput.type === 'text';
-                valueInput.type = showing ? 'password' : 'text';
-                const icon = revealBtn.querySelector('.icon');
-                if (icon) {
-                    icon.classList.toggle('icon-eye', showing);
-                    icon.classList.toggle('icon-eye-off', !showing);
-                }
-                revealBtn.title = showing ? 'Show value' : 'Hide value';
-            });
+            revealBtn.addEventListener('click', () => toggleRevealed(valueInput, revealBtn));
         }
     }
 
@@ -235,16 +218,12 @@ export class VariableManager extends BaseModal {
             return;
         }
 
-        if (this.onSave) {
-            this.onSave({ variables, secretKeys });
-        }
+        this.onSave?.({ variables, secretKeys });
         this.cleanup();
     }
 
     close() {
-        if (this.onCancel) {
-            this.onCancel();
-        }
+        this.onCancel?.();
         this.cleanup();
     }
 

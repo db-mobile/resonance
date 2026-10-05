@@ -133,36 +133,6 @@ describe('HistoryRepository', () => {
         });
     });
 
-    describe('getById', () => {
-        test('should return history entry by ID', async () => {
-            const history = [
-                { id: 'h1', timestamp: 1000, request: { url: 'http://first.com' } },
-                { id: 'h2', timestamp: 2000, request: { url: 'http://second.com' } }
-            ];
-            mockBackendAPI.store.get.mockResolvedValue(history);
-
-            const result = await repository.getById('h2');
-
-            expect(result.request.url).toBe('http://second.com');
-        });
-
-        test('should return undefined for non-existent entry', async () => {
-            mockBackendAPI.store.get.mockResolvedValue([]);
-
-            const result = await repository.getById('non-existent');
-
-            expect(result).toBeUndefined();
-        });
-
-        test('should return undefined on error', async () => {
-            mockBackendAPI.store.get.mockRejectedValue(new Error('Error'));
-
-            const result = await repository.getById('h1');
-
-            expect(result).toBeUndefined();
-        });
-    });
-
     describe('delete', () => {
         test('should delete history entry by ID', async () => {
             const history = [
@@ -201,42 +171,6 @@ describe('HistoryRepository', () => {
 
             await expect(repository.clear())
                 .rejects.toThrow('Failed to clear history');
-        });
-    });
-
-    describe('getByCollection', () => {
-        test('should return history entries for specific collection', async () => {
-            const history = [
-                { id: 'h1', timestamp: 1000, request: { collectionId: 'col1', url: 'http://a.com' } },
-                { id: 'h2', timestamp: 2000, request: { collectionId: 'col2', url: 'http://b.com' } },
-                { id: 'h3', timestamp: 3000, request: { collectionId: 'col1', url: 'http://c.com' } }
-            ];
-            mockBackendAPI.store.get.mockResolvedValue(history);
-
-            const result = await repository.getByCollection('col1');
-
-            expect(result).toHaveLength(2);
-            expect(result[0].request.collectionId).toBe('col1');
-            expect(result[1].request.collectionId).toBe('col1');
-        });
-
-        test('should return empty array when no matches', async () => {
-            const history = [
-                { id: 'h1', request: { collectionId: 'col1' } }
-            ];
-            mockBackendAPI.store.get.mockResolvedValue(history);
-
-            const result = await repository.getByCollection('col2');
-
-            expect(result).toEqual([]);
-        });
-
-        test('should return empty array on error', async () => {
-            mockBackendAPI.store.get.mockRejectedValue(new Error('Error'));
-
-            const result = await repository.getByCollection('col1');
-
-            expect(result).toEqual([]);
         });
     });
 
@@ -419,7 +353,6 @@ describe('HistoryRepository size bounds', () => {
 
             await repository.getAll();
             await repository.search('a');
-            await repository.getById('h1');
 
             expect(mockBackendAPI.store.get).toHaveBeenCalledTimes(1);
         });

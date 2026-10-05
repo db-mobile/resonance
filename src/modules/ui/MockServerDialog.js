@@ -9,7 +9,11 @@ import { pushEscapeHandler } from './modalEscape.js';
 import { flattenRequests, endpointKey } from '../collections/collectionTree.js';
 import { el } from '../htmlUtils.js';
 import { translate } from '../utils/translate.js';
+import { setRoleTexts } from './roleText.js';
 import { extractResponseSchema } from '../controllers/MockServerController.js';
+
+const LOG_STATUS_CLASSES = Object.freeze({ 200: 'is-success', 404: 'is-warning' });
+const DEFAULT_STATUS_CODES = Object.freeze({ POST: 201, DELETE: 204 });
 
 export class MockServerDialog {
     /** @param {MockServerController} controller */
@@ -43,45 +47,16 @@ export class MockServerDialog {
         );
         dialogContent.appendChild(fragment);
 
-        const titleEl = dialogContent.querySelector('[data-role="title"]');
-        if (titleEl) {
-            titleEl.textContent = translate('mock_server.title', 'Mock Server');
-        }
-
-        const statusStoppedEl = dialogContent.querySelector('[data-role="status-stopped"]');
-        if (statusStoppedEl) {
-            statusStoppedEl.textContent = translate('mock_server.status_stopped', 'Stopped');
-        }
-
-        const startServerEl = dialogContent.querySelector('[data-role="start-server"]');
-        if (startServerEl) {
-            startServerEl.textContent = translate('mock_server.start_server', 'Start Server');
-        }
-
-        const portLabelEl = dialogContent.querySelector('[data-role="port-label"]');
-        if (portLabelEl) {
-            portLabelEl.textContent = `${translate('mock_server.port', 'Port')}:`;
-        }
-
-        const collectionsHeadingEl = dialogContent.querySelector('[data-role="collections-heading"]');
-        if (collectionsHeadingEl) {
-            collectionsHeadingEl.textContent = translate('mock_server.collections_heading', 'COLLECTIONS TO MOCK');
-        }
-
-        const requestLogHeadingEl = dialogContent.querySelector('[data-role="request-log-heading"]');
-        if (requestLogHeadingEl) {
-            requestLogHeadingEl.textContent = translate('mock_server.request_log_heading', 'REQUEST LOG');
-        }
-
-        const clearEl = dialogContent.querySelector('[data-role="clear"]');
-        if (clearEl) {
-            clearEl.textContent = translate('mock_server.clear', 'Clear');
-        }
-
-        const closeEl = dialogContent.querySelector('[data-role="close"]');
-        if (closeEl) {
-            closeEl.textContent = translate('mock_server.close', 'Close');
-        }
+        setRoleTexts(dialogContent, {
+            title: translate('mock_server.title', 'Mock Server'),
+            'status-stopped': translate('mock_server.status_stopped', 'Stopped'),
+            'start-server': translate('mock_server.start_server', 'Start Server'),
+            'port-label': `${translate('mock_server.port', 'Port')}:`,
+            'collections-heading': translate('mock_server.collections_heading', 'COLLECTIONS TO MOCK'),
+            'request-log-heading': translate('mock_server.request_log_heading', 'REQUEST LOG'),
+            clear: translate('mock_server.clear', 'Clear'),
+            close: translate('mock_server.close', 'Close')
+        });
 
         const closeBtn = dialogContent.querySelector('#mock-server-close-btn');
         if (closeBtn) {
@@ -138,9 +113,7 @@ export class MockServerDialog {
             await this.renderCollections(collections, settings);
 
             await this.updateStatusDisplay(status);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /**
@@ -188,7 +161,7 @@ export class MockServerDialog {
             const collectionDiv = el('div', 'mock-server-collection');
 
             const headerDiv = el('div', 'mock-server-collection-header u-flex u-items-center u-gap-2');
-            headerDiv.classList.toggle('has-endpoints', Boolean(isEnabled && httpEndpoints.length > 0));
+            headerDiv.classList.toggle('has-endpoints', isEnabled);
 
             const toggleLabel = el('label', 'toggle-switch');
 
@@ -211,7 +184,7 @@ export class MockServerDialog {
             headerDiv.appendChild(toggleLabel);
             collectionDiv.appendChild(headerDiv);
 
-            if (isEnabled && httpEndpoints.length > 0) {
+            if (isEnabled) {
                 const endpointsDiv = el('div', 'mock-server-endpoints');
 
                 const endpointsToShow = collection._showAllEndpoints ? httpEndpoints : httpEndpoints.slice(0, 10);
@@ -246,34 +219,23 @@ export class MockServerDialog {
                 }
 
                 if (httpEndpoints.length > 10 && !collection._showAllEndpoints) {
-                    const moreDiv = el('div', 'mock-server-endpoints-toggle u-flex u-items-center u-gap-1');
-                    const showAllText = translate('mock_server.show_all_endpoints', 'Show all {{count}} endpoints', { count: httpEndpoints.length });
-                    {
-                        const labelEl = document.createElement('span');
-                        labelEl.textContent = showAllText;
-                        const iconEl = el('span', 'icon icon-12 icon-chevron-down');
-                        moreDiv.appendChild(labelEl);
-                        moreDiv.appendChild(iconEl);
-                    }
-                    moreDiv.addEventListener('click', async () => {
-                        collection._showAllEndpoints = true;
-                        await this.renderCollections(collections, settings);
-                    });
-                    endpointsDiv.appendChild(moreDiv);
+                    endpointsDiv.appendChild(this._createEndpointsToggle(
+                        translate('mock_server.show_all_endpoints', 'Show all {{count}} endpoints', { count: httpEndpoints.length }),
+                        'icon-chevron-down',
+                        async () => {
+                            collection._showAllEndpoints = true;
+                            await this.renderCollections(collections, settings);
+                        }
+                    ));
                 } else if (endpoints.length > 10 && collection._showAllEndpoints) {
-                    const lessDiv = el('div', 'mock-server-endpoints-toggle u-flex u-items-center u-gap-1');
-                    {
-                        const labelEl = document.createElement('span');
-                        labelEl.textContent = translate('mock_server.show_less', 'Show less');
-                        const iconEl = el('span', 'icon icon-12 icon-chevron-up');
-                        lessDiv.appendChild(labelEl);
-                        lessDiv.appendChild(iconEl);
-                    }
-                    lessDiv.addEventListener('click', async () => {
-                        collection._showAllEndpoints = false;
-                        await this.renderCollections(collections, settings);
-                    });
-                    endpointsDiv.appendChild(lessDiv);
+                    endpointsDiv.appendChild(this._createEndpointsToggle(
+                        translate('mock_server.show_less', 'Show less'),
+                        'icon-chevron-up',
+                        async () => {
+                            collection._showAllEndpoints = false;
+                            await this.renderCollections(collections, settings);
+                        }
+                    ));
                 }
 
                 collectionDiv.appendChild(endpointsDiv);
@@ -283,6 +245,22 @@ export class MockServerDialog {
         }
     }
 
+    /**
+     * @param {string} label
+     * @param {string} iconClass
+     * @param {() => Promise<void>} onClick
+     * @returns {HTMLElement}
+     */
+    _createEndpointsToggle(label, iconClass, onClick) {
+        const toggle = el('div', 'mock-server-endpoints-toggle u-flex u-items-center u-gap-1');
+        const labelEl = document.createElement('span');
+        labelEl.textContent = label;
+        toggle.appendChild(labelEl);
+        toggle.appendChild(el('span', `icon icon-12 ${iconClass}`));
+        toggle.addEventListener('click', onClick);
+        return toggle;
+    }
+
     async handleToggleServer() {
         try {
             const toggleBtn = this.dialog.querySelector('#mock-server-toggle-btn');
@@ -290,15 +268,12 @@ export class MockServerDialog {
 
             const status = await this.controller.getStatus();
 
-            let result;
-            if (status.running) {
-                result = await this.controller.handleStop();
-            } else {
-                result = await this.controller.handleStart();
-            }
+            const outcome = status.running
+                ? await this.controller.handleStop()
+                : await this.controller.handleStart();
 
-            if (!result.success) {
-                this.showAlert(result.message);
+            if (!outcome.success) {
+                this.showAlert(outcome.message);
             }
 
             await this.updateStatus();
@@ -319,9 +294,7 @@ export class MockServerDialog {
                 const portInput = this.dialog.querySelector('#mock-server-port-input');
                 portInput.value = settings.port;
             }
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /** @returns {Promise<void>} */
@@ -341,18 +314,14 @@ export class MockServerDialog {
             if (result.success) {
                 await this._refreshCollections();
             }
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     async handleClearLogs() {
         try {
             await this.controller.clearRequestLogs();
             await this.updateLogs();
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     startStatusPolling() {
@@ -373,9 +342,7 @@ export class MockServerDialog {
         try {
             const status = await this.controller.getStatus();
             await this.updateStatusDisplay(status);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /** @param {Object} status */
@@ -444,17 +411,13 @@ export class MockServerDialog {
             const tableEl = tableFragment.firstElementChild;
             const tbodyEl = tableEl.querySelector('[data-role="tbody"]');
 
-            const thTimeEl = tableEl.querySelector('[data-role="th-time"]');
-            const thMethodEl = tableEl.querySelector('[data-role="th-method"]');
-            const thPathEl = tableEl.querySelector('[data-role="th-path"]');
-            const thStatusEl = tableEl.querySelector('[data-role="th-status"]');
-            const thTimeMsEl = tableEl.querySelector('[data-role="th-time-ms"]');
-
-            if (thTimeEl) {thTimeEl.textContent = translate('mock_server.log_time', 'Time');}
-            if (thMethodEl) {thMethodEl.textContent = translate('mock_server.log_method', 'Method');}
-            if (thPathEl) {thPathEl.textContent = translate('mock_server.log_path', 'Path');}
-            if (thStatusEl) {thStatusEl.textContent = translate('mock_server.log_status', 'Status');}
-            if (thTimeMsEl) {thTimeMsEl.textContent = translate('mock_server.log_time_ms', 'Time (ms)');}
+            setRoleTexts(tableEl, {
+                'th-time': translate('mock_server.log_time', 'Time'),
+                'th-method': translate('mock_server.log_method', 'Method'),
+                'th-path': translate('mock_server.log_path', 'Path'),
+                'th-status': translate('mock_server.log_status', 'Status'),
+                'th-time-ms': translate('mock_server.log_time_ms', 'Time (ms)')
+            });
 
             logs.forEach(log => {
                 const rowFragment = templateLoader.cloneSync(
@@ -463,37 +426,23 @@ export class MockServerDialog {
                 );
                 const rowEl = rowFragment.firstElementChild;
 
-                const time = new Date(log.timestamp).toLocaleTimeString();
-                const statusClass = log.responseStatus === 200 ? 'is-success' :
-                    log.responseStatus === 404 ? 'is-warning' :
-                        'is-danger';
-
-                const timeEl = rowEl.querySelector('[data-role="time"]');
-                const methodEl = rowEl.querySelector('[data-role="method"]');
+                setRoleTexts(rowEl, {
+                    time: new Date(log.timestamp).toLocaleTimeString(),
+                    method: log.method,
+                    path: log.path,
+                    status: log.responseStatus,
+                    'time-ms': log.responseTime
+                });
                 const pathEl = rowEl.querySelector('[data-role="path"]');
-                const statusEl = rowEl.querySelector('[data-role="status"]');
-                const timeMsEl = rowEl.querySelector('[data-role="time-ms"]');
-
-                if (timeEl) {timeEl.textContent = time;}
-                if (methodEl) {methodEl.textContent = log.method;}
-                if (pathEl) {
-                    pathEl.textContent = log.path;
-                    pathEl.title = log.path;
-                }
-                if (statusEl) {
-                    statusEl.textContent = log.responseStatus;
-                    statusEl.classList.add(statusClass);
-                }
-                if (timeMsEl) {timeMsEl.textContent = log.responseTime;}
+                if (pathEl) {pathEl.title = log.path;}
+                rowEl.querySelector('[data-role="status"]')?.classList.add(LOG_STATUS_CLASSES[log.responseStatus] ?? 'is-danger');
 
                 tbodyEl.appendChild(rowEl);
             });
 
             container.innerHTML = '';
             container.appendChild(tableEl);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /** @param {string} message */
@@ -508,15 +457,7 @@ export class MockServerDialog {
         );
         dialog.appendChild(fragment);
 
-        const messageEl = dialog.querySelector('[data-role="message"]');
-        if (messageEl) {
-            messageEl.textContent = message;
-        }
-
-        const okTextEl = dialog.querySelector('[data-role="ok"]');
-        if (okTextEl) {
-            okTextEl.textContent = translate('mock_server.ok', 'OK');
-        }
+        setRoleTexts(dialog, { message, ok: translate('mock_server.ok', 'OK') });
 
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
@@ -563,15 +504,20 @@ export class MockServerDialog {
         );
         dialog.appendChild(fragment);
 
-        const titleEl = dialog.querySelector('[data-role="title"]');
-        if (titleEl) {
-            titleEl.textContent = translate('mock_server.edit_response_title', 'Edit Response');
-        }
-
-        const subtitleEl = dialog.querySelector('[data-role="subtitle"]');
-        if (subtitleEl) {
-            subtitleEl.textContent = `${endpoint.method.toUpperCase()} ${endpoint.path}`;
-        }
+        setRoleTexts(dialog, {
+            title: translate('mock_server.edit_response_title', 'Edit Response'),
+            subtitle: `${endpoint.method.toUpperCase()} ${endpoint.path}`,
+            'delay-label': translate('mock_server.delay', 'Delay (ms)'),
+            'status-code-label': translate('mock_server.status_code', 'Status Code'),
+            'body-label': translate('mock_server.response_body', 'Response Body (JSON)'),
+            'template-hint': translate(
+                'mock_server.template_hint',
+                'Strings may use {{request.params.id}}, {{request.query.name}}, {{request.headers.name}}, {{request.body.path}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} and {{$randomInt}}. Send "Prefer: code=404" or "Prefer: example=name" to get another documented response.'
+            ),
+            reset: translate('mock_server.reset_to_default', 'Reset to Default'),
+            cancel: translate('common.cancel', 'Cancel'),
+            save: translate('common.save', 'Save')
+        });
 
         const closeBtn = dialog.querySelector('#response-editor-close');
         if (closeBtn) {
@@ -584,40 +530,6 @@ export class MockServerDialog {
             if (hasCustomResponse) {
                 customNoticeEl.textContent = translate('mock_server.using_custom_response', 'Using custom response');
             }
-        }
-
-        const delayLabelEl = dialog.querySelector('[data-role="delay-label"]');
-        if (delayLabelEl) {
-            delayLabelEl.textContent = translate('mock_server.delay', 'Delay (ms)');
-        }
-        const statusCodeLabelEl = dialog.querySelector('[data-role="status-code-label"]');
-        if (statusCodeLabelEl) {
-            statusCodeLabelEl.textContent = translate('mock_server.status_code', 'Status Code');
-        }
-        const bodyLabelEl = dialog.querySelector('[data-role="body-label"]');
-        if (bodyLabelEl) {
-            bodyLabelEl.textContent = translate('mock_server.response_body', 'Response Body (JSON)');
-        }
-
-        const templateHintEl = dialog.querySelector('[data-role="template-hint"]');
-        if (templateHintEl) {
-            templateHintEl.textContent = translate(
-                'mock_server.template_hint',
-                'Strings may use {{request.params.id}}, {{request.query.name}}, {{request.headers.name}}, {{request.body.path}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} and {{$randomInt}}. Send "Prefer: code=404" or "Prefer: example=name" to get another documented response.'
-            );
-        }
-
-        const resetTextEl = dialog.querySelector('[data-role="reset"]');
-        if (resetTextEl) {
-            resetTextEl.textContent = translate('mock_server.reset_to_default', 'Reset to Default');
-        }
-        const cancelTextEl = dialog.querySelector('[data-role="cancel"]');
-        if (cancelTextEl) {
-            cancelTextEl.textContent = translate('common.cancel', 'Cancel');
-        }
-        const saveTextEl = dialog.querySelector('[data-role="save"]');
-        if (saveTextEl) {
-            saveTextEl.textContent = translate('common.save', 'Save');
         }
 
         overlay.appendChild(dialog);
@@ -681,15 +593,13 @@ export class MockServerDialog {
                     return;
                 }
 
-                const delayResult = await this.controller.handleSetDelay(collection.id, endpoint.id, delay);
-                const statusCodeResult = await this.controller.handleSetCustomStatusCode(collection.id, endpoint.id, statusCode);
-                const responseResult = await this.controller.handleSetCustomResponse(collection.id, endpoint.id, response);
+                const saved = await this._saveResponseOverrides(collection, endpoint, { delay, statusCode, response });
 
-                if (responseResult.success && delayResult.success && statusCodeResult.success) {
+                if (saved.success) {
                     cleanup();
                     await this._refreshCollections();
                 } else {
-                    errorDiv.textContent = responseResult.message || delayResult.message || statusCodeResult.message;
+                    errorDiv.textContent = saved.message;
                 }
             } catch (e) {
                 errorDiv.textContent = translate('mock_server.invalid_json', `Invalid JSON: ${e.message}`);
@@ -697,10 +607,8 @@ export class MockServerDialog {
         });
 
         resetBtn.addEventListener('click', async () => {
-            const delayResult = await this.controller.handleSetDelay(collection.id, endpoint.id, 0);
-            const statusCodeResult = await this.controller.handleSetCustomStatusCode(collection.id, endpoint.id, null);
-            const responseResult = await this.controller.handleSetCustomResponse(collection.id, endpoint.id, null);
-            if (responseResult.success && delayResult.success && statusCodeResult.success) {
+            const saved = await this._saveResponseOverrides(collection, endpoint, { delay: 0, statusCode: null, response: null });
+            if (saved.success) {
                 cleanup();
                 await this._refreshCollections();
             }
@@ -714,6 +622,22 @@ export class MockServerDialog {
                 closeHandler();
             }
         });
+    }
+
+    /**
+     * @param {Object} collection
+     * @param {Object} endpoint
+     * @param {{delay: number, statusCode: number|null, response: Object|null}} overrides
+     * @returns {Promise<{success: boolean, message: string|undefined}>}
+     */
+    async _saveResponseOverrides(collection, endpoint, { delay, statusCode, response }) {
+        const delayResult = await this.controller.handleSetDelay(collection.id, endpoint.id, delay);
+        const statusCodeResult = await this.controller.handleSetCustomStatusCode(collection.id, endpoint.id, statusCode);
+        const responseResult = await this.controller.handleSetCustomResponse(collection.id, endpoint.id, response);
+        return {
+            success: Boolean(responseResult.success && delayResult.success && statusCodeResult.success),
+            message: responseResult.message || delayResult.message || statusCodeResult.message
+        };
     }
 
     /**
@@ -741,21 +665,7 @@ export class MockServerDialog {
      * @returns {number}
      */
     getDefaultStatusCode(endpoint) {
-        const method = endpoint.method.toUpperCase();
-
-        switch (method) {
-            case 'POST':
-                return 201;
-            case 'DELETE':
-                return 204;
-            case 'GET':
-            case 'PUT':
-            case 'PATCH':
-            case 'HEAD':
-            case 'OPTIONS':
-            default:
-                return 200;
-        }
+        return DEFAULT_STATUS_CODES[endpoint.method.toUpperCase()] ?? 200;
     }
 
     close() {

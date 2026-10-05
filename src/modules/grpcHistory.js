@@ -12,8 +12,7 @@ async function getActiveEnvironmentName() {
     try {
         const environment = await app.environmentController?.service?.getActiveEnvironment();
         return environment?.name || null;
-    } catch (_e) {
-        void _e;
+    } catch {
         return null;
     }
 }
@@ -94,7 +93,5 @@ export async function recordGrpcHistory(call) {
             environmentName,
             { headerNames: call.sensitiveNames || [], queryNames: [] }
         );
-    } catch (_e) {
-        void _e;
-    }
+    } catch {}
 }

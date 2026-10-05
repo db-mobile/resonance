@@ -17,9 +17,23 @@ export class WorkspaceTabService {
         this.statusDisplay = statusDisplay;
     }
 
+    /**
+     * @param {string} label
+     * @param {function(): Promise<*>} work
+     * @returns {Promise<*>}
+     */
+    async _reporting(label, work) {
+        try {
+            return await work();
+        } catch (error) {
+            this.statusDisplay?.update(label, null);
+            throw error;
+        }
+    }
+
     /** @returns {Promise<Object>} */
     async initialize() {
-        try {
+        return this._reporting('Error initializing workspace tabs', async () => {
             const tabs = await this.repository.getTabs();
             let activeTabId = await this.repository.getActiveTabId();
 
@@ -34,10 +48,7 @@ export class WorkspaceTabService {
                 tabs,
                 activeTabId
             };
-        } catch (error) {
-            this.statusDisplay?.update('Error initializing workspace tabs', null);
-            throw error;
-        }
+        });
     }
 
     /** @returns {Promise<Array<Object>>} */
@@ -64,13 +75,7 @@ export class WorkspaceTabService {
      * @returns {Promise<Object>}
      */
     async createTab(options = {}) {
-        try {
-            const newTab = await this.repository.addTab(options);
-            return newTab;
-        } catch (error) {
-            this.statusDisplay?.update('Error creating tab', null);
-            throw error;
-        }
+        return this._reporting('Error creating tab', () => this.repository.addTab(options));
     }
 
     /**
@@ -78,7 +83,7 @@ export class WorkspaceTabService {
      * @returns {Promise<Object|null>}
      */
     async switchTab(tabId) {
-        try {
+        return this._reporting('Error switching tab', async () => {
             const tab = await this.repository.getTabById(tabId);
             if (!tab) {
                 log.warn('Tab not found', { tabId });
@@ -87,10 +92,7 @@ export class WorkspaceTabService {
 
             await this.repository.setActiveTabId(tabId);
             return tab;
-        } catch (error) {
-            this.statusDisplay?.update('Error switching tab', null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -98,7 +100,7 @@ export class WorkspaceTabService {
      * @returns {Promise<Object|null>}
      */
     async closeTab(tabId) {
-        try {
+        return this._reporting('Error closing tab', async () => {
             const tabs = await this.repository.getTabs();
             const tabIndex = tabs.findIndex(t => t.id === tabId);
 
@@ -123,16 +125,11 @@ export class WorkspaceTabService {
 
             await this.repository.deleteTab(tabId);
 
-            const result = {
+            return {
                 closedTab,
                 newActiveTabId
             };
-
-            return result;
-        } catch (error) {
-            this.statusDisplay?.update('Error closing tab', null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -140,7 +137,7 @@ export class WorkspaceTabService {
      * @returns {Promise<{closedTabs: Array<Object>, newActiveTabId: string}|null>}
      */
     async closeTabs(tabIds) {
-        try {
+        return this._reporting('Error closing tab', async () => {
             const ids = new Set(tabIds);
             const tabs = await this.repository.getTabs();
             const closedTabs = tabs.filter(t => ids.has(t.id));
@@ -161,10 +158,7 @@ export class WorkspaceTabService {
             await this.repository.deleteTabs([...ids]);
 
             return { closedTabs, newActiveTabId };
-        } catch (error) {
-            this.statusDisplay?.update('Error closing tab', null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -182,12 +176,7 @@ export class WorkspaceTabService {
      * @returns {Promise<Object|null>}
      */
     async renameTab(tabId, newName) {
-        try {
-            return await this.repository.updateTab(tabId, { name: newName });
-        } catch (error) {
-            this.statusDisplay?.update('Error renaming tab', null);
-            throw error;
-        }
+        return this._reporting('Error renaming tab', () => this.repository.updateTab(tabId, { name: newName }));
     }
 
     /**
@@ -195,7 +184,7 @@ export class WorkspaceTabService {
      * @returns {Promise<Object|null>}
      */
     async duplicateTab(tabId) {
-        try {
+        return this._reporting('Error duplicating tab', async () => {
             const tab = await this.repository.getTabById(tabId);
             if (!tab) {
                 return null;
@@ -209,12 +198,8 @@ export class WorkspaceTabService {
                 lastModifiedAt: undefined
             };
 
-            const newTab = await this.repository.addTab(duplicatedTab);
-            return newTab;
-        } catch (error) {
-            this.statusDisplay?.update('Error duplicating tab', null);
-            throw error;
-        }
+            return this.repository.addTab(duplicatedTab);
+        });
     }
 
     /**
@@ -251,10 +236,5 @@ export class WorkspaceTabService {
         } catch {
             return `${method} Request`;
         }
-    }
-
-    /** @returns {Promise<void>} */
-    async clearAllTabs() {
-        await this.repository.clearAllTabs();
     }
 }

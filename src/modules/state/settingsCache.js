@@ -45,8 +45,7 @@ export function deriveRequestSettings(settings) {
 export async function resolveRequestSettings() {
     try {
         return deriveRequestSettings(await getSettings());
-    } catch (error) {
-        void error;
+    } catch {
         return deriveRequestSettings(null);
     }
 }
@@ -64,8 +63,7 @@ export function updateSetting(key, value) {
             await window.backendAPI.settings.set(settings);
             invalidateSettingsCache();
             return true;
-        } catch (error) {
-            void error;
+        } catch {
             return false;
         }
     });

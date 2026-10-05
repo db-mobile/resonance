@@ -1,5 +1,6 @@
 import { templateLoader } from '../templateLoader.js';
 import { pushEscapeHandler } from './modalEscape.js';
+import { applyEnvButtonColor, createEnvDropdownItem, positionEnvDropdown } from './envDropdown.js';
 
 export class EnvironmentSelector {
     constructor(environmentService, onEnvironmentSwitch, onManageClick) {
@@ -41,17 +42,7 @@ export class EnvironmentSelector {
             return;
         }
 
-        const hasColor = Boolean(environment?.color);
-        button.classList.toggle('has-color', hasColor);
-        indicator.classList.toggle('is-hidden', !hasColor);
-
-        if (hasColor) {
-            button.style.setProperty('--env-selected-color', environment.color);
-            indicator.style.setProperty('--env-indicator-color', environment.color);
-        } else {
-            button.style.removeProperty('--env-selected-color');
-            indicator.style.removeProperty('--env-indicator-color');
-        }
+        applyEnvButtonColor(button, indicator, environment?.color);
     }
 
     setupEventListeners() {
@@ -85,26 +76,7 @@ export class EnvironmentSelector {
             this.dropdown.innerHTML = '';
 
             environments.forEach(env => {
-                const fragment = templateLoader.cloneSync(
-                    './src/templates/environment/environmentSelector.html',
-                    'tpl-env-dropdown-item'
-                );
-                const item = fragment.firstElementChild;
-                item.className = `env-dropdown-item dropdown-item${env.id === activeEnvId ? ' active is-active' : ''}`;
-
-                const nameEl = item.querySelector('[data-role="name"]');
-                const checkEl = item.querySelector('[data-role="check"]');
-                const colorEl = item.querySelector('[data-role="color"]');
-                if (nameEl) {nameEl.textContent = env.name;}
-                if (checkEl) {checkEl.classList.toggle('is-hidden', env.id !== activeEnvId);}
-                if (colorEl) {
-                    colorEl.classList.toggle('is-hidden', !env.color);
-                    if (env.color) {
-                        colorEl.style.setProperty('--env-indicator-color', env.color);
-                    } else {
-                        colorEl.style.removeProperty('--env-indicator-color');
-                    }
-                }
+                const item = createEnvDropdownItem(env, env.id === activeEnvId);
 
                 item.addEventListener('click', async (e) => {
                     e.stopPropagation();
@@ -134,9 +106,7 @@ export class EnvironmentSelector {
             manageItem.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.closeDropdown();
-                if (this.onManageClick) {
-                    this.onManageClick();
-                }
+                this.onManageClick?.();
             });
 
             this.dropdown.appendChild(manageItem);
@@ -146,9 +116,7 @@ export class EnvironmentSelector {
             this.releaseEscape = pushEscapeHandler(() => this.closeDropdown());
 
             this.positionDropdown();
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     closeDropdown() {
@@ -166,20 +134,13 @@ export class EnvironmentSelector {
         const button = document.getElementById('env-selector-btn');
         if (!button) {return;}
 
-        const rect = button.getBoundingClientRect();
-        this.dropdown.style.setProperty('--env-dropdown-top', `${rect.bottom + 4}px`);
-        this.dropdown.style.setProperty('--env-dropdown-left', `${rect.left}px`);
-        this.dropdown.style.setProperty('--env-dropdown-min-width', `${rect.width}px`);
+        positionEnvDropdown(this.dropdown, button);
     }
 
     async selectEnvironment(environmentId) {
         try {
-            if (this.onEnvironmentSwitch) {
-                await this.onEnvironmentSwitch(environmentId);
-            }
-        } catch (error) {
-            void error;
-        }
+            await this.onEnvironmentSwitch?.(environmentId);
+        } catch {}
     }
 
     setActiveEnvironment(environment) {
@@ -201,8 +162,6 @@ export class EnvironmentSelector {
             if (activeEnvironment) {
                 this.setActiveEnvironment(activeEnvironment);
             }
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 }

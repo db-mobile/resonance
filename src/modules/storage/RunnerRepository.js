@@ -3,6 +3,9 @@
  * @module storage/RunnerRepository
  */
 
+import { clone } from '../utils/clone.js';
+import { generateId } from '../utils/ids.js';
+
 /** @type {RunnerRepository|null} */
 let sharedRepository = null;
 
@@ -165,16 +168,8 @@ export class RunnerRepository {
 
     /** @returns {string} */
     _generateId() {
-        return `runner_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        return generateId('runner');
     }
-}
-
-/**
- * @param {*} value
- * @returns {*}
- */
-function clone(value) {
-    return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
 /**

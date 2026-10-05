@@ -5,6 +5,33 @@ import { attachCopyHandler, attachHeadersCopyHandler } from './copyHandler.js';
 import { attachSaveResponseHandler } from './responseSaver.js';
 import { PreviewManager } from './PreviewManager.js';
 
+const PANEL_ROLES = [
+    'response-body',
+    'response-headers',
+    'response-metadata',
+    'response-cookies',
+    'response-trailers',
+    'response-performance',
+    'response-scripts'
+];
+
+const TAB_SCOPED_SELECTORS = [
+    '.language-selector',
+    '.preview-mode-buttons',
+    '.preview-mode-btn',
+    '.copy-response-btn',
+    '.save-response-btn',
+    '.copy-headers-btn',
+    '.response-body-container',
+    '.response-preview-container',
+    '.response-headers-display',
+    '.response-metadata-display',
+    '.response-cookies-display',
+    '.response-trailers-display',
+    '.response-performance-display',
+    '.response-scripts-display'
+];
+
 export class ResponseContainerManager {
     constructor(previewRepository) {
         this.parentContainer = document.getElementById('workspace-response-container');
@@ -83,31 +110,12 @@ export class ResponseContainerManager {
         const wrapper = fragment.firstElementChild;
         wrapper.dataset.tabId = tabId;
 
-        const bodyPanel = wrapper.querySelector('[data-role="response-body"]');
-        bodyPanel.id = `response-body-${tabId}`;
-        wrapper.querySelector('[data-role="response-headers"]').id = `response-headers-${tabId}`;
-        wrapper.querySelector('[data-role="response-metadata"]').id = `response-metadata-${tabId}`;
-        wrapper.querySelector('[data-role="response-cookies"]').id = `response-cookies-${tabId}`;
-        wrapper.querySelector('[data-role="response-trailers"]').id = `response-trailers-${tabId}`;
-        wrapper.querySelector('[data-role="response-performance"]').id = `response-performance-${tabId}`;
-        wrapper.querySelector('[data-role="response-scripts"]').id = `response-scripts-${tabId}`;
-
-        wrapper.querySelector('.language-selector').dataset.tabId = tabId;
-        wrapper.querySelector('.preview-mode-buttons').dataset.tabId = tabId;
-        wrapper.querySelectorAll('.preview-mode-btn').forEach(btn => btn.dataset.tabId = tabId);
-        wrapper.querySelector('.copy-response-btn').dataset.tabId = tabId;
-        const saveBtn = wrapper.querySelector('.save-response-btn');
-        if (saveBtn) { saveBtn.dataset.tabId = tabId; }
-        const headersCopyBtn = wrapper.querySelector('.copy-headers-btn');
-        if (headersCopyBtn) { headersCopyBtn.dataset.tabId = tabId; }
-        wrapper.querySelector('.response-body-container').dataset.tabId = tabId;
-        wrapper.querySelector('.response-preview-container').dataset.tabId = tabId;
-        wrapper.querySelector('.response-headers-display').dataset.tabId = tabId;
-        wrapper.querySelector('.response-metadata-display').dataset.tabId = tabId;
-        wrapper.querySelector('.response-cookies-display').dataset.tabId = tabId;
-        wrapper.querySelector('.response-trailers-display').dataset.tabId = tabId;
-        wrapper.querySelector('.response-performance-display').dataset.tabId = tabId;
-        wrapper.querySelector('.response-scripts-display').dataset.tabId = tabId;
+        for (const role of PANEL_ROLES) {
+            wrapper.querySelector(`[data-role="${role}"]`).id = `${role}-${tabId}`;
+        }
+        wrapper.querySelectorAll(TAB_SCOPED_SELECTORS.join(', ')).forEach((el) => {
+            el.dataset.tabId = tabId;
+        });
 
         this.parentContainer.appendChild(wrapper);
 
@@ -159,16 +167,8 @@ export class ResponseContainerManager {
         if (copyBtn) {
             attachCopyHandler(copyBtn, tabId);
         }
-
-        const saveResponseBtn = wrapper.querySelector('.save-response-btn');
-        if (saveResponseBtn) {
-            attachSaveResponseHandler(saveResponseBtn, tabId);
-        }
-
-        const copyHeadersBtn = wrapper.querySelector('.copy-headers-btn');
-        if (copyHeadersBtn) {
-            attachHeadersCopyHandler(copyHeadersBtn, tabId);
-        }
+        attachSaveResponseHandler(wrapper.querySelector('.save-response-btn'), tabId);
+        attachHeadersCopyHandler(wrapper.querySelector('.copy-headers-btn'), tabId);
 
         return {
             wrapper,

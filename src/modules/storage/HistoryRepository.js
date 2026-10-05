@@ -161,8 +161,7 @@ export class HistoryRepository {
             if (typeof settings.historyLimit === 'number' && settings.historyLimit >= 10) {
                 return settings.historyLimit;
             }
-        } catch (e) {
-            void e;
+        } catch {
         }
         return this.MAX_HISTORY_ITEMS;
     }
@@ -172,8 +171,7 @@ export class HistoryRepository {
         await this._writeQueue;
         try {
             return [...await this._load()];
-        } catch (error) {
-            void error;
+        } catch {
             return [];
         }
     }
@@ -201,19 +199,6 @@ export class HistoryRepository {
 
     /**
      * @param {string} id
-     * @returns {Promise<Object|null>}
-     */
-    async getById(id) {
-        try {
-            const history = await this.getAll();
-            return history.find(entry => entry.id === id);
-        } catch (error) {
-            return null;
-        }
-    }
-
-    /**
-     * @param {string} id
      * @returns {Promise<boolean>}
      */
     async delete(id) {
@@ -232,21 +217,6 @@ export class HistoryRepository {
             return true;
         } catch (error) {
             throw new Error(`Failed to clear history: ${error.message}`, { cause: error });
-        }
-    }
-
-    /**
-     * @param {string} collectionId
-     * @returns {Promise<Array<Object>>}
-     */
-    async getByCollection(collectionId) {
-        try {
-            const history = await this.getAll();
-            return history.filter(entry =>
-                entry.request.collectionId === collectionId
-            );
-        } catch (error) {
-            return [];
         }
     }
 

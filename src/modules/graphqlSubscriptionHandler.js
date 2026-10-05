@@ -176,9 +176,7 @@ async function handleProtocolMessage(tabId, entry, msg) {
             await session.updateStatus(tabId, 'Subscription complete', null);
             try {
                 await window.backendAPI?.graphqlSubscription?.close(tabId);
-            } catch (_e) {
-                void _e;
-            }
+            } catch {}
             await refreshRunButton(tabId, false);
             return;
         }
@@ -274,9 +272,7 @@ export async function handleGraphQLSubscriptionCancel() {
             await sendFrame(tabId, entry, buildComplete(SUB_ID));
         }
         await window.backendAPI.graphqlSubscription.close(tabId);
-    } catch (_e) {
-        void _e;
-    }
+    } catch {}
 
     session.set(tabId, { ...entry, state: 'closed' });
     await session.updateStatus(tabId, 'Subscription stopped', null);
@@ -299,9 +295,7 @@ export async function clearGraphQLSubscriptionState(tabId) {
     if (window.backendAPI?.graphqlSubscription && tabId) {
         try {
             await window.backendAPI.graphqlSubscription.close(tabId);
-        } catch (_e) {
-            void _e;
-        }
+        } catch {}
     }
     session.remove(tabId);
 }

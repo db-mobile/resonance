@@ -650,5 +650,12 @@
     "live_hint": "Open streaming connections. Click to jump to a tab.",
     "keychain_unavailable": "Secrets unencrypted",
     "keychain_hint": "No OS keychain available. Secrets are stored locally without encryption at rest."
+  },
+  "data_migration": {
+    "title": "Data conversion",
+    "failed": "Converting your data to the current format failed at \"{{step}}\": {{message}}. Nothing was removed, and the conversion runs again the next time Resonance starts.",
+    "too_old": "Your data was saved by a Resonance release this version can no longer convert, so it was left unchanged. Install Resonance {{release}}, start it once, then update again.",
+    "global_store_collections": "Collections saved by a Resonance release from before March 2026 are still in your settings. This version can no longer convert them, so they were left unchanged. Install Resonance {{release}}, start it once, then update again.",
+    "unknown": "Your data could not be fully converted to the current format."
   }
 }

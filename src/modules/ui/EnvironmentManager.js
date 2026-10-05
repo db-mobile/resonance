@@ -2,6 +2,13 @@ import { templateLoader } from '../templateLoader.js';
 import { DynamicVariablesReferenceDialog } from './DynamicVariablesReferenceDialog.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
 import { pushEscapeHandler } from './modalEscape.js';
+import { applySecretState as applyRowSecretState, toggleRevealed } from './secretToggle.js';
+
+const SECRET_ROW_SELECTORS = Object.freeze({
+    valueInput: '.var-value-input',
+    secretBtn: '.var-secret-btn',
+    revealBtn: '.var-reveal-btn'
+});
 
 export class EnvironmentManager {
     constructor(environmentService) {
@@ -34,8 +41,7 @@ export class EnvironmentManager {
                 'tpl-environment-manager-dialog-content'
             );
             dialogContent.appendChild(fragment);
-        } catch (error) {
-            void error;
+        } catch {
             return;
         }
 
@@ -54,17 +60,17 @@ export class EnvironmentManager {
         const exportAllBtn = this.dialog.querySelector('#env-export-all-btn');
 
         createBtn.addEventListener('click', () => this.handleCreateEnvironment());
-        closeBtn.addEventListener('click', () => this.close(true));
+        closeBtn.addEventListener('click', () => this.close());
         importBtn.addEventListener('click', () => this.handleImport());
         exportAllBtn.addEventListener('click', () => this.handleExportAll());
 
         this.dialog.addEventListener('click', (e) => {
             if (e.target === this.dialog) {
-                this.close(true);
+                this.close();
             }
         });
 
-        this.releaseEscape = pushEscapeHandler(() => this.close(true));
+        this.releaseEscape = pushEscapeHandler(() => this.close());
     }
 
     async loadEnvironments() {
@@ -84,9 +90,7 @@ export class EnvironmentManager {
             if (envToSelect) {
                 await this.selectEnvironment(envToSelect);
             }
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     createEnvironmentListItem(environment, isActive) {
@@ -168,64 +172,81 @@ export class EnvironmentManager {
                 nameInput.value = environment.name;
             }
 
+            this._renderColorState(environment.color);
             const colorInput = detailsContainer.querySelector('#env-color-input');
-            const colorValue = detailsContainer.querySelector('#env-color-value');
-            const clearColorBtn = detailsContainer.querySelector('#env-color-clear-btn');
             if (colorInput) {
-                colorInput.value = environment.color || '#4F46E5';
                 colorInput.dataset.savedColor = environment.color || '';
-            }
-            if (colorValue) {
-                colorValue.textContent = environment.color || 'None';
-            }
-            if (clearColorBtn) {
-                clearColorBtn.disabled = !environment.color;
             }
 
             this.setupDetailEventListeners(environment);
 
             this.loadVariables(environment);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
-    setupDetailEventListeners(environment) {
-        const nameInput = this.dialog.querySelector('#env-name-input');
-        const setActiveBtn = this.dialog.querySelector('#env-set-active-btn');
-        const duplicateBtn = this.dialog.querySelector('#env-duplicate-btn');
-        const exportBtn = this.dialog.querySelector('#env-export-btn');
-        const deleteBtn = this.dialog.querySelector('#env-delete-btn');
-        const addVariableBtn = this.dialog.querySelector('#env-add-variable-btn');
-        const dynamicVarsBtn = this.dialog.querySelector('#env-dynamic-vars-btn');
+    /**
+     * @param {string|null|undefined} color
+     * @returns {void}
+     */
+    _renderColorState(color) {
         const colorInput = this.dialog.querySelector('#env-color-input');
         const colorValue = this.dialog.querySelector('#env-color-value');
         const clearColorBtn = this.dialog.querySelector('#env-color-clear-btn');
+        if (colorInput) {
+            colorInput.value = color || '#4F46E5';
+        }
+        if (colorValue) {
+            colorValue.textContent = color || 'None';
+        }
+        if (clearColorBtn) {
+            clearColorBtn.disabled = !color;
+        }
+    }
 
+    /** @param {Object} environment */
+    setupDetailEventListeners(environment) {
+        const dynamicVarsBtn = this.dialog.querySelector('#env-dynamic-vars-btn');
         if (dynamicVarsBtn) {
             dynamicVarsBtn.addEventListener('click', () => new DynamicVariablesReferenceDialog().show());
         }
 
-        if (nameInput) {
-            nameInput.addEventListener('blur', async () => {
-                const newName = nameInput.value.trim();
-                if (newName && newName !== environment.name) {
-                    try {
-                        await this.service.updateEnvironment(environment.id, { name: newName });
-                        await this.loadEnvironments();
-                    } catch (error) {
-                        this.showAlert(error.message);
-                        nameInput.value = environment.name;
-                    }
-                }
-            });
+        this._wireNameInput(environment);
+        this._wireColorControls(environment);
+        this._wireEnvironmentActions(environment);
+    }
 
-            nameInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    nameInput.blur();
-                }
-            });
+    /** @param {Object} environment */
+    _wireNameInput(environment) {
+        const nameInput = this.dialog.querySelector('#env-name-input');
+        if (!nameInput) {
+            return;
         }
+
+        nameInput.addEventListener('blur', async () => {
+            const newName = nameInput.value.trim();
+            if (newName && newName !== environment.name) {
+                try {
+                    await this.service.updateEnvironment(environment.id, { name: newName });
+                    await this.loadEnvironments();
+                } catch (error) {
+                    this.showAlert(error.message);
+                    nameInput.value = environment.name;
+                }
+            }
+        });
+
+        nameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                nameInput.blur();
+            }
+        });
+    }
+
+    /** @param {Object} environment */
+    _wireColorControls(environment) {
+        const colorInput = this.dialog.querySelector('#env-color-input');
+        const colorValue = this.dialog.querySelector('#env-color-value');
+        const clearColorBtn = this.dialog.querySelector('#env-color-clear-btn');
 
         const saveColor = async (nextColor) => {
             try {
@@ -238,15 +259,7 @@ export class EnvironmentManager {
                 await this.loadEnvironmentDetails(environment.id);
             } catch (error) {
                 this.showAlert(error.message);
-                if (colorInput) {
-                    colorInput.value = environment.color || '#4F46E5';
-                }
-                if (colorValue) {
-                    colorValue.textContent = environment.color || 'None';
-                }
-                if (clearColorBtn) {
-                    clearColorBtn.disabled = !environment.color;
-                }
+                this._renderColorState(environment.color);
             }
         };
 
@@ -274,16 +287,19 @@ export class EnvironmentManager {
                     return;
                 }
 
-                if (colorInput) {
-                    colorInput.value = '#4F46E5';
-                }
-                if (colorValue) {
-                    colorValue.textContent = 'None';
-                }
-                clearColorBtn.disabled = true;
+                this._renderColorState(null);
                 await saveColor(null);
             });
         }
+    }
+
+    /** @param {Object} environment */
+    _wireEnvironmentActions(environment) {
+        const setActiveBtn = this.dialog.querySelector('#env-set-active-btn');
+        const duplicateBtn = this.dialog.querySelector('#env-duplicate-btn');
+        const exportBtn = this.dialog.querySelector('#env-export-btn');
+        const deleteBtn = this.dialog.querySelector('#env-delete-btn');
+        const addVariableBtn = this.dialog.querySelector('#env-add-variable-btn');
 
         if (setActiveBtn) {
             setActiveBtn.addEventListener('click', async () => {
@@ -312,8 +328,8 @@ export class EnvironmentManager {
         if (exportBtn) {
             exportBtn.addEventListener('click', async () => {
                 try {
-                    const data = await this.service.exportEnvironment(environment.id);
-                    const json = JSON.stringify(data, null, 2);
+                    const exported = await this.service.exportEnvironment(environment.id);
+                    const json = JSON.stringify(exported, null, 2);
                     const filename = `${environment.name.replace(/[^a-z0-9]/gi, '_')}_environment.json`;
                     await this.saveJsonExport(
                         filename,
@@ -400,10 +416,7 @@ export class EnvironmentManager {
                 this.updateVariablesEmptyState();
                 return row;
             })
-            .catch((error) => {
-                void error;
-                return null;
-            });
+            .catch(() => null);
     }
 
     /**
@@ -411,27 +424,8 @@ export class EnvironmentManager {
      * @param {boolean} isSecret
      */
     applySecretState(row, isSecret) {
-        const valueInput = row.querySelector('.var-value-input');
-        const secretBtn = row.querySelector('.var-secret-btn');
-        const revealBtn = row.querySelector('.var-reveal-btn');
-
-        row.dataset.secret = isSecret ? 'true' : 'false';
-        if (secretBtn) {
-            secretBtn.classList.toggle('is-secret', isSecret);
-            secretBtn.setAttribute('aria-pressed', String(isSecret));
-        }
-        if (revealBtn) {revealBtn.classList.toggle('is-hidden', !isSecret);}
-        if (valueInput) {
-            valueInput.type = isSecret ? 'password' : 'text';
-        }
-        if (revealBtn) {
-            const icon = revealBtn.querySelector('.icon');
-            if (icon) {
-                icon.classList.toggle('icon-eye', true);
-                icon.classList.toggle('icon-eye-off', false);
-            }
-            revealBtn.title = 'Show value';
-        }
+        const { secretBtn } = applyRowSecretState(row, isSecret, SECRET_ROW_SELECTORS);
+        secretBtn?.setAttribute('aria-pressed', String(isSecret));
     }
 
     setupVariableRowListeners(row, originalName) {
@@ -487,16 +481,7 @@ export class EnvironmentManager {
         }
 
         if (revealBtn) {
-            revealBtn.addEventListener('click', () => {
-                const showing = valueInput.type === 'text';
-                valueInput.type = showing ? 'password' : 'text';
-                const icon = revealBtn.querySelector('.icon');
-                if (icon) {
-                    icon.classList.toggle('icon-eye', showing);
-                    icon.classList.toggle('icon-eye-off', !showing);
-                }
-                revealBtn.title = showing ? 'Show value' : 'Hide value';
-            });
+            revealBtn.addEventListener('click', () => toggleRevealed(valueInput, revealBtn));
         }
 
         deleteBtn.addEventListener('click', async () => {
@@ -595,8 +580,7 @@ export class EnvironmentManager {
                     input.focus();
                     input.select();
                 })
-                .catch((error) => {
-                    void error;
+                .catch(() => {
                     resolve(null);
                 });
         });
@@ -649,9 +633,7 @@ export class EnvironmentManager {
                     if (e.target === overlay) {cleanup();}
                 });
             })
-            .catch((error) => {
-                void error;
-            });
+            .catch(() => {});
     }
 
     async handleImport() {
@@ -670,9 +652,9 @@ export class EnvironmentManager {
                 if (!file) {return;}
 
                 const text = await file.text();
-                const data = JSON.parse(text);
+                const parsed = JSON.parse(text);
 
-                await this.service.importEnvironments(data, merge);
+                await this.service.importEnvironments(parsed, merge);
                 await this.loadEnvironments();
             } catch (error) {
                 this.showAlert(`Error importing environments: ${error.message}`);
@@ -684,8 +666,8 @@ export class EnvironmentManager {
 
     async handleExportAll() {
         try {
-            const data = await this.service.exportAllEnvironments();
-            const json = JSON.stringify(data, null, 2);
+            const exported = await this.service.exportAllEnvironments();
+            const json = JSON.stringify(exported, null, 2);
             await this.saveJsonExport(
                 `resonance_environments_${Date.now()}.json`,
                 json
@@ -697,17 +679,14 @@ export class EnvironmentManager {
 
     async saveJsonExport(filename, json) {
         if (window.backendAPI?.environments?.saveJsonExport) {
-            const result = await window.backendAPI.environments.saveJsonExport(filename, json);
-            if (result?.cancelled) {
-                return false;
-            }
-            return true;
+            await window.backendAPI.environments.saveJsonExport(filename, json);
+            return;
         }
 
         throw new Error('Native export is not available in this runtime');
     }
 
-    close(changed = false) {
+    close() {
         if (this.releaseEscape) {
             this.releaseEscape();
             this.releaseEscape = null;
@@ -719,7 +698,7 @@ export class EnvironmentManager {
         }
 
         if (this.resolve) {
-            this.resolve(changed);
+            this.resolve(true);
         }
     }
 }

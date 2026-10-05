@@ -49,6 +49,7 @@ import { CollectionRepository } from './modules/storage/CollectionRepository.js'
 import { loadEditor, warmEditors } from './modules/editorLoader.js';
 import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
 import { toast } from './modules/ui/Toast.js';
+import { showDataMigrationIssues } from './modules/ui/MigrationNoticeDialog.js';
 
 app.getApiHandlerSettingsCache = getSettingsCache;
 app.invalidateApiHandlerEnvironmentCache = invalidateEnvironmentCache;
@@ -144,29 +145,29 @@ async function handleSaveShortcut() {
             ...state.request
         };
 
-        const result = await saveRequestToCollection(requestData);
-        if (!result) {
+        const saved = await saveRequestToCollection(requestData);
+        if (!saved) {
             return;
         }
 
         setCurrentEndpoint({
-            collectionId: result.collectionId,
-            endpointId: result.endpointId
+            collectionId: saved.collectionId,
+            endpointId: saved.endpointId
         });
         await controller.service.updateTab(activeTab.id, {
-            name: result.name,
+            name: saved.name,
             endpoint: {
-                collectionId: result.collectionId,
-                endpointId: result.endpointId,
+                collectionId: saved.collectionId,
+                endpointId: saved.endpointId,
                 protocol: state.request.protocol || 'http'
             }
         });
-        controller.tabBar.updateTab(activeTab.id, { name: result.name });
+        controller.tabBar.updateTab(activeTab.id, { name: saved.name });
         await controller.markCurrentTabUnmodified();
 
-        toast.success(result.collectionName
-            ? `Saved "${result.name}" to ${result.collectionName}`
-            : `Saved "${result.name}"`);
+        toast.success(saved.collectionName
+            ? `Saved "${saved.name}" to ${saved.collectionName}`
+            : `Saved "${saved.name}"`);
     } catch (error) {
         toast.error(`Save failed: ${error.message || String(error)}`);
     }
@@ -187,11 +188,6 @@ function setHistoryVisible(show) {
     historySidebar.classList.toggle('visible', visible);
     historyResizerHandle.classList.toggle('visible', visible);
     historyToggleBtn?.classList.toggle('active', visible);
-}
-
-/** @returns {void} */
-function toggleHistorySidebar() {
-    setHistoryVisible();
 }
 
 /** @param {number} delta */
@@ -228,7 +224,7 @@ const REQUEST_TAB_SHORTCUTS = [
 
 const SHORTCUTS = [
     {
-        key: 'Enter', ctrl: true, category: 'Request', description: 'Send request',
+        key: 'Enter', ctrl: true, category: 'Request', description: 'Send request', hintTarget: 'send-request-btn',
         handler: () => {
             if (sendRequestBtn && !sendRequestBtn.disabled) {
                 handleSendRequest();
@@ -240,7 +236,7 @@ const SHORTCUTS = [
         handler: () => handleSaveShortcut()
     },
     {
-        key: 'Escape', category: 'Request', description: 'Cancel request',
+        key: 'Escape', category: 'Request', description: 'Cancel request', hintTarget: 'cancel-request-btn',
         handler: () => {
             if (cancelRequestBtn && !cancelRequestBtn.disabled && cancelRequestBtn.style.display !== 'none') {
                 handleCancelRequest();
@@ -257,11 +253,11 @@ const SHORTCUTS = [
         }
     },
     {
-        key: 'KeyH', ctrl: true, category: 'Navigation', description: 'Toggle history sidebar',
-        handler: toggleHistorySidebar
+        key: 'KeyH', ctrl: true, category: 'Navigation', description: 'Toggle history sidebar', hintTarget: 'history-toggle-btn',
+        handler: () => setHistoryVisible()
     },
     {
-        key: 'KeyJ', ctrl: true, category: 'Navigation', description: 'Open cookie jar',
+        key: 'KeyJ', ctrl: true, category: 'Navigation', description: 'Open cookie jar', hintTarget: 'cookie-jar-btn',
         handler: () => {
             if (app.cookieController) {
                 app.cookieController.openCookieManager();
@@ -269,7 +265,7 @@ const SHORTCUTS = [
         }
     },
     {
-        key: 'KeyK', ctrl: true, category: 'Actions', description: 'Generate cURL command',
+        key: 'KeyK', ctrl: true, category: 'Actions', description: 'Generate cURL command', hintTarget: 'curl-btn',
         handler: () => {
             if (curlBtn) {
                 handleGenerateCurl();
@@ -277,7 +273,7 @@ const SHORTCUTS = [
         }
     },
     {
-        key: 'KeyO', ctrl: true, category: 'Actions', description: 'Import collection file',
+        key: 'KeyO', ctrl: true, category: 'Actions', description: 'Import collection file', hintTarget: 'import-collection-btn',
         handler: () => {
             if (importCollectionBtn) {
                 importCollectionFile();
@@ -293,7 +289,7 @@ const SHORTCUTS = [
         }
     },
     {
-        key: 'Comma', ctrl: true, category: 'Settings', description: 'Open settings',
+        key: 'Comma', ctrl: true, category: 'Settings', description: 'Open settings', hintTarget: 'settings-btn',
         handler: () => {
             if (settingsModal) {
                 settingsModal.show();
@@ -343,7 +339,7 @@ const WORKSPACE_TAB_SHORTCUTS = [
 function initKeyboardShortcuts() {
     keyboardShortcuts.init();
 
-    for (const { key, ...options } of SHORTCUTS) {
+    for (const { key, hintTarget: _hintTarget, ...options } of SHORTCUTS) {
         keyboardShortcuts.register(key, options);
     }
 
@@ -376,18 +372,8 @@ function initKeyboardShortcuts() {
 }
 
 function applyShortcutHints() {
-    const hints = [
-        { id: 'send-request-btn', key: 'Enter', ctrl: true },
-        { id: 'cancel-request-btn', key: 'Escape' },
-        { id: 'curl-btn', key: 'KeyK', ctrl: true },
-        { id: 'import-collection-btn', key: 'KeyO', ctrl: true },
-        { id: 'history-toggle-btn', key: 'KeyH', ctrl: true },
-        { id: 'cookie-jar-btn', key: 'KeyJ', ctrl: true },
-        { id: 'settings-btn', key: 'Comma', ctrl: true },
-    ];
-
-    for (const { id, key, ctrl = false } of hints) {
-        const el = document.getElementById(id);
+    for (const { hintTarget, key, ctrl = false } of SHORTCUTS) {
+        const el = hintTarget ? document.getElementById(hintTarget) : null;
         if (!el) { continue; }
         const display = keyboardShortcuts.lookupDisplayKey(key, ctrl);
         if (!display) { continue; }
@@ -399,6 +385,75 @@ function applyShortcutHints() {
             el.title = currentTitle ? `${currentTitle} (${display})` : display;
         }
     }
+}
+
+/**
+ * @param {HTMLElement|null} container
+ * @param {Object} options
+ * @param {((content: string) => void)|null} changeCallback
+ * @returns {Object}
+ */
+function createLazyEditor(container, options, changeCallback) {
+    let instance = null;
+    let loadStarted = false;
+    let destroyed = false;
+    let pendingContent = null;
+
+    function ensure() {
+        if (instance || destroyed || !container || loadStarted) { return; }
+        loadStarted = true;
+        loadEditor('requestBody').then((RequestBodyEditor) => {
+            if (destroyed) { return; }
+            instance = new RequestBodyEditor(container, options);
+            if (pendingContent !== null) {
+                instance.setContent(pendingContent);
+                pendingContent = null;
+            }
+            if (changeCallback) {
+                instance.onChange(changeCallback);
+            }
+        });
+    }
+
+    return {
+        setContent(content) {
+            if (instance) { instance.setContent(content); }
+            else { pendingContent = content; ensure(); }
+        },
+        getContent() { return instance ? instance.getContent() : (pendingContent ?? ''); },
+        clear() {
+            if (instance) { instance.clear(); }
+            else { pendingContent = ''; }
+        },
+        onChange(cb) {
+            changeCallback = cb;
+            if (instance) { instance.onChange(cb); }
+        },
+        formatJSONWithFeedback() { instance?.formatJSONWithFeedback(); },
+        focus() {
+            if (instance) { instance.focus(); }
+            else { ensure(); }
+        },
+        ensure() { ensure(); },
+        destroy() { instance?.destroy(); instance = null; destroyed = true; pendingContent = null; }
+    };
+}
+
+/**
+ * @param {Object|null} editor
+ * @param {HTMLTextAreaElement|null} input
+ * @param {(flag: boolean) => void} setFlag
+ * @returns {void}
+ */
+function seedEditor(editor, input, setFlag) {
+    if (!editor || !input || !input.value) {
+        return;
+    }
+    setFlag(true);
+    editor.setContent(input.value);
+    setTimeout(() => {
+        setFlag(false);
+    }, 0);
 }
 
 /**
@@ -510,7 +565,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    document.getElementById('history-toggle-btn')?.addEventListener('click', toggleHistorySidebar);
+    document.getElementById('history-toggle-btn')?.addEventListener('click', () => setHistoryVisible());
     document.getElementById('close-history-btn')?.addEventListener('click', () => setHistoryVisible(false));
 
     const cookieJarBtn = document.getElementById('cookie-jar-btn');
@@ -579,52 +634,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isInitializingEditor = false;
     let isInitializingGrpcEditor = false;
 
-    function createLazyEditor(container, options, changeCallback) {
-        let instance = null;
-        let loadStarted = false;
-        let destroyed = false;
-        let pendingContent = null;
-
-        function ensure() {
-            if (instance || destroyed || !container || loadStarted) { return; }
-            loadStarted = true;
-            loadEditor('requestBody').then((RequestBodyEditor) => {
-                if (destroyed) { return; }
-                instance = new RequestBodyEditor(container, options);
-                if (pendingContent !== null) {
-                    instance.setContent(pendingContent);
-                    pendingContent = null;
-                }
-                if (changeCallback) {
-                    instance.onChange(changeCallback);
-                }
-            });
-        }
-
-        return {
-            setContent(content) {
-                if (instance) { instance.setContent(content); }
-                else { pendingContent = content; ensure(); }
-            },
-            getContent() { return instance ? instance.getContent() : (pendingContent ?? ''); },
-            clear() {
-                if (instance) { instance.clear(); }
-                else { pendingContent = ''; }
-            },
-            onChange(cb) {
-                changeCallback = cb;
-                if (instance) { instance.onChange(cb); }
-            },
-            formatJSONWithFeedback() { instance?.formatJSONWithFeedback(); },
-            focus() {
-                if (instance) { instance.focus(); }
-                else { ensure(); }
-            },
-            ensure() { ensure(); },
-            destroy() { instance?.destroy(); instance = null; destroyed = true; pendingContent = null; }
-        };
-    }
-
     let requestBodyEditor = null;
     if (bodyEditorContainer) {
         requestBodyEditor = createLazyEditor(bodyEditorContainer, {}, (content) => {
@@ -663,21 +672,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await workspaceTabController.initialize();
 
-    if (requestBodyEditor && bodyInput && bodyInput.value) {
-        isInitializingEditor = true;
-        requestBodyEditor.setContent(bodyInput.value);
-        setTimeout(() => {
-            isInitializingEditor = false;
-        }, 0);
-    }
-
-    if (grpcBodyEditor && grpcBodyInput && grpcBodyInput.value) {
-        isInitializingGrpcEditor = true;
-        grpcBodyEditor.setContent(grpcBodyInput.value);
-        setTimeout(() => {
-            isInitializingGrpcEditor = false;
-        }, 0);
-    }
+    seedEditor(requestBodyEditor, bodyInput, (flag) => {
+        isInitializingEditor = flag;
+    });
+    seedEditor(grpcBodyEditor, grpcBodyInput, (flag) => {
+        isInitializingGrpcEditor = flag;
+    });
 
     initTabListeners();
 
@@ -756,16 +756,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await initGrpcStreamHandler();
 
         try {
-            if (window.backendAPI?.collections?.needsMigration) {
-                const needsMigration = await window.backendAPI.collections.needsMigration();
-                if (needsMigration) {
-                    updateStatusDisplay('Migrating collections to new format...', null);
-                    const migratedCount = await window.backendAPI.collections.migrate();
-                    if (migratedCount > 0) {
-                        updateStatusDisplay(`Migrated ${migratedCount} collection(s) to new format`, null);
-                    }
-                }
-            }
+            await showDataMigrationIssues();
         } catch (error) {
             toast.error(`Migration check failed: ${error.message}`);
         }
@@ -783,9 +774,7 @@ window.addEventListener('beforeunload', async (_e) => {
             const currentState = await workspaceTabStateManager.captureCurrentState();
             await workspaceTabService.updateTab(activeTabId, currentState);
         }
-    } catch (error) {
-        void error;
-    }
+    } catch {}
 });
 
 async function checkForUpdatesOnLaunch() {
@@ -809,7 +798,5 @@ async function checkForUpdatesOnLaunch() {
             const message = app.i18n?.t('settings.update_available', { version: update.version }) || `Update available: v${update.version}`;
             toast.info(message);
         }
-    } catch (error) {
-        void error;
-    }
+    } catch {}
 }

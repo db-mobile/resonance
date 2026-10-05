@@ -5,6 +5,9 @@
 
 import { endpointKey } from '../collections/collectionTree.js';
 
+/** @type {ReadonlyArray<'endpointDelays'|'customResponses'|'customStatusCodes'>} */
+const KEYED_MAPS = Object.freeze(['endpointDelays', 'customResponses', 'customStatusCodes']);
+
 export class MockServerRepository {
     /** @param {Object} backendAPI */
     constructor(backendAPI) {
@@ -32,16 +35,10 @@ export class MockServerRepository {
                 validatedData.enabledCollections = [];
             }
 
-            if (!validatedData.endpointDelays || typeof validatedData.endpointDelays !== 'object') {
-                validatedData.endpointDelays = {};
-            }
-
-            if (!validatedData.customResponses || typeof validatedData.customResponses !== 'object') {
-                validatedData.customResponses = {};
-            }
-
-            if (!validatedData.customStatusCodes || typeof validatedData.customStatusCodes !== 'object') {
-                validatedData.customStatusCodes = {};
+            for (const mapName of KEYED_MAPS) {
+                if (!validatedData[mapName] || typeof validatedData[mapName] !== 'object') {
+                    validatedData[mapName] = {};
+                }
             }
 
             return validatedData;
@@ -81,25 +78,13 @@ export class MockServerRepository {
                 ...updates
             };
 
-            if (updates.endpointDelays) {
-                updatedSettings.endpointDelays = {
-                    ...currentSettings.endpointDelays,
-                    ...updates.endpointDelays
-                };
-            }
-
-            if (updates.customResponses) {
-                updatedSettings.customResponses = {
-                    ...currentSettings.customResponses,
-                    ...updates.customResponses
-                };
-            }
-
-            if (updates.customStatusCodes) {
-                updatedSettings.customStatusCodes = {
-                    ...currentSettings.customStatusCodes,
-                    ...updates.customStatusCodes
-                };
+            for (const mapName of KEYED_MAPS) {
+                if (updates[mapName]) {
+                    updatedSettings[mapName] = {
+                        ...currentSettings[mapName],
+                        ...updates[mapName]
+                    };
+                }
             }
 
             return await this.saveSettings(updatedSettings);
@@ -222,17 +207,6 @@ export class MockServerRepository {
         }
     }
 
-    /** @returns {Promise<Object>} */
-    async resetToDefaults() {
-        try {
-            const defaultSettings = this._getDefaultSettings();
-            await this.backendAPI.store.set(this.SETTINGS_KEY, defaultSettings);
-            return defaultSettings;
-        } catch (error) {
-            throw new Error(`Failed to reset mock server settings: ${error.message}`, { cause: error });
-        }
-    }
-
     /**
      * @param {Object} settings
      * @returns {Object}
@@ -245,10 +219,43 @@ export class MockServerRepository {
             enabledCollections: Array.isArray(settings.enabledCollections)
                 ? settings.enabledCollections.filter(id => typeof id === 'string' && id.trim())
                 : defaults.enabledCollections,
-            endpointDelays: this._validateEndpointDelays(settings.endpointDelays),
-            customResponses: this._validateCustomResponses(settings.customResponses),
-            customStatusCodes: this._validateCustomStatusCodes(settings.customStatusCodes)
+            endpointDelays: this._filterIntMap(settings.endpointDelays, value => this._validateDelay(value)),
+            customResponses: this._filterMap(
+                settings.customResponses,
+                value => typeof value === 'object' || typeof value === 'string'
+            ),
+            customStatusCodes: this._filterIntMap(settings.customStatusCodes, value => this._validateStatusCode(value))
         };
+    }
+
+    /**
+     * @param {Object} map
+     * @param {function(*): boolean} keep
+     * @param {function(*): *} [transform]
+     * @returns {Object}
+     */
+    _filterMap(map, keep, transform = (value) => value) {
+        if (!map || typeof map !== 'object') {
+            return {};
+        }
+
+        const filtered = {};
+        for (const [key, value] of Object.entries(map)) {
+            if (typeof key === 'string' && keep(value)) {
+                filtered[key] = transform(value);
+            }
+        }
+
+        return filtered;
+    }
+
+    /**
+     * @param {Object} map
+     * @param {function(*): boolean} isValid
+     * @returns {Object}
+     */
+    _filterIntMap(map, isValid) {
+        return this._filterMap(map, isValid, (value) => parseInt(value, 10));
     }
 
     /**
@@ -267,63 +274,6 @@ export class MockServerRepository {
     _validateDelay(delay) {
         const delayNum = parseInt(delay, 10);
         return !isNaN(delayNum) && delayNum >= 0 && delayNum <= 30000;
-    }
-
-    /**
-     * @param {Object} delays
-     * @returns {Object}
-     */
-    _validateEndpointDelays(delays) {
-        if (!delays || typeof delays !== 'object') {
-            return {};
-        }
-
-        const validatedDelays = {};
-        for (const [key, value] of Object.entries(delays)) {
-            if (typeof key === 'string' && this._validateDelay(value)) {
-                validatedDelays[key] = parseInt(value, 10);
-            }
-        }
-
-        return validatedDelays;
-    }
-
-    /**
-     * @param {Object} responses
-     * @returns {Object}
-     */
-    _validateCustomResponses(responses) {
-        if (!responses || typeof responses !== 'object') {
-            return {};
-        }
-
-        const validatedResponses = {};
-        for (const [key, value] of Object.entries(responses)) {
-            if (typeof key === 'string' && (typeof value === 'object' || typeof value === 'string')) {
-                validatedResponses[key] = value;
-            }
-        }
-
-        return validatedResponses;
-    }
-
-    /**
-     * @param {Object} statusCodes
-     * @returns {Object}
-     */
-    _validateCustomStatusCodes(statusCodes) {
-        if (!statusCodes || typeof statusCodes !== 'object') {
-            return {};
-        }
-
-        const validatedStatusCodes = {};
-        for (const [key, value] of Object.entries(statusCodes)) {
-            if (typeof key === 'string' && this._validateStatusCode(value)) {
-                validatedStatusCodes[key] = parseInt(value, 10);
-            }
-        }
-
-        return validatedStatusCodes;
     }
 
     /**

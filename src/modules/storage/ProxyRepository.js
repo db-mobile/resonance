@@ -3,6 +3,8 @@
  * @module storage/ProxyRepository
  */
 
+import { isValidProxyType, isValidPort, isValidTimeout } from '../utils/proxyValidation.js';
+
 export class ProxyRepository {
     /** @param {Object} backendAPI */
     constructor(backendAPI) {
@@ -62,15 +64,6 @@ export class ProxyRepository {
         }
     }
 
-    /** @returns {Promise<Object>} */
-    async resetToDefaults() {
-        try {
-            return await this.saveProxySettings(this._getDefaultProxySettings());
-        } catch (error) {
-            throw new Error(`Failed to reset proxy settings: ${error.message}`, { cause: error });
-        }
-    }
-
     /**
      * @param {Object} settings
      * @returns {Object}
@@ -81,9 +74,9 @@ export class ProxyRepository {
         return {
             enabled: typeof settings.enabled === 'boolean' ? settings.enabled : defaults.enabled,
             useSystemProxy: typeof settings.useSystemProxy === 'boolean' ? settings.useSystemProxy : defaults.useSystemProxy,
-            type: this._validateProxyType(settings.type) ? settings.type : defaults.type,
+            type: isValidProxyType(settings.type) ? settings.type : defaults.type,
             host: this._sanitizeHost(settings.host),
-            port: this._validatePort(settings.port)
+            port: isValidPort(settings.port)
                 ? Number.parseInt(settings.port, 10)
                 : defaults.port,
             auth: {
@@ -100,37 +93,10 @@ export class ProxyRepository {
             bypassList: Array.isArray(settings.bypassList)
                 ? settings.bypassList.filter(item => typeof item === 'string' && item.trim())
                 : defaults.bypassList,
-            timeout: this._validateTimeout(settings.timeout)
+            timeout: isValidTimeout(settings.timeout)
                 ? Number.parseInt(settings.timeout, 10)
                 : defaults.timeout
         };
-    }
-
-    /**
-     * @param {string} type
-     * @returns {boolean}
-     */
-    _validateProxyType(type) {
-        const validTypes = ['http', 'https', 'socks4', 'socks5'];
-        return validTypes.includes(type);
-    }
-
-    /**
-     * @param {number|string} port
-     * @returns {boolean}
-     */
-    _validatePort(port) {
-        const portNum = parseInt(port, 10);
-        return !isNaN(portNum) && portNum >= 1 && portNum <= 65535;
-    }
-
-    /**
-     * @param {number|string} timeout
-     * @returns {boolean}
-     */
-    _validateTimeout(timeout) {
-        const timeoutNum = parseInt(timeout, 10);
-        return !isNaN(timeoutNum) && timeoutNum >= 0 && timeoutNum <= 300000;
     }
 
     /**

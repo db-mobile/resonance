@@ -348,33 +348,6 @@ describe('WorkspaceTabRepository', () => {
         });
     });
 
-    describe('clearAllTabs', () => {
-        test('should clear all tabs and create default', async () => {
-            const tabs = [
-                { id: 'tab-1', name: 'First' },
-                { id: 'tab-2', name: 'Second' }
-            ];
-            mockBackendAPI.store.get.mockResolvedValue(tabs);
-
-            await repository.clearAllTabs();
-
-            expect(mockBackendAPI.store.set).toHaveBeenCalledTimes(2);
-            const tabsCall = mockBackendAPI.store.set.mock.calls[0];
-            expect(tabsCall[1]).toHaveLength(1);
-            expect(tabsCall[1][0].name).toBe('New Request');
-        });
-
-        test('should set new default tab as active', async () => {
-            mockBackendAPI.store.get.mockResolvedValue([]);
-
-            await repository.clearAllTabs();
-
-            const activeTabCall = mockBackendAPI.store.set.mock.calls[1];
-            expect(activeTabCall[0]).toBe('active-tab-id');
-            expect(activeTabCall[1]).toMatch(/^tab-/);
-        });
-    });
-
     describe('_createDefaultTab', () => {
         test('should create tab with default structure', async () => {
             mockBackendAPI.store.get.mockResolvedValue(null);

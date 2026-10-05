@@ -13,7 +13,8 @@ if (isTauri) {
     
     api = {
         app: {
-            getVersion: () => invoke('app_get_version')
+            getVersion: () => invoke('app_get_version'),
+            migrationStatus: () => invoke('data_migration_status')
         },
         logger: {
             error: (_scope, _message, _meta) => {
@@ -90,8 +91,6 @@ if (isTauri) {
             deleteFolder: (collectionId, folderId) => invoke('collection_delete_folder', { collectionId, folderId }),
             getVariables: (collectionId) => invoke('collection_get_variables', { collectionId }),
             saveVariables: (collectionId, variables) => invoke('collection_save_variables', { collectionId, variables }),
-            needsMigration: () => invoke('collections_needs_migration'),
-            migrate: () => invoke('collections_migrate'),
             getPath: () => invoke('collections_get_path'),
             pickDirectory: (remember = true) => invoke('collections_pick_directory', { remember }),
             pickImportFile: (importKind) => invoke('collections_pick_import_file', { importKind }),

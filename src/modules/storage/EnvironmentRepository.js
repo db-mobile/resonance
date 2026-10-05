@@ -3,6 +3,8 @@
  * @module storage/EnvironmentRepository
  */
 
+import { generateId } from '../utils/ids.js';
+
 export class EnvironmentRepository {
     /**
      * @param {Object} backendAPI
@@ -143,13 +145,21 @@ export class EnvironmentRepository {
 
     /** @returns {Promise<Object|null>} */
     async getActiveEnvironment() {
-        try {
-            const activeId = await this.getActiveEnvironmentId();
-            if (!activeId) {return null;}
-            return await this.getEnvironmentById(activeId);
-        } catch (error) {
-            return null;
+        const activeId = await this.getActiveEnvironmentId();
+        if (!activeId) {return null;}
+        return this.getEnvironmentById(activeId);
+    }
+
+    /**
+     * @param {string} environmentId
+     * @returns {Promise<Object>}
+     */
+    async _requireEnvironment(environmentId) {
+        const environment = await this.getEnvironmentById(environmentId);
+        if (!environment) {
+            throw new Error(`Environment with ID ${environmentId} not found`);
         }
+        return environment;
     }
 
     /**
@@ -259,10 +269,7 @@ export class EnvironmentRepository {
      */
     async duplicateEnvironment(environmentId, newName) {
         try {
-            const environment = await this.getEnvironmentById(environmentId);
-            if (!environment) {
-                throw new Error(`Environment with ID ${environmentId} not found`);
-            }
+            const environment = await this._requireEnvironment(environmentId);
 
             const duplicate = await this.createEnvironment(
                 newName || `${environment.name} (Copy)`,
@@ -291,10 +298,7 @@ export class EnvironmentRepository {
      * @returns {Promise<Object>}
      */
     async setEnvironmentVariable(environmentId, name, value, isSecret = false) {
-        const env = await this.getEnvironmentById(environmentId);
-        if (!env) {
-            throw new Error(`Environment with ID ${environmentId} not found`);
-        }
+        const env = await this._requireEnvironment(environmentId);
 
         const variables = { ...env.variables };
         let secretKeys = Array.isArray(env.secretKeys) ? [...env.secretKeys] : [];
@@ -324,10 +328,7 @@ export class EnvironmentRepository {
      * @returns {Promise<Object>}
      */
     async applyVariableChanges(environmentId, changes) {
-        const env = await this.getEnvironmentById(environmentId);
-        if (!env) {
-            throw new Error(`Environment with ID ${environmentId} not found`);
-        }
+        const env = await this._requireEnvironment(environmentId);
 
         const variables = { ...env.variables };
         const secretKeys = new Set(Array.isArray(env.secretKeys) ? env.secretKeys : []);
@@ -443,7 +444,7 @@ export class EnvironmentRepository {
 
     /** @returns {string} */
     _generateId() {
-        return `env_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        return generateId('env', { length: 9 });
     }
 
     /** @returns {Object} */

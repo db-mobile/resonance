@@ -128,8 +128,6 @@ export async function ensureFreshOAuthToken({ rawAuth, resolvedAuth, key, getTok
     const nextResolved = { ...resolvedAuth, config: applyTokenResult(resolvedAuth.config, result, now) };
     try {
         await persist(nextRaw, result);
-    } catch (error) {
-        void error;
-    }
+    } catch {}
     return { rawAuth: nextRaw, resolvedAuth: nextResolved, refreshed: true, error: null };
 }

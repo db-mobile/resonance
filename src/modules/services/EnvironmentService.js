@@ -30,6 +30,32 @@ export class EnvironmentService {
     }
 
     /**
+     * @param {string} label
+     * @param {function(): Promise<*>} work
+     * @returns {Promise<*>}
+     */
+    async _reporting(label, work) {
+        try {
+            return await work();
+        } catch (error) {
+            this.statusDisplay.update(`${label}: ${error.message}`, null);
+            throw error;
+        }
+    }
+
+    /**
+     * @param {string} environmentId
+     * @returns {Promise<Object>}
+     */
+    async _requireEnvironment(environmentId) {
+        const environment = await this.repository.getEnvironmentById(environmentId);
+        if (!environment) {
+            throw new Error('Environment not found');
+        }
+        return environment;
+    }
+
+    /**
      * @param {string|null|undefined} color
      * @returns {string|null}
      */
@@ -70,31 +96,20 @@ export class EnvironmentService {
 
     /** @returns {Promise<Array<Object>>} */
     async getAllEnvironments() {
-        try {
+        return this._reporting('Error loading environments', async () => {
             const data = await this.repository.getAllEnvironments();
             return data.items;
-        } catch (error) {
-            this.statusDisplay.update(`Error loading environments: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /** @returns {Promise<Object|null>} */
     async getActiveEnvironment() {
-        try {
-            return await this.repository.getActiveEnvironment();
-        } catch (error) {
-            return null;
-        }
+        return this.repository.getActiveEnvironment();
     }
 
     /** @returns {Promise<string|null>} */
     async getActiveEnvironmentId() {
-        try {
-            return await this.repository.getActiveEnvironmentId();
-        } catch (error) {
-            return null;
-        }
+        return this.repository.getActiveEnvironmentId();
     }
 
     /**
@@ -102,11 +117,8 @@ export class EnvironmentService {
      * @returns {Promise<Object>}
      */
     async switchEnvironment(environmentId) {
-        try {
-            const environment = await this.repository.getEnvironmentById(environmentId);
-            if (!environment) {
-                throw new Error('Environment not found');
-            }
+        return this._reporting('Error switching environment', async () => {
+            const environment = await this._requireEnvironment(environmentId);
 
             await this.repository.setActiveEnvironment(environmentId);
 
@@ -118,19 +130,17 @@ export class EnvironmentService {
             });
 
             return environment;
-        } catch (error) {
-            this.statusDisplay.update(`Error switching environment: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
      * @param {string} name
      * @param {Object} [variables={}]
+     * @param {string|null} [color=null]
      * @returns {Promise<Object>}
      */
     async createEnvironment(name, variables = {}, color = null) {
-        try {
+        return this._reporting('Error creating environment', async () => {
             if (!name || typeof name !== 'string' || name.trim() === '') {
                 throw new Error('Environment name is required');
             }
@@ -147,10 +157,7 @@ export class EnvironmentService {
             });
 
             return newEnvironment;
-        } catch (error) {
-            this.statusDisplay.update(`Error creating environment: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -161,7 +168,7 @@ export class EnvironmentService {
      * @returns {Promise<Object>}
      */
     async updateEnvironment(environmentId, updates) {
-        try {
+        return this._reporting('Error updating environment', async () => {
             if (updates.name !== undefined) {
                 if (!updates.name || typeof updates.name !== 'string' || updates.name.trim() === '') {
                     throw new Error('Environment name cannot be empty');
@@ -183,10 +190,7 @@ export class EnvironmentService {
             });
 
             return updatedEnvironment;
-        } catch (error) {
-            this.statusDisplay.update(`Error updating environment: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -194,11 +198,8 @@ export class EnvironmentService {
      * @returns {Promise<boolean>}
      */
     async deleteEnvironment(environmentId) {
-        try {
-            const environment = await this.repository.getEnvironmentById(environmentId);
-            if (!environment) {
-                throw new Error('Environment not found');
-            }
+        return this._reporting('Error deleting environment', async () => {
+            const environment = await this._requireEnvironment(environmentId);
 
             await this.repository.deleteEnvironment(environmentId);
 
@@ -210,10 +211,7 @@ export class EnvironmentService {
             });
 
             return true;
-        } catch (error) {
-            this.statusDisplay.update(`Error deleting environment: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -221,11 +219,8 @@ export class EnvironmentService {
      * @returns {Promise<Object>}
      */
     async duplicateEnvironment(environmentId) {
-        try {
-            const environment = await this.repository.getEnvironmentById(environmentId);
-            if (!environment) {
-                throw new Error('Environment not found');
-            }
+        return this._reporting('Error duplicating environment', async () => {
+            const environment = await this._requireEnvironment(environmentId);
 
             const newName = await this._generateUniqueName(`${environment.name} (Copy)`);
             const duplicatedEnvironment = await this.repository.duplicateEnvironment(environmentId, newName);
@@ -238,18 +233,12 @@ export class EnvironmentService {
             });
 
             return duplicatedEnvironment;
-        } catch (error) {
-            this.statusDisplay.update(`Error duplicating environment: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
+    /** @returns {Promise<Object>} */
     async getActiveEnvironmentVariables() {
-        try {
-            return await this.repository.getActiveEnvironmentVariables();
-        } catch (error) {
-            return {};
-        }
+        return this.repository.getActiveEnvironmentVariables();
     }
 
     /**
@@ -257,39 +246,37 @@ export class EnvironmentService {
      * @param {string} name
      * @param {string} value
      * @param {boolean} [isSecret=false]
+     * @returns {Promise<boolean>}
      */
     async setVariable(environmentId, name, value, isSecret = false) {
-        try {
+        return this._reporting('Error setting variable', async () => {
             await this.repository.setEnvironmentVariable(environmentId, name, value, isSecret);
             return true;
-        } catch (error) {
-            this.statusDisplay.update(`Error setting variable: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
      * @param {string} environmentId
      * @param {Object} changes
+     * @returns {Promise<boolean>}
      */
     async applyVariableChanges(environmentId, changes) {
-        try {
+        return this._reporting('Error setting variable', async () => {
             await this.repository.applyVariableChanges(environmentId, changes);
             return true;
-        } catch (error) {
-            this.statusDisplay.update(`Error setting variable: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
+    /**
+     * @param {string} environmentId
+     * @param {string} name
+     * @returns {Promise<boolean>}
+     */
     async deleteVariable(environmentId, name) {
-        try {
+        return this._reporting('Error deleting variable', async () => {
             await this.repository.deleteEnvironmentVariable(environmentId, name);
             return true;
-        } catch (error) {
-            this.statusDisplay.update(`Error deleting variable: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
     /**
@@ -305,35 +292,36 @@ export class EnvironmentService {
         }
     }
 
+    /**
+     * @param {string} environmentId
+     * @returns {Promise<{name: string, variables: Object, secretKeys: string[], color: string|null}>}
+     */
     async exportEnvironment(environmentId) {
-        try {
-            const environment = await this.repository.getEnvironmentById(environmentId);
-            if (!environment) {
-                throw new Error('Environment not found');
-            }
+        return this._reporting('Error exporting environment', async () => {
+            const environment = await this._requireEnvironment(environmentId);
 
             return toExportShape(environment);
-        } catch (error) {
-            this.statusDisplay.update(`Error exporting environment: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
+    /** @returns {Promise<{version: string, environments: Array<Object>}>} */
     async exportAllEnvironments() {
-        try {
+        return this._reporting('Error exporting environments', async () => {
             const data = await this.repository.exportEnvironments();
             return {
                 version: '1.0',
                 environments: data.items.map(toExportShape)
             };
-        } catch (error) {
-            this.statusDisplay.update(`Error exporting environments: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
+    /**
+     * @param {{environments: Array<Object>}} data
+     * @param {boolean} [merge=false]
+     * @returns {Promise<boolean>}
+     */
     async importEnvironments(data, merge = false) {
-        try {
+        return this._reporting('Error importing environments', async () => {
             if (!data || !Array.isArray(data.environments)) {
                 throw new Error('Invalid import data format');
             }
@@ -359,12 +347,13 @@ export class EnvironmentService {
             });
 
             return true;
-        } catch (error) {
-            this.statusDisplay.update(`Error importing environments: ${error.message}`, null);
-            throw error;
-        }
+        });
     }
 
+    /**
+     * @param {string} baseName
+     * @returns {Promise<string>}
+     */
     async _generateUniqueName(baseName) {
         const environments = await this.getAllEnvironments();
         const existingNames = environments.map(env => env.name);

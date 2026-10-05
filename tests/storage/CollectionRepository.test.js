@@ -350,14 +350,6 @@ describe('CollectionRepository', () => {
     });
 
     describe('individual endpoint data methods', () => {
-        test('getPersistedUrl should return URL', async () => {
-            mockBackendAPI.collections.getEndpointData.mockResolvedValue({ url: 'https://api.example.com' });
-
-            const result = await repository.getPersistedUrl('col_1', 'ep_1');
-
-            expect(result).toBe('https://api.example.com');
-        });
-
         test('getPersistedPathParams should return path params', async () => {
             const pathParams = [{ key: 'id', value: '123' }];
             mockBackendAPI.collections.getEndpointData.mockResolvedValue({ pathParams });

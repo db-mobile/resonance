@@ -3,6 +3,8 @@
  * @module storage/CookieRepository
  */
 
+import { cookieEnvironmentId, cookieId } from '../utils/cookieId.js';
+
 export class CookieRepository {
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
@@ -31,8 +33,8 @@ export class CookieRepository {
         let changed = false;
         const byId = new Map();
         for (const cookie of cookies) {
-            const envId = cookie.environmentId || 'default';
-            const id = `${envId}|${cookie.domain}|${cookie.path}|${cookie.name}`;
+            const envId = cookieEnvironmentId(cookie.environmentId);
+            const id = cookieId(envId, cookie.domain, cookie.path, cookie.name);
             const migrated = id === cookie.id ? cookie : { ...cookie, id, environmentId: envId };
             if (migrated !== cookie) {
                 changed = true;
@@ -106,11 +108,6 @@ export class CookieRepository {
     async deleteAll(environmentId) {
         const cookies = await this._getArrayFromStore();
         await this._save(cookies.filter(c => c.environmentId !== environmentId));
-    }
-
-    async deleteByDomain(domain, environmentId) {
-        const cookies = await this._getArrayFromStore();
-        await this._save(cookies.filter(c => !(c.domain === domain && c.environmentId === environmentId)));
     }
 
     async deleteExpired() {

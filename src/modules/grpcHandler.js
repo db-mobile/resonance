@@ -33,7 +33,7 @@ import { renderGrpcPanes } from './ResponseDisplayHelper.js';
 import { getActiveTabId, isTabCurrentlyActive } from './streaming/streamSession.js';
 import { startOrSend as grpcStreamStartOrSend } from './grpcStreamHandler.js';
 import { recordGrpcHistory } from './grpcHistory.js';
-import { createKeyValueRow } from './keyValueManager.js';
+import { createKeyValueRow, isKeyValueInput } from './keyValueManager.js';
 import { getCurrentEndpoint } from './state/currentEndpoint.js';
 import { fileNameFromPath } from './utils/fileName.js';
 
@@ -288,9 +288,7 @@ async function buildTlsOptions(target) {
     try {
         const settings = await getSettings();
         skipVerify = settings?.verifySsl === false;
-    } catch (_e) {
-        void _e;
-    }
+    } catch {}
 
     const tls = { useTls, skipVerify };
     if (useTls && app.certificateController) {
@@ -485,13 +483,33 @@ async function ensureProtoLoaded() {
     }
 }
 
-export async function handleGrpcSend() {
+/**
+ * @param {Error} error
+ * @returns {void}
+ */
+function reportVariableError(error) {
+    updateStatusDisplay(`Variable processing error: ${error.message || String(error)}`, null);
+}
+
+/**
+ * @typedef {Object} PreparedGrpcSend
+ * @property {string} rawTarget
+ * @property {string} target
+ * @property {string} fullMethod
+ * @property {Object<string, string>} metadata
+ * @property {Object} requestJson
+ * @property {string[]} sensitiveNames
+ * @property {string|null} protoPath
+ */
+
+/** @returns {Promise<PreparedGrpcSend|null>} */
+async function prepareGrpcSend() {
     const rawTarget = grpcTargetInput?.value?.trim();
     const fullMethod = grpcMethodSelect?.value;
 
     if (!rawTarget || !fullMethod) {
         updateStatusDisplay('gRPC target/method missing', null);
-        return;
+        return null;
     }
 
     const rawBody = (app.grpcBodyEditor ? app.grpcBodyEditor.getContent() : grpcBodyInput?.value || '').trim();
@@ -500,8 +518,8 @@ export async function handleGrpcSend() {
     try {
         context = await getRequestBuilderService().resolveVariables(getCurrentEndpoint(), {});
     } catch (error) {
-        updateStatusDisplay(`Variable processing error: ${error.message || String(error)}`, null);
-        return;
+        reportVariableError(error);
+        return null;
     }
 
     const { metadata: uiMetadata, sensitiveNames, unresolvedAuthVariables } =
@@ -511,11 +529,9 @@ export async function handleGrpcSend() {
     try {
         resolved = await resolveGrpcRequest(rawTarget, rawBody, uiMetadata, context, unresolvedAuthVariables);
     } catch (error) {
-        updateStatusDisplay(`Variable processing error: ${error.message || String(error)}`, null);
-        return;
+        reportVariableError(error);
+        return null;
     }
-
-    const { target, metadata } = resolved;
 
     let requestJson = {};
     if (resolved.rawBody) {
@@ -523,15 +539,33 @@ export async function handleGrpcSend() {
             requestJson = JSON.parse(resolved.rawBody);
         } catch (e) {
             toast.error(`Invalid gRPC JSON: ${e.message}`);
-            return;
+            return null;
         }
     }
 
-    const usingProto = activeSource.kind === 'proto' && !!activeSource.protoPath;
-    if (usingProto && !(await ensureProtoLoaded())) {
+    const protoPath = activeSource.kind === 'proto' ? activeSource.protoPath || null : null;
+    if (protoPath && !(await ensureProtoLoaded())) {
+        return null;
+    }
+
+    return {
+        rawTarget,
+        target: resolved.target,
+        fullMethod,
+        metadata: resolved.metadata,
+        requestJson,
+        sensitiveNames,
+        protoPath
+    };
+}
+
+export async function handleGrpcSend() {
+    const prepared = await prepareGrpcSend();
+    if (!prepared) {
         return;
     }
 
+    const { rawTarget, target, fullMethod, metadata, requestJson, sensitiveNames, protoPath } = prepared;
     const tls = await buildTlsOptions(target);
     const flags = methodFlagsCache.get(fullMethod);
     const isStreaming = !!(flags && (flags.serverStreaming || flags.clientStreaming));
@@ -543,7 +577,7 @@ export async function handleGrpcSend() {
         metadata,
         requestJson,
         useTls: !!tls.useTls,
-        protoPath: usingProto ? activeSource.protoPath : null,
+        protoPath,
         clientStreaming: !!flags?.clientStreaming,
         serverStreaming: !!flags?.serverStreaming,
         sensitiveNames
@@ -556,13 +590,23 @@ export async function handleGrpcSend() {
             requestJson,
             metadata,
             tls,
-            protoPath: usingProto ? activeSource.protoPath : null,
+            protoPath,
             canSend: !!flags.clientStreaming,
             historyContext
         });
         return;
     }
 
+    await invokeGrpcUnary(prepared, tls, historyContext);
+}
+
+/**
+ * @param {PreparedGrpcSend} prepared
+ * @param {Object} tls
+ * @param {Object} historyContext
+ * @returns {Promise<void>}
+ */
+async function invokeGrpcUnary({ target, fullMethod, requestJson, metadata, protoPath }, tls, historyContext) {
     const startedAt = Date.now();
     const requestTabId = await getActiveTabId();
     const requestId = newRequestId();
@@ -588,8 +632,8 @@ export async function handleGrpcSend() {
             tls,
             requestId
         };
-        const result = usingProto
-            ? await window.backendAPI.grpc.protoInvokeUnary(activeSource.protoPath, unaryRequest)
+        const result = protoPath
+            ? await window.backendAPI.grpc.protoInvokeUnary(protoPath, unaryRequest)
             : await window.backendAPI.grpc.invokeUnary(unaryRequest);
 
         if (result.cancelled) {
@@ -614,27 +658,7 @@ export async function handleGrpcSend() {
 
         await showStatus(result.success ? 'gRPC OK' : `gRPC error: ${result.statusMessage || 'unknown'}`);
 
-        const ttfb = Date.now() - startedAt;
-        if (app.workspaceTabController && requestTabId) {
-            app.workspaceTabController.service.updateTab(requestTabId, {
-                response: {
-                    data: result.data ?? null,
-                    headers: {},
-                    status: null,
-                    statusText: '',
-                    ttfb,
-                    size: null,
-                    timings: null,
-                    cookies: [],
-                    grpc: grpcPanes
-                }
-            }).catch(() => { });
-        }
-
-        await recordGrpcHistory({
-            ...historyContext,
-            result: { ...result, ttfb }
-        });
+        await persistGrpcResult(requestTabId, result, grpcPanes, Date.now() - startedAt, historyContext);
     } catch (error) {
         const msg = error.message || String(error);
         toast.error(`gRPC send error: ${msg}`);
@@ -655,6 +679,37 @@ export async function handleGrpcSend() {
         untrack();
         setRequestInProgress(false);
     }
+}
+
+/**
+ * @param {string|null} requestTabId
+ * @param {Object} result
+ * @param {Object} grpcPanes
+ * @param {number} ttfb
+ * @param {Object} historyContext
+ * @returns {Promise<void>}
+ */
+async function persistGrpcResult(requestTabId, result, grpcPanes, ttfb, historyContext) {
+    if (app.workspaceTabController && requestTabId) {
+        app.workspaceTabController.service.updateTab(requestTabId, {
+            response: {
+                data: result.data ?? null,
+                headers: {},
+                status: null,
+                statusText: '',
+                ttfb,
+                size: null,
+                timings: null,
+                cookies: [],
+                grpc: grpcPanes
+            }
+        }).catch(() => { });
+    }
+
+    await recordGrpcHistory({
+        ...historyContext,
+        result: { ...result, ttfb }
+    });
 }
 
 /**
@@ -722,8 +777,11 @@ export function initGrpcUI() {
     }
 
     grpcConnectBtn.addEventListener('click', onConnect);
-    grpcServiceSelect.addEventListener('change', onServiceChange);
-    
+    grpcServiceSelect.addEventListener('change', () => {
+        onServiceChange();
+        markTabModified();
+    });
+
     if (grpcSendBtn) {
         grpcSendBtn.addEventListener('click', handleGrpcSend);
     }
@@ -761,12 +819,6 @@ export function initGrpcUI() {
         }
     }
 
-    if (grpcServiceSelect) {
-        grpcServiceSelect.addEventListener('change', () => {
-            markTabModified();
-        });
-    }
-
     if (grpcMethodSelect) {
         grpcMethodSelect.addEventListener('change', () => {
             updateMethodKindBadge(grpcMethodSelect.value);
@@ -777,7 +829,7 @@ export function initGrpcUI() {
     const grpcMetadataList = document.getElementById('grpc-metadata-list');
     if (grpcMetadataList) {
         grpcMetadataList.addEventListener('input', (event) => {
-            if (event.target.classList.contains('key-input') || event.target.classList.contains('value-input')) {
+            if (isKeyValueInput(event.target)) {
                 markTabModified();
             }
         });
@@ -874,9 +926,7 @@ async function onAddIncludePath() {
         await loadProtoFile(protoPath, includePaths);
         pendingIncludePaths = [];
         updateProtoUI(true, protoPath);
-    } catch (error) {
-        void error;
-    }
+    } catch {}
 }
 
 /**

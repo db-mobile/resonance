@@ -172,13 +172,9 @@ export function requestsInFolder(collection, folderId) {
  * @returns {Object[]}
  */
 export function rootRequests(collection) {
-    const roots = [];
-    for (const entry of walkRequests(collection)) {
-        if (entry.chain.length === 0) {
-            roots.push(entry.request);
-        }
-    }
-    return roots;
+    return Array.from(walkRequests(collection))
+        .filter(entry => entry.chain.length === 0)
+        .map(entry => entry.request);
 }
 
 /**
@@ -198,15 +194,24 @@ export function topLevelFolders(collection) {
 /**
  * @param {Object|null|undefined} collection
  * @param {string} requestId
- * @returns {Object|null}
+ * @returns {{request: Object, chain: Object[]}|null}
  */
-export function findRequest(collection, requestId) {
+function findEntry(collection, requestId) {
     for (const entry of walkRequests(collection)) {
         if (entry.request.id === requestId) {
-            return entry.request;
+            return entry;
         }
     }
     return null;
+}
+
+/**
+ * @param {Object|null|undefined} collection
+ * @param {string} requestId
+ * @returns {Object|null}
+ */
+export function findRequest(collection, requestId) {
+    return findEntry(collection, requestId)?.request ?? null;
 }
 
 /**
@@ -229,12 +234,7 @@ export function findFolder(collection, folderId) {
  * @returns {Object[]}
  */
 export function folderChainForRequest(collection, requestId) {
-    for (const entry of walkRequests(collection)) {
-        if (entry.request.id === requestId) {
-            return entry.chain;
-        }
-    }
-    return [];
+    return findEntry(collection, requestId)?.chain ?? [];
 }
 
 /**
@@ -305,19 +305,47 @@ function patchLegacyFolderRequests(folders, requestId, patch) {
 /**
  * @param {Array|null|undefined} items
  * @param {string} folderId
- * @param {Object} patch
+ * @param {function(Object): Object} transform
  * @returns {Array}
  */
-function patchFolderItems(items, folderId, patch) {
+function mapFolderItem(items, folderId, transform) {
     return (items ?? []).map(item => {
         if (item?.type !== FOLDER) {
             return item;
         }
         if (item.id === folderId) {
-            return { ...item, ...patch };
+            return transform(item);
         }
-        return { ...item, items: patchFolderItems(item.items, folderId, patch) };
+        return { ...item, items: mapFolderItem(item.items, folderId, transform) };
     });
+}
+
+/**
+ * @param {Array|null|undefined} folders
+ * @param {string} folderId
+ * @param {function(Object): Object} transform
+ * @returns {Array}
+ */
+function mapLegacyFolder(folders, folderId, transform) {
+    return (folders ?? []).map(folder => {
+        if (folder?.id === folderId) {
+            return transform(folder);
+        }
+        if (Array.isArray(folder?.folders)) {
+            return { ...folder, folders: mapLegacyFolder(folder.folders, folderId, transform) };
+        }
+        return folder;
+    });
+}
+
+/**
+ * @param {Array|null|undefined} items
+ * @param {string} folderId
+ * @param {Object} patch
+ * @returns {Array}
+ */
+function patchFolderItems(items, folderId, patch) {
+    return mapFolderItem(items, folderId, item => ({ ...item, ...patch }));
 }
 
 /**
@@ -348,15 +376,7 @@ export function updateFolder(collection, folderId, patch) {
  * @returns {Array}
  */
 function patchLegacyFolders(folders, folderId, patch) {
-    return (folders ?? []).map(folder => {
-        if (folder?.id === folderId) {
-            return { ...folder, ...patch };
-        }
-        if (Array.isArray(folder?.folders)) {
-            return { ...folder, folders: patchLegacyFolders(folder.folders, folderId, patch) };
-        }
-        return folder;
-    });
+    return mapLegacyFolder(folders, folderId, folder => ({ ...folder, ...patch }));
 }
 
 /**
@@ -453,15 +473,10 @@ export function insertRequest(collection, folderId, request) {
  * @returns {Array}
  */
 function insertIntoLegacyFolders(folders, folderId, request) {
-    return (folders ?? []).map(folder => {
-        if (folder?.id === folderId) {
-            return { ...folder, endpoints: [...(folder.endpoints ?? []), request] };
-        }
-        if (Array.isArray(folder?.folders)) {
-            return { ...folder, folders: insertIntoLegacyFolders(folder.folders, folderId, request) };
-        }
-        return folder;
-    });
+    return mapLegacyFolder(folders, folderId, folder => ({
+        ...folder,
+        endpoints: [...(folder.endpoints ?? []), request]
+    }));
 }
 
 /**
@@ -471,15 +486,7 @@ function insertIntoLegacyFolders(folders, folderId, request) {
  * @returns {Array}
  */
 function insertIntoFolderItems(items, folderId, node) {
-    return (items ?? []).map(item => {
-        if (item?.type !== FOLDER) {
-            return item;
-        }
-        if (item.id === folderId) {
-            return { ...item, items: [...(item.items ?? []), node] };
-        }
-        return { ...item, items: insertIntoFolderItems(item.items, folderId, node) };
-    });
+    return mapFolderItem(items, folderId, item => ({ ...item, items: [...(item.items ?? []), node] }));
 }
 
 /**
@@ -515,15 +522,10 @@ export function insertFolder(collection, parentFolderId, folder) {
  * @returns {Array}
  */
 function insertSubfolder(folders, parentFolderId, node) {
-    return (folders ?? []).map(folder => {
-        if (folder?.id === parentFolderId) {
-            return { ...folder, folders: [...(folder.folders ?? []), node] };
-        }
-        if (Array.isArray(folder?.folders)) {
-            return { ...folder, folders: insertSubfolder(folder.folders, parentFolderId, node) };
-        }
-        return folder;
-    });
+    return mapLegacyFolder(folders, parentFolderId, folder => ({
+        ...folder,
+        folders: [...(folder.folders ?? []), node]
+    }));
 }
 
 /**

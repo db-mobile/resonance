@@ -622,5 +622,12 @@
   "body_editor": {
     "format": "Formatieren",
     "format_title": "JSON formatieren (Umschalt+Alt+F)"
+  },
+  "data_migration": {
+    "title": "Datenkonvertierung",
+    "failed": "Die Konvertierung Ihrer Daten in das aktuelle Format ist bei „{{step}}“ fehlgeschlagen: {{message}}. Es wurde nichts entfernt; die Konvertierung läuft beim nächsten Start von Resonance erneut.",
+    "too_old": "Ihre Daten stammen aus einer Resonance-Version, die diese Version nicht mehr konvertieren kann. Sie wurden nicht verändert. Installieren Sie Resonance {{release}}, starten Sie es einmal und aktualisieren Sie dann erneut.",
+    "global_store_collections": "In Ihren Einstellungen liegen noch Collections aus einer Resonance-Version vor März 2026. Diese Version kann sie nicht mehr konvertieren; sie wurden nicht verändert. Installieren Sie Resonance {{release}}, starten Sie es einmal und aktualisieren Sie dann erneut.",
+    "unknown": "Ihre Daten konnten nicht vollständig in das aktuelle Format konvertiert werden."
   }
 }

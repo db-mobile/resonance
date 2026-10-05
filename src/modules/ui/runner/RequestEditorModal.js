@@ -40,9 +40,7 @@ export class RequestEditorModal {
         this._opening = true;
         try {
             config = await resolveDefaults?.(request.collectionId, request.endpointId);
-        } catch (error) {
-            void error;
-        } finally {
+        } catch {} finally {
             this._opening = false;
         }
 
@@ -191,15 +189,12 @@ export class RequestEditorModal {
      */
     _collectKvList(container) {
         if (!container) {return [];}
-        const rows = [];
-        container.querySelectorAll('.key-value-row').forEach(row => {
-            const key = row.querySelector('[data-role="kv-key"]')?.value.trim() || '';
-            const value = row.querySelector('[data-role="kv-value"]')?.value || '';
-            if (key) {
-                rows.push({ key, value });
-            }
-        });
-        return rows;
+        return Array.from(container.querySelectorAll('.key-value-row'))
+            .map(row => ({
+                key: row.querySelector('[data-role="kv-key"]')?.value.trim() || '',
+                value: row.querySelector('[data-role="kv-value"]')?.value || ''
+            }))
+            .filter(row => row.key);
     }
 
     /** @param {string} tabName */

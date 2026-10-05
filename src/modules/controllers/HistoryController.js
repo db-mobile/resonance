@@ -31,9 +31,7 @@ export class HistoryController {
         try {
             await this.service.createHistoryEntry(requestConfig, result, currentEndpoint, environmentName, sensitive);
             await this.renderer.refresh();
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 
     /**
@@ -48,8 +46,6 @@ export class HistoryController {
             }
 
             await app.workspaceTabController.loadHistoryEntry(historyEntry);
-        } catch (error) {
-            void error;
-        }
+        } catch {}
     }
 }

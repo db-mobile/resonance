@@ -32,8 +32,7 @@ export class ChangeEmitter {
         this.listeners.forEach(callback => {
             try {
                 callback(...args);
-            } catch (error) {
-                void error;
+            } catch {
             }
         });
     }

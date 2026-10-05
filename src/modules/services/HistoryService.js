@@ -11,6 +11,7 @@ import {
 import { statusCategory } from '../utils/statusCategory.js';
 import { grpcStatusName, isGrpcStatusOk } from '../utils/grpcStatus.js';
 import { truncateBody } from '../utils/truncateBody.js';
+import { generateId } from '../utils/ids.js';
 
 /** @type {string} */
 export const REDACTED_PLACEHOLDER = '[redacted]';
@@ -39,7 +40,7 @@ export class HistoryService {
 
     /** @returns {string} */
     generateId() {
-        return `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        return generateId('history', { length: 9 });
     }
 
     /**
@@ -68,9 +69,17 @@ export class HistoryService {
     async createHistoryEntry(requestConfig, result, currentEndpoint = null, environmentName = null, sensitive = {}) {
         const headerNames = sensitive.headerNames || [];
         const queryNames = sensitive.queryNames || [];
-        const responseHeaders = this._redactHeaders(result.headers, SENSITIVE_RESPONSE_HEADERS);
         const cappedRequestBody = truncateBody(requestConfig.body || null, MAX_HISTORY_REQUEST_SIZE);
         const cappedResponseData = truncateBody(result.data || null, MAX_HISTORY_RESPONSE_SIZE);
+        const responseBody = {
+            data: cappedResponseData.value,
+            ...truncationFields(cappedResponseData),
+            headers: this._redactHeaders(result.headers, SENSITIVE_RESPONSE_HEADERS)
+        };
+        const responseTiming = {
+            ttfb: result.ttfb || null,
+            size: result.size || null
+        };
 
         const historyEntry = {
             id: this.generateId(),
@@ -91,22 +100,16 @@ export class HistoryService {
             response: result.success || result.status ? {
                 status: result.status ?? null,
                 statusText: result.statusText || '',
-                data: cappedResponseData.value,
-                ...truncationFields(cappedResponseData),
-                headers: responseHeaders,
+                ...responseBody,
                 trailers: result.trailers || null,
-                ttfb: result.ttfb || null,
-                size: result.size || null
+                ...responseTiming
             } : {
                 error: true,
                 status: result.status || null,
                 statusText: result.statusText || '',
                 message: result.message || 'Unknown error',
-                data: cappedResponseData.value,
-                ...truncationFields(cappedResponseData),
-                headers: responseHeaders,
-                ttfb: result.ttfb || null,
-                size: result.size || null
+                ...responseBody,
+                ...responseTiming
             },
             success: result.success || false
         };
@@ -151,8 +154,7 @@ export class HistoryService {
                 }
             }
             return changed ? parsed.toString() : url;
-        } catch (e) {
-            void e;
+        } catch {
             return url;
         }
     }
@@ -206,9 +208,9 @@ export class HistoryService {
             return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
         } else if (diffDays < 7) {
             return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-        } 
+        }
             return `${date.toLocaleDateString()  } ${  date.toLocaleTimeString()}`;
-        
+
     }
 
     /**

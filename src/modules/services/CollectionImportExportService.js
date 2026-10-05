@@ -8,6 +8,12 @@ import { toast } from '../ui/Toast.js';
 import { findRequest, flattenRequests } from '../collections/collectionTree.js';
 import { translate } from '../utils/translate.js';
 
+/** @type {Readonly<Object<string, {generate: string, extension: string, mimeType: string}>>} */
+const DOC_FORMATS = Object.freeze({
+    html: { generate: 'generateHtml', extension: 'html', mimeType: 'text/html' },
+    markdown: { generate: 'generateMarkdown', extension: 'md', mimeType: 'text/markdown' }
+});
+
 export class CollectionImportExportService {
     /**
      * @param {Object} options
@@ -40,28 +46,27 @@ export class CollectionImportExportService {
         this.refreshCollections = refreshCollections;
     }
 
-    async handleExportOpenApiJson(collection) {
+    /**
+     * @param {function(): Promise<*>} exportCall
+     * @returns {Promise<void>}
+     */
+    async _exportQuietly(exportCall) {
         try {
-            await this.collectionService.exportCollectionAsOpenApi(collection.id, 'json');
-        } catch (error) {
-            void error;
+            await exportCall();
+        } catch {
         }
+    }
+
+    async handleExportOpenApiJson(collection) {
+        await this._exportQuietly(() => this.collectionService.exportCollectionAsOpenApi(collection.id, 'json'));
     }
 
     async handleExportOpenApiYaml(collection) {
-        try {
-            await this.collectionService.exportCollectionAsOpenApi(collection.id, 'yaml');
-        } catch (error) {
-            void error;
-        }
+        await this._exportQuietly(() => this.collectionService.exportCollectionAsOpenApi(collection.id, 'yaml'));
     }
 
     async handleExportPostman(collection) {
-        try {
-            await this.collectionService.exportCollectionAsPostman(collection.id);
-        } catch (error) {
-            void error;
-        }
+        await this._exportQuietly(() => this.collectionService.exportCollectionAsPostman(collection.id));
     }
 
     async handleGenerateDocumentation(collection) {
@@ -78,28 +83,14 @@ export class CollectionImportExportService {
 
             this.statusDisplay.update('Generating documentation...', null);
 
-            let content;
-            let fileExtension;
-            let mimeType;
+            const format = DOC_FORMATS[options.format] ?? DOC_FORMATS.markdown;
+            const content = await this.docGeneratorService[format.generate](collection, {
+                includePersistedData: options.includeExamples,
+                languages: options.languages
+            });
 
-            if (options.format === 'html') {
-                content = await this.docGeneratorService.generateHtml(collection, {
-                    includePersistedData: options.includeExamples,
-                    languages: options.languages
-                });
-                fileExtension = 'html';
-                mimeType = 'text/html';
-            } else {
-                content = await this.docGeneratorService.generateMarkdown(collection, {
-                    includePersistedData: options.includeExamples,
-                    languages: options.languages
-                });
-                fileExtension = 'md';
-                mimeType = 'text/markdown';
-            }
-
-            const defaultFileName = `${collection.name.replace(/[^a-zA-Z0-9]/g, '_')}_docs.${fileExtension}`;
-            const result = await this.backendAPI.docs.save(defaultFileName, content, mimeType);
+            const defaultFileName = `${collection.name.replace(/[^a-zA-Z0-9]/g, '_')}_docs.${format.extension}`;
+            const result = await this.backendAPI.docs.save(defaultFileName, content, format.mimeType);
 
             if (result && result.success) {
                 toast.success(translate('docs.success', 'Documentation generated successfully'));
@@ -186,8 +177,7 @@ export class CollectionImportExportService {
                     await this.repository.saveFolderAuthConfig(collection.id, folder.id, folder.authConfig);
                 }
             }
-        } catch (error) {
-            void error;
+        } catch {
         }
     }
 
@@ -223,19 +213,10 @@ export class CollectionImportExportService {
                 return;
             }
 
-            let targetCollection;
-
-            if (result.newCollectionName) {
-                targetCollection = await this.collectionService.createCollection({
-                    name: result.newCollectionName,
-                    storageParentPath: result.newCollectionLocation
-                });
-            } else {
-                targetCollection = collections.find(current => current.id === result.collectionId);
-                if (!targetCollection) {
-                    this.statusDisplay.update('Collection not found', null);
-                    return;
-                }
+            const targetCollection = await this._resolveCurlTarget(result, collections);
+            if (!targetCollection) {
+                this.statusDisplay.update('Collection not found', null);
+                return;
             }
 
             const requestData = {
@@ -247,33 +228,7 @@ export class CollectionImportExportService {
 
             const newEndpoint = await this.collectionService.addRequestToCollection(targetCollection.id, requestData);
 
-            if (result.endpoint.requestBody) {
-                await this.repository.saveModifiedRequestBody(
-                    targetCollection.id,
-                    newEndpoint.id,
-                    result.endpoint.requestBody.example
-                );
-            }
-
-            if (Object.keys(result.endpoint.headers).length > 0) {
-                const headers = Object.entries(result.endpoint.headers).map(([key, value]) => ({
-                    key,
-                    value
-                }));
-                await this.repository.savePersistedHeaders(targetCollection.id, newEndpoint.id, headers);
-            }
-
-            if (Object.keys(result.endpoint.parameters.query).length > 0) {
-                const queryParams = Object.entries(result.endpoint.parameters.query).map(([key, param]) => ({
-                    key,
-                    value: param.example || ''
-                }));
-                await this.repository.savePersistedQueryParams(targetCollection.id, newEndpoint.id, queryParams);
-            }
-
-            if (result.auth) {
-                await this.repository.savePersistedAuthConfig(targetCollection.id, newEndpoint.id, result.auth);
-            }
+            await this._persistCurlSidecars(targetCollection.id, newEndpoint.id, result);
 
             await this.refreshCollections(false);
             toast.success(`Imported cURL as "${result.endpoint.name}"`);
@@ -281,6 +236,56 @@ export class CollectionImportExportService {
             await this.openImportedEndpoint(targetCollection.id, newEndpoint.id);
         } catch (error) {
             toast.error(`cURL import failed: ${error.message}`);
+        }
+    }
+
+    /**
+     * @param {Object} result
+     * @param {Array<Object>} collections
+     * @returns {Promise<Object|null>}
+     */
+    async _resolveCurlTarget(result, collections) {
+        if (result.newCollectionName) {
+            return this.collectionService.createCollection({
+                name: result.newCollectionName,
+                storageParentPath: result.newCollectionLocation
+            });
+        }
+
+        return collections.find(current => current.id === result.collectionId) ?? null;
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} result
+     * @returns {Promise<void>}
+     */
+    async _persistCurlSidecars(collectionId, endpointId, result) {
+        const { endpoint, auth } = result;
+
+        if (endpoint.requestBody) {
+            await this.repository.saveModifiedRequestBody(collectionId, endpointId, endpoint.requestBody.example);
+        }
+
+        if (Object.keys(endpoint.headers).length > 0) {
+            const headers = Object.entries(endpoint.headers).map(([key, value]) => ({
+                key,
+                value
+            }));
+            await this.repository.savePersistedHeaders(collectionId, endpointId, headers);
+        }
+
+        if (Object.keys(endpoint.parameters.query).length > 0) {
+            const queryParams = Object.entries(endpoint.parameters.query).map(([key, param]) => ({
+                key,
+                value: param.example || ''
+            }));
+            await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParams);
+        }
+
+        if (auth) {
+            await this.repository.savePersistedAuthConfig(collectionId, endpointId, auth);
         }
     }
 
@@ -302,8 +307,7 @@ export class CollectionImportExportService {
         if (app.workspaceTabController) {
             try {
                 await app.workspaceTabController.createNewTab();
-            } catch (error) {
-                void error;
+            } catch {
             }
         }
 

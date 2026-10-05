@@ -49,14 +49,6 @@ export function getResponseMeta(tabId) {
 }
 
 /**
- * @param {string} tabId
- * @returns {void}
- */
-export function clearResponseMeta(tabId) {
-    responseMeta.delete(tabId);
-}
-
-/**
  * @param {string} url
  * @param {string} [contentType]
  * @returns {string}
@@ -69,9 +61,7 @@ export function suggestedFileName(url, contentType) {
         if (segment) {
             base = segment;
         }
-    } catch (e) {
-        void e;
-    }
+    } catch {}
 
     if (/\.[a-z0-9]{1,8}$/i.test(base)) {
         return base;
@@ -141,8 +131,7 @@ export async function handleSaveResponse(button, tabId) {
             return;
         }
         showSaveFeedback(button, Boolean(result && result.success));
-    } catch (e) {
-        void e;
+    } catch {
         showSaveFeedback(button, false);
     }
 }

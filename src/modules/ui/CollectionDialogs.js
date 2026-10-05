@@ -12,6 +12,12 @@ import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
 import { fileNameFromPath } from '../utils/fileName.js';
 import { translate } from '../utils/translate.js';
 
+const NEW_DIALOGS_TEMPLATE = './src/templates/collections/newDialogs.html';
+const DOC_OPTIONS_TEMPLATE = './src/templates/docs/docOptionsDialog.html';
+
+/** @type {ReadonlyArray<string>} */
+const PLACEHOLDER_REQUEST_NAMES = Object.freeze(['New Request', 'New WebSocket', 'New gRPC']);
+
 export class CollectionDialogs {
     /**
      * @param {Object} options
@@ -25,21 +31,65 @@ export class CollectionDialogs {
         this.collectionRepository = collectionRepository;
     }
 
-    async showNewCollectionDialog(initialName = '') {
+    /**
+     * @param {string} templatePath
+     * @param {string} templateId
+     * @param {function(*): void} resolve
+     * @param {function(Error): void} [reject]
+     * @returns {{dialog: HTMLElement, finish: function(*): void, fail: function(Error): void}}
+     */
+    _mountDialog(templatePath, templateId, resolve, reject = null) {
+        const fragment = templateLoader.cloneSync(templatePath, templateId);
+        const dialog = fragment.firstElementChild;
+
+        document.body.appendChild(dialog);
+
+        if (app.i18n && app.i18n.updateUI) {
+            app.i18n.updateUI(dialog);
+        }
+
+        let settled = false;
+        let releaseEscape = null;
+
+        const teardown = () => {
+            settled = true;
+            releaseEscape?.();
+            releaseEscape = null;
+            dialog.remove();
+        };
+
+        const finish = (result) => {
+            if (settled) {
+                return;
+            }
+            teardown();
+            resolve(result);
+        };
+
+        const fail = (error) => {
+            if (settled) {
+                return;
+            }
+            teardown();
+            reject?.(error);
+        };
+
+        dialog.addEventListener('click', (e) => {
+            if (e.target === dialog) {
+                finish(null);
+            }
+        });
+
+        releaseEscape = pushEscapeHandler(() => finish(null));
+
+        return { dialog, finish, fail };
+    }
+
+    async showNewCollectionDialog() {
         const defaultStoragePath = await this.backendAPI.collections.getPath().catch(() => '');
 
         return new Promise((resolve) => {
-            const fragment = templateLoader.cloneSync(
-                './src/templates/collections/newDialogs.html',
-                'tpl-new-collection-dialog'
-            );
-            const dialog = fragment.firstElementChild;
-
-            document.body.appendChild(dialog);
-
-            if (app.i18n && app.i18n.updateUI) {
-                app.i18n.updateUI(dialog);
-            }
+            const { dialog, finish } = this._mountDialog(NEW_DIALOGS_TEMPLATE, 'tpl-new-collection-dialog', resolve);
 
             const form = dialog.querySelector('#new-collection-form');
             const nameInput = dialog.querySelector('#collection-name');
@@ -48,32 +98,13 @@ export class CollectionDialogs {
             const cancelBtn = dialog.querySelector('#cancel-btn');
             const closeBtn = dialog.querySelector('#new-collection-close-btn');
             let selectedStoragePath = defaultStoragePath;
-            let resolved = false;
 
-            nameInput.value = initialName;
             locationInput.value = selectedStoragePath;
 
             nameInput.focus();
 
-            const keydownController = new AbortController();
-
-            const finish = (result) => {
-                if (resolved) {
-                    return;
-                }
-                resolved = true;
-                keydownController.abort();
-                dialog.remove();
-                resolve(result);
-            };
-
-            cancelBtn.addEventListener('click', () => {
-                finish(null);
-            });
-
-            closeBtn.addEventListener('click', () => {
-                finish(null);
-            });
+            cancelBtn.addEventListener('click', () => finish(null));
+            closeBtn.addEventListener('click', () => finish(null));
 
             locationBtn.addEventListener('click', async () => {
                 const pickedPath = await this.backendAPI.collections.pickDirectory().catch(() => null);
@@ -94,31 +125,12 @@ export class CollectionDialogs {
                     });
                 }
             });
-
-            dialog.addEventListener('click', (e) => {
-                if (e.target === dialog) {
-                    finish(null);
-                }
-            });
-
-            const releaseEscape = pushEscapeHandler(() => finish(null));
-            keydownController.signal.addEventListener('abort', releaseEscape, { once: true });
         });
     }
 
     async showNewRequestDialog() {
         return new Promise((resolve) => {
-            const fragment = templateLoader.cloneSync(
-                './src/templates/collections/newDialogs.html',
-                'tpl-new-request-dialog'
-            );
-            const dialog = fragment.firstElementChild;
-
-            document.body.appendChild(dialog);
-
-            if (app.i18n && app.i18n.updateUI) {
-                app.i18n.updateUI(dialog);
-            }
+            const { dialog, finish } = this._mountDialog(NEW_DIALOGS_TEMPLATE, 'tpl-new-request-dialog', resolve);
 
             const form = dialog.querySelector('#new-request-form');
             const nameInput = dialog.querySelector('#request-name');
@@ -131,29 +143,11 @@ export class CollectionDialogs {
             const pathLabel = dialog.querySelector('label[for="request-path"]');
             const cancelBtn = dialog.querySelector('#cancel-btn');
             const closeBtn = dialog.querySelector('#new-request-close-btn');
-            let resolved = false;
 
             nameInput.focus();
 
-            const keydownController = new AbortController();
-
-            const finish = (result) => {
-                if (resolved) {
-                    return;
-                }
-                resolved = true;
-                keydownController.abort();
-                dialog.remove();
-                resolve(result);
-            };
-
-            cancelBtn.addEventListener('click', () => {
-                finish(null);
-            });
-
-            closeBtn.addEventListener('click', () => {
-                finish(null);
-            });
+            cancelBtn.addEventListener('click', () => finish(null));
+            closeBtn.addEventListener('click', () => finish(null));
 
             const updateProtocolUI = () => {
                 const descriptor = getProtocol(protocolSelect.value);
@@ -226,16 +220,110 @@ export class CollectionDialogs {
                     path: entered.startsWith('/') ? entered : `/${  entered}`
                 });
             });
-
-            dialog.addEventListener('click', (e) => {
-                if (e.target === dialog) {
-                    finish(null);
-                }
-            });
-
-            const releaseEscape = pushEscapeHandler(() => finish(null));
-            keydownController.signal.addEventListener('abort', releaseEscape, { once: true });
         });
+    }
+
+    /**
+     * @param {Object} requestData
+     * @returns {string}
+     */
+    _suggestRequestName(requestData) {
+        if (requestData.name && !PLACEHOLDER_REQUEST_NAMES.includes(requestData.name)) {
+            return requestData.name;
+        }
+        if (!requestData.url || !requestData.url.trim()) {
+            return '';
+        }
+        try {
+            const segments = new URL(requestData.url).pathname.split('/').filter(s => s);
+            if (segments.length > 0) {
+                return `${requestData.method || 'GET'} /${segments[segments.length - 1]}`;
+            }
+        } catch {
+        }
+        return '';
+    }
+
+    /**
+     * @param {string} name
+     * @param {Object} requestData
+     * @param {string} address
+     * @returns {Object}
+     */
+    _buildEndpointData(name, requestData, address) {
+        const descriptor = getProtocol(requestData.protocol);
+
+        const endpointData = {
+            name,
+            protocol: descriptor.id,
+            method: requestData.method || 'GET',
+            path: address || '/'
+        };
+
+        if (descriptor.urlBased) {
+            endpointData.url = address;
+        }
+
+        if (descriptor.needsTarget && requestData.grpc) {
+            endpointData.target = requestData.grpc.target;
+            endpointData.fullMethod = requestData.grpc.fullMethod;
+            endpointData.requestJson = requestData.grpc.requestJson;
+        }
+
+        if (descriptor.createSidecars.includes('graphqlData')) {
+            endpointData.query = requestData.query || '';
+            endpointData.variables = requestData.variables || '';
+            endpointData.operationName = requestData.operationName || null;
+        }
+
+        if (descriptor.createSidecars.includes('mqttData')) {
+            endpointData.clientId = requestData.clientId || '';
+            endpointData.username = requestData.username || '';
+            endpointData.subscribeTopic = requestData.subscribeTopic || '';
+            endpointData.publishTopic = requestData.publishTopic || '';
+            endpointData.qos = requestData.qos || 0;
+        }
+
+        return endpointData;
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object} requestData
+     * @param {string} address
+     * @returns {Promise<void>}
+     */
+    async _persistRequestSidecars(collectionId, endpointId, requestData, address) {
+        if (requestData.pathParams && Object.keys(requestData.pathParams).length > 0) {
+            const pathParamsArray = Object.entries(requestData.pathParams).map(([key, value]) => ({ key, value }));
+            await this.collectionRepository.savePersistedPathParams(collectionId, endpointId, pathParamsArray);
+        }
+
+        const queryParamsArray = normalizeKeyValueRows(requestData.queryParams);
+        if (queryParamsArray.length > 0) {
+            await this.collectionRepository.savePersistedQueryParams(collectionId, endpointId, queryParamsArray);
+        }
+
+        const headersArray = normalizeKeyValueRows(requestData.headers);
+        if (headersArray.length > 0) {
+            await this.collectionRepository.savePersistedHeaders(collectionId, endpointId, headersArray);
+        }
+
+        if (requestData.body?.content) {
+            await this.collectionRepository.saveModifiedRequestBody(collectionId, endpointId, requestData.body.content);
+        }
+
+        if (requestData.authType && requestData.authType !== 'none') {
+            await this.collectionRepository.savePersistedAuthConfig(collectionId, endpointId, {
+                type: requestData.authType,
+                config: requestData.authConfig || {}
+            });
+        }
+
+        if (address) {
+            await this.collectionRepository.savePersistedUrl(collectionId, endpointId, address);
+        }
     }
 
     async showSaveToCollectionDialog(requestData) {
@@ -243,17 +331,7 @@ export class CollectionDialogs {
         const defaultStoragePath = await this.backendAPI.collections.getPath().catch(() => '');
 
         return new Promise((resolve, reject) => {
-            const fragment = templateLoader.cloneSync(
-                './src/templates/collections/newDialogs.html',
-                'tpl-save-to-collection-dialog'
-            );
-            const dialog = fragment.firstElementChild;
-
-            document.body.appendChild(dialog);
-
-            if (app.i18n && app.i18n.updateUI) {
-                app.i18n.updateUI(dialog);
-            }
+            const { dialog, finish, fail } = this._mountDialog(NEW_DIALOGS_TEMPLATE, 'tpl-save-to-collection-dialog', resolve, reject);
 
             const form = dialog.querySelector('#save-to-collection-form');
             const nameInput = dialog.querySelector('#save-request-name');
@@ -266,24 +344,12 @@ export class CollectionDialogs {
             const cancelBtn = dialog.querySelector('#cancel-btn');
             const closeBtn = dialog.querySelector('#save-to-collection-close-btn');
             let newCollectionStoragePath = defaultStoragePath;
-            let resolved = false;
 
             newCollectionLocationInput.value = newCollectionStoragePath;
 
-            if (requestData.name && requestData.name !== 'New Request' &&
-                requestData.name !== 'New WebSocket' && requestData.name !== 'New gRPC') {
-                nameInput.value = requestData.name;
-            } else if (requestData.url && requestData.url.trim()) {
-                try {
-                    const urlObj = new URL(requestData.url);
-                    const path = urlObj.pathname;
-                    const segments = path.split('/').filter(s => s);
-                    if (segments.length > 0) {
-                        const endpoint = `/${segments[segments.length - 1]}`;
-                        nameInput.value = `${requestData.method || 'GET'} ${endpoint}`;
-                    }
-                } catch {
-                }
+            const suggestedName = this._suggestRequestName(requestData);
+            if (suggestedName) {
+                nameInput.value = suggestedName;
             }
 
             collections.forEach(collection => {
@@ -299,18 +365,6 @@ export class CollectionDialogs {
             collectionSelect.appendChild(newCollectionOption);
 
             nameInput.focus();
-
-            const keydownController = new AbortController();
-
-            const finish = (result) => {
-                if (resolved) {
-                    return;
-                }
-                resolved = true;
-                keydownController.abort();
-                dialog.remove();
-                resolve(result);
-            };
 
             collectionSelect.addEventListener('change', () => {
                 const isNewCollection = collectionSelect.value === '__new__';
@@ -330,13 +384,8 @@ export class CollectionDialogs {
                 }
             });
 
-            cancelBtn.addEventListener('click', () => {
-                finish(null);
-            });
-
-            closeBtn.addEventListener('click', () => {
-                finish(null);
-            });
+            cancelBtn.addEventListener('click', () => finish(null));
+            closeBtn.addEventListener('click', () => finish(null));
 
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
@@ -363,71 +412,10 @@ export class CollectionDialogs {
                         targetCollectionId = newCollection.id;
                     }
 
-                    const descriptor = getProtocol(requestData.protocol);
                     const address = requestData.url || requestData.broker || '';
-
-                    const endpointData = {
-                        name,
-                        protocol: descriptor.id,
-                        method: requestData.method || 'GET',
-                        path: address || '/'
-                    };
-
-                    if (descriptor.urlBased) {
-                        endpointData.url = address;
-                    }
-
-                    if (descriptor.needsTarget && requestData.grpc) {
-                        endpointData.target = requestData.grpc.target;
-                        endpointData.fullMethod = requestData.grpc.fullMethod;
-                        endpointData.requestJson = requestData.grpc.requestJson;
-                    }
-
-                    if (descriptor.createSidecars.includes('graphqlData')) {
-                        endpointData.query = requestData.query || '';
-                        endpointData.variables = requestData.variables || '';
-                        endpointData.operationName = requestData.operationName || null;
-                    }
-
-                    if (descriptor.createSidecars.includes('mqttData')) {
-                        endpointData.clientId = requestData.clientId || '';
-                        endpointData.username = requestData.username || '';
-                        endpointData.subscribeTopic = requestData.subscribeTopic || '';
-                        endpointData.publishTopic = requestData.publishTopic || '';
-                        endpointData.qos = requestData.qos || 0;
-                    }
-
+                    const endpointData = this._buildEndpointData(name, requestData, address);
                     const newEndpoint = await this.collectionService.addRequestToCollection(targetCollectionId, endpointData);
-
-                    if (requestData.pathParams && Object.keys(requestData.pathParams).length > 0) {
-                        const pathParamsArray = Object.entries(requestData.pathParams).map(([key, value]) => ({ key, value }));
-                        await this.collectionRepository.savePersistedPathParams(targetCollectionId, newEndpoint.id, pathParamsArray);
-                    }
-
-                    const queryParamsArray = normalizeKeyValueRows(requestData.queryParams);
-                    if (queryParamsArray.length > 0) {
-                        await this.collectionRepository.savePersistedQueryParams(targetCollectionId, newEndpoint.id, queryParamsArray);
-                    }
-
-                    const headersArray = normalizeKeyValueRows(requestData.headers);
-                    if (headersArray.length > 0) {
-                        await this.collectionRepository.savePersistedHeaders(targetCollectionId, newEndpoint.id, headersArray);
-                    }
-
-                    if (requestData.body?.content) {
-                        await this.collectionRepository.saveModifiedRequestBody(targetCollectionId, newEndpoint.id, requestData.body.content);
-                    }
-
-                    if (requestData.authType && requestData.authType !== 'none') {
-                        await this.collectionRepository.savePersistedAuthConfig(targetCollectionId, newEndpoint.id, {
-                            type: requestData.authType,
-                            config: requestData.authConfig || {}
-                        });
-                    }
-
-                    if (address) {
-                        await this.collectionRepository.savePersistedUrl(targetCollectionId, newEndpoint.id, address);
-                    }
+                    await this._persistRequestSidecars(targetCollectionId, newEndpoint.id, requestData, address);
 
                     const targetCollection = collections.find(entry => entry.id === targetCollectionId);
 
@@ -439,55 +427,27 @@ export class CollectionDialogs {
                             || (selectedCollectionId === '__new__' ? newCollectionInput.value.trim() : '')
                     });
                 } catch (error) {
-                    if (!resolved) {
-                        resolved = true;
-                        keydownController.abort();
-                        dialog.remove();
-                        reject(error);
-                    }
+                    fail(error);
                 }
             });
-
-            dialog.addEventListener('click', (e) => {
-                if (e.target === dialog) {
-                    finish(null);
-                }
-            });
-
-            const releaseEscape = pushEscapeHandler(() => finish(null));
-            keydownController.signal.addEventListener('abort', releaseEscape, { once: true });
         });
     }
 
     async showDocOptionsDialog() {
         return new Promise((resolve) => {
-            const fragment = templateLoader.cloneSync(
-                './src/templates/docs/docOptionsDialog.html',
-                'tpl-doc-options-dialog'
-            );
-            const dialog = fragment.firstElementChild;
-
-            document.body.appendChild(dialog);
-
-            if (app.i18n && app.i18n.updateUI) {
-                app.i18n.updateUI(dialog);
-            }
+            const { dialog, finish } = this._mountDialog(DOC_OPTIONS_TEMPLATE, 'tpl-doc-options-dialog', resolve);
 
             const form = dialog.querySelector('#doc-options-form');
             const formatSelect = dialog.querySelector('#doc-format');
             const includeExamplesCheckbox = dialog.querySelector('#doc-include-examples');
             const languageCheckboxesContainer = dialog.querySelector('#language-checkboxes');
             const cancelBtn = dialog.querySelector('#cancel-btn');
-            let resolved = false;
 
             const languages = DocGeneratorService.getAvailableLanguages();
             const defaultLanguages = DocGeneratorService.DEFAULT_LANGUAGES;
 
             languages.forEach(lang => {
-                const checkboxFragment = templateLoader.cloneSync(
-                    './src/templates/docs/docOptionsDialog.html',
-                    'tpl-language-checkbox'
-                );
+                const checkboxFragment = templateLoader.cloneSync(DOC_OPTIONS_TEMPLATE, 'tpl-language-checkbox');
                 const label = checkboxFragment.firstElementChild;
                 const checkbox = label.querySelector('input[type="checkbox"]');
                 const nameSpan = label.querySelector('.doc-language-name');
@@ -501,29 +461,15 @@ export class CollectionDialogs {
                 languageCheckboxesContainer.appendChild(label);
             });
 
-            const keydownController = new AbortController();
-
-            const finish = (result) => {
-                if (resolved) {
-                    return;
-                }
-                resolved = true;
-                keydownController.abort();
-                dialog.remove();
-                resolve(result);
-            };
-
-            cancelBtn.addEventListener('click', () => {
-                finish(null);
-            });
+            cancelBtn.addEventListener('click', () => finish(null));
 
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
 
-                const selectedLanguages = [];
-                languageCheckboxesContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-                    selectedLanguages.push(cb.dataset.langId);
-                });
+                const selectedLanguages = Array.from(
+                    languageCheckboxesContainer.querySelectorAll('input[type="checkbox"]:checked'),
+                    cb => cb.dataset.langId
+                );
 
                 finish({
                     format: formatSelect.value,
@@ -531,15 +477,6 @@ export class CollectionDialogs {
                     languages: selectedLanguages
                 });
             });
-
-            dialog.addEventListener('click', (e) => {
-                if (e.target === dialog) {
-                    finish(null);
-                }
-            });
-
-            const releaseEscape = pushEscapeHandler(() => finish(null));
-            keydownController.signal.addEventListener('abort', releaseEscape, { once: true });
         });
     }
 
@@ -547,13 +484,7 @@ export class CollectionDialogs {
         const defaultStoragePath = await this.backendAPI.collections.getPath().catch(() => '');
 
         return new Promise((resolve) => {
-            const fragment = templateLoader.cloneSync(
-                './src/templates/collections/newDialogs.html',
-                'tpl-import-collection-dialog'
-            );
-            const dialog = fragment.firstElementChild;
-
-            document.body.appendChild(dialog);
+            const { dialog, finish } = this._mountDialog(NEW_DIALOGS_TEMPLATE, 'tpl-import-collection-dialog', resolve);
 
             const titleElement = dialog.querySelector('#import-collection-title');
             const subtitleElement = dialog.querySelector('#import-collection-subtitle');
@@ -572,18 +503,10 @@ export class CollectionDialogs {
 
             let selectedFilePath = '';
             let selectedStoragePath = defaultStoragePath;
-            let dialogClosed = false;
-            const keydownController = new AbortController();
-
-            if (app.i18n && app.i18n.updateUI) {
-                app.i18n.updateUI(dialog);
-            }
 
             const t = (key, fallback) => (app.i18n && app.i18n.t) ? app.i18n.t(key) : fallback;
-            if (importKind === 'collection') {
-                titleElement.textContent = t('import_dialog.title_collection', 'Import Collection');
-                subtitleElement.textContent = t('import_dialog.subtitle_collection', 'Choose an OpenAPI/Swagger, Postman, Insomnia, or HAR file — the format is detected automatically.');
-            }
+            titleElement.textContent = t('import_dialog.title_collection', 'Import Collection');
+            subtitleElement.textContent = t('import_dialog.subtitle_collection', 'Choose an OpenAPI/Swagger, Postman, Insomnia, or HAR file — the format is detected automatically.');
 
             const setError = (message = '') => {
                 if (!message) {
@@ -614,26 +537,8 @@ export class CollectionDialogs {
             setSourceFile('');
             setDestinationFolder(selectedStoragePath);
 
-            const closeDialog = async (result = null) => {
-                if (dialogClosed) {
-                    return;
-                }
-                dialogClosed = true;
-                keydownController.abort();
-                dialog.remove();
-                resolve(result);
-            };
-
-            const releaseEscape = pushEscapeHandler(() => void closeDialog(null));
-            keydownController.signal.addEventListener('abort', releaseEscape, { once: true });
-
-            closeBtn.addEventListener('click', () => {
-                void closeDialog(null);
-            });
-
-            cancelBtn.addEventListener('click', () => {
-                void closeDialog(null);
-            });
+            closeBtn.addEventListener('click', () => finish(null));
+            cancelBtn.addEventListener('click', () => finish(null));
 
             sourceFileBtn.addEventListener('click', async () => {
                 const filePath = await this.backendAPI.collections.pickImportFile(importKind).catch(() => null);
@@ -666,16 +571,10 @@ export class CollectionDialogs {
                     return;
                 }
 
-                void closeDialog({
+                finish({
                     filePath: selectedFilePath,
                     storageParentPath: selectedStoragePath || null
                 });
-            });
-
-            dialog.addEventListener('click', (e) => {
-                if (e.target === dialog) {
-                    void closeDialog(null);
-                }
             });
         });
     }

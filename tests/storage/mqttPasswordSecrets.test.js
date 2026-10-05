@@ -82,8 +82,7 @@ describe('collection MQTT data keeps the password in the keychain', () => {
         await repo.saveMqttData('c1', 'e1', { clientId: 'x', password: 'pw' });
 
         expect(api.__endpointData['c1/e1'].mqttData).toEqual({ clientId: 'x' });
-        expect(await repo.getMqttData('c1', 'e1')).toEqual({ clientId: 'x', password: 'pw' });
-        expect((await repo.getAllPersistedEndpointData('c1', 'e1')).mqttData.password).toBe('pw');
+        expect((await repo.getAllPersistedEndpointData('c1', 'e1')).mqttData).toEqual({ clientId: 'x', password: 'pw' });
     });
 
     test('an empty password clears the secret; deleting endpoint data removes it', async () => {

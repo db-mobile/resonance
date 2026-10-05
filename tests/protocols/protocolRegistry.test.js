@@ -3,7 +3,6 @@ import {
     RequestMode,
     getProtocol,
     resolveProtocolId,
-    protocolIdFromMethodLabel,
     listProtocolIds,
     derivePath,
     deriveMethod,
@@ -48,15 +47,6 @@ describe('protocolRegistry', () => {
         Object.values(PROTOCOLS).forEach(descriptor => {
             expect(Object.keys(descriptor.persisted).sort()).toEqual([...PERSISTED_DATA_KINDS].sort());
         });
-    });
-
-    test('method labels reverse-map to their protocol', () => {
-        expect(protocolIdFromMethodLabel('SSE')).toBe('sse');
-        expect(protocolIdFromMethodLabel('WS')).toBe('websocket');
-        expect(protocolIdFromMethodLabel('GQL')).toBe('graphql');
-        expect(protocolIdFromMethodLabel('GRPC')).toBe('grpc');
-        expect(protocolIdFromMethodLabel('MQTT')).toBe('mqtt');
-        expect(protocolIdFromMethodLabel('GET')).toBeNull();
     });
 
     test('only http may rewrite a stored path from the entered URL', () => {

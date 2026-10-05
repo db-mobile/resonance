@@ -9,7 +9,6 @@ import { debounce } from './utils/debounce.js';
 import { findRequest } from './collections/collectionTree.js';
 import { buildMockPath } from './collections/endpointUrl.js';
 import { methodCarriesBody, requestSendsBody } from './utils/bodyMethods.js';
-import { processFormRows } from './utils/formDataRows.js';
 import { inFlightRequestFor, newRequestId, trackInFlight } from './state/inFlightRequests.js';
 import { registerPendingSave } from './state/pendingSaves.js';
 import { resolveRequestSettings } from './state/settingsCache.js';
@@ -183,6 +182,39 @@ export async function generateEffectiveAuthData({ variables, processor, refreshO
 }
 
 /**
+ * @param {Object} requestConfig
+ * @param {{authConfig?: Object, awsAuth?: Object, ntlmAuth?: Object}} authData
+ * @returns {void}
+ */
+function attachAuthTransport(requestConfig, authData) {
+    if (authData.authConfig) {
+        requestConfig.auth = authData.authConfig;
+    }
+    if (authData.awsAuth) {
+        requestConfig.awsAuth = authData.awsAuth;
+    }
+    if (authData.ntlmAuth) {
+        requestConfig.ntlm = authData.ntlmAuth;
+    }
+}
+
+/**
+ * @param {{url: string, clientCert?: Object}} requestConfig
+ * @returns {void}
+ */
+function attachClientCert(requestConfig) {
+    if (!app.certificateController) {
+        return;
+    }
+    try {
+        const clientCert = app.certificateController.getForHost(new URL(requestConfig.url).host);
+        if (clientCert) {
+            requestConfig.clientCert = clientCert;
+        }
+    } catch {}
+}
+
+/**
  * @param {Object} processor
  * @param {Object} requestConfig
  * @param {string[]} [extraNames]
@@ -208,9 +240,7 @@ export function warnUnresolvedVariables(processor, requestConfig, extraNames = [
         const shown = unresolved.slice(0, 5).map(name => `{{${name}}}`).join(', ');
         const more = unresolved.length > 5 ? ` and ${unresolved.length - 5} more` : '';
         toast.warning(`Request sent with unresolved variables: ${shown}${more}`);
-    } catch (e) {
-        void e;
-    }
+    } catch {}
 }
 
 /** @returns {Promise<{schema?: import('graphql').GraphQLSchema, url?: string, error?: string}>} */
@@ -223,20 +253,11 @@ export async function fetchGraphQLIntrospection() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    const builder = getRequestBuilderService();
-
-    let authData;
-    let resolvedUrl;
-    try {
-        const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
-        authData = await generateEffectiveAuthData({ variables, processor });
-        builder.mergeAuthData(headers, queryParams, authData);
-        ({ url: resolvedUrl } = builder.processRequestComponents({
-            url, pathParams: {}, headers, queryParams, variables, processor
-        }));
-    } catch (error) {
-        return { error: variableProcessingError(error) };
+    const prepared = await resolveRequestPipeline({ url, headers, queryParams });
+    if (!prepared.ok) {
+        return { error: prepared.error };
     }
+    const { url: resolvedUrl, authData } = prepared;
 
     const { timeout, verifySsl, followRedirects } = await resolveRequestSettings();
 
@@ -251,25 +272,8 @@ export async function fetchGraphQLIntrospection() {
         followRedirects
     };
 
-    if (authData.authConfig) {
-        requestConfig.auth = authData.authConfig;
-    }
-    if (authData.awsAuth) {
-        requestConfig.awsAuth = authData.awsAuth;
-    }
-    if (authData.ntlmAuth) {
-        requestConfig.ntlm = authData.ntlmAuth;
-    }
-    if (app.certificateController) {
-        try {
-            const clientCert = app.certificateController.getForHost(new URL(resolvedUrl).host);
-            if (clientCert) {
-                requestConfig.clientCert = clientCert;
-            }
-        } catch (e) {
-            void e;
-        }
-    }
+    attachAuthTransport(requestConfig, authData);
+    attachClientCert(requestConfig);
 
     let result;
     try {
@@ -637,22 +641,25 @@ async function handleGraphQLSubscriptionRequest() {
 
     scheduleEndpointSave();
 
-    let url = urlInput?.value?.trim() || urlInput?.getAttribute('value') || '';
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
-    const builder = getRequestBuilderService();
 
     let query = graphqlBodyManager.getGraphQLQuery().trim();
     const variablesText = graphqlBodyManager.getGraphQLVariables().trim();
     const operationName = graphqlBodyManager.getSelectedOperationName?.() || null;
 
+    const prepared = await resolveRequestPipeline({
+        url: urlInput?.value?.trim() || urlInput?.getAttribute('value') || '',
+        headers,
+        queryParams
+    });
+    if (!prepared.ok) {
+        updateStatusDisplay(prepared.error, null);
+        return;
+    }
+    const { url, variables, processor } = prepared;
+
     try {
-        const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
-        const authData = await generateEffectiveAuthData({ variables, processor });
-        builder.mergeAuthData(headers, queryParams, authData);
-        ({ url } = builder.processRequestComponents({
-            url, pathParams: {}, headers, queryParams, variables, processor
-        }));
         query = processor.processTemplate(query, variables);
 
         let parsedVariables = {};
@@ -770,36 +777,60 @@ function readSendUrl(protocolId) {
 }
 
 /**
- * @param {string} protocolId
- * @param {boolean} useAuth
- * @returns {Promise<Object>}
+ * @param {Array<{key: string, value: string, enabled: boolean}>} queryRows
+ * @param {Object<string, string>} authQueryParams
+ * @returns {void}
  */
-async function prepareStreamingSend(protocolId, useAuth) {
-    const headers = useAuth ? parseKeyValuePairs(document.getElementById('headers-list')) : {};
-    const queryParams = useAuth ? parseKeyValuePairs(document.getElementById('query-params-list')) : {};
+function appendAuthQueryRows(queryRows, authQueryParams) {
+    const rowKeys = new Set(queryRows.map((row) => row.key));
+    for (const [key, value] of Object.entries(authQueryParams || {})) {
+        if (!rowKeys.has(key)) {
+            queryRows.push({ key, value, enabled: true });
+        }
+    }
+}
+
+/**
+ * @param {{url: string, pathParams?: Object, headers: Object, queryParams: Object, queryRows?: Array<Object>, useAuth?: boolean, refreshOAuth?: boolean}} request
+ * @returns {Promise<{ok: true, url: string, queryString: string, pathParams: Object, headers: Object, queryParams: Object, variables: Object, processor: Object, authData: Object|null}|{ok: false, error: string}>}
+ */
+async function resolveRequestPipeline({ url, pathParams = {}, headers, queryParams, queryRows, useAuth = true, refreshOAuth = true }) {
     const builder = getRequestBuilderService();
 
     try {
         const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
 
+        let authData = null;
         if (useAuth) {
-            const authData = await generateEffectiveAuthData({ variables, processor });
+            authData = await generateEffectiveAuthData({ variables, processor, refreshOAuth });
             builder.mergeAuthData(headers, queryParams, authData);
+            if (queryRows) {
+                appendAuthQueryRows(queryRows, authData.queryParams);
+            }
         }
 
-        const { url } = builder.processRequestComponents({
-            url: readSendUrl(protocolId),
-            pathParams: {},
-            headers,
-            queryParams,
-            variables,
-            processor
+        const processed = builder.processRequestComponents({
+            url, pathParams, headers, queryParams, queryRows, variables, processor
         });
 
-        return { ok: true, url, headers, queryParams, variables, processor };
+        return { ok: true, ...processed, headers, queryParams, variables, processor, authData };
     } catch (error) {
         return { ok: false, error: variableProcessingError(error) };
     }
+}
+
+/**
+ * @param {string} protocolId
+ * @param {boolean} useAuth
+ * @returns {Promise<Object>}
+ */
+function prepareStreamingSend(protocolId, useAuth) {
+    return resolveRequestPipeline({
+        url: readSendUrl(protocolId),
+        headers: useAuth ? parseKeyValuePairs(document.getElementById('headers-list')) : {},
+        queryParams: useAuth ? parseKeyValuePairs(document.getElementById('query-params-list')) : {},
+        useAuth
+    });
 }
 
 /** @returns {Object} */
@@ -902,10 +933,263 @@ async function recordRequestOutcome(requestConfig, outcome, scriptResult, histor
                 requestConfig,
                 scriptResult
             );
-        } catch (error) {
-            void error;
+        } catch {}
+    }
+}
+
+/**
+ * @param {Object} processor
+ * @param {Object} variables
+ * @returns {{body?: {query: string, variables: Object, operationName?: string}, error?: string}}
+ */
+function buildGraphQLPayload(processor, variables) {
+    const query = processor.processTemplate(graphqlBodyManager.getGraphQLQuery().trim(), variables);
+    const variablesText = processor.processTemplate(graphqlBodyManager.getGraphQLVariables().trim(), variables);
+
+    let parsedVariables = {};
+    if (variablesText) {
+        try {
+            parsedVariables = JSON.parse(variablesText);
+        } catch (e) {
+            return { error: `Invalid GraphQL Variables JSON: ${e.message}` };
         }
     }
+
+    const body = { query, variables: parsedVariables };
+    const operationName = graphqlBodyManager.getSelectedOperationName?.();
+    if (operationName) {
+        body.operationName = operationName;
+    }
+    return { body };
+}
+
+/**
+ * @param {string} bodyMode
+ * @param {Object} processor
+ * @param {Object} variables
+ * @returns {{body?: *, error?: string}}
+ */
+function buildSendBody(bodyMode, processor, variables) {
+    try {
+        if (isGraphQLMode() && graphqlBodyManager) {
+            return buildGraphQLPayload(processor, variables);
+        }
+
+        const captured = captureSnippetBody({
+            bodyMode,
+            formBodyManager: app.formBodyManager,
+            requestBodyTextEditor: app.requestBodyTextEditor,
+            jsonContent: getRequestBodyContent(),
+            processor,
+            variables
+        });
+        if (captured.error) {
+            return { error: `Invalid Body JSON: ${captured.error}` };
+        }
+        if (bodyMode === 'binary' && app.formBodyManager && captured.body === undefined) {
+            return { error: 'No file selected for binary body.' };
+        }
+        return { body: captured.body };
+    } catch (e) {
+        return { error: `Error processing request body: ${e.message}` };
+    }
+}
+
+/**
+ * @param {string} message
+ * @returns {void}
+ */
+function abortSend(message) {
+    toast.error(message);
+    clearResponseDisplay();
+    setRequestInProgress(false);
+}
+
+/** @returns {Promise<Object>} */
+async function prepareHttpSend() {
+    let url = urlInput?.value?.trim() || '';
+    if (!url && urlInput) {
+        url = urlInput.getAttribute('value') || '';
+    }
+
+    const method = isGraphQLMode() ? 'POST' : methodSelect.value;
+    const pathParams = parseKeyValuePairs(document.getElementById('path-params-list'));
+    const headers = parseKeyValuePairs(document.getElementById('headers-list'));
+    const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
+    const queryRows = parseKeyValueRows(document.getElementById('query-params-list'))
+        .filter((row) => row.enabled);
+
+    const prepared = await resolveRequestPipeline({ url, pathParams, headers, queryParams, queryRows });
+    if (!prepared.ok) {
+        return prepared;
+    }
+
+    return {
+        ...prepared,
+        rawUrl: url,
+        method,
+        historySensitive: {
+            headerNames: Object.keys(prepared.authData.headers || {}),
+            queryNames: Object.keys(prepared.authData.queryParams || {})
+        }
+    };
+}
+
+/**
+ * @param {Object} processedPathParams
+ * @param {string} queryString
+ * @returns {Promise<{rewrite: {baseUrl: string, pathTemplate: string}, url: string}|null>}
+ */
+async function tryResolveMockRewrite(processedPathParams, queryString) {
+    if (!getCurrentEndpoint()) {
+        return null;
+    }
+    try {
+        return await resolveMockRewrite(processedPathParams, queryString);
+    } catch (error) {
+        console.warn('Mock server check failed, sending to the real URL:', error);
+        return null;
+    }
+}
+
+/**
+ * @param {{method: string, url: string, rawUrl: string, headers: Object, queryParams: Object, pathParams: Object, body: *, bodyMode: string}} parts
+ * @returns {Promise<Object>}
+ */
+async function buildSendConfig({ method, url, rawUrl, headers, queryParams, pathParams, body, bodyMode }) {
+    const { httpVersion, timeout, verifySsl, followRedirects } = await resolveRequestSettings();
+
+    return {
+        method,
+        url,
+        rawUrl,
+        headers,
+        queryParams,
+        pathParams,
+        body,
+        bodyType: (bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'text' || bodyMode === 'binary') ? bodyMode : undefined,
+        httpVersion,
+        timeout,
+        verifySsl,
+        followRedirects
+    };
+}
+
+/**
+ * @param {Object} requestConfig
+ * @param {string|null} requestTabId
+ * @returns {Promise<{requestConfig: Object, snapshot: {url: string, queryParams: Object, pathParams: Object}}|null>}
+ */
+async function runPreRequestScript(requestConfig, requestTabId) {
+    const snapshot = {
+        url: requestConfig.url,
+        queryParams: { ...requestConfig.queryParams },
+        pathParams: { ...requestConfig.pathParams }
+    };
+    try {
+        const scripted = await app.scriptController.executePreRequest(
+            getCurrentEndpoint().collectionId,
+            getCurrentEndpoint().endpointId,
+            requestConfig
+        );
+        return { requestConfig: scripted, snapshot };
+    } catch (error) {
+        const message = `Pre-request script error: ${error.message}`;
+        displayResponseWithLineNumbersForTab(`${message}\n\nThe request was not sent.`, null, requestTabId);
+        clearResponsePanes(requestTabId, globalResponseElements());
+        await showStatusIfActive(requestTabId, message);
+        toast.error(message);
+        return null;
+    }
+}
+
+/**
+ * @param {Object} requestConfig
+ * @param {{snapshot: Object, rawUrl: string, variables: Object, processor: Object, mockRewrite: Object|null, authData: Object}} ctx
+ * @returns {void}
+ */
+function applyScriptMutations(requestConfig, { snapshot, rawUrl, variables, processor, mockRewrite, authData }) {
+    const builder = getRequestBuilderService();
+    requestConfig.url = builder.applyScriptParamMutations({
+        requestConfig, snapshot, rawUrl, variables, processor, mockRewrite
+    });
+    const authStripped = builder.stripCrossOriginAuth({
+        requestConfig,
+        originalUrl: snapshot.url,
+        authData
+    });
+    if (authStripped) {
+        toast.warning('Authentication was not sent: the pre-request script changed the request host.');
+    }
+}
+
+/**
+ * @param {Object} requestConfig
+ * @returns {Promise<void>}
+ */
+async function attachCookieHeader(requestConfig) {
+    if (!app.cookieController) {
+        return;
+    }
+    const cookieHeader = await app.cookieController.getCookieHeader(requestConfig.url);
+    if (!cookieHeader) {
+        return;
+    }
+    requestConfig.headers = requestConfig.headers || {};
+    if (!requestConfig.headers['Cookie'] && !requestConfig.headers['cookie']) {
+        requestConfig.headers['Cookie'] = cookieHeader;
+    }
+}
+
+/**
+ * @param {Object} requestConfig
+ * @param {{processor: Object, authData: Object}} ctx
+ * @returns {Promise<void>}
+ */
+async function decorateSendConfig(requestConfig, { processor, authData }) {
+    attachClientCert(requestConfig);
+    await attachCookieHeader(requestConfig);
+    warnUnresolvedVariables(processor, requestConfig, authData.unresolvedVariables || []);
+}
+
+/**
+ * @param {Object} error
+ * @param {string} errorMessage
+ * @returns {string}
+ */
+function errorResponseText(error, errorMessage) {
+    if (!error.data) {
+        return `Error: ${errorMessage}`;
+    }
+    try {
+        return typeof error.data === 'object' ? JSON.stringify(error.data, null, 2) : String(error.data);
+    } catch {
+        return `Error: ${errorMessage}`;
+    }
+}
+
+/**
+ * @param {Object} error
+ * @param {{requestConfig: Object, requestTabId: string|null, historySensitive: Object}} ctx
+ * @returns {Promise<void>}
+ */
+async function handleSendError(error, { requestConfig, requestTabId, historySensitive }) {
+    const status = error.status || null;
+    const statusText = error.statusText || '';
+    const errorMessage = error.message || 'Unknown error';
+    const contentType = error.headers?.['content-type'] || null;
+
+    displayResponseWithLineNumbersForTab(errorResponseText(error, errorMessage), contentType, requestTabId);
+    displayErrorResponsePanes(requestTabId, globalResponseElements(), error);
+    clearGraphQLErrorsBadge(requestTabId);
+
+    if (await isTabCurrentlyActive(requestTabId)) {
+        updateStatusDisplay(status ? `${status}${statusText ? ` ${statusText}` : ''}` : 'Request Failed', status);
+        updateResponseTime(error.ttfb);
+        updateResponseSize(error.size);
+    }
+
+    await recordRequestOutcome(requestConfig, error, error, historySensitive);
 }
 
 export async function handleSendRequest() {
@@ -930,171 +1214,32 @@ export async function handleSendRequest() {
 
     scheduleEndpointSave();
 
-    let url = urlInput?.value?.trim() || '';
-    if (!url && urlInput) {
-        url = urlInput.getAttribute('value') || '';
-    }
-
-    const rawUrl = url;
-
-    const method = isGraphQLMode() ? 'POST' : methodSelect.value;
-    let body = undefined;
-
-    const pathParams = parseKeyValuePairs(document.getElementById('path-params-list'));
-    const headers = parseKeyValuePairs(document.getElementById('headers-list'));
-    const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
-    const queryRows = parseKeyValueRows(document.getElementById('query-params-list'))
-        .filter((row) => row.enabled);
-
-    const builder = getRequestBuilderService();
-
-    let authData;
-    let processor;
-    let _resolvedVariables;
-    let queryString;
-    let processedPathParams;
-    try {
-        ({ variables: _resolvedVariables, processor } = await builder.resolveVariables(
-            getCurrentEndpoint(), headers
-        ));
-
-        authData = await generateEffectiveAuthData({ variables: _resolvedVariables, processor });
-        builder.mergeAuthData(headers, queryParams, authData);
-
-        const rowKeys = new Set(queryRows.map((row) => row.key));
-        for (const [key, value] of Object.entries(authData.queryParams || {})) {
-            if (!rowKeys.has(key)) {
-                queryRows.push({ key, value, enabled: true });
-            }
-        }
-
-        ({ url, queryString, pathParams: processedPathParams } = builder.processRequestComponents({
-            url, pathParams, headers, queryParams, queryRows,
-            variables: _resolvedVariables,
-            processor
-        }));
-    } catch (error) {
-        updateStatusDisplay(variableProcessingError(error), null);
+    const prepared = await prepareHttpSend();
+    if (!prepared.ok) {
+        updateStatusDisplay(prepared.error, null);
         setRequestInProgress(false);
         return;
     }
+    const { method, rawUrl, headers, queryParams, variables, processor, authData, historySensitive } = prepared;
 
-    const historySensitive = {
-        headerNames: Object.keys(authData.headers || {}),
-        queryNames: Object.keys(authData.queryParams || {})
-    };
-
-    let mockRewrite = null;
-    if (getCurrentEndpoint()) {
-        try {
-            const mock = await resolveMockRewrite(processedPathParams, queryString);
-            if (mock) {
-                ({ rewrite: mockRewrite, url } = mock);
-            }
-        } catch (error) {
-            console.warn('Mock server check failed, sending to the real URL:', error);
-        }
-    }
+    const mock = await tryResolveMockRewrite(prepared.pathParams, prepared.queryString);
+    const mockRewrite = mock ? mock.rewrite : null;
+    const url = mock ? mock.url : prepared.url;
 
     const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
+    let body = undefined;
     if (requestSendsBody(method, bodyMode)) {
-        try {
-            const variables = _resolvedVariables;
-
-            if (isGraphQLMode() && graphqlBodyManager) {
-                let queryText = graphqlBodyManager.getGraphQLQuery().trim();
-                let variablesText = graphqlBodyManager.getGraphQLVariables().trim();
-
-                queryText = processor.processTemplate(queryText, variables);
-                variablesText = processor.processTemplate(variablesText, variables);
-
-                let parsedVariables = {};
-                if (variablesText) {
-                    try {
-                        parsedVariables = JSON.parse(variablesText);
-                    } catch (e) {
-                        toast.error(`Invalid GraphQL Variables JSON: ${e.message}`);
-                        clearResponseDisplay();
-                        setRequestInProgress(false);
-                        return;
-                    }
-                }
-
-                body = {
-                    query: queryText,
-                    variables: parsedVariables
-                };
-
-                const operationName = graphqlBodyManager.getSelectedOperationName?.();
-                if (operationName) {
-                    body.operationName = operationName;
-                }
-            } else if ((bodyMode === 'formdata' || bodyMode === 'urlencoded') && app.formBodyManager) {
-                const rows = bodyMode === 'formdata'
-                    ? app.formBodyManager.getFormDataRows()
-                    : app.formBodyManager.getUrlencodedRows();
-                const processed = processFormRows(rows, (text) => processor.processTemplate(text, variables));
-                if (processed.length > 0) {
-                    body = processed;
-                }
-            } else if (bodyMode === 'binary' && app.formBodyManager) {
-                const binary = app.formBodyManager.getBinaryBody();
-                if (!binary.filePath) {
-                    toast.error('No file selected for binary body.');
-                    clearResponseDisplay();
-                    setRequestInProgress(false);
-                    return;
-                }
-                body = {
-                    filePath: processor.processTemplate(binary.filePath, variables),
-                    contentType: binary.contentType || undefined
-                };
-            } else if (bodyMode === 'text') {
-                const rawText = app.requestBodyTextEditor
-                    ? app.requestBodyTextEditor.getContent()
-                    : '';
-                if (rawText) {
-                    body = processor.processTemplate(rawText, variables);
-                }
-            } else {
-                let bodyText = getRequestBodyContent().trim();
-                if (bodyText) {
-                    bodyText = processor.processTemplate(bodyText, variables);
-
-                    try {
-                        body = JSON.parse(bodyText);
-                    } catch (e) {
-                        toast.error(`Invalid Body JSON: ${e.message}`);
-                        clearResponseDisplay();
-                        setRequestInProgress(false);
-                        return;
-                    }
-                }
-            }
-        } catch (e) {
-            toast.error(`Error processing request body: ${e.message}`);
-            clearResponseDisplay();
-            setRequestInProgress(false);
+        const built = buildSendBody(bodyMode, processor, variables);
+        if (built.error) {
+            abortSend(built.error);
             return;
         }
+        ({ body } = built);
     }
 
-    const { httpVersion, timeout, verifySsl, followRedirects } = await resolveRequestSettings();
-
-    let requestConfig = {
-        method,
-        url,
-        rawUrl,
-        headers,
-        queryParams,
-        pathParams: processedPathParams,
-        body,
-        bodyType: (bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'text' || bodyMode === 'binary') ? bodyMode : undefined,
-        httpVersion,
-        timeout,
-        verifySsl,
-        followRedirects
-    };
+    let requestConfig = await buildSendConfig({
+        method, url, rawUrl, headers, queryParams, pathParams: prepared.pathParams, body, bodyMode
+    });
 
     const requestTabId = await getActiveTabId();
     let untrackRequest = null;
@@ -1106,138 +1251,38 @@ export async function handleSendRequest() {
 
         clearResponsePanes(requestTabId, globalResponseElements());
 
-        if (authData.authConfig) {
-            requestConfig.auth = authData.authConfig;
-        }
-
-        if (authData.awsAuth) {
-            requestConfig.awsAuth = authData.awsAuth;
-        }
-
-        if (authData.ntlmAuth) {
-            requestConfig.ntlm = authData.ntlmAuth;
-        }
+        attachAuthTransport(requestConfig, authData);
 
         if (getCurrentEndpoint() && app.scriptController) {
-            const preScriptSnapshot = {
-                url: requestConfig.url,
-                queryParams: { ...requestConfig.queryParams },
-                pathParams: { ...requestConfig.pathParams }
-            };
-            try {
-                requestConfig = await app.scriptController.executePreRequest(
-                    getCurrentEndpoint().collectionId,
-                    getCurrentEndpoint().endpointId,
-                    requestConfig
-                );
-            } catch (error) {
-                const message = `Pre-request script error: ${error.message}`;
-                displayResponseWithLineNumbersForTab(`${message}\n\nThe request was not sent.`, null, requestTabId);
-                clearResponsePanes(requestTabId, globalResponseElements());
-                await showStatusIfActive(requestTabId, message);
-                toast.error(message);
+            const scripted = await runPreRequestScript(requestConfig, requestTabId);
+            if (!scripted) {
                 return;
             }
-            requestConfig.url = builder.applyScriptParamMutations({
-                requestConfig,
-                snapshot: preScriptSnapshot,
-                rawUrl,
-                variables: _resolvedVariables,
-                processor,
-                mockRewrite
+            ({ requestConfig } = scripted);
+            applyScriptMutations(requestConfig, {
+                snapshot: scripted.snapshot, rawUrl, variables, processor, mockRewrite, authData
             });
-            const authStripped = builder.stripCrossOriginAuth({
-                requestConfig,
-                originalUrl: preScriptSnapshot.url,
-                authData
-            });
-            if (authStripped) {
-                toast.warning('Authentication was not sent: the pre-request script changed the request host.');
-            }
         }
 
-        if (app.certificateController) {
-            try {
-                const clientCert = app.certificateController.getForHost(new URL(requestConfig.url).host);
-                if (clientCert) {
-                    requestConfig.clientCert = clientCert;
-                }
-            } catch (e) {
-                void e;
-            }
-        }
-
-        if (app.cookieController) {
-            const cookieHeader = await app.cookieController.getCookieHeader(requestConfig.url);
-            if (cookieHeader) {
-                requestConfig.headers = requestConfig.headers || {};
-                if (!requestConfig.headers['Cookie'] && !requestConfig.headers['cookie']) {
-                    requestConfig.headers['Cookie'] = cookieHeader;
-                }
-            }
-        }
-
-        warnUnresolvedVariables(processor, requestConfig, authData.unresolvedVariables || []);
+        await decorateSendConfig(requestConfig, { processor, authData });
 
         requestConfig.requestId = newRequestId();
         untrackRequest = trackInFlight(requestTabId, requestConfig.requestId);
-        const result = await window.backendAPI.sendApiRequest(requestConfig);
+        const response = await window.backendAPI.sendApiRequest(requestConfig);
 
-        if (result.cancelled) {
+        if (response.cancelled) {
             await showStatusIfActive(requestTabId, 'Request cancelled');
             displayResponseWithLineNumbersForTab('Request was cancelled', null, requestTabId);
             clearResponsePanes(requestTabId, globalResponseElements());
             clearGraphQLErrorsBadge(requestTabId);
             setRequestInProgress(false);
-        } else if (result.status) {
-            await handleReceivedResponse(result, { requestConfig, requestTabId, url, historySensitive });
+        } else if (response.status) {
+            await handleReceivedResponse(response, { requestConfig, requestTabId, url, historySensitive });
         } else {
-            throw result;
+            throw response;
         }
-
     } catch (error) {
-
-        const status = error.status || null;
-        const statusText = error.statusText || '';
-        const errorMessage = error.message || 'Unknown error';
-
-        let errorContent;
-        if (error.data) {
-            try {
-                if (typeof error.data === 'object') {
-                    errorContent = JSON.stringify(error.data, null, 2);
-                } else {
-                    errorContent = String(error.data);
-                }
-            } catch {
-                errorContent = `Error: ${errorMessage}`;
-            }
-        } else {
-            errorContent = `Error: ${errorMessage}`;
-        }
-
-        let contentType = null;
-        if (error.headers && error.headers['content-type']) {
-            contentType = error.headers['content-type'];
-        }
-
-        displayResponseWithLineNumbersForTab(errorContent, contentType, requestTabId);
-
-        displayErrorResponsePanes(requestTabId, globalResponseElements(), error);
-        clearGraphQLErrorsBadge(requestTabId);
-
-        let statusDisplayText = 'Request Failed';
-        if (status) {
-            statusDisplayText = `${status}${statusText ? ` ${statusText}` : ''}`;
-        }
-
-        if (await isTabCurrentlyActive(requestTabId)) {
-            updateStatusDisplay(statusDisplayText, status);
-            updateResponseTime(error.ttfb);
-            updateResponseSize(error.size);
-        }
-
-        await recordRequestOutcome(requestConfig, error, error, historySensitive);
+        await handleSendError(error, { requestConfig, requestTabId, historySensitive });
     } finally {
         untrackRequest?.();
         setRequestInProgress(false);
@@ -1339,8 +1384,6 @@ async function handleReceivedResponse(result, { requestConfig, requestTabId, url
 export async function handleGenerateCurl() {
     scheduleEndpointSave();
 
-    let url = urlInput.value.trim();
-
     const method = methodSelect.value;
     let body = undefined;
 
@@ -1348,27 +1391,14 @@ export async function handleGenerateCurl() {
     const headers = parseKeyValuePairs(document.getElementById('headers-list'));
     const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
 
-    const builder = getRequestBuilderService();
-
-    let processor;
-    let resolvedVariables;
-    try {
-        ({ variables: resolvedVariables, processor } = await builder.resolveVariables(
-            getCurrentEndpoint(), headers
-        ));
-
-        const authData = await generateEffectiveAuthData({ variables: resolvedVariables, processor, refreshOAuth: false });
-        builder.mergeAuthData(headers, queryParams, authData);
-
-        ({ url } = builder.processRequestComponents({
-            url, pathParams, headers, queryParams,
-            variables: resolvedVariables,
-            processor
-        }));
-    } catch (error) {
-        updateStatusDisplay(variableProcessingError(error), null);
+    const prepared = await resolveRequestPipeline({
+        url: urlInput.value.trim(), pathParams, headers, queryParams, refreshOAuth: false
+    });
+    if (!prepared.ok) {
+        updateStatusDisplay(prepared.error, null);
         return;
     }
+    const { url, variables: resolvedVariables, processor } = prepared;
 
     const bodyModeSelect = document.getElementById('body-mode-select');
     const bodyMode = bodyModeSelect?.value || 'json';

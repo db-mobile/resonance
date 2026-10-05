@@ -4,7 +4,6 @@ import {
     textToBase64,
     setResponseMeta,
     getResponseMeta,
-    clearResponseMeta,
     resolveSavePayload,
     handleSaveResponse
 } from '../src/modules/responseSaver.js';
@@ -45,7 +44,6 @@ describe('responseSaver metadata + save', () => {
     const TAB = 'tab-1';
 
     beforeEach(() => {
-        clearResponseMeta(TAB);
         app.responseContainerManager = null;
         window.backendAPI = { saveResponseBody: jest.fn().mockResolvedValue({ success: true }) };
     });
@@ -95,7 +93,7 @@ describe('responseSaver metadata + save', () => {
 
     it('does not call the backend when there is nothing to save', async () => {
         const button = document.createElement('button');
-        await handleSaveResponse(button, TAB);
+        await handleSaveResponse(button, 'tab-without-response');
         expect(window.backendAPI.saveResponseBody).not.toHaveBeenCalled();
     });
 });

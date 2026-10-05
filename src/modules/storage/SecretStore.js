@@ -58,18 +58,6 @@ class StoreBackend {
         }
     }
 
-    async rename(scope, oldKey, newKey) {
-        if (oldKey === newKey) {
-            return;
-        }
-        const data = await this._load();
-        if (data[scope] && Object.prototype.hasOwnProperty.call(data[scope], oldKey)) {
-            data[scope][newKey] = data[scope][oldKey];
-            delete data[scope][oldKey];
-            await this._persist();
-        }
-    }
-
     async deleteScope(scope) {
         const data = await this._load();
         if (data[scope]) {
@@ -215,18 +203,6 @@ class KeychainBackend {
         await this._persistIndex();
     }
 
-    async rename(scope, oldKey, newKey) {
-        if (oldKey === newKey) {
-            return;
-        }
-        const value = await this.get(scope, oldKey);
-        if (value === undefined) {
-            return;
-        }
-        await this.set(scope, newKey, value);
-        await this.delete(scope, oldKey);
-    }
-
     async deleteScope(scope) {
         const index = await this._loadIndex();
         if (!index[scope]) {
@@ -290,8 +266,7 @@ export class SecretStore {
         let available = false;
         try {
             available = Boolean(this.backendAPI.secrets) && await this.backendAPI.secrets.keychainAvailable();
-        } catch (error) {
-            void error;
+        } catch {
         }
 
         if (available) {
@@ -303,7 +278,7 @@ export class SecretStore {
             this.usingKeychain = false;
             this._backend = new StoreBackend(this.backendAPI);
             if (this.onFallback) {
-                try { this.onFallback(); } catch (_e) { }
+                try { this.onFallback(); } catch { }
             }
         }
         return this._backend;
@@ -338,11 +313,6 @@ export class SecretStore {
     /** @param {string} scope */
     async delete(scope, key) {
         return (await this._init()).delete(scope, key);
-    }
-
-    /** @param {string} scope */
-    async rename(scope, oldKey, newKey) {
-        return (await this._init()).rename(scope, oldKey, newKey);
     }
 
     /** @param {string} scope */

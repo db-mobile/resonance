@@ -105,8 +105,10 @@ export class DocGeneratorService {
 
         lines.push('## Table of Contents');
         lines.push('');
-        
-        for (const group of this._groupByFolder(collection)) {
+
+        const groups = this._groupByFolder(collection);
+
+        for (const group of groups) {
             const indent = group.name ? '  ' : '';
             if (group.name) {
                 lines.push(`- [${group.name}](#${this._slugify(group.name)})`);
@@ -118,7 +120,7 @@ export class DocGeneratorService {
         }
         lines.push('');
 
-        for (const group of this._groupByFolder(collection)) {
+        for (const group of groups) {
             if (group.name) {
                 lines.push(`## ${group.name}`);
                 lines.push('');
@@ -156,15 +158,15 @@ export class DocGeneratorService {
         } = options;
 
         const endpoints = await this._getAllEndpointsWithData(collection, includePersistedData);
-        
+
         const template = await this._loadTemplate('./src/templates/docs/docTemplate.html');
 
         const title = escapeHtml(collection.name);
-        const description = collection.description 
-            ? `<p class="description">${escapeHtml(collection.description)}</p>` 
+        const description = collection.description
+            ? `<p class="description">${escapeHtml(collection.description)}</p>`
             : '';
-        const baseUrl = collection.baseUrl 
-            ? `<p class="base-url"><strong>Base URL:</strong> <code>${escapeHtml(collection.baseUrl)}</code></p>` 
+        const baseUrl = collection.baseUrl
+            ? `<p class="base-url"><strong>Base URL:</strong> <code>${escapeHtml(collection.baseUrl)}</code></p>`
             : '';
         const toc = this._generateHtmlToc(collection);
         const content = await this._generateHtmlContent(collection, endpoints, languages);
@@ -186,7 +188,7 @@ export class DocGeneratorService {
         if (DocGeneratorService[cacheKey]) {
             return DocGeneratorService[cacheKey];
         }
-        
+
         try {
             const response = await fetch(path);
             if (response.ok) {
@@ -196,8 +198,95 @@ export class DocGeneratorService {
         } catch (error) {
             console.warn(`Failed to load template: ${path}`);
         }
-        
+
         return '';
+    }
+
+    /**
+     * @param {Object} collection
+     * @param {Object} endpoint
+     * @returns {string}
+     */
+    _fullUrl(collection, endpoint) {
+        return collection.baseUrl ? `${collection.baseUrl}${endpoint.path}` : endpoint.path;
+    }
+
+    /**
+     * @param {Object} collection
+     * @param {Object} endpoint
+     * @param {boolean} includePersistedData
+     * @returns {Promise<Object|null>}
+     */
+    async _persistedDataFor(collection, endpoint, includePersistedData) {
+        if (!includePersistedData) {
+            return null;
+        }
+        return this.collectionRepository.getAllPersistedEndpointData(collection.id, endpoint.id);
+    }
+
+    /**
+     * @param {Object} collection
+     * @param {Object} endpoint
+     * @param {Object|null} persistedData
+     * @returns {Promise<Object|null|undefined>}
+     */
+    async _responseSchema(collection, endpoint, persistedData) {
+        const schemaSource = persistedData ?? await this.collectionRepository.getAllPersistedEndpointData(
+            collection.id,
+            endpoint.id
+        );
+        return schemaSource?.responseSchema;
+    }
+
+    /**
+     * @param {Array<string>} languages
+     * @returns {Array<{langId: string, lang: Object}>}
+     */
+    _knownLanguages(languages) {
+        return languages
+            .map(langId => ({ langId, lang: SUPPORTED_LANGUAGES.find(l => l.id === langId) }))
+            .filter(entry => entry.lang);
+    }
+
+    /**
+     * @param {Object} collection
+     * @param {Object} endpoint
+     * @param {Object|null} persistedData
+     * @param {Array<string>} languages
+     * @returns {Array<{langId: string, lang: Object, code: string}>}
+     */
+    _codeSamples(collection, endpoint, persistedData, languages) {
+        const config = this._buildRequestConfig(collection, endpoint, persistedData);
+        const samples = [];
+
+        for (const { langId, lang } of this._knownLanguages(languages)) {
+            try {
+                samples.push({ langId, lang, code: generateCode(langId, config) });
+            } catch {
+            }
+        }
+
+        return samples;
+    }
+
+    /**
+     * @param {Array<string>} lines
+     * @param {string} title
+     * @param {Array<Object>} params
+     * @returns {void}
+     */
+    _mdParamTable(lines, title, params) {
+        if (params.length === 0) {
+            return;
+        }
+        lines.push(`#### ${title}`);
+        lines.push('');
+        lines.push('| Name | Type | Required | Description |');
+        lines.push('|------|------|----------|-------------|');
+        for (const param of params) {
+            lines.push(`| ${param.name} | ${param.type} | ${param.required ? 'Yes' : 'No'} | ${param.description || '-'} |`);
+        }
+        lines.push('');
     }
 
     async _generateEndpointMarkdown(collection, endpoint, includePersistedData, languages) {
@@ -212,44 +301,13 @@ export class DocGeneratorService {
             lines.push('');
         }
 
-        let fullUrl = endpoint.path;
-        if (collection.baseUrl) {
-            fullUrl = `${collection.baseUrl}${endpoint.path}`;
-        }
-        lines.push(`**URL:** \`${fullUrl}\``);
+        lines.push(`**URL:** \`${this._fullUrl(collection, endpoint)}\``);
         lines.push('');
 
-        let persistedData = null;
-        if (includePersistedData) {
-            persistedData = await this.collectionRepository.getAllPersistedEndpointData(
-                collection.id,
-                endpoint.id
-            );
-        }
+        const persistedData = await this._persistedDataFor(collection, endpoint, includePersistedData);
 
-        const pathParams = this._getPathParams(endpoint, persistedData);
-        if (pathParams.length > 0) {
-            lines.push('#### Path Parameters');
-            lines.push('');
-            lines.push('| Name | Type | Required | Description |');
-            lines.push('|------|------|----------|-------------|');
-            for (const param of pathParams) {
-                lines.push(`| ${param.name} | ${param.type} | ${param.required ? 'Yes' : 'No'} | ${param.description || '-'} |`);
-            }
-            lines.push('');
-        }
-
-        const queryParams = this._getQueryParams(endpoint, persistedData);
-        if (queryParams.length > 0) {
-            lines.push('#### Query Parameters');
-            lines.push('');
-            lines.push('| Name | Type | Required | Description |');
-            lines.push('|------|------|----------|-------------|');
-            for (const param of queryParams) {
-                lines.push(`| ${param.name} | ${param.type} | ${param.required ? 'Yes' : 'No'} | ${param.description || '-'} |`);
-            }
-            lines.push('');
-        }
+        this._mdParamTable(lines, 'Path Parameters', this._getPathParams(endpoint, persistedData));
+        this._mdParamTable(lines, 'Query Parameters', this._getQueryParams(endpoint, persistedData));
 
         const headers = this._getHeaders(endpoint, persistedData, collection);
         if (headers.length > 0) {
@@ -279,11 +337,7 @@ export class DocGeneratorService {
             }
         }
 
-        const schemaSource = persistedData ?? await this.collectionRepository.getAllPersistedEndpointData(
-            collection.id,
-            endpoint.id
-        );
-        const responseSchema = schemaSource?.responseSchema;
+        const responseSchema = await this._responseSchema(collection, endpoint, persistedData);
         if (responseSchema) {
             lines.push('#### Response Schema');
             lines.push('');
@@ -297,23 +351,14 @@ export class DocGeneratorService {
             lines.push('#### Code Samples');
             lines.push('');
 
-            const config = this._buildRequestConfig(collection, endpoint, persistedData);
-
-            for (const langId of languages) {
-                const lang = SUPPORTED_LANGUAGES.find(l => l.id === langId);
-                if (!lang) {continue;}
-
-                try {
-                    const code = generateCode(langId, config);
-                    const langLabel = lang.description ? `${lang.name} (${lang.description})` : lang.name;
-                    lines.push(`**${langLabel}**`);
-                    lines.push('');
-                    lines.push(`\`\`\`${this._getCodeBlockLang(langId)}`);
-                    lines.push(code);
-                    lines.push('```');
-                    lines.push('');
-                } catch (error) {
-                }
+            for (const { langId, lang, code } of this._codeSamples(collection, endpoint, persistedData, languages)) {
+                const langLabel = lang.description ? `${lang.name} (${lang.description})` : lang.name;
+                lines.push(`**${langLabel}**`);
+                lines.push('');
+                lines.push(`\`\`\`${this._getCodeBlockLang(langId)}`);
+                lines.push(code);
+                lines.push('```');
+                lines.push('');
             }
         }
 
@@ -326,26 +371,13 @@ export class DocGeneratorService {
     async _getAllEndpointsWithData(collection, includePersistedData) {
         const endpoints = [];
 
-        const processEndpoint = async (endpoint, folderName = null) => {
-            if (!this._isHttpEndpoint(endpoint)) {return;}
-            
-            let persistedData = null;
-            if (includePersistedData) {
-                persistedData = await this.collectionRepository.getAllPersistedEndpointData(
-                    collection.id,
-                    endpoint.id
-                );
-            }
-            endpoints.push({
-                ...endpoint,
-                folderName,
-                persistedData
-            });
-        };
-
         for (const group of this._groupByFolder(collection)) {
             for (const endpoint of group.endpoints) {
-                await processEndpoint(endpoint, group.name ?? undefined);
+                endpoints.push({
+                    ...endpoint,
+                    folderName: group.name ?? null,
+                    persistedData: await this._persistedDataFor(collection, endpoint, includePersistedData)
+                });
             }
         }
 
@@ -405,11 +437,6 @@ export class DocGeneratorService {
         const endpointId = this._slugify(`${endpoint.method}-${displayName}`);
         const {persistedData} = endpoint;
 
-        let fullUrl = endpoint.path;
-        if (collection.baseUrl) {
-            fullUrl = `${collection.baseUrl}${endpoint.path}`;
-        }
-
         const html = [];
         html.push(`<article class="endpoint" id="${endpointId}">`);
         html.push(`<h3><span class="method method-${endpoint.method.toLowerCase()}">${endpoint.method}</span> ${escapeHtml(displayName)}</h3>`);
@@ -418,7 +445,7 @@ export class DocGeneratorService {
             html.push(`<p class="endpoint-description">${escapeHtml(endpoint.description || endpoint.summary)}</p>`);
         }
 
-        html.push(`<p class="endpoint-url"><strong>URL:</strong> <code>${escapeHtml(fullUrl)}</code></p>`);
+        html.push(`<p class="endpoint-url"><strong>URL:</strong> <code>${escapeHtml(this._fullUrl(collection, endpoint))}</code></p>`);
 
         const pathParams = this._getPathParams(endpoint, persistedData);
         if (pathParams.length > 0) {
@@ -457,11 +484,7 @@ export class DocGeneratorService {
             html.push('</div>');
         }
 
-        const schemaSource = persistedData ?? await this.collectionRepository.getAllPersistedEndpointData(
-            collection.id,
-            endpoint.id
-        );
-        const responseSchema = schemaSource?.responseSchema;
+        const responseSchema = await this._responseSchema(collection, endpoint, persistedData);
         if (responseSchema) {
             html.push('<details class="schema-section">');
             html.push('<summary><h4>Response Schema</h4></summary>');
@@ -474,34 +497,19 @@ export class DocGeneratorService {
             html.push('<h4>Code Samples</h4>');
             html.push('<div class="code-tabs">');
 
-            const config = this._buildRequestConfig(collection, endpoint, persistedData);
-
             html.push('<div class="tab-buttons">');
-            let isFirst = true;
-            for (const langId of languages) {
-                const lang = SUPPORTED_LANGUAGES.find(l => l.id === langId);
-                if (!lang) {continue;}
-                const activeClass = isFirst ? ' active' : '';
+            this._knownLanguages(languages).forEach(({ langId, lang }, index) => {
+                const activeClass = index === 0 ? ' active' : '';
                 html.push(`<button class="tab-btn${activeClass}" data-lang="${langId}">${escapeHtml(lang.name)}</button>`);
-                isFirst = false;
-            }
+            });
             html.push('</div>');
 
-            isFirst = true;
-            for (const langId of languages) {
-                const lang = SUPPORTED_LANGUAGES.find(l => l.id === langId);
-                if (!lang) {continue;}
-
-                try {
-                    const code = generateCode(langId, config);
-                    const activeClass = isFirst ? ' active' : '';
-                    html.push(`<div class="tab-content${activeClass}" data-lang="${langId}">`);
-                    html.push(`<pre><code class="language-${this._getCodeBlockLang(langId)}">${escapeHtml(code)}</code></pre>`);
-                    html.push('</div>');
-                    isFirst = false;
-                } catch (error) {
-                }
-            }
+            this._codeSamples(collection, endpoint, persistedData, languages).forEach(({ langId, code }, index) => {
+                const activeClass = index === 0 ? ' active' : '';
+                html.push(`<div class="tab-content${activeClass}" data-lang="${langId}">`);
+                html.push(`<pre><code class="language-${this._getCodeBlockLang(langId)}">${escapeHtml(code)}</code></pre>`);
+                html.push('</div>');
+            });
 
             html.push('</div>');
             html.push('</div>');
@@ -513,7 +521,7 @@ export class DocGeneratorService {
     }
 
     _generateParamsTable(params) {
-        const rows = params.map(p => 
+        const rows = params.map(p =>
             `<tr><td><code>${escapeHtml(p.name)}</code></td><td>${escapeHtml(p.type)}</td><td>${p.required ? 'Yes' : 'No'}</td><td>${escapeHtml(p.description || '-')}</td></tr>`
         ).join('');
 
@@ -521,92 +529,71 @@ export class DocGeneratorService {
     }
 
     _generateHeadersTable(headers) {
-        const rows = headers.map(h => 
+        const rows = headers.map(h =>
             `<tr><td><code>${escapeHtml(h.name)}</code></td><td>${escapeHtml(h.value || '-')}</td><td>${escapeHtml(h.description || '-')}</td></tr>`
         ).join('');
 
         return `<table><thead><tr><th>Name</th><th>Value</th><th>Description</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
+    /**
+     * @param {Object|undefined} definitions
+     * @param {function(string): (Object|undefined)} findPersisted
+     * @param {function(Object): boolean} isRequired
+     * @returns {Array<{name: string, type: string, required: boolean, description: string, example: string}>}
+     */
+    _paramRows(definitions, findPersisted, isRequired) {
+        return Object.entries(definitions || {}).map(([name, param]) => {
+            const persistedParam = findPersisted(name);
+            return {
+                name,
+                type: param.type || param.schema?.type || 'string',
+                required: isRequired(param),
+                description: param.description || '',
+                example: persistedParam?.value || param.example || ''
+            };
+        });
+    }
+
     _getPathParams(endpoint, persistedData) {
-        const params = [];
-
-        if (endpoint.parameters?.path) {
-            for (const [name, param] of Object.entries(endpoint.parameters.path)) {
-                const persistedParam = persistedData?.pathParams?.find(p => p.key === name);
-                params.push({
-                    name,
-                    type: param.type || param.schema?.type || 'string',
-                    required: param.required !== false,
-                    description: param.description || '',
-                    example: persistedParam?.value || param.example || ''
-                });
-            }
-        }
-
-        return params;
+        return this._paramRows(
+            endpoint.parameters?.path,
+            name => persistedData?.pathParams?.find(p => p.key === name),
+            param => param.required !== false
+        );
     }
 
     _getQueryParams(endpoint, persistedData) {
-        const params = [];
-
-        if (endpoint.parameters?.query) {
-            for (const [name, param] of Object.entries(endpoint.parameters.query)) {
-                const persistedParam = persistedData?.queryParams?.find(p => p.key === name && p.enabled !== false);
-                params.push({
-                    name,
-                    type: param.type || param.schema?.type || 'string',
-                    required: param.required === true,
-                    description: param.description || '',
-                    example: persistedParam?.value || param.example || ''
-                });
-            }
-        }
-
-        return params;
+        return this._paramRows(
+            endpoint.parameters?.query,
+            name => persistedData?.queryParams?.find(p => p.key === name && p.enabled !== false),
+            param => param.required === true
+        );
     }
 
     _getHeaders(endpoint, persistedData, collection) {
         const headers = [];
         const seen = new Set();
+        const pushUnique = (name, value, description) => {
+            if (seen.has(name.toLowerCase())) {
+                return;
+            }
+            seen.add(name.toLowerCase());
+            headers.push({ name, value, description });
+        };
 
-        if (persistedData?.headers) {
-            for (const h of persistedData.headers) {
-                if (h.key && h.enabled !== false && !seen.has(h.key.toLowerCase())) {
-                    seen.add(h.key.toLowerCase());
-                    headers.push({
-                        name: h.key,
-                        value: h.value || '',
-                        description: ''
-                    });
-                }
+        for (const h of persistedData?.headers || []) {
+            if (h.key && h.enabled !== false) {
+                pushUnique(h.key, h.value || '', '');
             }
         }
 
-        if (endpoint.parameters?.header) {
-            for (const [name, param] of Object.entries(endpoint.parameters.header)) {
-                if (!seen.has(name.toLowerCase())) {
-                    seen.add(name.toLowerCase());
-                    headers.push({
-                        name,
-                        value: param.example || '',
-                        description: param.description || ''
-                    });
-                }
-            }
+        for (const [name, param] of Object.entries(endpoint.parameters?.header || {})) {
+            pushUnique(name, param.example || '', param.description || '');
         }
 
-        if (collection.defaultHeaders) {
-            for (const [name, value] of Object.entries(collection.defaultHeaders)) {
-                if (!seen.has(name.toLowerCase())) {
-                    seen.add(name.toLowerCase());
-                    headers.push({
-                        name,
-                        value,
-                        description: ''
-                    });
-                }
-            }
+        for (const [name, value] of Object.entries(collection.defaultHeaders || {})) {
+            pushUnique(name, value, '');
         }
 
         return headers;
@@ -639,10 +626,7 @@ export class DocGeneratorService {
     }
 
     _buildRequestConfig(collection, endpoint, persistedData) {
-        let url = endpoint.path;
-        if (collection.baseUrl) {
-            url = `${collection.baseUrl}${endpoint.path}`;
-        }
+        let url = this._fullUrl(collection, endpoint);
 
         if (endpoint.parameters?.path) {
             for (const [name, param] of Object.entries(endpoint.parameters.path)) {

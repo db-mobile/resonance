@@ -4,7 +4,7 @@
  */
 
 import { app } from '../appContext.js';
-import { templateLoader } from '../templateLoader.js';
+import { applyEnvButtonColor, createEnvDropdownItem, positionEnvDropdown } from './envDropdown.js';
 import { toast } from './Toast.js';
 import { pushEscapeHandler } from './modalEscape.js';
 import { BaseModal } from './BaseModal.js';
@@ -80,22 +80,13 @@ export class CookieManagerDialog extends BaseModal {
     }
 
     _updateEnvButton(content, name, color) {
-        const button = content.querySelector('#cookie-manager-env-btn');
         const nameEl = content.querySelector('#cookie-manager-env-name');
-        const indicator = content.querySelector('[data-role="active-indicator"]');
         if (nameEl) { nameEl.textContent = name; }
-
-        const hasColor = Boolean(color);
-        if (button) {
-            button.classList.toggle('has-color', hasColor);
-            if (hasColor) { button.style.setProperty('--env-selected-color', color); }
-            else { button.style.removeProperty('--env-selected-color'); }
-        }
-        if (indicator) {
-            indicator.classList.toggle('is-hidden', !hasColor);
-            if (hasColor) { indicator.style.setProperty('--env-indicator-color', color); }
-            else { indicator.style.removeProperty('--env-indicator-color'); }
-        }
+        applyEnvButtonColor(
+            content.querySelector('#cookie-manager-env-btn'),
+            content.querySelector('[data-role="active-indicator"]'),
+            color
+        );
     }
 
     _openEnvDropdown(content) {
@@ -106,24 +97,7 @@ export class CookieManagerDialog extends BaseModal {
         dropdown.innerHTML = '';
 
         for (const env of this._environments) {
-            const fragment = templateLoader.cloneSync(
-                './src/templates/environment/environmentSelector.html',
-                'tpl-env-dropdown-item'
-            );
-            const item = fragment.firstElementChild;
-            const isActive = env.id === this._environmentId;
-            item.className = `env-dropdown-item dropdown-item${isActive ? ' active is-active' : ''}`;
-
-            const nameEl = item.querySelector('[data-role="name"]');
-            const checkEl = item.querySelector('[data-role="check"]');
-            const colorEl = item.querySelector('[data-role="color"]');
-            if (nameEl) { nameEl.textContent = env.name; }
-            if (checkEl) { checkEl.classList.toggle('is-hidden', !isActive); }
-            if (colorEl) {
-                colorEl.classList.toggle('is-hidden', !env.color);
-                if (env.color) { colorEl.style.setProperty('--env-indicator-color', env.color); }
-                else { colorEl.style.removeProperty('--env-indicator-color'); }
-            }
+            const item = createEnvDropdownItem(env, env.id === this._environmentId);
 
             item.addEventListener('click', async (e) => {
                 e.stopPropagation();
@@ -151,19 +125,26 @@ export class CookieManagerDialog extends BaseModal {
         const dropdown = content.querySelector('#cookie-manager-env-dropdown');
         const button = content.querySelector('#cookie-manager-env-btn');
         if (!dropdown || !button) { return; }
-        const rect = button.getBoundingClientRect();
-        dropdown.style.setProperty('--env-dropdown-top', `${rect.bottom + 4}px`);
-        dropdown.style.setProperty('--env-dropdown-left', `${rect.left}px`);
-        dropdown.style.setProperty('--env-dropdown-min-width', `${rect.width}px`);
+        positionEnvDropdown(dropdown, button);
     }
 
     async _selectEnvironment(content, env) {
         this._environmentId = env.id;
         this._environmentName = env.name;
         this._updateEnvButton(content, env.name, env.color || null);
+        await this._reloadAndFilter(content);
+    }
+
+    /**
+     * @param {Element} content
+     * @param {boolean} [trimSearch=true]
+     * @returns {Promise<void>}
+     */
+    async _reloadAndFilter(content, trimSearch = true) {
         await this._loadCookies();
         const search = content.querySelector('#cookie-manager-search');
-        if (search && search.value.trim()) { this._applySearch(search.value.trim()); }
+        const term = trimSearch ? search?.value.trim() : search?.value;
+        if (search && term) { this._applySearch(term); }
     }
 
     async _loadToggleState(content) {
@@ -251,9 +232,7 @@ export class CookieManagerDialog extends BaseModal {
             deleteBtn.textContent = translate('cookies.delete', 'Delete');
             deleteBtn.addEventListener('click', async () => {
                 await this.service.delete(cookie.id);
-                await this._loadCookies();
-                const search = content.querySelector('#cookie-manager-search');
-                if (search && search.value) { this._applySearch(search.value); }
+                await this._reloadAndFilter(content, false);
             });
             actionTd.appendChild(deleteBtn);
             tr.appendChild(actionTd);
@@ -382,9 +361,7 @@ export class CookieManagerDialog extends BaseModal {
 
         await this.service.putCookie(cookie, this._environmentId, this._editorOriginalId);
         this._closeEditor(content);
-        await this._loadCookies();
-        const search = content.querySelector('#cookie-manager-search');
-        if (search && search.value.trim()) { this._applySearch(search.value.trim()); }
+        await this._reloadAndFilter(content);
     }
 
     async _exportCookies() {
@@ -453,21 +430,15 @@ export class CookieManagerDialog extends BaseModal {
     }
 
     _setupListeners(content) {
-        const enabledToggle = content.querySelector('#cookie-manager-enabled-toggle');
-        if (enabledToggle) {
-            enabledToggle.addEventListener('change', async (e) => {
-                await updateSetting('cookieJarEnabled', e.target.checked);
-            });
-        }
+        content.querySelector('#cookie-manager-enabled-toggle')?.addEventListener('change', async (e) => {
+            await updateSetting('cookieJarEnabled', e.target.checked);
+        });
 
-        const envBtn = content.querySelector('#cookie-manager-env-btn');
-        if (envBtn) {
-            envBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (this._envDropdownOpen) { this._closeEnvDropdown(content); }
-                else { this._openEnvDropdown(content); }
-            });
-        }
+        content.querySelector('#cookie-manager-env-btn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (this._envDropdownOpen) { this._closeEnvDropdown(content); }
+            else { this._openEnvDropdown(content); }
+        });
 
         const closeBtn = content.querySelector('#cookie-manager-close-btn');
         const clearSessionBtn = content.querySelector('#cookie-manager-clear-session-btn');
@@ -498,26 +469,11 @@ export class CookieManagerDialog extends BaseModal {
             close();
         });
 
-        const addBtn = content.querySelector('#cookie-manager-add-btn');
-        if (addBtn) {
-            addBtn.addEventListener('click', () => this._openEditor(content, null));
-        }
-        const importBtn = content.querySelector('#cookie-manager-import-btn');
-        if (importBtn) {
-            importBtn.addEventListener('click', () => this._importCookies());
-        }
-        const exportBtn = content.querySelector('#cookie-manager-export-btn');
-        if (exportBtn) {
-            exportBtn.addEventListener('click', () => this._exportCookies());
-        }
-        const editorSaveBtn = content.querySelector('#cookie-editor-save-btn');
-        if (editorSaveBtn) {
-            editorSaveBtn.addEventListener('click', () => this._saveEditor(content));
-        }
-        const editorCancelBtn = content.querySelector('#cookie-editor-cancel-btn');
-        if (editorCancelBtn) {
-            editorCancelBtn.addEventListener('click', () => this._closeEditor(content));
-        }
+        content.querySelector('#cookie-manager-add-btn')?.addEventListener('click', () => this._openEditor(content, null));
+        content.querySelector('#cookie-manager-import-btn')?.addEventListener('click', () => this._importCookies());
+        content.querySelector('#cookie-manager-export-btn')?.addEventListener('click', () => this._exportCookies());
+        content.querySelector('#cookie-editor-save-btn')?.addEventListener('click', () => this._saveEditor(content));
+        content.querySelector('#cookie-editor-cancel-btn')?.addEventListener('click', () => this._closeEditor(content));
 
         searchInput.addEventListener('input', (e) => {
             const term = e.target.value.trim();
