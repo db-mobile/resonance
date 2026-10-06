@@ -7,6 +7,7 @@ import { app } from '../appContext.js';
 import { captureFormBody, getRequestBodyContent } from '../requestBodyHelper.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
 import { findRequest, updateRequest } from '../collections/collectionTree.js';
+import { readMqttForm } from '../mqtt/mqttFields.js';
 
 /**
  * @param {HTMLElement} list
@@ -192,14 +193,7 @@ export class CollectionRequestPersistenceService {
         await this.writeSidecarUpdates(collectionId, endpointId,
             this.collectSidecarUpdates({ urlInput, bodyInput }, {}));
 
-        await this.repository.saveMqttData(collectionId, endpointId, {
-            clientId: document.getElementById('mqtt-client-id-input')?.value || '',
-            username: document.getElementById('mqtt-username-input')?.value || '',
-            password: document.getElementById('mqtt-password-input')?.value || '',
-            subscribeTopic: document.getElementById('mqtt-subscribe-input')?.value || '',
-            publishTopic: document.getElementById('mqtt-topic-input')?.value || '',
-            qos: Number(document.getElementById('mqtt-qos-select')?.value) || 0
-        });
+        await this.repository.saveMqttData(collectionId, endpointId, readMqttForm());
     }
 
     /**

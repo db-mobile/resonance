@@ -11,6 +11,7 @@ import { handleGraphQLSubscriptionCancel, isSubscriptionActive, clearGraphQLSubs
 import { clearWebSocketState } from '../websocketHandler.js';
 import { clearSseState } from '../sseHandler.js';
 import { clearMqttState } from '../mqttHandler.js';
+import { MQTT_DEFAULTS } from '../mqtt/mqttFields.js';
 import { clearStreamState } from '../grpcStreamHandler.js';
 import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 
@@ -107,12 +108,7 @@ const NEW_TAB_DEFAULTS = new Map([
             protocol: 'mqtt',
             broker: '',
             method: 'MQTT',
-            clientId: '',
-            username: '',
-            password: '',
-            subscribeTopic: '',
-            publishTopic: '',
-            qos: 0,
+            ...MQTT_DEFAULTS,
             body: { mode: 'json', content: '' },
             authType: 'none',
             authConfig: {}

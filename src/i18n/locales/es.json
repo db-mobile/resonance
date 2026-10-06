@@ -599,7 +599,16 @@
     "status_disconnected": "Desconectado",
     "status_connecting": "Conectando…",
     "status_connected": "Conectado",
-    "status_connected_count": "Conectado · {{count}} recibidos"
+    "status_connected_count": "Conectado · {{count}} recibidos",
+    "retain": "Retener",
+    "keep_alive": "Keep-alive (s)",
+    "clean_session": "Sesión limpia",
+    "section_last_will": "Última voluntad",
+    "will_topic": "Tema del testamento",
+    "will_payload": "Contenido del testamento",
+    "will_qos": "QoS del testamento",
+    "will_retain": "Retener testamento",
+    "clean_session_needs_client_id": "Una sesión persistente (sesión limpia desactivada) necesita un ID de cliente fijo"
   },
   "folder": {
     "new_title": "Nueva carpeta",

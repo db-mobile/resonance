@@ -7,6 +7,7 @@ import { app } from '../appContext.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
 import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
 import { buildEndpointUrl } from '../collections/endpointUrl.js';
+import { normalizeMqttData } from '../mqtt/mqttFields.js';
 
 /**
  * @param {Object} headers
@@ -335,17 +336,10 @@ export class WorkspaceTabEndpointLoaderService {
      * @returns {Object}
      */
     createMqttTabUpdate(endpoint) {
-        const mqtt = endpoint.persistedMqttData || {};
-
         return this._tabUpdate(endpoint, 'mqtt', endpoint.name || 'MQTT Request', {
             broker: endpoint.persistedUrl || endpoint.path || '',
             method: 'MQTT',
-            clientId: mqtt.clientId || '',
-            username: mqtt.username || '',
-            password: mqtt.password || '',
-            subscribeTopic: mqtt.subscribeTopic || '',
-            publishTopic: mqtt.publishTopic || '',
-            qos: mqtt.qos || 0,
+            ...normalizeMqttData(endpoint.persistedMqttData),
             body: {
                 mode: 'json',
                 content: endpoint.persistedBody || ''

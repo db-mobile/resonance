@@ -599,7 +599,16 @@
     "status_disconnected": "Getrennt",
     "status_connecting": "Verbinde…",
     "status_connected": "Verbunden",
-    "status_connected_count": "Verbunden · {{count}} empfangen"
+    "status_connected_count": "Verbunden · {{count}} empfangen",
+    "retain": "Behalten (Retain)",
+    "keep_alive": "Keep-alive (s)",
+    "clean_session": "Saubere Sitzung",
+    "section_last_will": "Letzter Wille",
+    "will_topic": "Will-Topic",
+    "will_payload": "Will-Nutzlast",
+    "will_qos": "Will-QoS",
+    "will_retain": "Will behalten",
+    "clean_session_needs_client_id": "Eine persistente Sitzung (saubere Sitzung aus) braucht eine feste Client-ID"
   },
   "folder": {
     "new_title": "Neuer Ordner",

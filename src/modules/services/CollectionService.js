@@ -27,6 +27,7 @@ import {
 import { captureFormBody, getRequestBodyContent } from '../requestBodyHelper.js';
 import { toast } from '../ui/Toast.js';
 import { generateId } from '../utils/ids.js';
+import { normalizeMqttData } from '../mqtt/mqttFields.js';
 
 export class CollectionService {
     /**
@@ -351,13 +352,8 @@ export class CollectionService {
         }
 
         if (createSidecars.includes('mqttData')) {
-            await this.repository.saveMqttData(collectionId, endpointId, {
-                clientId: requestData.clientId || '',
-                username: requestData.username || '',
-                subscribeTopic: requestData.subscribeTopic || '',
-                publishTopic: requestData.publishTopic || '',
-                qos: requestData.qos || 0
-            });
+            const { password: _password, ...mqttData } = normalizeMqttData(requestData);
+            await this.repository.saveMqttData(collectionId, endpointId, mqttData);
         }
     }
 

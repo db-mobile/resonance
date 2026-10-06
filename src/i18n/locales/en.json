@@ -613,7 +613,16 @@
     "status_disconnected": "Disconnected",
     "status_connecting": "Connecting…",
     "status_connected": "Connected",
-    "status_connected_count": "Connected · {{count}} received"
+    "status_connected_count": "Connected · {{count}} received",
+    "retain": "Retain",
+    "keep_alive": "Keep-alive (s)",
+    "clean_session": "Clean session",
+    "section_last_will": "Last Will",
+    "will_topic": "Will Topic",
+    "will_payload": "Will Payload",
+    "will_qos": "Will QoS",
+    "will_retain": "Retain will",
+    "clean_session_needs_client_id": "A persistent session (clean session off) needs a fixed Client ID"
   },
   "folder": {
     "new_title": "New Folder",

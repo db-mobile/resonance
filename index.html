@@ -518,6 +518,10 @@
                                         </div>
                                     </label>
                                 </div>
+                                <label class="check-label toggle-switch mqtt-field-switch">
+                                    <input type="checkbox" id="mqtt-retain-checkbox" class="switch" aria-label="Retain published message">
+                                    <span data-i18n="mqtt.retain">Retain</span>
+                                </label>
                             </div>
                         </article>
 
@@ -526,11 +530,18 @@
                                 <h4 class="grpc-source-card-title heading" data-i18n="mqtt.section_connection_auth">Connection &amp; Auth</h4>
                             </header>
                             <div class="grpc-source-card-body">
-                                <label class="form-group">
-                                    <span class="grpc-field-label caption dim-label" data-i18n="mqtt.client_id">Client ID</span>
-                                    <input type="text" id="mqtt-client-id-input" class="entry grpc-field-input monospace"
-                                           placeholder="auto-generated" aria-label="MQTT Client ID">
-                                </label>
+                                <div class="mqtt-field-row">
+                                    <label class="form-group mqtt-field-grow">
+                                        <span class="grpc-field-label caption dim-label" data-i18n="mqtt.client_id">Client ID</span>
+                                        <input type="text" id="mqtt-client-id-input" class="entry grpc-field-input monospace"
+                                               placeholder="auto-generated" aria-label="MQTT Client ID">
+                                    </label>
+                                    <label class="form-group mqtt-field-qos">
+                                        <span class="grpc-field-label caption dim-label" data-i18n="mqtt.keep_alive">Keep-alive (s)</span>
+                                        <input type="number" id="mqtt-keepalive-input" class="entry grpc-field-input"
+                                               min="0" max="65535" step="1" value="60" aria-label="MQTT Keep-alive in seconds">
+                                    </label>
+                                </div>
                                 <div class="mqtt-field-row">
                                     <label class="form-group">
                                         <span class="grpc-field-label caption dim-label" data-i18n="mqtt.username">Username</span>
@@ -543,6 +554,45 @@
                                                placeholder="(optional)" autocomplete="off" aria-label="MQTT Password">
                                     </label>
                                 </div>
+                                <label class="check-label toggle-switch mqtt-field-switch">
+                                    <input type="checkbox" id="mqtt-clean-session-checkbox" class="switch" checked aria-label="Clean session">
+                                    <span data-i18n="mqtt.clean_session">Clean session</span>
+                                </label>
+                            </div>
+                        </article>
+
+                        <article class="grpc-source-card mqtt-card boxed-list">
+                            <header class="grpc-source-card-header">
+                                <h4 class="grpc-source-card-title heading" data-i18n="mqtt.section_last_will">Last Will</h4>
+                            </header>
+                            <div class="grpc-source-card-body">
+                                <div class="mqtt-field-row">
+                                    <label class="form-group mqtt-field-grow">
+                                        <span class="grpc-field-label caption dim-label" data-i18n="mqtt.will_topic">Will Topic</span>
+                                        <input type="text" id="mqtt-will-topic-input" class="entry grpc-field-input monospace"
+                                               placeholder="devices/1/status" aria-label="MQTT Will Topic">
+                                    </label>
+                                    <label class="form-group mqtt-field-qos">
+                                        <span class="grpc-field-label caption dim-label" data-i18n="mqtt.will_qos">Will QoS</span>
+                                        <div class="select-wrapper select-wrap">
+                                            <select id="mqtt-will-qos-select" class="select-base" aria-label="MQTT Will QoS Level">
+                                                <option value="0">0 — At most once</option>
+                                                <option value="1">1 — At least once</option>
+                                                <option value="2">2 — Exactly once</option>
+                                            </select>
+                                            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                                        </div>
+                                    </label>
+                                </div>
+                                <label class="form-group">
+                                    <span class="grpc-field-label caption dim-label" data-i18n="mqtt.will_payload">Will Payload</span>
+                                    <input type="text" id="mqtt-will-payload-input" class="entry grpc-field-input monospace"
+                                           placeholder="offline" aria-label="MQTT Will Payload">
+                                </label>
+                                <label class="check-label toggle-switch mqtt-field-switch">
+                                    <input type="checkbox" id="mqtt-will-retain-checkbox" class="switch" aria-label="Retain will message">
+                                    <span data-i18n="mqtt.will_retain">Retain will</span>
+                                </label>
                             </div>
                         </article>
                     </div>
