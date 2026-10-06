@@ -85,6 +85,64 @@ describe('WorkspaceTabEndpointLoaderService history entries', () => {
         });
     });
 
+    const graphqlEntry = () => ({
+        id: 'history_3',
+        request: {
+            protocol: 'graphql',
+            method: 'POST',
+            url: 'https://api.example.com/graphql',
+            rawUrl: '{{baseUrl}}/graphql',
+            headers: { 'Content-Type': 'application/json' },
+            body: {
+                query: 'query GetUser($id: ID!) { user(id: $id) { name } }',
+                variables: { id: 1 },
+                operationName: 'GetUser'
+            }
+        }
+    });
+
+    test('a GraphQL entry becomes a GraphQL tab with query, variables and operation', () => {
+        const update = loader.createHistoryTabUpdate(graphqlEntry());
+
+        expect(update.endpoint).toBeNull();
+        expect(update.historyEntryId).toBe('history_3');
+        expect(update.name).toBe('GetUser');
+        expect(update.request).toEqual({
+            protocol: 'graphql',
+            url: '{{baseUrl}}/graphql',
+            method: 'POST',
+            query: 'query GetUser($id: ID!) { user(id: $id) { name } }',
+            variables: JSON.stringify({ id: 1 }, null, 2),
+            operationName: 'GetUser',
+            headers: { 'Content-Type': 'application/json' },
+            authType: 'none',
+            authConfig: {}
+        });
+    });
+
+    test('a GraphQL entry without variables restores an empty variables pane', () => {
+        const entry = graphqlEntry();
+        entry.request.body = { query: '{ me { id } }', variables: {} };
+
+        const update = loader.createHistoryTabUpdate(entry);
+
+        expect(update.name).toBe('GraphQL Request');
+        expect(update.request.query).toBe('{ me { id } }');
+        expect(update.request.variables).toBe('');
+        expect(update.request.operationName).toBeNull();
+    });
+
+    test('a truncated GraphQL body falls back to the raw text as the query', () => {
+        const entry = graphqlEntry();
+        entry.request.body = '{"query":"{ me { id ';
+
+        const update = loader.createHistoryTabUpdate(entry);
+
+        expect(update.request.protocol).toBe('graphql');
+        expect(update.request.query).toBe('{"query":"{ me { id ');
+        expect(update.request.variables).toBe('');
+    });
+
     test('a string body is restored as text and a missing body as empty JSON', () => {
         const entry = httpEntry();
         entry.request.body = 'plain text payload';
