@@ -42,7 +42,8 @@ export class SchemaValidator {
             const actualType = this._getType(data);
             const expectedTypes = Array.isArray(schema.type) ? schema.type : [schema.type];
             
-            if (!expectedTypes.includes(actualType)) {
+            const isNumberMatch = actualType === 'integer' && expectedTypes.includes('number');
+            if (!expectedTypes.includes(actualType) && !isNumberMatch) {
                 errors.push({
                     path: path || '/',
                     message: `Expected ${expectedTypes.join(' | ')}, got ${actualType}`,
@@ -196,18 +197,20 @@ export class SchemaValidator {
             });
         }
 
-        if (schema.exclusiveMinimum !== undefined && data <= schema.exclusiveMinimum) {
+        const exclusiveMinimum = schema.exclusiveMinimum === true ? schema.minimum : schema.exclusiveMinimum;
+        if (typeof exclusiveMinimum === 'number' && data <= exclusiveMinimum) {
             errors.push({
                 path: path || '/',
-                message: `Value must be > ${schema.exclusiveMinimum}`,
+                message: `Value must be > ${exclusiveMinimum}`,
                 keyword: 'exclusiveMinimum'
             });
         }
 
-        if (schema.exclusiveMaximum !== undefined && data >= schema.exclusiveMaximum) {
+        const exclusiveMaximum = schema.exclusiveMaximum === true ? schema.maximum : schema.exclusiveMaximum;
+        if (typeof exclusiveMaximum === 'number' && data >= exclusiveMaximum) {
             errors.push({
                 path: path || '/',
-                message: `Value must be < ${schema.exclusiveMaximum}`,
+                message: `Value must be < ${exclusiveMaximum}`,
                 keyword: 'exclusiveMaximum'
             });
         }
