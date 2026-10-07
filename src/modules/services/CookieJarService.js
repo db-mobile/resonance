@@ -96,6 +96,8 @@ export class CookieJarService {
             requestHost = new URL(requestUrl).hostname.toLowerCase();
         } catch { return null; }
 
+        if (attributes.domain && !this._matchesDomain(attributes.domain, requestHost, false)) { return null; }
+
         const hostOnly = !attributes.hasDomainAttr;
         const domain = attributes.domain || requestHost;
 

@@ -599,7 +599,16 @@
     "status_disconnected": "Disconnesso",
     "status_connecting": "Connessione…",
     "status_connected": "Connesso",
-    "status_connected_count": "Connesso · {{count}} ricevuti"
+    "status_connected_count": "Connesso · {{count}} ricevuti",
+    "retain": "Mantieni (retain)",
+    "keep_alive": "Keep-alive (s)",
+    "clean_session": "Sessione pulita",
+    "section_last_will": "Ultime volontà",
+    "will_topic": "Topic del will",
+    "will_payload": "Payload del will",
+    "will_qos": "QoS del will",
+    "will_retain": "Mantieni il will",
+    "clean_session_needs_client_id": "Una sessione persistente (sessione pulita disattivata) richiede un ID client fisso"
   },
   "folder": {
     "new_title": "Nuova cartella",

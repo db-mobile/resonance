@@ -78,7 +78,14 @@ describe('CollectionService.addRequestToCollection protocol handling', () => {
             username: '',
             subscribeTopic: 'sensors/#',
             publishTopic: 'sensors/cmd',
-            qos: 1
+            qos: 1,
+            retain: false,
+            keepAlive: 60,
+            cleanSession: true,
+            willTopic: '',
+            willPayload: '',
+            willQos: 0,
+            willRetain: false
         });
     });
 

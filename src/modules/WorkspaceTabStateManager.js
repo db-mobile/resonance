@@ -12,6 +12,7 @@ import { activateTab } from './tabManager.js';
 import { captureFormBody, setRequestBodyContent, getRequestBodyContent } from './requestBodyHelper.js';
 import { setRequestMode, RequestMode, getCurrentMode } from './requestModeManager.js';
 import { getProtocol, resolveProtocolId } from './protocols/protocolRegistry.js';
+import { readMqttForm, writeMqttForm } from './mqtt/mqttFields.js';
 
 /** @type {Object<string, string>} */
 const CAPTURE_BY_PROTOCOL = Object.freeze({
@@ -147,8 +148,6 @@ export class WorkspaceTabStateManager {
 
     /** @returns {Object} */
     _captureMqtt() {
-        const fieldValue = (id) => document.getElementById(id)?.value || '';
-
         return {
             request: {
                 protocol: 'mqtt',
@@ -156,12 +155,7 @@ export class WorkspaceTabStateManager {
                     || this.dom.urlInput?.value
                     || '',
                 method: 'MQTT',
-                clientId: fieldValue('mqtt-client-id-input'),
-                username: fieldValue('mqtt-username-input'),
-                password: fieldValue('mqtt-password-input'),
-                subscribeTopic: fieldValue('mqtt-subscribe-input'),
-                publishTopic: fieldValue('mqtt-topic-input'),
-                qos: Number(document.getElementById('mqtt-qos-select')?.value) || 0,
+                ...readMqttForm(),
                 body: {
                     mode: 'json',
                     content: getRequestBodyContent() || ''
@@ -477,18 +471,7 @@ export class WorkspaceTabStateManager {
 
         this._restoreUrlInputs('mqtt', request.broker);
 
-        const setFieldValue = (id, value) => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.value = value;
-            }
-        };
-        setFieldValue('mqtt-client-id-input', request.clientId || '');
-        setFieldValue('mqtt-username-input', request.username || '');
-        setFieldValue('mqtt-password-input', request.password || '');
-        setFieldValue('mqtt-subscribe-input', request.subscribeTopic || '');
-        setFieldValue('mqtt-topic-input', request.publishTopic || '');
-        setFieldValue('mqtt-qos-select', String(request.qos ?? 0));
+        writeMqttForm(request);
 
         this._restorePlainJsonBody(request.body?.content);
 

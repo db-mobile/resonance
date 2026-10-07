@@ -179,9 +179,8 @@ async function handleBackendEvent(event) {
             state: 'open',
             messageCount: (current.messageCount || 0) + 1
         });
-        const topic = payload.topic ? ` ${payload.topic}` : '';
         await session.updateStatus(tabId, 'MQTT message received', 101);
-        await session.append(tabId, `RECEIVED${topic}`, payload.message || '');
+        await session.append(tabId, receivedLabel(payload), payload.message || '');
         await updateMqttUiIfActive(tabId, true);
         return;
     }
@@ -206,6 +205,48 @@ async function handleBackendEvent(event) {
     }
 }
 
+/**
+ * @param {string} base64
+ * @returns {number}
+ */
+function decodedByteLength(base64) {
+    const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+    return Math.floor(base64.length * 3 / 4) - padding;
+}
+
+/**
+ * @param {{topic?: string, message?: string, encoding?: string, retain?: boolean}} payload
+ * @returns {string}
+ */
+function receivedLabel(payload) {
+    const notes = [];
+    if (payload.encoding === 'base64') {
+        notes.push(`binary, ${decodedByteLength(payload.message || '')} bytes, base64`);
+    }
+    if (payload.retain) {
+        notes.push('retained');
+    }
+    const topic = payload.topic ? ` ${payload.topic}` : '';
+    const suffix = notes.length > 0 ? ` (${notes.join(', ')})` : '';
+    return `RECEIVED${topic}${suffix}`;
+}
+
+/**
+ * @param {{willTopic?: string, willPayload?: string, willQos?: number, willRetain?: boolean}} options
+ * @returns {{topic: string, payload: string, qos: number, retain: boolean}|null}
+ */
+function buildLastWill({ willTopic = '', willPayload = '', willQos = 0, willRetain = false }) {
+    if (!willTopic) {
+        return null;
+    }
+    return {
+        topic: willTopic,
+        payload: willPayload,
+        qos: Number(willQos) || 0,
+        retain: Boolean(willRetain)
+    };
+}
+
 export const initMqttHandler = createBackendEventListener(
     'mqtt-event',
     () => !!window.backendAPI?.mqtt,
@@ -221,6 +262,13 @@ export const initMqttHandler = createBackendEventListener(
  * @param {string} [options.subscribeTopic]
  * @param {string} [options.publishTopic]
  * @param {number} [options.qos]
+ * @param {boolean} [options.retain]
+ * @param {number} [options.keepAlive]
+ * @param {boolean} [options.cleanSession]
+ * @param {string} [options.willTopic]
+ * @param {string} [options.willPayload]
+ * @param {number} [options.willQos]
+ * @param {boolean} [options.willRetain]
  * @param {string} [options.payload]
  * @returns {Promise<boolean>}
  */
@@ -247,8 +295,16 @@ export async function handleMqttSend(broker, options = {}) {
         subscribeTopic = '',
         publishTopic = '',
         qos = 0,
+        retain = false,
+        keepAlive = 60,
+        cleanSession = true,
         payload = ''
     } = options;
+
+    if (!cleanSession && !clientId) {
+        toast.error(i18n.t('mqtt.clean_session_needs_client_id'));
+        return false;
+    }
 
     const current = session.get(tabId);
     if (!current || current.broker !== normalizedBroker) {
@@ -276,8 +332,14 @@ export async function handleMqttSend(broker, options = {}) {
         username,
         password,
         subscribeTopic,
-        qos: Number(qos) || 0
+        qos: Number(qos) || 0,
+        keepAlive,
+        cleanSession
     };
+    const lastWill = buildLastWill(options);
+    if (lastWill) {
+        connectRequest.lastWill = lastWill;
+    }
     if (tls) {
         connectRequest.tls = tls;
     }
@@ -301,9 +363,11 @@ export async function handleMqttSend(broker, options = {}) {
                 tabId,
                 topic: publishTopic,
                 payload,
-                qos: Number(qos) || 0
+                qos: Number(qos) || 0,
+                retain
             });
-            await session.append(tabId, `PUBLISHED ${publishTopic}`, payload || '');
+            const retainedNote = retain ? ' (retained)' : '';
+            await session.append(tabId, `PUBLISHED ${publishTopic}${retainedNote}`, payload || '');
         } catch (error) {
             toast.error(`MQTT publish failed: ${error.message || error}`);
         }

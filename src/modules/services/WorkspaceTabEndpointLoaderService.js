@@ -7,6 +7,7 @@ import { app } from '../appContext.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
 import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
 import { buildEndpointUrl } from '../collections/endpointUrl.js';
+import { normalizeMqttData } from '../mqtt/mqttFields.js';
 
 /**
  * @param {Object} headers
@@ -93,6 +94,7 @@ export class WorkspaceTabEndpointLoaderService {
         const request = historyEntry.request || {};
         const builders = {
             grpc: () => this.createGrpcHistoryTabUpdate(request),
+            graphql: () => this.createGraphQLHistoryTabUpdate(request),
             http: () => this.createHttpHistoryTabUpdate(request)
         };
 
@@ -142,6 +144,57 @@ export class WorkspaceTabEndpointLoaderService {
                     serverStreaming: !!grpc.serverStreaming
                 }
             }
+        };
+    }
+
+    /**
+     * @param {Object} request
+     * @returns {Object}
+     */
+    createGraphQLHistoryTabUpdate(request) {
+        const { query, variables, operationName } = this.historyGraphQLPayload(request.body);
+
+        return {
+            name: operationName || 'GraphQL Request',
+            request: {
+                protocol: 'graphql',
+                url: request.rawUrl || request.url || '',
+                method: 'POST',
+                query,
+                variables,
+                operationName,
+                headers: request.headers || {},
+                authType: 'none',
+                authConfig: {}
+            }
+        };
+    }
+
+    /**
+     * @param {*} body
+     * @returns {{query: string, variables: string, operationName: string|null}}
+     */
+    historyGraphQLPayload(body) {
+        let payload = body;
+        if (typeof body === 'string') {
+            try {
+                payload = JSON.parse(body);
+            } catch {
+                return { query: body, variables: '', operationName: null };
+            }
+        }
+
+        if (!payload || typeof payload !== 'object') {
+            return { query: '', variables: '', operationName: null };
+        }
+
+        const vars = payload.variables;
+        const hasVariables = vars && typeof vars === 'object' && Object.keys(vars).length > 0;
+
+        return {
+            query: typeof payload.query === 'string' ? payload.query : '',
+            variables: hasVariables ? JSON.stringify(vars, null, 2) : '',
+            operationName: payload.operationName || null
         };
     }
 
@@ -283,17 +336,10 @@ export class WorkspaceTabEndpointLoaderService {
      * @returns {Object}
      */
     createMqttTabUpdate(endpoint) {
-        const mqtt = endpoint.persistedMqttData || {};
-
         return this._tabUpdate(endpoint, 'mqtt', endpoint.name || 'MQTT Request', {
             broker: endpoint.persistedUrl || endpoint.path || '',
             method: 'MQTT',
-            clientId: mqtt.clientId || '',
-            username: mqtt.username || '',
-            password: mqtt.password || '',
-            subscribeTopic: mqtt.subscribeTopic || '',
-            publishTopic: mqtt.publishTopic || '',
-            qos: mqtt.qos || 0,
+            ...normalizeMqttData(endpoint.persistedMqttData),
             body: {
                 mode: 'json',
                 content: endpoint.persistedBody || ''

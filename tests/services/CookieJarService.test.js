@@ -288,3 +288,48 @@ describe('CookieJarService store traffic', () => {
         expect(mockBackendAPI.store.get).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('CookieJarService Domain attribute', () => {
+    let service;
+
+    beforeEach(() => {
+        const storeData = { cookieJar: [] };
+        const mockBackendAPI = {
+            store: {
+                get: jest.fn(async (key) => storeData[key]),
+                set: jest.fn(async (key, value) => { storeData[key] = value; })
+            }
+        };
+        service = new CookieJarService(new CookieRepository(mockBackendAPI));
+    });
+
+    test('a cookie for an unrelated domain is rejected', async () => {
+        await service.processCookiesFromResponse(
+            ['stolen=1; Domain=victim.com; Path=/'],
+            'https://attacker.com/',
+            'env-dev'
+        );
+
+        expect(await service.getAll('env-dev')).toHaveLength(0);
+    });
+
+    test('a cookie for a parent domain of the request host is accepted', async () => {
+        await service.processCookiesFromResponse(
+            ['shared=1; Domain=.example.com; Path=/'],
+            'https://api.example.com/',
+            'env-dev'
+        );
+
+        expect(await service.getCookieHeaderForRequest('https://www.example.com/', 'env-dev')).toBe('shared=1');
+    });
+
+    test('a cookie for a subdomain of the request host is rejected', async () => {
+        await service.processCookiesFromResponse(
+            ['child=1; Domain=api.example.com; Path=/'],
+            'https://example.com/',
+            'env-dev'
+        );
+
+        expect(await service.getAll('env-dev')).toHaveLength(0);
+    });
+});

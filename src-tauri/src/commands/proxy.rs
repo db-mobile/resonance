@@ -239,7 +239,7 @@ impl ProxySettings {
                 }
 
                 if let Some(domain) = pattern.strip_prefix("*.")
-                    && host.ends_with(domain)
+                    && (host == domain || host.ends_with(&format!(".{domain}")))
                 {
                     return true;
                 }
@@ -775,6 +775,18 @@ mod tests {
         });
         assert!(matches!(
             state.get_proxy_config("https://example.com"),
+            ProxyAction::Manual(_)
+        ));
+    }
+
+    #[test]
+    fn wildcard_bypass_stops_at_a_label_boundary() {
+        let state = state_with(ProxySettings {
+            bypass_list: vec!["*.internal.test".to_string()],
+            ..enabled_manual()
+        });
+        assert!(matches!(
+            state.get_proxy_config("https://evilinternal.test/x"),
             ProxyAction::Manual(_)
         ));
     }

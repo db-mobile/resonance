@@ -66,6 +66,7 @@ import { handleGrpcSend } from './grpcHandler.js';
 import { handleWebSocketCancel, handleWebSocketSend, isWebSocketLive } from './websocketHandler.js';
 import { handleSseCancel, handleSseConnect, isSseLive } from './sseHandler.js';
 import { handleMqttCancel, handleMqttSend } from './mqttHandler.js';
+import { readMqttForm } from './mqtt/mqttFields.js';
 import {
     handleGraphQLSubscriptionStart,
     handleGraphQLSubscriptionCancel,
@@ -835,15 +836,8 @@ function prepareStreamingSend(protocolId, useAuth) {
 
 /** @returns {Object} */
 function readMqttOptions() {
-    const fieldValue = (id) => document.getElementById(id)?.value?.trim() || '';
-
     return {
-        clientId: fieldValue('mqtt-client-id-input'),
-        username: document.getElementById('mqtt-username-input')?.value || '',
-        password: document.getElementById('mqtt-password-input')?.value || '',
-        subscribeTopic: fieldValue('mqtt-subscribe-input'),
-        publishTopic: fieldValue('mqtt-topic-input'),
-        qos: Number(document.getElementById('mqtt-qos-select')?.value) || 0,
+        ...readMqttForm({ trim: true }),
         payload: getRequestBodyContent() || ''
     };
 }
@@ -1028,6 +1022,7 @@ async function prepareHttpSend() {
         ...prepared,
         rawUrl: url,
         method,
+        protocol: isGraphQLMode() ? RequestMode.GRAPHQL : RequestMode.HTTP,
         historySensitive: {
             headerNames: Object.keys(prepared.authData.headers || {}),
             queryNames: Object.keys(prepared.authData.queryParams || {})
@@ -1053,13 +1048,14 @@ async function tryResolveMockRewrite(processedPathParams, queryString) {
 }
 
 /**
- * @param {{method: string, url: string, rawUrl: string, headers: Object, queryParams: Object, pathParams: Object, body: *, bodyMode: string}} parts
+ * @param {{protocol: string, method: string, url: string, rawUrl: string, headers: Object, queryParams: Object, pathParams: Object, body: *, bodyMode: string}} parts
  * @returns {Promise<Object>}
  */
-async function buildSendConfig({ method, url, rawUrl, headers, queryParams, pathParams, body, bodyMode }) {
+async function buildSendConfig({ protocol, method, url, rawUrl, headers, queryParams, pathParams, body, bodyMode }) {
     const { httpVersion, timeout, verifySsl, followRedirects } = await resolveRequestSettings();
 
     return {
+        protocol,
         method,
         url,
         rawUrl,
@@ -1220,7 +1216,7 @@ export async function handleSendRequest() {
         setRequestInProgress(false);
         return;
     }
-    const { method, rawUrl, headers, queryParams, variables, processor, authData, historySensitive } = prepared;
+    const { protocol, method, rawUrl, headers, queryParams, variables, processor, authData, historySensitive } = prepared;
 
     const mock = await tryResolveMockRewrite(prepared.pathParams, prepared.queryString);
     const mockRewrite = mock ? mock.rewrite : null;
@@ -1238,7 +1234,7 @@ export async function handleSendRequest() {
     }
 
     let requestConfig = await buildSendConfig({
-        method, url, rawUrl, headers, queryParams, pathParams: prepared.pathParams, body, bodyMode
+        protocol, method, url, rawUrl, headers, queryParams, pathParams: prepared.pathParams, body, bodyMode
     });
 
     const requestTabId = await getActiveTabId();

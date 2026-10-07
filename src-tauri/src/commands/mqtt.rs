@@ -1,6 +1,8 @@
 use super::api_request::ClientCertConfig;
 use super::tab_sessions::{CommandAck, Session, TabSessions, require_tab_id};
-use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS, Transport};
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use rumqttc::{AsyncClient, Event, LastWill, MqttOptions, Packet, QoS, Transport};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
@@ -11,6 +13,11 @@ use tokio::task::JoinHandle;
 /// testing client needs to handle realistically large messages. Bounded so a
 /// rogue broker cannot force an unbounded per-packet allocation.
 const MAX_MQTT_PACKET_SIZE: usize = 64 * 1024 * 1024;
+
+const DEFAULT_KEEP_ALIVE_SECS: u64 = 60;
+
+/// The CONNECT packet carries keep-alive as a u16 number of seconds.
+const MAX_KEEP_ALIVE_SECS: u64 = u16::MAX as u64;
 
 /// Build the base MQTT options (identity, keep-alive, packet size). Credentials
 /// and TLS transport are layered on by the caller.
@@ -77,7 +84,43 @@ pub struct MqttConnectRequest {
     #[serde(default)]
     pub qos: Option<u8>,
     #[serde(default)]
+    pub clean_session: Option<bool>,
+    #[serde(default)]
+    pub last_will: Option<MqttLastWill>,
+    #[serde(default)]
     pub tls: MqttTlsOptions,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MqttLastWill {
+    #[serde(default)]
+    pub topic: String,
+    #[serde(default)]
+    pub payload: String,
+    #[serde(default)]
+    pub qos: u8,
+    #[serde(default)]
+    pub retain: bool,
+}
+
+impl MqttConnectRequest {
+    fn keep_alive_secs(&self) -> u64 {
+        self.keep_alive
+            .unwrap_or(DEFAULT_KEEP_ALIVE_SECS)
+            .min(MAX_KEEP_ALIVE_SECS)
+    }
+
+    fn clean_session(&self) -> bool {
+        self.clean_session.unwrap_or(true)
+    }
+
+    /// A will without a topic is how the frontend says "no will".
+    fn last_will(&self) -> Option<&MqttLastWill> {
+        self.last_will
+            .as_ref()
+            .filter(|will| !will.topic.trim().is_empty())
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -105,6 +148,11 @@ struct MqttEventPayload {
     message: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     qos: Option<u8>,
+    /// `utf8` or `base64`; only set on message events.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    encoding: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    retain: Option<bool>,
 }
 
 impl MqttEventPayload {
@@ -116,6 +164,8 @@ impl MqttEventPayload {
             topic: None,
             message: None,
             qos: None,
+            encoding: None,
+            retain: None,
         }
     }
 
@@ -127,11 +177,21 @@ impl MqttEventPayload {
         Self::new(tab_id, broker, "disconnect")
     }
 
-    fn message(tab_id: &str, broker: &str, topic: String, body: String, qos: u8) -> Self {
+    fn message(
+        tab_id: &str,
+        broker: &str,
+        topic: String,
+        payload: &[u8],
+        qos: u8,
+        retain: bool,
+    ) -> Self {
+        let (body, encoding) = encode_payload(payload);
         Self {
             topic: Some(topic),
             message: Some(body),
             qos: Some(qos),
+            encoding: Some(encoding),
+            retain: Some(retain),
             ..Self::new(tab_id, broker, "message")
         }
     }
@@ -149,6 +209,15 @@ impl MqttEventPayload {
             topic: Some(topic),
             ..Self::error(tab_id, broker, message)
         }
+    }
+}
+
+/// Text payloads pass through as-is; anything that is not valid UTF-8 is
+/// base64-encoded so the bytes survive the trip to the frontend intact.
+fn encode_payload(payload: &[u8]) -> (String, &'static str) {
+    match std::str::from_utf8(payload) {
+        Ok(text) => (text.to_string(), "utf8"),
+        Err(_) => (BASE64_STANDARD.encode(payload), "base64"),
     }
 }
 
@@ -223,21 +292,72 @@ fn build_config_key(request: &MqttConnectRequest, host: &str, port: u16, use_tls
         ),
         None => (String::new(), String::new(), String::new()),
     };
+    let will = request
+        .last_will()
+        .map(|will| {
+            format!(
+                "{}|{}|{}|{}",
+                will.topic, will.payload, will.qos, will.retain
+            )
+        })
+        .unwrap_or_default();
     format!(
-        "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+        "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
         host,
         port,
         use_tls,
         request.client_id.clone().unwrap_or_default(),
         request.username.clone().unwrap_or_default(),
         request.password.clone().unwrap_or_default(),
-        request.keep_alive.unwrap_or(60),
+        request.keep_alive_secs(),
         request.subscribe_topic.clone().unwrap_or_default(),
         request.tls.skip_verify,
         cert_path,
         key_path,
         ca_path,
+        request.clean_session(),
+        will,
     )
+}
+
+/// Build the full client options for a connect request: identity, session,
+/// will, credentials and TLS transport.
+fn build_mqtt_options(
+    request: &MqttConnectRequest,
+    host: String,
+    port: u16,
+    use_tls: bool,
+) -> Result<MqttOptions, String> {
+    let given_client_id = request.client_id.clone().filter(|id| !id.trim().is_empty());
+
+    if !request.clean_session() && given_client_id.is_none() {
+        return Err("A persistent session (clean session off) needs a fixed Client ID".to_string());
+    }
+
+    let client_id = given_client_id
+        .unwrap_or_else(|| format!("resonance-{}", &uuid::Uuid::new_v4().to_string()[..8]));
+
+    let mut mqtt_options = base_mqtt_options(client_id, host, port, request.keep_alive_secs());
+    mqtt_options.set_clean_session(request.clean_session());
+
+    if let Some(will) = request.last_will() {
+        mqtt_options.set_last_will(LastWill::new(
+            will.topic.trim(),
+            will.payload.clone().into_bytes(),
+            qos_from_u8(will.qos),
+            will.retain,
+        ));
+    }
+
+    if let Some(username) = request.username.as_ref().filter(|value| !value.is_empty()) {
+        mqtt_options.set_credentials(username, request.password.clone().unwrap_or_default());
+    }
+
+    if use_tls {
+        mqtt_options.set_transport(build_tls_transport(&request.tls)?);
+    }
+
+    Ok(mqtt_options)
 }
 
 async fn establish_connection(
@@ -249,26 +369,7 @@ async fn establish_connection(
     use_tls: bool,
     config_key: String,
 ) -> Result<AsyncClient, String> {
-    let client_id = request
-        .client_id
-        .clone()
-        .filter(|id| !id.trim().is_empty())
-        .unwrap_or_else(|| format!("resonance-{}", &uuid::Uuid::new_v4().to_string()[..8]));
-
-    let mut mqtt_options = base_mqtt_options(
-        client_id,
-        host.clone(),
-        port,
-        request.keep_alive.unwrap_or(60),
-    );
-
-    if let Some(username) = request.username.as_ref().filter(|value| !value.is_empty()) {
-        mqtt_options.set_credentials(username, request.password.clone().unwrap_or_default());
-    }
-
-    if use_tls {
-        mqtt_options.set_transport(build_tls_transport(&request.tls)?);
-    }
+    let mqtt_options = build_mqtt_options(request, host, port, use_tls)?;
 
     let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
 
@@ -293,15 +394,15 @@ async fn establish_connection(
                     );
                 }
                 Ok(Event::Incoming(Packet::Publish(publish))) => {
-                    let body = String::from_utf8_lossy(&publish.payload).to_string();
                     emit_event(
                         &poll_app,
                         MqttEventPayload::message(
                             &poll_tab_id,
                             &poll_broker,
                             publish.topic.clone(),
-                            body,
+                            &publish.payload,
                             publish.qos as u8,
+                            publish.retain,
                         ),
                     );
                 }
@@ -512,18 +613,23 @@ mod tests {
         assert!(connect.get("topic").is_none());
         assert!(connect.get("message").is_none());
         assert!(connect.get("qos").is_none());
+        assert!(connect.get("encoding").is_none());
+        assert!(connect.get("retain").is_none());
 
         let message = json(MqttEventPayload::message(
             "tab-1",
             "mqtt://broker:1883",
             "sensors/temp".to_string(),
-            "21.5".to_string(),
+            b"21.5",
             1,
+            true,
         ));
         assert_eq!(message["eventType"], "message");
         assert_eq!(message["topic"], "sensors/temp");
         assert_eq!(message["message"], "21.5");
         assert_eq!(message["qos"], 1);
+        assert_eq!(message["encoding"], "utf8");
+        assert_eq!(message["retain"], true);
 
         let error = json(MqttEventPayload::error(
             "tab-1",
@@ -533,6 +639,7 @@ mod tests {
         assert_eq!(error["eventType"], "error");
         assert_eq!(error["message"], "boom");
         assert!(error.get("topic").is_none());
+        assert!(error.get("encoding").is_none());
 
         let topic_error = json(MqttEventPayload::error_on_topic(
             "tab-1",
@@ -621,8 +728,114 @@ mod tests {
             keep_alive: None,
             subscribe_topic: None,
             qos: None,
+            clean_session: None,
+            last_will: None,
             tls: MqttTlsOptions::default(),
         }
+    }
+
+    fn will(topic: &str) -> MqttLastWill {
+        MqttLastWill {
+            topic: topic.to_string(),
+            payload: "offline".to_string(),
+            qos: 1,
+            retain: true,
+        }
+    }
+
+    #[test]
+    fn text_payloads_pass_through_and_binary_is_base64() {
+        assert_eq!(
+            encode_payload("grüß".as_bytes()),
+            ("grüß".to_string(), "utf8")
+        );
+        assert_eq!(
+            encode_payload(&[0xff, 0x00, 0xfe]),
+            ("/wD+".to_string(), "base64")
+        );
+        assert_eq!(encode_payload(b""), (String::new(), "utf8"));
+    }
+
+    #[test]
+    fn keep_alive_defaults_and_clamps_to_the_wire_limit() {
+        let mut request = base_request();
+        assert_eq!(request.keep_alive_secs(), 60);
+        request.keep_alive = Some(0);
+        assert_eq!(request.keep_alive_secs(), 0);
+        request.keep_alive = Some(1_000_000);
+        assert_eq!(request.keep_alive_secs(), 65535);
+    }
+
+    #[test]
+    fn options_carry_session_and_will_settings() {
+        let mut request = base_request();
+        request.client_id = Some("fixed".to_string());
+        request.clean_session = Some(false);
+        request.last_will = Some(will("devices/1/status"));
+        request.keep_alive = Some(5);
+
+        let options = build_mqtt_options(&request, "broker".to_string(), 1883, false).unwrap();
+        assert!(!options.clean_session());
+        assert_eq!(options.keep_alive(), Duration::from_secs(5));
+        let last_will = options.last_will().expect("will set");
+        assert_eq!(last_will.topic, "devices/1/status");
+        assert_eq!(&last_will.message[..], b"offline");
+        assert_eq!(last_will.qos, QoS::AtLeastOnce);
+        assert!(last_will.retain);
+    }
+
+    #[test]
+    fn options_default_to_clean_session_without_will() {
+        let options =
+            build_mqtt_options(&base_request(), "broker".to_string(), 1883, false).unwrap();
+        assert!(options.clean_session());
+        assert!(options.last_will().is_none());
+        assert!(options.client_id().starts_with("resonance-"));
+    }
+
+    #[test]
+    fn a_will_with_a_blank_topic_is_no_will() {
+        let mut request = base_request();
+        request.last_will = Some(will("  "));
+        let options = build_mqtt_options(&request, "broker".to_string(), 1883, false).unwrap();
+        assert!(options.last_will().is_none());
+    }
+
+    #[test]
+    fn persistent_session_without_client_id_is_rejected() {
+        let mut request = base_request();
+        request.clean_session = Some(false);
+        request.client_id = Some("   ".to_string());
+        let err = build_mqtt_options(&request, "broker".to_string(), 1883, false)
+            .expect_err("expected an error");
+        assert!(err.contains("Client ID"));
+    }
+
+    #[test]
+    fn config_key_changes_when_session_or_will_changes() {
+        let base_key = build_config_key(&base_request(), "broker", 8883, true);
+
+        let mut persistent = base_request();
+        persistent.clean_session = Some(false);
+        assert_ne!(
+            base_key,
+            build_config_key(&persistent, "broker", 8883, true)
+        );
+
+        let mut with_will = base_request();
+        with_will.last_will = Some(will("t/will"));
+        let will_key = build_config_key(&with_will, "broker", 8883, true);
+        assert_ne!(base_key, will_key);
+
+        with_will.last_will.as_mut().unwrap().payload = "gone".to_string();
+        assert_ne!(will_key, build_config_key(&with_will, "broker", 8883, true));
+
+        let mut blank_will = base_request();
+        blank_will.last_will = Some(will(""));
+        assert_eq!(
+            base_key,
+            build_config_key(&blank_will, "broker", 8883, true)
+        );
     }
 
     fn cert_config(cert: &str, key: &str, ca: &str) -> ClientCertConfig {
@@ -676,6 +889,27 @@ mod tests {
         .unwrap();
         assert!(!request.tls.skip_verify);
         assert!(request.tls.client_cert.is_none());
+        assert!(request.clean_session());
+        assert!(request.last_will().is_none());
+    }
+
+    #[test]
+    fn connect_request_deserializes_camel_case_session_options() {
+        let request: MqttConnectRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab",
+            "broker": "mqtt://localhost",
+            "keepAlive": 30,
+            "cleanSession": false,
+            "lastWill": { "topic": "t/will", "payload": "bye", "qos": 2, "retain": true }
+        }))
+        .unwrap();
+        assert_eq!(request.keep_alive_secs(), 30);
+        assert!(!request.clean_session());
+        let will = request.last_will().unwrap();
+        assert_eq!(will.topic, "t/will");
+        assert_eq!(will.payload, "bye");
+        assert_eq!(will.qos, 2);
+        assert!(will.retain);
     }
 
     #[test]

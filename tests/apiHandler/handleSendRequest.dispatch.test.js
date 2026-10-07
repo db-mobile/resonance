@@ -237,7 +237,7 @@ describe('a variable-processing failure stops the send', () => {
 });
 
 describe('MQTT passes its whole connection record through', () => {
-    test('sends the eight broker options, coercing a blank QoS to 0', async () => {
+    test('sends every broker option, coercing a blank QoS to 0', async () => {
         const { handleSendRequest, setRequestMode } = await loadApiHandler();
         setRequestMode('mqtt');
 
@@ -260,6 +260,13 @@ describe('MQTT passes its whole connection record through', () => {
             subscribeTopic: 'sub/topic',
             publishTopic: 'pub/topic',
             qos: 0,
+            retain: false,
+            keepAlive: 60,
+            cleanSession: true,
+            willTopic: '',
+            willPayload: '',
+            willQos: 0,
+            willRetain: false,
             payload: ''
         });
     });

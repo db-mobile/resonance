@@ -58,7 +58,7 @@ const EXPECTED_REQUEST_KEYS = {
     grpc: ['grpc', 'protocol'],
     sse: ['authConfig', 'authType', 'body', 'headers', 'method', 'pathParams', 'protocol', 'queryParams', 'url'],
     websocket: ['authConfig', 'authType', 'body', 'headers', 'method', 'pathParams', 'protocol', 'queryParams', 'url'],
-    mqtt: ['authConfig', 'authType', 'body', 'broker', 'clientId', 'method', 'password', 'protocol', 'publishTopic', 'qos', 'subscribeTopic', 'username'],
+    mqtt: ['authConfig', 'authType', 'body', 'broker', 'cleanSession', 'clientId', 'keepAlive', 'method', 'password', 'protocol', 'publishTopic', 'qos', 'retain', 'subscribeTopic', 'username', 'willPayload', 'willQos', 'willRetain', 'willTopic'],
     graphql: ['authConfig', 'authType', 'headers', 'method', 'operationName', 'protocol', 'query', 'url', 'variables'],
     http: ['authConfig', 'authType', 'body', 'headers', 'method', 'pathParams', 'protocol', 'queryParams', 'url']
 };

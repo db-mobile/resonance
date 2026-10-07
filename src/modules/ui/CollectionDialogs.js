@@ -11,6 +11,7 @@ import { pushEscapeHandler } from './modalEscape.js';
 import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
 import { fileNameFromPath } from '../utils/fileName.js';
 import { translate } from '../utils/translate.js';
+import { normalizeMqttData } from '../mqtt/mqttFields.js';
 
 const NEW_DIALOGS_TEMPLATE = './src/templates/collections/newDialogs.html';
 const DOC_OPTIONS_TEMPLATE = './src/templates/docs/docOptionsDialog.html';
@@ -277,11 +278,8 @@ export class CollectionDialogs {
         }
 
         if (descriptor.createSidecars.includes('mqttData')) {
-            endpointData.clientId = requestData.clientId || '';
-            endpointData.username = requestData.username || '';
-            endpointData.subscribeTopic = requestData.subscribeTopic || '';
-            endpointData.publishTopic = requestData.publishTopic || '';
-            endpointData.qos = requestData.qos || 0;
+            const { password: _password, ...mqttData } = normalizeMqttData(requestData);
+            Object.assign(endpointData, mqttData);
         }
 
         return endpointData;
