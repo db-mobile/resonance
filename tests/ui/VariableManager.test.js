@@ -1,4 +1,4 @@
-/* global document, DOMParser */
+/* global document, DOMParser, KeyboardEvent */
 /** @fileoverview Characterization tests for the collection-variable dialog. */
 
 import fs from 'fs';
@@ -148,5 +148,38 @@ describe('VariableManager', () => {
         await result;
 
         expect(escapeHandlerCount()).toBe(before);
+    });
+
+    test('Escape closes only the import sub-dialog, keeping the manager and its edits', async () => {
+        const manager = new VariableManager();
+        const result = manager.show('C', [{ name: 'host', value: 'a' }]);
+        fillRow(rows()[0], 'host', 'edited');
+
+        click('import-variables-btn');
+        expect(document.querySelector('#import-textarea')).not.toBeNull();
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+        expect(document.querySelector('#import-textarea')).toBeNull();
+        expect(rows()[0].querySelector('.variable-value').value).toBe('edited');
+
+        click('variables-cancel-btn');
+        await result;
+        expect(escapeHandlerCount()).toBe(0);
+    });
+
+    test('importing JSON replaces the rows and closes the sub-dialog', async () => {
+        const manager = new VariableManager();
+        const result = manager.show('C', []);
+
+        click('import-variables-btn');
+        document.querySelector('#import-textarea').value = '{"a":"1"}';
+        click('import-confirm');
+
+        expect(document.querySelector('#import-textarea')).toBeNull();
+        expect(rows().map(r => r.querySelector('.variable-name').value)).toEqual(['a', '']);
+
+        click('variables-cancel-btn');
+        await result;
     });
 });

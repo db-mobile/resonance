@@ -1,4 +1,4 @@
-/* global document, window, DOMParser, KeyboardEvent */
+/* global document, window, DOMParser, KeyboardEvent, HTMLInputElement */
 import fs from 'fs';
 import path from 'path';
 import { templateLoader } from '../../src/modules/templateLoader.js';
@@ -252,5 +252,24 @@ describe('EnvironmentManager', () => {
         expect(document.querySelector('.dialog-message').textContent).toBe('Something failed');
         document.querySelector('#alert-dialog-ok').click();
         expect(document.querySelector('.modal-overlay')).toBeNull();
+    });
+
+    test('dismissing the import choice aborts instead of replacing all', async () => {
+        const confirmHtml = fs.readFileSync(path.join(process.cwd(), 'src/templates/dialogs/confirmDialog.html'), 'utf8');
+        templateLoader.cache.set('./src/templates/dialogs/confirmDialog.html', new DOMParser().parseFromString(confirmHtml, 'text/html'));
+        const clickSpy = jest.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+        const { manager } = await openManager(service);
+
+        document.querySelector('#env-import-btn').click();
+        expect(document.querySelector('.confirm-dialog')).not.toBeNull();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await flush();
+
+        expect(document.querySelector('.confirm-dialog')).toBeNull();
+        expect(document.querySelector('#env-import-btn')).not.toBeNull();
+        expect(clickSpy).not.toHaveBeenCalled();
+
+        clickSpy.mockRestore();
+        manager.close();
     });
 });

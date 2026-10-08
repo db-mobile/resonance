@@ -638,9 +638,10 @@ export class EnvironmentManager {
 
     async handleImport() {
         const merge = await new ConfirmDialog().show(
-            'Merge with existing environments? (Cancel to replace all)',
-            { title: 'Import Environments', confirmText: 'Merge', cancelText: 'Replace All', dangerous: false }
+            'Merge with existing environments, or replace all of them?',
+            { title: 'Import Environments', confirmText: 'Merge', cancelText: 'Replace All', dangerous: false, dismissValue: null }
         );
+        if (merge === null) {return;}
 
         const input = document.createElement('input');
         input.type = 'file';

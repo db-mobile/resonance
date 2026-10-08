@@ -60,7 +60,7 @@ export class HistoryRenderer {
 
         const title = translate('history.clear_all_title', 'Clear All History');
 
-        const confirmText = translate('common.delete', 'Clear');
+        const confirmText = translate('common.clear', 'Clear');
 
         const cancelText = translate('common.cancel', 'Cancel');
 

@@ -185,7 +185,7 @@ describe('MockServerDialog', () => {
         dialog.close();
     });
 
-    test('a failed start shows the alert and the alert closes on OK', async () => {
+    test('a failed start shows an error toast and re-enables the toggle', async () => {
         const controller = makeController({ handleStart: jest.fn(async () => ({ success: false, message: 'Port in use' })) });
         const dialog = await openDialog(controller);
 
@@ -194,11 +194,24 @@ describe('MockServerDialog', () => {
             await flush();
         }
 
-        const alert = document.querySelector('.mock-server-alert-message');
-        expect(alert.textContent).toBe('Port in use');
-        expect(document.querySelector('[data-role="ok"]').textContent).toBe('OK');
-        document.querySelector('#alert-ok').click();
-        expect(document.querySelector('.mock-server-alert-message')).toBeNull();
+        const toastEl = document.querySelector('.toast--error .toast__message');
+        expect(toastEl.textContent).toBe('Port in use');
+        expect(document.querySelector('#mock-server-toggle-btn').disabled).toBe(false);
+
+        dialog.close();
+    });
+
+    test('a thrown toggle error still re-enables the toggle', async () => {
+        const controller = makeController({ getStatus: jest.fn(async () => { throw new Error('boom'); }) });
+        const dialog = await openDialog(controller);
+        controller.getStatus.mockClear();
+
+        document.querySelector('#mock-server-toggle-btn').click();
+        for (let i = 0; i < 4; i++) {
+            await flush();
+        }
+
+        expect(document.querySelector('#mock-server-toggle-btn').disabled).toBe(false);
 
         dialog.close();
     });

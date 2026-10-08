@@ -8,6 +8,7 @@ import { templateLoader } from '../../src/modules/templateLoader.js';
 import { escapeHandlerCount } from '../../src/modules/ui/modalEscape.js';
 
 const MANAGER_TEMPLATE = './src/templates/cookies/cookieManager.html';
+const CONFIRM_TEMPLATE = './src/templates/dialogs/confirmDialog.html';
 
 const pressEscape = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -35,6 +36,13 @@ describe('CookieManagerDialog add/edit', () => {
             MANAGER_TEMPLATE,
             new DOMParser().parseFromString(
                 fs.readFileSync(path.join(process.cwd(), 'src/templates/cookies/cookieManager.html'), 'utf8'),
+                'text/html'
+            )
+        );
+        templateLoader.cache.set(
+            CONFIRM_TEMPLATE,
+            new DOMParser().parseFromString(
+                fs.readFileSync(path.join(process.cwd(), 'src/templates/dialogs/confirmDialog.html'), 'utf8'),
                 'text/html'
             )
         );
@@ -212,5 +220,41 @@ describe('CookieManagerDialog add/edit', () => {
 
         pressEscape();
         expect(document.querySelector('.cookie-manager-dialog')).toBeNull();
+    });
+
+    test('the empty state shows with no cookies and hides once one exists', async () => {
+        await openDialog();
+        const empty = content().querySelector('#cookie-manager-empty');
+        expect(empty.classList.contains('is-hidden')).toBe(false);
+
+        await service.putCookie({ name: 'a', value: '1', domain: 'example.com', path: '/' }, 'env-dev');
+        await dialog._loadCookies();
+        expect(empty.classList.contains('is-hidden')).toBe(true);
+
+        dialog._close();
+    });
+
+    test('Clear All asks first and keeps cookies when cancelled', async () => {
+        await service.putCookie({ name: 'a', value: '1', domain: 'example.com', path: '/' }, 'env-dev');
+        await openDialog();
+
+        content().querySelector('#cookie-manager-clear-all-btn').click();
+        expect(document.querySelector('.confirm-dialog')).not.toBeNull();
+        pressEscape();
+        await flush();
+
+        expect(document.querySelector('.confirm-dialog')).toBeNull();
+        expect(document.querySelector('.cookie-manager-dialog')).not.toBeNull();
+        expect(await service.getAll('env-dev')).toHaveLength(1);
+
+        content().querySelector('#cookie-manager-clear-all-btn').click();
+        document.querySelector('#confirm-confirm-btn').click();
+        await flush();
+        await flush();
+
+        expect(await service.getAll('env-dev')).toHaveLength(0);
+        expect(content().querySelector('#cookie-manager-empty').classList.contains('is-hidden')).toBe(false);
+
+        dialog._close();
     });
 });

@@ -236,6 +236,27 @@ describe('CollectionDialogs', () => {
             await expect(shown).rejects.toThrow('disk full');
             expect(document.querySelector('#save-to-collection-form')).toBeNull();
         });
+
+        test('a second submit while saving is ignored', async () => {
+            let release;
+            deps.collectionService.addRequestToCollection.mockImplementationOnce(
+                () => new Promise((resolve) => { release = () => resolve({ id: 'ep-1' }); })
+            );
+            const shown = dialogs.showSaveToCollectionDialog({ name: 'X', url: 'https://x.test', method: 'GET', protocol: 'http' });
+            await flush();
+            document.querySelector('#save-collection-select').value = 'c1';
+            const form = document.querySelector('#save-to-collection-form');
+
+            submit(form);
+            await flush();
+            expect(form.querySelector('#save-btn').disabled).toBe(true);
+            submit(form);
+            await flush();
+            release();
+
+            await shown;
+            expect(deps.collectionService.addRequestToCollection).toHaveBeenCalledTimes(1);
+        });
     });
 
     describe('showCollectionImportDialog', () => {

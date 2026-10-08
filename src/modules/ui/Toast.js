@@ -10,7 +10,7 @@ class Toast {
 
     /** @returns {HTMLElement} */
     getContainer() {
-        if (!this.container) {
+        if (!this.container?.isConnected) {
             this.container = document.createElement('div');
             this.container.className = 'toast-container';
             this.container.setAttribute('aria-live', 'polite');

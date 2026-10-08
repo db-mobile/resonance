@@ -11,6 +11,10 @@ export class ConfirmDialog extends BaseModal {
         super();
         /** @type {Function|null} */
         this.resolve = null;
+        /** @type {boolean|null} */
+        this.dismissValue = false;
+        /** @type {HTMLElement|null} */
+        this.previousFocus = null;
     }
 
     /**
@@ -20,11 +24,14 @@ export class ConfirmDialog extends BaseModal {
      * @param {string} [options.confirmText='Confirm']
      * @param {string} [options.cancelText='Cancel']
      * @param {boolean} [options.dangerous=true]
-     * @returns {Promise<boolean>}
+     * @param {boolean|null} [options.dismissValue=false]
+     * @returns {Promise<boolean|null>}
      */
     show(message, options = {}) {
         return new Promise((resolve) => {
             this.resolve = resolve;
+            this.dismissValue = options.dismissValue === undefined ? false : options.dismissValue;
+            this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
             this.createDialog(message, options);
         });
     }
@@ -118,11 +125,11 @@ export class ConfirmDialog extends BaseModal {
 
     /** @returns {void} */
     onDismiss() {
-        this.cancel();
+        this._settle(this.dismissValue);
     }
 
     /**
-     * @param {boolean} value
+     * @param {boolean|null} value
      * @returns {void}
      */
     _settle(value) {
@@ -132,9 +139,10 @@ export class ConfirmDialog extends BaseModal {
         }
         this.destroy();
 
-        const collectionsList = document.getElementById('collections-list');
-        if (collectionsList) {
-            collectionsList.focus();
-        }
+        const target = this.previousFocus?.isConnected && this.previousFocus !== document.body
+            ? this.previousFocus
+            : document.getElementById('collections-list');
+        this.previousFocus = null;
+        target?.focus();
     }
 }

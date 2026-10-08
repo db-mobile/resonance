@@ -97,6 +97,14 @@
   gap: var(--space-2);
 }
 
+.script-console-test-item.is-passed .script-console-test-icon {
+  color: var(--success-color);
+}
+
+.script-console-test-item.is-failed .script-console-test-icon {
+  color: var(--error-color);
+}
+
 .script-tabs {
   display: flex;
   gap: var(--space-1);

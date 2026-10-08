@@ -94,7 +94,10 @@
     "export_empty": "Nenhum cookie para exportar neste ambiente",
     "import_success": "Cookies importados",
     "import_skipped": "ignorados",
-    "import_invalid": "Não é uma exportação de cookies do Resonance (esperado { \"format\": \"resonance-cookie-jar\", \"cookies\": [...] })"
+    "import_invalid": "Não é uma exportação de cookies do Resonance (esperado { \"format\": \"resonance-cookie-jar\", \"cookies\": [...] })",
+    "confirm_clear_session": "Excluir todos os cookies de sessão deste ambiente?",
+    "confirm_clear_all": "Excluir todos os cookies deste ambiente?\n\nEsta ação não pode ser desfeita.",
+    "clear_failed": "Falha ao excluir cookies: {{message}}"
   },
   "import_dialog": {
     "title": "Importar coleção",
@@ -362,7 +365,8 @@
     "close": "Fechar",
     "yes": "Sim",
     "no": "Não",
-    "create": "Criar"
+    "create": "Criar",
+    "clear": "Limpar"
   },
   "errors": {
     "network": "Erro de rede",

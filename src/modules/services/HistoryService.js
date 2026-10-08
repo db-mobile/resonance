@@ -219,11 +219,11 @@ export class HistoryService {
      */
     getStatusColor(status) {
         const colors = {
-            success: 'var(--success-color, #10b981)',
-            redirect: 'var(--warning-color, #f59e0b)',
-            'client-error': 'var(--error-color, #ef4444)',
-            'server-error': 'var(--error-color, #dc2626)',
-            info: 'var(--text-secondary)'
+            success: 'var(--status-success-color)',
+            redirect: 'var(--status-redirect-color)',
+            'client-error': 'var(--status-error-color)',
+            'server-error': 'var(--status-error-color)',
+            info: 'var(--dim-fg-color)'
         };
         return colors[statusCategory(status)];
     }
@@ -234,14 +234,14 @@ export class HistoryService {
      */
     getMethodColor(method) {
         const colors = {
-            'GET': 'var(--method-get, #10b981)',
-            'POST': 'var(--method-post, #3b82f6)',
-            'PUT': 'var(--method-put, #f59e0b)',
-            'DELETE': 'var(--method-delete, #ef4444)',
-            'PATCH': 'var(--method-patch, #8b5cf6)',
-            'GRPC': 'var(--method-patch-color, #8939a4)'
+            'GET': 'var(--method-get-color)',
+            'POST': 'var(--method-post-color)',
+            'PUT': 'var(--method-put-color)',
+            'DELETE': 'var(--method-delete-color)',
+            'PATCH': 'var(--method-patch-color)',
+            'GRPC': 'var(--method-patch-color)'
         };
-        return colors[method] || 'var(--text-secondary)';
+        return colors[method] || 'var(--dim-fg-color)';
     }
 
     /**

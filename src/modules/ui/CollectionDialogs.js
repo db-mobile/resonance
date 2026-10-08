@@ -385,8 +385,14 @@ export class CollectionDialogs {
             cancelBtn.addEventListener('click', () => finish(null));
             closeBtn.addEventListener('click', () => finish(null));
 
+            const saveBtn = form.querySelector('#save-btn');
+            let submitting = false;
+
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
+                if (submitting) {
+                    return;
+                }
                 const name = nameInput.value.trim();
                 const selectedCollectionId = collectionSelect.value;
 
@@ -394,6 +400,8 @@ export class CollectionDialogs {
                     return;
                 }
 
+                submitting = true;
+                saveBtn.disabled = true;
                 try {
                     let targetCollectionId = selectedCollectionId;
 
@@ -401,6 +409,8 @@ export class CollectionDialogs {
                         const newCollectionName = newCollectionInput.value.trim();
                         if (!newCollectionName) {
                             newCollectionInput.focus();
+                            submitting = false;
+                            saveBtn.disabled = false;
                             return;
                         }
                         const newCollection = await this.collectionService.createCollection({

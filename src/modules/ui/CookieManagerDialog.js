@@ -8,6 +8,7 @@ import { applyEnvButtonColor, createEnvDropdownItem, positionEnvDropdown } from 
 import { toast } from './Toast.js';
 import { pushEscapeHandler } from './modalEscape.js';
 import { BaseModal } from './BaseModal.js';
+import { ConfirmDialog } from './ConfirmDialog.js';
 import { updateSetting } from '../state/settingsCache.js';
 import { translate } from '../utils/translate.js';
 
@@ -170,11 +171,11 @@ export class CookieManagerDialog extends BaseModal {
 
         tbody.innerHTML = '';
 
-        if (!cookies || cookies.length === 0) {
-            empty.style.display = '';
+        const isEmpty = !cookies || cookies.length === 0;
+        empty.classList.toggle('is-hidden', !isEmpty);
+        if (isEmpty) {
             return;
         }
-        empty.style.display = 'none';
 
         const sorted = [...cookies].sort((a, b) => a.domain.localeCompare(b.domain) || a.name.localeCompare(b.name));
 
@@ -484,15 +485,43 @@ export class CookieManagerDialog extends BaseModal {
             }
         });
 
-        clearSessionBtn.addEventListener('click', async () => {
-            await this.service.deleteSessionCookies(this._environmentId);
-            await this._loadCookies();
-        });
+        clearSessionBtn.addEventListener('click', () => this._confirmClear(
+            translate('cookies.confirm_clear_session', 'Delete all session cookies for this environment?'),
+            translate('cookies.clear_session', 'Clear Session'),
+            () => this.service.deleteSessionCookies(this._environmentId)
+        ));
 
-        clearAllBtn.addEventListener('click', async () => {
-            await this.service.deleteAll(this._environmentId);
-            await this._loadCookies();
+        clearAllBtn.addEventListener('click', () => this._confirmClear(
+            translate('cookies.confirm_clear_all', 'Delete all cookies for this environment?\n\nThis action cannot be undone.'),
+            translate('cookies.clear_all', 'Clear All'),
+            () => this.service.deleteAll(this._environmentId)
+        ));
+    }
+
+    /**
+     * @param {string} message
+     * @param {string} title
+     * @param {() => Promise<void>} clear
+     * @returns {Promise<void>}
+     */
+    async _confirmClear(message, title, clear) {
+        const confirmed = await new ConfirmDialog().show(message, {
+            title,
+            confirmText: translate('common.clear', 'Clear'),
+            cancelText: translate('common.cancel', 'Cancel'),
+            dangerous: true
         });
+        if (!confirmed) {
+            return;
+        }
+        try {
+            await clear();
+            await this._loadCookies();
+        } catch (error) {
+            toast.error(translate('cookies.clear_failed', 'Failed to delete cookies: {{message}}', {
+                message: typeof error === 'string' ? error : error.message
+            }));
+        }
     }
 
     _close() {

@@ -9,6 +9,7 @@ import { pushEscapeHandler } from './modalEscape.js';
 import { flattenRequests, endpointKey } from '../collections/collectionTree.js';
 import { el } from '../htmlUtils.js';
 import { translate } from '../utils/translate.js';
+import { toast } from './Toast.js';
 import { setRoleTexts } from './roleText.js';
 import { extractResponseSchema } from '../controllers/MockServerController.js';
 
@@ -262,9 +263,9 @@ export class MockServerDialog {
     }
 
     async handleToggleServer() {
+        const toggleBtn = this.dialog.querySelector('#mock-server-toggle-btn');
+        toggleBtn.disabled = true;
         try {
-            const toggleBtn = this.dialog.querySelector('#mock-server-toggle-btn');
-            toggleBtn.disabled = true;
 
             const status = await this.controller.getStatus();
 
@@ -273,14 +274,14 @@ export class MockServerDialog {
                 : await this.controller.handleStart();
 
             if (!outcome.success) {
-                this.showAlert(outcome.message);
+                toast.error(outcome.message);
             }
 
             await this.updateStatus();
-
-            toggleBtn.disabled = false;
         } catch (error) {
-            this.showAlert(error.message || translate('mock_server.error_toggle_server', 'Failed to toggle server'));
+            toast.error(error.message || translate('mock_server.error_toggle_server', 'Failed to toggle server'));
+        } finally {
+            toggleBtn.disabled = false;
         }
     }
 
@@ -289,7 +290,7 @@ export class MockServerDialog {
         try {
             const result = await this.controller.handleUpdatePort(port);
             if (!result.success) {
-                this.showAlert(result.message);
+                toast.error(result.message);
                 const settings = await this.controller.getSettings();
                 const portInput = this.dialog.querySelector('#mock-server-port-input');
                 portInput.value = settings.port;
@@ -443,34 +444,6 @@ export class MockServerDialog {
             container.innerHTML = '';
             container.appendChild(tableEl);
         } catch {}
-    }
-
-    /** @param {string} message */
-    showAlert(message) {
-        const overlay = el('div', 'modal-overlay');
-
-        const dialog = el('div', 'modal-dialog modal-dialog--sm');
-
-        const fragment = templateLoader.cloneSync(
-            './src/templates/mockServer/mockServerDialog.html',
-            'tpl-mock-server-alert'
-        );
-        dialog.appendChild(fragment);
-
-        setRoleTexts(dialog, { message, ok: translate('mock_server.ok', 'OK') });
-
-        overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
-
-        const okBtn = dialog.querySelector('#alert-ok');
-        const cleanup = () => {
-            document.body.removeChild(overlay);
-        };
-
-        okBtn.addEventListener('click', cleanup);
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {cleanup();}
-        });
     }
 
     /**

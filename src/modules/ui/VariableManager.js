@@ -240,27 +240,22 @@ export class VariableManager extends BaseModal {
     }
 
     showImportDialog() {
-        const importDialog = document.createElement('div');
-        importDialog.className = 'modal-overlay modal-overlay--dim';
-
-        const dialog = document.createElement('div');
-        dialog.className = 'modal-dialog modal-dialog--md';
-        const fragment = templateLoader.cloneSync(
-            './src/templates/variables/variableManager.html',
-            'tpl-variable-manager-import-dialog'
-        );
-        dialog.appendChild(fragment);
-        importDialog.appendChild(dialog);
-
-        document.body.appendChild(importDialog);
-
-        importDialog.querySelector('#import-cancel').addEventListener('click', () => {
-            importDialog.remove();
+        const importModal = new BaseModal();
+        const dialog = importModal.mount({
+            overlayClass: 'variable-import-overlay',
+            dialogClass: 'modal-dialog modal-dialog--md',
+            templatePath: './src/templates/variables/variableManager.html',
+            templateId: 'tpl-variable-manager-import-dialog',
+            closeOnOverlayClick: false
         });
 
-        importDialog.querySelector('#import-confirm').addEventListener('click', () => {
+        dialog.querySelector('#import-cancel').addEventListener('click', () => {
+            importModal.destroy();
+        });
+
+        dialog.querySelector('#import-confirm').addEventListener('click', () => {
             try {
-                const text = importDialog.querySelector('#import-textarea').value.trim();
+                const text = dialog.querySelector('#import-textarea').value.trim();
                 const variables = JSON.parse(text);
                 
                 if (typeof variables !== 'object' || Array.isArray(variables)) {
@@ -268,11 +263,13 @@ export class VariableManager extends BaseModal {
                 }
 
                 this.importVariables(variables);
-                importDialog.remove();
+                importModal.destroy();
             } catch (error) {
                 toast.error(`Invalid JSON: ${error.message}`);
             }
         });
+
+        dialog.querySelector('#import-textarea').focus();
     }
 
     importVariables(variables) {

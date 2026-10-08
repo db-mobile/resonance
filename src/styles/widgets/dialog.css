@@ -294,4 +294,5 @@
 
 .confirm-dialog-message {
   opacity: 0.8;
+  white-space: pre-line;
 }
