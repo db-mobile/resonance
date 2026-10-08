@@ -99,7 +99,8 @@
 }
 
 .dropdown-item:hover,
-.context-menu-item:hover {
+.context-menu-item:hover,
+.context-menu-item:focus-visible {
   background-color: var(--shade-color);
 }
 

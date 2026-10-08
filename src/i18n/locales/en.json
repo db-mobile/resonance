@@ -342,7 +342,13 @@
     "updates_managed_externally": "Updates are managed by your package manager",
     "version_info": "Version Information",
     "current_version": "Current version",
-    "retry_update": "Retry"
+    "retry_update": "Retry",
+    "proxy_testing": "Testing…",
+    "proxy_save_failed": "Failed to save proxy settings: {{error}}",
+    "certs_save_failed": "Failed to save certificates: {{error}}",
+    "certs_remove_title": "Remove Certificate",
+    "certs_remove_confirm": "Remove the certificate for \"{{host}}\"?",
+    "save_failed": "Failed to save setting: {{error}}"
   },
   "theme": {
     "light": "Light",
@@ -465,7 +471,14 @@
     "status_code": "Status Code",
     "ok": "OK",
     "error_toggle_server": "Failed to toggle server",
-    "template_hint": "Strings may use {{request.params.id}}, {{request.query.name}}, {{request.headers.name}}, {{request.body.path}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} and {{$randomInt}}. Send \"Prefer: code=404\" or \"Prefer: example=name\" to get another documented response."
+    "template_hint": "Strings may use {{request.params.id}}, {{request.query.name}}, {{request.headers.name}}, {{request.body.path}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} and {{$randomInt}}. Send \"Prefer: code=404\" or \"Prefer: example=name\" to get another documented response.",
+    "error_update_port": "Failed to update port",
+    "error_toggle_collection": "Failed to update collection",
+    "error_clear_logs": "Failed to clear request logs",
+    "error_reset_response": "Failed to reset response",
+    "reset_confirm_title": "Reset to Default?",
+    "reset_confirm_message": "Discard the custom delay, status code and response body for {{endpoint}}?",
+    "reset": "Reset"
   },
   "preview": {
     "toggle": "Toggle Preview",
@@ -670,5 +683,12 @@
     "too_old": "Your data was saved by a Resonance release this version can no longer convert, so it was left unchanged. Install Resonance {{release}}, start it once, then update again.",
     "global_store_collections": "Collections saved by a Resonance release from before March 2026 are still in your settings. This version can no longer convert them, so they were left unchanged. Install Resonance {{release}}, start it once, then update again.",
     "unknown": "Your data could not be fully converted to the current format."
+  },
+  "environment_manager": {
+    "create_default_name": "New Environment",
+    "create_title": "Create Environment",
+    "create_label": "Enter environment name:",
+    "create_confirm": "Create",
+    "import_error": "Error importing environments: {{message}}"
   }
 }

@@ -1,7 +1,30 @@
 
 import { app } from './appContext.js';
 import { templateLoader } from './templateLoader.js';
-import { pushEscapeHandler } from './ui/modalEscape.js';
+import { BaseModal } from './ui/BaseModal.js';
+
+const SHORTCUTS_TEMPLATE = './src/templates/shortcuts/keyboardShortcuts.html';
+
+/** @returns {boolean} */
+function isModalOpen() {
+    return document.querySelector('.modal-overlay:not(.is-hidden):not([hidden])') !== null;
+}
+
+class ShortcutsHelpModal extends BaseModal {
+    /**
+     * @param {() => void} onClose
+     */
+    constructor(onClose) {
+        super();
+        this.onClose = onClose;
+    }
+
+    /** @returns {void} */
+    destroy() {
+        super.destroy();
+        this.onClose();
+    }
+}
 
 class KeyboardShortcutsManager {
     constructor() {
@@ -88,6 +111,10 @@ class KeyboardShortcutsManager {
     }
 
     handleKeydown(event) {
+        if (isModalOpen()) {
+            return false;
+        }
+
         const ctrl = this.isMac ? event.metaKey : event.ctrlKey;
         const shift = event.shiftKey;
         const alt = event.altKey;
@@ -129,40 +156,28 @@ class KeyboardShortcutsManager {
     showHelp() {
         if (this.helpDialogVisible) {return;}
 
-        const fragment = templateLoader.cloneSync(
-            './src/templates/shortcuts/keyboardShortcuts.html',
-            'tpl-keyboard-shortcuts-overlay'
-        );
-        const overlay = fragment.firstElementChild;
+        const modal = new ShortcutsHelpModal(() => {
+            this.helpDialogVisible = false;
+        });
+        const dialog = modal.mount({
+            overlayClass: 'keyboard-shortcuts-overlay modal-overlay--blur',
+            dialogClass: 'modal-dialog modal-dialog--shortcuts',
+            templatePath: SHORTCUTS_TEMPLATE,
+            templateId: 'tpl-keyboard-shortcuts-dialog'
+        });
+        dialog.id = 'keyboard-shortcuts-dialog';
+        this.helpDialogVisible = true;
 
-        const contentEl = overlay.querySelector('[data-role="content"]');
+        const contentEl = dialog.querySelector('[data-role="content"]');
         if (contentEl) {
             this._renderHelpContent(contentEl);
         }
 
-        document.body.appendChild(overlay);
-        this.helpDialogVisible = true;
-
         if (app.i18n) {
-            app.i18n.updateUI(overlay);
+            app.i18n.updateUI(modal.overlay);
         }
 
-        const closeBtn = overlay.querySelector('#close-shortcuts-btn');
-        const _dialog = overlay.querySelector('#keyboard-shortcuts-dialog');
-
-        let releaseEscape = null;
-        const close = () => {
-            releaseEscape?.();
-            releaseEscape = null;
-            overlay.remove();
-            this.helpDialogVisible = false;
-        };
-        releaseEscape = pushEscapeHandler(close);
-
-        closeBtn.addEventListener('click', close);
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {close();}
-        });
+        dialog.querySelector('#close-shortcuts-btn').addEventListener('click', () => modal.onDismiss());
     }
 
     _renderHelpContent(containerEl) {
@@ -170,7 +185,7 @@ class KeyboardShortcutsManager {
 
         for (const [category, shortcutKeys] of this.categories) {
             const categoryFragment = templateLoader.cloneSync(
-                './src/templates/shortcuts/keyboardShortcuts.html',
+                SHORTCUTS_TEMPLATE,
                 'tpl-shortcuts-category'
             );
             const categoryEl = categoryFragment.firstElementChild;
@@ -190,7 +205,7 @@ class KeyboardShortcutsManager {
                 const shortcut = this.shortcuts.get(key);
                 if (!shortcut) { continue; }
                 const itemFragment = templateLoader.cloneSync(
-                    './src/templates/shortcuts/keyboardShortcuts.html',
+                    SHORTCUTS_TEMPLATE,
                     'tpl-shortcut-item'
                 );
                 const itemEl = itemFragment.firstElementChild;

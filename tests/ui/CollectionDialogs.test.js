@@ -1,4 +1,4 @@
-/* global document, DOMParser, KeyboardEvent */
+/* global document, DOMParser, KeyboardEvent, MouseEvent */
 import fs from 'fs';
 import path from 'path';
 import { templateLoader } from '../../src/modules/templateLoader.js';
@@ -57,6 +57,64 @@ describe('CollectionDialogs', () => {
     afterEach(() => {
         document.body.innerHTML = '';
         expect(escapeHandlerCount()).toBe(0);
+    });
+
+    describe('modal shell', () => {
+        test.each([
+            ['showNewCollectionDialog', [], 'new-request-dialog-overlay', 'modal-dialog--md'],
+            ['showNewRequestDialog', [], 'new-request-dialog-overlay', 'modal-dialog--sm'],
+            ['showSaveToCollectionDialog', [{ name: 'X', url: '', protocol: 'http' }], 'new-request-dialog-overlay', 'modal-dialog--sm'],
+            ['showCollectionImportDialog', [{ importKind: 'collection' }], 'new-request-dialog-overlay', 'modal-dialog--import'],
+            ['showDocOptionsDialog', [], 'doc-options-overlay', 'modal-dialog--docs']
+        ])('%s mounts an ARIA dialog inside a single overlay', async (method, args, overlayClass, sizeClass) => {
+            const shown = dialogs[method](...args);
+            await flush();
+
+            const overlays = document.querySelectorAll('.modal-overlay');
+            expect(overlays.length).toBe(1);
+            expect(overlays[0].classList.contains(overlayClass)).toBe(true);
+            const dialog = overlays[0].firstElementChild;
+            expect(dialog.classList.contains('modal-dialog')).toBe(true);
+            expect(dialog.classList.contains(sizeClass)).toBe(true);
+            expect(dialog.getAttribute('role')).toBe('dialog');
+            expect(dialog.getAttribute('aria-modal')).toBe('true');
+            const title = dialog.querySelector('h2.dialog-title');
+            expect(title).not.toBeNull();
+            expect(dialog.getAttribute('aria-labelledby')).toBe(title.id);
+            const closeBtn = dialog.querySelector('.dialog-header .dialog-close-btn');
+            expect(closeBtn.getAttribute('data-i18n-aria')).toBe('common.close');
+
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            await expect(shown).resolves.toBeNull();
+            expect(document.querySelector('.modal-overlay')).toBeNull();
+        });
+
+        test('closing restores focus to the opener', async () => {
+            const opener = document.createElement('button');
+            document.body.appendChild(opener);
+            opener.focus();
+
+            const shown = dialogs.showNewRequestDialog();
+            await flush();
+            expect(document.activeElement).toBe(document.querySelector('#request-name'));
+
+            document.querySelector('#cancel-btn').click();
+            await expect(shown).resolves.toBeNull();
+            expect(document.activeElement).toBe(opener);
+        });
+
+        test('clicking the overlay does not close a form dialog', async () => {
+            const shown = dialogs.showNewCollectionDialog();
+            await flush();
+
+            const overlay = document.querySelector('.modal-overlay');
+            overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            await flush();
+            expect(document.querySelector('#new-collection-form')).not.toBeNull();
+
+            document.querySelector('#new-collection-close-btn').click();
+            await expect(shown).resolves.toBeNull();
+        });
     });
 
     describe('showNewCollectionDialog', () => {
@@ -305,6 +363,19 @@ describe('CollectionDialogs', () => {
                 includeExamples: false,
                 languages: [checkboxes[0].dataset.langId]
             });
+        });
+
+        test.each([['#cancel-btn'], ['#doc-options-cancel-btn']])('%s resolves null', async (selector) => {
+            const shown = dialogs.showDocOptionsDialog();
+            await flush();
+
+            const footerButtons = Array.from(document.querySelectorAll('#doc-options-form .dialog-footer button'));
+            expect(footerButtons.map(b => b.id || b.type)).toEqual(['doc-options-cancel-btn', 'submit']);
+            expect(footerButtons[1].classList.contains('btn-primary')).toBe(true);
+
+            document.querySelector(selector).click();
+            await expect(shown).resolves.toBeNull();
+            expect(document.querySelector('#doc-options-form')).toBeNull();
         });
     });
 });

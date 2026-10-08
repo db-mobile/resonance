@@ -340,7 +340,13 @@
     "updates_managed_externally": "As atualizações são gerenciadas pelo seu gerenciador de pacotes",
     "version_info": "Informações da Versão",
     "current_version": "Versão atual",
-    "retry_update": "Tentar novamente"
+    "retry_update": "Tentar novamente",
+    "proxy_testing": "Testando…",
+    "proxy_save_failed": "Falha ao salvar as configurações de proxy: {{error}}",
+    "certs_save_failed": "Falha ao salvar os certificados: {{error}}",
+    "certs_remove_title": "Remover certificado",
+    "certs_remove_confirm": "Remover o certificado de \"{{host}}\"?",
+    "save_failed": "Falha ao salvar a configuração: {{error}}"
   },
   "theme": {
     "light": "Claro",
@@ -459,7 +465,14 @@
     "status_code": "Código de Status",
     "ok": "OK",
     "error_toggle_server": "Falha ao alternar servidor",
-    "template_hint": "As strings podem usar {{request.params.id}}, {{request.query.nome}}, {{request.headers.nome}}, {{request.body.caminho}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} e {{$randomInt}}. Envie \"Prefer: code=404\" ou \"Prefer: example=nome\" para obter outra resposta documentada."
+    "template_hint": "As strings podem usar {{request.params.id}}, {{request.query.nome}}, {{request.headers.nome}}, {{request.body.caminho}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} e {{$randomInt}}. Envie \"Prefer: code=404\" ou \"Prefer: example=nome\" para obter outra resposta documentada.",
+    "error_update_port": "Falha ao atualizar a porta",
+    "error_toggle_collection": "Falha ao atualizar a coleção",
+    "error_clear_logs": "Falha ao limpar o registro de requisições",
+    "error_reset_response": "Falha ao redefinir a resposta",
+    "reset_confirm_title": "Restaurar o padrão?",
+    "reset_confirm_message": "Descartar o atraso, o código de status e o corpo de resposta personalizados de {{endpoint}}?",
+    "reset": "Redefinir"
   },
   "preview": {
     "toggle": "Alternar Visualização",
@@ -650,5 +663,12 @@
     "too_old": "Seus dados foram salvos por uma versão do Resonance que esta versão não consegue mais converter, então não foram alterados. Instale o Resonance {{release}}, abra-o uma vez e atualize novamente.",
     "global_store_collections": "Suas configurações ainda contêm coleções salvas por uma versão do Resonance anterior a março de 2026. Esta versão não consegue mais convertê-las, então não foram alteradas. Instale o Resonance {{release}}, abra-o uma vez e atualize novamente.",
     "unknown": "Não foi possível converter completamente seus dados para o formato atual."
+  },
+  "environment_manager": {
+    "create_default_name": "Novo ambiente",
+    "create_title": "Criar ambiente",
+    "create_label": "Nome do ambiente:",
+    "create_confirm": "Criar",
+    "import_error": "Erro ao importar ambientes: {{message}}"
   }
 }

@@ -7,12 +7,15 @@ import { app } from '../../appContext.js';
 import { templateLoader } from '../../templateLoader.js';
 import { ScriptEditor } from '../../scriptEditor.bundle.js';
 import { JSONEditor } from '../../jsonEditor.bundle.js';
-import { pushEscapeHandler } from '../modalEscape.js';
+import { BaseModal } from '../BaseModal.js';
 import { endpointDefaults, effectiveOverrides, stripUnchangedOverrides } from '../../utils/requestOverrides.js';
 import { translate } from '../../utils/translate.js';
 
-export class RequestEditorModal {
+const TEMPLATE_PATH = './src/templates/runner/runnerPanel.html';
+
+export class RequestEditorModal extends BaseModal {
     constructor() {
+        super();
         this.modal = null;
         this.scriptEditor = null;
         this.bodyEditor = null;
@@ -21,7 +24,6 @@ export class RequestEditorModal {
         this._opening = false;
         this._onSave = null;
         this._keyHandler = null;
-        this._releaseEscape = null;
     }
 
     /**
@@ -49,13 +51,13 @@ export class RequestEditorModal {
         this.defaults = endpointDefaults(config);
         const overrides = effectiveOverrides(request.overrides, this.defaults);
 
-        const fragment = templateLoader.cloneSync(
-            './src/templates/runner/runnerPanel.html',
-            'tpl-runner-script-modal'
-        );
-
-        this.modal = fragment.firstElementChild;
-        document.body.appendChild(this.modal);
+        this.modal = this.mount({
+            overlayClass: 'runner-script-modal-overlay',
+            dialogClass: 'modal-dialog modal-dialog--script-editor',
+            templatePath: TEMPLATE_PATH,
+            templateId: 'tpl-runner-script-modal',
+            closeOnOverlayClick: false
+        });
 
         const methodEl = this.modal.querySelector('[data-role="script-method"]');
         const pathEl = this.modal.querySelector('[data-role="script-path"]');
@@ -90,6 +92,11 @@ export class RequestEditorModal {
         }
     }
 
+    /** @returns {void} */
+    onDismiss() {
+        this.close(false);
+    }
+
     /** @param {boolean} save */
     close(save) {
         if (save && this.request) {
@@ -111,13 +118,8 @@ export class RequestEditorModal {
             this._onSave?.();
         }
 
-        if (this._releaseEscape) {
-            this._releaseEscape();
-            this._releaseEscape = null;
-        }
-
         if (this._keyHandler) {
-            document.removeEventListener('keydown', this._keyHandler);
+            this.modal?.removeEventListener('keydown', this._keyHandler);
             this._keyHandler = null;
         }
 
@@ -131,10 +133,8 @@ export class RequestEditorModal {
             this.scriptEditor = null;
         }
 
-        if (this.modal) {
-            this.modal.remove();
-            this.modal = null;
-        }
+        this.destroy();
+        this.modal = null;
 
         this.request = null;
         this.defaults = null;
@@ -159,10 +159,7 @@ export class RequestEditorModal {
     _addKvRow(container, key = '', value = '') {
         if (!container) {return;}
 
-        const fragment = templateLoader.cloneSync(
-            './src/templates/runner/runnerPanel.html',
-            'tpl-runner-kv-row'
-        );
+        const fragment = templateLoader.cloneSync(TEMPLATE_PATH, 'tpl-runner-kv-row');
         const row = fragment.firstElementChild;
 
         const keyInput = row.querySelector('[data-role="kv-key"]');
@@ -240,20 +237,12 @@ export class RequestEditorModal {
             this._addKvRow(this.modal.querySelector('[data-role="headers-list"]'));
         });
 
-        this.modal.querySelector('[data-role="script-modal-overlay"]')?.addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
-                this.close(false);
-            }
-        });
-
-        this._releaseEscape = pushEscapeHandler(() => this.close(false));
-
         this._keyHandler = (e) => {
             if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
                 this.close(true);
             }
         };
-        document.addEventListener('keydown', this._keyHandler);
+        this.modal.addEventListener('keydown', this._keyHandler);
     }
 }

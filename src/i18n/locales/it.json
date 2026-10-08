@@ -340,7 +340,13 @@
     "updates_managed_externally": "Gli aggiornamenti sono gestiti dal tuo gestore di pacchetti",
     "version_info": "Informazioni Versione",
     "current_version": "Versione attuale",
-    "retry_update": "Riprova"
+    "retry_update": "Riprova",
+    "proxy_testing": "Test in corso…",
+    "proxy_save_failed": "Impossibile salvare le impostazioni del proxy: {{error}}",
+    "certs_save_failed": "Impossibile salvare i certificati: {{error}}",
+    "certs_remove_title": "Rimuovi certificato",
+    "certs_remove_confirm": "Rimuovere il certificato per \"{{host}}\"?",
+    "save_failed": "Impossibile salvare l'impostazione: {{error}}"
   },
   "theme": {
     "light": "Chiaro",
@@ -459,7 +465,14 @@
     "status_code": "Codice di stato",
     "ok": "OK",
     "error_toggle_server": "Impossibile attivare/disattivare il server",
-    "template_hint": "Le stringhe possono usare {{request.params.id}}, {{request.query.nome}}, {{request.headers.nome}}, {{request.body.percorso}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} e {{$randomInt}}. Invia \"Prefer: code=404\" o \"Prefer: example=nome\" per ottenere un’altra risposta documentata."
+    "template_hint": "Le stringhe possono usare {{request.params.id}}, {{request.query.nome}}, {{request.headers.nome}}, {{request.body.percorso}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} e {{$randomInt}}. Invia \"Prefer: code=404\" o \"Prefer: example=nome\" per ottenere un’altra risposta documentata.",
+    "error_update_port": "Impossibile aggiornare la porta",
+    "error_toggle_collection": "Impossibile aggiornare la raccolta",
+    "error_clear_logs": "Impossibile cancellare il registro delle richieste",
+    "error_reset_response": "Impossibile ripristinare la risposta",
+    "reset_confirm_title": "Ripristinare i valori predefiniti?",
+    "reset_confirm_message": "Scartare ritardo, codice di stato e corpo della risposta personalizzati per {{endpoint}}?",
+    "reset": "Ripristina"
   },
   "runner": {
     "title": "Collection Runner",
@@ -642,5 +655,12 @@
     "too_old": "I tuoi dati sono stati salvati da una versione di Resonance che questa versione non può più convertire, quindi non sono stati modificati. Installa Resonance {{release}}, avvialo una volta e poi aggiorna di nuovo.",
     "global_store_collections": "Le tue impostazioni contengono ancora collezioni salvate da una versione di Resonance precedente a marzo 2026. Questa versione non può più convertirle, quindi non sono state modificate. Installa Resonance {{release}}, avvialo una volta e poi aggiorna di nuovo.",
     "unknown": "Non è stato possibile convertire completamente i tuoi dati nel formato attuale."
+  },
+  "environment_manager": {
+    "create_default_name": "Nuovo ambiente",
+    "create_title": "Crea ambiente",
+    "create_label": "Nome dell'ambiente:",
+    "create_confirm": "Crea",
+    "import_error": "Errore durante l'importazione degli ambienti: {{message}}"
   }
 }

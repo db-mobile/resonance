@@ -145,67 +145,63 @@
 </template>
 
 <template id="tpl-runner-script-modal">
-    <div class="modal-overlay modal-overlay--dim" data-role="script-modal-overlay">
-        <div class="modal-dialog modal-dialog--script-editor">
-            <div class="dialog-header">
-                <div class="runner-script-modal-title u-flex u-flex-col">
-                    <h3 class="dialog-title" data-i18n="runner.edit_request">Edit Request</h3>
-                    <div class="runner-script-request-info u-flex u-items-center u-gap-2">
-                        <span class="method-pill" data-role="script-method">GET</span>
-                        <span class="runner-script-path" data-role="script-path">/endpoint</span>
-                    </div>
-                </div>
-                <button class="dialog-close-btn" data-action="close" aria-label="Close">
-                    <span class="icon icon-16 icon-x"></span>
-                </button>
-            </div>
-            <div class="runner-editor-tabs">
-                <button class="runner-editor-tab is-active" data-edit-tab="params" data-i18n="runner.tab_params">Params</button>
-                <button class="runner-editor-tab" data-edit-tab="headers" data-i18n="runner.tab_headers">Headers</button>
-                <button class="runner-editor-tab" data-edit-tab="body" data-i18n="runner.tab_body">Body</button>
-                <button class="runner-editor-tab" data-edit-tab="script" data-i18n="runner.tab_script">Script</button>
-            </div>
-            <div class="runner-editor-body">
-                <div class="runner-editor-tab-content is-active" data-edit-content="params">
-                    <div class="runner-editor-section">
-                        <div class="runner-editor-section-header u-flex u-items-center u-justify-between">
-                            <h4 class="runner-editor-section-title" data-i18n="runner.path_params">Path Parameters</h4>
-                            <button class="btn btn-sm btn-outline" data-action="add-path-param" data-i18n="runner.add_param">+ Add</button>
-                        </div>
-                        <div class="key-value-list" data-role="path-params-list"></div>
-                    </div>
-                    <div class="runner-editor-section">
-                        <div class="runner-editor-section-header u-flex u-items-center u-justify-between">
-                            <h4 class="runner-editor-section-title" data-i18n="runner.query_params">Query Parameters</h4>
-                            <button class="btn btn-sm btn-outline" data-action="add-query-param" data-i18n="runner.add_param">+ Add</button>
-                        </div>
-                        <div class="key-value-list" data-role="query-params-list"></div>
-                    </div>
-                </div>
-                <div class="runner-editor-tab-content" data-edit-content="headers">
-                    <div class="runner-editor-section">
-                        <div class="runner-editor-section-header u-flex u-items-center u-justify-between">
-                            <h4 class="runner-editor-section-title" data-i18n="runner.headers">Headers</h4>
-                            <button class="btn btn-sm btn-outline" data-action="add-header" data-i18n="runner.add_header">+ Add</button>
-                        </div>
-                        <div class="key-value-list" data-role="headers-list"></div>
-                    </div>
-                </div>
-                <div class="runner-editor-tab-content" data-edit-content="body">
-                    <div class="runner-editor-body-host" data-role="override-body-container"></div>
-                </div>
-                <div class="runner-editor-tab-content" data-edit-content="script">
-                    <div class="runner-script-editor-container" data-role="script-editor-container"></div>
-                    <div class="runner-script-modal-hint">
-                        <strong>Available APIs:</strong> response, environment.set(), environment.get(), console.log(), sendRequest()
-                    </div>
-                </div>
-            </div>
-            <div class="runner-script-modal-footer dialog-footer dialog-footer--divided">
-                <button class="btn btn-outline" data-action="cancel" data-i18n="common.cancel">Cancel</button>
-                <button class="btn btn-primary" data-action="save" data-i18n="common.save">Save</button>
+    <div class="dialog-header">
+        <div class="runner-script-modal-title u-flex u-flex-col">
+            <h2 class="dialog-title" data-i18n="runner.edit_request">Edit Request</h2>
+            <div class="runner-script-request-info u-flex u-items-center u-gap-2">
+                <span class="method-pill" data-role="script-method">GET</span>
+                <span class="runner-script-path" data-role="script-path">/endpoint</span>
             </div>
         </div>
+        <button type="button" class="dialog-close-btn" data-action="close" aria-label="Close" data-i18n-aria="common.close">
+            <span class="icon icon-16 icon-x"></span>
+        </button>
+    </div>
+    <div class="runner-editor-tabs">
+        <button class="runner-editor-tab is-active" data-edit-tab="params" data-i18n="runner.tab_params">Params</button>
+        <button class="runner-editor-tab" data-edit-tab="headers" data-i18n="runner.tab_headers">Headers</button>
+        <button class="runner-editor-tab" data-edit-tab="body" data-i18n="runner.tab_body">Body</button>
+        <button class="runner-editor-tab" data-edit-tab="script" data-i18n="runner.tab_script">Script</button>
+    </div>
+    <div class="runner-editor-body">
+        <div class="runner-editor-tab-content is-active" data-edit-content="params">
+            <div class="runner-editor-section">
+                <div class="runner-editor-section-header u-flex u-items-center u-justify-between">
+                    <h4 class="runner-editor-section-title" data-i18n="runner.path_params">Path Parameters</h4>
+                    <button class="btn btn-sm btn-outline" data-action="add-path-param" data-i18n="runner.add_param">+ Add</button>
+                </div>
+                <div class="key-value-list" data-role="path-params-list"></div>
+            </div>
+            <div class="runner-editor-section">
+                <div class="runner-editor-section-header u-flex u-items-center u-justify-between">
+                    <h4 class="runner-editor-section-title" data-i18n="runner.query_params">Query Parameters</h4>
+                    <button class="btn btn-sm btn-outline" data-action="add-query-param" data-i18n="runner.add_param">+ Add</button>
+                </div>
+                <div class="key-value-list" data-role="query-params-list"></div>
+            </div>
+        </div>
+        <div class="runner-editor-tab-content" data-edit-content="headers">
+            <div class="runner-editor-section">
+                <div class="runner-editor-section-header u-flex u-items-center u-justify-between">
+                    <h4 class="runner-editor-section-title" data-i18n="runner.headers">Headers</h4>
+                    <button class="btn btn-sm btn-outline" data-action="add-header" data-i18n="runner.add_header">+ Add</button>
+                </div>
+                <div class="key-value-list" data-role="headers-list"></div>
+            </div>
+        </div>
+        <div class="runner-editor-tab-content" data-edit-content="body">
+            <div class="runner-editor-body-host" data-role="override-body-container"></div>
+        </div>
+        <div class="runner-editor-tab-content" data-edit-content="script">
+            <div class="runner-script-editor-container" data-role="script-editor-container"></div>
+            <div class="runner-script-modal-hint">
+                <strong>Available APIs:</strong> response, environment.set(), environment.get(), console.log(), sendRequest()
+            </div>
+        </div>
+    </div>
+    <div class="runner-script-modal-footer dialog-footer dialog-footer--divided">
+        <button class="btn btn-outline" data-action="cancel" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-primary" data-action="save" data-i18n="common.save">Save</button>
     </div>
 </template>
 

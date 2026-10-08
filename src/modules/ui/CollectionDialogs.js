@@ -7,7 +7,7 @@ import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { DocGeneratorService } from '../services/DocGeneratorService.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
-import { pushEscapeHandler } from './modalEscape.js';
+import { BaseModal } from './BaseModal.js';
 import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
 import { fileNameFromPath } from '../utils/fileName.js';
 import { translate } from '../utils/translate.js';
@@ -15,6 +15,19 @@ import { normalizeMqttData } from '../mqtt/mqttFields.js';
 
 const NEW_DIALOGS_TEMPLATE = './src/templates/collections/newDialogs.html';
 const DOC_OPTIONS_TEMPLATE = './src/templates/docs/docOptionsDialog.html';
+const COLLECTION_OVERLAY_CLASS = 'new-request-dialog-overlay';
+
+/**
+ * @param {string} templateId
+ * @param {string} size
+ * @returns {{templatePath: string, templateId: string, overlayClass: string, dialogClass: string}}
+ */
+const collectionDialog = (templateId, size) => ({
+    templatePath: NEW_DIALOGS_TEMPLATE,
+    templateId,
+    overlayClass: COLLECTION_OVERLAY_CLASS,
+    dialogClass: `new-request-dialog modal-dialog modal-dialog--${size}`
+});
 
 /** @type {ReadonlyArray<string>} */
 const PLACEHOLDER_REQUEST_NAMES = Object.freeze(['New Request', 'New WebSocket', 'New gRPC']);
@@ -33,30 +46,24 @@ export class CollectionDialogs {
     }
 
     /**
-     * @param {string} templatePath
-     * @param {string} templateId
+     * @param {{templatePath: string, templateId: string, overlayClass: string, dialogClass: string}} config
      * @param {function(*): void} resolve
      * @param {function(Error): void} [reject]
      * @returns {{dialog: HTMLElement, finish: function(*): void, fail: function(Error): void}}
      */
-    _mountDialog(templatePath, templateId, resolve, reject = null) {
-        const fragment = templateLoader.cloneSync(templatePath, templateId);
-        const dialog = fragment.firstElementChild;
-
-        document.body.appendChild(dialog);
+    _mountDialog(config, resolve, reject = null) {
+        const modal = new BaseModal();
+        const dialog = modal.mount({ ...config, closeOnOverlayClick: false });
 
         if (app.i18n && app.i18n.updateUI) {
             app.i18n.updateUI(dialog);
         }
 
         let settled = false;
-        let releaseEscape = null;
 
         const teardown = () => {
             settled = true;
-            releaseEscape?.();
-            releaseEscape = null;
-            dialog.remove();
+            modal.destroy();
         };
 
         const finish = (result) => {
@@ -75,13 +82,7 @@ export class CollectionDialogs {
             reject?.(error);
         };
 
-        dialog.addEventListener('click', (e) => {
-            if (e.target === dialog) {
-                finish(null);
-            }
-        });
-
-        releaseEscape = pushEscapeHandler(() => finish(null));
+        modal.onDismiss = () => finish(null);
 
         return { dialog, finish, fail };
     }
@@ -90,7 +91,7 @@ export class CollectionDialogs {
         const defaultStoragePath = await this.backendAPI.collections.getPath().catch(() => '');
 
         return new Promise((resolve) => {
-            const { dialog, finish } = this._mountDialog(NEW_DIALOGS_TEMPLATE, 'tpl-new-collection-dialog', resolve);
+            const { dialog, finish } = this._mountDialog(collectionDialog('tpl-new-collection-dialog', 'md'), resolve);
 
             const form = dialog.querySelector('#new-collection-form');
             const nameInput = dialog.querySelector('#collection-name');
@@ -131,7 +132,7 @@ export class CollectionDialogs {
 
     async showNewRequestDialog() {
         return new Promise((resolve) => {
-            const { dialog, finish } = this._mountDialog(NEW_DIALOGS_TEMPLATE, 'tpl-new-request-dialog', resolve);
+            const { dialog, finish } = this._mountDialog(collectionDialog('tpl-new-request-dialog', 'sm'), resolve);
 
             const form = dialog.querySelector('#new-request-form');
             const nameInput = dialog.querySelector('#request-name');
@@ -329,7 +330,7 @@ export class CollectionDialogs {
         const defaultStoragePath = await this.backendAPI.collections.getPath().catch(() => '');
 
         return new Promise((resolve, reject) => {
-            const { dialog, finish, fail } = this._mountDialog(NEW_DIALOGS_TEMPLATE, 'tpl-save-to-collection-dialog', resolve, reject);
+            const { dialog, finish, fail } = this._mountDialog(collectionDialog('tpl-save-to-collection-dialog', 'sm'), resolve, reject);
 
             const form = dialog.querySelector('#save-to-collection-form');
             const nameInput = dialog.querySelector('#save-request-name');
@@ -443,13 +444,19 @@ export class CollectionDialogs {
 
     async showDocOptionsDialog() {
         return new Promise((resolve) => {
-            const { dialog, finish } = this._mountDialog(DOC_OPTIONS_TEMPLATE, 'tpl-doc-options-dialog', resolve);
+            const { dialog, finish } = this._mountDialog({
+                templatePath: DOC_OPTIONS_TEMPLATE,
+                templateId: 'tpl-doc-options-dialog',
+                overlayClass: 'doc-options-overlay',
+                dialogClass: 'modal-dialog modal-dialog--docs'
+            }, resolve);
 
             const form = dialog.querySelector('#doc-options-form');
             const formatSelect = dialog.querySelector('#doc-format');
             const includeExamplesCheckbox = dialog.querySelector('#doc-include-examples');
             const languageCheckboxesContainer = dialog.querySelector('#language-checkboxes');
-            const cancelBtn = dialog.querySelector('#cancel-btn');
+            const closeBtn = dialog.querySelector('#cancel-btn');
+            const cancelBtn = dialog.querySelector('#doc-options-cancel-btn');
 
             const languages = DocGeneratorService.getAvailableLanguages();
             const defaultLanguages = DocGeneratorService.DEFAULT_LANGUAGES;
@@ -469,6 +476,7 @@ export class CollectionDialogs {
                 languageCheckboxesContainer.appendChild(label);
             });
 
+            closeBtn.addEventListener('click', () => finish(null));
             cancelBtn.addEventListener('click', () => finish(null));
 
             form.addEventListener('submit', (e) => {
@@ -492,7 +500,7 @@ export class CollectionDialogs {
         const defaultStoragePath = await this.backendAPI.collections.getPath().catch(() => '');
 
         return new Promise((resolve) => {
-            const { dialog, finish } = this._mountDialog(NEW_DIALOGS_TEMPLATE, 'tpl-import-collection-dialog', resolve);
+            const { dialog, finish } = this._mountDialog(collectionDialog('tpl-import-collection-dialog', 'import'), resolve);
 
             const titleElement = dialog.querySelector('#import-collection-title');
             const subtitleElement = dialog.querySelector('#import-collection-subtitle');

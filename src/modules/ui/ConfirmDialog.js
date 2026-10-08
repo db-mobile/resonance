@@ -13,8 +13,6 @@ export class ConfirmDialog extends BaseModal {
         this.resolve = null;
         /** @type {boolean|null} */
         this.dismissValue = false;
-        /** @type {HTMLElement|null} */
-        this.previousFocus = null;
     }
 
     /**
@@ -23,7 +21,7 @@ export class ConfirmDialog extends BaseModal {
      * @param {string} [options.title='Confirm Action']
      * @param {string} [options.confirmText='Confirm']
      * @param {string} [options.cancelText='Cancel']
-     * @param {boolean} [options.dangerous=true]
+     * @param {boolean} [options.dangerous=false]
      * @param {boolean|null} [options.dismissValue=false]
      * @returns {Promise<boolean|null>}
      */
@@ -31,7 +29,6 @@ export class ConfirmDialog extends BaseModal {
         return new Promise((resolve) => {
             this.resolve = resolve;
             this.dismissValue = options.dismissValue === undefined ? false : options.dismissValue;
-            this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
             this.createDialog(message, options);
         });
     }
@@ -44,7 +41,7 @@ export class ConfirmDialog extends BaseModal {
     createDialog(message, options) {
         const dialog = this.mount({
             overlayClass: 'confirm-dialog-overlay',
-            dialogClass: 'confirm-dialog modal-dialog modal-dialog--sm',
+            dialogClass: 'confirm-dialog modal-dialog modal-dialog--sm alert-dialog',
             templatePath: './src/templates/dialogs/confirmDialog.html',
             templateId: 'tpl-confirm-dialog'
         });
@@ -52,7 +49,7 @@ export class ConfirmDialog extends BaseModal {
         const title = options.title || 'Confirm Action';
         const confirmText = options.confirmText || 'Confirm';
         const cancelText = options.cancelText || 'Cancel';
-        const isDangerous = options.dangerous !== false;
+        const isDangerous = options.dangerous === true;
 
         const titleEl = dialog.querySelector('[data-role="title"]');
         const messageEl = dialog.querySelector('[data-role="message"]');
@@ -90,13 +87,6 @@ export class ConfirmDialog extends BaseModal {
                     this.cancel();
                 } else {
                     this.confirm();
-                }
-            } else if (e.key === 'Tab') {
-                e.preventDefault();
-                if (document.activeElement === cancelBtn) {
-                    confirmBtn.focus();
-                } else {
-                    cancelBtn.focus();
                 }
             }
         };
@@ -139,10 +129,8 @@ export class ConfirmDialog extends BaseModal {
         }
         this.destroy();
 
-        const target = this.previousFocus?.isConnected && this.previousFocus !== document.body
-            ? this.previousFocus
-            : document.getElementById('collections-list');
-        this.previousFocus = null;
-        target?.focus();
+        if (document.activeElement === document.body) {
+            document.getElementById('collections-list')?.focus();
+        }
     }
 }

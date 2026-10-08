@@ -1,162 +1,156 @@
 <template id="tpl-settings-modal">
-    <div class="modal-overlay">
-        <div class="modal-dialog modal-dialog--settings u-flex u-flex-col">
-            <div class="dialog-header">
-                <h2 class="dialog-title" data-i18n="settings.title">Settings</h2>
-                <button class="dialog-close-btn" aria-label="Close Settings" data-i18n-aria="settings.close">
-                    <span class="icon icon-16 icon-x"></span>
-                </button>
-            </div>
+    <div class="dialog-header">
+        <h2 class="dialog-title" data-i18n="settings.title">Settings</h2>
+        <button type="button" class="dialog-close-btn" aria-label="Close Settings" data-i18n-aria="settings.close">
+            <span class="icon icon-16 icon-x"></span>
+        </button>
+    </div>
 
-            <div class="settings-tabs">
-                <button class="settings-tab active" data-tab="general" data-i18n="settings.tab_general">General</button>
-            </div>
+    <div class="settings-tabs">
+        <button class="settings-tab active" data-tab="general" data-i18n="settings.tab_general">General</button>
+    </div>
 
-            <div class="settings-content">
-                <div class="settings-tab-content active" data-tab-content="general">
-                    <p class="list-group-title" data-i18n="settings.group_appearance">Appearance</p>
-                    <div class="boxed-list">
-                        <div data-role="language-section"></div>
+    <div class="settings-content">
+        <div class="settings-tab-content active" data-tab-content="general">
+            <p class="list-group-title" data-i18n="settings.group_appearance">Appearance</p>
+            <div class="boxed-list">
+                <div data-role="language-section"></div>
 
-                        <div class="row">
-                            <div class="row-content">
-                                <span class="title" data-i18n="settings.theme">Theme</span>
-                            </div>
-                            <div class="suffix">
-                                <div class="select-wrap">
-                                    <select class="select-base theme-select" name="theme">
-                                        <option value="light" data-i18n="theme.light">Light</option>
-                                        <option value="dark" data-i18n="theme.dark">Dark</option>
-                                        <option value="system" data-i18n="theme.system">System</option>
-                                    </select>
-                                    <span class="select-arrow icon icon-12 icon-chevron-down"></span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="row-content">
-                                <span class="title" data-i18n="settings.accent_color">Accent Color</span>
-                            </div>
-                            <div class="suffix accent-color-grid" data-role="accent-grid"></div>
-                        </div>
-
-                        <div class="row">
-                            <div class="row-content">
-                                <span class="title" data-i18n="settings.layout">Layout</span>
-                                <span class="subtitle" data-i18n="settings.layout_description">Where the response appears relative to the request.</span>
-                            </div>
-                            <div class="suffix">
-                                <div class="select-wrap">
-                                    <select class="select-base" name="layout">
-                                        <option value="stacked" data-i18n="layout.stacked">Stacked</option>
-                                        <option value="side-by-side" data-i18n="layout.side_by_side">Side by side</option>
-                                    </select>
-                                    <span class="select-arrow icon icon-12 icon-chevron-down"></span>
-                                </div>
-                            </div>
-                        </div>
+                <div class="row">
+                    <div class="row-content">
+                        <span class="title" data-i18n="settings.theme">Theme</span>
                     </div>
-
-                    <p class="list-group-title" data-i18n="settings.group_requests">Requests</p>
-                    <div class="boxed-list">
-                        <div class="row">
-                            <div class="row-content">
-                                <span class="title" data-i18n="settings.http_version">HTTP Version</span>
-                            </div>
-                            <div class="suffix">
-                                <div class="select-wrap">
-                                    <select class="select-base http-version-select" name="httpVersion">
-                                        <option value="auto" data-i18n="http_version.auto">Auto</option>
-                                        <option value="http1" data-i18n="http_version.http1">HTTP/1.x</option>
-                                        <option value="http2" data-i18n="http_version.http2">HTTP/2</option>
-                                    </select>
-                                    <span class="select-arrow icon icon-12 icon-chevron-down"></span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="row-content">
-                                <span class="title" data-i18n="settings.request_timeout">Request Timeout</span>
-                                <span class="subtitle" data-i18n="settings.timeout_description">Set to 0 for no timeout</span>
-                            </div>
-                            <div class="suffix">
-                                <div class="form-input-container">
-                                    <input type="number" class="entry settings-number-input" name="requestTimeout" min="0" step="1000" placeholder="0">
-                                    <span class="form-input-unit">ms</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="row-content">
-                                <span class="title" data-i18n="settings.ssl_verification_label">Verify SSL certificates</span>
-                                <span class="subtitle" data-i18n="settings.ssl_verification_description">Disable for self-signed certificates in development environments.</span>
-                            </div>
-                            <div class="suffix">
-                                <input type="checkbox" class="switch" name="verifySsl" aria-label="Verify SSL certificates">
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="row-content">
-                                <span class="title" data-i18n="settings.follow_redirects_label">Follow redirects</span>
-                                <span class="subtitle" data-i18n="settings.follow_redirects_description">Disable to inspect redirect responses without following them.</span>
-                            </div>
-                            <div class="suffix">
-                                <input type="checkbox" class="switch" name="followRedirects" aria-label="Follow redirects">
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="row-content">
-                                <span class="title" data-i18n="settings.history_limit">History Limit</span>
-                                <span class="subtitle" data-i18n="settings.history_limit_description">Maximum number of requests stored in history</span>
-                            </div>
-                            <div class="suffix">
-                                <div class="form-input-container">
-                                    <input type="number" class="entry settings-number-input" name="historyLimit" min="10" max="10000" step="10" placeholder="100">
-                                    <span class="form-input-unit" data-i18n="settings.history_limit_unit">entries</span>
-                                </div>
-                            </div>
+                    <div class="suffix">
+                        <div class="select-wrap">
+                            <select class="select-base theme-select" name="theme">
+                                <option value="light" data-i18n="theme.light">Light</option>
+                                <option value="dark" data-i18n="theme.dark">Dark</option>
+                                <option value="system" data-i18n="theme.system">System</option>
+                            </select>
+                            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                         </div>
                     </div>
                 </div>
 
-                <div class="settings-tab-content" data-tab-content="updates">
-                    <div class="boxed-list">
-                        <div class="row">
-                            <div class="row-content">
-                                <span class="title" data-i18n="settings.check_updates_on_launch">Check for updates on launch</span>
-                                <span class="subtitle" data-i18n="settings.check_updates_on_launch_description">Automatically check for new versions when the application starts.</span>
-                            </div>
-                            <div class="suffix">
-                                <input type="checkbox" class="switch" name="checkUpdatesOnLaunch" aria-label="Check for updates on launch">
-                            </div>
-                        </div>
+                <div class="row">
+                    <div class="row-content">
+                        <span class="title" data-i18n="settings.accent_color">Accent Color</span>
+                    </div>
+                    <div class="suffix accent-color-grid" data-role="accent-grid"></div>
+                </div>
 
-                        <div class="row">
-                            <div class="row-content">
-                                <span class="title" data-i18n="settings.manual_update">Manual Update</span>
-                                <span id="update-status" class="subtitle update-status"></span>
-                            </div>
-                            <div class="suffix">
-                                <button type="button" class="button" id="check-for-updates-btn" data-i18n="settings.check_for_updates">Check for Updates</button>
-                            </div>
-                        </div>
-
-                        <div class="row property">
-                            <div class="row-content">
-                                <span class="title" data-i18n="settings.version_info">Version</span>
-                                <span class="subtitle" id="settings-current-version"></span>
-                            </div>
+                <div class="row">
+                    <div class="row-content">
+                        <span class="title" data-i18n="settings.layout">Layout</span>
+                        <span class="subtitle" data-i18n="settings.layout_description">Where the response appears relative to the request.</span>
+                    </div>
+                    <div class="suffix">
+                        <div class="select-wrap">
+                            <select class="select-base" name="layout">
+                                <option value="stacked" data-i18n="layout.stacked">Stacked</option>
+                                <option value="side-by-side" data-i18n="layout.side_by_side">Side by side</option>
+                            </select>
+                            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="settings-footer"></div>
+            <p class="list-group-title" data-i18n="settings.group_requests">Requests</p>
+            <div class="boxed-list">
+                <div class="row">
+                    <div class="row-content">
+                        <span class="title" data-i18n="settings.http_version">HTTP Version</span>
+                    </div>
+                    <div class="suffix">
+                        <div class="select-wrap">
+                            <select class="select-base http-version-select" name="httpVersion">
+                                <option value="auto" data-i18n="http_version.auto">Auto</option>
+                                <option value="http1" data-i18n="http_version.http1">HTTP/1.x</option>
+                                <option value="http2" data-i18n="http_version.http2">HTTP/2</option>
+                            </select>
+                            <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="row-content">
+                        <span class="title" data-i18n="settings.request_timeout">Request Timeout</span>
+                        <span class="subtitle" data-i18n="settings.timeout_description">Set to 0 for no timeout</span>
+                    </div>
+                    <div class="suffix">
+                        <div class="form-input-container">
+                            <input type="number" class="entry settings-number-input" name="requestTimeout" min="0" step="1000" placeholder="0">
+                            <span class="form-input-unit">ms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="row-content">
+                        <span class="title" data-i18n="settings.ssl_verification_label">Verify SSL certificates</span>
+                        <span class="subtitle" data-i18n="settings.ssl_verification_description">Disable for self-signed certificates in development environments.</span>
+                    </div>
+                    <div class="suffix">
+                        <input type="checkbox" class="switch" name="verifySsl" aria-label="Verify SSL certificates">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="row-content">
+                        <span class="title" data-i18n="settings.follow_redirects_label">Follow redirects</span>
+                        <span class="subtitle" data-i18n="settings.follow_redirects_description">Disable to inspect redirect responses without following them.</span>
+                    </div>
+                    <div class="suffix">
+                        <input type="checkbox" class="switch" name="followRedirects" aria-label="Follow redirects">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="row-content">
+                        <span class="title" data-i18n="settings.history_limit">History Limit</span>
+                        <span class="subtitle" data-i18n="settings.history_limit_description">Maximum number of requests stored in history</span>
+                    </div>
+                    <div class="suffix">
+                        <div class="form-input-container">
+                            <input type="number" class="entry settings-number-input" name="historyLimit" min="10" max="10000" step="10" placeholder="100">
+                            <span class="form-input-unit" data-i18n="settings.history_limit_unit">entries</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-tab-content" data-tab-content="updates">
+            <div class="boxed-list">
+                <div class="row">
+                    <div class="row-content">
+                        <span class="title" data-i18n="settings.check_updates_on_launch">Check for updates on launch</span>
+                        <span class="subtitle" data-i18n="settings.check_updates_on_launch_description">Automatically check for new versions when the application starts.</span>
+                    </div>
+                    <div class="suffix">
+                        <input type="checkbox" class="switch" name="checkUpdatesOnLaunch" aria-label="Check for updates on launch">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="row-content">
+                        <span class="title" data-i18n="settings.manual_update">Manual Update</span>
+                        <span id="update-status" class="subtitle update-status"></span>
+                    </div>
+                    <div class="suffix">
+                        <button type="button" class="button" id="check-for-updates-btn" data-i18n="settings.check_for_updates">Check for Updates</button>
+                    </div>
+                </div>
+
+                <div class="row property">
+                    <div class="row-content">
+                        <span class="title" data-i18n="settings.version_info">Version</span>
+                        <span class="subtitle" id="settings-current-version"></span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </template>

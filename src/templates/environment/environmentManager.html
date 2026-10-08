@@ -1,7 +1,7 @@
 <template id="tpl-environment-manager-dialog-content">
     <div class="dialog-header">
-        <h3 class="dialog-title">Manage Environments</h3>
-        <button id="env-close-btn" class="dialog-close-btn" aria-label="Close"><span class="icon icon-16 icon-x"></span></button>
+        <h2 class="dialog-title">Manage Environments</h2>
+        <button type="button" id="env-close-btn" class="dialog-close-btn" aria-label="Close" data-i18n-aria="common.close"><span class="icon icon-16 icon-x"></span></button>
     </div>
 
     <div class="u-flex u-flex-1 u-gap-4 u-overflow-hidden">
@@ -130,26 +130,5 @@
             <span class="icon icon-14 icon-lock"></span>
         </button>
         <button type="button" class="btn-delete var-delete-btn" title="Delete variable" aria-label="Delete variable">×</button>
-    </div>
-</template>
-
-<template id="tpl-environment-manager-input-dialog">
-    <div class="u-flex u-flex-col u-gap-4">
-        <h3 class="dialog-title" data-role="title"></h3>
-        <p class="dialog-message" data-role="message"></p>
-        <input type="text" id="input-dialog-input" class="input-base field-input" />
-        <div class="dialog-footer">
-            <button id="input-dialog-cancel" class="btn btn-outline">Cancel</button>
-            <button id="input-dialog-ok" class="btn btn-primary">OK</button>
-        </div>
-    </div>
-</template>
-
-<template id="tpl-environment-manager-alert-dialog">
-    <div class="u-flex u-flex-col u-gap-4">
-        <p class="dialog-message dialog-message--primary" data-role="message"></p>
-        <div class="dialog-footer">
-            <button id="alert-dialog-ok" class="btn btn-primary">OK</button>
-        </div>
     </div>
 </template>

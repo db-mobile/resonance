@@ -7,11 +7,6 @@
   opacity: 0.8;
 }
 
-#keyboard-shortcuts-dialog {
-  width: 640px;
-  height: min(640px, 100%);
-}
-
 .keyboard-shortcuts-content {
   flex: 1;
   min-height: 0;
@@ -94,11 +89,6 @@
   max-height: none;
 }
 
-.modal-dialog.curl-import-dialog {
-  width: 960px;
-  height: min(760px, 100%);
-}
-
 .curl-import-dialog-body {
   gap: var(--space-4);
   flex: 1;
@@ -169,10 +159,6 @@
 .import-dialog-error {
   color: var(--error-color);
   font-size: var(--font-size-small);
-}
-
-.modal-dialog:has(#import-collection-form) {
-  width: 640px;
 }
 
 #import-collection-form {

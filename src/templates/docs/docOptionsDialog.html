@@ -1,45 +1,44 @@
 <template id="tpl-doc-options-dialog">
-    <div class="modal-overlay doc-options-overlay">
-        <div class="modal-dialog modal-dialog--docs">
-            <form id="doc-options-form" class="u-flex u-flex-col u-gap-4">
-                <div class="dialog-header">
-                    <h3 class="dialog-title" data-i18n="docs.title">Generate Documentation</h3>
-                    <button type="button" id="cancel-btn" class="dialog-close-btn" aria-label="Close"><span class="icon icon-16 icon-x"></span></button>
-                </div>
-                
-                <div class="form-group">
-                    <label for="doc-format" class="form-label" data-i18n="docs.format">Format</label>
-                    <div class="select-wrapper">
-                        <select id="doc-format" class="select-base">
-                            <option value="html" data-i18n="docs.format_html">HTML</option>
-                            <option value="markdown" data-i18n="docs.format_markdown">Markdown</option>
-                        </select>
-                        <span class="select-arrow icon icon-12 icon-chevron-down"></span>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="doc-include-examples">
-                        <span class="toggle-track"></span>
-                        <span data-i18n="docs.include_examples">Include example data</span>
-                    </label>
-                    <p class="form-hint" data-i18n="docs.include_examples_help">Include your saved parameter values and request bodies</p>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" data-i18n="docs.code_samples">Code Samples</label>
-                    <div class="doc-language-list" id="language-checkboxes">
-                        <!-- Populated dynamically -->
-                    </div>
-                </div>
-
-                <div class="dialog-footer">
-                    <button type="submit" class="btn btn-primary" data-i18n="docs.generate">Generate</button>
-                </div>
-            </form>
+    <form id="doc-options-form" class="u-flex u-flex-col u-gap-4">
+        <div class="dialog-header">
+            <h2 class="dialog-title" data-i18n="docs.title">Generate Documentation</h2>
+            <button type="button" id="cancel-btn" class="dialog-close-btn" aria-label="Close" data-i18n-aria="common.close"><span class="icon icon-16 icon-x"></span></button>
         </div>
-    </div>
+
+        <div class="dialog-body u-flex u-flex-col u-gap-4">
+            <div class="form-group">
+                <label for="doc-format" class="form-label" data-i18n="docs.format">Format</label>
+                <div class="select-wrapper">
+                    <select id="doc-format" class="select-base">
+                        <option value="html" data-i18n="docs.format_html">HTML</option>
+                        <option value="markdown" data-i18n="docs.format_markdown">Markdown</option>
+                    </select>
+                    <span class="select-arrow icon icon-12 icon-chevron-down"></span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="doc-include-examples">
+                    <span class="toggle-track"></span>
+                    <span data-i18n="docs.include_examples">Include example data</span>
+                </label>
+                <p class="form-hint" data-i18n="docs.include_examples_help">Include your saved parameter values and request bodies</p>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" data-i18n="docs.code_samples">Code Samples</label>
+                <div class="doc-language-list" id="language-checkboxes">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <div class="dialog-footer">
+            <button type="button" id="doc-options-cancel-btn" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary" data-i18n="docs.generate">Generate</button>
+        </div>
+    </form>
 </template>
 
 <template id="tpl-language-checkbox">
