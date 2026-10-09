@@ -7,7 +7,8 @@
     "beforeDevCommand": "npm run build && node serve.js",
     "beforeBuildCommand": "npm run build:prod",
     "devUrl": "http://localhost:1420",
-    "frontendDist": "../dist"
+    "frontendDist": "../dist",
+    "removeUnusedCommands": true
   },
   "app": {
     "windows": [
