@@ -52,7 +52,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml_ng = "0.10"
 
 # Mock server
-axum = "0.7"
+axum = { version = "0.7", default-features = false, features = ["http1", "json", "query", "tokio"] }
 tower = { version = "0.5", features = ["util"] }
 
 # TLS for connection timing measurement
@@ -76,7 +76,7 @@ url = "2"
 idna_adapter = "=1.2.0"
 
 # Digest auth + AWS Signature V4
-md5 = "0.7"
+md-5 = "0.10"
 sha2 = "0.10"
 sha1 = "0.10"
 hmac = "0.12"

@@ -1376,7 +1376,7 @@ fn string_arg(args: &[JsValue], index: usize) -> String {
 fn digest_bytes(algorithm: &str, data: &[u8]) -> JsResult<Vec<u8>> {
     use sha2::Digest;
     Ok(match algorithm {
-        "md5" => md5::compute(data).0.to_vec(),
+        "md5" => md5::Md5::digest(data).to_vec(),
         "sha1" => sha1::Sha1::digest(data).to_vec(),
         "sha256" => sha2::Sha256::digest(data).to_vec(),
         "sha384" => sha2::Sha384::digest(data).to_vec(),
@@ -1389,23 +1389,6 @@ fn digest_bytes(algorithm: &str, data: &[u8]) -> JsResult<Vec<u8>> {
     })
 }
 
-/// RFC 2104 HMAC over the `md5` crate, which does not implement the
-/// RustCrypto traits the `hmac` crate needs.
-fn hmac_md5(key: &[u8], data: &[u8]) -> Vec<u8> {
-    const BLOCK: usize = 64;
-    let mut block_key = if key.len() > BLOCK {
-        md5::compute(key).0.to_vec()
-    } else {
-        key.to_vec()
-    };
-    block_key.resize(BLOCK, 0);
-    let mut inner: Vec<u8> = block_key.iter().map(|b| b ^ 0x36).collect();
-    inner.extend_from_slice(data);
-    let mut outer: Vec<u8> = block_key.iter().map(|b| b ^ 0x5c).collect();
-    outer.extend_from_slice(&md5::compute(inner).0);
-    md5::compute(outer).0.to_vec()
-}
-
 fn hmac_bytes(algorithm: &str, key: &[u8], data: &[u8]) -> JsResult<Vec<u8>> {
     use hmac::{Hmac, Mac};
     fn run<M: Mac + hmac::digest::KeyInit>(key: &[u8], data: &[u8]) -> Vec<u8> {
@@ -1415,7 +1398,7 @@ fn hmac_bytes(algorithm: &str, key: &[u8], data: &[u8]) -> JsResult<Vec<u8>> {
         mac.finalize().into_bytes().to_vec()
     }
     Ok(match algorithm {
-        "md5" => hmac_md5(key, data),
+        "md5" => run::<Hmac<md5::Md5>>(key, data),
         "sha1" => run::<Hmac<sha1::Sha1>>(key, data),
         "sha256" => run::<Hmac<sha2::Sha256>>(key, data),
         "sha384" => run::<Hmac<sha2::Sha384>>(key, data),

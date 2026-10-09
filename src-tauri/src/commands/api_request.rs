@@ -68,8 +68,8 @@ impl DigestChallenge {
 
 /// Compute MD5 hash of a string
 fn md5_hash(data: &str) -> String {
-    let digest = md5::compute(data.as_bytes());
-    hex::encode(digest.0)
+    use md5::Digest;
+    hex::encode(md5::Md5::digest(data.as_bytes()))
 }
 
 /// Generate a random client nonce
