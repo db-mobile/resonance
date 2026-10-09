@@ -441,10 +441,7 @@ fn capture_request_mutations(
 fn console_fn(ctx: Rc<RefCell<ScriptContext>>, level: &'static str) -> NativeFunction {
     unsafe {
         NativeFunction::from_closure(move |_, args, _| {
-            let message = args
-                .first()
-                .map(|v| v.display().to_string())
-                .unwrap_or_default();
+            let message = args.first().map(js_text).unwrap_or_default();
             push_log(&ctx, level, message);
             Ok(JsValue::undefined())
         })
@@ -679,10 +676,7 @@ fn setup_pm(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<()
     let env_get_ctx = ctx.clone();
     let env_get_fn = unsafe {
         NativeFunction::from_closure(move |_, args, _| {
-            let key = args
-                .first()
-                .map(|v| v.display().to_string().trim_matches('"').to_string())
-                .unwrap_or_default();
+            let key = args.first().map(js_text).unwrap_or_default();
             let borrowed = env_get_ctx.borrow();
             let value = match borrowed.environment_changes.get(&key) {
                 Some(change) => change.clone(),
@@ -700,14 +694,8 @@ fn setup_pm(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<()
     let env_set_ctx = ctx.clone();
     let env_set_fn = unsafe {
         NativeFunction::from_closure(move |_, args, _| {
-            let key = args
-                .first()
-                .map(|v| v.display().to_string().trim_matches('"').to_string())
-                .unwrap_or_default();
-            let value = args
-                .get(1)
-                .map(|v| v.display().to_string().trim_matches('"').to_string())
-                .unwrap_or_default();
+            let key = args.first().map(js_text).unwrap_or_default();
+            let value = args.get(1).map(js_text).unwrap_or_default();
             env_set_ctx
                 .borrow_mut()
                 .environment_changes
@@ -720,10 +708,7 @@ fn setup_pm(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Result<()
     let env_unset_ctx = ctx.clone();
     let env_unset_fn = unsafe {
         NativeFunction::from_closure(move |_, args, _| {
-            let key = args
-                .first()
-                .map(|v| v.display().to_string().trim_matches('"').to_string())
-                .unwrap_or_default();
+            let key = args.first().map(js_text).unwrap_or_default();
             env_unset_ctx
                 .borrow_mut()
                 .environment_changes
@@ -1366,6 +1351,13 @@ fn hex_arg(args: &[JsValue], index: usize) -> JsResult<Vec<u8>> {
     })
 }
 
+fn js_text(value: &JsValue) -> String {
+    match value.as_string() {
+        Some(s) => s.to_std_string_escaped(),
+        None => value.display().to_string(),
+    }
+}
+
 fn string_arg(args: &[JsValue], index: usize) -> String {
     args.get(index)
         .and_then(|v| v.as_string())
@@ -1500,9 +1492,7 @@ fn setup_pm_compat(context: &mut Context, ctx: Rc<RefCell<ScriptContext>>) -> Re
         NativeFunction::from_closure(move |_, args, _| {
             let key = string_arg(args, 0);
             let value = match args.get(1) {
-                Some(v) if !v.is_null_or_undefined() => {
-                    Some(v.display().to_string().trim_matches('"').to_string())
-                }
+                Some(v) if !v.is_null_or_undefined() => Some(js_text(v)),
                 _ => None,
             };
             write_ctx
@@ -1825,6 +1815,43 @@ mod tests {
 
     fn set_to(env: &HashMap<String, Option<String>>, key: &str) -> Option<String> {
         env.get(key).cloned().flatten()
+    }
+
+    #[test]
+    fn environment_values_keep_their_surrounding_quotes() {
+        let (result, env) = run_script_env(
+            r#"
+            environment.set('quoted', '"abc"');
+            environment.set('"key"', 'v');
+            environment.set('n', 42);
+        "#,
+        );
+        assert!(result.is_ok(), "{:?}", result);
+        assert_eq!(set_to(&env, "quoted").as_deref(), Some(r#""abc""#));
+        assert_eq!(set_to(&env, r#""key""#).as_deref(), Some("v"));
+        assert_eq!(set_to(&env, "n").as_deref(), Some("42"));
+    }
+
+    #[test]
+    fn console_logs_strings_without_quotes() {
+        let ctx = Rc::new(RefCell::new(ScriptContext {
+            request: default_request(),
+            ..Default::default()
+        }));
+        execute_script(
+            r#"console.log('hi'); console.warn(7);"#,
+            ctx.clone(),
+            false,
+            ProxySettings::default(),
+        )
+        .expect("script should execute");
+        let messages: Vec<String> = ctx
+            .borrow()
+            .logs
+            .iter()
+            .map(|l| l.message.clone())
+            .collect();
+        assert_eq!(messages, vec!["hi".to_string(), "7".to_string()]);
     }
 
     #[test]
