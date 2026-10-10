@@ -12,37 +12,24 @@ const THEME_CHANGED_EVENT = 'resonance:theme-changed';
 
 export const baseEditorTheme = EditorView.theme({
     '&': {
-        height: '100%',
-        fontSize: '13px',
-        backgroundColor: 'var(--bg-primary)'
+        height: '100%'
     },
     '.cm-scroller': {
-        fontFamily: '"Fira Code", "Courier New", monospace',
         overflow: 'auto'
     },
     '.cm-gutters': {
-        backgroundColor: 'var(--bg-secondary)',
-        color: 'var(--text-secondary)',
         border: 'none',
         paddingRight: '8px'
     },
     '.cm-content': {
-        color: 'var(--text-primary)',
-        caretColor: 'var(--text-primary)',
         padding: '4px 0'
     },
     '.cm-line': {
         padding: '0 8px'
     },
     '.cm-placeholder': {
-        color: 'var(--text-tertiary)',
+        color: 'var(--dim-fg-color)',
         fontStyle: 'italic'
-    },
-    '.cm-activeLine': {
-        backgroundColor: 'var(--bg-secondary)'
-    },
-    '.cm-activeLineGutter': {
-        backgroundColor: 'var(--bg-secondary)'
     }
 });
 

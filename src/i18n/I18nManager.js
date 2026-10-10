@@ -138,6 +138,11 @@ export class I18nManager {
             const key = element.getAttribute('data-i18n-aria');
             element.setAttribute('aria-label', this.t(key));
         });
+
+        const placeholderElements = container.querySelectorAll('[data-i18n-placeholder]');
+        placeholderElements.forEach(element => {
+            element.placeholder = this.t(element.getAttribute('data-i18n-placeholder'));
+        });
     }
 
     getCurrentLanguage() {

@@ -95,6 +95,7 @@
   --status-success-color: var(--success-color);
   --status-redirect-color: var(--warning-color);
   --status-error-color: var(--error-color);
+  --dim-fg-color: color-mix(in srgb, currentColor 55%, transparent);
 
   --shadow-card: 0 0 0 1px var(--card-shade-color);
   --shadow-popover: 0 1px 5px 1px rgb(0 0 6 / 9%), 0 2px 14px 3px rgb(0 0 6 / 5%);

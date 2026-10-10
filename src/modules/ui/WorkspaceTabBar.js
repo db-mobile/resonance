@@ -8,6 +8,7 @@ import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { toast } from './Toast.js';
 import { el } from '../htmlUtils.js';
+import { pushEscapeHandler } from './modalEscape.js';
 
 export class WorkspaceTabBar {
     constructor(containerId) {
@@ -263,10 +264,8 @@ export class WorkspaceTabBar {
     }
 
     _showNewTabMenu(button) {
-        const existingDropdown = document.querySelector('.workspace-tab-new-menu');
-        if (existingDropdown) {
-            existingDropdown.remove();
-            document.removeEventListener('click', this._closeNewTabMenu);
+        if (this._closeNewTabMenu) {
+            this._closeNewTabMenu();
             return;
         }
 
@@ -295,7 +294,7 @@ export class WorkspaceTabBar {
             item.appendChild(labelEl);
 
             item.addEventListener('click', () => {
-                menu.remove();
+                this._closeNewTabMenu?.();
                 this.onTabCreate?.(protocol);
             });
 
@@ -304,14 +303,9 @@ export class WorkspaceTabBar {
 
         document.body.appendChild(menu);
 
-        const closeMenu = (e) => {
-            if (!menu.contains(e.target) && !button.contains(e.target)) {
-                menu.remove();
-                document.removeEventListener('click', closeMenu);
-            }
-        };
-        this._closeNewTabMenu = closeMenu;
-        setTimeout(() => document.addEventListener('click', closeMenu), 0);
+        this._closeNewTabMenu = this._attachMenuDismiss(menu, button, () => {
+            this._closeNewTabMenu = null;
+        });
     }
 
     _createTabListButton() {
@@ -332,10 +326,8 @@ export class WorkspaceTabBar {
     }
 
     _toggleTabListDropdown(button) {
-        const existingDropdown = document.querySelector('.workspace-tab-list-dropdown');
-        if (existingDropdown) {
-            existingDropdown.remove();
-            document.removeEventListener('click', this._closeTabListDropdown);
+        if (this._closeTabListDropdown) {
+            this._closeTabListDropdown();
             return;
         }
 
@@ -358,7 +350,7 @@ export class WorkspaceTabBar {
 
             item.addEventListener('click', () => {
                 this.onTabSwitch?.(tab.id);
-                dropdown.remove();
+                this._closeTabListDropdown?.();
             });
 
             dropdown.appendChild(item);
@@ -366,21 +358,47 @@ export class WorkspaceTabBar {
 
         document.body.appendChild(dropdown);
 
-        const closeDropdown = (e) => {
-            if (!dropdown.contains(e.target) && !button.contains(e.target)) {
-                dropdown.remove();
-                document.removeEventListener('click', closeDropdown);
+        this._closeTabListDropdown = this._attachMenuDismiss(dropdown, button, () => {
+            this._closeTabListDropdown = null;
+        });
+    }
+
+    /**
+     * @param {HTMLElement} menu
+     * @param {HTMLElement} button
+     * @param {() => void} onClosed
+     * @returns {() => void}
+     */
+    _attachMenuDismiss(menu, button, onClosed) {
+        let closed = false;
+        let releaseEscape = null;
+        let onOutsideClick = null;
+        const close = () => {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            menu.remove();
+            document.removeEventListener('click', onOutsideClick);
+            releaseEscape?.();
+            onClosed();
+        };
+        onOutsideClick = (e) => {
+            if (!menu.contains(e.target) && !button.contains(e.target)) {
+                close();
             }
         };
-        this._closeTabListDropdown = closeDropdown;
-        setTimeout(() => document.addEventListener('click', closeDropdown), 0);
+        releaseEscape = pushEscapeHandler(close);
+        setTimeout(() => {
+            if (!closed) {
+                document.addEventListener('click', onOutsideClick);
+            }
+        }, 0);
+        return close;
     }
 
     _startRenaming(tabElement, tab) {
-        const existingDropdown = document.querySelector('.workspace-tab-list-dropdown');
-        if (existingDropdown) {
-            existingDropdown.remove();
-        }
+        this._closeTabListDropdown?.();
 
         const nameEl = tabElement.querySelector('.workspace-tab-name');
         const currentName = nameEl.textContent;
@@ -390,7 +408,12 @@ export class WorkspaceTabBar {
         input.className = 'workspace-tab-rename-input';
         input.value = currentName;
 
+        let settled = false;
         const finishRenaming = () => {
+            if (settled) {
+                return;
+            }
+            settled = true;
             const newName = input.value.trim() || currentName;
             nameEl.textContent = newName;
             nameEl.title = newName;
@@ -406,6 +429,9 @@ export class WorkspaceTabBar {
             if (e.key === 'Enter') {
                 finishRenaming();
             } else if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                settled = true;
                 nameEl.textContent = currentName;
                 input.replaceWith(nameEl);
             }
@@ -473,10 +499,7 @@ export class WorkspaceTabBar {
     }
 
     _showContextMenu(event, tab) {
-        const existingMenu = document.querySelector('.workspace-tab-context-menu');
-        if (existingMenu) {
-            existingMenu.remove();
-        }
+        this._closeTabContextMenu?.();
 
         const menu = el('div', 'workspace-tab-context-menu dropdown-panel');
         menu.style.left = `${event.pageX}px`;
@@ -555,8 +578,8 @@ export class WorkspaceTabBar {
                 const menuItem = createMenuItemEl(item.label, item.iconClass, item.disabled);
                 menuItem.addEventListener('click', () => {
                     if (!item.disabled) {
+                        this._closeTabContextMenu?.();
                         item.action();
-                        menu.remove();
                     }
                 });
                 menu.appendChild(menuItem);
@@ -565,13 +588,9 @@ export class WorkspaceTabBar {
 
         document.body.appendChild(menu);
 
-        const closeMenu = (e) => {
-            if (!menu.contains(e.target)) {
-                menu.remove();
-                document.removeEventListener('click', closeMenu);
-            }
-        };
-        setTimeout(() => document.addEventListener('click', closeMenu), 0);
+        this._closeTabContextMenu = this._attachMenuDismiss(menu, menu, () => {
+            this._closeTabContextMenu = null;
+        });
     }
 
     /**

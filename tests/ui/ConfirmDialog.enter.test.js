@@ -49,4 +49,24 @@ describe('ConfirmDialog Enter key routing', () => {
 
         expect(document.activeElement).toBe(document.getElementById('confirm-cancel-btn'));
     });
+
+    test('dismissing resolves with dismissValue when one is given', async () => {
+        const result = dialog.show('Merge or replace?', { dismissValue: null });
+
+        document.querySelector('.confirm-dialog-overlay').click();
+
+        await expect(result).resolves.toBeNull();
+    });
+
+    test('closing returns focus to the element that opened it', async () => {
+        const opener = document.createElement('button');
+        document.body.appendChild(opener);
+        opener.focus();
+
+        const result = dialog.show('Delete everything?');
+        document.getElementById('confirm-cancel-btn').click();
+        await result;
+
+        expect(document.activeElement).toBe(opener);
+    });
 });

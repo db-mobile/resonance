@@ -87,7 +87,6 @@ describe('ScriptConsolePanel', () => {
         expect(items).toHaveLength(2);
         expect(items[0].classList.contains('is-passed')).toBe(true);
         expect(items[0].querySelector('[data-role="icon"]').textContent).toBe('✓');
-        expect(items[0].style.getPropertyValue('--script-console-accent')).toBe('var(--color-success, #10b981)');
         expect(content().querySelectorAll('.script-console-separator')).toHaveLength(0);
     });
 
@@ -107,7 +106,6 @@ describe('ScriptConsolePanel', () => {
         const failedItem = content().querySelectorAll('.script-console-test-item')[1];
         expect(failedItem.classList.contains('is-failed')).toBe(true);
         expect(failedItem.querySelector('[data-role="icon"]').textContent).toBe('✗');
-        expect(failedItem.style.getPropertyValue('--script-console-accent')).toBe('var(--color-error, #ef4444)');
 
         const separators = Array.from(content().querySelectorAll('.script-console-separator'));
         expect(separators).toHaveLength(2);

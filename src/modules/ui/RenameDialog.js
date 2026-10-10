@@ -66,6 +66,7 @@ export class RenameDialog extends BaseModal {
         const confirmBtn = dialog.querySelector('#rename-confirm-btn');
 
         cancelBtn.addEventListener('click', () => this.onDismiss());
+        dialog.querySelector('#rename-close-btn')?.addEventListener('click', () => this.onDismiss());
         confirmBtn.addEventListener('click', () => this.confirm(nameInput.value));
 
         nameInput.addEventListener('keydown', (e) => {

@@ -1,6 +1,9 @@
 <template id="tpl-move-request-dialog">
     <div class="u-flex u-flex-col u-gap-4">
-        <h3 class="dialog-title" data-role="title" data-i18n="move_request.title">Move Request</h3>
+        <div class="dialog-header">
+            <h2 class="dialog-title" data-role="title" data-i18n="move_request.title">Move Request</h2>
+            <button type="button" id="move-request-close-btn" class="dialog-close-btn" aria-label="Close" data-i18n-aria="common.close"><span class="icon icon-16 icon-x"></span></button>
+        </div>
         <div class="dialog-body">
             <div class="u-flex u-flex-col u-gap-2">
                 <label for="move-request-target" class="form-label" data-i18n="move_request.label">Move to:</label>

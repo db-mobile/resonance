@@ -181,8 +181,6 @@ export class ScriptConsolePanel {
 
         testResults.forEach(test => {
             const testItem = cloneTemplate('tpl-script-console-test-item').firstElementChild;
-            testItem.style.setProperty('--script-console-accent', test.passed ? 'var(--color-success, #10b981)' : 'var(--color-error, #ef4444)');
-
             testItem.classList.toggle('is-passed', test.passed);
             testItem.classList.toggle('is-failed', !test.passed);
 

@@ -5,29 +5,37 @@
 
 import { templateLoader } from '../templateLoader.js';
 import { SchemaProcessor } from '../schema/SchemaProcessor.js';
-import { pushEscapeHandler } from './modalEscape.js';
+import { BaseModal } from './BaseModal.js';
+import { ConfirmDialog } from './ConfirmDialog.js';
 import { flattenRequests, endpointKey } from '../collections/collectionTree.js';
 import { el } from '../htmlUtils.js';
 import { translate } from '../utils/translate.js';
+import { toast } from './Toast.js';
 import { setRoleTexts } from './roleText.js';
 import { extractResponseSchema } from '../controllers/MockServerController.js';
 
 const LOG_STATUS_CLASSES = Object.freeze({ 200: 'is-success', 404: 'is-warning' });
 const DEFAULT_STATUS_CODES = Object.freeze({ POST: 201, DELETE: 204 });
+const TEMPLATE_PATH = './src/templates/mockServer/mockServerDialog.html';
 
-export class MockServerDialog {
+/** @augments */
+export class MockServerDialog extends BaseModal {
     /** @param {MockServerController} controller */
     constructor(controller) {
+        super();
         this.controller = controller;
-        this.dialog = null;
         this.resolve = null;
         this.statusPoller = null;
         this.logsPoller = null;
-        this.releaseEscape = null;
+        /** @type {BaseModal|null} */
+        this.responseEditor = null;
     }
 
     /** @returns {Promise<boolean>} */
     show() {
+        if (this.overlay) {
+            return Promise.resolve(false);
+        }
         return new Promise((resolve) => {
             this.resolve = resolve;
             this.createDialog();
@@ -35,17 +43,12 @@ export class MockServerDialog {
     }
 
     async createDialog() {
-        this.dialog = document.createElement('div');
-        this.dialog.className = 'mock-server-overlay modal-overlay';
-
-        const dialogContent = el('div', 'mock-server-dialog modal-dialog modal-dialog--mock-server');
-
-
-        const fragment = templateLoader.cloneSync(
-            './src/templates/mockServer/mockServerDialog.html',
-            'tpl-mock-server-dialog'
-        );
-        dialogContent.appendChild(fragment);
+        const dialogContent = this.mount({
+            overlayClass: 'mock-server-overlay',
+            dialogClass: 'mock-server-dialog modal-dialog modal-dialog--mock-server',
+            templatePath: TEMPLATE_PATH,
+            templateId: 'tpl-mock-server-dialog'
+        });
 
         setRoleTexts(dialogContent, {
             title: translate('mock_server.title', 'Mock Server'),
@@ -63,12 +66,13 @@ export class MockServerDialog {
             closeBtn.setAttribute('aria-label', translate('mock_server.close', 'Close'));
         }
 
-        this.dialog.appendChild(dialogContent);
-        document.body.appendChild(this.dialog);
-
         this.setupEventListeners();
 
         await this.loadInitialState();
+
+        if (!this.dialog) {
+            return;
+        }
 
         this.startStatusPolling();
         this.startLogsPolling();
@@ -89,14 +93,6 @@ export class MockServerDialog {
         clearLogsBtn.addEventListener('click', () => this.handleClearLogs());
 
         closeBtn.addEventListener('click', () => this.close());
-
-        this.dialog.addEventListener('click', (e) => {
-            if (e.target === this.dialog) {
-                this.close();
-            }
-        });
-
-        this.releaseEscape = pushEscapeHandler(() => this.close());
     }
 
     async loadInitialState() {
@@ -125,7 +121,7 @@ export class MockServerDialog {
 
         if (collections.length === 0) {
             const fragment = templateLoader.cloneSync(
-                './src/templates/mockServer/mockServerDialog.html',
+                TEMPLATE_PATH,
                 'tpl-mock-server-empty-state'
             );
             const emptyEl = fragment.firstElementChild;
@@ -262,9 +258,9 @@ export class MockServerDialog {
     }
 
     async handleToggleServer() {
+        const toggleBtn = this.dialog.querySelector('#mock-server-toggle-btn');
+        toggleBtn.disabled = true;
         try {
-            const toggleBtn = this.dialog.querySelector('#mock-server-toggle-btn');
-            toggleBtn.disabled = true;
 
             const status = await this.controller.getStatus();
 
@@ -273,14 +269,14 @@ export class MockServerDialog {
                 : await this.controller.handleStart();
 
             if (!outcome.success) {
-                this.showAlert(outcome.message);
+                toast.error(outcome.message);
             }
 
             await this.updateStatus();
-
-            toggleBtn.disabled = false;
         } catch (error) {
-            this.showAlert(error.message || translate('mock_server.error_toggle_server', 'Failed to toggle server'));
+            toast.error(error.message || translate('mock_server.error_toggle_server', 'Failed to toggle server'));
+        } finally {
+            toggleBtn.disabled = false;
         }
     }
 
@@ -289,12 +285,14 @@ export class MockServerDialog {
         try {
             const result = await this.controller.handleUpdatePort(port);
             if (!result.success) {
-                this.showAlert(result.message);
+                toast.error(result.message);
                 const settings = await this.controller.getSettings();
                 const portInput = this.dialog.querySelector('#mock-server-port-input');
                 portInput.value = settings.port;
             }
-        } catch {}
+        } catch {
+            toast.error(translate('mock_server.error_update_port', 'Failed to update port'));
+        }
     }
 
     /** @returns {Promise<void>} */
@@ -314,14 +312,18 @@ export class MockServerDialog {
             if (result.success) {
                 await this._refreshCollections();
             }
-        } catch {}
+        } catch {
+            toast.error(translate('mock_server.error_toggle_collection', 'Failed to update collection'));
+        }
     }
 
     async handleClearLogs() {
         try {
             await this.controller.clearRequestLogs();
             await this.updateLogs();
-        } catch {}
+        } catch {
+            toast.error(translate('mock_server.error_clear_logs', 'Failed to clear request logs'));
+        }
     }
 
     startStatusPolling() {
@@ -391,7 +393,7 @@ export class MockServerDialog {
 
             if (!logs || logs.length === 0) {
                 const fragment = templateLoader.cloneSync(
-                    './src/templates/mockServer/mockServerDialog.html',
+                    TEMPLATE_PATH,
                     'tpl-mock-server-logs-empty'
                 );
                 const emptyEl = fragment.firstElementChild;
@@ -405,7 +407,7 @@ export class MockServerDialog {
             }
 
             const tableFragment = templateLoader.cloneSync(
-                './src/templates/mockServer/mockServerDialog.html',
+                TEMPLATE_PATH,
                 'tpl-mock-server-logs-table'
             );
             const tableEl = tableFragment.firstElementChild;
@@ -421,7 +423,7 @@ export class MockServerDialog {
 
             logs.forEach(log => {
                 const rowFragment = templateLoader.cloneSync(
-                    './src/templates/mockServer/mockServerDialog.html',
+                    TEMPLATE_PATH,
                     'tpl-mock-server-logs-row'
                 );
                 const rowEl = rowFragment.firstElementChild;
@@ -445,34 +447,6 @@ export class MockServerDialog {
         } catch {}
     }
 
-    /** @param {string} message */
-    showAlert(message) {
-        const overlay = el('div', 'modal-overlay');
-
-        const dialog = el('div', 'modal-dialog modal-dialog--sm');
-
-        const fragment = templateLoader.cloneSync(
-            './src/templates/mockServer/mockServerDialog.html',
-            'tpl-mock-server-alert'
-        );
-        dialog.appendChild(fragment);
-
-        setRoleTexts(dialog, { message, ok: translate('mock_server.ok', 'OK') });
-
-        overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
-
-        const okBtn = dialog.querySelector('#alert-ok');
-        const cleanup = () => {
-            document.body.removeChild(overlay);
-        };
-
-        okBtn.addEventListener('click', cleanup);
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {cleanup();}
-        });
-    }
-
     /**
      * @param {Object} collection
      * @param {Object} endpoint
@@ -494,15 +468,19 @@ export class MockServerDialog {
             this.generateDefaultResponse(endpoint);
         const currentResponse = customResponse || defaultResponse;
 
-        const overlay = el('div', 'modal-overlay');
+        if (!this.dialog) {
+            return;
+        }
 
-        const dialog = el('div', 'modal-dialog modal-dialog--mock-server-response-editor');
-
-        const fragment = templateLoader.cloneSync(
-            './src/templates/mockServer/mockServerDialog.html',
-            'tpl-mock-server-response-editor'
-        );
-        dialog.appendChild(fragment);
+        const editor = new BaseModal();
+        const dialog = editor.mount({
+            overlayClass: 'mock-server-response-editor-overlay',
+            dialogClass: 'modal-dialog modal-dialog--mock-server-response-editor',
+            templatePath: TEMPLATE_PATH,
+            templateId: 'tpl-mock-server-response-editor',
+            closeOnOverlayClick: false
+        });
+        this.responseEditor = editor;
 
         setRoleTexts(dialog, {
             title: translate('mock_server.edit_response_title', 'Edit Response'),
@@ -532,9 +510,6 @@ export class MockServerDialog {
             }
         }
 
-        overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
-
         const textarea = dialog.querySelector('#response-editor-textarea');
         const delayInput = dialog.querySelector('#response-editor-delay');
         const statusCodeInput = dialog.querySelector('#response-editor-status-code');
@@ -556,15 +531,13 @@ export class MockServerDialog {
             errorDiv.textContent = '';
         }
 
-        let releaseEscape = null;
         const cleanup = () => {
-            if (releaseEscape) {
-                releaseEscape();
-                releaseEscape = null;
+            editor.destroy();
+            if (this.responseEditor === editor) {
+                this.responseEditor = null;
             }
-            overlay.remove();
         };
-        releaseEscape = pushEscapeHandler(cleanup);
+        editor.onDismiss = cleanup;
 
         textarea.addEventListener('input', () => {
             try {
@@ -572,7 +545,7 @@ export class MockServerDialog {
                 errorDiv.textContent = '';
                 saveBtn.disabled = false;
             } catch (e) {
-                errorDiv.textContent = translate('mock_server.invalid_json', `Invalid JSON: ${e.message}`);
+                errorDiv.textContent = translate('mock_server.invalid_json', 'Invalid JSON: {{message}}', { message: e.message });
                 saveBtn.disabled = true;
             }
         });
@@ -602,26 +575,39 @@ export class MockServerDialog {
                     errorDiv.textContent = saved.message;
                 }
             } catch (e) {
-                errorDiv.textContent = translate('mock_server.invalid_json', `Invalid JSON: ${e.message}`);
+                errorDiv.textContent = translate('mock_server.invalid_json', 'Invalid JSON: {{message}}', { message: e.message });
             }
         });
 
         resetBtn.addEventListener('click', async () => {
-            const saved = await this._saveResponseOverrides(collection, endpoint, { delay: 0, statusCode: null, response: null });
-            if (saved.success) {
-                cleanup();
-                await this._refreshCollections();
+            const confirmed = await new ConfirmDialog().show(
+                translate(
+                    'mock_server.reset_confirm_message',
+                    'Discard the custom delay, status code and response body for {{endpoint}}?',
+                    { endpoint: `${endpoint.method.toUpperCase()} ${endpoint.path}` }
+                ),
+                {
+                    title: translate('mock_server.reset_confirm_title', 'Reset to Default?'),
+                    confirmText: translate('mock_server.reset', 'Reset'),
+                    cancelText: translate('common.cancel', 'Cancel'),
+                    dangerous: true
+                }
+            );
+            if (!confirmed) {
+                return;
             }
+            const saved = await this._saveResponseOverrides(collection, endpoint, { delay: 0, statusCode: null, response: null })
+                .catch(error => ({ success: false, message: error?.message }));
+            if (!saved.success) {
+                toast.error(saved.message || translate('mock_server.error_reset_response', 'Failed to reset response'));
+                return;
+            }
+            cleanup();
+            await this._refreshCollections();
         });
 
-        const closeHandler = () => cleanup();
-        cancelBtn.addEventListener('click', closeHandler);
-        closeBtn.addEventListener('click', closeHandler);
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                closeHandler();
-            }
-        });
+        cancelBtn.addEventListener('click', cleanup);
+        closeBtn.addEventListener('click', cleanup);
     }
 
     /**
@@ -668,6 +654,11 @@ export class MockServerDialog {
         return DEFAULT_STATUS_CODES[endpoint.method.toUpperCase()] ?? 200;
     }
 
+    /** @returns {void} */
+    onDismiss() {
+        this.close();
+    }
+
     close() {
         if (this.statusPoller) {
             clearInterval(this.statusPoller);
@@ -679,15 +670,12 @@ export class MockServerDialog {
             this.logsPoller = null;
         }
 
-        if (this.releaseEscape) {
-            this.releaseEscape();
-            this.releaseEscape = null;
+        if (this.responseEditor) {
+            this.responseEditor.destroy();
+            this.responseEditor = null;
         }
 
-        if (this.dialog) {
-            document.body.removeChild(this.dialog);
-            this.dialog = null;
-        }
+        this.destroy();
 
         if (this.resolve) {
             this.resolve(true);

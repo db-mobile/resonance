@@ -94,7 +94,10 @@
     "export_empty": "Aucun cookie à exporter pour cet environnement",
     "import_success": "Cookies importés",
     "import_skipped": "ignorés",
-    "import_invalid": "Pas un export de cookies Resonance (attendu { \"format\": \"resonance-cookie-jar\", \"cookies\": [...] })"
+    "import_invalid": "Pas un export de cookies Resonance (attendu { \"format\": \"resonance-cookie-jar\", \"cookies\": [...] })",
+    "confirm_clear_session": "Supprimer tous les cookies de session de cet environnement ?",
+    "confirm_clear_all": "Supprimer tous les cookies de cet environnement ?\n\nCette action est irréversible.",
+    "clear_failed": "Impossible de supprimer les cookies : {{message}}"
   },
   "import_dialog": {
     "title": "Importer une collection",
@@ -337,7 +340,13 @@
     "updates_managed_externally": "Les mises à jour sont gérées par votre gestionnaire de paquets",
     "version_info": "Informations de version",
     "current_version": "Version actuelle",
-    "retry_update": "Réessayer"
+    "retry_update": "Réessayer",
+    "proxy_testing": "Test en cours…",
+    "proxy_save_failed": "Impossible d'enregistrer les paramètres du proxy : {{error}}",
+    "certs_save_failed": "Impossible d'enregistrer les certificats : {{error}}",
+    "certs_remove_title": "Supprimer le certificat",
+    "certs_remove_confirm": "Supprimer le certificat pour « {{host}} » ?",
+    "save_failed": "Impossible d'enregistrer le paramètre : {{error}}"
   },
   "theme": {
     "light": "Clair",
@@ -362,7 +371,8 @@
     "close": "Fermer",
     "yes": "Oui",
     "no": "Non",
-    "create": "Créer"
+    "create": "Créer",
+    "clear": "Effacer"
   },
   "errors": {
     "network": "Erreur réseau",
@@ -455,7 +465,14 @@
     "status_code": "Code de statut",
     "ok": "OK",
     "error_toggle_server": "Échec du basculement du serveur",
-    "template_hint": "Les chaînes peuvent utiliser {{request.params.id}}, {{request.query.nom}}, {{request.headers.nom}}, {{request.body.chemin}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} et {{$randomInt}}. Envoyez « Prefer: code=404 » ou « Prefer: example=nom » pour obtenir une autre réponse documentée."
+    "template_hint": "Les chaînes peuvent utiliser {{request.params.id}}, {{request.query.nom}}, {{request.headers.nom}}, {{request.body.chemin}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} et {{$randomInt}}. Envoyez « Prefer: code=404 » ou « Prefer: example=nom » pour obtenir une autre réponse documentée.",
+    "error_update_port": "Impossible de mettre à jour le port",
+    "error_toggle_collection": "Impossible de mettre à jour la collection",
+    "error_clear_logs": "Impossible d'effacer le journal des requêtes",
+    "error_reset_response": "Impossible de réinitialiser la réponse",
+    "reset_confirm_title": "Rétablir les valeurs par défaut ?",
+    "reset_confirm_message": "Abandonner le délai, le code de statut et le corps de réponse personnalisés pour {{endpoint}} ?",
+    "reset": "Réinitialiser"
   },
   "runner": {
     "title": "Collection Runner",
@@ -638,5 +655,12 @@
     "too_old": "Vos données ont été enregistrées par une version de Resonance que cette version ne peut plus convertir ; elles n’ont pas été modifiées. Installez Resonance {{release}}, lancez-le une fois, puis mettez à jour de nouveau.",
     "global_store_collections": "Vos paramètres contiennent encore des collections enregistrées par une version de Resonance antérieure à mars 2026. Cette version ne peut plus les convertir ; elles n’ont pas été modifiées. Installez Resonance {{release}}, lancez-le une fois, puis mettez à jour de nouveau.",
     "unknown": "Vos données n’ont pas pu être entièrement converties au format actuel."
+  },
+  "environment_manager": {
+    "create_default_name": "Nouvel environnement",
+    "create_title": "Créer un environnement",
+    "create_label": "Nom de l'environnement :",
+    "create_confirm": "Créer",
+    "import_error": "Erreur lors de l'importation des environnements : {{message}}"
   }
 }

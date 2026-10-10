@@ -37,7 +37,7 @@ export class CurlImportDialog extends BaseModal {
     createDialog(collections, options) {
         const dialog = this.mount({
             overlayClass: 'curl-import-dialog-overlay',
-            dialogClass: 'curl-import-dialog modal-dialog modal-dialog--lg',
+            dialogClass: 'curl-import-dialog modal-dialog modal-dialog--curl-import',
             templatePath: './src/templates/curl/curlImportDialog.html',
             templateId: 'tpl-curl-import-dialog'
         });

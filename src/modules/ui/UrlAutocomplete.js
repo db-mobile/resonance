@@ -1,4 +1,5 @@
 import { debounce } from '../utils/debounce.js';
+import { pushEscapeHandler } from './modalEscape.js';
 
 export class UrlAutocomplete {
     constructor(urlInputElement, historyController) {
@@ -8,6 +9,7 @@ export class UrlAutocomplete {
         this.suggestions = [];
         this.activeIndex = -1;
         this._searchSeq = 0;
+        this._releaseEscape = null;
         this._debouncedShow = debounce((query) => this._showSuggestions(query), 150);
     }
 
@@ -57,8 +59,6 @@ export class UrlAutocomplete {
                 e.preventDefault();
                 e.stopImmediatePropagation();
                 this._select(this.suggestions[this.activeIndex]);
-            } else if (e.key === 'Escape') {
-                this._hide();
             }
         });
 
@@ -134,6 +134,9 @@ export class UrlAutocomplete {
         });
 
         this.dropdown.classList.add('visible');
+        if (!this._releaseEscape) {
+            this._releaseEscape = pushEscapeHandler(() => this._hide());
+        }
     }
 
     _setActive(index) {
@@ -150,6 +153,10 @@ export class UrlAutocomplete {
     _hide() {
         this.dropdown.classList.remove('visible');
         this.activeIndex = -1;
+        if (this._releaseEscape) {
+            this._releaseEscape();
+            this._releaseEscape = null;
+        }
     }
 
     _isVisible() {

@@ -3,7 +3,6 @@
  * @module ui/MoveRequestDialog
  */
 
-import { app } from '../appContext.js';
 import { BaseModal } from './BaseModal.js';
 
 const ROOT_TARGET = '__root__';
@@ -31,7 +30,6 @@ export class MoveRequestDialog extends BaseModal {
                 templatePath: './src/templates/dialogs/moveRequestDialog.html',
                 templateId: 'tpl-move-request-dialog'
             });
-            app.i18n?.updateUI?.(dialog);
 
             const select = dialog.querySelector('[data-role="target"]');
             select.appendChild(this._option(ROOT_TARGET, rootLabel, 0));
@@ -41,6 +39,7 @@ export class MoveRequestDialog extends BaseModal {
             select.value = currentFolderId ?? ROOT_TARGET;
 
             dialog.querySelector('#move-request-cancel-btn').addEventListener('click', () => this.onDismiss());
+            dialog.querySelector('#move-request-close-btn').addEventListener('click', () => this.onDismiss());
             dialog.querySelector('#move-request-confirm-btn').addEventListener('click', () => {
                 this._settle(select.value === ROOT_TARGET ? null : select.value);
             });

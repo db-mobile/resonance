@@ -1,6 +1,9 @@
 <template id="tpl-rename-dialog">
     <div class="u-flex u-flex-col u-gap-4">
-        <h3 class="dialog-title" data-role="title"></h3>
+        <div class="dialog-header">
+            <h2 class="dialog-title" data-role="title"></h2>
+            <button type="button" id="rename-close-btn" class="dialog-close-btn" aria-label="Close" data-i18n-aria="common.close"><span class="icon icon-16 icon-x"></span></button>
+        </div>
         <div class="dialog-body">
             <div class="u-flex u-flex-col u-gap-2">
                 <label for="rename-input" class="form-label" data-role="label"></label>
@@ -8,7 +11,7 @@
             </div>
         </div>
         <div class="dialog-footer">
-            <button id="rename-cancel-btn" class="btn btn-outline" data-role="cancel">Cancel</button>
+            <button id="rename-cancel-btn" class="btn btn-outline" data-role="cancel" data-i18n="common.cancel">Cancel</button>
             <button id="rename-confirm-btn" class="btn btn-primary" data-role="confirm"></button>
         </div>
     </div>

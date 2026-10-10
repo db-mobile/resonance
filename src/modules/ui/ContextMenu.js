@@ -5,12 +5,18 @@
 
 import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
+import { pushEscapeHandler } from './modalEscape.js';
+import { restoreFocus } from './BaseModal.js';
 
 export class ContextMenu {
     constructor() {
         this.currentMenu = null;
         this.clickHandler = null;
         this.contextMenuHandler = null;
+        /** @type {(() => void)|null} */
+        this.releaseEscape = null;
+        /** @type {HTMLElement|null} */
+        this.previousFocus = null;
     }
 
     /**
@@ -27,6 +33,7 @@ export class ContextMenu {
 
         const menu = document.createElement('div');
         menu.className = 'context-menu';
+        menu.setAttribute('role', 'menu');
         menu.style.position = 'fixed';
         menu.style.left = `${event.clientX}px`;
         menu.style.top = `${event.clientY}px`;
@@ -46,6 +53,38 @@ export class ContextMenu {
 
         this.adjustPosition(menu, event);
         this.attachCloseHandlers();
+
+        this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        menu.addEventListener('keydown', (e) => this.handleMenuKeydown(e));
+        this.releaseEscape = pushEscapeHandler(() => this.hide());
+        this.menuItems()[0]?.focus();
+    }
+
+    /** @returns {HTMLElement[]} */
+    menuItems() {
+        return this.currentMenu ? Array.from(this.currentMenu.querySelectorAll('[role="menuitem"]')) : [];
+    }
+
+    /**
+     * @param {KeyboardEvent} e
+     * @returns {void}
+     */
+    handleMenuKeydown(e) {
+        const items = this.menuItems();
+        if (items.length === 0) {
+            return;
+        }
+        const index = items.indexOf(/** @type {HTMLElement} */ (document.activeElement));
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            const step = e.key === 'ArrowDown' ? 1 : -1;
+            const start = index === -1 && step === -1 ? 0 : index;
+            items[(start + step + items.length) % items.length].focus();
+        } else if (e.key === 'Enter' && index !== -1) {
+            e.preventDefault();
+            e.stopPropagation();
+            items[index].click();
+        }
     }
 
     /**
@@ -59,6 +98,8 @@ export class ContextMenu {
         );
         const menuItem = fragment.firstElementChild;
         menuItem.className = `context-menu-item ${item.className || ''}`;
+        menuItem.setAttribute('role', 'menuitem');
+        menuItem.tabIndex = -1;
 
         const iconEl = menuItem.querySelector('[data-role="icon"]');
         const labelEl = menuItem.querySelector('[data-role="label"]');
@@ -130,10 +171,19 @@ export class ContextMenu {
 
     /** @returns {void} */
     hide() {
+        if (this.releaseEscape) {
+            this.releaseEscape();
+            this.releaseEscape = null;
+        }
         if (this.currentMenu) {
+            const hadFocus = this.currentMenu.contains(document.activeElement);
             this.currentMenu.remove();
             this.currentMenu = null;
+            if (hadFocus) {
+                restoreFocus(this.previousFocus);
+            }
         }
+        this.previousFocus = null;
         this.removeCloseHandlers();
     }
 

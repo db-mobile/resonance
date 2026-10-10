@@ -11,6 +11,8 @@ export class ConfirmDialog extends BaseModal {
         super();
         /** @type {Function|null} */
         this.resolve = null;
+        /** @type {boolean|null} */
+        this.dismissValue = false;
     }
 
     /**
@@ -19,12 +21,14 @@ export class ConfirmDialog extends BaseModal {
      * @param {string} [options.title='Confirm Action']
      * @param {string} [options.confirmText='Confirm']
      * @param {string} [options.cancelText='Cancel']
-     * @param {boolean} [options.dangerous=true]
-     * @returns {Promise<boolean>}
+     * @param {boolean} [options.dangerous=false]
+     * @param {boolean|null} [options.dismissValue=false]
+     * @returns {Promise<boolean|null>}
      */
     show(message, options = {}) {
         return new Promise((resolve) => {
             this.resolve = resolve;
+            this.dismissValue = options.dismissValue === undefined ? false : options.dismissValue;
             this.createDialog(message, options);
         });
     }
@@ -37,7 +41,7 @@ export class ConfirmDialog extends BaseModal {
     createDialog(message, options) {
         const dialog = this.mount({
             overlayClass: 'confirm-dialog-overlay',
-            dialogClass: 'confirm-dialog modal-dialog modal-dialog--sm',
+            dialogClass: 'confirm-dialog modal-dialog modal-dialog--sm alert-dialog',
             templatePath: './src/templates/dialogs/confirmDialog.html',
             templateId: 'tpl-confirm-dialog'
         });
@@ -45,7 +49,7 @@ export class ConfirmDialog extends BaseModal {
         const title = options.title || 'Confirm Action';
         const confirmText = options.confirmText || 'Confirm';
         const cancelText = options.cancelText || 'Cancel';
-        const isDangerous = options.dangerous !== false;
+        const isDangerous = options.dangerous === true;
 
         const titleEl = dialog.querySelector('[data-role="title"]');
         const messageEl = dialog.querySelector('[data-role="message"]');
@@ -84,13 +88,6 @@ export class ConfirmDialog extends BaseModal {
                 } else {
                     this.confirm();
                 }
-            } else if (e.key === 'Tab') {
-                e.preventDefault();
-                if (document.activeElement === cancelBtn) {
-                    confirmBtn.focus();
-                } else {
-                    cancelBtn.focus();
-                }
             }
         };
 
@@ -118,11 +115,11 @@ export class ConfirmDialog extends BaseModal {
 
     /** @returns {void} */
     onDismiss() {
-        this.cancel();
+        this._settle(this.dismissValue);
     }
 
     /**
-     * @param {boolean} value
+     * @param {boolean|null} value
      * @returns {void}
      */
     _settle(value) {
@@ -132,9 +129,8 @@ export class ConfirmDialog extends BaseModal {
         }
         this.destroy();
 
-        const collectionsList = document.getElementById('collections-list');
-        if (collectionsList) {
-            collectionsList.focus();
+        if (document.activeElement === document.body) {
+            document.getElementById('collections-list')?.focus();
         }
     }
 }

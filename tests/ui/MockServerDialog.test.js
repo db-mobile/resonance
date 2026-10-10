@@ -1,4 +1,4 @@
-/* global document, DOMParser */
+/* global document, DOMParser, KeyboardEvent */
 import fs from 'fs';
 import path from 'path';
 import { templateLoader } from '../../src/modules/templateLoader.js';
@@ -6,11 +6,28 @@ import { MockServerDialog } from '../../src/modules/ui/MockServerDialog.js';
 import { escapeHandlerCount } from '../../src/modules/ui/modalEscape.js';
 
 const TEMPLATE_PATH = './src/templates/mockServer/mockServerDialog.html';
+const CONFIRM_TEMPLATE_PATH = './src/templates/dialogs/confirmDialog.html';
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+const pressEscape = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
 function seedTemplates() {
-    const html = fs.readFileSync(path.join(process.cwd(), 'src/templates/mockServer/mockServerDialog.html'), 'utf8');
-    templateLoader.cache.set(TEMPLATE_PATH, new DOMParser().parseFromString(html, 'text/html'));
+    for (const templatePath of [TEMPLATE_PATH, CONFIRM_TEMPLATE_PATH]) {
+        const html = fs.readFileSync(path.join(process.cwd(), templatePath), 'utf8');
+        templateLoader.cache.set(templatePath, new DOMParser().parseFromString(html, 'text/html'));
+    }
+}
+
+async function flushMany(count = 6) {
+    for (let i = 0; i < count; i++) {
+        await flush();
+    }
+}
+
+async function openEditor(controller) {
+    const dialog = await openDialog(controller);
+    document.querySelector('.mock-server-edit-response-btn').click();
+    await flushMany();
+    return { dialog, editor: document.querySelector('.mock-server-response-editor') };
 }
 
 function endpoint(id, method, p) {
@@ -66,6 +83,7 @@ describe('MockServerDialog', () => {
         expect(document.querySelector('[data-role="request-log-heading"]').textContent).toBe('REQUEST LOG');
         expect(document.querySelector('[data-role="clear"]').textContent).toBe('Clear');
         expect(document.querySelector('#mock-server-close-btn').getAttribute('aria-label')).toBe('Close');
+        expect(document.querySelector('#mock-server-close-btn').dataset.i18nAria).toBe('common.close');
         expect(document.querySelector('#mock-server-port-input').value).toBe('3000');
         expect(document.querySelector('#mock-server-status-text').textContent).toBe('Stopped');
         expect(document.querySelector('#mock-server-toggle-btn').textContent).toBe('Start Server');
@@ -185,7 +203,7 @@ describe('MockServerDialog', () => {
         dialog.close();
     });
 
-    test('a failed start shows the alert and the alert closes on OK', async () => {
+    test('a failed start shows an error toast and re-enables the toggle', async () => {
         const controller = makeController({ handleStart: jest.fn(async () => ({ success: false, message: 'Port in use' })) });
         const dialog = await openDialog(controller);
 
@@ -194,11 +212,24 @@ describe('MockServerDialog', () => {
             await flush();
         }
 
-        const alert = document.querySelector('.mock-server-alert-message');
-        expect(alert.textContent).toBe('Port in use');
-        expect(document.querySelector('[data-role="ok"]').textContent).toBe('OK');
-        document.querySelector('#alert-ok').click();
-        expect(document.querySelector('.mock-server-alert-message')).toBeNull();
+        const toastEl = document.querySelector('.toast--error .toast__message');
+        expect(toastEl.textContent).toBe('Port in use');
+        expect(document.querySelector('#mock-server-toggle-btn').disabled).toBe(false);
+
+        dialog.close();
+    });
+
+    test('a thrown toggle error still re-enables the toggle', async () => {
+        const controller = makeController({ getStatus: jest.fn(async () => { throw new Error('boom'); }) });
+        const dialog = await openDialog(controller);
+        controller.getStatus.mockClear();
+
+        document.querySelector('#mock-server-toggle-btn').click();
+        for (let i = 0; i < 4; i++) {
+            await flush();
+        }
+
+        expect(document.querySelector('#mock-server-toggle-btn').disabled).toBe(false);
 
         dialog.close();
     });
@@ -291,14 +322,151 @@ describe('MockServerDialog', () => {
         expect(editor.querySelector('#response-editor-status-code').value).toBe('204');
 
         editor.querySelector('#response-editor-reset').click();
-        for (let i = 0; i < 6; i++) {
-            await flush();
-        }
+        await flushMany();
+
+        const confirm = document.querySelector('.confirm-dialog');
+        expect(confirm).not.toBeNull();
+        expect(confirm.querySelector('[data-role="title"]').textContent).toBe('Reset to Default?');
+        expect(confirm.querySelector('[data-role="message"]').textContent).toBe('Discard the custom delay, status code and response body for DELETE /a?');
+        expect(confirm.querySelector('#confirm-confirm-btn').classList.contains('btn-danger')).toBe(true);
+        expect(controller.handleSetDelay).not.toHaveBeenCalled();
+
+        confirm.querySelector('#confirm-confirm-btn').click();
+        await flushMany();
 
         expect(controller.handleSetDelay).toHaveBeenCalledWith('c1', 'a', 0);
         expect(controller.handleSetCustomStatusCode).toHaveBeenCalledWith('c1', 'a', null);
         expect(controller.handleSetCustomResponse).toHaveBeenCalledWith('c1', 'a', null);
         expect(document.querySelector('.mock-server-response-editor')).toBeNull();
+
+        dialog.close();
+    });
+
+    test('the main dialog and the response editor are labelled ARIA dialogs', async () => {
+        const collections = [{ id: 'c1', name: 'Shop', endpoints: [endpoint('a', 'GET', '/a')] }];
+        const { dialog, editor } = await openEditor(makeController({ getCollections: jest.fn(async () => collections) }));
+
+        const main = document.querySelector('.mock-server-dialog');
+        expect(main.getAttribute('role')).toBe('dialog');
+        expect(main.getAttribute('aria-modal')).toBe('true');
+        expect(document.getElementById(main.getAttribute('aria-labelledby')).textContent).toBe('Mock Server');
+        expect(main.querySelector('.dialog-title').tagName).toBe('H2');
+        expect(main.parentElement.classList.contains('mock-server-overlay')).toBe(true);
+
+        const editorDialog = editor.closest('[role="dialog"]');
+        expect(editorDialog.getAttribute('aria-modal')).toBe('true');
+        expect(document.getElementById(editorDialog.getAttribute('aria-labelledby')).textContent).toBe('Edit Response');
+        expect(editor.querySelector('.dialog-title').tagName).toBe('H2');
+        expect(editor.querySelector('.dialog-subtitle').textContent).toBe('GET /a');
+        expect(editor.querySelector('#response-editor-close').dataset.i18nAria).toBe('common.close');
+
+        dialog.close();
+    });
+
+    test('Escape in the response editor closes only the editor', async () => {
+        const collections = [{ id: 'c1', name: 'Shop', endpoints: [endpoint('a', 'GET', '/a')] }];
+        const { dialog } = await openEditor(makeController({ getCollections: jest.fn(async () => collections) }));
+        expect(escapeHandlerCount()).toBe(2);
+
+        pressEscape();
+
+        expect(document.querySelector('.mock-server-response-editor')).toBeNull();
+        expect(document.querySelector('.mock-server-dialog')).not.toBeNull();
+        expect(escapeHandlerCount()).toBe(1);
+
+        pressEscape();
+
+        expect(document.querySelector('.mock-server-dialog')).toBeNull();
+        expect(dialog.statusPoller).toBeNull();
+        expect(dialog.logsPoller).toBeNull();
+    });
+
+    test('clicking the editor backdrop keeps the editor open', async () => {
+        const collections = [{ id: 'c1', name: 'Shop', endpoints: [endpoint('a', 'GET', '/a')] }];
+        const { dialog } = await openEditor(makeController({ getCollections: jest.fn(async () => collections) }));
+
+        document.querySelector('.mock-server-response-editor-overlay').click();
+
+        expect(document.querySelector('.mock-server-response-editor')).not.toBeNull();
+
+        dialog.close();
+        expect(document.querySelector('.mock-server-response-editor')).toBeNull();
+    });
+
+    test('cancelling the reset confirm keeps the overrides and the editor', async () => {
+        const collections = [{ id: 'c1', name: 'Shop', endpoints: [endpoint('a', 'GET', '/a')] }];
+        const controller = makeController({ getCollections: jest.fn(async () => collections) });
+        const { dialog, editor } = await openEditor(controller);
+
+        editor.querySelector('#response-editor-reset').click();
+        await flushMany();
+        pressEscape();
+        await flushMany();
+
+        expect(document.querySelector('.confirm-dialog')).toBeNull();
+        expect(document.querySelector('.mock-server-response-editor')).not.toBeNull();
+        expect(controller.handleSetDelay).not.toHaveBeenCalled();
+        expect(controller.handleSetCustomResponse).not.toHaveBeenCalled();
+
+        dialog.close();
+    });
+
+    test('a failed reset reports an error toast and keeps the editor open', async () => {
+        const collections = [{ id: 'c1', name: 'Shop', endpoints: [endpoint('a', 'GET', '/a')] }];
+        const controller = makeController({
+            getCollections: jest.fn(async () => collections),
+            handleSetCustomResponse: jest.fn(async () => { throw new Error('disk full'); })
+        });
+        const { dialog, editor } = await openEditor(controller);
+
+        editor.querySelector('#response-editor-reset').click();
+        await flushMany();
+        document.querySelector('#confirm-confirm-btn').click();
+        await flushMany();
+
+        expect(document.querySelector('.toast--error .toast__message').textContent).toBe('disk full');
+        expect(document.querySelector('.mock-server-response-editor')).not.toBeNull();
+
+        dialog.close();
+    });
+
+    test('invalid JSON in the editor interpolates the parse error', async () => {
+        const collections = [{ id: 'c1', name: 'Shop', endpoints: [endpoint('a', 'GET', '/a')] }];
+        const { dialog, editor } = await openEditor(makeController({ getCollections: jest.fn(async () => collections) }));
+
+        const textarea = editor.querySelector('#response-editor-textarea');
+        textarea.value = '{oops';
+        textarea.dispatchEvent(new Event('input'));
+
+        const error = editor.querySelector('#response-editor-error').textContent;
+        expect(error).toMatch(/^Invalid JSON: \S/);
+        expect(error).not.toContain('{{message}}');
+        expect(editor.querySelector('#response-editor-save').disabled).toBe(true);
+
+        dialog.close();
+    });
+
+    test.each([
+        ['handlePortChange', 'handleUpdatePort', (d) => d.handlePortChange('5000'), 'Failed to update port'],
+        ['handleToggleCollection', 'handleToggleCollection', (d) => d.handleToggleCollection('c1'), 'Failed to update collection'],
+        ['handleClearLogs', 'clearRequestLogs', (d) => d.handleClearLogs(), 'Failed to clear request logs']
+    ])('%s reports a thrown controller error', async (_name, method, run, message) => {
+        const controller = makeController({ [method]: jest.fn(async () => { throw new Error('boom'); }) });
+        const dialog = await openDialog(controller);
+
+        await run(dialog);
+
+        expect(document.querySelector('.toast--error .toast__message').textContent).toBe(message);
+
+        dialog.close();
+    });
+
+    test('showing an already open dialog does not mount a second copy', async () => {
+        const dialog = await openDialog(makeController());
+
+        await expect(dialog.show()).resolves.toBe(false);
+        expect(document.querySelectorAll('.mock-server-dialog')).toHaveLength(1);
+        expect(escapeHandlerCount()).toBe(1);
 
         dialog.close();
     });

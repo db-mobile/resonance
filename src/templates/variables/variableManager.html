@@ -1,8 +1,8 @@
 <template id="tpl-variable-manager-dialog">
     <div class="u-flex u-flex-col u-gap-4">
         <div class="dialog-header">
-            <h3 class="dialog-title" data-role="title"></h3>
-            <button id="variables-close-btn" class="dialog-close-btn" aria-label="Close"><span class="icon icon-16 icon-x"></span></button>
+            <h2 class="dialog-title" data-role="title"></h2>
+            <button type="button" id="variables-close-btn" class="dialog-close-btn" aria-label="Close" data-i18n-aria="common.close"><span class="icon icon-16 icon-x"></span></button>
         </div>
 
         <div class="variable-manager-usage">
@@ -50,8 +50,10 @@
 
 <template id="tpl-variable-manager-import-dialog">
     <div class="u-flex u-flex-col u-gap-4">
-        <h4 class="dialog-title">Import Variables</h4>
-        <textarea id="import-textarea" placeholder="Paste JSON object with variables..." class="textarea-base variable-import-textarea"></textarea>
+        <h2 class="dialog-title">Import Variables</h2>
+        <div class="dialog-body">
+            <textarea id="import-textarea" placeholder="Paste JSON object with variables..." class="textarea-base variable-import-textarea"></textarea>
+        </div>
         <div class="dialog-footer">
             <button id="import-cancel" class="btn btn-outline">Cancel</button>
             <button id="import-confirm" class="btn btn-primary">Import</button>

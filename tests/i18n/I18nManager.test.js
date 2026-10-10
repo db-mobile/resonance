@@ -1,3 +1,4 @@
+/* global document */
 import { I18nManager } from '../../src/i18n/I18nManager.js';
 
 const LOCALES = {
@@ -64,5 +65,18 @@ describe('I18nManager', () => {
         await i18n.loadLanguage('xx');
         expect(i18n.getCurrentLanguage()).toBe('en');
         expect(i18n.t('settings.title')).toBe('Settings');
+    });
+
+    test('updateUI translates data-i18n-placeholder on inputs and textareas', async () => {
+        const i18n = new I18nManager();
+        await i18n.loadLanguage('de');
+        const container = document.createElement('div');
+        container.innerHTML = '<input data-i18n-placeholder="settings.title" placeholder="x">'
+            + '<textarea data-i18n-placeholder="settings.group_requests" placeholder="y"></textarea>';
+
+        i18n.updateUI(container);
+
+        expect(container.querySelector('input').placeholder).toBe('Einstellungen');
+        expect(container.querySelector('textarea').placeholder).toBe('Requests');
     });
 });

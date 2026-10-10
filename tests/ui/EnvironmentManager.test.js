@@ -1,9 +1,10 @@
-/* global document, window, DOMParser, KeyboardEvent */
+/* global document, window, DOMParser, KeyboardEvent, HTMLInputElement */
 import fs from 'fs';
 import path from 'path';
 import { templateLoader } from '../../src/modules/templateLoader.js';
 import { EnvironmentManager } from '../../src/modules/ui/EnvironmentManager.js';
 import { escapeHandlerCount } from '../../src/modules/ui/modalEscape.js';
+import { toast } from '../../src/modules/ui/Toast.js';
 
 const TEMPLATE_PATH = './src/templates/environment/environmentManager.html';
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -11,6 +12,11 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 function seedTemplates() {
     const html = fs.readFileSync(path.join(process.cwd(), 'src/templates/environment/environmentManager.html'), 'utf8');
     templateLoader.cache.set(TEMPLATE_PATH, new DOMParser().parseFromString(html, 'text/html'));
+}
+
+function seedTemplate(templatePath) {
+    const html = fs.readFileSync(path.join(process.cwd(), templatePath.replace(/^\.\//, '')), 'utf8');
+    templateLoader.cache.set(templatePath, new DOMParser().parseFromString(html, 'text/html'));
 }
 
 function makeService() {
@@ -244,13 +250,112 @@ describe('EnvironmentManager', () => {
         await expect(shown).resolves.toBe(true);
     });
 
-    test('showAlert renders the message and closes on OK', async () => {
-        const manager = new EnvironmentManager(service);
-        manager.showAlert('Something failed');
+    test('a failing service call shows an error toast', async () => {
+        const errorSpy = jest.spyOn(toast, 'error').mockImplementation(() => {});
+        service.duplicateEnvironment.mockRejectedValueOnce(new Error('Something failed'));
+        const { manager } = await openManager(service);
+
+        document.querySelector('#env-duplicate-btn').click();
         await flush();
 
-        expect(document.querySelector('.dialog-message').textContent).toBe('Something failed');
-        document.querySelector('#alert-dialog-ok').click();
-        expect(document.querySelector('.modal-overlay')).toBeNull();
+        expect(errorSpy).toHaveBeenCalledWith('Something failed');
+        expect(document.querySelectorAll('.modal-overlay')).toHaveLength(1);
+
+        errorSpy.mockRestore();
+        manager.close();
+    });
+
+    test('the dialog has dialog ARIA semantics labelled by its title', async () => {
+        const { manager } = await openManager(service);
+
+        const dialog = document.querySelector('.environment-manager-dialog');
+        expect(dialog.getAttribute('role')).toBe('dialog');
+        expect(dialog.getAttribute('aria-modal')).toBe('true');
+        const title = document.getElementById(dialog.getAttribute('aria-labelledby'));
+        expect(title.tagName).toBe('H2');
+        expect(title.textContent).toBe('Manage Environments');
+        expect(document.querySelector('#env-close-btn').classList.contains('dialog-close-btn')).toBe(true);
+
+        manager.close();
+    });
+
+    test('closing restores focus to the opener', async () => {
+        const opener = document.createElement('button');
+        document.body.appendChild(opener);
+        opener.focus();
+
+        const { manager } = await openManager(service);
+        expect(document.activeElement).not.toBe(opener);
+
+        manager.close();
+        expect(document.activeElement).toBe(opener);
+    });
+
+    test('a template load failure rejects show() instead of hanging', async () => {
+        templateLoader.cache.delete(TEMPLATE_PATH);
+        const loadSpy = jest.spyOn(templateLoader, 'loadTemplateFile').mockRejectedValueOnce(new Error('missing'));
+        const manager = new EnvironmentManager(service);
+
+        await expect(manager.show()).rejects.toThrow('missing');
+        expect(document.querySelector('.environment-manager-overlay')).toBeNull();
+
+        loadSpy.mockRestore();
+    });
+
+    test('creating an environment prompts with a RenameDialog', async () => {
+        seedTemplate('./src/templates/dialogs/renameDialog.html');
+        const { manager } = await openManager(service);
+
+        document.querySelector('#env-create-btn').click();
+        expect(document.querySelector('.rename-dialog [data-role="title"]').textContent).toBe('Create Environment');
+        const input = document.querySelector('#rename-input');
+        expect(input.value).toBe('New Environment');
+        input.value = 'Staging';
+        document.querySelector('#rename-confirm-btn').click();
+        await flush();
+
+        expect(service.createEnvironment).toHaveBeenCalledWith('Staging');
+        expect(document.querySelector('.rename-dialog')).toBeNull();
+
+        manager.close();
+    });
+
+    test('Escape in the stacked create prompt closes only that prompt', async () => {
+        seedTemplate('./src/templates/dialogs/renameDialog.html');
+        const { manager, shown } = await openManager(service);
+        const settled = jest.fn();
+        shown.then(settled);
+
+        document.querySelector('#env-create-btn').click();
+        expect(escapeHandlerCount()).toBe(2);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await flush();
+
+        expect(document.querySelector('.rename-dialog')).toBeNull();
+        expect(document.querySelector('.environment-manager-dialog')).not.toBeNull();
+        expect(escapeHandlerCount()).toBe(1);
+        expect(service.createEnvironment).not.toHaveBeenCalled();
+        expect(settled).not.toHaveBeenCalled();
+
+        manager.close();
+    });
+
+    test('dismissing the import choice aborts instead of replacing all', async () => {
+        const confirmHtml = fs.readFileSync(path.join(process.cwd(), 'src/templates/dialogs/confirmDialog.html'), 'utf8');
+        templateLoader.cache.set('./src/templates/dialogs/confirmDialog.html', new DOMParser().parseFromString(confirmHtml, 'text/html'));
+        const clickSpy = jest.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+        const { manager } = await openManager(service);
+
+        document.querySelector('#env-import-btn').click();
+        expect(document.querySelector('.confirm-dialog')).not.toBeNull();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await flush();
+
+        expect(document.querySelector('.confirm-dialog')).toBeNull();
+        expect(document.querySelector('#env-import-btn')).not.toBeNull();
+        expect(clickSpy).not.toHaveBeenCalled();
+
+        clickSpy.mockRestore();
+        manager.close();
     });
 });

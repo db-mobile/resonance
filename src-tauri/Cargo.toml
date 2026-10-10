@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "3.3.2"
+version = "3.3.3"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -14,7 +14,9 @@ prost-build = "0.13"
 protoc-bin-vendored = "3"
 
 [dependencies]
-tauri = { version = "2.12", features = [] }
+# Tauri defaults minus `dynamic-acl` (no runtime capabilities; required for
+# build.removeUnusedCommands). Recheck this list against the defaults on Tauri upgrades.
+tauri = { version = "2.12", default-features = false, features = ["wry", "compression", "common-controls-v6", "x11", "dbus"] }
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-window-state = "2"
@@ -52,7 +54,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml_ng = "0.10"
 
 # Mock server
-axum = "0.7"
+axum = { version = "0.7", default-features = false, features = ["http1", "json", "query", "tokio"] }
 tower = { version = "0.5", features = ["util"] }
 
 # TLS for connection timing measurement
@@ -76,7 +78,7 @@ url = "2"
 idna_adapter = "=1.2.0"
 
 # Digest auth + AWS Signature V4
-md5 = "0.7"
+md-5 = "0.10"
 sha2 = "0.10"
 sha1 = "0.10"
 hmac = "0.12"
@@ -119,7 +121,7 @@ keyring = { version = "3", default-features = false, features = ["windows-native
 # hand-rolled temp_dir().join(Uuid) pattern in fs_secure.rs does not.
 tempfile = "3"
 # Mock runtime, so transports that emit events can be driven end to end.
-tauri = { version = "2.12", features = ["test"] }
+tauri = { version = "2.12", default-features = false, features = ["wry", "compression", "common-controls-v6", "x11", "dbus", "test"] }
 
 [features]
 default = ["custom-protocol"]

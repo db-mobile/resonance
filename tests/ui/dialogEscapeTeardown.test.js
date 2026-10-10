@@ -14,9 +14,10 @@ describe('dialog Escape teardown runs on every close path', () => {
 
         const release = jest.fn();
         modal.isOpen = true;
+        modal.overlay = overlay;
         modal._releaseEscape = release;
 
-        modal.hide(overlay);
+        modal.hide();
 
         expect(release).toHaveBeenCalledTimes(1);
         expect(modal._releaseEscape).toBeNull();
@@ -30,10 +31,11 @@ describe('dialog Escape teardown runs on every close path', () => {
 
         const release = jest.fn();
         modal.isOpen = true;
+        modal.overlay = overlay;
         modal._releaseEscape = release;
 
-        modal.hide(overlay);
-        modal.hide(overlay);
+        modal.hide();
+        modal.hide();
 
         expect(release).toHaveBeenCalledTimes(1);
     });
@@ -44,14 +46,14 @@ describe('dialog Escape teardown runs on every close path', () => {
         document.body.appendChild(overlay);
 
         const release = jest.fn();
-        dialog.dialog = overlay;
-        dialog.releaseEscape = release;
+        dialog.overlay = overlay;
+        dialog._releaseEscape = release;
         dialog.resolve = jest.fn();
 
         dialog.close();
 
         expect(release).toHaveBeenCalledTimes(1);
-        expect(dialog.releaseEscape).toBeNull();
+        expect(dialog._releaseEscape).toBeNull();
         expect(overlay.parentNode).toBeNull();
     });
 });

@@ -4,7 +4,9 @@
  */
 
 import { templateLoader } from '../templateLoader.js';
-import { pushEscapeHandler } from './modalEscape.js';
+import { BaseModal } from './BaseModal.js';
+import { ConfirmDialog } from './ConfirmDialog.js';
+import { toast } from './Toast.js';
 import { updateSetting } from '../state/settingsCache.js';
 import { translate } from '../utils/translate.js';
 
@@ -18,8 +20,9 @@ function formatUpdateError(error) {
     return typeof error === 'string' ? error : (error?.message || JSON.stringify(error));
 }
 
-export class SettingsModal {
+export class SettingsModal extends BaseModal {
     constructor(themeManager, i18nManager = null, httpVersionManager = null, timeoutManager = null, proxyController = null, certificateController = null, layoutManager = null) {
+        super();
         this.themeManager = themeManager;
         this.layoutManager = layoutManager;
         this.i18nManager = i18nManager;
@@ -42,9 +45,9 @@ export class SettingsModal {
             modal = await this.createModal();
         } catch (error) {
             this.isOpen = false;
+            this.destroy();
             throw error;
         }
-        document.body.appendChild(modal);
 
         const appVersionDisplay = modal.querySelector('#settings-app-version');
         if (appVersionDisplay) {
@@ -68,12 +71,6 @@ export class SettingsModal {
     }
 
     async createModal() {
-        const fragment = templateLoader.cloneSync(
-            TEMPLATE_PATH,
-            'tpl-settings-modal'
-        );
-        const overlay = fragment.firstElementChild;
-
         const currentHttpVersion = this.httpVersionManager ? await this.httpVersionManager.getCurrentVersion() : 'auto';
         const currentTimeout = this.timeoutManager ? this.timeoutManager.getCurrentTimeout() : 0;
 
@@ -89,7 +86,17 @@ export class SettingsModal {
             currentCheckUpdatesOnLaunch = settings.checkUpdatesOnLaunch === true;
         } catch {}
 
-        this._populateGeneralFields(overlay, {
+        const proxySection = this.proxyController ? await this.createProxySectionDOM() : null;
+        const certsSection = this.certificateController ? await this.createCertsSectionDOM() : null;
+
+        const dialog = this.mount({
+            overlayClass: 'settings-modal-overlay',
+            dialogClass: 'modal-dialog modal-dialog--settings u-flex u-flex-col',
+            templatePath: TEMPLATE_PATH,
+            templateId: 'tpl-settings-modal'
+        });
+
+        this._populateGeneralFields(dialog, {
             httpVersion: currentHttpVersion,
             timeout: currentTimeout,
             verifySsl: currentVerifySsl,
@@ -98,7 +105,7 @@ export class SettingsModal {
             checkUpdatesOnLaunch: currentCheckUpdatesOnLaunch
         });
 
-        const currentVersionSpan = overlay.querySelector('#settings-current-version');
+        const currentVersionSpan = dialog.querySelector('#settings-current-version');
         if (currentVersionSpan && window.backendAPI?.app?.getVersion) {
             window.backendAPI.app.getVersion().then(version => {
                 currentVersionSpan.textContent = version;
@@ -107,39 +114,39 @@ export class SettingsModal {
             });
         }
 
-        const languagePlaceholder = overlay.querySelector('[data-role="language-section"]');
+        const languagePlaceholder = dialog.querySelector('[data-role="language-section"]');
         if (languagePlaceholder && this.i18nManager) {
             languagePlaceholder.replaceWith(this.createLanguageSectionDOM());
         } else if (languagePlaceholder) {
             languagePlaceholder.remove();
         }
 
-        const accentGrid = overlay.querySelector('[data-role="accent-grid"]');
+        const accentGrid = dialog.querySelector('[data-role="accent-grid"]');
         if (accentGrid) {
             this.createAccentButtonsDOM(accentGrid);
         }
 
-        if (this.proxyController) {
-            this._appendOptionalTab(overlay, 'tpl-settings-proxy-tab', 'tpl-settings-proxy-content', await this.createProxySectionDOM());
+        if (proxySection) {
+            this._appendOptionalTab(dialog, 'tpl-settings-proxy-tab', 'tpl-settings-proxy-content', proxySection);
         }
 
-        if (this.certificateController) {
-            this._appendOptionalTab(overlay, 'tpl-settings-certs-tab', 'tpl-settings-certs-content', await this.createCertsSectionDOM());
+        if (certsSection) {
+            this._appendOptionalTab(dialog, 'tpl-settings-certs-tab', 'tpl-settings-certs-content', certsSection);
         }
 
-        overlay.querySelector('.settings-tabs').appendChild(templateLoader.cloneSync(TEMPLATE_PATH, 'tpl-settings-updates-tab'));
+        dialog.querySelector('.settings-tabs').appendChild(templateLoader.cloneSync(TEMPLATE_PATH, 'tpl-settings-updates-tab'));
 
-        this.i18nManager?.updateUI(overlay);
-        this.attachEventListeners(overlay);
-        return overlay;
+        this.i18nManager?.updateUI(dialog);
+        this.attachEventListeners(dialog);
+        return dialog;
     }
 
     /**
-     * @param {HTMLElement} overlay
+     * @param {HTMLElement} dialog
      * @param {{httpVersion: string, timeout: number, verifySsl: boolean, followRedirects: boolean, historyLimit: number, checkUpdatesOnLaunch: boolean}} current
      * @returns {void}
      */
-    _populateGeneralFields(overlay, current) {
+    _populateGeneralFields(dialog, current) {
         const fields = [
             ['select[name="theme"]', 'value', () => this.themeManager.getCurrentTheme()],
             ['select[name="layout"]', 'value', () => this.layoutManager?.getLayout()],
@@ -151,7 +158,7 @@ export class SettingsModal {
             ['input[name="checkUpdatesOnLaunch"]', 'checked', () => current.checkUpdatesOnLaunch]
         ];
         for (const [selector, property, read] of fields) {
-            const field = overlay.querySelector(selector);
+            const field = dialog.querySelector(selector);
             if (!field) {
                 continue;
             }
@@ -163,18 +170,18 @@ export class SettingsModal {
     }
 
     /**
-     * @param {HTMLElement} overlay
+     * @param {HTMLElement} dialog
      * @param {string} tabTemplateId
      * @param {string} contentTemplateId
      * @param {HTMLElement} section
      * @returns {void}
      */
-    _appendOptionalTab(overlay, tabTemplateId, contentTemplateId, section) {
-        overlay.querySelector('.settings-tabs').appendChild(templateLoader.cloneSync(TEMPLATE_PATH, tabTemplateId));
+    _appendOptionalTab(dialog, tabTemplateId, contentTemplateId, section) {
+        dialog.querySelector('.settings-tabs').appendChild(templateLoader.cloneSync(TEMPLATE_PATH, tabTemplateId));
 
         const content = templateLoader.cloneSync(TEMPLATE_PATH, contentTemplateId).firstElementChild;
         content.appendChild(section);
-        overlay.querySelector('.settings-content').appendChild(content);
+        dialog.querySelector('.settings-content').appendChild(content);
     }
 
     createLanguageSectionDOM() {
@@ -380,7 +387,18 @@ export class SettingsModal {
             });
         });
 
-        row.querySelector('[data-role="cert-remove"]')?.addEventListener('click', () => {
+        row.querySelector('[data-role="cert-remove"]')?.addEventListener('click', async () => {
+            const confirmed = await new ConfirmDialog().show(
+                translate('settings.certs_remove_confirm', 'Remove the certificate for "{{host}}"?', { host: host.value.trim() || '*' }),
+                {
+                    title: translate('settings.certs_remove_title', 'Remove Certificate'),
+                    confirmText: translate('settings.certs_remove', 'Remove'),
+                    dangerous: true
+                }
+            );
+            if (!confirmed) {
+                return;
+            }
             const section = row.closest('.certs-settings-section');
             row.remove();
             this._saveCerts();
@@ -444,7 +462,9 @@ export class SettingsModal {
         }
         try {
             await this.certificateController.saveItems(this._collectCertItems());
-        } catch {}
+        } catch (error) {
+            toast.error(translate('settings.certs_save_failed', 'Failed to save certificates: {{error}}', { error: formatUpdateError(error) }));
+        }
     }
 
     _updateCertsEmpty(section) {
@@ -456,14 +476,14 @@ export class SettingsModal {
     }
 
     /**
-     * @param {HTMLElement} overlay
+     * @param {HTMLElement} dialog
      * @param {string} selector
      * @param {string} key
      * @param {Function} [read]
      * @returns {void}
      */
-    _bindSetting(overlay, selector, key, read = (e) => e.target.checked) {
-        const input = overlay.querySelector(selector);
+    _bindSetting(dialog, selector, key, read = (e) => e.target.checked) {
+        const input = dialog.querySelector(selector);
         if (!input) {
             return;
         }
@@ -472,19 +492,23 @@ export class SettingsModal {
             if (value === undefined) {
                 return;
             }
-            await updateSetting(key, value);
+            try {
+                await updateSetting(key, value);
+            } catch (error) {
+                toast.error(translate('settings.save_failed', 'Failed to save setting: {{error}}', { error: formatUpdateError(error) }));
+            }
         });
     }
 
-    attachEventListeners(overlay) {
-        const closeBtn = overlay.querySelector('.dialog-close-btn');
-        const themeSelect = overlay.querySelector('select[name="theme"]');
-        const languageSelect = overlay.querySelector('select[name="language"]');
-        const httpVersionSelect = overlay.querySelector('select[name="httpVersion"]');
-        const timeoutInput = overlay.querySelector('input[name="requestTimeout"]');
+    attachEventListeners(dialog) {
+        const closeBtn = dialog.querySelector('.dialog-close-btn');
+        const themeSelect = dialog.querySelector('select[name="theme"]');
+        const languageSelect = dialog.querySelector('select[name="language"]');
+        const httpVersionSelect = dialog.querySelector('select[name="httpVersion"]');
+        const timeoutInput = dialog.querySelector('input[name="requestTimeout"]');
 
-        const tabButtons = overlay.querySelectorAll('.settings-tab');
-        const tabContents = overlay.querySelectorAll('.settings-tab-content');
+        const tabButtons = dialog.querySelectorAll('.settings-tab');
+        const tabContents = dialog.querySelectorAll('.settings-tab-content');
 
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
@@ -494,14 +518,14 @@ export class SettingsModal {
                 tabContents.forEach(content => content.classList.remove('active'));
 
                 button.classList.add('active');
-                const targetContent = overlay.querySelector(`[data-tab-content="${targetTab}"]`);
+                const targetContent = dialog.querySelector(`[data-tab-content="${targetTab}"]`);
                 if (targetContent) {
                     targetContent.classList.add('active');
                 }
             });
         });
 
-        closeBtn.addEventListener('click', () => this.hide(overlay));
+        closeBtn.addEventListener('click', () => this.hide());
 
         if (themeSelect) {
             themeSelect.addEventListener('change', async (e) => {
@@ -509,14 +533,14 @@ export class SettingsModal {
             });
         }
 
-        const layoutSelect = overlay.querySelector('select[name="layout"]');
+        const layoutSelect = dialog.querySelector('select[name="layout"]');
         if (layoutSelect && this.layoutManager) {
             layoutSelect.addEventListener('change', async (e) => {
                 await this.layoutManager.setLayout(e.target.value);
             });
         }
 
-        const accentButtons = overlay.querySelectorAll('.accent-btn');
+        const accentButtons = dialog.querySelectorAll('.accent-btn');
         accentButtons.forEach(btn => {
             if (btn.dataset.btnColor) {
                 btn.style.setProperty('--btn-color', btn.dataset.btnColor);
@@ -552,44 +576,36 @@ export class SettingsModal {
             });
         }
 
-        this._bindSetting(overlay, 'input[name="verifySsl"]', 'verifySsl');
-        this._bindSetting(overlay, 'input[name="followRedirects"]', 'followRedirects');
-        this._bindSetting(overlay, 'input[name="historyLimit"]', 'historyLimit', (e) => {
+        this._bindSetting(dialog, 'input[name="verifySsl"]', 'verifySsl');
+        this._bindSetting(dialog, 'input[name="followRedirects"]', 'followRedirects');
+        this._bindSetting(dialog, 'input[name="historyLimit"]', 'historyLimit', (e) => {
             const limit = parseInt(e.target.value, 10);
             return !isNaN(limit) && limit >= 10 ? limit : undefined;
         });
-        this._bindSetting(overlay, 'input[name="checkUpdatesOnLaunch"]', 'checkUpdatesOnLaunch');
+        this._bindSetting(dialog, 'input[name="checkUpdatesOnLaunch"]', 'checkUpdatesOnLaunch');
 
-        const checkUpdatesOnLaunchCheckbox = overlay.querySelector('input[name="checkUpdatesOnLaunch"]');
+        const checkUpdatesOnLaunchCheckbox = dialog.querySelector('input[name="checkUpdatesOnLaunch"]');
 
         if (this.proxyController) {
-            this.attachProxyEventListeners(overlay);
+            this.attachProxyEventListeners(dialog);
         }
 
-        this._attachUpdateChecker(overlay, checkUpdatesOnLaunchCheckbox);
-
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                this.hide(overlay);
-            }
-        });
-
-        this._releaseEscape = pushEscapeHandler(() => this.hide(overlay));
+        this._attachUpdateChecker(dialog, checkUpdatesOnLaunchCheckbox);
     }
 
     /**
-     * @param {HTMLElement} overlay
+     * @param {HTMLElement} dialog
      * @param {HTMLElement|null} checkUpdatesOnLaunchCheckbox
      * @returns {void}
      */
-    _attachUpdateChecker(overlay, checkUpdatesOnLaunchCheckbox) {
-        const checkUpdatesBtn = overlay.querySelector('#check-for-updates-btn');
-        const updateStatus = overlay.querySelector('#update-status');
+    _attachUpdateChecker(dialog, checkUpdatesOnLaunchCheckbox) {
+        const checkUpdatesBtn = dialog.querySelector('#check-for-updates-btn');
+        const updateStatus = dialog.querySelector('#update-status');
         if (!checkUpdatesBtn || !updateStatus) {
             return;
         }
 
-        this._applyInstallInfo(overlay, checkUpdatesBtn, checkUpdatesOnLaunchCheckbox);
+        this._applyInstallInfo(dialog, checkUpdatesBtn, checkUpdatesOnLaunchCheckbox);
 
         const setStatus = (text, kind = '') => {
             updateStatus.textContent = text;
@@ -643,12 +659,12 @@ export class SettingsModal {
     }
 
     /**
-     * @param {HTMLElement} overlay
+     * @param {HTMLElement} dialog
      * @param {HTMLElement} checkUpdatesBtn
      * @param {HTMLElement|null} checkUpdatesOnLaunchCheckbox
      * @returns {Promise<void>}
      */
-    async _applyInstallInfo(overlay, checkUpdatesBtn, checkUpdatesOnLaunchCheckbox) {
+    async _applyInstallInfo(dialog, checkUpdatesBtn, checkUpdatesOnLaunchCheckbox) {
         try {
             if (!window.backendAPI?.updater?.getInstallInfo) {
                 return;
@@ -665,7 +681,7 @@ export class SettingsModal {
             if (manualUpdateRow) {
                 manualUpdateRow.style.display = 'none';
             }
-            const versionRow = overlay.querySelector('#settings-current-version')?.closest('.row');
+            const versionRow = dialog.querySelector('#settings-current-version')?.closest('.row');
             if (!versionRow) {
                 return;
             }
@@ -682,41 +698,41 @@ export class SettingsModal {
         } catch {}
     }
 
-    attachProxyEventListeners(overlay) {
-        const proxyEnabled = overlay.querySelector('input[name="proxyEnabled"]');
-        const proxyContent = overlay.querySelector('.proxy-settings-content');
-        const proxyUseSystem = overlay.querySelector('input[name="proxyUseSystem"]');
-        const proxyManualSettings = overlay.querySelector('.proxy-manual-settings');
-        const proxyAuthEnabled = overlay.querySelector('input[name="proxyAuthEnabled"]');
-        const proxyAuthFields = overlay.querySelector('.proxy-auth-fields');
-        const proxyTestBtn = overlay.querySelector('.proxy-test-btn');
-        const proxyTestResult = overlay.querySelector('.proxy-test-result');
+    attachProxyEventListeners(dialog) {
+        const proxyEnabled = dialog.querySelector('input[name="proxyEnabled"]');
+        const proxyContent = dialog.querySelector('.proxy-settings-content');
+        const proxyUseSystem = dialog.querySelector('input[name="proxyUseSystem"]');
+        const proxyManualSettings = dialog.querySelector('.proxy-manual-settings');
+        const proxyAuthEnabled = dialog.querySelector('input[name="proxyAuthEnabled"]');
+        const proxyAuthFields = dialog.querySelector('.proxy-auth-fields');
+        const proxyTestBtn = dialog.querySelector('.proxy-test-btn');
+        const proxyTestResult = dialog.querySelector('.proxy-test-result');
 
-        const proxyType = overlay.querySelector('select[name="proxyType"]');
-        const proxyHost = overlay.querySelector('input[name="proxyHost"]');
-        const proxyPort = overlay.querySelector('input[name="proxyPort"]');
-        const proxyUsername = overlay.querySelector('input[name="proxyUsername"]');
-        const proxyPassword = overlay.querySelector('input[name="proxyPassword"]');
-        const proxyBypass = overlay.querySelector('input[name="proxyBypass"]');
+        const proxyType = dialog.querySelector('select[name="proxyType"]');
+        const proxyHost = dialog.querySelector('input[name="proxyHost"]');
+        const proxyPort = dialog.querySelector('input[name="proxyPort"]');
+        const proxyUsername = dialog.querySelector('input[name="proxyUsername"]');
+        const proxyPassword = dialog.querySelector('input[name="proxyPassword"]');
+        const proxyBypass = dialog.querySelector('input[name="proxyBypass"]');
 
         if (proxyEnabled && proxyContent) {
             proxyEnabled.addEventListener('change', async (e) => {
                 proxyContent.classList.toggle('is-hidden', !e.target.checked);
-                await this.saveProxySettings(overlay);
+                await this.saveProxySettings(dialog);
             });
         }
 
         if (proxyUseSystem && proxyManualSettings) {
             proxyUseSystem.addEventListener('change', async (e) => {
                 proxyManualSettings.classList.toggle('is-hidden', e.target.checked);
-                await this.saveProxySettings(overlay);
+                await this.saveProxySettings(dialog);
             });
         }
 
         if (proxyAuthEnabled && proxyAuthFields) {
             proxyAuthEnabled.addEventListener('change', async (e) => {
                 proxyAuthFields.classList.toggle('is-hidden', !e.target.checked);
-                await this.saveProxySettings(overlay);
+                await this.saveProxySettings(dialog);
             });
         }
 
@@ -724,7 +740,7 @@ export class SettingsModal {
         proxyFields.forEach(field => {
             if (field) {
                 field.addEventListener('change', async () => {
-                    await this.saveProxySettings(overlay);
+                    await this.saveProxySettings(dialog);
                 });
             }
         });
@@ -732,12 +748,12 @@ export class SettingsModal {
         if (proxyTestBtn && proxyTestResult) {
             proxyTestBtn.addEventListener('click', async () => {
                 proxyTestBtn.disabled = true;
-                proxyTestBtn.textContent = 'Testing...';
+                proxyTestBtn.textContent = translate('settings.proxy_testing', 'Testing...');
                 proxyTestResult.textContent = '';
                 proxyTestResult.className = 'proxy-test-result';
 
                 try {
-                    await this.saveProxySettings(overlay);
+                    await this.saveProxySettings(dialog);
 
                     const result = await this.proxyController.testConnection();
 
@@ -753,25 +769,25 @@ export class SettingsModal {
                     proxyTestResult.className = 'proxy-test-result error';
                 } finally {
                     proxyTestBtn.disabled = false;
-                    proxyTestBtn.textContent = 'Test Connection';
+                    proxyTestBtn.textContent = translate('settings.proxy_test', 'Test Connection');
                 }
             });
         }
     }
 
-    async saveProxySettings(overlay) {
+    async saveProxySettings(dialog) {
         if (!this.proxyController) {return;}
 
         try {
-            const enabled = overlay.querySelector('input[name="proxyEnabled"]')?.checked || false;
-            const useSystemProxy = overlay.querySelector('input[name="proxyUseSystem"]')?.checked || false;
-            const type = overlay.querySelector('select[name="proxyType"]')?.value || 'http';
-            const host = overlay.querySelector('input[name="proxyHost"]')?.value || '';
-            const port = parseInt(overlay.querySelector('input[name="proxyPort"]')?.value, 10) || 8080;
-            const authEnabled = overlay.querySelector('input[name="proxyAuthEnabled"]')?.checked || false;
-            const username = overlay.querySelector('input[name="proxyUsername"]')?.value || '';
-            const password = overlay.querySelector('input[name="proxyPassword"]')?.value || '';
-            const bypassText = overlay.querySelector('input[name="proxyBypass"]')?.value || '';
+            const enabled = dialog.querySelector('input[name="proxyEnabled"]')?.checked || false;
+            const useSystemProxy = dialog.querySelector('input[name="proxyUseSystem"]')?.checked || false;
+            const type = dialog.querySelector('select[name="proxyType"]')?.value || 'http';
+            const host = dialog.querySelector('input[name="proxyHost"]')?.value || '';
+            const port = parseInt(dialog.querySelector('input[name="proxyPort"]')?.value, 10) || 8080;
+            const authEnabled = dialog.querySelector('input[name="proxyAuthEnabled"]')?.checked || false;
+            const username = dialog.querySelector('input[name="proxyUsername"]')?.value || '';
+            const password = dialog.querySelector('input[name="proxyPassword"]')?.value || '';
+            const bypassText = dialog.querySelector('input[name="proxyBypass"]')?.value || '';
 
             const bypassList = bypassText
                 .split(',')
@@ -794,17 +810,21 @@ export class SettingsModal {
             };
 
             await this.proxyController.updateSettings(settings);
-        } catch {}
+        } catch (error) {
+            toast.error(translate('settings.proxy_save_failed', 'Failed to save proxy settings: {{error}}', { error: formatUpdateError(error) }));
+        }
     }
 
-    hide(overlay) {
+    /** @returns {void} */
+    onDismiss() {
+        this.hide();
+    }
+
+    /** @returns {void} */
+    hide() {
         if (!this.isOpen) {return;}
 
         this.isOpen = false;
-        if (this._releaseEscape) {
-            this._releaseEscape();
-            this._releaseEscape = null;
-        }
-        overlay.remove();
+        this.destroy();
     }
 }

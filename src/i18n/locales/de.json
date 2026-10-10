@@ -94,7 +94,10 @@
     "export_empty": "Keine Cookies zum Exportieren in dieser Umgebung",
     "import_success": "Cookies importiert",
     "import_skipped": "übersprungen",
-    "import_invalid": "Kein Resonance-Cookie-Export (erwartet { \"format\": \"resonance-cookie-jar\", \"cookies\": [...] })"
+    "import_invalid": "Kein Resonance-Cookie-Export (erwartet { \"format\": \"resonance-cookie-jar\", \"cookies\": [...] })",
+    "confirm_clear_session": "Alle Sitzungs-Cookies dieser Umgebung löschen?",
+    "confirm_clear_all": "Alle Cookies dieser Umgebung löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden.",
+    "clear_failed": "Cookies konnten nicht gelöscht werden: {{message}}"
   },
   "import_dialog": {
     "title": "Sammlung importieren",
@@ -337,7 +340,13 @@
     "updates_managed_externally": "Updates werden von Ihrem Paketmanager verwaltet",
     "version_info": "Versionsinformationen",
     "current_version": "Aktuelle Version",
-    "retry_update": "Erneut versuchen"
+    "retry_update": "Erneut versuchen",
+    "proxy_testing": "Wird getestet…",
+    "proxy_save_failed": "Proxy-Einstellungen konnten nicht gespeichert werden: {{error}}",
+    "certs_save_failed": "Zertifikate konnten nicht gespeichert werden: {{error}}",
+    "certs_remove_title": "Zertifikat entfernen",
+    "certs_remove_confirm": "Zertifikat für „{{host}}“ entfernen?",
+    "save_failed": "Einstellung konnte nicht gespeichert werden: {{error}}"
   },
   "theme": {
     "light": "Hell",
@@ -362,7 +371,8 @@
     "close": "Schließen",
     "yes": "Ja",
     "no": "Nein",
-    "create": "Erstellen"
+    "create": "Erstellen",
+    "clear": "Leeren"
   },
   "errors": {
     "network": "Netzwerkfehler aufgetreten",
@@ -455,7 +465,14 @@
     "status_code": "Statuscode",
     "ok": "OK",
     "error_toggle_server": "Server konnte nicht umgeschaltet werden",
-    "template_hint": "Zeichenketten können {{request.params.id}}, {{request.query.name}}, {{request.headers.name}}, {{request.body.pfad}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} und {{$randomInt}} enthalten. Mit „Prefer: code=404“ oder „Prefer: example=name“ erhält man eine andere dokumentierte Antwort."
+    "template_hint": "Zeichenketten können {{request.params.id}}, {{request.query.name}}, {{request.headers.name}}, {{request.body.pfad}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} und {{$randomInt}} enthalten. Mit „Prefer: code=404“ oder „Prefer: example=name“ erhält man eine andere dokumentierte Antwort.",
+    "error_update_port": "Port konnte nicht aktualisiert werden",
+    "error_toggle_collection": "Sammlung konnte nicht aktualisiert werden",
+    "error_clear_logs": "Anfrageprotokoll konnte nicht geleert werden",
+    "error_reset_response": "Antwort konnte nicht zurückgesetzt werden",
+    "reset_confirm_title": "Auf Standard zurücksetzen?",
+    "reset_confirm_message": "Benutzerdefinierte Verzögerung, Statuscode und Antworttext für {{endpoint}} verwerfen?",
+    "reset": "Zurücksetzen"
   },
   "runner": {
     "title": "Collection Runner",
@@ -638,5 +655,12 @@
     "too_old": "Ihre Daten stammen aus einer Resonance-Version, die diese Version nicht mehr konvertieren kann. Sie wurden nicht verändert. Installieren Sie Resonance {{release}}, starten Sie es einmal und aktualisieren Sie dann erneut.",
     "global_store_collections": "In Ihren Einstellungen liegen noch Collections aus einer Resonance-Version vor März 2026. Diese Version kann sie nicht mehr konvertieren; sie wurden nicht verändert. Installieren Sie Resonance {{release}}, starten Sie es einmal und aktualisieren Sie dann erneut.",
     "unknown": "Ihre Daten konnten nicht vollständig in das aktuelle Format konvertiert werden."
+  },
+  "environment_manager": {
+    "create_default_name": "Neue Umgebung",
+    "create_title": "Umgebung erstellen",
+    "create_label": "Name der Umgebung:",
+    "create_confirm": "Erstellen",
+    "import_error": "Fehler beim Importieren der Umgebungen: {{message}}"
   }
 }

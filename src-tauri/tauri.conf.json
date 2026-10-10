@@ -1,13 +1,14 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Resonance",
-  "version": "3.3.2",
+  "version": "3.3.3",
   "identifier": "io.github.db-mobile.resonance",
   "build": {
     "beforeDevCommand": "npm run build && node serve.js",
     "beforeBuildCommand": "npm run build:prod",
     "devUrl": "http://localhost:1420",
-    "frontendDist": "../dist"
+    "frontendDist": "../dist",
+    "removeUnusedCommands": true
   },
   "app": {
     "windows": [

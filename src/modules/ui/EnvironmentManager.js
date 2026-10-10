@@ -1,8 +1,13 @@
 import { templateLoader } from '../templateLoader.js';
 import { DynamicVariablesReferenceDialog } from './DynamicVariablesReferenceDialog.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
-import { pushEscapeHandler } from './modalEscape.js';
+import { RenameDialog } from './RenameDialog.js';
+import { BaseModal } from './BaseModal.js';
+import { toast } from './Toast.js';
+import { translate } from '../utils/translate.js';
 import { applySecretState as applyRowSecretState, toggleRevealed } from './secretToggle.js';
+
+const TEMPLATE_PATH = './src/templates/environment/environmentManager.html';
 
 const SECRET_ROW_SELECTORS = Object.freeze({
     valueInput: '.var-value-input',
@@ -10,43 +15,37 @@ const SECRET_ROW_SELECTORS = Object.freeze({
     revealBtn: '.var-reveal-btn'
 });
 
-export class EnvironmentManager {
+export class EnvironmentManager extends BaseModal {
     constructor(environmentService) {
+        super();
         this.service = environmentService;
-        this.dialog = null;
         this.currentEnvironmentId = null;
         this.resolve = null;
-        this.releaseEscape = null;
     }
 
+    /** @returns {Promise<boolean>} */
     show() {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             this.resolve = resolve;
-            this.createDialog();
+            this.createDialog().catch((error) => {
+                this.resolve = null;
+                reject(error);
+            });
         });
     }
 
+    /** @returns {Promise<void>} */
     async createDialog() {
         this.currentEnvironmentId = null;
 
-        this.dialog = document.createElement('div');
-        this.dialog.className = 'environment-manager-overlay modal-overlay';
+        await templateLoader.loadTemplateFile(TEMPLATE_PATH);
 
-        const dialogContent = document.createElement('div');
-        dialogContent.className = 'environment-manager-dialog modal-dialog modal-dialog--environment-manager';
-
-        try {
-            const fragment = await templateLoader.clone(
-                './src/templates/environment/environmentManager.html',
-                'tpl-environment-manager-dialog-content'
-            );
-            dialogContent.appendChild(fragment);
-        } catch {
-            return;
-        }
-
-        this.dialog.appendChild(dialogContent);
-        document.body.appendChild(this.dialog);
+        this.mount({
+            overlayClass: 'environment-manager-overlay',
+            dialogClass: 'environment-manager-dialog modal-dialog modal-dialog--environment-manager',
+            templatePath: TEMPLATE_PATH,
+            templateId: 'tpl-environment-manager-dialog-content'
+        });
 
         this.setupEventListeners();
 
@@ -63,14 +62,6 @@ export class EnvironmentManager {
         closeBtn.addEventListener('click', () => this.close());
         importBtn.addEventListener('click', () => this.handleImport());
         exportAllBtn.addEventListener('click', () => this.handleExportAll());
-
-        this.dialog.addEventListener('click', (e) => {
-            if (e.target === this.dialog) {
-                this.close();
-            }
-        });
-
-        this.releaseEscape = pushEscapeHandler(() => this.close());
     }
 
     async loadEnvironments() {
@@ -229,7 +220,7 @@ export class EnvironmentManager {
                     await this.service.updateEnvironment(environment.id, { name: newName });
                     await this.loadEnvironments();
                 } catch (error) {
-                    this.showAlert(error.message);
+                    toast.error(error.message);
                     nameInput.value = environment.name;
                 }
             }
@@ -258,7 +249,7 @@ export class EnvironmentManager {
                 await this.loadEnvironments();
                 await this.loadEnvironmentDetails(environment.id);
             } catch (error) {
-                this.showAlert(error.message);
+                toast.error(error.message);
                 this._renderColorState(environment.color);
             }
         };
@@ -308,7 +299,7 @@ export class EnvironmentManager {
                     await this.loadEnvironments();
                     await this.loadEnvironmentDetails(environment.id);
                 } catch (error) {
-                    this.showAlert(error.message);
+                    toast.error(error.message);
                 }
             });
         }
@@ -320,7 +311,7 @@ export class EnvironmentManager {
                     await this.loadEnvironments();
                     this.selectEnvironment(newEnv.id);
                 } catch (error) {
-                    this.showAlert(error.message);
+                    toast.error(error.message);
                 }
             });
         }
@@ -336,7 +327,7 @@ export class EnvironmentManager {
                         json
                     );
                 } catch (error) {
-                    this.showAlert(error.message);
+                    toast.error(error.message);
                 }
             });
         }
@@ -345,7 +336,7 @@ export class EnvironmentManager {
             deleteBtn.addEventListener('click', async () => {
                 const confirmed = await new ConfirmDialog().show(
                     `Are you sure you want to delete the environment "${environment.name}"?`,
-                    { title: 'Delete Environment', confirmText: 'Delete' }
+                    { title: 'Delete Environment', confirmText: 'Delete', dangerous: true }
                 );
                 if (confirmed) {
                     try {
@@ -353,7 +344,7 @@ export class EnvironmentManager {
                         this.currentEnvironmentId = null;
                         await this.loadEnvironments();
                     } catch (error) {
-                        this.showAlert(error.message);
+                        toast.error(error.message);
                     }
                 }
             });
@@ -503,7 +494,7 @@ export class EnvironmentManager {
             if (!this.currentEnvironmentId) {return;}
             await this.service.setVariable(this.currentEnvironmentId, name, value, isSecret);
         } catch (error) {
-            this.showAlert(error.message);
+            toast.error(error.message);
         }
     }
 
@@ -512,12 +503,16 @@ export class EnvironmentManager {
             if (!this.currentEnvironmentId) {return;}
             await this.service.deleteVariable(this.currentEnvironmentId, name);
         } catch (error) {
-            this.showAlert(error.message);
+            toast.error(error.message);
         }
     }
 
     async handleCreateEnvironment() {
-        const name = await this.showInputDialog('Create Environment', 'Enter environment name:', 'New Environment');
+        const name = await new RenameDialog().show(translate('environment_manager.create_default_name', 'New Environment'), {
+            title: translate('environment_manager.create_title', 'Create Environment'),
+            label: translate('environment_manager.create_label', 'Enter environment name:'),
+            confirmText: translate('environment_manager.create_confirm', 'Create')
+        });
         if (!name) {return;}
 
         try {
@@ -525,122 +520,16 @@ export class EnvironmentManager {
             await this.loadEnvironments();
             this.selectEnvironment(newEnv.id);
         } catch (error) {
-            this.showAlert(error.message);
+            toast.error(error.message);
         }
-    }
-
-    showInputDialog(title, message, defaultValue = '') {
-        return new Promise((resolve) => {
-            const overlay = document.createElement('div');
-            overlay.className = 'modal-overlay';
-
-            const dialog = document.createElement('div');
-            dialog.className = 'modal-dialog modal-dialog--sm';
-
-            templateLoader
-                .clone('./src/templates/environment/environmentManager.html', 'tpl-environment-manager-input-dialog')
-                .then((fragment) => {
-                    dialog.appendChild(fragment);
-
-                    const titleEl = dialog.querySelector('[data-role="title"]');
-                    const messageEl = dialog.querySelector('[data-role="message"]');
-                    if (titleEl) {titleEl.textContent = title;}
-                    if (messageEl) {messageEl.textContent = message;}
-
-                    overlay.appendChild(dialog);
-                    document.body.appendChild(overlay);
-
-                    const input = dialog.querySelector('#input-dialog-input');
-                    if (input) {input.value = defaultValue;}
-                    const okBtn = dialog.querySelector('#input-dialog-ok');
-                    const cancelBtn = dialog.querySelector('#input-dialog-cancel');
-
-                    let releaseEscape = null;
-                    const cleanup = (value) => {
-                        if (releaseEscape) {
-                            releaseEscape();
-                            releaseEscape = null;
-                        }
-                        overlay.remove();
-                        resolve(value);
-                    };
-                    releaseEscape = pushEscapeHandler(() => cleanup(null));
-
-                    okBtn.addEventListener('click', () => cleanup(input.value.trim()));
-                    cancelBtn.addEventListener('click', () => cleanup(null));
-
-                    input.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter') {cleanup(input.value.trim());}
-                    });
-
-                    overlay.addEventListener('click', (e) => {
-                        if (e.target === overlay) {cleanup(null);}
-                    });
-
-                    input.focus();
-                    input.select();
-                })
-                .catch(() => {
-                    resolve(null);
-                });
-        });
-    }
-
-    showAlert(message) {
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
-
-        const dialog = document.createElement('div');
-        dialog.className = 'modal-dialog modal-dialog--sm';
-
-        templateLoader
-            .clone('./src/templates/environment/environmentManager.html', 'tpl-environment-manager-alert-dialog')
-            .then((fragment) => {
-                dialog.appendChild(fragment);
-
-                const messageEl = dialog.querySelector('[data-role="message"]');
-                if (messageEl) {messageEl.textContent = message;}
-
-                overlay.appendChild(dialog);
-                document.body.appendChild(overlay);
-
-                const okBtn = dialog.querySelector('#alert-dialog-ok');
-
-                let releaseEscape = null;
-                let onEnter = null;
-                const cleanup = () => {
-                    if (releaseEscape) {
-                        releaseEscape();
-                        releaseEscape = null;
-                    }
-                    if (onEnter) {
-                        document.removeEventListener('keydown', onEnter);
-                        onEnter = null;
-                    }
-                    overlay.remove();
-                };
-                onEnter = (e) => {
-                    if (e.key === 'Enter') {
-                        cleanup();
-                    }
-                };
-                releaseEscape = pushEscapeHandler(cleanup);
-                document.addEventListener('keydown', onEnter);
-
-                okBtn.addEventListener('click', cleanup);
-
-                overlay.addEventListener('click', (e) => {
-                    if (e.target === overlay) {cleanup();}
-                });
-            })
-            .catch(() => {});
     }
 
     async handleImport() {
         const merge = await new ConfirmDialog().show(
-            'Merge with existing environments? (Cancel to replace all)',
-            { title: 'Import Environments', confirmText: 'Merge', cancelText: 'Replace All', dangerous: false }
+            'Merge with existing environments, or replace all of them?',
+            { title: 'Import Environments', confirmText: 'Merge', cancelText: 'Replace All', dangerous: false, dismissValue: null }
         );
+        if (merge === null) {return;}
 
         const input = document.createElement('input');
         input.type = 'file';
@@ -657,7 +546,7 @@ export class EnvironmentManager {
                 await this.service.importEnvironments(parsed, merge);
                 await this.loadEnvironments();
             } catch (error) {
-                this.showAlert(`Error importing environments: ${error.message}`);
+                toast.error(translate('environment_manager.import_error', 'Error importing environments: {{message}}', { message: error.message }));
             }
         };
 
@@ -673,7 +562,7 @@ export class EnvironmentManager {
                 json
             );
         } catch (error) {
-            this.showAlert(error.message);
+            toast.error(error.message);
         }
     }
 
@@ -686,19 +575,19 @@ export class EnvironmentManager {
         throw new Error('Native export is not available in this runtime');
     }
 
-    close() {
-        if (this.releaseEscape) {
-            this.releaseEscape();
-            this.releaseEscape = null;
-        }
+    /** @returns {void} */
+    onDismiss() {
+        this.close();
+    }
 
-        if (this.dialog) {
-            this.dialog.remove();
-            this.dialog = null;
-        }
+    /** @returns {void} */
+    close() {
+        this.destroy();
 
         if (this.resolve) {
-            this.resolve(true);
+            const { resolve } = this;
+            this.resolve = null;
+            resolve(true);
         }
     }
 }
