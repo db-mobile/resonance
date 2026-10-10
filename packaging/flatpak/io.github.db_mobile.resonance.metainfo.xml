@@ -119,6 +119,16 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.3.3" date="2026-10-10">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Fix dialog, cookie jar, and i18n placeholder UI bugs</li>
+          <li>Make dialogs behave consistently</li>
+          <li>Fix quote stripping in script environment values and console output</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.3.2" date="2026-10-08">
       <description>
         <p>Feature stabilization release</p>
