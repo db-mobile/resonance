@@ -82,6 +82,12 @@ The application follows a modular MVC-like architecture:
 - **Services**: Business logic and API interactions
 - **Commands**: Rust backend IPC handlers
 
+Window geometry is tracked and saved by `tauri-plugin-window-state`. On Linux,
+`src-tauri/src/window_state.rs` restores the main window after display association,
+using the monitor scale and measured GTK decoration extents. Maximization waits
+for the normal size to settle so unmaximizing recovers the saved bounds. This
+avoids early scaling errors and [growth on each restart from GTK decorations](https://github.com/tauri-apps/plugins-workspace/issues/3553).
+
 ## Development Scripts
 
 - `npm run dev` - Start development server with hot reload
