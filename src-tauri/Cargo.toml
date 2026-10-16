@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "3.3.3"
+version = "3.3.4"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -20,7 +20,9 @@ tauri = { version = "2.12", default-features = false, features = ["wry", "compre
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-window-state = "2"
-tauri-plugin-updater = "2"
+# Releases use raw NSIS installers/AppImages; legacy ZIP/tar.gz support would
+# pull in yanked zip 4.x releases. macOS .app.tar.gz support is unconditional.
+tauri-plugin-updater = { version = "2.13.2", default-features = false, features = ["rustls-tls", "system-proxy"] }
 
 # HTTP client. rustls-no-provider instead of plain rustls: the latter would
 # statically link the aws-lc-rs crypto provider; ring is installed as the
@@ -102,6 +104,9 @@ boa_engine = "0.19"
 # project's rustls/ring-only TLS stack: Linux uses the D-Bus Secret Service with RustCrypto
 # (zbus, no OpenSSL); macOS/Windows use their native credential stores.
 [target.'cfg(target_os = "linux")'.dependencies]
+# Use the native content/surface sizes to compensate GTK client-side decorations
+# when restoring the window-state plugin's saved bounds.
+gtk = "0.18"
 keyring = { version = "3", default-features = false, features = ["sync-secret-service", "crypto-rust"] }
 # Secret portal backend, used only when running inside a Flatpak sandbox so the app can
 # encrypt secrets at rest without a `--talk-name=org.freedesktop.secrets` permission

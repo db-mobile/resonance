@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+#[cfg(target_os = "linux")]
+mod window_state;
 
 use commands::{
     api_request::{
@@ -64,14 +66,15 @@ fn main() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(
-            tauri_plugin_window_state::Builder::new()
-                .with_state_flags(
-                    tauri_plugin_window_state::StateFlags::all()
-                        & !tauri_plugin_window_state::StateFlags::DECORATIONS,
-                )
-                .build(),
-        )
+        .plugin({
+            let builder = tauri_plugin_window_state::Builder::new().with_state_flags(
+                tauri_plugin_window_state::StateFlags::all()
+                    & !tauri_plugin_window_state::StateFlags::DECORATIONS,
+            );
+            #[cfg(target_os = "linux")]
+            let builder = builder.skip_initial_state("main");
+            builder.build()
+        })
         .manage(RequestState::default())
         .manage(CollectionLoadErrors::default())
         .manage(ProxyState::default())
@@ -87,6 +90,10 @@ fn main() {
         .manage(MigrationStatus::default())
         .setup(|app| {
             use tauri::Manager;
+            #[cfg(target_os = "linux")]
+            if let Err(error) = window_state::restore_main_window(app) {
+                tracing::warn!(%error, "Failed to restore main window state");
+            }
             if let Ok(dir) = app.path().app_data_dir() {
                 let _ = std::fs::create_dir_all(&dir);
                 commands::fs_secure::restrict_dir(&dir);
