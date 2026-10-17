@@ -38,6 +38,8 @@
         <div class="doc-sidebar-label">Documentation</div>
         <ul class="doc-nav-list">
           <li><a href="documentation.html">Getting Started</a></li>
+          <li><a href="requests.html">Requests &amp; Responses</a></li>
+          <li><a href="graphql.html">GraphQL</a></li>
           <li><a href="grpc.html">gRPC</a></li>
           <li><a href="websocket.html">WebSocket</a></li>
           <li><a href="mqtt.html" class="active">MQTT</a></li>
@@ -46,6 +48,7 @@
           <li><a href="mock-server.html">Mock Server</a></li>
           <li><a href="scripts.html">Using Scripts</a></li>
           <li><a href="collection-runner.html">Collection Runner</a></li>
+          <li><a href="settings.html">Settings &amp; Network</a></li>
         </ul>
       </aside>
 
@@ -58,22 +61,39 @@
         <ul class="doc-list">
           <li>Connects to plaintext (<code>mqtt://</code>, default port 1883), TLS (<code>mqtts://</code>, default port 8883), or bare <code>host:port</code> brokers</li>
           <li>Subscribes to a topic, including wildcards like <code>sensors/#</code></li>
-          <li>Publishes messages to a topic</li>
+          <li>Publishes messages to a topic, optionally as <strong>retained</strong> messages</li>
           <li>Supports QoS 0, 1, and 2 for the subscription and published messages</li>
           <li>Optional client ID (auto-generated when blank), username, and password</li>
+          <li>Configurable keep-alive interval, clean or persistent sessions, and a Last Will message</li>
+          <li>Shows binary payloads safely &mdash; non-UTF-8 messages appear base64-encoded with their byte size; messages up to 64&nbsp;MB are accepted</li>
           <li>Resolves <code>&#123;&#123;variables&#125;&#125;</code> in topics, client ID, credentials, and payload</li>
           <li>Keeps the password in the OS keychain &mdash; it is not written to the collection files or the saved tab state</li>
           <li>Live status indicator with a received-message count and an incoming-message flash</li>
-          <li>Transcript of published and received messages with topics and timestamps</li>
+          <li>Transcript of published and received messages with topics and timestamps; retained messages are marked <code>retained</code></li>
         </ul>
 
         <h3>Connecting</h3>
         <ol class="doc-list">
           <li>Enter the broker URL &mdash; <code>mqtt://broker.example.com</code>, <code>mqtts://&hellip;</code> for TLS, or <code>host:port</code></li>
-          <li>Optionally set a client ID, username, and password</li>
-          <li>Click <strong>Send</strong> &mdash; the status indicator goes live once connected. Sending again with the same settings reuses the open connection</li>
+          <li>Optionally set a client ID, username, and password under <strong>Connection &amp; Auth</strong></li>
+          <li>Click <strong>Send</strong> &mdash; the status indicator goes live once connected. Sending again with the same connection settings reuses the open connection; changing the broker, credentials, subscription, session, Last Will, or TLS options reconnects</li>
           <li>Use the <strong>Disconnect</strong> button in the MQTT panel to close the connection</li>
         </ol>
+
+        <h3>Connection Options</h3>
+        <ul class="doc-list">
+          <li><strong>Keep-alive (s)</strong> &mdash; seconds between keep-alive pings, 0&ndash;65535 (default 60). <code>0</code> disables keep-alive</li>
+          <li><strong>Clean session</strong> (on by default) &mdash; turn it off for a persistent session: the broker keeps your subscriptions and queued QoS&nbsp;1/2 messages while you are disconnected. A persistent session needs a fixed <strong>Client ID</strong></li>
+        </ul>
+
+        <h3>Last Will</h3>
+        <p>The <strong>Last Will</strong> section sets a message the broker publishes on your behalf if the connection drops unexpectedly &mdash; useful for testing presence or &ldquo;device offline&rdquo; handling.</p>
+        <ol class="doc-list">
+          <li>Enter a <strong>Will Topic</strong> &mdash; leaving it empty sends no Last Will</li>
+          <li>Enter the <strong>Will Payload</strong> and choose the <strong>Will QoS</strong></li>
+          <li>Tick <strong>Retain will</strong> to have the broker keep the will message as the topic&rsquo;s retained value</li>
+        </ol>
+        <p>The will payload is stored like the password &mdash; in the OS keychain, not in collection files.</p>
 
         <h3>Subscribing</h3>
         <ol class="doc-list">
@@ -86,6 +106,7 @@
         <ol class="doc-list">
           <li>Enter the target topic</li>
           <li>Enter the payload in the body editor</li>
+          <li>Tick <strong>Retain</strong> to ask the broker to keep the message as the topic&rsquo;s last known value for future subscribers</li>
           <li>Click <strong>Send</strong> &mdash; the message is published on the open connection</li>
         </ol>
 
@@ -94,6 +115,7 @@
         <ul class="doc-list">
           <li>Check the scheme and port &mdash; 1883 for <code>mqtt://</code>, 8883 for <code>mqtts://</code></li>
           <li>Verify credentials, and that the broker accepts your client ID</li>
+          <li>&ldquo;A persistent session (clean session off) needs a fixed Client ID&rdquo; &mdash; enter a client ID or turn <strong>Clean session</strong> back on</li>
         </ul>
         <h4>No messages received</h4>
         <ul class="doc-list">

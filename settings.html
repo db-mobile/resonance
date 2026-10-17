@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Resonance settings — appearance, request defaults, proxy, client certificates (mTLS), secrets, and updates.">
+
+  <title>Settings — Resonance</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+</head>
+<body>
+
+  <div class="grain" aria-hidden="true"></div>
+
+  <header id="header">
+    <nav class="container nav-inner">
+      <a href="index.html" class="logo">
+        <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+        <span class="logo-text">Resonance</span>
+      </a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="index.html#screenshots">Screenshots</a></li>
+        <li><a href="index.html#download">Download</a></li>
+        <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="documentation.html" class="nav-cta">Docs</a></li>
+      </ul>
+      <button class="burger" id="burger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <div class="doc-page">
+      <aside class="doc-sidebar">
+        <div class="doc-sidebar-label">Documentation</div>
+        <ul class="doc-nav-list">
+          <li><a href="documentation.html">Getting Started</a></li>
+          <li><a href="requests.html">Requests &amp; Responses</a></li>
+          <li><a href="graphql.html">GraphQL</a></li>
+          <li><a href="grpc.html">gRPC</a></li>
+          <li><a href="websocket.html">WebSocket</a></li>
+          <li><a href="mqtt.html">MQTT</a></li>
+          <li><a href="sse.html">Server-Sent Events</a></li>
+          <li><a href="cookie-jar.html">Cookie Jar</a></li>
+          <li><a href="mock-server.html">Mock Server</a></li>
+          <li><a href="scripts.html">Using Scripts</a></li>
+          <li><a href="collection-runner.html">Collection Runner</a></li>
+          <li><a href="settings.html" class="active">Settings &amp; Network</a></li>
+        </ul>
+      </aside>
+
+      <div class="doc-content-wrap">
+        <div class="doc-page-label">// settings</div>
+        <h2>Settings, Proxy &amp; Certificates</h2>
+        <p class="doc-lead">Open Settings with <code>Ctrl/Cmd+,</code> or <strong>Settings</strong> in the main menu. There is no Save button &mdash; every change applies immediately.</p>
+
+        <h3 id="general">General</h3>
+        <h4>Appearance</h4>
+        <ul class="doc-list">
+          <li><strong>Language</strong> &mdash; English, Deutsch, Fran&ccedil;ais, Italiano, Espa&ntilde;ol, or Portugu&ecirc;s (Brasil)</li>
+          <li><strong>Theme</strong> &mdash; Light, Dark, or System (default)</li>
+          <li><strong>Accent Color</strong> &mdash; green (default), teal, blue, indigo, purple, yellow, orange, red, or pink</li>
+          <li><strong>Layout</strong> &mdash; <strong>Stacked</strong> (default) or <strong>Side by side</strong>; see <a href="requests.html#layout">Layout</a></li>
+        </ul>
+        <h4>Requests</h4>
+        <ul class="doc-list">
+          <li><strong>HTTP Version</strong> &mdash; <strong>Auto</strong> (default) negotiates HTTP/2 or HTTP/1.1 with the server; <strong>HTTP/1.x</strong> forces HTTP/1.1; <strong>HTTP/2</strong> uses HTTP/2 without negotiation, so servers that only speak HTTP/1 will fail</li>
+          <li><strong>Request Timeout</strong> &mdash; in milliseconds; <code>0</code> (default) means no timeout</li>
+          <li><strong>Verify SSL certificates</strong> &mdash; on by default. Turn it off for self-signed certificates in development; it applies to HTTP, WebSocket, SSE, gRPC, MQTT, and GraphQL subscriptions</li>
+          <li><strong>Automatically follow HTTP redirects</strong> &mdash; on by default. Turn it off to inspect a redirect response itself</li>
+          <li><strong>History Limit</strong> &mdash; how many requests <a href="requests.html#history">history</a> keeps (default 100, minimum 10)</li>
+        </ul>
+
+        <h3 id="proxy">Proxy</h3>
+        <ol class="doc-list">
+          <li>Open the <strong>Proxy</strong> tab and turn on <strong>Enable Proxy</strong></li>
+          <li>Either turn on <strong>Use System Proxy</strong>, or choose a <strong>Type</strong> (HTTP, HTTPS, SOCKS4, or SOCKS5) and enter <strong>Host</strong> and <strong>Port</strong></li>
+          <li>If the proxy needs credentials, turn on <strong>Authentication</strong> and enter a username and password</li>
+          <li>List hosts that should skip the proxy in <strong>Bypass List</strong>, separated by commas</li>
+          <li>Click <strong>Test Connection</strong> to check the proxy</li>
+        </ol>
+        <h4>Bypass list rules</h4>
+        <ul class="doc-list">
+          <li><code>localhost</code>, <code>10.0.0.5</code> &mdash; that exact host</li>
+          <li><code>*.example.com</code> &mdash; <code>example.com</code> and all of its subdomains</li>
+          <li><code>.example.com</code> &mdash; subdomains only</li>
+          <li>IP ranges (CIDR), ports, and other wildcards are not supported; write entries in lower case</li>
+        </ul>
+        <h4>What goes through the proxy</h4>
+        <ul class="doc-list">
+          <li>HTTP and GraphQL requests, SSE, OAuth 2.0 token requests, and <code>pm.sendRequest</code> in scripts</li>
+          <li>WebSocket and GraphQL subscriptions &mdash; through HTTP or HTTPS proxies only; with a SOCKS proxy, add the host to the bypass list</li>
+          <li>gRPC and MQTT connect directly and ignore the proxy</li>
+        </ul>
+        <p><strong>Use System Proxy</strong> reads the <code>HTTP_PROXY</code>, <code>HTTPS_PROXY</code>, <code>ALL_PROXY</code>, and <code>NO_PROXY</code> environment variables, and on macOS and Windows also the system settings. On Linux, desktop proxy settings (GNOME, KDE) are not read &mdash; set the environment variables or configure the proxy manually. While a proxy is active it is shown in the status bar.</p>
+        <p>The proxy password is stored in Resonance&rsquo;s local settings file (readable only by you), not in the OS keychain.</p>
+
+        <h3 id="certificates">Client Certificates (mTLS)</h3>
+        <p>Present a client certificate to servers that require mutual TLS, or trust a private CA, per host.</p>
+        <ol class="doc-list">
+          <li>Open the <strong>Certificates</strong> tab and click <strong>Add Certificate</strong></li>
+          <li>Enter the <strong>Host</strong>, e.g. <code>api.example.com</code> &mdash; or <code>api.example.com:8443</code> to match one port only</li>
+          <li>Choose the <strong>Certificate (PEM)</strong> and <strong>Private Key (PEM, unencrypted)</strong>, and optionally a <strong>CA Bundle (PEM, optional)</strong></li>
+        </ol>
+        <ul class="doc-list">
+          <li>Files must be PEM. The certificate may include its chain; the key must be unencrypted (PKCS#8, PKCS#1 RSA, or SEC1). PKCS#12 (<code>.pfx</code>/<code>.p12</code>) files and encrypted keys are not supported &mdash; convert them with <code>openssl</code> first</li>
+          <li>An entry with only a <strong>CA Bundle</strong> trusts that CA for the host without sending a client certificate. CA certificates are added to the system roots, not used instead of them</li>
+          <li>Hosts match case-insensitively and exactly &mdash; no wildcards or subdomains. A bare host matches every port; don&rsquo;t include default ports such as <code>:443</code></li>
+          <li>Only the file paths are stored; the files are read on every request, so renewed certificates are picked up automatically</li>
+          <li>Used for HTTP, GraphQL, SSE, WebSocket, GraphQL subscriptions, gRPC, and MQTT. Turn an entry off with <strong>Enabled</strong> without deleting it</li>
+        </ul>
+
+        <h3 id="secrets">Secrets &amp; the OS Keychain</h3>
+        <p>Secrets are kept in the OS keychain &mdash; Keychain on macOS, Credential Manager on Windows, Secret Service (GNOME Keyring or KWallet) on Linux &mdash; and written to collection files and exports as empty values, so a collection can be committed safely.</p>
+        <ul class="doc-list">
+          <li><strong>Variables</strong> &mdash; click the lock on a row in <strong>Manage Environments</strong> or a collection&rsquo;s <strong>Manage Variables</strong>. Secret values are masked; use the eye button to show one</li>
+          <li><strong>Credentials</strong> &mdash; tokens, passwords, API key values, OAuth 2.0 secrets and tokens, AWS secret keys, and MQTT passwords are always stored as secrets</li>
+          <li>A credential field that contains a <code>&#123;&#123;variable&#125;&#125;</code> is saved as written &mdash; a good pattern is <code>&#123;&#123;token&#125;&#125;</code> in the auth field and <code>token</code> as a secret environment variable</li>
+        </ul>
+        <p>If no keychain is available, secrets are stored unencrypted in a local file readable only by you; the status bar shows <strong>Secrets unencrypted</strong>, and they move into the keychain once one is available. The Flatpak uses the desktop secret portal; the Snap needs <code>snap connect db-mobile-resonance:password-manager-service</code>.</p>
+
+        <h3 id="updates">Updates</h3>
+        <ul class="doc-list">
+          <li><strong>Check for updates on launch</strong> &mdash; off by default; when on, a notification appears if a new version is out</li>
+          <li><strong>Check for Updates</strong> &mdash; checks now, then <strong>Install &amp; Restart</strong> downloads and installs the update</li>
+          <li>Self-updating applies to the AppImage, the Windows installer, and the macOS app. Flatpak, Snap, Homebrew, Scoop, and <code>.deb</code>/<code>.rpm</code> installs are updated by their package manager instead, and the tab says so</li>
+        </ul>
+
+        <h3>Troubleshooting</h3>
+        <h4>Requests fail with a certificate error</h4>
+        <ul class="doc-list">
+          <li>For a private CA, add a <strong>CA Bundle</strong> entry for the host instead of turning off <strong>Verify SSL certificates</strong></li>
+          <li>Note that a CA bundle is ignored while verification is off</li>
+        </ul>
+        <h4>Requests time out behind a corporate proxy</h4>
+        <ul class="doc-list">
+          <li>Use <strong>Test Connection</strong> to check the proxy, and add internal hosts to the bypass list</li>
+        </ul>
+
+        <h3>Next Steps</h3>
+        <ul class="doc-list">
+          <li><a href="documentation.html#environments">Environments &amp; Variables</a> &mdash; variables, secrets, and dynamic values</li>
+          <li><a href="requests.html">Requests &amp; Responses</a> &mdash; bodies, inspection, and history</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="index.html" class="logo">
+          <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+          <span class="logo-text">Resonance</span>
+        </a>
+        <p class="footer-tagline">A Tauri desktop app. Open source under the MIT license.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <span class="footer-col-label">Project</span>
+          <ul>
+            <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub Repository</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/issues" target="_blank" rel="noopener">Report Issues</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <span class="footer-col-label">Resources</span>
+          <ul>
+            <li><a href="documentation.html">Documentation</a></li>
+            <li><a href="scripts.html">Using Scripts</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/blob/main/LICENSE" target="_blank" rel="noopener">License (MIT)</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <span>&copy; 2026 Resonance &mdash; MIT License</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

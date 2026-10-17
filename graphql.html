@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Use GraphQL in Resonance — query editor, schema introspection, the click-to-build Explorer, and live subscriptions.">
+
+  <title>GraphQL — Resonance</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+</head>
+<body>
+
+  <div class="grain" aria-hidden="true"></div>
+
+  <header id="header">
+    <nav class="container nav-inner">
+      <a href="index.html" class="logo">
+        <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+        <span class="logo-text">Resonance</span>
+      </a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="index.html#screenshots">Screenshots</a></li>
+        <li><a href="index.html#download">Download</a></li>
+        <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="documentation.html" class="nav-cta">Docs</a></li>
+      </ul>
+      <button class="burger" id="burger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <div class="doc-page">
+      <aside class="doc-sidebar">
+        <div class="doc-sidebar-label">Documentation</div>
+        <ul class="doc-nav-list">
+          <li><a href="documentation.html">Getting Started</a></li>
+          <li><a href="requests.html">Requests &amp; Responses</a></li>
+          <li><a href="graphql.html" class="active">GraphQL</a></li>
+          <li><a href="grpc.html">gRPC</a></li>
+          <li><a href="websocket.html">WebSocket</a></li>
+          <li><a href="mqtt.html">MQTT</a></li>
+          <li><a href="sse.html">Server-Sent Events</a></li>
+          <li><a href="cookie-jar.html">Cookie Jar</a></li>
+          <li><a href="mock-server.html">Mock Server</a></li>
+          <li><a href="scripts.html">Using Scripts</a></li>
+          <li><a href="collection-runner.html">Collection Runner</a></li>
+          <li><a href="settings.html">Settings &amp; Network</a></li>
+        </ul>
+      </aside>
+
+      <div class="doc-content-wrap">
+        <div class="doc-page-label">// graphql</div>
+        <h2>GraphQL</h2>
+        <p class="doc-lead">Write queries with schema-aware autocompletion, or build them by ticking fields in the Explorer. Subscriptions stream live over WebSocket from the same tab.</p>
+
+        <h3>What It Does</h3>
+        <ul class="doc-list">
+          <li>Query editor with syntax highlighting, autocompletion once a schema is loaded, and a <strong>Format</strong> button</li>
+          <li>Loads the schema by introspection, automatically or on demand, and caches it per URL</li>
+          <li><strong>Explorer</strong> &mdash; a schema tree you click to build queries, with arguments edited inline as real <code>$variables</code></li>
+          <li>Queries, mutations, and subscriptions (over <code>graphql-transport-ws</code>)</li>
+          <li>Highlights a <strong>GraphQL Errors (n)</strong> badge when a response carries an <code>errors</code> array</li>
+          <li>Uses the request&rsquo;s headers, authorization, client certificate, and TLS settings &mdash; including for introspection</li>
+        </ul>
+
+        <h3>Creating a GraphQL Request</h3>
+        <ol class="doc-list">
+          <li>Click <strong>+</strong> in the workspace tab bar and choose <strong>GraphQL</strong> &mdash; or, in a collection, pick <strong>GraphQL</strong> as the <strong>Protocol</strong> in the <strong>Create New Request</strong> dialog</li>
+          <li>Enter the endpoint, e.g. <code>https://api.example.com/graphql</code>. GraphQL requests are always sent as <code>POST</code>, so there is no method selector</li>
+          <li>Write the query in the <strong>Body</strong> tab, or build it in the Explorer</li>
+          <li>Click <strong>Send</strong></li>
+        </ol>
+        <p>A GraphQL tab shows the <strong>Body</strong>, <strong>Headers</strong>, <strong>Authorization</strong>, and <strong>Scripts</strong> tabs. <code>&#123;&#123;variables&#125;&#125;</code> are substituted in both the query and the variable values. If the document defines several named operations, an <strong>Operation to run</strong> selector appears and the chosen name is sent as <code>operationName</code>.</p>
+
+        <h3>Loading the Schema</h3>
+        <ul class="doc-list">
+          <li><strong>Automatically</strong> &mdash; when you switch a tab to GraphQL, open a saved GraphQL request, or finish editing the URL (Enter or leaving the field). Background fetches run once per URL per session and fail silently</li>
+          <li><strong>Manually</strong> &mdash; click the <strong>Schema</strong> button to run introspection now; errors such as disabled introspection are reported</li>
+          <li>Schemas are cached per URL (up to 50), so reopening a request reuses the schema without a network call</li>
+        </ul>
+
+        <h3>Building Queries in the Explorer</h3>
+        <p>The <strong>Explorer</strong> rail opens next to the editor in GraphQL mode; toggle it with the <strong>Explorer</strong> button and drag its edge to resize. It lists the schema&rsquo;s <strong>Query</strong>, <strong>Mutation</strong>, and <strong>Subscription</strong> roots.</p>
+        <ol class="doc-list">
+          <li>Expand a type with its chevron, and tick a field to add it to the query &mdash; unticking removes it (and the whole operation once it is empty)</li>
+          <li>Ticking an object field also selects its scalar and enum fields, so you get a useful query in one click</li>
+          <li>Fields tagged <strong>ARG</strong> take arguments. Once ticked, each argument gets an inline input: a checkbox for booleans, a dropdown for enums, a number field for <code>Int</code>/<code>Float</code>, text for strings and IDs, and JSON for lists and input objects</li>
+          <li>Each argument value becomes a real variable &mdash; e.g. <code>country(code: $code)</code> with <code>$code: ID!</code> declared on the operation &mdash; and is sent in the request&rsquo;s variables. Required arguments are bound as soon as you tick the field; optional ones when you type a value, and they are removed again when you clear it</li>
+          <li>Use <strong>Search fields</strong> to filter the expanded tree by name</li>
+        </ol>
+        <p>The query text stays the source of truth: edit it by hand and the checkboxes follow. Fragments, aliases, and directives you write are preserved. While the query has a syntax error the Explorer is read-only until you fix it. Variable values are saved with the tab and the collection request &mdash; there is no separate variables pane.</p>
+
+        <h3>Subscriptions</h3>
+        <ol class="doc-list">
+          <li>Write or build a <code>subscription</code> operation</li>
+          <li>Click <strong>Send</strong> &mdash; Resonance opens a WebSocket to the same URL (<code>http</code> becomes <code>ws</code>, <code>https</code> becomes <code>wss</code>) using the <code>graphql-transport-ws</code> protocol</li>
+          <li>Events stream into the response body as a transcript (<code>CONNECTED</code>, <code>ACK</code>, <code>DATA</code>, <code>ERROR</code>, <code>COMPLETE</code>&hellip;)</li>
+          <li>Click <strong>Send</strong> again to stop it</li>
+        </ol>
+        <p>The request&rsquo;s headers &mdash; including auth &mdash; go into the <code>connection_init</code> message, both as <code>payload.headers</code> and as a top-level <code>Authorization</code>, which covers Hasura- and Apollo-style servers. An open subscription counts as a live connection in the status bar. Subscriptions are not written to request history.</p>
+
+        <h3>History</h3>
+        <p>Sent queries and mutations appear in the request history and reopen as GraphQL tabs, named after the operation, with the URL, query, variables, operation name, and headers restored. Authorization is not restored &mdash; set it again before sending.</p>
+
+        <h3>Troubleshooting</h3>
+        <h4>The Explorer says to load the schema</h4>
+        <ul class="doc-list">
+          <li>Click <strong>Schema</strong>. If it reports that the response has no schema, introspection is disabled on the server &mdash; you can still write queries by hand</li>
+          <li>Check that the headers and authorization the server needs for introspection are set on the request</li>
+        </ul>
+        <h4>Subscription closes immediately</h4>
+        <ul class="doc-list">
+          <li>The server must support the <code>graphql-transport-ws</code> protocol; the legacy <code>subscriptions-transport-ws</code> protocol is not supported</li>
+          <li>Check the auth the server expects in <code>connection_init</code></li>
+        </ul>
+
+        <h3>Next Steps</h3>
+        <ul class="doc-list">
+          <li><a href="websocket.html">WebSocket</a> &mdash; raw WebSocket connections</li>
+          <li><a href="requests.html#inspection">Requests &amp; Responses</a> &mdash; inspect results with JSONPath</li>
+          <li><a href="scripts.html">Using Scripts</a> &mdash; test GraphQL responses with scripts</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="index.html" class="logo">
+          <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+          <span class="logo-text">Resonance</span>
+        </a>
+        <p class="footer-tagline">A Tauri desktop app. Open source under the MIT license.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <span class="footer-col-label">Project</span>
+          <ul>
+            <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub Repository</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/issues" target="_blank" rel="noopener">Report Issues</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <span class="footer-col-label">Resources</span>
+          <ul>
+            <li><a href="documentation.html">Documentation</a></li>
+            <li><a href="scripts.html">Using Scripts</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/blob/main/LICENSE" target="_blank" rel="noopener">License (MIT)</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <span>&copy; 2026 Resonance &mdash; MIT License</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

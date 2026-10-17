@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Request bodies, the response panel, JSONPath and XPath inspection, schema validation, request history, and layout in Resonance.">
+
+  <title>Requests &amp; Responses — Resonance</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+</head>
+<body>
+
+  <div class="grain" aria-hidden="true"></div>
+
+  <header id="header">
+    <nav class="container nav-inner">
+      <a href="index.html" class="logo">
+        <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+        <span class="logo-text">Resonance</span>
+      </a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="index.html#screenshots">Screenshots</a></li>
+        <li><a href="index.html#download">Download</a></li>
+        <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="documentation.html" class="nav-cta">Docs</a></li>
+      </ul>
+      <button class="burger" id="burger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <div class="doc-page">
+      <aside class="doc-sidebar">
+        <div class="doc-sidebar-label">Documentation</div>
+        <ul class="doc-nav-list">
+          <li><a href="documentation.html">Getting Started</a></li>
+          <li><a href="requests.html" class="active">Requests &amp; Responses</a></li>
+          <li><a href="graphql.html">GraphQL</a></li>
+          <li><a href="grpc.html">gRPC</a></li>
+          <li><a href="websocket.html">WebSocket</a></li>
+          <li><a href="mqtt.html">MQTT</a></li>
+          <li><a href="sse.html">Server-Sent Events</a></li>
+          <li><a href="cookie-jar.html">Cookie Jar</a></li>
+          <li><a href="mock-server.html">Mock Server</a></li>
+          <li><a href="scripts.html">Using Scripts</a></li>
+          <li><a href="collection-runner.html">Collection Runner</a></li>
+          <li><a href="settings.html">Settings &amp; Network</a></li>
+        </ul>
+      </aside>
+
+      <div class="doc-content-wrap">
+        <div class="doc-page-label">// requests &amp; responses</div>
+        <h2>Requests &amp; Responses</h2>
+        <p class="doc-lead">Everything around an HTTP request: what you can send, how to read and query what comes back, and how to find it again later.</p>
+
+        <h3 id="bodies">Request Bodies</h3>
+        <p>Pick a type in the <strong>Body</strong> tab&rsquo;s mode selector. A body is sent for every method except <code>GET</code> and <code>HEAD</code>.</p>
+        <ul class="doc-list">
+          <li><strong>JSON</strong> &mdash; editor with highlighting, sent as <code>application/json</code>. <code>&#123;&#123;variables&#125;&#125;</code> are substituted first; invalid JSON stops the send with an error. Leave it empty to send no body</li>
+          <li><strong>Form Data</strong> &mdash; multipart fields. <strong>Add Field</strong> adds a row; set its type to <strong>Text</strong> or <strong>File</strong>. File fields take a path (or a <code>&#123;&#123;variable&#125;&#125;</code>) or <strong>Browse</strong>, plus an optional content type. The file is read when you send, and the multipart boundary is generated for you</li>
+          <li><strong>URL Encoded</strong> &mdash; key/value rows sent as <code>application/x-www-form-urlencoded</code>, keeping row order and duplicate keys</li>
+          <li><strong>Text</strong> &mdash; plain text, <code>text/plain</code> unless you set a <code>Content-Type</code> header</li>
+          <li><strong>Binary File</strong> &mdash; send a file unchanged. Choose it with <strong>Browse</strong> or a path, and optionally set its content type (default <code>application/octet-stream</code>)</li>
+        </ul>
+        <p>In JSON mode, <strong>Format</strong> (or <code>Shift+Alt+F</code> in the editor) re-indents the body with two spaces. It only changes whitespace and tolerates unquoted <code>&#123;&#123;variable&#125;&#125;</code> placeholders. GraphQL has its own editor &mdash; see <a href="graphql.html">GraphQL</a>.</p>
+
+        <h3 id="responses">The Response Panel</h3>
+        <p>The header shows the status (colour-coded), time to first byte, and size. Below it are the <strong>Body</strong>, <strong>Headers</strong>, <strong>Cookies</strong>, <strong>Performance</strong>, and <strong>Scripts</strong> tabs (gRPC shows <strong>Body</strong>, <strong>Metadata</strong>, and <strong>Trailers</strong>). Error responses (4xx/5xx) are shown in full, like successful ones.</p>
+        <ul class="doc-list">
+          <li><strong>Code</strong> &mdash; the raw body with highlighting. The language (JSON, XML, HTML, Plain Text) is detected from <code>Content-Type</code> and can be overridden</li>
+          <li><strong>Preview</strong> &mdash; JSON and XML as a collapsible tree, HTML rendered in a sandbox with scripts and images blocked. Very large bodies stay in the code view</li>
+          <li><strong>Results</strong> &mdash; query the body with JSONPath or XPath (see below)</li>
+          <li><strong>Copy</strong> copies the body; <strong>Save</strong> writes it to a file, suggesting a name from the URL and <code>Content-Type</code>. Binary responses (images, PDFs, archives) are not shown as text &mdash; save them to get the exact bytes</li>
+          <li><strong>Cookies</strong> lists the cookies the response set, with domain, path, expiry, and flags</li>
+          <li><strong>Scripts</strong> shows the console output of the request&rsquo;s scripts</li>
+        </ul>
+        <h4>Performance</h4>
+        <p>The <strong>Performance</strong> tab breaks the total time into DNS lookup, connect (TCP + TLS), waiting (TTFB), and content download, with response size, transfer speed, and a waterfall. Phases that did not happen &mdash; for example connecting, when an open connection was reused &mdash; show <em>n/a</em>.</p>
+
+        <h3 id="inspection">JSONPath &amp; XPath Inspection</h3>
+        <p>Pull the parts you need out of a large response without leaving the app.</p>
+        <ol class="doc-list">
+          <li>Send the request, then click <strong>Results</strong> in the body toolbar</li>
+          <li>Type an expression &mdash; JSONPath for JSON (e.g. <code>$.items[*].name</code>), XPath 1.0 for XML (e.g. <code>//ns:item</code>)</li>
+          <li>Press <strong>Apply</strong> or Enter. Matches appear with a count; use <strong>Copy Results</strong> or <strong>Save Results</strong> to take them with you</li>
+          <li><strong>Clear</strong> returns to the code or preview view</li>
+        </ol>
+        <ul class="doc-list">
+          <li>The format follows the response, not the highlighting: JSON responses use JSONPath (RFC 9535) and return a JSON array; XML responses (<code>*/xml</code>, <code>*+xml</code>) use XPath 1.0 and return XML fragments, text, or a number/boolean/string result</li>
+          <li>XML namespaces declared on the root element are bound automatically; a default namespace gets the prefix <code>ns</code>. Add or override prefixes under <strong>Namespace overrides</strong>, one <code>prefix=URI</code> per line</li>
+          <li>An applied expression re-runs on every new response, and is remembered per tab separately for JSON and XML</li>
+          <li>Queries run natively in the background, on bodies up to 5&nbsp;MB; results are capped at 1,000 matches or 1&nbsp;MB, with a note when they are partial</li>
+          <li>HTML, binary, and streaming responses (WebSocket, SSE, MQTT, gRPC streams) cannot be inspected</li>
+        </ul>
+
+        <h3 id="schema-validation">Response Schema Validation</h3>
+        <p>Check every successful response against a JSON Schema automatically.</p>
+        <ol class="doc-list">
+          <li>Open the request&rsquo;s <strong>Schema</strong> tab. Requests imported from OpenAPI or Swagger are pre-filled from the spec&rsquo;s JSON response schema (200, 201, 202, or <code>default</code>)</li>
+          <li>Paste or edit a schema, or click <strong>Infer from Response</strong> to generate one from the last response &mdash; then tighten it by hand</li>
+          <li>Send the request: a <strong>Schema Valid</strong> or <strong>Schema Invalid (n)</strong> badge appears in the response header. Hover it to see each failing path and message</li>
+        </ol>
+        <ul class="doc-list">
+          <li>Validation runs for 2xx HTTP responses that have a schema; error responses and GraphQL requests are not validated</li>
+          <li>Supports JSON Schema drafts 4, 6, 7, 2019-09, and 2020-12 (the default), plus OpenAPI 3.0 conventions such as <code>nullable</code>. <code>format</code> is checked</li>
+          <li><code>$ref</code> must point inside the schema &mdash; nothing is fetched from the network</li>
+        </ul>
+
+        <h3 id="history">Request History</h3>
+        <p>Click <strong>History</strong> at the top of the sidebar, or press <code>Ctrl/Cmd+H</code>. Every HTTP, GraphQL, and gRPC request you send is listed &mdash; including those sent by the collection runner &mdash; with method, status, time, URL, and environment.</p>
+        <ul class="doc-list">
+          <li><strong>Search history&hellip;</strong> filters by URL, method, or status code</li>
+          <li>Click an entry to reopen it in a new tab of the right protocol; it is not sent until you press <strong>Send</strong></li>
+          <li>Delete single entries with the trash icon, or everything with <strong>Clear All History</strong></li>
+          <li>The number of entries kept is set by <strong>History Limit</strong> in <a href="settings.html">Settings</a> (default 100)</li>
+        </ul>
+        <p>History never stores credentials: <code>Authorization</code>, <code>Proxy-Authorization</code>, <code>Cookie</code>, <code>Set-Cookie</code>, and any header or parameter added by an auth setting are saved as <code>[redacted]</code>, and authorization is not restored on reopening. Replace those values before re-sending. Large bodies are truncated in history; WebSocket, SSE, MQTT, and GraphQL subscriptions are not recorded.</p>
+
+        <h3 id="layout">Layout &amp; Status Bar</h3>
+        <h4>Side-by-side layout</h4>
+        <p>Show the response to the right of the request instead of below it &mdash; handy on wide screens. Toggle it with <code>Ctrl/Cmd+\</code>, <strong>Side-by-side layout</strong> in the main menu, or <strong>Layout</strong> in <a href="settings.html">Settings</a>. Drag the divider to resize; each layout remembers its own split. When the window is too narrow for two panes, it falls back to stacked until there is room again.</p>
+        <h4>Status bar</h4>
+        <p>The bar at the bottom of the window shows only what is relevant right now:</p>
+        <ul class="doc-list">
+          <li>The HTTP version in use &mdash; click to change it in Settings</li>
+          <li>An elapsed-time counter while a request is running</li>
+          <li><strong>Mock :port</strong> while the mock server is running &mdash; click to open it</li>
+          <li>The active proxy &mdash; click to open the proxy settings</li>
+          <li>The number of live connections (WebSocket, SSE, MQTT, gRPC streams, GraphQL subscriptions) &mdash; click to jump to one</li>
+          <li><strong>Secrets unencrypted</strong> when no OS keychain is available</li>
+          <li>The app version</li>
+        </ul>
+
+        <h3>Next Steps</h3>
+        <ul class="doc-list">
+          <li><a href="scripts.html">Using Scripts</a> &mdash; assert on responses with test scripts</li>
+          <li><a href="graphql.html">GraphQL</a> &mdash; queries, the Explorer, and subscriptions</li>
+          <li><a href="settings.html">Settings, Proxy &amp; Certificates</a> &mdash; timeouts, TLS, and networking</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="index.html" class="logo">
+          <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+          <span class="logo-text">Resonance</span>
+        </a>
+        <p class="footer-tagline">A Tauri desktop app. Open source under the MIT license.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <span class="footer-col-label">Project</span>
+          <ul>
+            <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub Repository</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/issues" target="_blank" rel="noopener">Report Issues</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <span class="footer-col-label">Resources</span>
+          <ul>
+            <li><a href="documentation.html">Documentation</a></li>
+            <li><a href="scripts.html">Using Scripts</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/blob/main/LICENSE" target="_blank" rel="noopener">License (MIT)</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <span>&copy; 2026 Resonance &mdash; MIT License</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

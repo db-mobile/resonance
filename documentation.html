@@ -38,6 +38,8 @@
         <div class="doc-sidebar-label">Documentation</div>
         <ul class="doc-nav-list">
           <li><a href="documentation.html" class="active">Getting Started</a></li>
+          <li><a href="requests.html">Requests &amp; Responses</a></li>
+          <li><a href="graphql.html">GraphQL</a></li>
           <li><a href="grpc.html">gRPC</a></li>
           <li><a href="websocket.html">WebSocket</a></li>
           <li><a href="mqtt.html">MQTT</a></li>
@@ -46,6 +48,7 @@
           <li><a href="mock-server.html">Mock Server</a></li>
           <li><a href="scripts.html">Using Scripts</a></li>
           <li><a href="collection-runner.html">Collection Runner</a></li>
+          <li><a href="settings.html">Settings &amp; Network</a></li>
         </ul>
       </aside>
 
@@ -80,19 +83,20 @@
           <li>Click <strong>Send</strong> — <strong>Cancel</strong> (or <code>Esc</code>) stops a slow request; each tab cancels only its own request</li>
           <li>Inspect the response — Body, Headers, Cookies, and Performance tabs are all available. Error responses (4xx/5xx) are kept in the tab just like successful ones</li>
         </ol>
-        <p>Bodies are sent for every method except <code>GET</code> and <code>HEAD</code>, so a <code>DELETE</code> or <code>OPTIONS</code> request can carry one.</p>
+        <p>Bodies are sent for every method except <code>GET</code> and <code>HEAD</code>, so a <code>DELETE</code> or <code>OPTIONS</code> request can carry one. See <a href="requests.html">Requests &amp; Responses</a> for body types, response preview, JSONPath/XPath inspection, schema validation, and history.</p>
 
         <h3>Importing Collections</h3>
         <h4>Collection file</h4>
         <ol class="doc-list">
-          <li>Click <strong>Import</strong> in the collections sidebar header and choose <strong>Collection File</strong></li>
-          <li>Pick an <strong>OpenAPI 3.0 / 3.1</strong> or <strong>Swagger 2.0</strong> spec (YAML or JSON), a <strong>Postman</strong> v2.0 / v2.1 collection, an <strong>Insomnia</strong> export, or a <strong>HAR</strong> file — the format is detected automatically</li>
+          <li>Open the main menu (&#9776;) at the top of the sidebar, choose <strong>Import</strong> and then <strong>Collection File</strong> — or press <code>Ctrl/Cmd+O</code></li>
+          <li>Pick an <strong>OpenAPI 3.0 / 3.1</strong> or <strong>Swagger 2.0</strong> spec (YAML or JSON), a <strong>Postman</strong> v2.0 / v2.1 collection, an <strong>Insomnia</strong> v4 (JSON) or v5 (YAML) export, or a <strong>HAR</strong> file — the format is detected automatically</li>
           <li>Choose where the collection folder is created, then click <strong>Import</strong></li>
-          <li>OpenAPI endpoints get example bodies generated from their schemas; Postman request examples, auth settings, and scripts are preserved</li>
+          <li>OpenAPI endpoints get example bodies and <a href="requests.html#schema-validation">response schemas</a> from the spec; Postman request examples, auth settings, and scripts are preserved; environments in an Insomnia export are imported too</li>
         </ol>
         <h4>cURL command</h4>
         <ol class="doc-list">
-          <li>Click <strong>Import</strong> and choose <strong>cURL Command</strong>, then paste the command</li>
+          <li>Click <strong>Import</strong> and choose <strong>cURL Command</strong>, then paste the command — a live preview shows the parsed request</li>
+          <li>Name the request and pick the collection to add it to (or create a new one)</li>
         </ol>
         <h4>Existing folder</h4>
         <ol class="doc-list">
@@ -107,7 +111,7 @@
         <h3>Organising Collections</h3>
         <p>Right-click in the collections sidebar for these actions:</p>
         <ul class="doc-list">
-          <li><strong>Collection:</strong> New Request, New Folder, Run Collection, Manage Variables, Edit Auth, export, Rename, Delete (or Close for a collection opened in place)</li>
+          <li><strong>Collection:</strong> New Request, New Folder, Run Collection, Manage Variables, Edit Auth, Export as OpenAPI (JSON or YAML), Export as Postman, Generate Documentation, Rename, Delete (or Close for a collection opened in place)</li>
           <li><strong>Folder:</strong> New Request (created inside the folder), New Subfolder, Rename Folder, Run Folder, Edit Auth, Delete Folder (removes the folder and the requests in it)</li>
           <li><strong>Request:</strong> Pin, Rename, <strong>Duplicate</strong> (copies the body, headers, parameters, scripts, and stored credentials), <strong>Move to Folder…</strong> (another folder or the collection root), Delete</li>
         </ul>
@@ -118,22 +122,43 @@
           <li><strong>Remove from list</strong> — forget a collection that is gone for good; nothing on disk is touched, and you can open it again with <strong>Import → Existing Folder</strong></li>
           <li><strong>Retry</strong> — after fixing a file (for example invalid YAML), reload the collections</li>
         </ul>
+        <h4>Exporting collections</h4>
+        <ul class="doc-list">
+          <li><strong>Export as OpenAPI</strong> writes an OpenAPI 3.0.3 spec with paths, parameters, bodies, and saved responses</li>
+          <li><strong>Export as Postman</strong> writes a Postman v2.1 collection including folders, scripts, auth, and collection variables</li>
+          <li><strong>Generate Documentation</strong> produces an HTML or Markdown API reference, optionally with example data and code samples in your chosen languages</li>
+          <li>Secret values are exported empty; <code>&#123;&#123;variable&#125;&#125;</code> references are kept. Only HTTP requests are exported</li>
+        </ul>
 
-        <h3>Environments &amp; Variables</h3>
+        <h3 id="environments">Environments &amp; Variables</h3>
         <ol class="doc-list">
-          <li>Open the environment selector dropdown in the sidebar and click <strong>Manage Environments…</strong></li>
-          <li>Click <strong>Add Environment</strong>, give it a name (e.g. <em>Development</em>), and add key-value pairs such as <code>baseUrl → https://api-dev.example.com</code></li>
-          <li>Select the environment from the dropdown to activate it</li>
-          <li>Use <code>&#123;&#123;variableName&#125;&#125;</code> anywhere in URLs, headers, or request bodies — values are substituted at send time, entirely locally</li>
+          <li>Open the environment selector in the sidebar and click <strong>Manage Environments…</strong> — or press <code>Ctrl/Cmd+E</code></li>
+          <li>Click <strong>New</strong>, name the environment (e.g. <em>Development</em>), and give it a <strong>Color</strong> if you like — it is shown next to the name</li>
+          <li>Under <strong>Variables</strong>, click <strong>Add</strong> and enter pairs such as <code>baseUrl → https://api-dev.example.com</code>. Click the lock to make a value <a href="settings.html#secrets">secret</a></li>
+          <li>Click <strong>Set active</strong>, or pick the environment from the selector, to use it</li>
+          <li>Use <code>&#123;&#123;variableName&#125;&#125;</code> anywhere in URLs, headers, auth, or request bodies — values are substituted at send time, entirely locally</li>
         </ol>
-        <p>Dynamic variables like <code>&#123;&#123;$uuid&#125;&#125;</code> and <code>&#123;&#123;$timestamp&#125;&#125;</code> are generated fresh on every request without touching the environment.</p>
+        <p>Edits save as you go. <strong>Duplicate</strong>, <strong>Export</strong>, and <strong>Delete</strong> act on the selected environment; <strong>Import</strong> and <strong>Export All</strong> at the bottom of the list move all environments between machines (merge with or replace the existing ones).</p>
+        <h4>Collection variables</h4>
+        <p>Right-click a collection and choose <strong>Manage Variables</strong> for values shared by everyone using the collection, stored in the collection folder. When both define the same name, the active environment wins. In the collection runner, values set by scripts and data-file rows take precedence over both.</p>
+        <p>Variables can reference other variables. A request that still contains unresolved <code>&#123;&#123;names&#125;&#125;</code> is sent as-is, with a warning listing them.</p>
+        <h4>Dynamic variables</h4>
+        <p>Generated fresh on every send (the same value everywhere within one request), without touching the environment. Click <strong>Dynamic variables…</strong> in either variables dialog for the reference.</p>
+        <ul class="doc-list">
+          <li><code>&#123;&#123;$uuid&#125;&#125;</code>, <code>&#123;&#123;$timestamp&#125;&#125;</code> (seconds), <code>&#123;&#123;$timestampMs&#125;&#125;</code>, <code>&#123;&#123;$isoTimestamp&#125;&#125;</code></li>
+          <li><code>&#123;&#123;$randomInt:min:max&#125;&#125;</code> (default 0–1000), <code>&#123;&#123;$randomPrice:min:max&#125;&#125;</code>, <code>&#123;&#123;$randomBoolean&#125;&#125;</code></li>
+          <li><code>&#123;&#123;$randomString:length&#125;&#125;</code> (default 8), <code>&#123;&#123;$randomLoremWords:count&#125;&#125;</code> (default 5)</li>
+          <li><code>&#123;&#123;$randomEmail&#125;&#125;</code>, <code>&#123;&#123;$randomName&#125;&#125;</code>, <code>&#123;&#123;$randomPhoneNumber&#125;&#125;</code>, <code>&#123;&#123;$randomUrl&#125;&#125;</code>, <code>&#123;&#123;$randomIPv4&#125;&#125;</code></li>
+          <li><code>&#123;&#123;$randomDate:days&#125;&#125;</code>, <code>&#123;&#123;$randomDatePast:days&#125;&#125;</code>, <code>&#123;&#123;$randomDateFuture:days&#125;&#125;</code> (default 365)</li>
+        </ul>
+        <p>Arguments are optional and separated by colons. Postman-only dynamic variables such as <code>&#123;&#123;$randomFirstName&#125;&#125;</code> are not translated on import.</p>
 
         <h3>Authentication</h3>
         <ol class="doc-list">
           <li>Open the <strong>Authorization</strong> tab in the request panel</li>
           <li>Choose a type: <strong>Bearer Token</strong>, <strong>Basic Auth</strong>, <strong>API Key</strong>, <strong>OAuth 2.0</strong>, <strong>Digest Auth</strong>, <strong>NTLM</strong>, or <strong>AWS Signature v4</strong></li>
           <li>Set auth once on a collection or folder (<strong>Edit Auth</strong> in its context menu) and choose <strong>Inherit from Parent</strong> on the requests</li>
-          <li>Credentials are kept in the OS keychain, not in the collection files you commit</li>
+          <li>Credentials are kept in the OS keychain, not in the collection files you commit — see <a href="settings.html#secrets">Secrets</a></li>
           <li>Reference sensitive values via variables: <code>&#123;&#123;token&#125;&#125;</code> — this also works in the OAuth 2.0 token URL, client ID, and secret</li>
         </ol>
         <h4>OAuth 2.0 token renewal</h4>
@@ -161,6 +186,7 @@
         <h3>Real-Time Protocols</h3>
         <p>Beyond REST and GraphQL, Resonance speaks several streaming and messaging protocols natively &mdash; each from its own request tab:</p>
         <ul class="doc-list">
+          <li><a href="graphql.html">GraphQL</a> &mdash; queries, the click-to-build Explorer, and subscriptions</li>
           <li><a href="grpc.html">gRPC</a> &mdash; server reflection with unary and streaming calls</li>
           <li><a href="websocket.html">WebSocket</a> &mdash; persistent <code>ws://</code> / <code>wss://</code> connections</li>
           <li><a href="mqtt.html">MQTT</a> &mdash; publish/subscribe with QoS, retain, and wildcards</li>
@@ -170,24 +196,37 @@
 
         <h3>Keyboard Shortcuts</h3>
         <ul class="doc-list">
-          <li>Press <code>?</code> anywhere to open the shortcuts reference</li>
+          <li><code>Ctrl/Cmd+/</code> — Show the keyboard shortcuts reference</li>
           <li><code>Ctrl/Cmd+Enter</code> — Send request</li>
           <li><code>Esc</code> — Cancel the running request, or disconnect an open stream</li>
-          <li><code>Ctrl/Cmd+S</code> — Save current endpoint</li>
+          <li><code>Ctrl/Cmd+S</code> — Save request</li>
+          <li><code>Ctrl/Cmd+L</code> — Focus the URL bar</li>
+          <li><code>Ctrl/Cmd+H</code> — Toggle the history sidebar</li>
+          <li><code>Ctrl/Cmd+J</code> — Open the cookie jar</li>
+          <li><code>Ctrl/Cmd+K</code> — Generate a code snippet (cURL and other languages)</li>
+          <li><code>Ctrl/Cmd+O</code> — Import a collection file</li>
+          <li><code>Ctrl/Cmd+E</code> — Open the environment manager</li>
+          <li><code>Ctrl/Cmd+,</code> — Open settings</li>
+          <li><code>Ctrl/Cmd+\</code> — Toggle the side-by-side layout</li>
           <li><code>Ctrl/Cmd+T</code> — New workspace tab</li>
           <li><code>Ctrl/Cmd+W</code> — Close current tab</li>
-          <li><code>Ctrl/Cmd+,</code> — Open settings</li>
+          <li><code>Ctrl/Cmd+Tab / Ctrl/Cmd+Shift+Tab</code> — Next / previous workspace tab</li>
+          <li><code>Ctrl/Cmd+1–9</code> — Switch to workspace tab 1–9</li>
+          <li><code>Alt+1–6</code> — Switch request tab: Path Params, Query Params, Headers, Authorization, Body, Scripts</li>
         </ul>
-
+        <p>Press <code>Ctrl/Cmd+/</code> or choose <strong>Keyboard Shortcuts</strong> in the main menu for the in-app reference. On macOS the shortcuts use <code>Cmd</code>.</p>
         <h3>Exporting Code</h3>
         <ol class="doc-list">
-          <li>Right-click an endpoint or use the export button and select <strong>Export Code</strong></li>
-          <li>Choose from cURL, Python, JavaScript (Fetch or Axios), Node.js, Go, PHP, Ruby, or Java</li>
-          <li>The generated snippet copies to your clipboard</li>
+          <li>Click the code button next to the URL bar (<strong>Generate Code Snippet</strong>) or press <code>Ctrl/Cmd+K</code></li>
+          <li>Pick a language: cURL, Python (requests), JavaScript (Fetch or Axios), Node.js (https), Go (net/http), PHP (cURL), Ruby (net/http), or Java (HttpClient)</li>
+          <li>The snippet uses the request with variables and auth already resolved; click <strong>Copy to Clipboard</strong></li>
         </ol>
 
         <h3>Next Steps</h3>
         <ul class="doc-list">
+          <li><a href="requests.html">Requests &amp; Responses</a> — bodies, inspection, schema validation, and history</li>
+          <li><a href="graphql.html">GraphQL</a> — the Explorer and subscriptions</li>
+          <li><a href="settings.html">Settings, Proxy &amp; Certificates</a> — networking, mTLS, secrets, and updates</li>
           <li><a href="collection-runner.html">Collection Runner</a> — run sequences of requests and chain variables between steps</li>
           <li><a href="scripts.html">Using Scripts</a> — full pre-request and test script API reference</li>
           <li><a href="mock-server.html">Mock Server</a> — serve OpenAPI-backed responses locally</li>
