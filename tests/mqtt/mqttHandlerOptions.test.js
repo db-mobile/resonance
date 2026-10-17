@@ -1,5 +1,5 @@
 /* global window */
-jest.mock('../../src/modules/apiHandler.js', () => ({
+jest.mock('../../src/modules/responseView.js', () => ({
     displayResponseWithLineNumbersForTab: jest.fn(),
     clearResponseDisplayForTab: jest.fn()
 }));
@@ -14,7 +14,7 @@ jest.mock('../../src/modules/ui/Toast.js', () => ({
     toast: { error: jest.fn(), success: jest.fn(), info: jest.fn() }
 }));
 
-import { displayResponseWithLineNumbersForTab } from '../../src/modules/apiHandler.js';
+import { displayResponseWithLineNumbersForTab } from '../../src/modules/responseView.js';
 import { toast } from '../../src/modules/ui/Toast.js';
 import { app } from '../../src/modules/appContext.js';
 import { initMqttHandler, handleMqttSend, clearMqttState } from '../../src/modules/mqttHandler.js';

@@ -272,8 +272,16 @@ describe('recordGrpcHistory', () => {
         `;
         jest.resetModules();
 
-        jest.doMock('../src/modules/apiHandler.js', () => ({
+        jest.doMock('../src/modules/responseView.js', () => ({
             displayResponseWithLineNumbersForTab: jest.fn()
+        }));
+        jest.doMock('../src/modules/requestServices.js', () => ({
+            generateEffectiveAuthData: jest.fn(),
+            getRequestBuilderService: jest.fn(),
+            warnUnresolvedVariables: jest.fn()
+        }));
+        jest.doMock('../src/modules/sendControls.js', () => ({
+            setRequestInProgress: jest.fn()
         }));
 
         const { app } = await import('../src/modules/appContext.js');

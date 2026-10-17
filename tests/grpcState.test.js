@@ -30,12 +30,16 @@ async function loadGrpcHandler(markup = GRPC_MARKUP) {
         getSettings: jest.fn(async () => ({})),
         resolveRequestSettings: jest.fn(async () => ({ timeout: 12000 }))
     }));
-    jest.doMock('../src/modules/apiHandler.js', () => ({
-        displayResponseWithLineNumbersForTab: jest.fn(),
+    jest.doMock('../src/modules/responseView.js', () => ({
+        displayResponseWithLineNumbersForTab: jest.fn()
+    }));
+    jest.doMock('../src/modules/requestServices.js', () => ({
         generateEffectiveAuthData: jest.fn(async () => ({ headers: {}, queryParams: {} })),
         getRequestBuilderService: jest.fn(),
-        setRequestInProgress: jest.fn(),
         warnUnresolvedVariables: jest.fn()
+    }));
+    jest.doMock('../src/modules/sendControls.js', () => ({
+        setRequestInProgress: jest.fn()
     }));
     return import('../src/modules/grpcHandler.js');
 }
@@ -59,19 +63,24 @@ async function loadGrpcHandlerForSend({ variables = {}, authData = { headers: {}
         getSettings: jest.fn(async () => ({})),
         resolveRequestSettings: jest.fn(async () => ({ timeout: 12000 }))
     }));
-    jest.doMock('../src/modules/apiHandler.js', () => ({
-        displayResponseWithLineNumbersForTab: jest.fn(),
+    jest.doMock('../src/modules/responseView.js', () => ({
+        displayResponseWithLineNumbersForTab: jest.fn()
+    }));
+    jest.doMock('../src/modules/requestServices.js', () => ({
         generateEffectiveAuthData: jest.fn(async () => authData),
         getRequestBuilderService: jest.fn(() => builder),
-        setRequestInProgress: jest.fn(),
         warnUnresolvedVariables: jest.fn()
+    }));
+    jest.doMock('../src/modules/sendControls.js', () => ({
+        setRequestInProgress: jest.fn()
     }));
 
     const invokeUnary = jest.fn(async () => ({ success: true, data: {}, headers: {}, trailers: {} }));
     window.backendAPI = { grpc: { invokeUnary } };
 
-    const apiHandler = await import('../src/modules/apiHandler.js');
-    return { module: await import('../src/modules/grpcHandler.js'), invokeUnary, apiHandler };
+    const sendControls = await import('../src/modules/sendControls.js');
+    const responseView = await import('../src/modules/responseView.js');
+    return { module: await import('../src/modules/grpcHandler.js'), invokeUnary, sendControls, responseView };
 }
 
 describe('gRPC send path', () => {
@@ -104,7 +113,7 @@ describe('gRPC send path', () => {
     });
 
     it('renders the result into the tab that sent it and saves it there', async () => {
-        const { module, invokeUnary, apiHandler } = await loadGrpcHandlerForSend();
+        const { module, invokeUnary, sendControls, responseView } = await loadGrpcHandlerForSend();
         const { app } = await import('../src/modules/appContext.js');
         const originContainer = { metadataDisplay: { textContent: '' }, trailersDisplay: { textContent: '' } };
         const updateTab = jest.fn().mockResolvedValue(undefined);
@@ -133,13 +142,13 @@ describe('gRPC send path', () => {
         const request = invokeUnary.mock.calls[0][0];
         expect(request.deadlineMs).toBe(12000);
         expect(request.requestId).toEqual(expect.any(String));
-        expect(apiHandler.displayResponseWithLineNumbersForTab)
+        expect(responseView.displayResponseWithLineNumbersForTab)
             .toHaveBeenLastCalledWith(JSON.stringify({ ok: 1 }, null, 2), 'application/json', 'tab-origin');
         expect(originContainer.metadataDisplay.textContent).toContain('"h"');
         expect(updateTab).toHaveBeenCalledWith('tab-origin', expect.objectContaining({
             response: expect.objectContaining({ data: { ok: 1 }, grpc: expect.objectContaining({ ok: true }) })
         }));
-        expect(apiHandler.setRequestInProgress).toHaveBeenLastCalledWith(false);
+        expect(sendControls.setRequestInProgress).toHaveBeenLastCalledWith(false);
         delete app.workspaceTabController;
         delete app.responseContainerManager;
     });

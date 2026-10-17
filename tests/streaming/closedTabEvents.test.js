@@ -1,5 +1,5 @@
 /* global window */
-jest.mock('../../src/modules/apiHandler.js', () => ({
+jest.mock('../../src/modules/responseView.js', () => ({
     displayResponseWithLineNumbersForTab: jest.fn(),
     clearResponseDisplayForTab: jest.fn()
 }));
@@ -22,7 +22,7 @@ jest.mock('../../src/modules/requestBodyHelper.js', () => ({
     getRequestBodyContent: jest.fn(() => '')
 }));
 
-import { displayResponseWithLineNumbersForTab } from '../../src/modules/apiHandler.js';
+import { displayResponseWithLineNumbersForTab } from '../../src/modules/responseView.js';
 import { updateStatusDisplay } from '../../src/modules/statusDisplay.js';
 import { app } from '../../src/modules/appContext.js';
 import { initWebSocketHandler, handleWebSocketSend } from '../../src/modules/websocketHandler.js';

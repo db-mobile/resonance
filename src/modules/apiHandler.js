@@ -1,68 +1,37 @@
 import { getCurrentEndpoint } from './state/currentEndpoint.js';
 import { app } from './appContext.js';
-import { urlInput, methodSelect, sendRequestBtn, cancelRequestBtn, responseBodyContainer, responseHeadersDisplay, responseCookiesDisplay, responsePerformanceDisplay, languageSelector } from './domElements.js';
+import { urlInput, methodSelect } from './domElements.js';
 import { toast } from './ui/Toast.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import { parseKeyValuePairs, parseKeyValueRows } from './keyValueManager.js';
-import { saveAllRequestModifications } from './collectionManager.js';
-import { debounce } from './utils/debounce.js';
-import { findRequest } from './collections/collectionTree.js';
-import { buildMockPath } from './collections/endpointUrl.js';
 import { methodCarriesBody, requestSendsBody } from './utils/bodyMethods.js';
 import { inFlightRequestFor, newRequestId, trackInFlight } from './state/inFlightRequests.js';
-import { registerPendingSave } from './state/pendingSaves.js';
 import { resolveRequestSettings } from './state/settingsCache.js';
+import {
+    getRequestPipeline,
+    warnUnresolvedVariables,
+    variableProcessingError,
+    resolveRequestPipeline
+} from './requestServices.js';
+import { scheduleEndpointSave } from './endpointSave.js';
+import { buildGraphQLBody } from './utils/graphqlBody.js';
+import { setRequestInProgress, withRequestInProgress } from './sendControls.js';
 
-const SAVE_DEBOUNCE_MS = 500;
-
-let inFlightRequestSave = null;
-
-/**
- * @param {string} collectionId
- * @param {string} endpointId
- */
-const debouncedSaveRequestModifications = debounce((collectionId, endpointId) => {
-    inFlightRequestSave = saveAllRequestModifications(collectionId, endpointId)
-        .catch(() => {
-            toast.error('Failed to save changes');
-        })
-        .finally(() => {
-            inFlightRequestSave = null;
-        });
-    return inFlightRequestSave;
-}, SAVE_DEBOUNCE_MS);
-
-/** @returns {Promise<void>} */
-async function flushPendingRequestSave() {
-    await debouncedSaveRequestModifications.flush();
-    await inFlightRequestSave;
-}
-
-/** @returns {void} */
-function cancelPendingRequestSave() {
-    debouncedSaveRequestModifications.cancel();
-}
-
-registerPendingSave({ flush: flushPendingRequestSave, cancel: cancelPendingRequestSave });
-import { VariableProcessor } from './variables/VariableProcessor.js';
-import { VariableRepository } from './storage/VariableRepository.js';
-import { EnvironmentRepository } from './storage/EnvironmentRepository.js';
-import { CollectionRepository } from './storage/CollectionRepository.js';
-import { VariableService } from './services/VariableService.js';
-import { StatusDisplayAdapter } from './interfaces/IStatusDisplay.js';
-import { authManager, setOAuthVariableResolver } from './authManager.js';
-import { resolveEffectiveAuthWithSource } from './auth/authInheritance.js';
-import { ensureFreshOAuthToken, oauthRefreshKey } from './auth/oauthRefresh.js';
-import { resolveAuthConfigVariables } from './auth/authVariables.js';
 import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
-import { createLazyEditorProxy } from './editorLoader.js';
+import {
+    globalResponseElements,
+    displaySchemaValidationResult,
+    renderGraphQLErrorsBadge,
+    displayResponseWithLineNumbersForTab,
+    clearResponseDisplayForTab,
+    clearSchemaValidationBadge,
+    clearGraphQLErrorsBadge
+} from './responseView.js';
 import { responseCookies } from './cookieParser.js';
 import { getRequestBodyContent, captureSnippetBody } from './requestBodyHelper.js';
-import { MockServerRepository } from './storage/MockServerRepository.js';
-import { MockServerService } from './services/MockServerService.js';
-import { isGrpcMode, isGraphQLMode, getCurrentMode, RequestMode } from './requestModeManager.js';
-import { getProtocol } from './protocols/protocolRegistry.js';
-import { handleGrpcSend } from './grpcHandler.js';
+import { isGraphQLMode, getCurrentMode, RequestMode } from './requestModeManager.js';
+import { getProtocol, getProtocolHandler, registerProtocolHandler } from './protocols/protocolRegistry.js';
+import { handleGrpcSend, handleGrpcCancel } from './grpcHandler.js';
 import { handleWebSocketCancel, handleWebSocketSend, isWebSocketLive } from './websocketHandler.js';
 import { handleSseCancel, handleSseConnect, isSseLive } from './sseHandler.js';
 import { handleMqttCancel, handleMqttSend } from './mqttHandler.js';
@@ -73,335 +42,15 @@ import {
     isSubscriptionActive
 } from './graphqlSubscriptionHandler.js';
 import { selectActiveOperationType } from './graphqlTransportWs.js';
-import { cancelStream as cancelGrpcStream, hasActiveStream as hasActiveGrpcStream, isGrpcStreamLive } from './grpcStreamHandler.js';
-import { STREAM_STATE_EVENT } from './streaming/streamState.js';
+import { isGrpcStreamLive } from './grpcStreamHandler.js';
 import { getActiveTabId, isTabCurrentlyActive, showStatusIfActive } from './streaming/streamSession.js';
-import { translate } from './utils/translate.js';
-import { RequestBuilderService } from './services/RequestBuilderService.js';
-import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes, responseContainerFor } from './ResponseDisplayHelper.js';
+import { clearResponsePanes, displayResponsePanes, displayErrorResponsePanes } from './ResponseDisplayHelper.js';
 import { setResponseMeta, suggestedFileName } from './responseSaver.js';
-import { getIntrospectionQuery, buildClientSchema } from 'graphql';
-
-let responseEditor = null;
 
 let graphqlBodyManager = null;
 
 export function setGraphQLBodyManager(manager) {
     graphqlBodyManager = manager;
-}
-
-let _variableService = null;
-let _mockServerService = null;
-let _collectionRepository = null;
-
-export function invalidateEnvironmentCache() {
-    if (_variableService?.environmentRepository) {
-        _variableService.environmentRepository._cache = null;
-    }
-}
-
-function getVariableService() {
-    if (!_variableService) {
-        const variableRepository = new VariableRepository(window.backendAPI, app.secretStore);
-        const environmentRepository = new EnvironmentRepository(window.backendAPI, app.secretStore);
-        const variableProcessor = new VariableProcessor();
-        const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
-        _variableService = new VariableService(variableRepository, variableProcessor, statusDisplayAdapter, environmentRepository);
-    }
-    return _variableService;
-}
-
-function getMockServerService() {
-    if (!_mockServerService) {
-        const mockServerRepository = new MockServerRepository(window.backendAPI);
-        const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
-        _mockServerService = new MockServerService(mockServerRepository, statusDisplayAdapter);
-    }
-    return _mockServerService;
-}
-
-function getCollectionRepository() {
-    if (!_collectionRepository) {
-        _collectionRepository = new CollectionRepository(window.backendAPI, app.secretStore);
-    }
-    return _collectionRepository;
-}
-
-let _requestBuilderService = null;
-export function getRequestBuilderService() {
-    if (!_requestBuilderService) {
-        _requestBuilderService = new RequestBuilderService(getVariableService, getCollectionRepository);
-    }
-    return _requestBuilderService;
-}
-
-setOAuthVariableResolver((collectionId) => {
-    const endpoint = collectionId ? { collectionId } : getCurrentEndpoint();
-    return getRequestBuilderService().resolveVariables(endpoint, {});
-});
-
-/**
- * @param {{variables?: Object, processor?: Object, refreshOAuth?: boolean}} [substitution]
- * @returns {Promise<Object>}
- */
-export async function generateEffectiveAuthData({ variables, processor, refreshOAuth = true } = {}) {
-    const current = getCurrentEndpoint();
-    const repository = getCollectionRepository();
-    const { authConfig: resolved, source } = await resolveEffectiveAuthWithSource(authManager.getAuthConfig(), {
-        collectionId: current?.collectionId,
-        endpointId: current?.endpointId,
-        repository
-    });
-    const substituted = resolveAuthConfigVariables(resolved, variables, processor);
-    const { unresolved } = substituted;
-    let effective = substituted.authConfig;
-
-    if (refreshOAuth && source) {
-        const renewal = await ensureFreshOAuthToken({
-            rawAuth: resolved,
-            resolvedAuth: effective,
-            key: oauthRefreshKey(current, source),
-            getToken: (request) => window.backendAPI.oauth2.getToken(request),
-            persist: async (nextRaw, result) => {
-                if (source.kind === 'request') {
-                    authManager.applyTokenResult(result);
-                    scheduleEndpointSave();
-                } else if (current?.collectionId) {
-                    await repository.saveAuthConfigAtSource(current.collectionId, current.endpointId, source, nextRaw);
-                }
-            }
-        });
-        effective = renewal.resolvedAuth;
-        if (renewal.error) {
-            toast.warning(renewal.error);
-        }
-    }
-
-    const authData = authManager.generateAuthData(effective);
-    authData.unresolvedVariables = unresolved;
-    return authData;
-}
-
-/**
- * @param {Object} requestConfig
- * @param {{authConfig?: Object, awsAuth?: Object, ntlmAuth?: Object}} authData
- * @returns {void}
- */
-function attachAuthTransport(requestConfig, authData) {
-    if (authData.authConfig) {
-        requestConfig.auth = authData.authConfig;
-    }
-    if (authData.awsAuth) {
-        requestConfig.awsAuth = authData.awsAuth;
-    }
-    if (authData.ntlmAuth) {
-        requestConfig.ntlm = authData.ntlmAuth;
-    }
-}
-
-/**
- * @param {{url: string, clientCert?: Object}} requestConfig
- * @returns {void}
- */
-function attachClientCert(requestConfig) {
-    if (!app.certificateController) {
-        return;
-    }
-    try {
-        const clientCert = app.certificateController.getForHost(new URL(requestConfig.url).host);
-        if (clientCert) {
-            requestConfig.clientCert = clientCert;
-        }
-    } catch {}
-}
-
-/**
- * @param {Object} processor
- * @param {Object} requestConfig
- * @param {string[]} [extraNames]
- * @returns {void}
- */
-export function warnUnresolvedVariables(processor, requestConfig, extraNames = []) {
-    try {
-        const unresolved = [...new Set([
-            ...processor.extractUnresolvedVariableNames({
-                url: requestConfig.url,
-                headers: requestConfig.headers,
-                queryParams: requestConfig.queryParams,
-                pathParams: requestConfig.pathParams,
-                body: requestConfig.body
-            }),
-            ...extraNames
-        ])];
-
-        if (unresolved.length === 0) {
-            return;
-        }
-
-        const shown = unresolved.slice(0, 5).map(name => `{{${name}}}`).join(', ');
-        const more = unresolved.length > 5 ? ` and ${unresolved.length - 5} more` : '';
-        toast.warning(`Request sent with unresolved variables: ${shown}${more}`);
-    } catch {}
-}
-
-/** @returns {Promise<{schema?: import('graphql').GraphQLSchema, url?: string, error?: string}>} */
-export async function fetchGraphQLIntrospection() {
-    const url = urlInput?.value?.trim() || urlInput?.getAttribute('value') || '';
-    if (!url) {
-        return { error: 'Enter a URL before fetching the schema' };
-    }
-
-    const headers = parseKeyValuePairs(document.getElementById('headers-list'));
-    const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
-
-    const prepared = await resolveRequestPipeline({ url, headers, queryParams });
-    if (!prepared.ok) {
-        return { error: prepared.error };
-    }
-    const { url: resolvedUrl, authData } = prepared;
-
-    const { timeout, verifySsl, followRedirects } = await resolveRequestSettings();
-
-    const requestConfig = {
-        method: 'POST',
-        url: resolvedUrl,
-        rawUrl: url,
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: { query: getIntrospectionQuery(), variables: {} },
-        timeout,
-        verifySsl,
-        followRedirects
-    };
-
-    attachAuthTransport(requestConfig, authData);
-    attachClientCert(requestConfig);
-
-    let result;
-    try {
-        result = await window.backendAPI.sendApiRequest(requestConfig);
-    } catch (error) {
-        return { error: `Request failed: ${error.message || error}` };
-    }
-
-    if (!result || !result.success) {
-        const status = result?.status ? ` (HTTP ${result.status})` : '';
-        return { error: `${result?.message || 'Introspection request failed'}${status}` };
-    }
-
-    const payload = result.data;
-    if (payload && Array.isArray(payload.errors) && payload.errors.length > 0) {
-        return { error: `GraphQL error: ${payload.errors[0].message || 'introspection rejected'}` };
-    }
-
-    const introspection = payload?.data;
-    if (!introspection || !introspection.__schema) {
-        return { error: 'Response did not contain a GraphQL schema (introspection may be disabled)' };
-    }
-
-    try {
-        return { schema: buildClientSchema(introspection), introspection, url: resolvedUrl };
-    } catch (error) {
-        return { error: `Could not parse schema: ${error.message}` };
-    }
-}
-
-/**
- * @param {object} introspection
- * @returns {import('graphql').GraphQLSchema|null}
- */
-export function buildSchemaFromIntrospection(introspection) {
-    if (!introspection || !introspection.__schema) {
-        return null;
-    }
-    try {
-        return buildClientSchema(introspection);
-    } catch (_error) {
-        return null;
-    }
-}
-
-function globalResponseElements() {
-    return {
-        headersDisplay: responseHeadersDisplay,
-        cookiesDisplay: responseCookiesDisplay,
-        performanceDisplay: responsePerformanceDisplay
-    };
-}
-
-function initResponseEditor() {
-    if (!responseEditor && responseBodyContainer) {
-        responseEditor = createLazyEditorProxy('response', responseBodyContainer);
-
-        responseEditor.onLanguageChange((languageType) => {
-            if (languageSelector) {
-                languageSelector.value = languageType || 'text';
-            }
-        });
-
-        if (languageSelector) {
-            languageSelector.addEventListener('change', (e) => {
-                const selectedLanguage = e.target.value;
-                responseEditor.setLanguage(selectedLanguage);
-            });
-        }
-    }
-}
-
-/**
- * @param {string|null} tabId
- * @returns {HTMLElement|null}
- */
-function statusContainerFor(tabId) {
-    return responseContainerFor(tabId)?.statusContainer || document.querySelector('.status-info-container');
-}
-
-/** @param {string|null} tabId */
-export function clearSchemaValidationBadge(tabId = null) {
-    const statusContainer = statusContainerFor(tabId);
-    if (!statusContainer) {
-        return;
-    }
-
-    const existingBadge = statusContainer.querySelector('.response-validation-badge');
-    if (existingBadge) {
-        existingBadge.remove();
-    }
-}
-
-/**
- * @param {Object} validationResult
- * @param {string|null} tabId
- */
-function displaySchemaValidationResult(validationResult, tabId = null) {
-    clearSchemaValidationBadge(tabId);
-
-    if (!validationResult.hasSchema) {
-        return;
-    }
-
-    const statusContainer = statusContainerFor(tabId);
-    if (!statusContainer) {
-        return;
-    }
-
-    const badge = document.createElement('span');
-    badge.className = `status-badge response-validation-badge ${validationResult.valid ? 'is-success' : 'is-error'}`;
-    badge.textContent = validationResult.valid ? 'Schema Valid' : `Schema Invalid (${validationResult.errors.length})`;
-
-    if (!validationResult.valid && validationResult.errors.length > 0) {
-        badge.title = validationResult.errors.map(e => `${e.path}: ${e.message}`).join('\n');
-    }
-
-    statusContainer.appendChild(badge);
-}
-
-/** @param {string|null} tabId */
-export function clearGraphQLErrorsBadge(tabId = null) {
-    const statusContainer = statusContainerFor(tabId);
-    const existingBadge = statusContainer?.querySelector('.graphql-errors-badge');
-    if (existingBadge) {
-        existingBadge.remove();
-    }
 }
 
 /**
@@ -421,184 +70,24 @@ function displayGraphQLErrorsBadge(result, tabId = null) {
         return;
     }
 
-    const statusContainer = statusContainerFor(tabId);
-    if (!statusContainer) {
-        return;
-    }
-
-    const badge = document.createElement('span');
-    badge.className = 'status-badge graphql-errors-badge is-error';
-    badge.textContent = `GraphQL Errors (${errors.length})`;
-    badge.title = errors
-        .map(e => (e && typeof e.message === 'string') ? e.message : JSON.stringify(e))
-        .join('\n');
-
-    statusContainer.appendChild(badge);
-}
-
-export function displayResponseWithLineNumbersForTab(content, contentType = null, tabId = null, languageHint = undefined) {
-    const containerElements = responseContainerFor(tabId);
-
-    if (containerElements && containerElements.editor) {
-        containerElements.renderedResponse = null;
-        containerElements.editor.setContent(content, contentType, languageHint);
-
-        if (containerElements.previewManager && containerElements.tabId) {
-            const language = containerElements.editor.currentLanguage;
-
-            containerElements.previewManager.updateButtonState(containerElements.tabId, language);
-
-            if (containerElements.previewManager.isPreviewable(language)) {
-                containerElements.previewManager.refreshPreviewContent(containerElements.tabId, content, language);
-            } else {
-                containerElements.previewManager.clearPreview(containerElements.tabId);
-            }
-        }
-    } else {
-        initResponseEditor();
-        if (responseEditor) {
-            responseEditor.setContent(content, contentType, languageHint);
-        }
-    }
+    renderGraphQLErrorsBadge(errors, tabId);
 }
 
 function clearResponseDisplay() {
     return clearResponseDisplayForTab(null);
 }
 
-export function clearResponseDisplayForTab(tabId = null) {
-    const containerElements = responseContainerFor(tabId);
-
-    if (containerElements && containerElements.editor) {
-        containerElements.renderedResponse = null;
-        containerElements.editor.clear();
-    } else {
-        initResponseEditor();
-        if (responseEditor) {
-            responseEditor.clear();
-        }
-    }
-}
-
-let requestInProgress = false;
-
 /**
- * @param {boolean} inProgress
- * @returns {void}
+ * @param {function(): Promise<*>} cancel
+ * @returns {Promise<void>}
  */
-export function setRequestInProgress(inProgress) {
-    requestInProgress = inProgress;
-    if (inProgress) {
-        sendRequestBtn.style.display = 'none';
-        cancelRequestBtn.style.display = 'inline-block';
-        setCancelButtonLabel(false);
-        sendRequestBtn.disabled = true;
-    } else {
-        sendRequestBtn.style.display = 'inline-block';
-        cancelRequestBtn.style.display = 'none';
-        sendRequestBtn.disabled = false;
-    }
-    app.statusBar?.setRequestRunning(inProgress);
-    if (!inProgress) {
-        refreshStreamControls();
-    }
-}
-
-/** @type {Object<string, function(string): boolean>} */
-const LIVE_STREAM_CHECKS = Object.freeze({
-    [RequestMode.WEBSOCKET]: isWebSocketLive,
-    [RequestMode.SSE]: isSseLive,
-    [RequestMode.GRPC]: isGrpcStreamLive
-});
-
-/**
- * @param {boolean} disconnect
- * @returns {void}
- */
-function setCancelButtonLabel(disconnect) {
-    if (!cancelRequestBtn) {
-        return;
-    }
-    const label = disconnect ? translate('request.disconnect', 'Disconnect') : translate('request.cancel', 'Cancel');
-    cancelRequestBtn.textContent = label;
-    cancelRequestBtn.setAttribute('aria-label', label);
-}
-
-/**
- * @param {Object} processedPathParams
- * @param {string} queryString
- * @returns {Promise<{rewrite: {baseUrl: string, pathTemplate: string}, url: string}|null>}
- */
-async function resolveMockRewrite(processedPathParams, queryString) {
-    const { shouldUseMock, mockBaseUrl } = await getMockServerService().shouldUseMockServer(getCurrentEndpoint().collectionId);
-    if (!shouldUseMock || !mockBaseUrl) {
-        return null;
-    }
-    const collection = await getCollectionRepository().getById(getCurrentEndpoint().collectionId);
-    if (!collection) {
-        return null;
-    }
-    const endpoint = findRequest(collection, getCurrentEndpoint().endpointId);
-    if (!endpoint?.path) {
-        return null;
-    }
-    const mockPath = buildMockPath(endpoint.path, processedPathParams);
-    return {
-        rewrite: { baseUrl: mockBaseUrl, pathTemplate: endpoint.path },
-        url: queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`
-    };
+async function cancelStreaming(cancel) {
+    await cancel();
+    setRequestInProgress(false);
 }
 
 /** @returns {Promise<void>} */
-async function refreshStreamControls() {
-    if (requestInProgress || !cancelRequestBtn) {
-        return;
-    }
-    const isLive = LIVE_STREAM_CHECKS[getCurrentMode()];
-    const tabId = await getActiveTabId();
-    if (requestInProgress) {
-        return;
-    }
-    const live = Boolean(isLive?.(tabId));
-    cancelRequestBtn.style.display = live ? 'inline-block' : 'none';
-    setCancelButtonLabel(live);
-}
-
-if (typeof document !== 'undefined') {
-    document.addEventListener(STREAM_STATE_EVENT, () => {
-        refreshStreamControls();
-    });
-}
-
-/** @type {Object<string, function(): Promise<*>>} */
-const STREAMING_CANCELS = Object.freeze({
-    [RequestMode.WEBSOCKET]: handleWebSocketCancel,
-    [RequestMode.SSE]: handleSseCancel,
-    [RequestMode.MQTT]: handleMqttCancel
-});
-
-export async function handleCancelRequest() {
-    const cancelStreaming = STREAMING_CANCELS[getCurrentMode()];
-    if (cancelStreaming) {
-        await cancelStreaming();
-        setRequestInProgress(false);
-        return;
-    }
-
-    if (isGrpcMode()) {
-        const tabId = await getActiveTabId();
-        if (tabId && hasActiveGrpcStream(tabId)) {
-            await cancelGrpcStream(tabId);
-            setRequestInProgress(false);
-            return;
-        }
-        const unaryId = inFlightRequestFor(tabId);
-        if (unaryId) {
-            await window.backendAPI.grpc.unaryCancel(unaryId).catch(() => { });
-        }
-        return;
-    }
-
+async function cancelHttpRequest() {
     try {
         const requestTabId = await getActiveTabId();
 
@@ -620,6 +109,11 @@ export async function handleCancelRequest() {
     } finally {
         setRequestInProgress(false);
     }
+}
+
+/** @returns {Promise<*>} */
+export async function handleCancelRequest() {
+    return getProtocolHandler(getCurrentMode()).cancel();
 }
 
 /** @returns {string|null} */
@@ -735,35 +229,6 @@ function buildSseBody(method, headers, variables, processor) {
 }
 
 /**
- * @param {Error} error
- * @returns {string}
- */
-function variableProcessingError(error) {
-    return `Variable processing error: ${error.message}`;
-}
-
-/** @returns {void} */
-function scheduleEndpointSave() {
-    const current = getCurrentEndpoint();
-    if (current) {
-        debouncedSaveRequestModifications(current.collectionId, current.endpointId);
-    }
-}
-
-/**
- * @param {function(): Promise<*>} send
- * @returns {Promise<*>}
- */
-async function withRequestInProgress(send) {
-    setRequestInProgress(true);
-    try {
-        return await send();
-    } finally {
-        setRequestInProgress(false);
-    }
-}
-
-/**
  * @param {string} protocolId
  * @returns {string}
  */
@@ -775,49 +240,6 @@ function readSendUrl(protocolId) {
         || urlInput?.value?.trim()
         || urlInput?.getAttribute('value')
         || '';
-}
-
-/**
- * @param {Array<{key: string, value: string, enabled: boolean}>} queryRows
- * @param {Object<string, string>} authQueryParams
- * @returns {void}
- */
-function appendAuthQueryRows(queryRows, authQueryParams) {
-    const rowKeys = new Set(queryRows.map((row) => row.key));
-    for (const [key, value] of Object.entries(authQueryParams || {})) {
-        if (!rowKeys.has(key)) {
-            queryRows.push({ key, value, enabled: true });
-        }
-    }
-}
-
-/**
- * @param {{url: string, pathParams?: Object, headers: Object, queryParams: Object, queryRows?: Array<Object>, useAuth?: boolean, refreshOAuth?: boolean}} request
- * @returns {Promise<{ok: true, url: string, queryString: string, pathParams: Object, headers: Object, queryParams: Object, variables: Object, processor: Object, authData: Object|null}|{ok: false, error: string}>}
- */
-async function resolveRequestPipeline({ url, pathParams = {}, headers, queryParams, queryRows, useAuth = true, refreshOAuth = true }) {
-    const builder = getRequestBuilderService();
-
-    try {
-        const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
-
-        let authData = null;
-        if (useAuth) {
-            authData = await generateEffectiveAuthData({ variables, processor, refreshOAuth });
-            builder.mergeAuthData(headers, queryParams, authData);
-            if (queryRows) {
-                appendAuthQueryRows(queryRows, authData.queryParams);
-            }
-        }
-
-        const processed = builder.processRequestComponents({
-            url, pathParams, headers, queryParams, queryRows, variables, processor
-        });
-
-        return { ok: true, ...processed, headers, queryParams, variables, processor, authData };
-    } catch (error) {
-        return { ok: false, error: variableProcessingError(error) };
-    }
 }
 
 /**
@@ -843,33 +265,43 @@ function readMqttOptions() {
 }
 
 /** @type {Object<string, {useAuth: boolean, send: function(Object): Promise<*>}>} */
-const STREAMING_SENDS = Object.freeze({
-    [RequestMode.WEBSOCKET]: Object.freeze({
-        useAuth: true,
-        buildPayload: ({ variables, processor }) => {
-            const message = processor.processTemplate(getRequestBodyContent() || '', variables);
-            warnUnresolvedVariables(processor, { body: message });
-            return message;
-        },
-        send: ({ url, headers }, message) => handleWebSocketSend(url, headers, message)
-    }),
-    [RequestMode.SSE]: Object.freeze({
-        useAuth: true,
-        buildPayload: ({ headers, variables, processor }) => {
-            const method = methodSelect?.value || 'GET';
-            return { method, body: buildSseBody(method, headers, variables, processor) };
-        },
-        send: ({ url, headers }, payload) => handleSseConnect(url, headers, payload)
-    }),
-    [RequestMode.MQTT]: Object.freeze({
-        useAuth: false,
-        buildPayload: ({ variables, processor }) => {
-            const options = processor.processObject(readMqttOptions(), variables);
-            warnUnresolvedVariables(processor, { body: options });
-            return options;
-        },
-        send: ({ url }, options) => handleMqttSend(url, options)
-    })
+/**
+ * @typedef {Object} StreamingSend
+ * @property {boolean} useAuth
+ * @property {(prepared: Object) => *} [buildPayload]
+ * @property {(prepared: Object, payload: *) => Promise<*>} send
+ */
+
+/** @type {StreamingSend} */
+const WEBSOCKET_STREAM = Object.freeze({
+    useAuth: true,
+    buildPayload: ({ variables, processor }) => {
+        const message = processor.processTemplate(getRequestBodyContent() || '', variables);
+        warnUnresolvedVariables(processor, { body: message });
+        return message;
+    },
+    send: ({ url, headers }, message) => handleWebSocketSend(url, headers, message)
+});
+
+/** @type {StreamingSend} */
+const SSE_STREAM = Object.freeze({
+    useAuth: true,
+    buildPayload: ({ headers, variables, processor }) => {
+        const method = methodSelect?.value || 'GET';
+        return { method, body: buildSseBody(method, headers, variables, processor) };
+    },
+    send: ({ url, headers }, payload) => handleSseConnect(url, headers, payload)
+});
+
+/** @type {StreamingSend} */
+const MQTT_STREAM = Object.freeze({
+    useAuth: false,
+    buildPayload: ({ variables, processor }) => {
+        const options = processor.processObject(readMqttOptions(), variables);
+        warnUnresolvedVariables(processor, { body: options });
+        return options;
+    },
+    send: ({ url }, options) => handleMqttSend(url, options)
 });
 
 /**
@@ -937,24 +369,15 @@ async function recordRequestOutcome(requestConfig, outcome, scriptResult, histor
  * @returns {{body?: {query: string, variables: Object, operationName?: string}, error?: string}}
  */
 function buildGraphQLPayload(processor, variables) {
-    const query = processor.processTemplate(graphqlBodyManager.getGraphQLQuery().trim(), variables);
-    const variablesText = processor.processTemplate(graphqlBodyManager.getGraphQLVariables().trim(), variables);
-
-    let parsedVariables = {};
-    if (variablesText) {
-        try {
-            parsedVariables = JSON.parse(variablesText);
-        } catch (e) {
-            return { error: `Invalid GraphQL Variables JSON: ${e.message}` };
-        }
+    const built = buildGraphQLBody({
+        query: graphqlBodyManager.getGraphQLQuery(),
+        variables: graphqlBodyManager.getGraphQLVariables(),
+        operationName: graphqlBodyManager.getSelectedOperationName?.()
+    }, (text) => processor.processTemplate(text, variables));
+    if (built.error) {
+        return { error: `Invalid GraphQL Variables JSON: ${built.error.message}` };
     }
-
-    const body = { query, variables: parsedVariables };
-    const operationName = graphqlBodyManager.getSelectedOperationName?.();
-    if (operationName) {
-        body.operationName = operationName;
-    }
-    return { body };
+    return { body: built.body };
 }
 
 /**
@@ -1031,44 +454,14 @@ async function prepareHttpSend() {
 }
 
 /**
- * @param {Object} processedPathParams
- * @param {string} queryString
- * @returns {Promise<{rewrite: {baseUrl: string, pathTemplate: string}, url: string}|null>}
- */
-async function tryResolveMockRewrite(processedPathParams, queryString) {
-    if (!getCurrentEndpoint()) {
-        return null;
-    }
-    try {
-        return await resolveMockRewrite(processedPathParams, queryString);
-    } catch (error) {
-        console.warn('Mock server check failed, sending to the real URL:', error);
-        return null;
-    }
-}
-
-/**
- * @param {{protocol: string, method: string, url: string, rawUrl: string, headers: Object, queryParams: Object, pathParams: Object, body: *, bodyMode: string}} parts
+ * @param {{protocol: string, method: string, url: string, rawUrl: string, headers: Object, queryParams: Object, pathParams: Object, body: *, bodyMode: string, authData: Object}} parts
  * @returns {Promise<Object>}
  */
-async function buildSendConfig({ protocol, method, url, rawUrl, headers, queryParams, pathParams, body, bodyMode }) {
-    const { httpVersion, timeout, verifySsl, followRedirects } = await resolveRequestSettings();
-
-    return {
-        protocol,
-        method,
-        url,
-        rawUrl,
-        headers,
-        queryParams,
-        pathParams,
-        body,
-        bodyType: (bodyMode === 'formdata' || bodyMode === 'urlencoded' || bodyMode === 'text' || bodyMode === 'binary') ? bodyMode : undefined,
-        httpVersion,
-        timeout,
-        verifySsl,
-        followRedirects
-    };
+async function buildSendConfig({ protocol, method, url, rawUrl, headers, queryParams, pathParams, body, bodyMode, authData }) {
+    const settings = await resolveRequestSettings();
+    return getRequestPipeline().assembleRequestConfig({
+        protocol, method, url, rawUrl, headers, queryParams, pathParams, body, bodyType: bodyMode, settings, authData
+    });
 }
 
 /**
@@ -1104,36 +497,9 @@ async function runPreRequestScript(requestConfig, requestTabId) {
  * @param {{snapshot: Object, rawUrl: string, variables: Object, processor: Object, mockRewrite: Object|null, authData: Object}} ctx
  * @returns {void}
  */
-function applyScriptMutations(requestConfig, { snapshot, rawUrl, variables, processor, mockRewrite, authData }) {
-    const builder = getRequestBuilderService();
-    requestConfig.url = builder.applyScriptParamMutations({
-        requestConfig, snapshot, rawUrl, variables, processor, mockRewrite
-    });
-    const authStripped = builder.stripCrossOriginAuth({
-        requestConfig,
-        originalUrl: snapshot.url,
-        authData
-    });
-    if (authStripped) {
+function applyScriptMutations(requestConfig, ctx) {
+    if (getRequestPipeline().applyScriptMutations(requestConfig, ctx)) {
         toast.warning('Authentication was not sent: the pre-request script changed the request host.');
-    }
-}
-
-/**
- * @param {Object} requestConfig
- * @returns {Promise<void>}
- */
-async function attachCookieHeader(requestConfig) {
-    if (!app.cookieController) {
-        return;
-    }
-    const cookieHeader = await app.cookieController.getCookieHeader(requestConfig.url);
-    if (!cookieHeader) {
-        return;
-    }
-    requestConfig.headers = requestConfig.headers || {};
-    if (!requestConfig.headers['Cookie'] && !requestConfig.headers['cookie']) {
-        requestConfig.headers['Cookie'] = cookieHeader;
     }
 }
 
@@ -1143,8 +509,7 @@ async function attachCookieHeader(requestConfig) {
  * @returns {Promise<void>}
  */
 async function decorateSendConfig(requestConfig, { processor, authData }) {
-    attachClientCert(requestConfig);
-    await attachCookieHeader(requestConfig);
+    await getRequestPipeline().finalize(requestConfig);
     warnUnresolvedVariables(processor, requestConfig, authData.unresolvedVariables || []);
 }
 
@@ -1188,24 +553,23 @@ async function handleSendError(error, { requestConfig, requestTabId, historySens
     await recordRequestOutcome(requestConfig, error, error, historySensitive);
 }
 
+/** @returns {Promise<*>} */
+async function sendGraphQLRequest() {
+    const gqlTabId = await getActiveTabId();
+    if ((gqlTabId && isSubscriptionActive(gqlTabId))
+        || getActiveGraphQLOperationType() === 'subscription') {
+        return handleGraphQLSubscriptionRequest();
+    }
+    return sendHttpRequest();
+}
+
+/** @returns {Promise<*>} */
 export async function handleSendRequest() {
-    if (isGrpcMode()) {
-        return handleGrpcSend();
-    }
+    return getProtocolHandler(getCurrentMode()).send();
+}
 
-    if (isGraphQLMode()) {
-        const gqlTabId = await getActiveTabId();
-        if ((gqlTabId && isSubscriptionActive(gqlTabId))
-            || getActiveGraphQLOperationType() === 'subscription') {
-            return handleGraphQLSubscriptionRequest();
-        }
-    }
-
-    const streaming = STREAMING_SENDS[getCurrentMode()];
-    if (streaming) {
-        return runStreamingSend(getCurrentMode(), streaming);
-    }
-
+/** @returns {Promise<void>} */
+async function sendHttpRequest() {
     setRequestInProgress(true);
 
     scheduleEndpointSave();
@@ -1218,9 +582,12 @@ export async function handleSendRequest() {
     }
     const { protocol, method, rawUrl, headers, queryParams, variables, processor, authData, historySensitive } = prepared;
 
-    const mock = await tryResolveMockRewrite(prepared.pathParams, prepared.queryString);
-    const mockRewrite = mock ? mock.rewrite : null;
-    const url = mock ? mock.url : prepared.url;
+    const { url, mockRewrite } = await getRequestPipeline().resolveMockRewrite({
+        endpoint: getCurrentEndpoint(),
+        url: prepared.url,
+        queryString: prepared.queryString,
+        pathParams: prepared.pathParams
+    });
 
     const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
     let body = undefined;
@@ -1234,7 +601,7 @@ export async function handleSendRequest() {
     }
 
     let requestConfig = await buildSendConfig({
-        protocol, method, url, rawUrl, headers, queryParams, pathParams: prepared.pathParams, body, bodyMode
+        protocol, method, url, rawUrl, headers, queryParams, pathParams: prepared.pathParams, body, bodyMode, authData
     });
 
     const requestTabId = await getActiveTabId();
@@ -1246,8 +613,6 @@ export async function handleSendRequest() {
         displayResponseWithLineNumbersForTab('Sending request...', null, requestTabId);
 
         clearResponsePanes(requestTabId, globalResponseElements());
-
-        attachAuthTransport(requestConfig, authData);
 
         if (getCurrentEndpoint() && app.scriptController) {
             const scripted = await runPreRequestScript(requestConfig, requestTabId);
@@ -1427,3 +792,34 @@ export async function handleGenerateCurl() {
     const codeSnippetDialog = new CodeSnippetDialog();
     codeSnippetDialog.show(requestConfig);
 }
+
+registerProtocolHandler(RequestMode.HTTP, {
+    send: sendHttpRequest,
+    cancel: cancelHttpRequest,
+    isLive: () => false
+});
+registerProtocolHandler(RequestMode.WEBSOCKET, {
+    send: () => runStreamingSend(RequestMode.WEBSOCKET, WEBSOCKET_STREAM),
+    cancel: () => cancelStreaming(handleWebSocketCancel),
+    isLive: isWebSocketLive
+});
+registerProtocolHandler(RequestMode.SSE, {
+    send: () => runStreamingSend(RequestMode.SSE, SSE_STREAM),
+    cancel: () => cancelStreaming(handleSseCancel),
+    isLive: isSseLive
+});
+registerProtocolHandler(RequestMode.MQTT, {
+    send: () => runStreamingSend(RequestMode.MQTT, MQTT_STREAM),
+    cancel: () => cancelStreaming(handleMqttCancel),
+    isLive: () => false
+});
+registerProtocolHandler(RequestMode.GRPC, {
+    send: handleGrpcSend,
+    cancel: handleGrpcCancel,
+    isLive: isGrpcStreamLive
+});
+registerProtocolHandler(RequestMode.GRAPHQL, {
+    send: sendGraphQLRequest,
+    cancel: cancelHttpRequest,
+    isLive: isSubscriptionActive
+});

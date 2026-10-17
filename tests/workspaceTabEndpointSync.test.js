@@ -12,7 +12,7 @@ const APP_MARKUP = `
 async function loadStateManager() {
     document.body.innerHTML = APP_MARKUP;
     jest.resetModules();
-    jest.doMock('../src/modules/apiHandler.js', () => ({
+    jest.doMock('../src/modules/responseView.js', () => ({
         displayResponseWithLineNumbersForTab: jest.fn(),
         clearResponseDisplayForTab: jest.fn(),
         clearSchemaValidationBadge: jest.fn(),

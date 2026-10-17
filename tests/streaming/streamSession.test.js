@@ -1,4 +1,4 @@
-jest.mock('../../src/modules/apiHandler.js', () => ({
+jest.mock('../../src/modules/responseView.js', () => ({
     displayResponseWithLineNumbersForTab: jest.fn()
 }));
 
@@ -9,8 +9,8 @@ jest.mock('../../src/modules/statusDisplay.js', () => ({
 }));
 
 import { app } from '../../src/modules/appContext.js';
-import { displayResponseWithLineNumbersForTab } from '../../src/modules/apiHandler.js';
-import { StreamSession } from '../../src/modules/streaming/streamSession.js';
+import { displayResponseWithLineNumbersForTab } from '../../src/modules/responseView.js';
+import { StreamSession, transcriptResponseMeta } from '../../src/modules/streaming/streamSession.js';
 import { isStaleEvent } from '../../src/modules/streaming/streamState.js';
 
 const TAB = 'tab-1';
@@ -209,5 +209,26 @@ describe('isStaleEvent', () => {
         expect(isStaleEvent({ url: 'wss://a' }, 'wss://a', 'close')).toBe(false);
         expect(isStaleEvent({}, 'wss://a', 'close')).toBe(false);
         expect(isStaleEvent({ url: 'wss://a' }, '', 'close')).toBe(false);
+    });
+});
+
+describe('transcriptResponseMeta', () => {
+    const BASE = { headers: {}, ttfb: null, size: null, timings: null, cookies: [] };
+
+    test('reproduces each protocol response shape for an open stream', () => {
+        const entry = { url: 'wss://x', broker: 'mqtt://b' };
+        expect(transcriptResponseMeta({ status: 101, statusText: 'Switching Protocols', key: 'websocket' })(entry, 'log', 'open'))
+            .toEqual({ ...BASE, data: 'log', status: 101, statusText: 'Switching Protocols', websocket: { url: 'wss://x', state: 'open' } });
+        expect(transcriptResponseMeta({ status: 200, statusText: 'OK', key: 'sse' })(entry, 'log', 'open'))
+            .toEqual({ ...BASE, data: 'log', status: 200, statusText: 'OK', sse: { url: 'wss://x', state: 'open' } });
+        expect(transcriptResponseMeta({ status: 101, statusText: 'Connected', key: 'mqtt', addressField: 'broker' })(entry, 'log', 'open'))
+            .toEqual({ ...BASE, data: 'log', status: 101, statusText: 'Connected', mqtt: { broker: 'mqtt://b', state: 'open' } });
+        expect(transcriptResponseMeta({ status: 101, statusText: 'Subscription Active', key: 'graphqlSubscription' })(entry, 'log', 'open'))
+            .toEqual({ ...BASE, data: 'log', status: 101, statusText: 'Subscription Active', graphqlSubscription: { url: 'wss://x', state: 'open' } });
+    });
+
+    test('drops the status and defaults the address once the stream is closed', () => {
+        expect(transcriptResponseMeta({ status: 101, statusText: 'Connected', key: 'mqtt', addressField: 'broker' })({}, '', 'closed'))
+            .toEqual({ ...BASE, data: '', status: null, statusText: '', mqtt: { broker: '', state: 'closed' } });
     });
 });

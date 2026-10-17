@@ -1,5 +1,5 @@
 import { app } from '../appContext.js';
-import { displayResponseWithLineNumbersForTab } from '../apiHandler.js';
+import { displayResponseWithLineNumbersForTab } from '../responseView.js';
 import { updateResponseSize, updateResponseTime, updateStatusDisplay } from '../statusDisplay.js';
 import { debounce } from '../utils/debounce.js';
 import { notifyStreamStateChanged, registerStreamSource } from './streamState.js';
@@ -62,6 +62,24 @@ export function createBackendEventListener(eventName, isBackendAvailable, handle
         })();
         return listenerPromise;
     };
+}
+
+/**
+ * @param {{status: number, statusText: string, key: string, addressField?: string}} options
+ * @returns {(entry: object, transcript: string, state: string) => object}
+ */
+export function transcriptResponseMeta({ status, statusText, key, addressField = 'url' }) {
+    return (entry, transcript, state) => ({
+        data: transcript,
+        headers: {},
+        status: state === 'open' ? status : null,
+        statusText: state === 'open' ? statusText : '',
+        ttfb: null,
+        size: null,
+        timings: null,
+        cookies: [],
+        [key]: { [addressField]: entry[addressField] || '', state }
+    });
 }
 
 const MAX_TRANSCRIPT_ENTRIES = 500;
