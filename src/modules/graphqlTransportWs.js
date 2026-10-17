@@ -7,7 +7,7 @@
  * @param {string} url
  * @returns {string}
  */
-export function normalizeSubscriptionUrl(url) {
+export function normalizeWsUrl(url) {
     if (!url) {
         return '';
     }

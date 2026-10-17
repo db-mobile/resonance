@@ -20,18 +20,14 @@ import {
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
 import { markTabModified } from './state/tabModified.js';
-import {
-    displayResponseWithLineNumbersForTab,
-    generateEffectiveAuthData,
-    getRequestBuilderService,
-    setRequestInProgress,
-    warnUnresolvedVariables
-} from './apiHandler.js';
+import { displayResponseWithLineNumbersForTab } from './responseView.js';
+import { generateEffectiveAuthData, getRequestBuilderService, warnUnresolvedVariables } from './requestServices.js';
+import { setRequestInProgress } from './sendControls.js';
 import { getSettings, resolveRequestSettings } from './state/settingsCache.js';
-import { newRequestId, trackInFlight } from './state/inFlightRequests.js';
+import { inFlightRequestFor, newRequestId, trackInFlight } from './state/inFlightRequests.js';
 import { renderGrpcPanes } from './ResponseDisplayHelper.js';
 import { getActiveTabId, isTabCurrentlyActive } from './streaming/streamSession.js';
-import { startOrSend as grpcStreamStartOrSend } from './grpcStreamHandler.js';
+import { startOrSend as grpcStreamStartOrSend, cancelStream, hasActiveStream } from './grpcStreamHandler.js';
 import { recordGrpcHistory } from './grpcHistory.js';
 import { createKeyValueRow, isKeyValueInput } from './keyValueManager.js';
 import { getCurrentEndpoint } from './state/currentEndpoint.js';
@@ -977,5 +973,19 @@ function setProtoStatusError(message) {
     if (grpcProtoStatus) {
         grpcProtoStatus.textContent = message || 'Error';
         grpcProtoStatus.setAttribute('data-state', 'error');
+    }
+}
+
+/** @returns {Promise<void>} */
+export async function handleGrpcCancel() {
+    const tabId = await getActiveTabId();
+    if (tabId && hasActiveStream(tabId)) {
+        await cancelStream(tabId);
+        setRequestInProgress(false);
+        return;
+    }
+    const unaryId = inFlightRequestFor(tabId);
+    if (unaryId) {
+        await window.backendAPI.grpc.unaryCancel(unaryId).catch(() => { });
     }
 }

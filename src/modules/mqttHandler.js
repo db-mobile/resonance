@@ -1,4 +1,4 @@
-import { clearResponseDisplayForTab } from './apiHandler.js';
+import { clearResponseDisplayForTab } from './responseView.js';
 import { getSettings } from './state/settingsCache.js';
 import { app } from './appContext.js';
 import { updateStatusDisplay } from './statusDisplay.js';
@@ -8,22 +8,13 @@ import {
     StreamSession,
     createBackendEventListener,
     getActiveTabId,
-    isTabCurrentlyActive
+    isTabCurrentlyActive,
+    transcriptResponseMeta
 } from './streaming/streamSession.js';
 
 const session = new StreamSession({
     protocol: 'MQTT',
-    buildResponseMeta: (entry, transcript, state) => ({
-        data: transcript,
-        headers: {},
-        status: state === 'open' ? 101 : null,
-        statusText: state === 'open' ? 'Connected' : '',
-        ttfb: null,
-        size: null,
-        timings: null,
-        cookies: [],
-        mqtt: { broker: entry.broker || '', state }
-    })
+    buildResponseMeta: transcriptResponseMeta({ status: 101, statusText: 'Connected', key: 'mqtt', addressField: 'broker' })
 });
 
 /**

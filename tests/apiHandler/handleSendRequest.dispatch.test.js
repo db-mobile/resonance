@@ -12,31 +12,36 @@ const handlers = {
     grpc: jest.fn()
 };
 
+const cancels = {
+    websocket: jest.fn(),
+    sse: jest.fn(),
+    mqtt: jest.fn(),
+    grpc: jest.fn()
+};
+
 async function loadApiHandler({ resolveVariablesError = null, variables = null } = {}) {
     document.body.innerHTML = requestBarMarkup() + requestFormMarkup();
     jest.resetModules();
     Object.values(handlers).forEach(fn => fn.mockReset());
+    Object.values(cancels).forEach(fn => fn.mockReset());
 
-    jest.doMock('../../src/modules/collectionManager.js', () => ({
-        saveAllRequestModifications: jest.fn().mockResolvedValue(undefined),
-        saveRequestToCollection: jest.fn(),
-        getCollections: jest.fn().mockResolvedValue([])
-    }));
     jest.doMock('../../src/modules/websocketHandler.js', () => ({
         handleWebSocketSend: handlers.websocket,
-        handleWebSocketCancel: jest.fn(),
+        handleWebSocketCancel: cancels.websocket,
         isWebSocketLive: liveness.websocket
     }));
     jest.doMock('../../src/modules/sseHandler.js', () => ({
         handleSseConnect: handlers.sse,
-        handleSseCancel: jest.fn()
+        handleSseCancel: cancels.sse,
+        isSseLive: jest.fn(() => false)
     }));
     jest.doMock('../../src/modules/mqttHandler.js', () => ({
         handleMqttSend: handlers.mqtt,
-        handleMqttCancel: jest.fn()
+        handleMqttCancel: cancels.mqtt
     }));
     jest.doMock('../../src/modules/grpcHandler.js', () => ({
-        handleGrpcSend: handlers.grpc
+        handleGrpcSend: handlers.grpc,
+        handleGrpcCancel: cancels.grpc
     }));
 
     if (variables) {
@@ -72,7 +77,8 @@ async function loadApiHandler({ resolveVariablesError = null, variables = null }
 
     const apiHandler = await import('../../src/modules/apiHandler.js');
     const { setRequestMode } = await import('../../src/modules/requestModeManager.js');
-    const { authManager } = await import('../../src/modules/authManager.js');
+    const { AuthManager } = await import('../../src/modules/authManager.js');
+    const authManager = new AuthManager({ typeSelect: null, fieldsContainer: null });
     const { initTabListeners } = await import('../../src/modules/tabManager.js');
     const { setCurrentEndpoint } = await import('../../src/modules/state/currentEndpoint.js');
 
@@ -83,6 +89,11 @@ async function loadApiHandler({ resolveVariablesError = null, variables = null }
         settings: { get: jest.fn().mockResolvedValue({}) },
         sendApiRequest: jest.fn().mockResolvedValue({ status: 200, headers: {}, body: '' })
     };
+
+    const { app } = await import('../../src/modules/appContext.js');
+    app.authManager = authManager;
+    const { installTestRequestPipeline } = await import('../helpers/requestPipeline.js');
+    await installTestRequestPipeline(app, window.backendAPI);
 
     setCurrentEndpoint(null);
 
@@ -359,6 +370,49 @@ describe('streaming payloads resolve {{variables}}', () => {
             subscribeTopic: 'devices/d1/#',
             publishTopic: 'devices/d1/cmd'
         });
+    });
+});
+
+describe('handleCancelRequest dispatches to exactly one protocol cancel', () => {
+    test.each(['websocket', 'sse', 'mqtt'])('%s cancels its own stream and leaves the in-progress bracket', async (mode) => {
+        const { handleSendRequest, handleCancelRequest, setRequestMode } = await loadApiHandler();
+        setRequestMode(mode);
+        handlers[mode].mockImplementation(() => new Promise(() => {}));
+        handleSendRequest();
+        await new Promise(resolve => setTimeout(resolve, 0));
+        expect(document.getElementById('send-request-btn').style.display).toBe('none');
+
+        await handleCancelRequest();
+
+        expect(cancels[mode]).toHaveBeenCalledTimes(1);
+        for (const [key, fn] of Object.entries(cancels)) {
+            if (key !== mode) {
+                expect(fn).not.toHaveBeenCalled();
+            }
+        }
+        expect(document.getElementById('send-request-btn').style.display).not.toBe('none');
+        expect(document.getElementById('cancel-request-btn').style.display).toBe('none');
+    });
+
+    test('grpc delegates to the gRPC cancel handler', async () => {
+        const { handleCancelRequest, setRequestMode } = await loadApiHandler();
+        setRequestMode('grpc');
+
+        await handleCancelRequest();
+
+        expect(cancels.grpc).toHaveBeenCalledTimes(1);
+        expect(cancels.websocket).not.toHaveBeenCalled();
+    });
+
+    test('http with nothing in flight calls no protocol cancel and leaves the bridge alone', async () => {
+        const { handleCancelRequest, setRequestMode } = await loadApiHandler();
+        window.backendAPI.cancelApiRequest = jest.fn();
+        setRequestMode('http');
+
+        await handleCancelRequest();
+
+        Object.values(cancels).forEach(fn => expect(fn).not.toHaveBeenCalled());
+        expect(window.backendAPI.cancelApiRequest).not.toHaveBeenCalled();
     });
 });
 

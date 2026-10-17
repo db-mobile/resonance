@@ -3,17 +3,18 @@
  * @module graphqlSubscriptionHandler
  */
 
-import { clearResponseDisplayForTab } from './apiHandler.js';
+import { clearResponseDisplayForTab } from './responseView.js';
 import { resolveTlsOptions } from './tlsOptions.js';
 import { toast } from './ui/Toast.js';
 import {
     StreamSession,
     createBackendEventListener,
-    getActiveTabId
+    getActiveTabId,
+    transcriptResponseMeta
 } from './streaming/streamSession.js';
 import { isStaleEvent } from './streaming/streamState.js';
 import {
-    normalizeSubscriptionUrl,
+    normalizeWsUrl,
     buildConnectionInit,
     buildSubscribe,
     buildComplete,
@@ -24,17 +25,7 @@ const SUB_ID = '1';
 
 const session = new StreamSession({
     protocol: 'GraphQL',
-    buildResponseMeta: (entry, transcript, state) => ({
-        data: transcript,
-        headers: {},
-        status: state === 'open' ? 101 : null,
-        statusText: state === 'open' ? 'Subscription Active' : '',
-        ttfb: null,
-        size: null,
-        timings: null,
-        cookies: [],
-        graphqlSubscription: { url: entry.url || '', state }
-    })
+    buildResponseMeta: transcriptResponseMeta({ status: 101, statusText: 'Subscription Active', key: 'graphqlSubscription' })
 });
 
 /**
@@ -60,37 +51,6 @@ async function sendFrame(tabId, entry, messageObj) {
         message: JSON.stringify(messageObj),
         ...(entry.tls || {})
     });
-}
-
-const ORIGINAL_LABELS = new WeakMap();
-
-/**
- * @param {HTMLElement|null} btn
- * @param {boolean} active
- * @param {string} stopHtml
- */
-function setButtonStop(btn, active, stopHtml) {
-    if (!btn) {
-        return;
-    }
-    if (!ORIGINAL_LABELS.has(btn)) {
-        ORIGINAL_LABELS.set(btn, { html: btn.innerHTML, title: btn.title });
-    }
-    const original = ORIGINAL_LABELS.get(btn);
-    if (active) {
-        btn.innerHTML = stopHtml;
-        btn.title = 'Stop subscription';
-    } else {
-        btn.innerHTML = original.html;
-        btn.title = original.title;
-    }
-}
-
-async function refreshRunButton(tabId, active) {
-    if ((await getActiveTabId()) !== tabId) {
-        return;
-    }
-    setButtonStop(document.getElementById('send-request-btn'), active, 'Stop');
 }
 
 async function handleBackendEvent(event) {
@@ -132,7 +92,6 @@ async function handleBackendEvent(event) {
             tabId,
             `CLOSED ${payload.code || 1000}${payload.reason ? ` ${payload.reason}` : ''}`
         );
-        await refreshRunButton(tabId, false);
         return;
     }
 
@@ -144,7 +103,6 @@ async function handleBackendEvent(event) {
             null
         );
         await session.append(tabId, 'ERROR', payload.message || 'Subscription error');
-        await refreshRunButton(tabId, false);
     }
 }
 
@@ -177,7 +135,6 @@ async function handleProtocolMessage(tabId, entry, msg) {
             try {
                 await window.backendAPI?.graphqlSubscription?.close(tabId);
             } catch {}
-            await refreshRunButton(tabId, false);
             return;
         }
         case 'ping': {
@@ -221,7 +178,7 @@ export async function handleGraphQLSubscriptionStart({ url, headers = {}, query,
         return;
     }
 
-    const normalizedUrl = normalizeSubscriptionUrl(url?.trim());
+    const normalizedUrl = normalizeWsUrl(url?.trim());
     if (!normalizedUrl) {
         toast.error('GraphQL endpoint URL is required');
         return;
@@ -247,14 +204,12 @@ export async function handleGraphQLSubscriptionStart({ url, headers = {}, query,
     session.set(tabId, entry);
     clearResponseDisplayForTab(tabId);
     await session.updateStatus(tabId, 'Subscription connecting...', null);
-    await refreshRunButton(tabId, true);
 
     try {
         await sendFrame(tabId, entry, buildConnectionInit(connectionInitPayload(headers)));
     } catch (error) {
         await session.append(tabId, 'ERROR', `Connection failed: ${error.message || error}`);
         await session.updateStatus(tabId, 'Subscription connection failed', null);
-        await refreshRunButton(tabId, false);
     }
 }
 
@@ -277,7 +232,6 @@ export async function handleGraphQLSubscriptionCancel() {
     session.set(tabId, { ...entry, state: 'closed' });
     await session.updateStatus(tabId, 'Subscription stopped', null);
     await session.append(tabId, 'STOPPED', 'subscription stopped by user');
-    await refreshRunButton(tabId, false);
     return true;
 }
 
