@@ -27,15 +27,13 @@ async function loadHarness() {
     modeCalls.length = 0;
     Object.values(keyValueCalls).forEach(fn => fn.mockClear());
 
-    jest.doMock('../src/modules/apiHandler.js', () => ({
+    jest.doMock('../src/modules/responseView.js', () => ({
         displayResponseWithLineNumbersForTab: jest.fn(),
         clearResponseDisplayForTab: jest.fn(),
         clearSchemaValidationBadge: jest.fn(),
         clearGraphQLErrorsBadge: jest.fn()
     }));
-    jest.doMock('../src/modules/authManager.js', () => ({
-        authManager: { getAuthConfig: jest.fn(() => ({})), loadAuthConfig: jest.fn() }
-    }));
+    const authManagerStub = { getAuthConfig: jest.fn(() => ({})), loadAuthConfig: jest.fn() };
     jest.doMock('../src/modules/mqttHandler.js', () => ({ refreshMqttConnectionUi: jest.fn() }));
 
     jest.doMock('../src/modules/requestModeManager.js', () => {
@@ -87,7 +85,7 @@ async function loadHarness() {
     app.inlineScriptManager = { loadScripts: jest.fn(), clear: jest.fn() };
     app.schemaController = { loadSchema: jest.fn(), clearContext: jest.fn() };
 
-    const manager = new WorkspaceTabStateManager({ ...domElements, graphqlBodyManager });
+    const manager = new WorkspaceTabStateManager({ ...domElements, graphqlBodyManager, authManager: authManagerStub });
     manager._restoreResponse = jest.fn();
     manager._clearResponse = jest.fn();
 

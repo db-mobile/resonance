@@ -9,15 +9,13 @@ async function loadHarness() {
     Object.values(statusCalls).forEach(fn => fn.mockClear());
     displayResponse = jest.fn();
 
-    jest.doMock('../src/modules/apiHandler.js', () => ({
+    jest.doMock('../src/modules/responseView.js', () => ({
         displayResponseWithLineNumbersForTab: displayResponse,
         clearResponseDisplayForTab: jest.fn(),
         clearSchemaValidationBadge: jest.fn(),
         clearGraphQLErrorsBadge: jest.fn()
     }));
-    jest.doMock('../src/modules/authManager.js', () => ({
-        authManager: { getAuthConfig: jest.fn(() => ({})), loadAuthConfig: jest.fn() }
-    }));
+    const authManagerStub = { getAuthConfig: jest.fn(() => ({})), loadAuthConfig: jest.fn() };
     jest.doMock('../src/modules/mqttHandler.js', () => ({ refreshMqttConnectionUi: jest.fn() }));
     jest.doMock('../src/modules/statusDisplay.js', () => ({
         updateStatusDisplay: statusCalls.status,
@@ -36,7 +34,7 @@ async function loadHarness() {
     };
     app.responseContainerManager = { getOrCreateContainer: jest.fn(() => container) };
 
-    const manager = new WorkspaceTabStateManager({});
+    const manager = new WorkspaceTabStateManager({ authManager: authManagerStub });
     return { manager, container };
 }
 

@@ -3,7 +3,6 @@
  * @module renderer
  */
 
-import { getCurrentEndpoint, setCurrentEndpoint } from './modules/state/currentEndpoint.js';
 import { app } from './modules/appContext.js';
 import './modules/ipcBridge.js';
 
@@ -13,7 +12,7 @@ import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl } from 
 import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
-import { handleSendRequest, handleCancelRequest, handleGenerateCurl, invalidateEnvironmentCache } from './modules/apiHandler.js';
+import { handleSendRequest, handleCancelRequest, handleGenerateCurl } from './modules/apiHandler.js';
 import { getSettingsCache } from './modules/state/settingsCache.js';
 import { markTabModified } from './modules/state/tabModified.js';
 import { applyGrpcState, captureGrpcState, initGrpcUI } from './modules/grpcHandler.js';
@@ -23,10 +22,8 @@ import { initGraphQLSubscriptionHandler } from './modules/graphqlSubscriptionHan
 import { initSseHandler } from './modules/sseHandler.js';
 import { initMqttHandler, handleMqttCancel } from './modules/mqttHandler.js';
 import { initGrpcStreamHandler } from './modules/grpcStreamHandler.js';
-import { loadCollections, importCollectionFile, importPostmanEnvironment, importCurl, openExistingCollection, initializeBodyTracking, saveAllRequestModifications, saveRequestToCollection } from './modules/collectionManager.js';
 import { initResizer } from './modules/resizer.js';
 import { i18n } from './i18n/I18nManager.js';
-import { authManager } from './modules/authManager.js';
 import { SecretStore } from './modules/storage/SecretStore.js';
 import { StatusBar } from './modules/ui/StatusBar.js';
 import { ContextMenu } from './modules/ui/ContextMenu.js';
@@ -36,7 +33,10 @@ import { certificateFeature } from './modules/certificate.feature.js';
 import { cookieFeature } from './modules/cookie.feature.js';
 import { environmentFeature } from './modules/environment.feature.js';
 import { scriptFeature } from './modules/script.feature.js';
+import { authFeature } from './modules/auth.feature.js';
+import { collectionFeature } from './modules/collection.feature.js';
 import { mockServerFeature } from './modules/mockServer.feature.js';
+import { requestPipelineFeature } from './modules/requestPipeline.feature.js';
 import { schemaFeature } from './modules/schema.feature.js';
 import { historyFeature } from './modules/history.feature.js';
 import { workspaceTabFeature } from './modules/workspaceTab.feature.js';
@@ -45,14 +45,12 @@ import { formBodyFeature } from './modules/formBody.feature.js';
 import { settingsFeature } from './modules/settings.feature.js';
 import { StatusDisplayAdapter } from './modules/interfaces/IStatusDisplay.js';
 import { keyboardShortcuts } from './modules/keyboardShortcuts.js';
-import { CollectionRepository } from './modules/storage/CollectionRepository.js';
 import { loadEditor, warmEditors } from './modules/editorLoader.js';
 import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
 import { toast } from './modules/ui/Toast.js';
 import { showDataMigrationIssues } from './modules/ui/MigrationNoticeDialog.js';
 
 app.getApiHandlerSettingsCache = getSettingsCache;
-app.invalidateApiHandlerEnvironmentCache = invalidateEnvironmentCache;
 
 const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
 
@@ -62,8 +60,6 @@ const secretStore = new SecretStore(window.backendAPI, {
     )
 });
 app.secretStore = secretStore;
-
-const collectionRepository = new CollectionRepository(window.backendAPI, secretStore);
 
 const featureRegistry = new FeatureRegistry({
     backendAPI: window.backendAPI,
@@ -79,7 +75,6 @@ const featureRegistry = new FeatureRegistry({
         return this._shared.get(name);
     },
 });
-featureRegistry.provide('collectionRepository', collectionRepository);
 featureRegistry
     .register(graphqlBodyFeature)
     .register(formBodyFeature)
@@ -89,7 +84,10 @@ featureRegistry
     .register(settingsFeature)
     .register(cookieFeature)
     .register(scriptFeature)
+    .register(authFeature)
+    .register(collectionFeature)
     .register(mockServerFeature)
+    .register(requestPipelineFeature)
     .register(schemaFeature)
     .register(historyFeature)
     .register(workspaceTabFeature)
@@ -108,70 +106,8 @@ const workspaceTabController = workspaceTab.controller;
 const workspaceTabService = workspaceTab.service;
 const workspaceTabStateManager = workspaceTab.stateManager;
 const settingsModal = featureRegistry.get('settings').modal;
+const collectionController = featureRegistry.get('collection').controller;
 const { layoutManager } = featureRegistry.get('settings');
-
-/** @returns {Promise<void>} */
-async function handleSaveShortcut() {
-    const controller = app.workspaceTabController;
-    const activeTab = controller ? await controller.service.getActiveTab() : null;
-
-    if (activeTab && activeTab.type === 'runner') {
-        return;
-    }
-
-    const tabEndpoint = activeTab?.endpoint?.collectionId && activeTab?.endpoint?.endpointId
-        ? activeTab.endpoint
-        : null;
-    const endpoint = tabEndpoint || getCurrentEndpoint();
-
-    try {
-        if (endpoint) {
-            await saveAllRequestModifications(endpoint.collectionId, endpoint.endpointId);
-
-            if (controller) {
-                await controller.markCurrentTabUnmodified();
-            }
-            toast.success(activeTab?.name ? `Saved "${activeTab.name}"` : 'Request saved');
-            return;
-        }
-
-        if (!controller || !activeTab) {
-            return;
-        }
-
-        const state = await controller.stateManager.captureCurrentState();
-        const requestData = {
-            name: activeTab.name,
-            ...state.request
-        };
-
-        const saved = await saveRequestToCollection(requestData);
-        if (!saved) {
-            return;
-        }
-
-        setCurrentEndpoint({
-            collectionId: saved.collectionId,
-            endpointId: saved.endpointId
-        });
-        await controller.service.updateTab(activeTab.id, {
-            name: saved.name,
-            endpoint: {
-                collectionId: saved.collectionId,
-                endpointId: saved.endpointId,
-                protocol: state.request.protocol || 'http'
-            }
-        });
-        controller.tabBar.updateTab(activeTab.id, { name: saved.name });
-        await controller.markCurrentTabUnmodified();
-
-        toast.success(saved.collectionName
-            ? `Saved "${saved.name}" to ${saved.collectionName}`
-            : `Saved "${saved.name}"`);
-    } catch (error) {
-        toast.error(`Save failed: ${error.message || String(error)}`);
-    }
-}
 
 /**
  * @param {boolean} [show]
@@ -233,7 +169,7 @@ const SHORTCUTS = [
     },
     {
         key: 'KeyS', ctrl: true, category: 'Request', description: 'Save request',
-        handler: () => handleSaveShortcut()
+        handler: () => workspaceTabController.saveActiveTab()
     },
     {
         key: 'Escape', category: 'Request', description: 'Cancel request', hintTarget: 'cancel-request-btn',
@@ -276,7 +212,7 @@ const SHORTCUTS = [
         key: 'KeyO', ctrl: true, category: 'Actions', description: 'Import collection file', hintTarget: 'import-collection-btn',
         handler: () => {
             if (importCollectionBtn) {
-                importCollectionFile();
+                collectionController.importCollectionFile();
             }
         }
     },
@@ -490,25 +426,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                 label: 'Collection File',
                 translationKey: 'import.collection',
                 icon: '<path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path><path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14 3v6h6"></path>',
-                onClick: importCollectionFile
+                onClick: () => collectionController.importCollectionFile()
             },
             {
                 label: 'Postman Environment',
                 translationKey: 'import.postman_environment',
                 icon: '<path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>',
-                onClick: importPostmanEnvironment
+                onClick: () => collectionController.importPostmanEnvironment()
             },
             {
                 label: 'cURL Command',
                 translationKey: 'import.curl',
                 icon: '<path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>',
-                onClick: importCurl
+                onClick: () => collectionController.handleImportCurl(null)
             },
             {
                 label: 'Existing Folder',
                 translationKey: 'import.open_existing',
                 icon: '<path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path>',
-                onClick: openExistingCollection
+                onClick: () => collectionController.handleOpenExisting()
             }
         ]);
     });
@@ -575,47 +511,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    app.authManager = authManager;
-    authManager.getInheritedAuthInfo = async () => {
-        const controller = app.collectionController;
-        const current = getCurrentEndpoint();
-        if (!controller || !current?.collectionId) {
-            return null;
-        }
-        const [collection, folder] = await Promise.all([
-            controller.repository.getById(current.collectionId),
-            controller.repository.findFolderForEndpoint(current.collectionId, current.endpointId)
-        ]);
-        const folderHasAuth = Boolean(folder?.authConfig?.type && folder.authConfig.type !== 'inherit');
-        const authConfig = folderHasAuth
-            ? await controller.repository.getFolderAuthConfig(current.collectionId, folder.id)
-            : await controller.repository.getCollectionAuthConfig(current.collectionId);
-        return {
-            collectionId: current.collectionId,
-            collectionName: collection?.name || '',
-            folderId: folderHasAuth ? folder.id : null,
-            folderName: folderHasAuth ? folder.name : '',
-            authType: authConfig?.type || 'none'
-        };
-    };
-    authManager.onOpenCollectionAuth = async (collectionId, folderId = null) => {
-        const controller = app.collectionController;
-        if (!controller) {
-            return;
-        }
-        const collection = await controller.repository.getById(collectionId);
-        if (!collection) {
-            return;
-        }
-        const folder = folderId
-            ? (collection.folders || []).find((f) => f.id === folderId)
-            : null;
-        if (folder) {
-            await controller.handleFolderAuth(collection, folder);
-        } else {
-            await controller.handleCollectionAuth(collection);
-        }
-    };
     app.captureGrpcState = captureGrpcState;
     app.applyGrpcState = applyGrpcState;
 
@@ -688,7 +583,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateStatusDisplay('Ready', null);
 
     initKeyValueListeners();
-    initializeBodyTracking();
+    collectionController.initializeBodyTracking(bodyInput);
     initResizer(layoutManager);
     initKeyboardShortcuts();
     applyShortcutHints();
@@ -719,7 +614,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     updateQueryParamsFromUrl();
 
-    loadCollections();
+    collectionController.loadCollections();
 
     scheduleIdleTask(() => {
         warmEditors();

@@ -17,6 +17,8 @@ const inFlight = new Map();
  * @param {number} [now]
  * @returns {boolean}
  */
+
+import { DEFAULT_REDIRECT_URI } from './authTypes.js';
 export function tokenNeedsRefresh(config, now = Date.now()) {
     if (!config?.token || typeof config.expiresAt !== 'number') {
         return false;
@@ -26,28 +28,50 @@ export function tokenNeedsRefresh(config, now = Date.now()) {
 
 /**
  * @param {Object} config
- * @returns {Object|null}
+ * @param {string} grantType
+ * @param {{authorizationCode?: string, codeVerifier?: string|null}} [extras]
+ * @returns {Object}
  */
-export function buildRenewalRequest(config) {
+export function buildTokenRequest(config, grantType, extras = {}) {
     const base = {
+        grantType,
         tokenUrl: config.tokenUrl,
         clientId: config.clientId,
         clientSecret: config.clientSecret || null,
         clientAuthMethod: config.clientAuthMethod || 'body'
     };
-    if (config.refreshToken) {
-        return { ...base, grantType: 'refresh_token', refreshToken: config.refreshToken };
+    if (grantType === 'refresh_token') {
+        return { ...base, refreshToken: config.refreshToken };
     }
-    const grantType = config.grantType || 'client_credentials';
-    if (!REPEATABLE_GRANTS.has(grantType)) {
-        return null;
+    if (grantType === 'authorization_code') {
+        return {
+            ...base,
+            authorizationCode: extras.authorizationCode,
+            redirectUri: config.redirectUri || DEFAULT_REDIRECT_URI,
+            codeVerifier: extras.codeVerifier ?? null
+        };
     }
-    const request = { ...base, grantType, scope: config.scope || null, audience: config.audience || null };
+    const request = { ...base, scope: config.scope || null, audience: config.audience || null };
     if (grantType === 'password') {
         request.username = config.username;
         request.password = config.password;
     }
     return request;
+}
+
+/**
+ * @param {Object} config
+ * @returns {Object|null}
+ */
+export function buildRenewalRequest(config) {
+    if (config.refreshToken) {
+        return buildTokenRequest(config, 'refresh_token');
+    }
+    const grantType = config.grantType || 'client_credentials';
+    if (!REPEATABLE_GRANTS.has(grantType)) {
+        return null;
+    }
+    return buildTokenRequest(config, grantType);
 }
 
 /**

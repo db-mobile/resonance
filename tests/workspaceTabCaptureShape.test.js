@@ -16,18 +16,13 @@ async function loadHarness() {
     document.body.innerHTML = requestBarMarkup() + requestFormMarkup();
     jest.resetModules();
 
-    jest.doMock('../src/modules/apiHandler.js', () => ({
+    jest.doMock('../src/modules/responseView.js', () => ({
         displayResponseWithLineNumbersForTab: jest.fn(),
         clearResponseDisplayForTab: jest.fn(),
         clearSchemaValidationBadge: jest.fn(),
         clearGraphQLErrorsBadge: jest.fn()
     }));
-    jest.doMock('../src/modules/authManager.js', () => ({
-        authManager: {
-            getAuthConfig: jest.fn(() => AUTH_CONFIG),
-            loadAuthConfig: jest.fn()
-        }
-    }));
+    const authManagerStub = { getAuthConfig: jest.fn(() => AUTH_CONFIG), loadAuthConfig: jest.fn() };
 
     const { WorkspaceTabStateManager } = await import('../src/modules/WorkspaceTabStateManager.js');
     const { setRequestMode, RequestMode } = await import('../src/modules/requestModeManager.js');
@@ -49,7 +44,7 @@ async function loadHarness() {
     app.captureGrpcState = jest.fn(() => ({ target: 'localhost:50051' }));
     app.graphqlBodyManager = graphqlBodyManager;
 
-    const manager = new WorkspaceTabStateManager({ ...domElements, graphqlBodyManager });
+    const manager = new WorkspaceTabStateManager({ ...domElements, graphqlBodyManager, authManager: authManagerStub });
 
     return { manager, setRequestMode, RequestMode, setCurrentEndpoint, app };
 }

@@ -1,8 +1,7 @@
 import { getCurrentEndpoint, setCurrentEndpoint } from './state/currentEndpoint.js';
 import { app } from './appContext.js';
 import { parseKeyValuePairs, parseKeyValueRows, populateKeyValueList, clearKeyValueList, addKeyValueRow, updateUrlFromQueryParams } from './keyValueManager.js';
-import { authManager } from './authManager.js';
-import { displayResponseWithLineNumbersForTab, clearResponseDisplayForTab, clearSchemaValidationBadge, clearGraphQLErrorsBadge } from './apiHandler.js';
+import { displayResponseWithLineNumbersForTab, clearResponseDisplayForTab, clearSchemaValidationBadge, clearGraphQLErrorsBadge } from './responseView.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 
 import { displayPerformanceMetrics, clearPerformanceMetrics } from './performanceMetrics.js';
@@ -53,6 +52,12 @@ export class WorkspaceTabStateManager {
     constructor(domElements) {
         this.dom = domElements;
         this.graphqlBodyManager = domElements.graphqlBodyManager || null;
+        this.authManager = domElements.authManager || null;
+    }
+
+    /** @returns {{type: string, config: Object}} */
+    _authConfig() {
+        return this.authManager ? this.authManager.getAuthConfig() : { type: 'none', config: {} };
     }
 
     /** @returns {Promise<Object>} */
@@ -102,7 +107,7 @@ export class WorkspaceTabStateManager {
         const sseBodyMode = document.getElementById('body-mode-select')?.value === 'text'
             ? 'text'
             : 'json';
-        const authConfig = authManager.getAuthConfig();
+        const authConfig = this._authConfig();
 
         return {
             request: {
@@ -171,7 +176,7 @@ export class WorkspaceTabStateManager {
     /** @returns {Object} */
     _captureGraphQL() {
         const graphqlUrlInput = document.getElementById('graphql-url-input');
-        const authConfig = authManager.getAuthConfig();
+        const authConfig = this._authConfig();
 
         return {
             request: {
@@ -198,7 +203,7 @@ export class WorkspaceTabStateManager {
 
     /** @returns {Object} */
     _captureHttp() {
-        const authConfig = authManager.getAuthConfig();
+        const authConfig = this._authConfig();
         const containerElements = app.responseContainerManager?.getActiveElements();
 
         return {
@@ -314,11 +319,11 @@ export class WorkspaceTabStateManager {
      * @returns {void}
      */
     _restoreAuth(request) {
-        if (!authManager) {
+        if (!this.authManager) {
             return;
         }
 
-        authManager.loadAuthConfig({
+        this.authManager.loadAuthConfig({
             type: request.authType || 'none',
             config: request.authConfig || {}
         });
