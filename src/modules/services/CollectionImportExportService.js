@@ -213,7 +213,8 @@ export class CollectionImportExportService {
             }
 
             if (app.environmentController) {
-                await app.environmentController.handleImportEnvironment(environment);
+                const created = await app.environmentController.handleImportEnvironment(environment);
+                this.statusDisplay.update(`Imported environment "${created.name}"`, null);
             }
             return environment;
         } catch (error) {

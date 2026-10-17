@@ -229,7 +229,8 @@ impl ProxySettings {
             && let Some(host) = parsed.host_str()
         {
             for pattern in bypass_list {
-                let pattern = pattern.trim();
+                let pattern = pattern.trim().to_ascii_lowercase();
+                let pattern = pattern.as_str();
                 if pattern.is_empty() {
                     continue;
                 }
@@ -758,6 +759,31 @@ mod tests {
             "https://api.internal.test/x",
             "https://internal.test/x",
             "https://host.corp.example/x",
+        ] {
+            assert!(
+                matches!(state.get_proxy_config(bypassed), ProxyAction::Disable),
+                "{} should bypass the proxy",
+                bypassed
+            );
+        }
+    }
+
+    #[test]
+    fn bypass_patterns_match_case_insensitively() {
+        let state = state_with(ProxySettings {
+            bypass_list: vec![
+                "API.Corp.com".to_string(),
+                "*.Example.COM".to_string(),
+                ".EXAMPLE.org".to_string(),
+            ],
+            ..enabled_manual()
+        });
+
+        for bypassed in [
+            "https://api.corp.com/x",
+            "https://API.CORP.COM/x",
+            "https://www.example.com/x",
+            "https://sub.example.org/x",
         ] {
             assert!(
                 matches!(state.get_proxy_config(bypassed), ProxyAction::Disable),

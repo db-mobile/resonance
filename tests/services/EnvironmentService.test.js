@@ -195,8 +195,38 @@ describe('EnvironmentService', () => {
             expect(events).toEqual([{ type: 'environments-imported', merge: true }]);
         });
 
+        test('importEnvironments accepts a single exported environment', async () => {
+            await service.importEnvironments({ name: 'Solo', variables: { k: '' }, secretKeys: ['k'], color: null });
+
+            expect(repository.importEnvironments).toHaveBeenCalledWith({
+                items: [{ id: null, name: 'Solo', variables: { k: '' }, secretKeys: ['k'], color: null }]
+            }, false);
+        });
+
+        test('importEnvironment keeps secrets out of the created variables', async () => {
+            const created = await service.importEnvironment({
+                name: 'Staging',
+                variables: { baseUrl: 'https://s.example', token: 't0k' },
+                secretKeys: ['token']
+            });
+
+            expect(created).toEqual({ id: 'env2', name: 'Prod' });
+            expect(repository.createEnvironment).toHaveBeenCalledWith('Staging', { baseUrl: 'https://s.example' }, null);
+            expect(repository.setEnvironmentVariable).toHaveBeenCalledWith('env2', 'token', 't0k', true);
+        });
+
+        test('importEnvironment renames on a clash and falls back to a default name', async () => {
+            await service.importEnvironment({ name: 'Dev', variables: {} });
+            expect(repository.createEnvironment).toHaveBeenLastCalledWith('Dev 1', {}, null);
+
+            await service.importEnvironment({ variables: {} });
+            expect(repository.createEnvironment).toHaveBeenLastCalledWith('Imported Environment', {}, null);
+            expect(repository.setEnvironmentVariable).not.toHaveBeenCalled();
+        });
+
         test('importEnvironments rejects malformed data', async () => {
             await expect(service.importEnvironments({})).rejects.toThrow('Invalid import data format');
+            await expect(service.importEnvironments({ name: 'x' })).rejects.toThrow('Invalid import data format');
             expect(statusDisplay.update).toHaveBeenCalledWith('Error importing environments: Invalid import data format', null);
         });
     });
