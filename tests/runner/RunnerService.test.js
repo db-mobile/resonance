@@ -1,6 +1,13 @@
 /* global window */
 import { RunnerService } from '../../src/modules/services/RunnerService.js';
 import { ScriptService } from '../../src/modules/services/ScriptService.js';
+import { CertificateService } from '../../src/modules/services/CertificateService.js';
+import { CertificateRepository } from '../../src/modules/storage/CertificateRepository.js';
+import { CollectionRepository } from '../../src/modules/storage/CollectionRepository.js';
+import { EnvironmentRepository } from '../../src/modules/storage/EnvironmentRepository.js';
+import { MockServerRepository } from '../../src/modules/storage/MockServerRepository.js';
+import { MockServerService } from '../../src/modules/services/MockServerService.js';
+import { createRequestPipeline } from '../../src/modules/requestPipeline.feature.js';
 import { app } from '../../src/modules/appContext.js';
 
 function inheritedFromCollection(authConfig) {
@@ -51,7 +58,17 @@ describe('RunnerService', () => {
             update: jest.fn()
         };
 
-        service = new RunnerService(mockRepository, mockBackendAPI, mockStatusDisplay);
+        const pipeline = createRequestPipeline({
+            backendAPI: mockBackendAPI,
+            secretStore: null,
+            statusDisplay: mockStatusDisplay,
+            collectionRepository: new CollectionRepository(mockBackendAPI, null),
+            environmentRepository: new EnvironmentRepository(mockBackendAPI, null),
+            mockServerService: new MockServerService(new MockServerRepository(mockBackendAPI), null),
+            certificates: new CertificateService(new CertificateRepository(mockBackendAPI)),
+            cookies: { getCookieHeader: (url) => app.cookieController?.getCookieHeader(url) ?? null }
+        });
+        service = new RunnerService(mockRepository, mockBackendAPI, mockStatusDisplay, { pipeline });
 
         mockEnvironmentService = {
             getActiveEnvironment: jest.fn().mockResolvedValue({ id: 'env1', name: 'Dev', secretKeys: [] }),
@@ -61,7 +78,7 @@ describe('RunnerService', () => {
         };
         window.backendAPI = mockBackendAPI;
         app.scriptController = {
-            service: new ScriptService(null, mockEnvironmentService, null),
+            service: new ScriptService(null, mockEnvironmentService, null, null, { backendAPI: mockBackendAPI }),
             getScriptsForEndpoint: jest.fn().mockResolvedValue({ preRequestScript: '', testScript: '' })
         };
     });

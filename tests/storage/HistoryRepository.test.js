@@ -24,6 +24,13 @@ describe('HistoryRepository', () => {
     });
 
     describe('getAll', () => {
+        test('caps saved binary bytes while preserving format metadata', async () => {
+            mockBackendAPI.store.get.mockResolvedValue([{ id: 'h1', timestamp: 1, request: {},
+                response: { data: null, isJson: false, isBinary: true, bodyBase64: 'A'.repeat(MAX_HISTORY_RESPONSE_SIZE + 1) } }]);
+            const result = await repository.getAll();
+            expect(result[0].response).toEqual({ data: null, isJson: false, isBinary: true, bodyBase64: null, truncated: true });
+        });
+
         test('should return history entries sorted by timestamp descending', async () => {
             const history = [
                 { id: 'h1', timestamp: 1000, request: { url: 'http://first.com' } },

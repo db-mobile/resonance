@@ -63,6 +63,8 @@ function escapeGoString(str) {
         .replace(/\t/g, '\\t');
 }
 
+const escapeJavaString = escapeGoString;
+
 /**
  * @param {string} str
  * @returns {string}
@@ -634,7 +636,7 @@ function generateRuby(config) {
 function javaMethodCall(method, bodyText) {
     const hasBodyText = bodyText !== null;
     const publisher = hasBodyText
-        ? `HttpRequest.BodyPublishers.ofString("${escapeGoString(bodyText)}")`
+        ? `HttpRequest.BodyPublishers.ofString("${escapeJavaString(bodyText)}")`
         : 'HttpRequest.BodyPublishers.noBody()';
 
     if (method === 'POST' || method === 'PUT') {
@@ -665,10 +667,10 @@ function generateJava(config) {
     lines.push('');
 
     lines.push('        HttpRequest request = HttpRequest.newBuilder()');
-    lines.push(`            .uri(URI.create("${escapeGoString(url)}"))`);
+    lines.push(`            .uri(URI.create("${escapeJavaString(url)}"))`);
 
     for (const [key, value] of validHeaders(headers)) {
-        lines.push(`            .header("${escapeGoString(key)}", "${escapeGoString(value)}")`);
+        lines.push(`            .header("${escapeJavaString(key)}", "${escapeJavaString(value)}")`);
     }
 
     const methodUpper = (method || 'GET').toUpperCase();

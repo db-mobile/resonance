@@ -3,7 +3,6 @@
  * @module services/ScriptService
  */
 
-import { app } from '../appContext.js';
 
 /** @type {ReadonlyArray<string>} */
 export const SCRIPT_MUTABLE_REQUEST_FIELDS = Object.freeze([
@@ -19,14 +18,17 @@ export class ScriptService {
     /**
      * @param {Object} scriptRepository
      * @param {Object} environmentService
-     * @param {Object} statusDisplay
+     * @param {Object} _statusDisplay
      * @param {Object|null} [variableRepository]
+     * @param {{backendAPI?: Object|null, cookieController?: Object|null, getSettings?: (function(): (Object|null))|null}} [deps]
      */
-    constructor(scriptRepository, environmentService, statusDisplay, variableRepository = null) {
+    constructor(scriptRepository, environmentService, _statusDisplay, variableRepository = null, { backendAPI = null, cookieController = null, getSettings = null } = {}) {
         this.repository = scriptRepository;
         this.environmentService = environmentService;
-        this.statusDisplay = statusDisplay;
         this.variableRepository = variableRepository;
+        this.backendAPI = backendAPI;
+        this.cookieController = cookieController;
+        this.getSettings = getSettings;
     }
 
     /**
@@ -182,7 +184,7 @@ export class ScriptService {
 
         try {
             const scriptData = await this._scriptPayload(script, requestConfig, options);
-            const result = await window.backendAPI.scripts.executePreRequest(scriptData);
+            const result = await this.backendAPI.scripts.executePreRequest(scriptData);
             await this._applyScriptSideEffects(result, options.collectionId);
 
             return {
@@ -221,7 +223,7 @@ export class ScriptService {
             const scriptData = await this._scriptPayload(script, requestConfig, options, {
                 response: this._scriptResponse(response)
             });
-            const result = await window.backendAPI.scripts.executeTest(scriptData);
+            const result = await this.backendAPI.scripts.executeTest(scriptData);
             await this._applyScriptSideEffects(result, options.collectionId);
 
             return result;
@@ -250,12 +252,12 @@ export class ScriptService {
 
     /** @returns {Promise<Object|null>} */
     async _cookieController() {
-        const controller = app.cookieController;
+        const controller = this.cookieController;
         if (!controller) {
             return null;
         }
         try {
-            const settings = app.getApiHandlerSettingsCache?.() ?? await window.backendAPI.settings.get();
+            const settings = this.getSettings?.() ?? await this.backendAPI.settings.get();
             if (settings?.cookieJarEnabled === false) {
                 return null;
             }

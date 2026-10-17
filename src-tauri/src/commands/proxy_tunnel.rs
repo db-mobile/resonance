@@ -283,7 +283,7 @@ mod tests {
             while let Some(Ok(message)) = server.next().await {
                 if let Message::Text(text) = message {
                     server
-                        .send(Message::Text(format!("echo:{}", text)))
+                        .send(Message::text(format!("echo:{}", text)))
                         .await
                         .unwrap();
                 }
@@ -335,12 +335,9 @@ mod tests {
                 .await
                 .expect("the handshake should complete through the tunnel");
 
-        socket
-            .send(Message::Text("hello".to_string()))
-            .await
-            .unwrap();
+        socket.send(Message::text("hello")).await.unwrap();
         let reply = socket.next().await.unwrap().unwrap();
-        assert_eq!(reply, Message::Text("echo:hello".to_string()));
+        assert_eq!(reply, Message::text("echo:hello"));
     }
 
     #[tokio::test]

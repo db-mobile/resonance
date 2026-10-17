@@ -4,6 +4,8 @@
  */
 
 import { app } from '../appContext.js';
+import { getCurrentEndpoint, setCurrentEndpoint } from '../state/currentEndpoint.js';
+import { toast } from '../ui/Toast.js';
 import { flushPendingSaves, registerPendingSave } from '../state/pendingSaves.js';
 import { debounce } from '../utils/debounce.js';
 import { WorkspaceTabEndpointLoaderService } from '../services/WorkspaceTabEndpointLoaderService.js';
@@ -122,9 +124,12 @@ export class WorkspaceTabController {
      * @param {WorkspaceTabBar} tabBar
      * @param {WorkspaceTabStateManager} stateManager
      * @param {ResponseContainerManager} responseContainerManager
+     * @param {{requestPipeline?: Object, collectionRequests?: Object}} [deps]
      */
-    constructor(service, tabBar, stateManager, responseContainerManager) {
+    constructor(service, tabBar, stateManager, responseContainerManager, { requestPipeline = null, collectionRequests = null } = {}) {
         this.service = service;
+        this.requestPipeline = requestPipeline;
+        this.collectionRequests = collectionRequests;
         this.tabBar = tabBar;
         this.stateManager = stateManager;
         this.responseContainerManager = responseContainerManager;
@@ -160,8 +165,8 @@ export class WorkspaceTabController {
         this.tabBar.onTabRename = (tabId, newName) => this.renameTab(tabId, newName);
         this.tabBar.onTabDuplicate = (tabId) => this.duplicateTab(tabId);
         this.tabBar.onCloseOthers = (tabId) => this.closeOtherTabs(tabId);
-        this.tabBar.onRunnerTabCreate = () => this.createRunnerTab();
         this.tabBar.onTabReorder = (orderedTabIds) => this.reorderTabs(orderedTabIds);
+        this.tabBar.onTabSave = (tab) => this.saveTab(tab);
     }
 
     /**
@@ -299,7 +304,6 @@ export class WorkspaceTabController {
      */
     async _initializeRunnerTab(tabId, preset = null) {
         const { RunnerController } = await import('./RunnerController.js');
-        const { getCollections, onCollectionsLoaded } = await import('../collectionManager.js');
 
         const mainContentArea = document.getElementById('main-content-area');
         if (!mainContentArea) {return;}
@@ -326,8 +330,9 @@ export class WorkspaceTabController {
 
         const runnerController = new RunnerController(
             window.backendAPI,
-            () => getCollections(),
-            (listener) => onCollectionsLoaded(listener)
+            () => this.collectionRequests.getCollections(),
+            (listener) => this.collectionRequests.onCollectionsLoaded(listener),
+            { requestPipeline: this.requestPipeline }
         );
 
         await runnerController.initialize(runnerContainer, preset);
@@ -775,8 +780,8 @@ export class WorkspaceTabController {
             await this.service.updateTab(activeTabId, currentState);
 
             const ep = currentState.endpoint;
-            if (ep && ep.collectionId && ep.endpointId && app.collectionController) {
-                await app.collectionController.saveRequestBodyModification(
+            if (ep && ep.collectionId && ep.endpointId && this.collectionRequests) {
+                await this.collectionRequests.saveRequestBodyModification(
                     ep.collectionId,
                     ep.endpointId
                 );
@@ -801,6 +806,103 @@ export class WorkspaceTabController {
         try {
             await this.service.reorderTabs(orderedTabIds);
         } catch {}
+    }
+
+    /**
+     * @param {Object} tab
+     * @returns {Promise<void>}
+     */
+    async saveTab(tab) {
+        if (!tab || tab.type === 'runner' || !this.collectionRequests) {
+            return;
+        }
+        try {
+            const bound = tab.endpoint?.collectionId && tab.endpoint?.endpointId ? tab.endpoint : null;
+            const activeTabId = await this.service.getActiveTabId();
+            const endpoint = bound || (tab.id === activeTabId ? getCurrentEndpoint() : null);
+
+            if (endpoint) {
+                await this.collectionRequests.saveAllRequestModifications(endpoint.collectionId, endpoint.endpointId);
+                await this.markCurrentTabUnmodified();
+                toast.success(tab.name ? `Saved "${tab.name}"` : 'Request saved');
+                return;
+            }
+
+            const state = await this.stateManager.captureCurrentState();
+            const saved = await this.collectionRequests.showSaveToCollectionDialog({ name: tab.name, ...state.request });
+            if (!saved) {
+                return;
+            }
+
+            setCurrentEndpoint({ collectionId: saved.collectionId, endpointId: saved.endpointId });
+            await this.service.updateTab(tab.id, {
+                name: saved.name,
+                endpoint: {
+                    collectionId: saved.collectionId,
+                    endpointId: saved.endpointId,
+                    protocol: state.request.protocol || 'http'
+                }
+            });
+            await this.markCurrentTabUnmodified();
+            const tabs = await this.service.getAllTabs();
+            this.tabBar.render(tabs, await this.service.getActiveTabId());
+
+            toast.success(saved.collectionName
+                ? `Saved "${saved.name}" to ${saved.collectionName}`
+                : `Saved "${saved.name}"`);
+        } catch (error) {
+            toast.error(`Save failed: ${error.message || String(error)}`);
+        }
+    }
+
+    /** @returns {Promise<void>} */
+    async saveActiveTab() {
+        const tab = await this.getActiveTab();
+        if (tab) {
+            await this.saveTab(tab);
+        }
+    }
+
+    /**
+     * @param {string} collectionId
+     * @returns {Promise<void>}
+     */
+    async closeTabsForCollection(collectionId) {
+        try {
+            const tabs = await this.service.getAllTabs();
+            await this.closeTabs(tabs.filter(tab => tab.collectionId === collectionId).map(tab => tab.id));
+        } catch {}
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {string} name
+     * @returns {Promise<void>}
+     */
+    async renameTabsForEndpoint(collectionId, endpointId, name) {
+        const tabs = await this.service.getAllTabs();
+        const matching = tabs.filter(tab =>
+            tab.endpoint
+            && tab.endpoint.collectionId === collectionId
+            && tab.endpoint.endpointId === endpointId
+        );
+        for (const tab of matching) {
+            await this.service.updateTab(tab.id, { name });
+            this.tabBar.updateTab(tab.id, { name });
+        }
+    }
+
+    /**
+     * @param {Object} request
+     * @returns {Promise<void>}
+     */
+    async updateActiveTabRequest(request) {
+        const activeTabId = await this.service.getActiveTabId();
+        if (!activeTabId) {
+            return;
+        }
+        await this.service.updateTab(activeTabId, { request });
     }
 
     /** @returns {Promise<Object|null>} */

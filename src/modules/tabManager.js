@@ -3,6 +3,8 @@
  * @module modules/tabManager
  */
 
+import { getProtocol } from './protocols/protocolRegistry.js';
+
 /** @returns {void} */
 export function initTabListeners() {
     const requestTabButtons = document.querySelectorAll('.request-config .tab-button');
@@ -74,19 +76,12 @@ export function initTabListeners() {
  * @returns {void}
  */
 export function setResponseTabsForProtocol(protocol) {
+    const tabSet = getProtocol(protocol).responseTabSet;
     const httpTabs = document.querySelectorAll('.response-tabs .tab-button[data-protocol="http"]');
     const grpcTabs = document.querySelectorAll('.response-tabs .tab-button[data-protocol="grpc"]');
 
-    if (protocol === 'grpc') {
-        httpTabs.forEach(tab => tab.classList.add('is-hidden'));
-        grpcTabs.forEach(tab => tab.classList.remove('is-hidden'));
-    } else if (protocol === 'websocket' || protocol === 'sse' || protocol === 'mqtt') {
-        httpTabs.forEach(tab => tab.classList.add('is-hidden'));
-        grpcTabs.forEach(tab => tab.classList.add('is-hidden'));
-    } else {
-        httpTabs.forEach(tab => tab.classList.remove('is-hidden'));
-        grpcTabs.forEach(tab => tab.classList.add('is-hidden'));
-    }
+    httpTabs.forEach(tab => tab.classList.toggle('is-hidden', tabSet !== 'http'));
+    grpcTabs.forEach(tab => tab.classList.toggle('is-hidden', tabSet !== 'grpc'));
 
     const activeTab = document.querySelector('.response-tabs .tab-button.active');
     if (activeTab && activeTab.classList.contains('is-hidden')) {

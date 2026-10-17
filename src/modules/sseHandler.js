@@ -1,23 +1,18 @@
-import { clearResponseDisplayForTab } from './apiHandler.js';
+import { clearResponseDisplayForTab } from './responseView.js';
 import { resolveTlsOptions } from './tlsOptions.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
-import { StreamSession, createBackendEventListener, getActiveTabId } from './streaming/streamSession.js';
+import {
+    StreamSession,
+    createBackendEventListener,
+    getActiveTabId,
+    transcriptResponseMeta
+} from './streaming/streamSession.js';
 import { isLiveEntry, isStaleEvent } from './streaming/streamState.js';
 
 const session = new StreamSession({
     protocol: 'SSE',
-    buildResponseMeta: (entry, transcript, state) => ({
-        data: transcript,
-        headers: {},
-        status: state === 'open' ? 200 : null,
-        statusText: state === 'open' ? 'OK' : '',
-        ttfb: null,
-        size: null,
-        timings: null,
-        cookies: [],
-        sse: { url: entry.url || '', state }
-    })
+    buildResponseMeta: transcriptResponseMeta({ status: 200, statusText: 'OK', key: 'sse' })
 });
 
 function formatMessage(payload) {

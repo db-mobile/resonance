@@ -88,6 +88,23 @@ const ALL_URL_SECTIONS = [
     'graphql-url-section'
 ];
 
+const RESPONSE_TAB_SETS = {
+    [RequestMode.HTTP]: 'http',
+    [RequestMode.GRPC]: 'grpc',
+    [RequestMode.SSE]: 'none',
+    [RequestMode.WEBSOCKET]: 'none',
+    [RequestMode.MQTT]: 'none',
+    [RequestMode.GRAPHQL]: 'http'
+};
+
+function visibleResponseTabProtocols() {
+    return [...new Set(
+        Array.from(document.querySelectorAll('.response-tabs .tab-button[data-protocol]'))
+            .filter((btn) => !btn.classList.contains('is-hidden'))
+            .map((btn) => btn.dataset.protocol)
+    )];
+}
+
 function displayOf(selector) {
     return document.querySelector(selector)?.style.display;
 }
@@ -144,6 +161,11 @@ describe('updateUIForMode renders each protocol', () => {
 
             test('shows the body-mode selector when the protocol lets you pick', () => {
                 expect(isShown('.body-mode-selector-container')).toBe(expected.selectorVisible);
+            });
+
+            test('shows the response tabs of its protocol family', () => {
+                const tabSet = RESPONSE_TAB_SETS[mode];
+                expect(visibleResponseTabProtocols()).toEqual(tabSet === 'none' ? [] : [tabSet]);
             });
         });
     }

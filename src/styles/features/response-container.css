@@ -382,3 +382,116 @@
   height: 11px;
   border-radius: 3px;
 }
+
+.response-toolbar { flex-wrap: wrap; }
+
+.inspection-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  gap: var(--space-4);
+  padding-top: var(--space-2);
+}
+
+.inspection-controls {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-medium);
+  background: var(--card-bg-color);
+}
+
+.inspection-form,
+.inspection-result-toolbar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  flex-shrink: 0;
+}
+
+.inspection-query-field {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 18rem;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.inspection-format {
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  opacity: var(--dim-opacity);
+}
+
+.inspection-expression {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-height);
+  font-family: var(--font-mono);
+}
+
+.inspection-query-actions,
+.inspection-export-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.inspection-panel input,
+.inspection-panel textarea {
+  border: 1px solid var(--border-color);
+  background: var(--view-bg-color);
+  color: inherit;
+  border-radius: var(--radius-small);
+  padding: var(--space-2) var(--space-3);
+}
+
+.inspection-panel button {
+  min-height: var(--control-height);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-small);
+  background: var(--shade-color);
+  color: inherit;
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+.inspection-panel button:disabled { opacity: 0.5; cursor: default; }
+.inspection-panel button:not(:disabled):hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+.inspection-panel :focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
+
+.inspection-result-toolbar {
+  align-items: center;
+  padding: 0 var(--space-1);
+}
+
+.inspection-status {
+  flex: 1 1 160px;
+  font-size: var(--font-size-small);
+  opacity: var(--dim-opacity);
+}
+
+.inspection-editor {
+  flex: 1;
+  min-height: 100px;
+  min-width: 0;
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-small);
+  background: var(--view-bg-color);
+}
+
+.inspection-editor > .cm-editor { flex: 1; min-width: 0; }
+.inspection-namespace-options { max-height: 200px; overflow: auto; font-size: var(--font-size-small); }
+.inspection-namespace-options summary { cursor: pointer; }
+.inspection-namespace-options p { margin: var(--space-3) 0; }
+.inspection-namespaces { width: 100%; box-sizing: border-box; font-family: var(--font-mono); }
+.inspection-bindings { white-space: pre-wrap; overflow-wrap: anywhere; }

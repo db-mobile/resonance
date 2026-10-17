@@ -343,7 +343,7 @@ impl ReflectionClient {
             .path()
             .parse()
             .map_err(|e| ReflectionCallError::Other(format!("Invalid reflection path: {}", e)))?;
-        let codec = tonic::codec::ProstCodec::<
+        let codec = tonic_prost::ProstCodec::<
             reflection::ServerReflectionRequest,
             reflection::ServerReflectionResponse,
         >::default();

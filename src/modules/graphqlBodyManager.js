@@ -8,7 +8,7 @@ import { loadEditor } from './editorLoader.js';
 import { toast } from './ui/Toast.js';
 import { debounce } from './utils/debounce.js';
 import { markTabModified } from './state/tabModified.js';
-import { fetchGraphQLIntrospection, buildSchemaFromIntrospection } from './apiHandler.js';
+import { fetchGraphQLIntrospection, buildSchemaFromIntrospection } from './graphqlIntrospection.js';
 import { GraphQLExplorer } from './graphqlExplorer.js';
 import { resetRequestBias, setRequestBias } from './resizer.js';
 

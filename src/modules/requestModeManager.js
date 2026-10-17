@@ -4,7 +4,7 @@
  */
 
 import { app } from './appContext.js';
-import { PROTOCOLS, RequestMode, getProtocol, listProtocolIds, resolveProtocolId } from './protocols/protocolRegistry.js';
+import { RequestMode, getProtocol, listProtocolIds, resolveProtocolId } from './protocols/protocolRegistry.js';
 import { activateTab, setResponseTabsForProtocol } from './tabManager.js';
 import { notifyStreamStateChanged } from './streaming/streamState.js';
 import { createMirroredUrlSection, syncMirroredUrlInput } from './ui/mirroredUrlSection.js';
@@ -13,87 +13,6 @@ export { RequestMode };
 
 /** @type {string} */
 let currentMode = RequestMode.HTTP;
-
-const MODE_UI = Object.freeze({
-    [RequestMode.HTTP]: Object.freeze({
-        urlSection: null,
-        showBodyModeSelector: true,
-        forceBodyMode: null,
-        lockBodyMode: false,
-        workbench: null
-    }),
-    [RequestMode.GRPC]: Object.freeze({
-        urlSection: Object.freeze({ sectionId: 'grpc-url-section' }),
-        showBodyModeSelector: true,
-        forceBodyMode: null,
-        lockBodyMode: false,
-        workbench: null
-    }),
-    [RequestMode.SSE]: Object.freeze({
-        urlSection: Object.freeze({
-            sectionId: 'sse-url-section',
-            method: 'SSE',
-            label: 'SSE',
-            inputType: 'url',
-            placeholder: 'https://example.com/events',
-            ariaLabel: 'SSE URL',
-            peerId: 'url-input',
-            syncQueryParams: true
-        }),
-        showBodyModeSelector: true,
-        forceBodyMode: null,
-        lockBodyMode: false,
-        workbench: null
-    }),
-    [RequestMode.WEBSOCKET]: Object.freeze({
-        urlSection: Object.freeze({
-            sectionId: 'websocket-url-section',
-            method: 'WS',
-            label: 'WS',
-            inputType: 'url',
-            placeholder: 'wss://echo.websocket.events',
-            ariaLabel: 'WebSocket URL',
-            peerId: 'url-input',
-            syncQueryParams: true
-        }),
-        showBodyModeSelector: false,
-        forceBodyMode: 'json',
-        lockBodyMode: true,
-        workbench: 'off'
-    }),
-    [RequestMode.MQTT]: Object.freeze({
-        urlSection: Object.freeze({
-            sectionId: 'mqtt-url-section',
-            method: 'MQTT',
-            label: 'MQTT',
-            inputType: 'text',
-            placeholder: 'mqtt://localhost:1883',
-            ariaLabel: 'MQTT Broker URL',
-            peerId: 'url-input'
-        }),
-        showBodyModeSelector: false,
-        forceBodyMode: 'json',
-        lockBodyMode: true,
-        workbench: 'off'
-    }),
-    [RequestMode.GRAPHQL]: Object.freeze({
-        urlSection: Object.freeze({
-            sectionId: 'graphql-url-section',
-            method: 'GRAPHQL',
-            label: 'GraphQL',
-            inputType: 'url',
-            placeholder: 'https://api.example.com/graphql',
-            ariaLabel: 'GraphQL Endpoint URL',
-            peerId: 'url-input',
-            syncQueryParams: true
-        }),
-        showBodyModeSelector: false,
-        forceBodyMode: null,
-        lockBodyMode: null,
-        workbench: 'on',
-        alwaysActivateDefaultTab: true
-    })
-});
 
 /** @returns {string} */
 export function getCurrentMode() {
@@ -127,7 +46,7 @@ export function setRequestMode(mode) {
 /** @param {string} mode */
 function updateUIForMode(mode) {
     const descriptor = getProtocol(mode);
-    const ui = MODE_UI[descriptor.id];
+    const { ui } = descriptor;
     const usesSharedUrlBar = ui.urlSection === null;
 
     const methodSelectContainer = document.querySelector('.method-select-container');
@@ -246,12 +165,13 @@ function restrictBodyModes(allowed) {
  * @returns {void}
  */
 function toggleUrlSection(protocolId, show) {
-    const config = MODE_UI[protocolId].urlSection;
+    const descriptor = getProtocol(protocolId);
+    const config = descriptor.ui.urlSection;
     if (!config) {
         return;
     }
 
-    const inputId = PROTOCOLS[protocolId].urlInputId;
+    const inputId = descriptor.urlInputId;
     let section = document.getElementById(config.sectionId);
 
     if (show) {

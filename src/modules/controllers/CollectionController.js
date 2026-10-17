@@ -7,96 +7,78 @@ import { getCurrentEndpoint, setCurrentEndpoint } from '../state/currentEndpoint
 import { debounce } from '../utils/debounce.js';
 import { registerPendingSave, cancelPendingSaves } from '../state/pendingSaves.js';
 import { app } from '../appContext.js';
-import { CollectionRepository } from '../storage/CollectionRepository.js';
-import { VariableRepository } from '../storage/VariableRepository.js';
-import { SchemaProcessor } from '../schema/SchemaProcessor.js';
-import { VariableProcessor } from '../variables/VariableProcessor.js';
-import { CollectionService } from '../services/CollectionService.js';
-import { CollectionEndpointLoaderService } from '../services/CollectionEndpointLoaderService.js';
-import { CollectionImportExportService } from '../services/CollectionImportExportService.js';
-import { CollectionRequestPersistenceService } from '../services/CollectionRequestPersistenceService.js';
-import { VariableService } from '../services/VariableService.js';
-import { CollectionRenderer } from '../ui/CollectionRenderer.js';
 import { ContextMenu } from '../ui/ContextMenu.js';
-import { RenameDialog } from '../ui/RenameDialog.js';
-import { ConfirmDialog } from '../ui/ConfirmDialog.js';
-import { VariableManager } from '../ui/VariableManager.js';
-import { CurlImportDialog } from '../ui/CurlImportDialog.js';
-import { CollectionDialogs } from '../ui/CollectionDialogs.js';
-import { CollectionAuthDialog } from '../ui/CollectionAuthDialog.js';
 import { toast } from '../ui/Toast.js';
-import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
-import { setRequestBodyContent } from '../requestBodyHelper.js';
 import { ChangeEmitter } from '../services/ChangeEmitter.js';
 import { flattenRequests, requestsInFolder, folderChainForRequest, folderOutline, endpointKey } from '../collections/collectionTree.js';
-import { MoveRequestDialog } from '../ui/MoveRequestDialog.js';
 import { isRunnable } from '../utils/runnableRequests.js';
 import { translate, translateCount } from '../utils/translate.js';
-import { DocGeneratorService } from '../services/DocGeneratorService.js';
 
 export class CollectionController {
     /**
-     * @param {Object} backendAPI
-     * @param {Function} updateStatusDisplay
+     * @param {Object} deps
+     * @param {Object} deps.backendAPI
+     * @param {Object} deps.repository
+     * @param {Object} deps.service
+     * @param {Object} deps.variableService
+     * @param {Object} deps.renderer
+     * @param {Object} deps.endpointLoaderService
+     * @param {Object} deps.importExportService
+     * @param {Object} deps.requestPersistenceService
+     * @param {Object} deps.collectionDialogs
+     * @param {Object} deps.contextMenu
+     * @param {Object} deps.renameDialog
+     * @param {Object} deps.confirmDialog
+     * @param {Object} deps.moveRequestDialog
+     * @param {Object} deps.variableManager
+     * @param {Object} deps.collectionAuthDialog
+     * @param {import('../requestFormReader.js').RequestFormReader} deps.formReader
+     * @param {HTMLElement|null} [deps.searchInput]
      */
-    constructor(backendAPI, updateStatusDisplay) {
+    constructor({
+        backendAPI,
+        repository,
+        service,
+        variableService,
+        renderer,
+        endpointLoaderService,
+        importExportService,
+        requestPersistenceService,
+        collectionDialogs,
+        contextMenu,
+        renameDialog,
+        confirmDialog,
+        moveRequestDialog,
+        variableManager,
+        collectionAuthDialog,
+        formReader,
+        searchInput = null
+    }) {
         this.backendAPI = backendAPI;
-        this.repository = new CollectionRepository(backendAPI, app.secretStore);
-        this.variableRepository = new VariableRepository(backendAPI, app.secretStore);
-        this.schemaProcessor = new SchemaProcessor();
-        this.variableProcessor = new VariableProcessor();
-        this.statusDisplay = new StatusDisplayAdapter(updateStatusDisplay);
+        this.repository = repository;
+        this.service = service;
+        this.variableService = variableService;
+        this.renderer = renderer;
+        this.endpointLoaderService = endpointLoaderService;
+        this.importExportService = importExportService;
+        this.requestPersistenceService = requestPersistenceService;
+        this.collectionDialogs = collectionDialogs;
+        this.contextMenu = contextMenu;
+        this.renameDialog = renameDialog;
+        this.confirmDialog = confirmDialog;
+        this.moveRequestDialog = moveRequestDialog;
+        this.variableManager = variableManager;
+        this.collectionAuthDialog = collectionAuthDialog;
+        this.formReader = formReader;
+        this.collectionsSearchInput = searchInput;
         this._debouncedSaveBody = null;
         this._inFlightBodySave = null;
         this._pinnedRequests = null;
         this._debouncedSearch = null;
-        
-        this.service = new CollectionService(this.repository, this.schemaProcessor, this.statusDisplay);
-        this.variableService = new VariableService(this.variableRepository, this.variableProcessor, this.statusDisplay);
-        
-        this.renderer = new CollectionRenderer('collections-list', this.repository);
-        this.contextMenu = new ContextMenu();
-        this.renameDialog = new RenameDialog();
-        this.confirmDialog = new ConfirmDialog();
-        this.moveRequestDialog = new MoveRequestDialog();
-        this.variableManager = new VariableManager();
-        this.collectionAuthDialog = new CollectionAuthDialog();
-        this.curlImportDialog = new CurlImportDialog();
-        this.collectionDialogs = new CollectionDialogs({
-            backendAPI,
-            collectionService: this.service,
-            collectionRepository: this.repository
-        });
-        this.endpointLoaderService = new CollectionEndpointLoaderService({
-            repository: this.repository,
-            collectionService: this.service,
-            schemaProcessor: this.schemaProcessor,
-            setActiveEndpoint: (collectionId, endpointId) => this.renderer.setActiveEndpoint(collectionId, endpointId)
-        });
-        this.docGeneratorService = new DocGeneratorService(this.repository);
-        this.importExportService = new CollectionImportExportService({
-            backendAPI,
-            repository: this.repository,
-            collectionService: this.service,
-            docGeneratorService: this.docGeneratorService,
-            statusDisplay: this.statusDisplay,
-            collectionDialogs: this.collectionDialogs,
-            curlImportDialog: this.curlImportDialog,
-            refreshCollections: (preserveExpansionState = false) => preserveExpansionState
-                ? this.loadCollectionsWithExpansionState()
-                : this.loadCollections()
-        });
-        this.requestPersistenceService = new CollectionRequestPersistenceService({
-            repository: this.repository,
-            collectionService: this.service,
-            statusDisplay: this.statusDisplay,
-            refreshCollections: () => this.loadCollectionsWithExpansionState()
-        });
-        this.collectionsSearchInput = document.getElementById('collections-search-input');
         this.allCollections = [];
         this.searchQuery = '';
         this._collectionEvents = new ChangeEmitter();
-        
+
         this.handleEndpointClick = this.handleEndpointClick.bind(this);
         this.handleContextMenu = this.handleContextMenu.bind(this);
         this.handleFolderContextMenu = this.handleFolderContextMenu.bind(this);
@@ -168,6 +150,14 @@ export class CollectionController {
     /** @returns {Promise<Array<Object>>} */
     async loadCollections() {
         return this._reload(false);
+    }
+
+    /** @returns {Promise<Array<Object>>} */
+    async getCollections() {
+        if (this.allCollections && this.allCollections.length > 0) {
+            return this.allCollections;
+        }
+        return this.loadCollections();
     }
 
     /** @returns {Promise<Array<Object>>} */
@@ -729,13 +719,7 @@ export class CollectionController {
             return;
         }
         cancelPendingSaves();
-        const formElements = this.getFormElements();
-        formElements.urlInput.value = '';
-        formElements.methodSelect.value = 'GET';
-        setRequestBodyContent('');
-        this.service.clearKeyValueList(formElements.pathParamsList);
-        this.service.clearKeyValueList(formElements.headersList);
-        this.service.clearKeyValueList(formElements.queryParamsList);
+        this.formReader.clear();
         setCurrentEndpoint(null);
         await this.repository.clearLastSelectedRequest();
         this.renderer.clearActiveEndpoint();
@@ -776,6 +760,35 @@ export class CollectionController {
                 this.refreshInheritHint();
             }
         } catch {}
+    }
+
+    /** @returns {Promise<Object|null>} */
+    async describeInheritedAuth() {
+        const current = getCurrentEndpoint();
+        if (!current?.collectionId) {
+            return null;
+        }
+        return this.service.getInheritedAuthInfo(current.collectionId, current.endpointId);
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string|null} [folderId]
+     * @returns {Promise<void>}
+     */
+    async openAuthEditor(collectionId, folderId = null) {
+        const collection = await this.repository.getById(collectionId);
+        if (!collection) {
+            return;
+        }
+        const folder = folderId
+            ? (collection.folders || []).find((entry) => entry.id === folderId)
+            : null;
+        if (folder) {
+            await this.handleFolderAuth(collection, folder);
+        } else {
+            await this.handleCollectionAuth(collection);
+        }
     }
 
     /** @returns {void} */
@@ -887,15 +900,7 @@ export class CollectionController {
      * @returns {Promise<void>}
      */
     async closeTabsForCollection(collectionId) {
-        try {
-            if (!app.workspaceTabController) {
-                return;
-            }
-            const tabs = await app.workspaceTabController.service.getAllTabs();
-            await app.workspaceTabController.closeTabs(
-                tabs.filter(tab => tab.collectionId === collectionId).map(tab => tab.id)
-            );
-        } catch {}
+        await app.workspaceTabController?.closeTabsForCollection(collectionId);
     }
 
     /**
@@ -1052,19 +1057,7 @@ export class CollectionController {
             await this.service.renameRequest(collection.id, endpoint.id, newName);
             await this.loadCollectionsWithExpansionState();
 
-            if (!app.workspaceTabController) {
-                return;
-            }
-            const tabs = await app.workspaceTabController.service.getAllTabs();
-            const matchingTabs = tabs.filter(tab => 
-                tab.endpoint && 
-                tab.endpoint.collectionId === collection.id && 
-                tab.endpoint.endpointId === endpoint.id
-            );
-            for (const tab of matchingTabs) {
-                await app.workspaceTabController.service.updateTab(tab.id, { name: newName });
-                app.workspaceTabController.tabBar.updateTab(tab.id, { name: newName });
-            }
+            await app.workspaceTabController?.renameTabsForEndpoint(collection.id, endpoint.id, newName);
         } catch {}
     }
 
@@ -1136,9 +1129,11 @@ export class CollectionController {
         await this.requestPersistenceService.saveAllRequestModifications(collectionId, endpointId);
     }
 
-    /** @returns {void} */
-    initializeBodyTracking() {
-        const bodyInput = document.getElementById('body-input');
+    /**
+     * @param {HTMLElement|null} bodyInput
+     * @returns {void}
+     */
+    initializeBodyTracking(bodyInput) {
         if (!bodyInput) {
             return;
         }
@@ -1181,18 +1176,6 @@ export class CollectionController {
             await this._debouncedSaveBody.flush();
         }
         await this._inFlightBodySave;
-    }
-
-    /** @returns {Object} */
-    getFormElements() {
-        return {
-            urlInput: document.getElementById('url-input'),
-            methodSelect: document.getElementById('method-select'),
-            bodyInput: document.getElementById('body-input'),
-            pathParamsList: document.getElementById('path-params-list'),
-            headersList: document.getElementById('headers-list'),
-            queryParamsList: document.getElementById('query-params-list')
-        };
     }
 
 }

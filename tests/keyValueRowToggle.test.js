@@ -225,10 +225,10 @@ describe('request headers', () => {
         try {
             const { kv, app, currentEndpoint } = loadKeyValueManager();
             const headersList = document.getElementById('headers-list');
-            const saveCurrentHeaders = jest.fn();
+            const saveHeaders = jest.fn();
 
             currentEndpoint.getCurrentEndpoint.mockReturnValue({ collectionId: 'c1', endpointId: 'e1' });
-            app.collectionService = { saveCurrentHeaders };
+            app.collectionService = { saveHeaders };
             kv.initKeyValueListeners();
 
             kv.addKeyValueRow(headersList, 'X-Debug', 'on');
@@ -236,7 +236,7 @@ describe('request headers', () => {
             jest.advanceTimersByTime(500);
 
             expect(headersList.children[0].classList.contains('row-disabled')).toBe(true);
-            expect(saveCurrentHeaders).toHaveBeenCalledWith('c1', 'e1', { headersList });
+            expect(saveHeaders).toHaveBeenCalledWith('c1', 'e1', [{ key: 'X-Debug', value: 'on', enabled: false }]);
             expect(kv.parseKeyValueRows(headersList)).toEqual([
                 { key: 'X-Debug', value: 'on', enabled: false }
             ]);
@@ -259,9 +259,9 @@ describe('key-value autosave', () => {
         const { kv, app, currentEndpoint } = loadKeyValueManager();
         currentEndpoint.getCurrentEndpoint.mockReturnValue({ collectionId: 'c1', endpointId: 'e1' });
         app.collectionService = {
-            saveCurrentPathParams: jest.fn().mockResolvedValue(undefined),
-            saveCurrentQueryParams: jest.fn().mockResolvedValue(undefined),
-            saveCurrentHeaders: jest.fn().mockResolvedValue(undefined)
+            savePathParams: jest.fn().mockResolvedValue(undefined),
+            saveQueryParams: jest.fn().mockResolvedValue(undefined),
+            saveHeaders: jest.fn().mockResolvedValue(undefined)
         };
         kv.initKeyValueListeners();
 
@@ -274,8 +274,8 @@ describe('key-value autosave', () => {
         headers.querySelector('.key-input').dispatchEvent(new window.Event('input', { bubbles: true }));
         jest.advanceTimersByTime(500);
 
-        expect(app.collectionService.saveCurrentPathParams).toHaveBeenCalledTimes(1);
-        expect(app.collectionService.saveCurrentHeaders).toHaveBeenCalledTimes(1);
+        expect(app.collectionService.savePathParams).toHaveBeenCalledTimes(1);
+        expect(app.collectionService.saveHeaders).toHaveBeenCalledTimes(1);
     });
 });
 

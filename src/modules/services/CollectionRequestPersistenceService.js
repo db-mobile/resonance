@@ -1,72 +1,61 @@
 /**
- * @fileoverview Persists collection request edits from the request UI
+ * @fileoverview Persists what the request editor shows into the endpoint's sidecar records, one saver per protocol
  * @module services/CollectionRequestPersistenceService
  */
 
 import { app } from '../appContext.js';
-import { captureFormBody, getRequestBodyContent } from '../requestBodyHelper.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
 import { findRequest, updateRequest } from '../collections/collectionTree.js';
-import { readMqttForm } from '../mqtt/mqttFields.js';
-
-/**
- * @param {HTMLElement} list
- * @param {Function} parseKeyValuePairs
- * @param {Function} [parseKeyValueRows]
- * @returns {Array<Object>}
- */
-function readPersistedRows(list, parseKeyValuePairs, parseKeyValueRows) {
-    if (parseKeyValueRows) {
-        return parseKeyValueRows(list);
-    }
-
-    return Object.entries(parseKeyValuePairs(list)).map(([key, value]) => ({ key, value }));
-}
 
 export class CollectionRequestPersistenceService {
     /**
-     * @param {Object} options
-     * @param {CollectionRepository} options.repository
-     * @param {CollectionService} options.collectionService
-     * @param {IStatusDisplay} options.statusDisplay
-     * @param {Function} options.refreshCollections
+     * @param {Object} deps
+     * @param {Object} deps.repository
+     * @param {Object} deps.collectionService
+     * @param {Object} deps.statusDisplay
+     * @param {Function} deps.refreshCollections
+     * @param {import('../requestFormReader.js').RequestFormReader} deps.formReader
      */
-    constructor({ repository, collectionService, statusDisplay, refreshCollections }) {
+    constructor({ repository, collectionService, statusDisplay, refreshCollections, formReader }) {
         this.repository = repository;
         this.collectionService = collectionService;
         this.statusDisplay = statusDisplay;
         this.refreshCollections = refreshCollections;
+        this.formReader = formReader;
     }
 
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<void>}
+     */
     async saveRequestBodyModification(collectionId, endpointId) {
-        const bodyInput = document.getElementById('body-input');
-        if (bodyInput) {
-            await this.collectionService.saveRequestBodyModification(collectionId, endpointId);
+        if (this.formReader.hasBody()) {
+            await this.collectionService.saveBodyState(collectionId, endpointId, this.formReader.readBodyState());
         }
     }
 
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<void>}
+     */
     async saveAllRequestModifications(collectionId, endpointId) {
         try {
-            const { parseKeyValuePairs, parseKeyValueRows } = await import('../keyValueManager.js');
-            const { authManager } = await import('../authManager.js');
-
             const collection = await this.repository.readForUpdate(collectionId);
             if (!collection) {
                 return;
             }
-
             const endpoint = findRequest(collection, endpointId);
             const descriptor = getProtocol(endpoint?.protocol);
-
             const savers = {
                 grpc: () => this.saveGrpcRequest(collectionId, endpointId, endpoint, collection),
-                websocket: () => this.saveWebSocketRequest(collectionId, endpointId, parseKeyValuePairs, parseKeyValueRows),
-                graphql: () => this.saveGraphQLRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows),
-                sse: () => this.saveSseRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows, collection),
+                websocket: () => this.saveWebSocketRequest(collectionId, endpointId),
+                graphql: () => this.saveGraphQLRequest(collectionId, endpointId),
+                sse: () => this.saveSseRequest(collectionId, endpointId, collection),
                 mqtt: () => this.saveMqttRequest(collectionId, endpointId),
-                http: () => this.saveHttpRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows, collection)
+                http: () => this.saveHttpRequest(collectionId, endpointId, collection)
             };
-
             await (savers[descriptor.builder] || savers.http)();
         } catch (error) {
             this.statusDisplay.update(`Error saving request: ${error.message}`, null);
@@ -82,13 +71,11 @@ export class CollectionRequestPersistenceService {
      * @returns {Promise<void>}
      */
     async saveGrpcRequest(collectionId, endpointId, endpoint, collection) {
-        const grpcState = app.captureGrpcState ? app.captureGrpcState() : {};
-
+        const grpcState = this.formReader.readGrpcState();
         await this.repository.saveGrpcData(collectionId, endpointId, {
             ...grpcState,
             fullMethod: grpcState.fullMethod || endpoint.path || ''
         });
-
         const path = grpcState.fullMethod || endpoint.path;
         if (path !== endpoint.path) {
             await this.repository.saveOne(updateRequest(collection, endpointId, { path }) ?? collection);
@@ -97,36 +84,26 @@ export class CollectionRequestPersistenceService {
     }
 
     /**
-     * @param {Object} elements
-     * @param {Object} parsers
-     * @param {Object|null} [authManager]
+     * @param {{url?: string|null, queryParams?: Array<Object>|null, headers?: Array<Object>|null, bodyState?: Object|null, authConfig?: Object|null}} fields
      * @returns {Object}
      */
-    collectSidecarUpdates({ urlInput, queryParamsList, headersList, bodyInput }, { parseKeyValuePairs, parseKeyValueRows }, authManager = null) {
+    collectSidecarUpdates({ url = null, queryParams = null, headers = null, bodyState = null, authConfig = null }) {
         const updates = {};
-
-        if (urlInput && urlInput.value) {
-            updates.url = urlInput.value;
+        if (url) {
+            updates.url = url;
         }
-
-        if (queryParamsList) {
-            updates.queryParams = readPersistedRows(queryParamsList, parseKeyValuePairs, parseKeyValueRows);
+        if (queryParams !== null) {
+            updates.queryParams = queryParams;
         }
-
-        if (headersList) {
-            updates.headers = readPersistedRows(headersList, parseKeyValuePairs, parseKeyValueRows);
+        if (headers !== null) {
+            updates.headers = headers;
         }
-
-        const authConfig = authManager?.getAuthConfig();
         if (authConfig) {
             updates.authConfig = authConfig;
         }
-
-        const bodyState = bodyInput ? this.collectionService.captureRequestBodyState() : null;
         if (bodyState) {
             Object.assign(updates, bodyState);
         }
-
         return updates;
     }
 
@@ -142,23 +119,29 @@ export class CollectionRequestPersistenceService {
         }
     }
 
-    async saveWebSocketRequest(collectionId, endpointId, parseKeyValuePairs, parseKeyValueRows) {
-        const elements = this.getRequestFormElements(getProtocol('websocket'));
-        await this.writeSidecarUpdates(collectionId, endpointId,
-            this.collectSidecarUpdates(elements, { parseKeyValuePairs, parseKeyValueRows }));
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<void>}
+     */
+    async saveWebSocketRequest(collectionId, endpointId) {
+        const form = this.formReader.read(getProtocol('websocket'));
+        await this.writeSidecarUpdates(collectionId, endpointId, this.collectSidecarUpdates({
+            url: form.url, queryParams: form.queryParams, headers: form.headers, bodyState: form.bodyState
+        }));
     }
 
-    async saveGraphQLRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows) {
-        const { urlInput, headersList } = this.getRequestFormElements(getProtocol('graphql'));
-        const { graphqlBodyManager } = app;
-
-        const updates = this.collectSidecarUpdates({ urlInput, headersList }, { parseKeyValuePairs, parseKeyValueRows }, authManager);
-        if (graphqlBodyManager) {
-            updates.graphqlData = {
-                query: graphqlBodyManager.getGraphQLQuery(),
-                variables: graphqlBodyManager.getGraphQLVariables(),
-                operationName: graphqlBodyManager.getSelectedOperationName?.() || null
-            };
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<void>}
+     */
+    async saveGraphQLRequest(collectionId, endpointId) {
+        const form = this.formReader.read(getProtocol('graphql'));
+        const updates = this.collectSidecarUpdates({ url: form.url, headers: form.headers, authConfig: form.authConfig });
+        const graphqlData = this.formReader.readGraphQLData();
+        if (graphqlData) {
+            updates.graphqlData = graphqlData;
         }
         await this.writeSidecarUpdates(collectionId, endpointId, updates);
     }
@@ -166,18 +149,16 @@ export class CollectionRequestPersistenceService {
     /**
      * @param {string} collectionId
      * @param {string} endpointId
-     * @param {Function} parseKeyValuePairs
-     * @param {Object} authManager
+     * @param {Object|null} [collection]
      * @returns {Promise<void>}
      */
-    async saveSseRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows, collection = null) {
-        const elements = this.getRequestFormElements(getProtocol('sse'));
-        await this.writeSidecarUpdates(collectionId, endpointId,
-            this.collectSidecarUpdates(elements, { parseKeyValuePairs, parseKeyValueRows }, authManager));
-
-        const methodSelect = document.getElementById('method-select');
-        if (methodSelect && methodSelect.value) {
-            await this.patchEndpointRecords(collectionId, endpointId, { httpMethod: methodSelect.value }, collection);
+    async saveSseRequest(collectionId, endpointId, collection = null) {
+        const form = this.formReader.read(getProtocol('sse'));
+        await this.writeSidecarUpdates(collectionId, endpointId, this.collectSidecarUpdates({
+            url: form.url, queryParams: form.queryParams, headers: form.headers, bodyState: form.bodyState, authConfig: form.authConfig
+        }));
+        if (form.method) {
+            await this.patchEndpointRecords(collectionId, endpointId, { httpMethod: form.method }, collection);
         }
     }
 
@@ -187,13 +168,107 @@ export class CollectionRequestPersistenceService {
      * @returns {Promise<void>}
      */
     async saveMqttRequest(collectionId, endpointId) {
-        const descriptor = getProtocol('mqtt');
-        const { urlInput, bodyInput } = this.getRequestFormElements(descriptor);
+        const form = this.formReader.read(getProtocol('mqtt'));
+        await this.writeSidecarUpdates(collectionId, endpointId, this.collectSidecarUpdates({ url: form.url, bodyState: form.bodyState }));
+        await this.repository.saveMqttData(collectionId, endpointId, this.formReader.readMqttData());
+    }
 
-        await this.writeSidecarUpdates(collectionId, endpointId,
-            this.collectSidecarUpdates({ urlInput, bodyInput }, {}));
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object|null} [collection]
+     * @returns {Promise<void>}
+     */
+    async saveHttpRequest(collectionId, endpointId, collection = null) {
+        const descriptor = getProtocol('http');
+        const form = this.formReader.read(descriptor);
+        const updates = {};
 
-        await this.repository.saveMqttData(collectionId, endpointId, readMqttForm());
+        if (form.url) {
+            updates.url = form.url;
+        }
+
+        let pathParams = {};
+        let queryParams = [];
+        let headers = [];
+
+        if (form.pathParams !== null) {
+            ({ pathParams } = form);
+            updates.pathParams = Object.entries(pathParams).map(([key, value]) => ({ key, value }));
+        }
+        if (form.queryParams !== null) {
+            ({ queryParams } = form);
+            updates.queryParams = queryParams;
+        }
+        if (form.headers !== null) {
+            ({ headers } = form);
+            updates.headers = headers;
+        }
+        if (form.bodyState) {
+            Object.assign(updates, form.bodyState);
+        }
+        const { authConfig } = form;
+        if (authConfig) {
+            updates.authConfig = authConfig;
+        }
+
+        await this.writeSidecarUpdates(collectionId, endpointId, updates);
+
+        if (descriptor.rewritePathFromUrl && form.url) {
+            await this.updateEndpointPathFromUrl(collectionId, endpointId, form.url, collection);
+        }
+
+        await this.syncActiveWorkspaceTab(form, { pathParams, queryParams, headers, authConfig });
+    }
+
+    /**
+     * @param {import('../requestFormReader.js').RequestFormSnapshot} form
+     * @param {{pathParams: Object, queryParams: Array<Object>, headers: Array<Object>, authConfig: Object|null}} data
+     * @returns {Promise<void>}
+     */
+    async syncActiveWorkspaceTab(form, { pathParams, queryParams, headers, authConfig }) {
+        if (!app.workspaceTabController) {
+            return;
+        }
+        const activeTab = await app.workspaceTabController.getActiveTab();
+        if (!activeTab || !activeTab.request) {
+            return;
+        }
+
+        const updatedRequest = {};
+        let hasChanges = false;
+
+        if (form.url && activeTab.request.url !== form.url) {
+            updatedRequest.url = form.url;
+            hasChanges = true;
+        }
+        if (form.pathParams !== null) {
+            updatedRequest.pathParams = pathParams;
+            hasChanges = true;
+        }
+        if (form.queryParams !== null) {
+            updatedRequest.queryParams = queryParams;
+            hasChanges = true;
+        }
+        if (form.headers !== null) {
+            updatedRequest.headers = headers;
+            hasChanges = true;
+        }
+        if (form.bodyState !== null) {
+            updatedRequest.body = this.formReader.readTabBody();
+            hasChanges = true;
+        }
+        if (authConfig) {
+            updatedRequest.authType = authConfig.type || 'none';
+            updatedRequest.authConfig = authConfig.config || {};
+            hasChanges = true;
+        }
+
+        if (!hasChanges) {
+            return;
+        }
+
+        await app.workspaceTabController.updateActiveTabRequest(updatedRequest);
     }
 
     /**
@@ -222,65 +297,6 @@ export class CollectionRequestPersistenceService {
         await this.repository.saveOne(updateRequest(collection, endpointId, patch));
     }
 
-    async saveHttpRequest(collectionId, endpointId, parseKeyValuePairs, authManager, parseKeyValueRows, collection = null) {
-        const descriptor = getProtocol('http');
-        const { urlInput, pathParamsList, queryParamsList, headersList, bodyInput } =
-            this.getRequestFormElements(descriptor);
-
-        const updates = {};
-
-        if (urlInput && urlInput.value) {
-            updates.url = urlInput.value;
-        }
-
-        let pathParams = {};
-        let queryParams = [];
-        let headers = [];
-
-        if (pathParamsList) {
-            pathParams = parseKeyValuePairs(pathParamsList);
-            updates.pathParams = Object.entries(pathParams).map(([key, value]) => ({ key, value }));
-        }
-
-        if (queryParamsList) {
-            queryParams = readPersistedRows(queryParamsList, parseKeyValuePairs, parseKeyValueRows);
-            updates.queryParams = queryParams;
-        }
-
-        if (headersList) {
-            headers = readPersistedRows(headersList, parseKeyValuePairs, parseKeyValueRows);
-            updates.headers = headers;
-        }
-
-        const bodyState = bodyInput ? this.collectionService.captureRequestBodyState() : null;
-        if (bodyState) {
-            Object.assign(updates, bodyState);
-        }
-
-        const authConfig = authManager.getAuthConfig();
-        if (authConfig) {
-            updates.authConfig = authConfig;
-        }
-
-        await this.writeSidecarUpdates(collectionId, endpointId, updates);
-
-        if (descriptor.rewritePathFromUrl && urlInput && urlInput.value) {
-            await this.updateEndpointPathFromUrl(collectionId, endpointId, urlInput.value, collection);
-        }
-
-        await this.syncActiveWorkspaceTab({
-            urlInput,
-            pathParamsList,
-            queryParamsList,
-            headersList,
-            bodyInput,
-            pathParams,
-            queryParams,
-            headers,
-            authConfig
-        });
-    }
-
     async updateEndpointPathFromUrl(collectionId, endpointId, url, loaded = null) {
         try {
             const path = this.normalizePath(url);
@@ -299,96 +315,6 @@ export class CollectionRequestPersistenceService {
             await this.refreshCollections();
         } catch {
         }
-    }
-
-    async syncActiveWorkspaceTab({
-        urlInput,
-        pathParamsList,
-        queryParamsList,
-        headersList,
-        bodyInput,
-        pathParams,
-        queryParams,
-        headers,
-        authConfig
-    }) {
-        if (!app.workspaceTabController) {
-            return;
-        }
-
-        const activeTab = await app.workspaceTabController.getActiveTab();
-        if (!activeTab || !activeTab.request) {
-            return;
-        }
-
-        const updatedRequest = {};
-        let hasChanges = false;
-
-        if (urlInput && urlInput.value && activeTab.request.url !== urlInput.value) {
-            updatedRequest.url = urlInput.value;
-            hasChanges = true;
-        }
-
-        if (pathParamsList) {
-            updatedRequest.pathParams = pathParams;
-            hasChanges = true;
-        }
-
-        if (queryParamsList) {
-            updatedRequest.queryParams = queryParams;
-            hasChanges = true;
-        }
-
-        if (headersList) {
-            updatedRequest.headers = headers;
-            hasChanges = true;
-        }
-
-        if (bodyInput) {
-            const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
-            updatedRequest.body = captureFormBody(bodyMode) ?? {
-                mode: 'json',
-                content: getRequestBodyContent()
-            };
-            hasChanges = true;
-        }
-
-        if (authConfig) {
-            updatedRequest.authType = authConfig.type || 'none';
-            updatedRequest.authConfig = authConfig.config || {};
-            hasChanges = true;
-        }
-
-        if (!hasChanges) {
-            return;
-        }
-
-        const activeTabId = await app.workspaceTabController.service.getActiveTabId();
-        if (!activeTabId) {
-            return;
-        }
-
-        await app.workspaceTabController.service.updateTab(activeTabId, {
-            request: updatedRequest
-        });
-    }
-
-    /**
-     * @param {Object} [descriptor]
-     * @returns {Object}
-     */
-    getRequestFormElements(descriptor = getProtocol('http')) {
-        const ownUrlInput = descriptor.urlInputId
-            ? document.getElementById(descriptor.urlInputId)
-            : null;
-
-        return {
-            urlInput: ownUrlInput || document.getElementById('url-input'),
-            pathParamsList: document.getElementById('path-params-list'),
-            queryParamsList: document.getElementById('query-params-list'),
-            headersList: document.getElementById('headers-list'),
-            bodyInput: document.getElementById('body-input')
-        };
     }
 
     normalizePath(url) {

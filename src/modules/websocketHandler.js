@@ -1,41 +1,21 @@
 import { getRequestBodyContent } from './requestBodyHelper.js';
-import { clearResponseDisplayForTab } from './apiHandler.js';
+import { clearResponseDisplayForTab } from './responseView.js';
+import { normalizeWsUrl } from './graphqlTransportWs.js';
 import { resolveTlsOptions } from './tlsOptions.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
-import { StreamSession, createBackendEventListener, getActiveTabId } from './streaming/streamSession.js';
+import {
+    StreamSession,
+    createBackendEventListener,
+    getActiveTabId,
+    transcriptResponseMeta
+} from './streaming/streamSession.js';
 import { isLiveEntry, isStaleEvent } from './streaming/streamState.js';
 
 const session = new StreamSession({
     protocol: 'WebSocket',
-    buildResponseMeta: (entry, transcript, state) => ({
-        data: transcript,
-        headers: {},
-        status: state === 'open' ? 101 : null,
-        statusText: state === 'open' ? 'Switching Protocols' : '',
-        ttfb: null,
-        size: null,
-        timings: null,
-        cookies: [],
-        websocket: { url: entry.url || '', state }
-    })
+    buildResponseMeta: transcriptResponseMeta({ status: 101, statusText: 'Switching Protocols', key: 'websocket' })
 });
-
-function normalizeWebSocketUrl(url) {
-    if (!url) {
-        return '';
-    }
-
-    if (/^wss?:\/\//i.test(url)) {
-        return url;
-    }
-
-    if (/^https?:\/\//i.test(url)) {
-        return url.replace(/^http/i, 'ws');
-    }
-
-    return `ws://${url}`;
-}
 
 /**
  * @param {{payload: Object}} event
@@ -111,7 +91,7 @@ export async function handleWebSocketSend(url, headers = {}, message = getReques
     }
 
     const tabId = await getActiveTabId();
-    const normalizedUrl = normalizeWebSocketUrl(url?.trim());
+    const normalizedUrl = normalizeWsUrl(url?.trim());
 
     if (!normalizedUrl) {
         toast.error('WebSocket URL is required');

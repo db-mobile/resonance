@@ -18,4 +18,5 @@ export const mockServerFeature = {
         const dialog = new MockServerDialog(controller);
         return { repository, service, controller, dialog };
     },
+    provides: { mockServerService: 'service' },
 };

@@ -66,6 +66,11 @@ export class EnvironmentRepository {
         return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed.toUpperCase() : null;
     }
 
+    /** @returns {void} */
+    invalidateCache() {
+        this._cache = null;
+    }
+
     /** @returns {Promise<Object>} */
     async getAllEnvironments() {
         if (this._cache !== null) {

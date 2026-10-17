@@ -5,23 +5,12 @@
 
 import { app } from '../appContext.js';
 import { VariableProcessor } from '../variables/VariableProcessor.js';
-import { VariableRepository } from '../storage/VariableRepository.js';
-import { EnvironmentRepository } from '../storage/EnvironmentRepository.js';
-import { CollectionRepository } from '../storage/CollectionRepository.js';
-import { CertificateRepository } from '../storage/CertificateRepository.js';
-import { MockServerRepository } from '../storage/MockServerRepository.js';
-import { CertificateService } from './CertificateService.js';
-import { MockServerService } from './MockServerService.js';
-import { RequestBuilderService } from './RequestBuilderService.js';
 import { ChangeEmitter } from './ChangeEmitter.js';
 import { normalizeFormRows, processFormRows } from '../utils/formDataRows.js';
-import { activeKeyValueRows } from '../utils/keyValueRows.js';
+import { activeKeyValueRows, appendAuthQueryRows } from '../utils/keyValueRows.js';
+import { buildGraphQLBody } from '../utils/graphqlBody.js';
 import { findRequest } from '../collections/collectionTree.js';
-import { buildEndpointUrl, buildMockPath } from '../collections/endpointUrl.js';
-import { resolveEffectiveAuthWithSource } from '../auth/authInheritance.js';
-import { ensureFreshOAuthToken, oauthRefreshKey } from '../auth/oauthRefresh.js';
-import { resolveAuthConfigVariables } from '../auth/authVariables.js';
-import { generateAuthData } from '../auth/authData.js';
+import { buildEndpointUrl } from '../collections/endpointUrl.js';
 import { deriveRequestSettings } from '../state/settingsCache.js';
 import { responseCookies } from '../cookieParser.js';
 import { methodCarriesBody } from '../utils/bodyMethods.js';
@@ -30,7 +19,6 @@ import { translate, translateCount } from '../utils/translate.js';
 import { RUNNABLE_PROTOCOLS } from '../utils/runnableRequests.js';
 import { parseDataFile } from '../utils/dataFile.js';
 
-
 const ABSOLUTE_OR_TEMPLATED_PATH = /^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/|\{\{)/;
 
 export class RunnerService {
@@ -38,18 +26,23 @@ export class RunnerService {
      * @param {RunnerRepository} repository
      * @param {Object} backendAPI
      * @param {IStatusDisplay} statusDisplay
+     * @param {{pipeline: import('./RequestPipeline.js').RequestPipeline}} deps
      */
-    constructor(repository, backendAPI, statusDisplay) {
+    constructor(repository, backendAPI, statusDisplay, { pipeline } = {}) {
+        if (!pipeline) {
+            throw new Error('RunnerService needs a RequestPipeline');
+        }
         this.repository = repository;
         this.backendAPI = backendAPI;
         this.statusDisplay = statusDisplay;
+        this.pipeline = pipeline;
         this.variableProcessor = new VariableProcessor();
-        this.variableRepository = new VariableRepository(backendAPI, app.secretStore);
-        this.environmentRepository = new EnvironmentRepository(backendAPI, app.secretStore);
-        this.collectionRepository = new CollectionRepository(backendAPI, app.secretStore);
-        this.certificateService = new CertificateService(new CertificateRepository(backendAPI));
-        this.mockServerService = new MockServerService(new MockServerRepository(backendAPI), null);
-        this.requestBuilder = new RequestBuilderService(null, null);
+        this.variableRepository = pipeline.variableRepository;
+        this.environmentRepository = pipeline.environmentRepository;
+        this.collectionRepository = pipeline.collectionRepository;
+        this.certificateService = pipeline.certificates;
+        this.mockServerService = pipeline.mockServerService;
+        this.requestBuilder = pipeline.requestBuilder;
 
         this.isRunning = false;
         this.shouldStop = false;
@@ -497,8 +490,13 @@ export class RunnerService {
      * @returns {Promise<Object>}
      */
     async _sendTracked(requestConfig, runContext) {
-        await this._attachClientCert(requestConfig, runContext);
-        await this._attachCookies(requestConfig);
+        if (!runContext?.certificatesLoaded) {
+            try {
+                await this.certificateService.getItems();
+            } catch {
+            }
+        }
+        await this.pipeline.finalize(requestConfig);
 
         requestConfig.requestId = newRequestId();
         this._inFlightRequestId = requestConfig.requestId;
@@ -723,12 +721,7 @@ export class RunnerService {
         const authData = await this._resolveAuthData(collection, endpoint, persisted, effectiveVariables);
         this.requestBuilder.mergeAuthData(headers, queryParams, authData);
 
-        const rowKeys = new Set(queryRows.map(row => row.key));
-        for (const [key, value] of Object.entries(authData.queryParams)) {
-            if (!rowKeys.has(key)) {
-                queryRows.push({ key, value });
-            }
-        }
+        appendAuthQueryRows(queryRows, authData.queryParams);
 
         const { url: resolvedUrl, queryString, pathParams: processedPathParams } = this.requestBuilder.processRequestComponents({
             url: rawUrl,
@@ -761,7 +754,8 @@ export class RunnerService {
         const settings = deriveRequestSettings(runContext ? runContext.settings : await this._loadSettings());
 
         return {
-            requestConfig: {
+            requestConfig: this.pipeline.assembleRequestConfig({
+                protocol: isGraphQL ? 'graphql' : 'http',
                 method,
                 url,
                 rawUrl,
@@ -770,15 +764,9 @@ export class RunnerService {
                 pathParams: processedPathParams,
                 body,
                 bodyType,
-                httpVersion: settings.httpVersion,
-                timeout: settings.timeout,
-                verifySsl: settings.verifySsl,
-                followRedirects: settings.followRedirects,
-                auth: authData.authConfig,
-                awsAuth: authData.awsAuth || null,
-                ntlm: authData.ntlmAuth || null,
-                clientCert: null
-            },
+                settings,
+                authData
+            }),
             rawUrl,
             authData,
             mockRewrite
@@ -793,28 +781,15 @@ export class RunnerService {
      * @returns {Promise<Object>}
      */
     async _resolveAuthData(collection, endpoint, persisted, effectiveVariables) {
-        const configuredAuth = persisted.authConfig || endpoint.security || { type: 'inherit', config: {} };
-        const { authConfig: inheritedAuth, source: authSource } = await resolveEffectiveAuthWithSource(configuredAuth, {
-            collectionId: collection.id,
-            endpointId: endpoint.id,
-            repository: this.collectionRepository
+        const { authData, warnings } = await this.pipeline.resolveAuth({
+            authConfig: persisted.authConfig || endpoint.security || { type: 'inherit', config: {} },
+            endpoint: { collectionId: collection.id, endpointId: endpoint.id },
+            variables: effectiveVariables,
+            processor: this.variableProcessor,
+            bearerFallback: true
         });
-        const resolvedAuth = withBearerFallback(inheritedAuth, effectiveVariables);
-        let { authConfig: substitutedAuth } = resolveAuthConfigVariables(resolvedAuth, effectiveVariables, this.variableProcessor);
-        if (authSource && resolvedAuth === inheritedAuth) {
-            const renewal = await ensureFreshOAuthToken({
-                rawAuth: resolvedAuth,
-                resolvedAuth: substitutedAuth,
-                key: oauthRefreshKey({ collectionId: collection.id, endpointId: endpoint.id }, authSource),
-                getToken: (request) => this.backendAPI.oauth2.getToken(request),
-                persist: (nextRaw) => this.collectionRepository.saveAuthConfigAtSource(collection.id, endpoint.id, authSource, nextRaw)
-            });
-            substitutedAuth = renewal.resolvedAuth;
-            if (renewal.error) {
-                this.statusDisplay?.update(renewal.error, null);
-            }
-        }
-        return generateAuthData(substitutedAuth);
+        warnings.forEach((warning) => this.statusDisplay?.update(warning, null));
+        return authData;
     }
 
     /**
@@ -828,16 +803,14 @@ export class RunnerService {
      * @returns {Promise<{url: string, mockRewrite: Object|null}>}
      */
     async _applyMockRewrite({ collection, endpoint, url, queryString, pathParams, runContext }) {
-        const mockBaseUrl = await this._mockBaseUrlFor(collection.id, runContext);
-        if (!mockBaseUrl || !endpoint.path) {
-            return { url, mockRewrite: null };
-        }
-
-        const mockPath = buildMockPath(endpoint.path, pathParams);
-        return {
-            url: queryString ? `${mockBaseUrl}${mockPath}?${queryString}` : `${mockBaseUrl}${mockPath}`,
-            mockRewrite: { baseUrl: mockBaseUrl, pathTemplate: endpoint.path }
-        };
+        return this.pipeline.resolveMockRewrite({
+            endpoint: { collectionId: collection.id, endpointId: endpoint.id },
+            url,
+            queryString,
+            pathParams,
+            mockBaseUrl: await this._mockBaseUrlFor(collection.id, runContext),
+            endpointPath: endpoint.path || null
+        });
     }
 
     /**
@@ -979,26 +952,14 @@ export class RunnerService {
      * @returns {Object}
      */
     _buildGraphQLBody(graphqlData, process) {
-        const query = process((graphqlData.query || '').trim());
-        const variablesText = process((graphqlData.variables || '').trim());
-
-        let parsedVariables = {};
-        if (variablesText) {
-            try {
-                parsedVariables = JSON.parse(variablesText);
-            } catch (e) {
-                throw new Error(
-                    translate('runner.error_invalid_graphql_variables', 'Invalid GraphQL Variables JSON: {{message}}', { message: e.message }),
-                    { cause: e }
-                );
-            }
+        const built = buildGraphQLBody(graphqlData, process);
+        if (built.error) {
+            throw new Error(
+                translate('runner.error_invalid_graphql_variables', 'Invalid GraphQL Variables JSON: {{message}}', { message: built.error.message }),
+                { cause: built.error }
+            );
         }
-
-        const body = { query, variables: parsedVariables };
-        if (graphqlData.operationName) {
-            body.operationName = graphqlData.operationName;
-        }
-        return body;
+        return built.body;
     }
 
     /**
@@ -1010,47 +971,9 @@ export class RunnerService {
         if (runContext?.mockBaseUrls.has(collectionId)) {
             return runContext.mockBaseUrls.get(collectionId);
         }
-        let mockBaseUrl = null;
-        try {
-            const { shouldUseMock, mockBaseUrl: base } = await this.mockServerService.shouldUseMockServer(collectionId);
-            mockBaseUrl = shouldUseMock && base ? base : null;
-        } catch {
-        }
+        const mockBaseUrl = await this.pipeline.mockBaseUrlFor(collectionId);
         runContext?.mockBaseUrls.set(collectionId, mockBaseUrl);
         return mockBaseUrl;
-    }
-
-    /**
-     * @param {Object} requestConfig
-     * @param {Object|null} runContext
-     * @returns {Promise<void>}
-     */
-    async _attachClientCert(requestConfig, runContext) {
-        try {
-            if (!runContext?.certificatesLoaded) {
-                await this.certificateService.getItems();
-            }
-            requestConfig.clientCert = this.certificateService.getForHost(new URL(requestConfig.url).host) || null;
-        } catch {
-        }
-    }
-
-    /**
-     * @param {Object} requestConfig
-     * @returns {Promise<void>}
-     */
-    async _attachCookies(requestConfig) {
-        if (!app.cookieController) {
-            return;
-        }
-        const cookieHeader = await app.cookieController.getCookieHeader(requestConfig.url);
-        if (!cookieHeader) {
-            return;
-        }
-        requestConfig.headers = requestConfig.headers || {};
-        if (!requestConfig.headers['Cookie'] && !requestConfig.headers['cookie']) {
-            requestConfig.headers['Cookie'] = cookieHeader;
-        }
     }
 
     /**
@@ -1113,17 +1036,12 @@ export class RunnerService {
         });
         this._collectScriptResult(result, outcome);
 
-        modifiedRequest.url = this.requestBuilder.applyScriptParamMutations({
-            requestConfig: modifiedRequest,
+        const authStripped = this.pipeline.applyScriptMutations(modifiedRequest, {
             snapshot,
             rawUrl: prepared.rawUrl,
             variables,
             processor: this.variableProcessor,
-            mockRewrite: prepared.mockRewrite
-        });
-        const authStripped = this.requestBuilder.stripCrossOriginAuth({
-            requestConfig: modifiedRequest,
-            originalUrl: snapshot.url,
+            mockRewrite: prepared.mockRewrite,
             authData: prepared.authData
         });
         if (authStripped) {
@@ -1254,14 +1172,3 @@ function mergeVariables(base, changes) {
     return merged;
 }
 
-/**
- * @param {Object} authConfig
- * @param {Object} variables
- * @returns {Object}
- */
-function withBearerFallback(authConfig, variables) {
-    if (authConfig?.type !== 'bearer' || authConfig.config?.token || !variables.bearerToken) {
-        return authConfig;
-    }
-    return { ...authConfig, config: { ...authConfig.config, token: '{{bearerToken}}' } };
-}

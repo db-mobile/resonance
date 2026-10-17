@@ -13,10 +13,13 @@ export class SchemaController {
      * @param {Object} options.repository
      * @param {Object} options.statusDisplay
      */
-    constructor({ repository, statusDisplay }) {
+    constructor({ repository, statusDisplay, backendAPI }) {
         this.repository = repository;
         this.statusDisplay = statusDisplay;
-        this.validator = new SchemaValidator();
+        this.validator = new SchemaValidator(backendAPI);
+        this._contextRevision = 0;
+        this._checkRevision = 0;
+        this._destroyed = false;
         this.editor = null;
         this.currentCollectionId = null;
         this.currentEndpointId = null;
@@ -63,13 +66,10 @@ export class SchemaController {
     }
 
     _handleSchemaChange(_value) {
-        if (!this.currentCollectionId || !this.currentEndpointId) {
-            return;
-        }
-
         this._updateValidationStatus();
-
-        this._debouncedSave(this.currentCollectionId, this.currentEndpointId);
+        if (this.currentCollectionId && this.currentEndpointId) {
+            this._debouncedSave(this.currentCollectionId, this.currentEndpointId);
+        }
     }
 
     /**
@@ -82,10 +82,14 @@ export class SchemaController {
             return;
         }
 
-        const schema = this.editor.getSchema();
+        const snapshot = this.captureSchema();
+        if (snapshot.error || (snapshot.hasSchema && (snapshot.schema === null ||
+            (typeof snapshot.schema !== 'boolean' && typeof snapshot.schema !== 'object')))) {
+            return;
+        }
 
         try {
-            await this.repository.saveResponseSchema(collectionId, endpointId, schema);
+            await this.repository.saveResponseSchema(collectionId, endpointId, snapshot.schema);
         } catch (error) {
             console.error('Failed to save schema:', error);
         }
@@ -97,27 +101,59 @@ export class SchemaController {
         await this._inFlightSave;
     }
 
-    _updateValidationStatus() {
+    /** Snapshot the editor before an asynchronous request can change its context. */
+    captureSchema() {
+        const content = this.editor?.getContent?.() ?? JSON.stringify(this.editor?.getSchema?.()) ?? '';
+        const snapshot = {
+            content,
+            schema: null,
+            hasSchema: Boolean(content.trim()),
+            collectionId: this.currentCollectionId,
+            endpointId: this.currentEndpointId,
+            revision: this._contextRevision
+        };
+        if (snapshot.hasSchema) {
+            try {
+                snapshot.schema = JSON.parse(content);
+            } catch {
+                snapshot.error = 'Invalid JSON syntax';
+            }
+        }
+        return snapshot;
+    }
+
+    isCurrentSnapshot(snapshot) {
+        return !this._destroyed && snapshot.revision === this._contextRevision &&
+            snapshot.content === this.captureSchema().content;
+    }
+
+    async _updateValidationStatus() {
+        const revision = ++this._checkRevision;
         const statusEl = document.getElementById('schema-validation-status');
-        if (!statusEl || !this.editor) {
+        if (!statusEl || !this.editor || this._destroyed) {
             return;
         }
-
-        if (!this.editor.isValidJson()) {
-            statusEl.className = 'schema-validation-status is-error';
-            statusEl.textContent = 'Invalid JSON syntax';
-            return;
-        }
-
-        const schema = this.editor.getSchema();
-        if (!schema) {
-            statusEl.className = 'schema-validation-status';
+        const snapshot = this.captureSchema();
+        statusEl.className = 'schema-validation-status';
+        statusEl.title = '';
+        if (!snapshot.hasSchema) {
             statusEl.textContent = '';
             return;
         }
-
-        statusEl.className = 'schema-validation-status is-success';
-        statusEl.textContent = 'Valid JSON Schema';
+        if (snapshot.error) {
+            statusEl.classList.add('is-error');
+            statusEl.textContent = snapshot.error;
+            return;
+        }
+        statusEl.textContent = 'Checking schema…';
+        const result = await this.validator.check(snapshot.schema);
+        if (revision !== this._checkRevision || !this.isCurrentSnapshot(snapshot)) {
+            return;
+        }
+        statusEl.classList.add(result.valid ? 'is-success' : 'is-error');
+        statusEl.textContent = result.valid ? 'Valid JSON Schema' :
+            result.errors.some(error => error.keyword === 'backend') ? 'Schema validation unavailable' : 'Invalid JSON Schema';
+        statusEl.title = result.errors.map(error => `${error.path}: ${error.message}`).join('\n');
     }
 
     /**
@@ -125,7 +161,11 @@ export class SchemaController {
      * @param {string} endpointId
      */
     async loadSchema(collectionId, endpointId) {
+        const revision = ++this._contextRevision;
         await this.flushPendingSave();
+        if (this._destroyed || revision !== this._contextRevision) {
+            return;
+        }
 
         this.currentCollectionId = collectionId;
         this.currentEndpointId = endpointId;
@@ -137,16 +177,26 @@ export class SchemaController {
 
         try {
             const schema = await this.repository.getResponseSchema(collectionId, endpointId);
+            await this.editor?.__ready;
+            if (this._destroyed || revision !== this._contextRevision) {
+                return;
+            }
             this.editor.setSchema(schema, { emitChange: false });
-            this._updateValidationStatus();
+            await this._updateValidationStatus();
         } catch (error) {
-            console.error('Failed to load schema:', error);
-            this.editor.setSchema(null, { emitChange: false });
+            if (!this._destroyed && revision === this._contextRevision) {
+                console.error('Failed to load schema:', error);
+                this.editor?.setSchema(null, { emitChange: false });
+            }
         }
     }
 
     async clearContext() {
+        const revision = ++this._contextRevision;
         await this.flushPendingSave();
+        if (this._destroyed || revision !== this._contextRevision) {
+            return;
+        }
 
         this.currentCollectionId = null;
         this.currentEndpointId = null;
@@ -163,7 +213,7 @@ export class SchemaController {
     }
 
     inferSchemaFromResponse() {
-        if (!this.lastResponseBody) {
+        if (this.lastResponseBody === null || this.lastResponseBody === undefined) {
             this.statusDisplay.update('No response available to infer schema from', null);
             return;
         }
@@ -172,18 +222,7 @@ export class SchemaController {
             this.statusDisplay.update('No endpoint selected - schema will not be saved', null);
         }
 
-        let data = this.lastResponseBody;
-        
-        if (typeof data === 'string') {
-            try {
-                data = JSON.parse(data);
-            } catch {
-                this.statusDisplay.update('Response is not valid JSON', null);
-                return;
-            }
-        }
-
-        const schema = this.validator.inferSchema(data);
+        const schema = this.validator.inferSchema(this.lastResponseBody);
         this.editor.setSchema(schema);
         this._updateValidationStatus();
         this.statusDisplay.update('Schema inferred from response', null);
@@ -202,31 +241,30 @@ export class SchemaController {
      * @param {*} responseBody
      * @returns {Object}
      */
-    validateResponse(responseBody) {
-        const schema = this.editor?.getSchema();
-        
-        if (!schema) {
+    async validateResponse(responseBody, snapshot = this.captureSchema(), { isJson = true } = {}) {
+        if (!snapshot.hasSchema) {
             return { valid: true, errors: [], hasSchema: false };
         }
-
-        let data = responseBody;
-        if (typeof data === 'string') {
-            try {
-                data = JSON.parse(data);
-            } catch {
-                return {
-                    valid: false,
-                    errors: [{ path: '/', message: 'Response is not valid JSON', keyword: 'parse' }],
-                    hasSchema: true
-                };
-            }
+        if (snapshot.error) {
+            return {
+                valid: false, schemaValid: false, hasSchema: true,
+                errors: [{ path: '/', message: snapshot.error, keyword: 'parse' }]
+            };
         }
-
-        const result = this.validator.validate(data, schema);
+        if (!isJson) {
+            return {
+                valid: false, schemaValid: true, hasSchema: true,
+                errors: [{ path: '/', message: 'Response is not valid JSON', keyword: 'parse' }]
+            };
+        }
+        // HTTP transport has already decoded JSON, including scalar strings.
+        const result = await this.validator.validate(responseBody, snapshot.schema);
         return { ...result, hasSchema: true };
     }
 
     destroy() {
+        this._destroyed = true;
+        this._contextRevision++;
         this._debouncedSave.cancel();
         if (this.editor) {
             this.editor.destroy();

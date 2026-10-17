@@ -1,6 +1,6 @@
 [package]
 name = "resonance"
-version = "3.3.4"
+version = "3.4.0"
 description = "A local-first, zero-account API client with excellent user experience"
 authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
 license = "MIT"
@@ -9,8 +9,8 @@ edition = "2024"
 
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }
-tonic-build = "0.13"
-prost-build = "0.13"
+tonic-prost-build = "0.14"
+prost-build = "0.14"
 protoc-bin-vendored = "3"
 
 [dependencies]
@@ -30,7 +30,7 @@ tauri-plugin-updater = { version = "2.13.2", default-features = false, features 
 # rustls-platform-verifier (0.12's rustls-tls bundled webpki-roots instead).
 reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "form", "rustls-no-provider", "http2", "gzip", "brotli", "socks"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util"] }
-tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
 futures-util = "0.3"
 # MQTT client (async, rustls to match project TLS stack — no OpenSSL).
 # use-rustls-no-provider instead of use-rustls: the latter enables
@@ -39,11 +39,12 @@ futures-util = "0.3"
 rumqttc = { version = "0.25", default-features = false, features = ["use-rustls-no-provider"] }
 
 # gRPC client (rustls-only TLS via tls-ring; keep the tree OpenSSL-free)
-tonic = { version = "0.13", default-features = false, features = ["codegen", "prost", "channel", "tls-ring", "tls-native-roots"] }
-prost = "0.13"
-prost-types = "0.13"
+tonic = { version = "0.14", default-features = false, features = ["codegen", "channel", "tls-ring", "tls-native-roots"] }
+prost = "0.14"
+prost-types = "0.14"
+tonic-prost = "0.14"
 tokio-stream = "0.1"
-prost-reflect = { version = "0.15", features = ["serde"] }
+prost-reflect = { version = "0.16", features = ["serde"] }
 bytes = "1"
 http = "1"
 base64 = "0.22"
@@ -54,9 +55,16 @@ rustls-pemfile = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml_ng = "0.10"
+# Validate user-provided schemas locally; no HTTP/file retrieval or extra TLS provider.
+jsonschema = { version = "0.59", default-features = false, features = ["idna"] }
+# Local response queries (no script evaluation or external document retrieval).
+serde_json_path = "0.7"
+sxd-document = "0.3"
+sxd-xpath = "0.4"
+quick-xml = "0.42"
 
 # Mock server
-axum = { version = "0.7", default-features = false, features = ["http1", "json", "query", "tokio"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio"] }
 tower = { version = "0.5", features = ["util"] }
 
 # TLS for connection timing measurement
@@ -95,7 +103,7 @@ ntlmclient = "0.2"
 getrandom = "0.3"
 
 # Proto file parsing (pure Rust; bundles the well-known types, no protoc needed)
-protox = "0.8"
+protox = "0.10"
 
 # JavaScript engine for script execution
 boa_engine = "0.19"

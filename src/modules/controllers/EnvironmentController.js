@@ -3,7 +3,6 @@
  * @module controllers/EnvironmentController
  */
 
-import { app } from '../appContext.js';
 
 export class EnvironmentController {
     /**
@@ -58,7 +57,7 @@ export class EnvironmentController {
     /** @returns {Promise<void>} */
     async onEnvironmentSwitched() {
         try {
-            app.invalidateApiHandlerEnvironmentCache?.();
+            this.service.invalidateCache();
             const environment = await this.service.getActiveEnvironment();
             if (environment) {
                 this.selector.setActiveEnvironment(environment);
@@ -69,7 +68,7 @@ export class EnvironmentController {
     /** @returns {Promise<void>} */
     async onEnvironmentsChanged() {
         try {
-            app.invalidateApiHandlerEnvironmentCache?.();
+            this.service.invalidateCache();
             const activeEnvironment = await this.service.getActiveEnvironment();
             if (activeEnvironment) {
                 this.selector.setActiveEnvironment(activeEnvironment);

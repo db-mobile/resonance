@@ -20,11 +20,6 @@ async function loadApiHandler() {
         warmEditors: jest.fn(),
         createLazyEditorProxy: jest.fn(() => responseEditor)
     }));
-    jest.doMock('../../src/modules/collectionManager.js', () => ({
-        saveAllRequestModifications: jest.fn().mockResolvedValue(undefined),
-        saveRequestToCollection: jest.fn(),
-        getCollections: jest.fn().mockResolvedValue([])
-    }));
     jest.doMock('../../src/modules/services/RequestBuilderService.js', () => {
         const { VariableProcessor } = jest.requireActual('../../src/modules/variables/VariableProcessor.js');
         return {
@@ -42,6 +37,9 @@ async function loadApiHandler() {
 
     const apiHandler = await import('../../src/modules/apiHandler.js');
     const { app } = await import('../../src/modules/appContext.js');
+    const { AuthManager } = await import('../../src/modules/authManager.js');
+    const authManager = new AuthManager({ typeSelect: null, fieldsContainer: null });
+    app.authManager = authManager;
     const { toast } = await import('../../src/modules/ui/Toast.js');
     const { initTabListeners } = await import('../../src/modules/tabManager.js');
     const { setCurrentEndpoint } = await import('../../src/modules/state/currentEndpoint.js');
@@ -55,6 +53,9 @@ async function loadApiHandler() {
         history: { add: jest.fn().mockResolvedValue(undefined) },
         sendApiRequest: jest.fn().mockResolvedValue({ success: true, status: 200, headers: {}, data: 'ok' })
     };
+
+    const { installTestRequestPipeline } = await import('../helpers/requestPipeline.js');
+    await installTestRequestPipeline(app, window.backendAPI);
 
     const toastError = jest.spyOn(toast, 'error').mockImplementation(() => {});
     const setRequestRunning = jest.fn();

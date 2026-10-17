@@ -13,10 +13,8 @@ jest.mock('../../src/modules/keyValueManager.js', () => ({
     addKeyValueRow: jest.fn(),
     updateUrlFromQueryParams: jest.fn()
 }));
-jest.mock('../../src/modules/authManager.js', () => ({
-    authManager: { loadAuthConfig: jest.fn() }
-}));
-jest.mock('../../src/modules/apiHandler.js', () => ({
+const authManagerStub = { getAuthConfig: jest.fn(() => ({ type: 'none', config: {} })), loadAuthConfig: jest.fn() };
+jest.mock('../../src/modules/responseView.js', () => ({
     displayResponseWithLineNumbersForTab: jest.fn(),
     clearResponseDisplayForTab: jest.fn(),
     clearSchemaValidationBadge: jest.fn(),
@@ -70,6 +68,7 @@ describe('GraphQL tab restore', () => {
             })
         };
         manager = new WorkspaceTabStateManager({
+            authManager: authManagerStub,
             urlInput: globalThis.document.getElementById('url-input'),
             graphqlBodyManager
         });

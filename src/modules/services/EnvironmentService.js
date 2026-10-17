@@ -94,6 +94,11 @@ export class EnvironmentService {
         this._events.emit(event);
     }
 
+    /** @returns {void} */
+    invalidateCache() {
+        this.repository.invalidateCache();
+    }
+
     /** @returns {Promise<Array<Object>>} */
     async getAllEnvironments() {
         return this._reporting('Error loading environments', async () => {

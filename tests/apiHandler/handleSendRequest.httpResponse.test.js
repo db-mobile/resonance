@@ -28,14 +28,12 @@ async function loadApiHandler(sendResult) {
             createLazyEditorProxy: jest.fn(() => stub())
         };
     });
-    jest.doMock('../../src/modules/collectionManager.js', () => ({
-        saveAllRequestModifications: jest.fn().mockResolvedValue(undefined),
-        saveRequestToCollection: jest.fn(),
-        getCollections: jest.fn().mockResolvedValue([])
-    }));
 
     const apiHandler = await import('../../src/modules/apiHandler.js');
     const { app } = await import('../../src/modules/appContext.js');
+    const { AuthManager } = await import('../../src/modules/authManager.js');
+    const authManager = new AuthManager({ typeSelect: null, fieldsContainer: null });
+    app.authManager = authManager;
     const { initTabListeners } = await import('../../src/modules/tabManager.js');
     const { setCurrentEndpoint } = await import('../../src/modules/state/currentEndpoint.js');
 
@@ -47,6 +45,9 @@ async function loadApiHandler(sendResult) {
         history: { add: jest.fn().mockResolvedValue(undefined) },
         sendApiRequest: jest.fn().mockResolvedValue(sendResult)
     };
+
+    const { installTestRequestPipeline } = await import('../helpers/requestPipeline.js');
+    await installTestRequestPipeline(app, window.backendAPI);
 
     const updateTab = jest.fn().mockResolvedValue(undefined);
     app.workspaceTabController = {
@@ -70,6 +71,30 @@ afterEach(() => {
 });
 
 describe('HTTP responses of every status are treated as responses', () => {
+    test('retains the complete live inspection source across tab restores when storage caps its body', async () => {
+        const data = { value: 'x'.repeat(500100) };
+        const { handleSendRequest, app, updateTab } = await loadApiHandler({
+            status: 500, success: false, data, isJson: true, headers: { 'content-type': 'application/json' }
+        });
+        const inspection = { source: null, setSource: jest.fn(source => { inspection.source = source; }) };
+        const container = { tabId: 'tab-1', inspection, editor: { setContent: jest.fn(), currentLanguage: 'json' } };
+        const savedResponse = { data: '{truncated', truncated: true, isJson: true };
+        updateTab.mockResolvedValue({ response: savedResponse });
+        app.responseContainerManager = { containers: new Map([['tab-1', container]]), getOrCreateContainer: () => container };
+        await handleSendRequest();
+        expect(inspection.source).toEqual({ format: 'json', body: JSON.stringify(data) });
+        expect(container.renderedResponse).toBe(savedResponse);
+        expect(updateTab.mock.calls[0][1].response.isJson).toBe(true);
+        const { WorkspaceTabStateManager } = await import('../../src/modules/WorkspaceTabStateManager.js');
+        const before = inspection.setSource.mock.calls.length;
+        await new WorkspaceTabStateManager({})._restoreResponse(savedResponse, 'tab-1');
+        expect(inspection.setSource).toHaveBeenCalledTimes(before);
+        expect(inspection.source.body.length).toBeGreaterThan(500000);
+        delete app.responseContainerManager;
+        delete app.workspaceTabController;
+        delete app.cookieController;
+    });
+
     test('a 500 is saved to the tab with its body and every Set-Cookie header', async () => {
         const { handleSendRequest, updateTab, handleCookiesFromResponse, app } = await loadApiHandler({
             success: false,
@@ -192,7 +217,7 @@ describe('cancelling a unary gRPC call', () => {
 describe('OAuth tokens are renewed before sending', () => {
     test('an expired request-level token is refreshed, sent, and shown in the auth form', async () => {
         const loaded = await loadApiHandler({ success: true, status: 200, headers: {}, data: 'ok' });
-        const { authManager } = await import('../../src/modules/authManager.js');
+        const { authManager } = loaded.app;
         authManager.currentAuthConfig = {
             type: 'oauth2',
             config: { token: 'stale', expiresAt: Date.now() - 1000, refreshToken: 'r1', tokenUrl: 'https://auth.test/token', clientId: 'app' }

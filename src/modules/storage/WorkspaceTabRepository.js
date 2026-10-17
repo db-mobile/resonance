@@ -149,10 +149,8 @@ export class WorkspaceTabRepository {
                 this._queueStoreWrite(this.STORE_KEY, hydrated).catch(() => { });
             }
             return [...hydrated];
-        } catch (error) {
-            const defaultTabs = [this._createDefaultTab()];
-            this._tabsCache = defaultTabs;
-            return [...defaultTabs];
+        } catch {
+            return [this._createDefaultTab()];
         }
     }
 
@@ -255,6 +253,10 @@ export class WorkspaceTabRepository {
 
         let mergedResponse = updates.response !== undefined ?
             updates.response : existingTab.response;
+
+        if (updates.response !== undefined && mergedResponse?.bodyBase64?.length > WorkspaceTabRepository.MAX_RESPONSE_SIZE) {
+            mergedResponse = { ...mergedResponse, bodyBase64: null, truncated: true };
+        }
 
         if (updates.response !== undefined && mergedResponse?.data) {
             const capped = truncateBody(

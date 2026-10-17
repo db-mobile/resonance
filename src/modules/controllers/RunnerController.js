@@ -23,8 +23,9 @@ export class RunnerController {
      * @param {Object} backendAPI
      * @param {Function} getCollections
      * @param {Function} [subscribeToCollections]
+     * @param {{requestPipeline?: Object}} [deps]
      */
-    constructor(backendAPI, getCollections, subscribeToCollections = null) {
+    constructor(backendAPI, getCollections, subscribeToCollections = null, { requestPipeline = null } = {}) {
         this.backendAPI = backendAPI;
         this.getCollections = getCollections;
         this.subscribeToCollections = subscribeToCollections;
@@ -33,7 +34,7 @@ export class RunnerController {
         const statusDisplay = new StatusDisplayAdapter(updateStatusDisplay);
         this.repository = RunnerRepository.shared(backendAPI);
         this.historyRepository = RunnerHistoryRepository.shared(backendAPI);
-        this.service = new RunnerService(this.repository, backendAPI, statusDisplay);
+        this.service = new RunnerService(this.repository, backendAPI, statusDisplay, { pipeline: requestPipeline });
 
         this.panel = null;
         this._currentRunnerId = null;

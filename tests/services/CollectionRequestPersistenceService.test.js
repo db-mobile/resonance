@@ -1,39 +1,49 @@
 import { CollectionRequestPersistenceService } from '../../src/modules/services/CollectionRequestPersistenceService.js';
 
+function readerWithAuth(authConfig) {
+    return {
+        read: jest.fn(() => ({ url: null, method: null, pathParams: null, queryParams: null, headers: null, bodyState: null, authConfig })),
+        hasBody: jest.fn(() => false)
+    };
+}
+
 describe('CollectionRequestPersistenceService auth persistence', () => {
     let repository;
-    let service;
+
+    const makeService = (formReader) => new CollectionRequestPersistenceService({
+        repository,
+        collectionService: {},
+        statusDisplay: { update: jest.fn() },
+        refreshCollections: jest.fn(),
+        formReader
+    });
 
     beforeEach(() => {
         repository = {
             updateEndpointFields: jest.fn().mockResolvedValue(undefined)
         };
-        service = new CollectionRequestPersistenceService({
-            repository,
-            collectionService: {},
-            statusDisplay: { update: jest.fn() },
-            refreshCollections: jest.fn()
-        });
     });
 
     test('saveHttpRequest saves auth in the same sidecar write as the other fields', async () => {
         const authConfig = { type: 'bearer', config: { token: 'sk-live-abc' } };
-        const authManager = { getAuthConfig: jest.fn(() => authConfig) };
-        const parseKeyValuePairs = jest.fn(() => ({}));
 
-        await service.saveHttpRequest('c1', 'e1', parseKeyValuePairs, authManager);
+        await makeService(readerWithAuth(authConfig)).saveHttpRequest('c1', 'e1');
 
         expect(repository.updateEndpointFields).toHaveBeenCalledTimes(1);
         expect(repository.updateEndpointFields).toHaveBeenCalledWith('c1', 'e1', { authConfig });
     });
 
     test('saveHttpRequest persists an explicit inherit choice', async () => {
-        const authManager = { getAuthConfig: jest.fn(() => ({ type: 'inherit', config: {} })) };
-
-        await service.saveHttpRequest('c1', 'e1', jest.fn(() => ({})), authManager);
+        await makeService(readerWithAuth({ type: 'inherit', config: {} })).saveHttpRequest('c1', 'e1');
 
         expect(repository.updateEndpointFields).toHaveBeenCalledWith('c1', 'e1', {
             authConfig: { type: 'inherit', config: {} }
         });
+    });
+
+    test('saveHttpRequest writes nothing when the form is empty', async () => {
+        await makeService(readerWithAuth(null)).saveHttpRequest('c1', 'e1');
+
+        expect(repository.updateEndpointFields).not.toHaveBeenCalled();
     });
 });

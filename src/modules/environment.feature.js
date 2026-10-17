@@ -29,5 +29,5 @@ export const environmentFeature = {
         return { repository, service, manager, selector, controller };
     },
     globals: { environmentController: 'controller' },
-    provides: { environmentService: 'service' },
+    provides: { environmentService: 'service', environmentRepository: 'repository' },
 };

@@ -27,15 +27,7 @@ function makeDeps() {
             createCollection: jest.fn(async ({ name }) => ({ id: 'new-col', name })),
             addRequestToCollection: jest.fn(async () => ({ id: 'ep-1' }))
         },
-        collectionRepository: {
-            getAll: jest.fn(async () => [{ id: 'c1', name: 'Shop' }]),
-            savePersistedPathParams: jest.fn(async () => {}),
-            savePersistedQueryParams: jest.fn(async () => {}),
-            savePersistedHeaders: jest.fn(async () => {}),
-            saveModifiedRequestBody: jest.fn(async () => {}),
-            savePersistedAuthConfig: jest.fn(async () => {}),
-            savePersistedUrl: jest.fn(async () => {})
-        }
+        listCollections: jest.fn(async () => [{ id: 'c1', name: 'Shop' }])
     };
 }
 
@@ -216,14 +208,14 @@ describe('CollectionDialogs', () => {
             });
             expect(deps.collectionService.addRequestToCollection).toHaveBeenCalledWith('c1', {
                 name: 'GET /users', protocol: 'http', method: 'GET',
-                path: 'https://api.example.com/v1/users?x=1'
+                path: 'https://api.example.com/v1/users?x=1',
+                url: 'https://api.example.com/v1/users?x=1',
+                pathParams: { id: '7' },
+                queryParams: [{ key: 'x', value: '1' }],
+                headers: [{ key: 'Accept', value: 'application/json' }],
+                body: '{"a":1}',
+                authConfig: { type: 'bearer', config: { token: 't' } }
             });
-            expect(deps.collectionRepository.savePersistedPathParams).toHaveBeenCalledWith('c1', 'ep-1', [{ key: 'id', value: '7' }]);
-            expect(deps.collectionRepository.savePersistedQueryParams).toHaveBeenCalledWith('c1', 'ep-1', [{ key: 'x', value: '1', enabled: true }]);
-            expect(deps.collectionRepository.savePersistedHeaders).toHaveBeenCalledWith('c1', 'ep-1', [{ key: 'Accept', value: 'application/json', enabled: true }]);
-            expect(deps.collectionRepository.saveModifiedRequestBody).toHaveBeenCalledWith('c1', 'ep-1', '{"a":1}');
-            expect(deps.collectionRepository.savePersistedAuthConfig).toHaveBeenCalledWith('c1', 'ep-1', { type: 'bearer', config: { token: 't' } });
-            expect(deps.collectionRepository.savePersistedUrl).toHaveBeenCalledWith('c1', 'ep-1', 'https://api.example.com/v1/users?x=1');
         });
 
         test('creating a new collection inline uses the picked location and skips empty sidecars', async () => {
@@ -249,12 +241,9 @@ describe('CollectionDialogs', () => {
                 collectionId: 'new-col', endpointId: 'ep-1', name: 'Custom name', collectionName: 'Fresh'
             });
             expect(deps.collectionService.createCollection).toHaveBeenCalledWith({ name: 'Fresh', storageParentPath: '/default/store' });
-            expect(deps.collectionRepository.savePersistedPathParams).not.toHaveBeenCalled();
-            expect(deps.collectionRepository.savePersistedQueryParams).not.toHaveBeenCalled();
-            expect(deps.collectionRepository.savePersistedHeaders).not.toHaveBeenCalled();
-            expect(deps.collectionRepository.saveModifiedRequestBody).not.toHaveBeenCalled();
-            expect(deps.collectionRepository.savePersistedAuthConfig).not.toHaveBeenCalled();
-            expect(deps.collectionRepository.savePersistedUrl).toHaveBeenCalledWith('new-col', 'ep-1', 'https://x.test/a');
+            expect(deps.collectionService.addRequestToCollection).toHaveBeenCalledWith('new-col', {
+                name: 'Custom name', protocol: 'http', method: 'POST', path: 'https://x.test/a', url: 'https://x.test/a'
+            });
         });
 
         test('GraphQL and gRPC requests carry their protocol fields', async () => {
@@ -281,7 +270,6 @@ describe('CollectionDialogs', () => {
                 name: 'G', protocol: 'grpc', method: 'GET', path: '/',
                 target: 'localhost:1', fullMethod: 'pkg.Svc/Do', requestJson: '{}'
             });
-            expect(deps.collectionRepository.savePersistedUrl).toHaveBeenCalledTimes(1);
         });
 
         test('a failing save rejects and closes the dialog', async () => {

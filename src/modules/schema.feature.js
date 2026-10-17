@@ -12,6 +12,7 @@ export const schemaFeature = {
         const controller = new SchemaController({
             repository: ctx.get('collectionRepository'),
             statusDisplay: ctx.statusDisplay,
+            backendAPI: ctx.backendAPI,
         });
         return { controller };
     },

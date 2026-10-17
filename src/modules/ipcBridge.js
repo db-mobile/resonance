@@ -150,6 +150,13 @@ if (isTauri) {
             clearLogs: () => invoke('mock_server_clear_logs'),
             reloadSettings: (settings) => invoke('mock_server_reload_settings', { settings })
         },
+        schema: {
+            check: (schema) => invoke('schema_check', { schema }),
+            validate: (schema, instance) => invoke('schema_validate', { schema, instance })
+        },
+        responses: {
+            inspect: (request) => invoke('response_inspect', { request })
+        },
         scripts: {
             get: (collectionId, endpointId) => invoke('script_get', { collectionId, endpointId }),
             save: (collectionId, endpointId, scripts) => invoke('script_save', { collectionId, endpointId, scripts }),

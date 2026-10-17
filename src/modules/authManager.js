@@ -6,6 +6,8 @@
 import { templateLoader } from './templateLoader.js';
 import { api } from './ipcBridge.js';
 import { generateAuthData } from './auth/authData.js';
+import { getAuthType, getAuthTypeLabel, DEFAULT_REDIRECT_URI } from './auth/authTypes.js';
+import { buildTokenRequest, applyTokenResult } from './auth/oauthRefresh.js';
 import { resolveAuthConfigVariables } from './auth/authVariables.js';
 import { toast } from './ui/Toast.js';
 
@@ -21,86 +23,12 @@ export function setOAuthVariableResolver(resolver) {
 }
 
 /**
- * @typedef {Object} AuthFieldSpec
- * @property {string} id
- * @property {string} key
- * @property {'value'|'checked'} [prop]
- * @property {string} [event]
- * @property {string} [fallback]
- * @property {boolean} [seed]
- * @property {string} [reveals]
- * @property {string} [dispatch]
- */
-
-/** @type {Object<string, AuthFieldSpec[]>} */
-const AUTH_FIELDS = {
-    bearer: [
-        { id: 'bearer-token', key: 'token', fallback: '{{bearerToken}}', seed: true }
-    ],
-    basic: [
-        { id: 'basic-username', key: 'username' },
-        { id: 'basic-password', key: 'password' }
-    ],
-    'api-key': [
-        { id: 'api-key-name', key: 'keyName' },
-        { id: 'api-key-value', key: 'keyValue' },
-        { id: 'api-key-location', key: 'location', event: 'change', fallback: 'header', seed: true }
-    ],
-    oauth2: [
-        { id: 'oauth2-grant-type', key: 'grantType', event: 'change', fallback: 'client_credentials', seed: true, dispatch: 'change' },
-        { id: 'oauth2-token-url', key: 'tokenUrl' },
-        { id: 'oauth2-auth-url', key: 'authorizationUrl' },
-        { id: 'oauth2-client-id', key: 'clientId' },
-        { id: 'oauth2-client-secret', key: 'clientSecret' },
-        { id: 'oauth2-username', key: 'username' },
-        { id: 'oauth2-password', key: 'password' },
-        { id: 'oauth2-redirect-uri', key: 'redirectUri', fallback: 'http://localhost:8080/callback' },
-        { id: 'oauth2-scope', key: 'scope' },
-        { id: 'oauth2-audience', key: 'audience' },
-        { id: 'oauth2-use-pkce', key: 'usePkce', prop: 'checked', event: 'change' },
-        { id: 'oauth2-client-auth', key: 'clientAuthMethod', event: 'change', fallback: 'body', seed: true },
-        { id: 'oauth2-token', key: 'token' },
-        { id: 'oauth2-header-prefix', key: 'headerPrefix', fallback: 'Bearer', seed: true },
-        { id: 'oauth2-refresh-token', key: 'refreshToken', reveals: 'oauth2-refresh-token-group' }
-    ],
-    digest: [
-        { id: 'digest-username', key: 'username' },
-        { id: 'digest-password', key: 'password' }
-    ],
-    ntlm: [
-        { id: 'ntlm-username', key: 'username' },
-        { id: 'ntlm-password', key: 'password' },
-        { id: 'ntlm-domain', key: 'domain' },
-        { id: 'ntlm-workstation', key: 'workstation' }
-    ],
-    'aws-v4': [
-        { id: 'aws-access-key-id', key: 'accessKeyId' },
-        { id: 'aws-secret-access-key', key: 'secretAccessKey' },
-        { id: 'aws-region', key: 'region' },
-        { id: 'aws-service', key: 'service' },
-        { id: 'aws-session-token', key: 'sessionToken' }
-    ]
-};
-
-const AUTH_TYPE_LABELS = {
-    none: 'No Auth',
-    inherit: 'Inherit from Parent',
-    bearer: 'Bearer Token',
-    basic: 'Basic Auth',
-    'api-key': 'API Key',
-    oauth2: 'OAuth 2.0',
-    digest: 'Digest Auth',
-    ntlm: 'NTLM',
-    'aws-v4': 'AWS Signature'
-};
-
-/**
  * @param {{authType?: string, folderName?: string, collectionName?: string}} info
  * @returns {string}
  */
 function inheritSummaryText(info) {
     if (info.authType && info.authType !== 'none') {
-        return `Inheriting ${AUTH_TYPE_LABELS[info.authType] || info.authType} from ${inheritSourceText(info)}.`;
+        return `Inheriting ${getAuthTypeLabel(info.authType)} from ${inheritSourceText(info)}.`;
     }
     if (info.folderName) {
         return `Folder "${info.folderName}" opts out of collection auth — this request is sent unauthenticated.`;
@@ -139,6 +67,8 @@ export class AuthManager {
         this.authTypeSelect = options.typeSelect || document.getElementById('auth-type-select');
         this.authFieldsContainer = options.fieldsContainer || document.getElementById('auth-fields-container');
         this.inheritSummary = options.inheritSummary || null;
+        this.getInheritedAuthInfo = options.getInheritedAuthInfo || null;
+        this.onOpenCollectionAuth = options.onOpenCollectionAuth || null;
         this.currentAuthConfig = {
             type: 'none',
             config: {}
@@ -191,7 +121,7 @@ export class AuthManager {
      * @returns {void}
      */
     _bindFields(type, hooks = {}) {
-        const fields = AUTH_FIELDS[type] || [];
+        const fields = getAuthType(type)?.fields ?? [];
         const { config } = this.currentAuthConfig;
 
         fields.forEach((field) => {
@@ -229,7 +159,7 @@ export class AuthManager {
      * @returns {void}
      */
     _populateFields(type, config) {
-        const fields = AUTH_FIELDS[type] || [];
+        const fields = getAuthType(type)?.fields ?? [];
         const pending = [];
 
         fields.forEach((field) => {
@@ -314,39 +244,16 @@ export class AuthManager {
 
         this.authFieldsContainer.innerHTML = '';
 
-        switch (authType) {
-            case 'none':
-                break;
-
-            case 'inherit':
-                this.renderInheritFields();
-                break;
-
-            case 'bearer':
-            case 'basic':
-            case 'api-key':
-            case 'digest':
-            case 'ntlm':
-            case 'aws-v4':
-                this._renderSimpleFields(authType);
-                break;
-
-            case 'oauth2':
-                this.renderOAuth2Fields();
-                break;
-
-            default:
-                break;
+        const entry = getAuthType(authType);
+        if (!entry?.template) {
+            return;
         }
-    }
-
-    /**
-     * @param {'bearer'|'basic'|'api-key'|'digest'|'ntlm'|'aws-v4'} authType
-     * @returns {void}
-     */
-    _renderSimpleFields(authType) {
-        this._mountTemplate(`tpl-auth-${authType}`);
-        this._bindFields(authType);
+        if (entry.mount) {
+            this[entry.mount]();
+            return;
+        }
+        this._mountTemplate(entry.template);
+        this._bindFields(entry.id);
     }
 
     /** @returns {void} */
@@ -385,7 +292,7 @@ export class AuthManager {
      * @returns {string}
      */
     getAuthTypeLabel(type) {
-        return AUTH_TYPE_LABELS[type] || type;
+        return getAuthTypeLabel(type);
     }
 
     /** @returns {void} */
@@ -469,22 +376,7 @@ export class AuthManager {
                 await this._handleAuthorizationCodeFlow();
             } else {
                 const config = await this._resolvedOAuthConfig();
-                const tokenConfig = {
-                    grantType: grantType,
-                    tokenUrl: config.tokenUrl,
-                    clientId: config.clientId,
-                    clientSecret: config.clientSecret || null,
-                    scope: config.scope || null,
-                    audience: config.audience || null,
-                    clientAuthMethod: config.clientAuthMethod || 'body'
-                };
-
-                if (grantType === 'password') {
-                    tokenConfig.username = config.username;
-                    tokenConfig.password = config.password;
-                }
-
-                const result = await api.oauth2.getToken(tokenConfig);
+                const result = await api.oauth2.getToken(buildTokenRequest(config, grantType));
                 this._handleTokenResponse(result, errorGroup, errorMessage);
             }
         } catch (error) {
@@ -510,7 +402,7 @@ export class AuthManager {
         const authUrlParams = {
             authorizationUrl: config.authorizationUrl,
             clientId: config.clientId,
-            redirectUri: config.redirectUri || 'http://localhost:8080/callback',
+            redirectUri: config.redirectUri || DEFAULT_REDIRECT_URI,
             scope: config.scope || null,
             state: state,
             audience: config.audience || null
@@ -575,18 +467,7 @@ export class AuthManager {
                 codeVerifier = await api.oauth2.getPkceVerifier(raw._pendingState);
             }
 
-            const tokenConfig = {
-                grantType: 'authorization_code',
-                tokenUrl: config.tokenUrl,
-                clientId: config.clientId,
-                clientSecret: config.clientSecret || null,
-                authorizationCode: code,
-                redirectUri: config.redirectUri || 'http://localhost:8080/callback',
-                codeVerifier: codeVerifier,
-                clientAuthMethod: config.clientAuthMethod || 'body'
-            };
-
-            const result = await api.oauth2.getToken(tokenConfig);
+            const result = await api.oauth2.getToken(buildTokenRequest(config, 'authorization_code', { authorizationCode: code, codeVerifier }));
             this._handleTokenResponse(result, errorGroup, errorMessage);
 
             delete raw._pendingState;
@@ -609,16 +490,7 @@ export class AuthManager {
 
         try {
             const config = await this._resolvedOAuthConfig();
-            const tokenConfig = {
-                grantType: 'refresh_token',
-                tokenUrl: config.tokenUrl,
-                clientId: config.clientId,
-                clientSecret: config.clientSecret || null,
-                refreshToken: config.refreshToken,
-                clientAuthMethod: config.clientAuthMethod || 'body'
-            };
-
-            const result = await api.oauth2.getToken(tokenConfig);
+            const result = await api.oauth2.getToken(buildTokenRequest(config, 'refresh_token'));
             this._handleTokenResponse(result, errorGroup, errorMessage);
         } catch (error) {
             this._showError(errorGroup, errorMessage, error.message || 'Failed to refresh token');
@@ -643,7 +515,10 @@ export class AuthManager {
      */
     _handleTokenResponse(result, errorGroup, errorMessage) {
         if (result.success && result.accessToken) {
-            this.currentAuthConfig.config.token = result.accessToken;
+            const { config } = this.currentAuthConfig;
+            const next = applyTokenResult(config, result);
+            delete config.expiresAt;
+            Object.assign(config, next);
 
             const tokenInput = this._el('oauth2-token');
             if (tokenInput) {tokenInput.value = result.accessToken;}
@@ -655,20 +530,16 @@ export class AuthManager {
             }
 
             const tokenExpires = this._el('oauth2-token-expires');
-            if (result.expiresIn) {
-                const expiresAt = new Date(Date.now() + result.expiresIn * 1000);
-                this.currentAuthConfig.config.expiresAt = expiresAt.getTime();
+            if (config.expiresAt) {
                 if (tokenExpires) {
-                    tokenExpires.textContent = `Expires: ${expiresAt.toLocaleTimeString()}`;
+                    tokenExpires.textContent = `Expires: ${new Date(config.expiresAt).toLocaleTimeString()}`;
                     tokenExpires.classList.remove('u-hidden');
                 }
             } else {
-                delete this.currentAuthConfig.config.expiresAt;
                 tokenExpires?.classList.add('u-hidden');
             }
 
             if (result.refreshToken) {
-                this.currentAuthConfig.config.refreshToken = result.refreshToken;
                 const refreshTokenInput = this._el('oauth2-refresh-token');
                 const refreshTokenGroup = this._el('oauth2-refresh-token-group');
                 if (refreshTokenInput) {refreshTokenInput.value = result.refreshToken;}
@@ -744,5 +615,3 @@ export class AuthManager {
     }
 
 }
-
-export const authManager = new AuthManager();

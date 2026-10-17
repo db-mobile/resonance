@@ -36,7 +36,7 @@ describe('DELETE requests keep their body', () => {
     });
 
     test('in the collection runner', () => {
-        const service = new RunnerService({}, {}, null);
+        const service = new RunnerService({}, {}, null, { pipeline: {} });
         const { body } = service._buildBody({
             endpoint: { id: 'e1' },
             method: 'DELETE',

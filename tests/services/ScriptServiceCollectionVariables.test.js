@@ -12,7 +12,6 @@ describe('scripts and collection variables', () => {
             applyVariableChanges: jest.fn().mockResolvedValue(undefined)
         };
         const environmentService = { getActiveEnvironmentVariables: jest.fn().mockResolvedValue({}) };
-        service = new ScriptService(null, environmentService, null, variableRepository);
         window.backendAPI = {
             scripts: {
                 executePreRequest: jest.fn().mockResolvedValue({
@@ -22,6 +21,7 @@ describe('scripts and collection variables', () => {
                 })
             }
         };
+        service = new ScriptService(null, environmentService, null, variableRepository, { backendAPI: window.backendAPI });
     });
 
     afterEach(() => {

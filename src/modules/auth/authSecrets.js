@@ -3,16 +3,12 @@
  * @module auth/authSecrets
  */
 
+import { AUTH_TYPES } from './authTypes.js';
+
 /** @type {Object<string, string[]>} */
-export const SECRET_AUTH_FIELDS = {
-    bearer: ['token'],
-    basic: ['password'],
-    'api-key': ['keyValue'],
-    oauth2: ['clientSecret', 'password', 'token', 'refreshToken'],
-    digest: ['password'],
-    ntlm: ['password'],
-    'aws-v4': ['secretAccessKey', 'sessionToken']
-};
+export const SECRET_AUTH_FIELDS = Object.freeze(Object.fromEntries(
+    AUTH_TYPES.filter((entry) => entry.secretFields.length > 0).map((entry) => [entry.id, [...entry.secretFields]])
+));
 
 /**
  * @param {*} value

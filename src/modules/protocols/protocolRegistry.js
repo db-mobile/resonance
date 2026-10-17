@@ -28,6 +28,35 @@ export const RequestMode = {
  */
 
 /**
+ * @typedef {Object} ProtocolUrlSection
+ * @property {string} sectionId
+ * @property {string} [method]
+ * @property {string} [label]
+ * @property {string} [inputType]
+ * @property {string} [placeholder]
+ * @property {string} [ariaLabel]
+ * @property {string} [peerId]
+ * @property {boolean} [syncQueryParams]
+ */
+
+/**
+ * @typedef {Object} ProtocolUi
+ * @property {?ProtocolUrlSection} urlSection
+ * @property {boolean} showBodyModeSelector
+ * @property {?string} forceBodyMode
+ * @property {?boolean} lockBodyMode
+ * @property {?('on'|'off')} workbench
+ * @property {boolean} [alwaysActivateDefaultTab]
+ */
+
+/**
+ * @typedef {Object} ProtocolHandler
+ * @property {() => Promise<*>} send
+ * @property {() => Promise<*>} cancel
+ * @property {(tabId: ?string) => boolean} isLive
+ */
+
+/**
  * @typedef {Object} ProtocolDescriptor
  * @property {string} id
  * @property {string} label
@@ -49,6 +78,8 @@ export const RequestMode = {
  * @property {'http'|'grpc'|'none'} responseTabSet
  * @property {PersistedDataCapabilities} persisted
  * @property {string[]} createSidecars
+ * @property {?('cancel'|'send')} liveControl
+ * @property {ProtocolUi} ui
  */
 
 /**
@@ -107,7 +138,15 @@ export const PROTOCOLS = Object.freeze({
             formBodyData: true,
             graphqlData: true
         })),
-        createSidecars: Object.freeze([])
+        createSidecars: Object.freeze([]),
+        liveControl: null,
+        ui: Object.freeze({
+            urlSection: null,
+            showBodyModeSelector: true,
+            forceBodyMode: null,
+            lockBodyMode: false,
+            workbench: null
+        })
     }),
     [RequestMode.SSE]: Object.freeze({
         id: RequestMode.SSE,
@@ -135,7 +174,24 @@ export const PROTOCOLS = Object.freeze({
             headers: true,
             modifiedBody: true
         })),
-        createSidecars: Object.freeze(['url'])
+        createSidecars: Object.freeze(['url']),
+        liveControl: 'cancel',
+        ui: Object.freeze({
+            urlSection: Object.freeze({
+                sectionId: 'sse-url-section',
+                method: 'SSE',
+                label: 'SSE',
+                inputType: 'url',
+                placeholder: 'https://example.com/events',
+                ariaLabel: 'SSE URL',
+                peerId: 'url-input',
+                syncQueryParams: true
+            }),
+            showBodyModeSelector: true,
+            forceBodyMode: null,
+            lockBodyMode: false,
+            workbench: null
+        })
     }),
     [RequestMode.WEBSOCKET]: Object.freeze({
         id: RequestMode.WEBSOCKET,
@@ -162,7 +218,24 @@ export const PROTOCOLS = Object.freeze({
             headers: true,
             modifiedBody: true
         })),
-        createSidecars: Object.freeze(['url'])
+        createSidecars: Object.freeze(['url']),
+        liveControl: 'cancel',
+        ui: Object.freeze({
+            urlSection: Object.freeze({
+                sectionId: 'websocket-url-section',
+                method: 'WS',
+                label: 'WS',
+                inputType: 'url',
+                placeholder: 'wss://echo.websocket.events',
+                ariaLabel: 'WebSocket URL',
+                peerId: 'url-input',
+                syncQueryParams: true
+            }),
+            showBodyModeSelector: false,
+            forceBodyMode: 'json',
+            lockBodyMode: true,
+            workbench: 'off'
+        })
     }),
     [RequestMode.GRAPHQL]: Object.freeze({
         id: RequestMode.GRAPHQL,
@@ -191,7 +264,25 @@ export const PROTOCOLS = Object.freeze({
             formBodyData: true,
             graphqlData: true
         })),
-        createSidecars: Object.freeze(['url', 'graphqlData'])
+        createSidecars: Object.freeze(['url', 'graphqlData']),
+        liveControl: 'send',
+        ui: Object.freeze({
+            urlSection: Object.freeze({
+                sectionId: 'graphql-url-section',
+                method: 'GRAPHQL',
+                label: 'GraphQL',
+                inputType: 'url',
+                placeholder: 'https://api.example.com/graphql',
+                ariaLabel: 'GraphQL Endpoint URL',
+                peerId: 'url-input',
+                syncQueryParams: true
+            }),
+            showBodyModeSelector: false,
+            forceBodyMode: null,
+            lockBodyMode: null,
+            workbench: 'on',
+            alwaysActivateDefaultTab: true
+        })
     }),
     [RequestMode.GRPC]: Object.freeze({
         id: RequestMode.GRPC,
@@ -215,7 +306,15 @@ export const PROTOCOLS = Object.freeze({
         persisted: Object.freeze(capabilities({
             grpcData: true
         })),
-        createSidecars: Object.freeze(['grpcData'])
+        createSidecars: Object.freeze(['grpcData']),
+        liveControl: 'cancel',
+        ui: Object.freeze({
+            urlSection: Object.freeze({ sectionId: 'grpc-url-section' }),
+            showBodyModeSelector: true,
+            forceBodyMode: null,
+            lockBodyMode: false,
+            workbench: null
+        })
     }),
     [RequestMode.MQTT]: Object.freeze({
         id: RequestMode.MQTT,
@@ -241,7 +340,23 @@ export const PROTOCOLS = Object.freeze({
             modifiedBody: true,
             mqttData: true
         })),
-        createSidecars: Object.freeze(['url', 'mqttData'])
+        createSidecars: Object.freeze(['url', 'mqttData']),
+        liveControl: null,
+        ui: Object.freeze({
+            urlSection: Object.freeze({
+                sectionId: 'mqtt-url-section',
+                method: 'MQTT',
+                label: 'MQTT',
+                inputType: 'text',
+                placeholder: 'mqtt://localhost:1883',
+                ariaLabel: 'MQTT Broker URL',
+                peerId: 'url-input'
+            }),
+            showBodyModeSelector: false,
+            forceBodyMode: 'json',
+            lockBodyMode: true,
+            workbench: 'off'
+        })
     })
 });
 
@@ -261,6 +376,29 @@ export function resolveProtocolId(protocol) {
  */
 export function getProtocol(protocol) {
     return PROTOCOLS[resolveProtocolId(protocol)];
+}
+
+/** @type {Map<string, ProtocolHandler>} */
+const handlers = new Map();
+
+/**
+ * @param {string} protocolId
+ * @param {ProtocolHandler} handler
+ * @returns {void}
+ */
+export function registerProtocolHandler(protocolId, handler) {
+    if (!PROTOCOLS[protocolId]) {
+        throw new Error(`Unknown protocol: ${protocolId}`);
+    }
+    handlers.set(protocolId, Object.freeze({ ...handler }));
+}
+
+/**
+ * @param {*} protocol
+ * @returns {?ProtocolHandler}
+ */
+export function getProtocolHandler(protocol) {
+    return handlers.get(resolveProtocolId(protocol)) || null;
 }
 
 /** @returns {string[]} */

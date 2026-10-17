@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import {
-    normalizeSubscriptionUrl,
+    normalizeWsUrl,
     buildConnectionInit,
     buildSubscribe,
     buildComplete,
@@ -8,24 +8,24 @@ import {
     selectActiveOperationType
 } from '../../src/modules/graphqlTransportWs.js';
 
-describe('normalizeSubscriptionUrl', () => {
+describe('normalizeWsUrl', () => {
     it('swaps http(s) to ws(s)', () => {
-        expect(normalizeSubscriptionUrl('http://x/graphql')).toBe('ws://x/graphql');
-        expect(normalizeSubscriptionUrl('https://x/graphql')).toBe('wss://x/graphql');
+        expect(normalizeWsUrl('http://x/graphql')).toBe('ws://x/graphql');
+        expect(normalizeWsUrl('https://x/graphql')).toBe('wss://x/graphql');
     });
 
     it('leaves ws(s) URLs untouched', () => {
-        expect(normalizeSubscriptionUrl('ws://x')).toBe('ws://x');
-        expect(normalizeSubscriptionUrl('wss://x')).toBe('wss://x');
+        expect(normalizeWsUrl('ws://x')).toBe('ws://x');
+        expect(normalizeWsUrl('wss://x')).toBe('wss://x');
     });
 
     it('defaults scheme-less input to ws://', () => {
-        expect(normalizeSubscriptionUrl('x/graphql')).toBe('ws://x/graphql');
+        expect(normalizeWsUrl('x/graphql')).toBe('ws://x/graphql');
     });
 
     it('returns empty string for falsy input', () => {
-        expect(normalizeSubscriptionUrl('')).toBe('');
-        expect(normalizeSubscriptionUrl(undefined)).toBe('');
+        expect(normalizeWsUrl('')).toBe('');
+        expect(normalizeWsUrl(undefined)).toBe('');
     });
 });
 

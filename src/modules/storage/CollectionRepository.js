@@ -102,6 +102,23 @@ export class CollectionRepository {
         }
     }
 
+    /**
+     * @param {string} collectionId
+     * @param {string} format
+     * @returns {Promise<Object>}
+     */
+    exportOpenApi(collectionId, format) {
+        return this.backendAPI.collections.exportOpenApi(collectionId, format);
+    }
+
+    /**
+     * @param {string} collectionId
+     * @returns {Promise<Object>}
+     */
+    exportPostman(collectionId) {
+        return this.backendAPI.collections.exportPostman(collectionId);
+    }
+
     /** @returns {void} */
     invalidateCache() {
         this._byIdCache.clear();
@@ -286,7 +303,7 @@ export class CollectionRepository {
             formBodyData: data.formBodyData || null,
             grpcData: data.grpcData || null,
             mqttData: await this._hydrateMqttData(collectionId, endpointId, data.mqttData || null),
-            responseSchema: data.responseSchema || null
+            responseSchema: data.responseSchema ?? null
         };
     }
 
@@ -908,6 +925,7 @@ export class CollectionRepository {
      * @returns {Promise<Object|null>}
      */
     async getResponseSchema(collectionId, endpointId) {
-        return this._readSidecar(collectionId, endpointId, 'responseSchema', null);
+        const data = await this._getEndpointData(collectionId, endpointId);
+        return data.responseSchema ?? null;
     }
 }

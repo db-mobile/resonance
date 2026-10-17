@@ -1,4 +1,3 @@
-/* global window */
 import { CollectionService } from '../../src/modules/services/CollectionService.js';
 
 jest.mock('../../src/modules/ui/Toast.js', () => ({
@@ -15,20 +14,12 @@ describe('CollectionService exports, opening and row saves', () => {
             openExisting: jest.fn().mockResolvedValue({ opened: [{ id: 'a' }, { id: 'b' }] }),
             savePersistedPathParams: jest.fn().mockResolvedValue(undefined),
             savePersistedQueryParams: jest.fn().mockResolvedValue(undefined),
-            savePersistedHeaders: jest.fn().mockResolvedValue(undefined)
+            savePersistedHeaders: jest.fn().mockResolvedValue(undefined),
+            exportOpenApi: jest.fn().mockResolvedValue({ success: true }),
+            exportPostman: jest.fn().mockResolvedValue({ success: true, skipped: { count: 2 } })
         };
         statusDisplay = { update: jest.fn() };
         service = new CollectionService(repository, {}, statusDisplay);
-        window.backendAPI = {
-            collections: {
-                exportOpenApi: jest.fn().mockResolvedValue({ success: true }),
-                exportPostman: jest.fn().mockResolvedValue({ success: true, skipped: { count: 2 } })
-            }
-        };
-    });
-
-    afterEach(() => {
-        delete window.backendAPI;
     });
 
     describe('exportCollectionAsOpenApi / exportCollectionAsPostman', () => {
@@ -36,8 +27,8 @@ describe('CollectionService exports, opening and row saves', () => {
             const openApi = await service.exportCollectionAsOpenApi('c1', 'yaml');
             const postman = await service.exportCollectionAsPostman('c1');
 
-            expect(window.backendAPI.collections.exportOpenApi).toHaveBeenCalledWith('c1', 'yaml');
-            expect(window.backendAPI.collections.exportPostman).toHaveBeenCalledWith('c1');
+            expect(repository.exportOpenApi).toHaveBeenCalledWith('c1', 'yaml');
+            expect(repository.exportPostman).toHaveBeenCalledWith('c1');
             expect(openApi).toEqual({ success: true });
             expect(postman).toEqual({ success: true, skipped: { count: 2 } });
             expect(statusDisplay.update.mock.calls).toEqual([
@@ -49,18 +40,18 @@ describe('CollectionService exports, opening and row saves', () => {
         });
 
         test('a cancelled export returns the cancelled shape', async () => {
-            window.backendAPI.collections.exportOpenApi.mockResolvedValue({ cancelled: true });
+            repository.exportOpenApi.mockResolvedValue({ cancelled: true });
 
             expect(await service.exportCollectionAsOpenApi('c1', 'json')).toEqual({ success: false, cancelled: true });
             expect(statusDisplay.update).toHaveBeenLastCalledWith('Export cancelled', null);
         });
 
         test('an unsuccessful result or a thrown error is reported and rethrown', async () => {
-            window.backendAPI.collections.exportOpenApi.mockResolvedValue({ success: false });
+            repository.exportOpenApi.mockResolvedValue({ success: false });
             await expect(service.exportCollectionAsOpenApi('c1', 'json')).rejects.toThrow('Export failed');
             expect(statusDisplay.update).toHaveBeenLastCalledWith('Export error: Export failed', null);
 
-            window.backendAPI.collections.exportPostman.mockRejectedValue(new Error('disk'));
+            repository.exportPostman.mockRejectedValue(new Error('disk'));
             await expect(service.exportCollectionAsPostman('c1')).rejects.toThrow('disk');
             expect(statusDisplay.update).toHaveBeenLastCalledWith('Export error: disk', null);
         });
@@ -97,41 +88,31 @@ describe('CollectionService exports, opening and row saves', () => {
         });
     });
 
-    describe('saveCurrent* rows', () => {
-        const row = (key, value, enabled) => {
-            const checkbox = enabled === undefined ? null : { checked: enabled };
-            const cells = { '.key-input': { value: key }, '.value-input': { value }, '.row-enabled-checkbox': checkbox };
-            return { querySelector: selector => cells[selector] };
-        };
-        const list = (...rows) => ({ querySelectorAll: () => rows });
-
-        test('each saver parses its own list and persists through its repository method', async () => {
-            const formElements = {
-                pathParamsList: list(row(' id ', ' 7 ')),
-                queryParamsList: list(row('q', 'x', false), row('', 'skipped')),
-                headersList: list(row('Accept', '*/*', true))
-            };
-
-            await service.saveCurrentPathParams('c1', 'e1', formElements);
-            await service.saveCurrentQueryParams('c1', 'e1', formElements);
-            await service.saveCurrentHeaders('c1', 'e1', formElements);
+    describe('data-only row saves', () => {
+        test('each saver persists the rows it is given through its repository method', async () => {
+            await service.savePathParams('c1', 'e1', [{ key: 'id', value: '7' }]);
+            await service.saveQueryParams('c1', 'e1', [{ key: 'q', value: 'x', enabled: false }]);
+            await service.saveHeaders('c1', 'e1', [{ key: 'Accept', value: '*/*', enabled: true }]);
 
             expect(repository.savePersistedPathParams).toHaveBeenCalledWith('c1', 'e1', [{ key: 'id', value: '7' }]);
             expect(repository.savePersistedQueryParams).toHaveBeenCalledWith('c1', 'e1', [{ key: 'q', value: 'x', enabled: false }]);
             expect(repository.savePersistedHeaders).toHaveBeenCalledWith('c1', 'e1', [{ key: 'Accept', value: '*/*', enabled: true }]);
         });
 
-        test('a missing list or a repository failure is swallowed', async () => {
+        test('a repository failure is swallowed', async () => {
             repository.savePersistedHeaders.mockRejectedValue(new Error('x'));
 
-            await expect(service.saveCurrentPathParams('c1', 'e1', {})).resolves.toBeUndefined();
-            await expect(service.saveCurrentHeaders('c1', 'e1', { headersList: list() })).resolves.toBeUndefined();
+            await expect(service.saveHeaders('c1', 'e1', [])).resolves.toBeUndefined();
         });
 
-        test('the three savers stay reachable by name for dynamic callers', () => {
-            for (const name of ['saveCurrentPathParams', 'saveCurrentQueryParams', 'saveCurrentHeaders']) {
-                expect(typeof service[name]).toBe('function');
-            }
+        test('saveBodyState writes the state and swallows failures', async () => {
+            repository.saveBodyState = jest.fn().mockRejectedValueOnce(new Error('x')).mockResolvedValue(undefined);
+            const state = { modifiedBody: '{}', formBodyData: null, graphqlData: null };
+
+            await expect(service.saveBodyState('c1', 'e1', state)).resolves.toBeUndefined();
+            await service.saveBodyState('c1', 'e1', state);
+
+            expect(repository.saveBodyState).toHaveBeenLastCalledWith('c1', 'e1', state);
         });
     });
 });

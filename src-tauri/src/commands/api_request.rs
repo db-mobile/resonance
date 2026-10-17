@@ -713,6 +713,9 @@ impl RequestTimings {
 pub struct ApiResponse {
     pub success: bool,
     pub data: Option<serde_json::Value>,
+    /// Distinguishes decoded JSON strings from text fallback, including malformed JSON.
+    #[serde(default)]
+    pub is_json: bool,
     /// True when the response body was not valid UTF-8 and is carried in
     /// `body_base64` instead of `data` (so binary downloads survive intact).
     #[serde(default)]
@@ -739,6 +742,7 @@ impl ApiResponse {
         Self {
             success: false,
             data: None,
+            is_json: false,
             is_binary: false,
             body_base64: None,
             status: None,
@@ -825,28 +829,29 @@ fn decode_with_declared_charset(bytes: &[u8], content_type: Option<&str>) -> Opt
 /// a string through that charset. Anything left is preserved base64-encoded in
 /// the third element (with `is_binary` true and `data` `None`) instead of being
 /// lossily mangled, so binary downloads survive intact and can be saved
-/// byte-for-byte.
+/// byte-for-byte. The final flag records whether JSON decoding succeeded.
 fn decode_response_body(
     bytes: &[u8],
     content_type: Option<&str>,
-) -> (Option<serde_json::Value>, bool, Option<String>) {
+) -> (Option<serde_json::Value>, bool, Option<String>, bool) {
     if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) {
-        return (Some(value), false, None);
+        return (Some(value), false, None, true);
     }
     if let Ok(text) = std::str::from_utf8(bytes) {
         return (
             Some(serde_json::Value::String(text.to_string())),
             false,
             None,
+            false,
         );
     }
     if let Some(text) = decode_with_declared_charset(bytes, content_type) {
-        return (Some(serde_json::Value::String(text)), false, None);
+        return (Some(serde_json::Value::String(text)), false, None, false);
     }
 
     use base64::Engine;
     use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-    (None, true, Some(BASE64_STANDARD.encode(bytes)))
+    (None, true, Some(BASE64_STANDARD.encode(bytes)), false)
 }
 
 #[derive(Default)]
@@ -1262,12 +1267,13 @@ async fn process_response(
             timings.total = elapsed_millis(start_time);
             timings.download = (timings.total - ttfb_ms).max(0.0);
 
-            let (data, is_binary, body_base64) =
+            let (data, is_binary, body_base64, is_json) =
                 decode_response_body(&bytes, headers.get("content-type").map(String::as_str));
 
             Ok(ApiResponse {
                 success: (200..300).contains(&status),
                 data,
+                is_json,
                 is_binary,
                 body_base64,
                 status: Some(status),
@@ -1729,15 +1735,25 @@ mod tests {
 
     #[test]
     fn decode_response_body_parses_json() {
-        let (data, is_binary, base64) = decode_response_body(br#"{"a":1}"#, None);
+        let (data, is_binary, base64, _) = decode_response_body(br#"{"a":1}"#, None);
         assert_eq!(data, Some(serde_json::json!({ "a": 1 })));
         assert!(!is_binary);
         assert!(base64.is_none());
     }
 
     #[test]
+    fn decode_response_body_distinguishes_json_strings_from_invalid_json() {
+        let (data, _, _, is_json) = decode_response_body(br#""123""#, Some("application/json"));
+        assert_eq!(data, Some(serde_json::json!("123")));
+        assert!(is_json);
+        let (data, _, _, is_json) = decode_response_body(b"{broken", Some("application/json"));
+        assert_eq!(data, Some(serde_json::json!("{broken")));
+        assert!(!is_json);
+    }
+
+    #[test]
     fn decode_response_body_keeps_plain_utf8_as_string() {
-        let (data, is_binary, base64) = decode_response_body(b"hello, world", None);
+        let (data, is_binary, base64, _) = decode_response_body(b"hello, world", None);
         assert_eq!(
             data,
             Some(serde_json::Value::String("hello, world".to_string()))
@@ -1752,7 +1768,7 @@ mod tests {
         use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 
         let raw = [0x89u8, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0x01];
-        let (data, is_binary, base64) =
+        let (data, is_binary, base64, _) =
             decode_response_body(&raw, Some("application/octet-stream"));
 
         assert!(data.is_none());
@@ -1765,7 +1781,7 @@ mod tests {
     #[test]
     fn decode_response_body_decodes_declared_latin1_html_as_text() {
         let raw = [b'G', b'r', b'u', 0xdf, b'e'];
-        let (data, is_binary, base64) =
+        let (data, is_binary, base64, _) =
             decode_response_body(&raw, Some("text/html; charset=ISO-8859-1"));
 
         assert_eq!(data, Some(serde_json::Value::String("Gruße".to_string())));
@@ -1776,7 +1792,7 @@ mod tests {
     #[test]
     fn decode_response_body_decodes_textual_body_without_charset() {
         let raw = [b'c', b'a', b'f', 0xe9];
-        let (data, is_binary, _) = decode_response_body(&raw, Some("text/plain"));
+        let (data, is_binary, _, _) = decode_response_body(&raw, Some("text/plain"));
 
         assert_eq!(data, Some(serde_json::Value::String("café".to_string())));
         assert!(!is_binary);
@@ -1785,7 +1801,7 @@ mod tests {
     #[test]
     fn decode_response_body_keeps_image_with_text_charset_binary() {
         let raw = [0x89u8, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0x01];
-        let (_, is_binary, base64) = decode_response_body(&raw, Some("image/png"));
+        let (_, is_binary, base64, _) = decode_response_body(&raw, Some("image/png"));
 
         assert!(is_binary);
         assert!(base64.is_some());

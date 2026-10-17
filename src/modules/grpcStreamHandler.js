@@ -1,4 +1,4 @@
-import { displayResponseWithLineNumbersForTab } from './apiHandler.js';
+import { displayResponseWithLineNumbersForTab } from './responseView.js';
 import { recordGrpcHistory } from './grpcHistory.js';
 import { toast } from './ui/Toast.js';
 import { StreamSession, createBackendEventListener, getActiveTabId } from './streaming/streamSession.js';

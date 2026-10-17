@@ -8,7 +8,9 @@ import {
     deriveMethod,
     deriveHttpMethod,
     endpointHttpMethod,
-    projectPersistedData
+    projectPersistedData,
+    registerProtocolHandler,
+    getProtocolHandler
 } from '../../src/modules/protocols/protocolRegistry.js';
 
 const PERSISTED_DATA_KINDS = [
@@ -167,5 +169,74 @@ describe('protocolRegistry', () => {
             expect(projected.url).toBeNull();
             expect(projected.headers).toEqual([]);
         });
+    });
+});
+
+const EXPECTED_URL_SECTIONS = {
+    http: null,
+    grpc: { sectionId: 'grpc-url-section' },
+    sse: {
+        sectionId: 'sse-url-section', method: 'SSE', label: 'SSE', inputType: 'url',
+        placeholder: 'https://example.com/events', ariaLabel: 'SSE URL', peerId: 'url-input', syncQueryParams: true
+    },
+    websocket: {
+        sectionId: 'websocket-url-section', method: 'WS', label: 'WS', inputType: 'url',
+        placeholder: 'wss://echo.websocket.events', ariaLabel: 'WebSocket URL', peerId: 'url-input', syncQueryParams: true
+    },
+    mqtt: {
+        sectionId: 'mqtt-url-section', method: 'MQTT', label: 'MQTT', inputType: 'text',
+        placeholder: 'mqtt://localhost:1883', ariaLabel: 'MQTT Broker URL', peerId: 'url-input'
+    },
+    graphql: {
+        sectionId: 'graphql-url-section', method: 'GRAPHQL', label: 'GraphQL', inputType: 'url',
+        placeholder: 'https://api.example.com/graphql', ariaLabel: 'GraphQL Endpoint URL', peerId: 'url-input', syncQueryParams: true
+    }
+};
+
+describe('protocol ui descriptors', () => {
+    test('every descriptor carries the mode-manager ui block', () => {
+        listProtocolIds().forEach((id) => {
+            const { ui } = getProtocol(id);
+            expect(Object.keys(ui).sort()).toEqual(expect.arrayContaining(
+                ['urlSection', 'showBodyModeSelector', 'forceBodyMode', 'lockBodyMode', 'workbench'].sort()
+            ));
+            expect(ui.urlSection).toEqual(EXPECTED_URL_SECTIONS[id]);
+        });
+    });
+
+    test('body-mode and workbench rules match the former MODE_UI table', () => {
+        expect(getProtocol('http').ui).toMatchObject({ showBodyModeSelector: true, forceBodyMode: null, lockBodyMode: false, workbench: null });
+        expect(getProtocol('websocket').ui).toMatchObject({ showBodyModeSelector: false, forceBodyMode: 'json', lockBodyMode: true, workbench: 'off' });
+        expect(getProtocol('mqtt').ui).toMatchObject({ showBodyModeSelector: false, forceBodyMode: 'json', lockBodyMode: true, workbench: 'off' });
+        expect(getProtocol('graphql').ui).toMatchObject({ showBodyModeSelector: false, forceBodyMode: null, lockBodyMode: null, workbench: 'on', alwaysActivateDefaultTab: true });
+        expect(getProtocol('sse').ui.alwaysActivateDefaultTab).toBeUndefined();
+    });
+
+    test('liveControl names which button mirrors a live stream', () => {
+        expect(Object.fromEntries(listProtocolIds().map((id) => [id, getProtocol(id).liveControl]))).toEqual({
+            http: null, sse: 'cancel', websocket: 'cancel', graphql: 'send', grpc: 'cancel', mqtt: null
+        });
+    });
+});
+
+describe('protocol handlers', () => {
+    const handler = { send: jest.fn(), cancel: jest.fn(), isLive: jest.fn(() => true) };
+
+    test('round-trips a registered handler and freezes it', () => {
+        registerProtocolHandler('sse', handler);
+
+        const stored = getProtocolHandler('sse');
+        expect(stored.send).toBe(handler.send);
+        expect(Object.isFrozen(stored)).toBe(true);
+    });
+
+    test('unknown ids are rejected and unregistered protocols yield null', () => {
+        expect(() => registerProtocolHandler('carrier-pigeon', handler)).toThrow('Unknown protocol: carrier-pigeon');
+        expect(getProtocolHandler('mqtt')).toBeNull();
+    });
+
+    test('an unknown lookup resolves to the http handler', () => {
+        registerProtocolHandler('http', handler);
+        expect(getProtocolHandler('carrier-pigeon')).toBe(getProtocolHandler('http'));
     });
 });

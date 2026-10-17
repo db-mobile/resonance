@@ -20,6 +20,18 @@ src/
     ├── registry/       # FeatureRegistry booting co-located *.feature.js descriptors
     ├── state/          # Encapsulated app state modules
     ├── ipcBridge.js    # Tauri IPC compatibility layer
+    ├── protocols/              # protocolRegistry: descriptors, ui data and the send/cancel/isLive handler table
+    ├── apiHandler.js           # HTTP send pipeline + per-protocol handler registration
+    ├── responseView.js         # Response pane rendering shared by every protocol handler (leaf)
+    ├── sendControls.js         # Send/cancel button state driven by the active handler's isLive
+    ├── requestServices.js      # Variable/auth resolution shared by HTTP and gRPC sends
+    ├── endpointSave.js         # Debounced save of the current endpoint's modifications
+    ├── graphqlIntrospection.js # Introspection fetch and client-schema build
+    ├── requestPipeline.feature.js # Builds the RequestPipeline (services/RequestPipeline.js) shared by the editor send path and the runner
+    ├── collection.feature.js   # Composition root of the collection sidebar stack (repository → services → UI → controller)
+    ├── auth.feature.js         # Builds the request form's AuthManager; auth types live in auth/authTypes.js
+    ├── requestFormReader.js    # Reads the request editor form into plain data for the collection services
+    ├── collections/endpointSidecars.js # The single writer of a new request's sidecar records
     ├── codeGenerator.js        # Multi-language code export
     ├── *.feature.js            # Per-feature wiring descriptors
     └── [60+ other modules]     # Protocol handlers (gRPC, WebSocket, MQTT, SSE), editors, managers
@@ -106,5 +118,6 @@ avoids early scaling errors and [growth on each restart from GTK decorations](ht
 1. Create the feature's modules in the appropriate `src/modules/` subdirectories (controller, service, repository, UI) and export them from index files
 2. Add a co-located `src/modules/<name>.feature.js` descriptor that wires the stack together
 3. Register the descriptor on the `FeatureRegistry` in `renderer.js` with a single `.register(...)` call — avoid manual wiring in `renderer.js`
+   (order matters: a feature may `ctx.get(...)` only what earlier features `provides`; see the registration list in `renderer.js`)
 4. Add Tauri commands in `src-tauri/src/commands/` if backend functionality is needed
 5. Register commands in `src-tauri/src/main.rs`

@@ -45,7 +45,8 @@ describe('CollectionRequestPersistenceService with an unreadable collection on d
             repository,
             collectionService: {},
             statusDisplay: { update: jest.fn() },
-            refreshCollections: jest.fn()
+            refreshCollections: jest.fn(),
+            formReader: {}
         });
     });
 

@@ -32,17 +32,28 @@ const collectionDialog = (templateId, size) => ({
 /** @type {ReadonlyArray<string>} */
 const PLACEHOLDER_REQUEST_NAMES = Object.freeze(['New Request', 'New WebSocket', 'New gRPC']);
 
+/**
+ * @param {Object|Array|null|undefined} pathParams
+ * @returns {number}
+ */
+function pathParamCount(pathParams) {
+    if (Array.isArray(pathParams)) {
+        return pathParams.length;
+    }
+    return pathParams && typeof pathParams === 'object' ? Object.keys(pathParams).length : 0;
+}
+
 export class CollectionDialogs {
     /**
      * @param {Object} options
      * @param {Object} options.backendAPI
      * @param {CollectionService} options.collectionService
-     * @param {CollectionRepository} options.collectionRepository
+     * @param {function(): Promise<Array<Object>>} options.listCollections
      */
-    constructor({ backendAPI, collectionService, collectionRepository }) {
+    constructor({ backendAPI, collectionService, listCollections }) {
         this.backendAPI = backendAPI;
         this.collectionService = collectionService;
-        this.collectionRepository = collectionRepository;
+        this.listCollections = listCollections;
     }
 
     /**
@@ -283,50 +294,31 @@ export class CollectionDialogs {
             Object.assign(endpointData, mqttData);
         }
 
+        if (address) {
+            endpointData.url = address;
+        }
+        if (pathParamCount(requestData.pathParams) > 0) {
+            endpointData.pathParams = requestData.pathParams;
+        }
+        if (normalizeKeyValueRows(requestData.queryParams).length > 0) {
+            endpointData.queryParams = requestData.queryParams;
+        }
+        if (normalizeKeyValueRows(requestData.headers).length > 0) {
+            endpointData.headers = requestData.headers;
+        }
+        if (requestData.body?.content) {
+            endpointData.body = requestData.body.content;
+        }
+        if (requestData.authType && requestData.authType !== 'none') {
+            endpointData.authConfig = { type: requestData.authType, config: requestData.authConfig || {} };
+        }
+
         return endpointData;
     }
 
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @param {Object} requestData
-     * @param {string} address
-     * @returns {Promise<void>}
-     */
-    async _persistRequestSidecars(collectionId, endpointId, requestData, address) {
-        if (requestData.pathParams && Object.keys(requestData.pathParams).length > 0) {
-            const pathParamsArray = Object.entries(requestData.pathParams).map(([key, value]) => ({ key, value }));
-            await this.collectionRepository.savePersistedPathParams(collectionId, endpointId, pathParamsArray);
-        }
-
-        const queryParamsArray = normalizeKeyValueRows(requestData.queryParams);
-        if (queryParamsArray.length > 0) {
-            await this.collectionRepository.savePersistedQueryParams(collectionId, endpointId, queryParamsArray);
-        }
-
-        const headersArray = normalizeKeyValueRows(requestData.headers);
-        if (headersArray.length > 0) {
-            await this.collectionRepository.savePersistedHeaders(collectionId, endpointId, headersArray);
-        }
-
-        if (requestData.body?.content) {
-            await this.collectionRepository.saveModifiedRequestBody(collectionId, endpointId, requestData.body.content);
-        }
-
-        if (requestData.authType && requestData.authType !== 'none') {
-            await this.collectionRepository.savePersistedAuthConfig(collectionId, endpointId, {
-                type: requestData.authType,
-                config: requestData.authConfig || {}
-            });
-        }
-
-        if (address) {
-            await this.collectionRepository.savePersistedUrl(collectionId, endpointId, address);
-        }
-    }
 
     async showSaveToCollectionDialog(requestData) {
-        const collections = await this.collectionRepository.getAll();
+        const collections = await this.listCollections();
         const defaultStoragePath = await this.backendAPI.collections.getPath().catch(() => '');
 
         return new Promise((resolve, reject) => {
@@ -424,7 +416,6 @@ export class CollectionDialogs {
                     const address = requestData.url || requestData.broker || '';
                     const endpointData = this._buildEndpointData(name, requestData, address);
                     const newEndpoint = await this.collectionService.addRequestToCollection(targetCollectionId, endpointData);
-                    await this._persistRequestSidecars(targetCollectionId, newEndpoint.id, requestData, address);
 
                     const targetCollection = collections.find(entry => entry.id === targetCollectionId);
 
