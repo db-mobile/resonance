@@ -28,4 +28,5 @@ export const cookieFeature = {
         return { repository, service, dialog, controller };
     },
     globals: { cookieController: 'controller' },
+    provides: { cookieController: 'controller' },
 };

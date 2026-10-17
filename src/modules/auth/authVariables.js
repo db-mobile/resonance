@@ -23,3 +23,15 @@ export function resolveAuthConfigVariables(authConfig, variables, processor) {
         unresolved
     };
 }
+
+/**
+ * @param {Object} authConfig
+ * @param {Object} variables
+ * @returns {Object}
+ */
+export function withBearerFallback(authConfig, variables) {
+    if (authConfig?.type !== 'bearer' || authConfig.config?.token || !variables.bearerToken) {
+        return authConfig;
+    }
+    return { ...authConfig, config: { ...authConfig.config, token: '{{bearerToken}}' } };
+}

@@ -154,24 +154,17 @@ describe('ScriptService._applyEnvironmentChanges', () => {
 describe('ScriptService cookie jar bridge', () => {
     let service;
     let cookieController;
+    let settings;
 
-    beforeEach(async () => {
-        service = new ScriptService(null, null, null);
+    beforeEach(() => {
+        settings = { cookieJarEnabled: true };
         cookieController = {
             getCookiesForScripts: jest.fn().mockResolvedValue([
                 { id: 'env|api.example.com|/|session', name: 'session', value: 'abc', domain: 'api.example.com' }
             ]),
             applyScriptCookieChanges: jest.fn().mockResolvedValue(undefined)
         };
-        const { app } = await import('../../src/modules/appContext.js');
-        app.cookieController = cookieController;
-        app.getApiHandlerSettingsCache = () => ({ cookieJarEnabled: true });
-    });
-
-    afterEach(async () => {
-        const { app } = await import('../../src/modules/appContext.js');
-        delete app.cookieController;
-        delete app.getApiHandlerSettingsCache;
+        service = new ScriptService(null, null, null, null, { cookieController, getSettings: () => settings });
     });
 
     it('seeds the sandbox with the active environment cookies', async () => {
@@ -182,15 +175,13 @@ describe('ScriptService cookie jar bridge', () => {
     });
 
     it('reads an empty jar when cookies are disabled', async () => {
-        const { app } = await import('../../src/modules/appContext.js');
-        app.getApiHandlerSettingsCache = () => ({ cookieJarEnabled: false });
+        settings = { cookieJarEnabled: false };
 
         expect(await service._readCookieJar()).toEqual([]);
     });
 
     it('reads an empty jar when the cookie feature is absent', async () => {
-        const { app } = await import('../../src/modules/appContext.js');
-        delete app.cookieController;
+        service = new ScriptService(null, null, null, null, { getSettings: () => settings });
 
         expect(await service._readCookieJar()).toEqual([]);
     });
@@ -211,8 +202,7 @@ describe('ScriptService cookie jar bridge', () => {
     });
 
     it('discards cookie writes when cookies are disabled', async () => {
-        const { app } = await import('../../src/modules/appContext.js');
-        app.getApiHandlerSettingsCache = () => ({ cookieJarEnabled: false });
+        settings = { cookieJarEnabled: false };
 
         await service._applyCookieChanges([{ op: 'clear' }]);
 

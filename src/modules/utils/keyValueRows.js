@@ -32,3 +32,17 @@ export function normalizeKeyValueRows(entries) {
 export function activeKeyValueRows(entries) {
     return normalizeKeyValueRows(entries).filter((row) => row.key && row.enabled);
 }
+
+/**
+ * @param {Array<{key: string, value: string, enabled: boolean}>} queryRows
+ * @param {Object<string, string>} authQueryParams
+ * @returns {void}
+ */
+export function appendAuthQueryRows(queryRows, authQueryParams) {
+    const rowKeys = new Set(queryRows.map((row) => row.key));
+    for (const [key, value] of Object.entries(authQueryParams || {})) {
+        if (!rowKeys.has(key)) {
+            queryRows.push({ key, value, enabled: true });
+        }
+    }
+}
