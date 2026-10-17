@@ -18,6 +18,10 @@ import { newRequestId } from '../state/inFlightRequests.js';
 import { translate, translateCount } from '../utils/translate.js';
 import { RUNNABLE_PROTOCOLS } from '../utils/runnableRequests.js';
 import { parseDataFile } from '../utils/dataFile.js';
+import { RunnerScheduler, executionLimit } from './RunnerScheduler.js';
+import { createExecutionScope, resolvedScopeVariables } from './ScriptExecutionScope.js';
+import { clone } from '../utils/clone.js';
+import { refreshScriptRequest } from './scriptRequestRefresh.js';
 
 const ABSOLUTE_OR_TEMPLATED_PATH = /^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/|\{\{)/;
 
@@ -186,7 +190,7 @@ export class RunnerService {
         this.shouldStop = false;
         this.currentRunId = runnerId ?? 'temp';
 
-        const queue = runner.requests;
+        const queue = clone(runner.requests);
         const results = {
             runnerId,
             runnerName,
@@ -198,80 +202,68 @@ export class RunnerService {
             failed: 0,
             skipped: 0,
             requests: [],
-            variablesSet: {}
+            variablesSet: {}, plannedRequests: 0, sentRequests: 0, terminationReason: 'completed', error: null
         };
-
-        let runtimeVariables = {};
 
         try {
             const dataRows = await this._loadDataRows(runner.options?.dataFile);
             const iterations = dataRows ? dataRows.length : clampIterations(runner.options?.iterations);
             const total = queue.length * iterations;
             results.iterations = iterations;
-            results.totalRequests = total;
+            results.plannedRequests = total;
 
             this._notifyListeners('run-started', {
                 runnerId,
                 total,
+                timeline: true,
                 iterations,
                 iterationLabels: dataRows ? dataRows.map(describeDataRow) : null
             });
 
-            const runContext = await this._buildRunContext();
-
-            for (let flat = 0; flat < total; flat++) {
-                if (this.shouldStop) {
-                    this._markRemainingAsSkipped(queue, results, flat, translate('runner.skip_stopped', 'Execution stopped by user'));
-                    break;
-                }
-
-                const iteration = Math.floor(flat / queue.length);
-                this._notifyListeners('request-started', { index: flat });
-
-                const request = queue[flat % queue.length];
-                const requestResult = await this._untilStopped(
-                    this._executeRequest(request, runtimeVariables, flat, runContext, {
-                        index: iteration,
-                        count: iterations,
-                        data: dataRows?.[iteration] ?? null
-                    })
-                );
-
+            const runContext = await this._buildRunContext() || {};
+            runContext.scope ||= createExecutionScope({ runner: true });
+            this._activeScope = runContext.scope;
+            if (this.shouldStop) { runContext.scope.active = false; }
+            const scheduler = new RunnerScheduler(queue, iterations, executionLimit(runner.options?.maxExecutionsPerIteration, queue.length));
+            while (!scheduler.done) {
+                if (this.shouldStop) { results.terminationReason = 'stoppedByUser'; break; }
+                const visit = scheduler.take();
+                const { request, index, queuePosition, iteration, attempt } = visit;
+                this._notifyListeners('request-started', visit);
+                const visitState = { sent: false };
+                let requestResult = await this._untilStopped(this._executeRequest(request, {}, index, { ...runContext, visitState }, {
+                    index: iteration - 1, count: iterations, data: dataRows?.[iteration - 1] ?? null
+                }));
                 if (!requestResult) {
-                    this._markRemainingAsSkipped(queue, results, flat, translate('runner.skip_stopped', 'Execution stopped by user'));
-                    break;
+                    requestResult = { ...request, index, sent: visitState.sent, status: 'skipped', error: translate('runner.skip_stopped', 'Execution stopped by user') };
+                    results.terminationReason = 'stoppedByUser';
                 }
-
-                requestResult.iteration = iteration + 1;
+                Object.assign(requestResult, { index, queuePosition, iteration, attempt });
+                if (!this.shouldStop) {
+                    try { scheduler.advance(requestResult.status === 'success' ? requestResult.execution?.next : undefined); }
+                    catch (error) { requestResult.status = 'error'; requestResult.error = error.message; results.error = error.message; results.terminationReason = error.reason; }
+                }
                 results.requests.push(requestResult);
-
-                if (requestResult.variablesSet) {
-                    runtimeVariables = { ...runtimeVariables, ...requestResult.variablesSet };
-                    Object.assign(results.variablesSet, requestResult.variablesSet);
-                }
-
-                const failed = requestResult.status !== 'success';
-                if (failed) {
-                    results.failed++;
-                } else {
-                    results.passed++;
-                }
-
-                if (onProgress) {
-                    onProgress(flat, total, requestResult);
-                }
-                this._notifyListeners('request-completed', { index: flat, result: requestResult });
-
-                if (failed && runner.options?.stopOnError) {
-                    this._markRemainingAsSkipped(queue, results, flat + 1, translate('runner.skip_previous_error', 'Skipped due to previous error'));
-                    break;
-                }
-
-                if (runner.options?.delayMs > 0 && flat < total - 1) {
-                    await this._delay(runner.options.delayMs);
-                }
+                results.totalRequests = results.requests.length;
+                if (requestResult.sent) { results.sentRequests++; }
+                if (requestResult.status === 'skipped') { results.skipped++; }
+                else if (requestResult.status === 'success') { results.passed++; }
+                else { results.failed++; }
+                Object.assign(results.variablesSet, requestResult.variablesSet || {});
+                onProgress?.(index, total, requestResult);
+                this._notifyListeners('request-completed', { index, result: requestResult });
+                if (this.shouldStop || results.error) { break; }
+                if (requestResult.status === 'error' && runner.options?.stopOnError) { results.terminationReason = 'stoppedOnError'; break; }
+                if (runner.options?.delayMs > 0 && !scheduler.done) { await this._delay(runner.options.delayMs); }
             }
+        } catch (error) {
+            if (!error.reason) { throw error; }
+            results.error = error.message;
+            results.terminationReason = error.reason || 'executionError';
+
         } finally {
+            if (this._activeScope) { this._activeScope.active = false; }
+            this._activeScope = null;
             results.endTime = Date.now();
             results.totalTime = results.endTime - results.startTime;
 
@@ -293,6 +285,7 @@ export class RunnerService {
     stopExecution() {
         if (this.isRunning) {
             this.shouldStop = true;
+            if (this._activeScope) { this._activeScope.active = false; }
             if (this._inFlightRequestId) {
                 Promise.resolve(this.backendAPI.cancelApiRequest?.(this._inFlightRequestId)).catch(() => { });
             }
@@ -313,25 +306,6 @@ export class RunnerService {
             this._stopWaiters.add(wake);
             work.then(resolve, reject).finally(() => this._stopWaiters.delete(wake));
         });
-    }
-
-    /**
-     * @param {Array} queue
-     * @param {Object} results
-     * @param {number} startIndex
-     * @param {string} reason
-     */
-    _markRemainingAsSkipped(queue, results, startIndex, reason) {
-        for (let flat = startIndex; flat < results.totalRequests; flat++) {
-            results.requests.push({
-                index: flat,
-                ...queue[flat % queue.length],
-                iteration: Math.floor(flat / queue.length) + 1,
-                status: 'skipped',
-                error: reason
-            });
-            results.skipped++;
-        }
     }
 
     /**
@@ -395,16 +369,17 @@ export class RunnerService {
             };
 
             const { collection, endpoint } = await this._resolveRunTarget(request, runContext);
+            if (runContext) { runContext.currentRequestId = endpoint.id; }
 
             const scripts = await this._getEndpointScripts(collection.id, endpoint.id);
             const prepared = await this._buildRequestConfig(collection, endpoint, variables, request.overrides, runContext);
-            const outcome = { variablesSet: {}, logs: [], testResults: [], errors: [] };
+            const outcome = { variablesSet: {}, logs: [], testResults: [], errors: [], execution: { next: { kind: 'unchanged' }, skipped: false } };
 
             let { requestConfig } = prepared;
             if (scripts.preRequestScript.trim()) {
                 const errorsBefore = outcome.errors.length;
-                requestConfig = await this._runPreRequestScript(scripts.preRequestScript, prepared, variables, outcome, scriptIteration, collection.id);
-                variables = mergeVariables(variables, outcome.variablesSet);
+                requestConfig = await this._runPreRequestScript(scripts.preRequestScript, prepared, variables, outcome, scriptIteration, collection.id, runContext, { collection, endpoint, overrides: request.overrides });
+                variables = runContext?.scope ? resolvedScopeVariables(runContext.scope, collection.id, iteration?.data || {}) : mergeVariables(variables, outcome.variablesSet);
                 if (outcome.errors.length > errorsBefore) {
                     result.logs = outcome.logs;
                     result.variablesSet = outcome.variablesSet;
@@ -416,29 +391,36 @@ export class RunnerService {
                 }
             }
 
-            if (this.shouldStop) {
+            if (outcome.execution.skipped) {
+                Object.assign(result, { status: 'skipped', logs: outcome.logs, variablesSet: outcome.variablesSet,
+                    execution: outcome.execution, error: translate('runner.flow.skipped', 'Skipped by pre-request script') });
                 return result;
             }
+            if (this.shouldStop || runContext?.scope?.active === false) { return result; }
 
-            const response = await this._sendTracked(requestConfig, runContext);
+            const response = await this._sendTracked(requestConfig, runContext, () => { result.sent = true; });
 
-            if (this.shouldStop || response.cancelled) {
+            if (this.shouldStop || runContext?.scope?.active === false || response.cancelled) {
                 return result;
             }
 
             this._captureResponse(result, response, startTime);
 
             await this._storeResponseCookies(response, requestConfig.url);
+            if (runContext?.scope?.active === false) { return result; }
             this._recordHistory(requestConfig, response, collection.id, endpoint.id, prepared.authData, runContext);
 
             for (const script of [scripts.testScript, request.postResponseScript]) {
+                if (runContext?.scope?.active === false) { return result; }
                 if (script && script.trim()) {
-                    await this._runTestScript(script, requestConfig, response, variables, outcome, scriptIteration, collection.id);
-                    variables = mergeVariables(variables, outcome.variablesSet);
+                    await this._runTestScript(script, requestConfig, response, variables, outcome, scriptIteration, collection.id, runContext);
+                    variables = runContext?.scope ? resolvedScopeVariables(runContext.scope, collection.id, iteration?.data || {}) : mergeVariables(variables, outcome.variablesSet);
                 }
             }
 
+            if (runContext?.scope?.active === false) { return result; }
             this._finalizeStatus(result, response, outcome);
+            result.execution = result.status === 'success' ? outcome.execution : { next: { kind: 'unchanged' }, skipped: false };
         } catch (error) {
             result.status = 'error';
             result.error = error.message;
@@ -489,7 +471,7 @@ export class RunnerService {
      * @param {Object|null} runContext
      * @returns {Promise<Object>}
      */
-    async _sendTracked(requestConfig, runContext) {
+    async _sendTracked(requestConfig, runContext, onSend) {
         if (!runContext?.certificatesLoaded) {
             try {
                 await this.certificateService.getItems();
@@ -498,9 +480,12 @@ export class RunnerService {
         }
         await this.pipeline.finalize(requestConfig);
 
+        if (runContext?.scope?.active === false || this.shouldStop) { return { cancelled: true }; }
         requestConfig.requestId = newRequestId();
         this._inFlightRequestId = requestConfig.requestId;
         try {
+            if (runContext?.visitState) { runContext.visitState.sent = true; }
+            onSend?.();
             return await this.backendAPI.sendApiRequest(requestConfig);
         } finally {
             if (this._inFlightRequestId === requestConfig.requestId) {
@@ -591,6 +576,12 @@ export class RunnerService {
      * @returns {Promise<Object>}
      */
     async _buildVariables(collectionId, runtimeVariables, runContext = null, dataRow = null) {
+        if (runContext?.scope) {
+            if (!runContext.scope.collections.has(collectionId)) {
+                runContext.scope.collections.set(collectionId, await this.variableRepository.getVariablesForCollection(collectionId) || {});
+            }
+            return resolvedScopeVariables(runContext.scope, collectionId, dataRow || {});
+        }
         let variables = {};
 
         try {
@@ -634,8 +625,12 @@ export class RunnerService {
         }
 
         try {
-            const activeEnvironment = await app.environmentController?.service?.getActiveEnvironment();
+            const activeEnvironment = await this.environmentRepository.getActiveEnvironment?.() ?? await app.environmentController?.service?.getActiveEnvironment();
             context.environmentName = activeEnvironment?.name || null;
+            context.environmentId = activeEnvironment?.id || null;
+            if (activeEnvironment?.id && this.environmentRepository.getVariablesForEnvironment) {
+                context.envVars = await this.environmentRepository.getVariablesForEnvironment(activeEnvironment.id);
+            }
         } catch {
         }
 
@@ -645,6 +640,8 @@ export class RunnerService {
         } catch {
         }
 
+        context.scope = createExecutionScope({ runner: true, environment: context.envVars, environmentId: context.environmentId || null });
+        context.scope.collections = context.collectionVars;
         return context;
     }
 
@@ -1017,7 +1014,7 @@ export class RunnerService {
      * @param {string} collectionId
      * @returns {Promise<Object>}
      */
-    async _runPreRequestScript(script, prepared, variables, outcome, iteration, collectionId) {
+    async _runPreRequestScript(script, prepared, variables, outcome, iteration, collectionId, runContext, target) {
         const scriptService = app.scriptController?.service;
         const { requestConfig } = prepared;
         if (!scriptService) {
@@ -1032,17 +1029,27 @@ export class RunnerService {
         const { modifiedRequest, result } = await scriptService.executePreRequestScript(script, requestConfig, {
             environment: variables,
             iteration,
-            collectionId
+            collectionId, scope: runContext?.scope, requestId: runContext?.currentRequestId
         });
         this._collectScriptResult(result, outcome);
 
-        const authStripped = this.pipeline.applyScriptMutations(modifiedRequest, {
+        if (outcome.execution.skipped || runContext?.scope?.active === false) { return modifiedRequest; }
+        const scriptVariables = runContext?.scope ? resolvedScopeVariables(runContext.scope, collectionId, iteration.data) : mergeVariables(variables, outcome.variablesSet);
+        let refreshedRequest = modifiedRequest;
+        let refreshedAuth = prepared.authData;
+        if (target && runContext?.scope) {
+            const refreshed = await this._buildRequestConfig(target.collection, target.endpoint, scriptVariables, target.overrides, runContext);
+            refreshedAuth = refreshed.authData;
+            refreshedRequest = refreshScriptRequest(requestConfig, modifiedRequest, refreshed.requestConfig, this.variableProcessor, scriptVariables);
+        }
+        const authStripped = this.pipeline.applyScriptMutations(refreshedRequest, {
             snapshot,
             rawUrl: prepared.rawUrl,
-            variables,
+            variables: scriptVariables,
             processor: this.variableProcessor,
             mockRewrite: prepared.mockRewrite,
-            authData: prepared.authData
+            authData: refreshedAuth,
+            originalAuthData: prepared.authData
         });
         if (authStripped) {
             outcome.logs.push({
@@ -1054,7 +1061,7 @@ export class RunnerService {
                 timestamp: Date.now()
             });
         }
-        return modifiedRequest;
+        return refreshedRequest;
     }
 
     /**
@@ -1067,7 +1074,7 @@ export class RunnerService {
      * @param {string} collectionId
      * @returns {Promise<void>}
      */
-    async _runTestScript(script, requestConfig, response, variables, outcome, iteration, collectionId) {
+    async _runTestScript(script, requestConfig, response, variables, outcome, iteration, collectionId, runContext) {
         const scriptService = app.scriptController?.service;
         if (!scriptService) {
             return;
@@ -1076,7 +1083,7 @@ export class RunnerService {
             script,
             requestConfig,
             { ...response, cookies: responseCookies(response) },
-            { environment: variables, iteration, collectionId }
+            { environment: variables, iteration, collectionId, scope: runContext?.scope, requestId: runContext?.currentRequestId }
         );
         this._collectScriptResult(result, outcome);
     }
@@ -1091,6 +1098,10 @@ export class RunnerService {
         outcome.errors.push(...(result?.errors || []));
         Object.assign(outcome.variablesSet, result?.modifiedCollectionVariables || {});
         Object.assign(outcome.variablesSet, result?.modifiedEnvironment || {});
+        if (result?.execution?.skipped) { outcome.execution = result.execution; }
+        else if (result?.success && result.execution?.next?.kind !== undefined && result.execution.next.kind !== 'unchanged') { outcome.execution.next = result.execution.next; }
+        if (result?.success === false) { outcome.execution.next = { kind: 'unchanged' }; }
+
     }
 
     /**

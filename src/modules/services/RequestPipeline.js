@@ -218,15 +218,17 @@ export class RequestPipeline {
      * @param {{snapshot: Object, rawUrl: string, variables: Object, processor: Object, mockRewrite: Object|null, authData: Object}} ctx
      * @returns {boolean}
      */
-    applyScriptMutations(requestConfig, { snapshot, rawUrl, variables, processor, mockRewrite, authData }) {
+    applyScriptMutations(requestConfig, { snapshot, rawUrl, variables, processor, mockRewrite, authData, originalAuthData }) {
         requestConfig.url = this.requestBuilder.applyScriptParamMutations({
             requestConfig, snapshot, rawUrl, variables, processor, mockRewrite
         });
-        return this.requestBuilder.stripCrossOriginAuth({
-            requestConfig,
-            originalUrl: snapshot.url,
-            authData
-        });
+        let stripped = false;
+        for (const credentials of [originalAuthData, authData]) {
+            if (credentials) {
+                stripped = this.requestBuilder.stripCrossOriginAuth({ requestConfig, originalUrl: snapshot.url, authData: credentials }) || stripped;
+            }
+        }
+        return stripped;
     }
 
     /**

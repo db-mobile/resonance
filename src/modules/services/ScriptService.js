@@ -4,6 +4,8 @@
  */
 
 
+import { createExecutionScope, applyVariableChanges } from './ScriptExecutionScope.js';
+
 /** @type {ReadonlyArray<string>} */
 export const SCRIPT_MUTABLE_REQUEST_FIELDS = Object.freeze([
     'url',
@@ -94,18 +96,31 @@ export class ScriptService {
     }
 
     /**
-     * @param {string} script
-     * @param {Object} requestConfig
-     * @param {Object} options
-     * @param {Object} [options.environment]
-     * @param {Object} [options.iteration]
-     * @param {string} [options.collectionId]
-     * @param {Object} [extra]
+     * Pin and hydrate the environment once for this send or runner execution.
+     * @param {Object} [options]
      * @returns {Promise<Object>}
      */
-    async _scriptPayload(script, requestConfig, { environment, iteration, collectionId }, extra = {}) {
-        const environmentVariables = environment ?? await this.environmentService.getActiveEnvironmentVariables();
+    async createExecutionScope(options = {}) {
+        const active = await this.environmentService.getActiveEnvironment?.();
+        const environment = active?.id && this.environmentService.getVariablesForEnvironment
+            ? await this.environmentService.getVariablesForEnvironment(active.id)
+            : await this.environmentService.getActiveEnvironmentVariables();
+        return createExecutionScope({ ...options, environment, environmentId: active?.id || null });
+    }
 
+    async loadCollectionScope(scope, collectionId) {
+        if (!scope.collections.has(collectionId)) { scope.collections.set(collectionId, await this._readCollectionVariables(collectionId)); }
+        return scope.collections.get(collectionId);
+    }
+
+    async _scriptPayload(script, requestConfig, { environment, iteration, collectionId, scope, requestId }, extra = {}) {
+        const environmentVariables = scope?.environment ?? environment ?? await this.environmentService.getActiveEnvironmentVariables();
+
+        let collectionVariables = scope?.collections.get(collectionId);
+        if (!collectionVariables) {
+            collectionVariables = await this._readCollectionVariables(collectionId);
+            scope?.collections.set(collectionId, collectionVariables);
+        }
         return {
             script,
             request: {
@@ -118,7 +133,8 @@ export class ScriptService {
             },
             ...extra,
             environment: environmentVariables || {},
-            collectionVariables: await this._readCollectionVariables(collectionId),
+            collectionVariables,
+            ...(scope ? { localVariables: { ...scope.localVariables }, executionContext: { runner: Boolean(scope.runner), requestId: requestId || null } } : {}),
             cookies: await this._readCookieJar(),
             ...(iteration ? { iteration } : {})
         };
@@ -144,11 +160,27 @@ export class ScriptService {
      * @param {string|undefined} collectionId
      * @returns {Promise<void>}
      */
-    async _applyScriptSideEffects(result, collectionId) {
-        if (result.modifiedEnvironment && Object.keys(result.modifiedEnvironment).length > 0) {
-            await this._applyEnvironmentChanges(result.modifiedEnvironment);
+    async _applyScriptSideEffects(result, collectionId, scope) {
+        if (scope?.active === false) { return; }
+        if (scope) {
+            if (Object.keys(result.modifiedLocalVariables || {}).length || result.removedLocalVariables?.length ||
+                Object.keys(result.modifiedEnvironment || {}).length || Object.keys(result.modifiedCollectionVariables || {}).length) {
+                scope.revision = (scope.revision || 0) + 1;
+            }
+            scope.localVariables = applyVariableChanges(scope.localVariables, result.modifiedLocalVariables, result.removedLocalVariables || []);
+            scope.environment = applyVariableChanges(scope.environment, result.modifiedEnvironment);
+            if (collectionId) {
+                scope.collections.set(collectionId, applyVariableChanges(scope.collections.get(collectionId), result.modifiedCollectionVariables));
+            }
         }
+        if (result.modifiedEnvironment && Object.keys(result.modifiedEnvironment).length > 0) {
+            if (scope) {
+                if (scope.environmentId) { await this.environmentService.applyVariableChanges(scope.environmentId, result.modifiedEnvironment); }
+            } else { await this._applyEnvironmentChanges(result.modifiedEnvironment); }
+        }
+        if (scope?.active === false) { return; }
         await this._applyCollectionVariableChanges(collectionId, result.modifiedCollectionVariables);
+        if (scope?.active === false) { return; }
         await this._applyCookieChanges(result.cookieChanges);
     }
 
@@ -184,8 +216,9 @@ export class ScriptService {
 
         try {
             const scriptData = await this._scriptPayload(script, requestConfig, options);
+            if (options.scope?.active === false) { return { modifiedRequest: requestConfig, result: this._scriptFailure(new Error('Execution cancelled')) }; }
             const result = await this.backendAPI.scripts.executePreRequest(scriptData);
-            await this._applyScriptSideEffects(result, options.collectionId);
+            await this._applyScriptSideEffects(result, options.collectionId, options.scope);
 
             return {
                 modifiedRequest: this._mergeModifiedRequest(requestConfig, result.modifiedRequest),
@@ -223,8 +256,9 @@ export class ScriptService {
             const scriptData = await this._scriptPayload(script, requestConfig, options, {
                 response: this._scriptResponse(response)
             });
+            if (options.scope?.active === false) { return this._scriptFailure(new Error('Execution cancelled')); }
             const result = await this.backendAPI.scripts.executeTest(scriptData);
-            await this._applyScriptSideEffects(result, options.collectionId);
+            await this._applyScriptSideEffects(result, options.collectionId, options.scope);
 
             return result;
         } catch (error) {

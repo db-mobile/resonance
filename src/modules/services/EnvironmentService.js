@@ -18,6 +18,20 @@ function toExportShape(environment) {
     };
 }
 
+/**
+ * @param {*} data
+ * @returns {Array<Object>|null}
+ */
+function toImportList(data) {
+    if (Array.isArray(data?.environments)) {
+        return data.environments;
+    }
+    if (typeof data?.name === 'string' && data.variables && typeof data.variables === 'object') {
+        return [data];
+    }
+    return null;
+}
+
 export class EnvironmentService {
     /**
      * @param {EnvironmentRepository} environmentRepository
@@ -241,7 +255,35 @@ export class EnvironmentService {
         });
     }
 
+    /**
+     * @param {Object} environment
+     * @param {string} [environment.name]
+     * @param {Object} [environment.variables]
+     * @param {string[]} [environment.secretKeys]
+     * @param {string|null} [environment.color]
+     * @returns {Promise<Object>}
+     */
+    async importEnvironment({ name, variables = {}, secretKeys = [], color = null }) {
+        return this._reporting('Error importing environment', async () => {
+            const uniqueName = await this._generateUniqueName(name?.trim() || 'Imported Environment');
+            const secrets = new Set(secretKeys);
+            const plainVariables = Object.fromEntries(
+                Object.entries(variables).filter(([key]) => !secrets.has(key))
+            );
+
+            const created = await this.createEnvironment(uniqueName, plainVariables, color);
+            for (const key of secrets) {
+                await this.setVariable(created.id, key, variables[key] ?? '', true);
+            }
+            return created;
+        });
+    }
+
     /** @returns {Promise<Object>} */
+    async getVariablesForEnvironment(environmentId) {
+        return this.repository.getVariablesForEnvironment(environmentId);
+    }
+
     async getActiveEnvironmentVariables() {
         return this.repository.getActiveEnvironmentVariables();
     }
@@ -327,12 +369,13 @@ export class EnvironmentService {
      */
     async importEnvironments(data, merge = false) {
         return this._reporting('Error importing environments', async () => {
-            if (!data || !Array.isArray(data.environments)) {
+            const environments = toImportList(data);
+            if (!environments) {
                 throw new Error('Invalid import data format');
             }
 
             const environmentsData = {
-                items: data.environments.map(env => ({
+                items: environments.map(env => ({
                     id: null,
                     name: env.name || 'Imported Environment',
                     variables: env.variables || {},

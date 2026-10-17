@@ -415,6 +415,11 @@ export class EnvironmentRepository {
     }
 
     /** @returns {Promise<Object>} */
+    async getVariablesForEnvironment(environmentId) {
+        const environment = await this.getEnvironmentById(environmentId);
+        return environment ? this._hydrateSecrets(environment) : {};
+    }
+
     async getActiveEnvironmentVariables() {
         try {
             const activeEnv = await this.getActiveEnvironment();

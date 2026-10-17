@@ -65,6 +65,10 @@
                                aria-label="Iterations"
                                data-i18n-aria="runner.iterations">
                     </div>
+                    <label class="runner-chip">
+                        <span class="runner-chip-label" data-i18n="runner.flow.max_executions">Max executions / iteration</span>
+                        <input type="number" class="runner-delay-input-sm" data-option="max-executions" value="1000" min="1" max="100000" required aria-label="Maximum executions per iteration" data-i18n-aria="runner.flow.max_executions">
+                    </label>
                     <div class="runner-chip">
                         <span class="runner-chip-label" data-i18n="runner.delay">Delay</span>
                         <input type="number"
@@ -310,6 +314,7 @@
                 </div>
             </div>
         </div>
+        <div class="runner-run-notice is-hidden" data-role="run-notice" role="status" aria-live="polite"></div>
         <div class="runner-results-body u-flex u-flex-1 u-overflow-hidden u-min-h-0">
             <div class="runner-results-list-panel">
                 <div class="runner-results-list" data-role="results-list">

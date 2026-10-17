@@ -176,7 +176,10 @@ export default [
                 __randomUUID__: 'readonly',
                 __collectionVariables__: 'readonly',
                 __setCollectionVariable__: 'readonly',
-                __environmentVariables__: 'readonly'
+                __environmentVariables__: 'readonly',
+                __localVariables__: 'readonly',
+                __setLocalVariable__: 'readonly',
+                __unsetLocalVariable__: 'readonly'
             }
         },
         rules: {

@@ -204,10 +204,12 @@ export class RequestBuilderService {
         let stripped = false;
         const authHeaders = authData?.headers || {};
         if (requestConfig.headers) {
-            for (const key of Object.keys(authHeaders)) {
-                if (requestConfig.headers[key] === authHeaders[key]) {
-                    delete requestConfig.headers[key];
-                    stripped = true;
+            for (const [authName, authValue] of Object.entries(authHeaders)) {
+                for (const key of Object.keys(requestConfig.headers)) {
+                    if (key.toLowerCase() === authName.toLowerCase() && requestConfig.headers[key] === authValue) {
+                        delete requestConfig.headers[key];
+                        stripped = true;
+                    }
                 }
             }
         }
@@ -221,6 +223,22 @@ export class RequestBuilderService {
                 }
             }
         }
+        // Query parameters may already have been baked into the URL before the
+        // script ran. Removing only the transport map would leave them on the wire.
+        try {
+            const url = new URL(requestConfig.url);
+            let changed = false;
+            for (const [key, value] of Object.entries(authQuery)) {
+                const values = url.searchParams.getAll(key);
+                const remaining = values.filter(item => item !== String(value));
+                if (values.length !== remaining.length) {
+                    url.searchParams.delete(key);
+                    remaining.forEach(item => url.searchParams.append(key, item));
+                    changed = true;
+                }
+            }
+            if (changed) { requestConfig.url = url.toString(); stripped = true; }
+        } catch { /* Invalid URLs are reported by the send pipeline. */ }
 
         if (requestConfig.auth) {
             delete requestConfig.auth;

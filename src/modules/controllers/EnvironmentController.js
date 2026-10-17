@@ -102,13 +102,11 @@ export class EnvironmentController {
      * @param {Object} environment
      * @param {string} environment.name
      * @param {Object} environment.variables
+     * @param {string[]} [environment.secretKeys]
      * @returns {Promise<Object>}
      */
     async handleImportEnvironment(environment) {
-        const created = await this.service.createEnvironment(
-            environment.name,
-            environment.variables || {}
-        );
+        const created = await this.service.importEnvironment(environment);
         await this.onEnvironmentsChanged();
         return created;
     }

@@ -600,7 +600,25 @@
     "history_failed": "{{count}} fehlgeschlagen",
     "history_source": "Ausführung vom {{date}}",
     "history_no_body": "Antwort-Bodies, Header und Cookies werden im Ausführungsverlauf nicht gespeichert",
-    "pre_request_failed": "Das Pre-Request-Skript ist fehlgeschlagen, die Anfrage wurde nicht gesendet: {{message}}"
+    "pre_request_failed": "Das Pre-Request-Skript ist fehlgeschlagen, die Anfrage wurde nicht gesendet: {{message}}",
+    "flow": {
+      "max_executions": "Max. Ausführungen / Iteration",
+      "invalid_limit": "Maximale Ausführungen müssen eine ganze Zahl zwischen {{min}} und {{max}} sein.",
+      "limit_reached": "Ausführungslimit von {{limit}} in Iteration {{iteration}} erreicht.",
+      "ambiguous_target": "Nächste Anfrage „{{target}}“ ist in der Auswahl nicht eindeutig.",
+      "missing_target": "Nächste Anfrage „{{target}}“ ist nicht in der Auswahl enthalten.",
+      "skipped": "Durch Vorabskript übersprungen",
+      "running": "Läuft · {{count}} Durchläufe abgeschlossen",
+      "attempt": "Versuch {{attempt}}",
+      "counts": "{{visited}} Durchläufe · {{sent}} gesendet · {{planned}} geplant",
+      "stoppedByUser": "Vom Benutzer gestoppt",
+      "stoppedOnError": "Nach fehlgeschlagener Anfrage gestoppt",
+      "executionLimit": "Ausführungslimit erreicht",
+      "invalidTarget": "Ungültige nächste Anfrage",
+      "executionError": "Ausführungsfehler",
+      "jump": "Weiter: {{target}}",
+      "end_iteration": "Iteration beenden"
+    }
   },
   "mqtt": {
     "title": "MQTT",

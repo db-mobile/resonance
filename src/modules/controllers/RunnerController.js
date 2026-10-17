@@ -234,7 +234,7 @@ export class RunnerController {
     _handleServiceEvent(event, data) {
         switch (event) {
             case 'run-started':
-                this.panel?.prepareResults?.(data.iterations, data.iterationLabels);
+                this.panel?.prepareResults?.(data.iterations, data.iterationLabels, data.timeline);
                 updateStatusDisplay(translateCount('runner.running_requests', data.total, {
                     one: 'Running {{count}} request...',
                     other: 'Running {{count}} requests...'
@@ -242,7 +242,7 @@ export class RunnerController {
                 break;
 
             case 'request-started':
-                this.panel?.markRequestRunning?.(data.index);
+                this.panel?.markRequestRunning?.(data.index, data);
                 break;
 
             case 'request-completed': {
@@ -259,12 +259,12 @@ export class RunnerController {
 
             case 'run-completed':
                 updateStatusDisplay(
-                    translate('runner.completed', 'Completed: {{passed}} passed, {{failed}} failed ({{time}}ms)', {
+                    data.error || translate('runner.completed', 'Completed: {{passed}} passed, {{failed}} failed ({{time}}ms)', {
                         passed: data.passed,
                         failed: data.failed,
                         time: data.totalTime
                     }),
-                    data.failed === 0 ? 200 : null
+                    data.failed === 0 && !data.error ? 200 : null
                 );
                 break;
         }

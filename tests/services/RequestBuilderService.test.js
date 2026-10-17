@@ -391,6 +391,12 @@ describe('RequestBuilderService', () => {
             expect(requestConfig.headers.Accept).toBe('application/json');
         });
 
+        it('recognizes generated auth headers after scripts change their casing', () => {
+            const requestConfig = { url: 'https://outside.example', headers: { authorization: 'Bearer secret-token' } };
+            service.stripCrossOriginAuth({ requestConfig, originalUrl: 'https://api.example.com', authData: bearerAuthData() });
+            expect(requestConfig.headers).toEqual({});
+        });
+
         it('strips digest and AWS credentials when the host changes', () => {
             const requestConfig = {
                 url: 'https://attacker.example/collect',
@@ -443,6 +449,17 @@ describe('RequestBuilderService', () => {
             expect(stripped).toBe(true);
             expect(requestConfig.queryParams.api_key).toBeUndefined();
             expect(requestConfig.queryParams.page).toBe('1');
+        });
+
+        it('removes generated query credentials from the assembled URL while keeping explicit different values', () => {
+            const requestConfig = {
+                url: 'https://attacker.example/collect?api_key=k&api_key=custom&page=1',
+                queryParams: { api_key: 'k', page: '1' }
+            };
+            service.stripCrossOriginAuth({ requestConfig, originalUrl: 'https://api.example.com',
+                authData: { headers: {}, queryParams: { api_key: 'k' } } });
+            expect(new URL(requestConfig.url).searchParams.getAll('api_key')).toEqual(['custom']);
+            expect(new URL(requestConfig.url).searchParams.get('page')).toBe('1');
         });
 
         it('leaves a header the script overrode with a different value', () => {

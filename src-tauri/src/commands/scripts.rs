@@ -14,6 +14,9 @@ use super::http_client::{HttpClientOptions, build_http_client};
 use super::proxy::{ProxySettings, ProxyState};
 
 use super::store_files::MAIN_STORE as STORE_FILE;
+#[path = "script_execution.rs"]
+mod execution;
+use execution::{ExecutionContext, ExecutionControl, NextRequest};
 const SCRIPTS_KEY: &str = "persistedScripts";
 
 /// Wall-clock limit for one script run. Blocking `sendRequest` calls count
@@ -82,6 +85,10 @@ pub struct ScriptExecutionData {
     /// `pm.collectionVariables`.
     #[serde(default)]
     pub collection_variables: HashMap<String, String>,
+    #[serde(default)]
+    pub local_variables: HashMap<String, Value>,
+    #[serde(default)]
+    pub execution_context: ExecutionContext,
 }
 
 /// Where a script runs within a collection-runner run. Mirrors Postman:
@@ -124,6 +131,12 @@ pub struct ScriptResult {
     /// { op: "set", cookie } | { op: "delete", name, domain?, path? } | { op: "clear" }.
     #[serde(default)]
     pub cookie_changes: Vec<Value>,
+    #[serde(default)]
+    pub modified_local_variables: HashMap<String, Value>,
+    #[serde(default)]
+    pub removed_local_variables: Vec<String>,
+    #[serde(default)]
+    pub execution: ExecutionControl,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -289,6 +302,11 @@ struct ScriptContext {
     iteration: IterationInfo,
     collection_variables: HashMap<String, String>,
     collection_variable_changes: HashMap<String, Option<String>>,
+    local_variables: HashMap<String, Value>,
+    local_changes: HashMap<String, Value>,
+    removed_locals: Vec<String>,
+    execution_context: ExecutionContext,
+    execution: ExecutionControl,
 }
 
 /// Execute a JavaScript script in a sandboxed environment.
@@ -331,6 +349,7 @@ fn execute_script(
     // Crypto helpers, then the Postman compatibility layer that builds on
     // everything above
     setup_crypto(&mut context)?;
+    execution::setup(&mut context, ctx.clone(), capture_request)?;
     setup_pm_compat(&mut context, ctx.clone())?;
 
     let baseline = if capture_request {
@@ -347,7 +366,9 @@ fn execute_script(
             }
             Ok(())
         }
+        Err(ScriptRunError::Js(_)) if ctx.borrow().execution.skipped => Ok(()),
         Err(ScriptRunError::Js(e)) => {
+            ctx.borrow_mut().execution.next = NextRequest::Unchanged;
             if capture_request {
                 let _ = capture_request_mutations(&mut context, &ctx, baseline.as_deref());
             }
@@ -1081,6 +1102,7 @@ fn setup_iteration(
             "iteration": info.iteration,
             "iterationCount": info.iteration_count,
             "requestName": info.request_name,
+            "requestId": ctx.borrow().execution_context.request_id,
             "eventName": event_name,
             "data": info.data,
         })
@@ -1108,6 +1130,7 @@ fn setup_iteration(
                 iteration: payload.iteration,
                 iterationCount: payload.iterationCount,
                 requestName: payload.requestName === null ? undefined : payload.requestName,
+                requestId: payload.requestId === null ? undefined : payload.requestId,
                 eventName: payload.eventName
             }};
             if (typeof pm === 'object' && pm !== null) {{
@@ -1572,7 +1595,10 @@ fn run_script_sync(
         cookie_changes: Vec::new(),
         iteration: script_data.iteration,
         collection_variables: script_data.collection_variables,
+        local_variables: script_data.local_variables,
+        execution_context: script_data.execution_context,
         collection_variable_changes: HashMap::new(),
+        ..Default::default()
     }));
 
     let result = execute_script(
@@ -1598,6 +1624,13 @@ fn run_script_sync(
         modified_environment: ctx_ref.environment_changes.clone(),
         modified_collection_variables: ctx_ref.collection_variable_changes.clone(),
         cookie_changes: ctx_ref.cookie_changes.clone(),
+        modified_local_variables: ctx_ref.local_changes.clone(),
+        removed_local_variables: ctx_ref.removed_locals.clone(),
+        execution: if success {
+            ctx_ref.execution.clone()
+        } else {
+            ExecutionControl::default()
+        },
     }
 }
 
@@ -1616,6 +1649,9 @@ pub async fn script_execute_pre_request(
             modified_environment: HashMap::new(),
             modified_collection_variables: HashMap::new(),
             cookie_changes: Vec::new(),
+            modified_local_variables: HashMap::new(),
+            removed_local_variables: Vec::new(),
+            execution: ExecutionControl::default(),
         });
     }
 
@@ -1640,6 +1676,9 @@ pub async fn script_execute_test(
             modified_environment: HashMap::new(),
             modified_collection_variables: HashMap::new(),
             cookie_changes: Vec::new(),
+            modified_local_variables: HashMap::new(),
+            removed_local_variables: Vec::new(),
+            execution: ExecutionControl::default(),
         });
     }
 
@@ -2445,6 +2484,8 @@ mod tests {
             cookies: Vec::new(),
             iteration: IterationInfo::default(),
             collection_variables: HashMap::new(),
+            local_variables: HashMap::new(),
+            execution_context: ExecutionContext::default(),
         };
         let result = tokio::task::spawn_blocking(move || {
             run_script_sync(script_data, false, ProxySettings::default())
@@ -2508,6 +2549,8 @@ mod tests {
                     ]),
                     cookies: Vec::new(),
                     iteration: IterationInfo::default(),
+                    local_variables: HashMap::new(),
+                    execution_context: ExecutionContext::default(),
                     collection_variables: collection
                         .iter()
                         .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -2659,3 +2702,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "script_execution_tests.rs"]
+mod execution_tests;

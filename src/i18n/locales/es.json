@@ -600,7 +600,25 @@
     "history_failed": "{{count}} fallidas",
     "history_source": "Ejecución del {{date}}",
     "history_no_body": "El historial no conserva cuerpos de respuesta, encabezados ni cookies",
-    "pre_request_failed": "El script previo a la solicitud falló, por lo que no se envió: {{message}}"
+    "pre_request_failed": "El script previo a la solicitud falló, por lo que no se envió: {{message}}",
+    "flow": {
+      "max_executions": "Máx. ejecuciones / iteración",
+      "invalid_limit": "El máximo de ejecuciones debe ser un entero entre {{min}} y {{max}}.",
+      "limit_reached": "Se alcanzó el límite de {{limit}} ejecuciones en la iteración {{iteration}}.",
+      "ambiguous_target": "La siguiente solicitud \"{{target}}\" es ambigua en la selección.",
+      "missing_target": "La siguiente solicitud \"{{target}}\" no está en la selección.",
+      "skipped": "Omitida por el script previo",
+      "running": "En ejecución · {{count}} pasos completados",
+      "attempt": "Intento {{attempt}}",
+      "counts": "{{visited}} pasos · {{sent}} enviadas · {{planned}} planificadas",
+      "stoppedByUser": "Detenido por el usuario",
+      "stoppedOnError": "Detenido tras fallar una solicitud",
+      "executionLimit": "Límite de ejecuciones alcanzado",
+      "invalidTarget": "Siguiente solicitud no válida",
+      "executionError": "Error de ejecución",
+      "jump": "Siguiente: {{target}}",
+      "end_iteration": "Finalizar iteración"
+    }
   },
   "mqtt": {
     "title": "MQTT",

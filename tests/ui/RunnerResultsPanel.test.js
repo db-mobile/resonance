@@ -25,6 +25,27 @@ const REQUESTS = [
 ];
 
 describe('RunnerResultsPanel', () => {
+    test('restored history keeps the visited total when its request details were truncated', () => {
+        const { container, panel } = mount();
+        panel.showSummary({ requests: [], iterations: 1, summary: {}, totalRequests: 2500,
+            plannedRequests: 2, sentRequests: 2500, terminationReason: 'completed' }, 'Saved run');
+        expect(container.textContent).toContain('2500 visited');
+    });
+    test('timeline appends repeated visits and preserves their separate details and termination error', () => {
+        seedTemplates();
+        const { container, panel } = mount();
+        panel.open(REQUESTS, { timeline: true, iterations: 2 });
+        expect(container.querySelectorAll('.runner-result-item')).toHaveLength(0);
+        for (let index = 0; index < 2; index++) {
+            panel.markRequestRunning(index, { request: REQUESTS[0], iteration: 1, attempt: index + 1, queuePosition: 0 });
+            panel.updateResultWithResponse(index, { status: 'success', body: { attempt: index + 1 } });
+        }
+        expect(container.querySelectorAll('.runner-result-item')).toHaveLength(2);
+        expect(panel.data.map(result => result.body)).toEqual([{ attempt: 1 }, { attempt: 2 }]);
+        expect(container.textContent).toContain('Attempt 2');
+        panel.show({ requests: panel.data, passed: 2, error: 'Execution limit reached', terminationReason: 'executionLimit', sentRequests: 2, plannedRequests: 4 });
+        expect(container.textContent).toContain('Execution limit reached');
+    });
     beforeEach(seedTemplates);
 
     afterEach(() => {
