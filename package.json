@@ -33,7 +33,7 @@
     "babel-jest": "^30.0.4",
     "esbuild": "^0.28.1",
     "eslint": "^10.8.0",
-    "globals": "^16.5.0",
+    "globals": "^17.13.0",
     "jest": "^30.0.4",
     "jest-environment-jsdom": "^30.0.4",
     "prettier": "^3.6.2"
@@ -51,5 +51,10 @@
     "@lezer/highlight": "^1.2.3",
     "cm6-graphql": "^0.2.1",
     "graphql": "^17.0.2"
+  },
+  "overrides": {
+    "@istanbuljs/load-nyc-config": {
+      "js-yaml": "^4.1.0"
+    }
   }
 }

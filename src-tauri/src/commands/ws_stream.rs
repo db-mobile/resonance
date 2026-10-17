@@ -339,7 +339,7 @@ where
         while let Some(command) = receiver.recv().await {
             match command {
                 WsCommand::Send(message) => {
-                    if let Err(error) = writer.send(Message::Text(message)).await {
+                    if let Err(error) = writer.send(Message::text(message)).await {
                         emit_event(
                             &write_app,
                             channel,

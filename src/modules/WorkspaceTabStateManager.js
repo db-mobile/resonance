@@ -638,7 +638,7 @@ export class WorkspaceTabStateManager {
             displayResponseWithLineNumbersForTab(
                 `[Binary response — ${response.size || 0} bytes]`, null, tabId, 'text'
             );
-        } else if (Object.hasOwn(response, 'data')) {
+        } else if (Object.hasOwn(response, 'data') && (response.data !== null || Object.hasOwn(response, 'isJson'))) {
             const isStructured = typeof response.data !== 'string';
             const formattedResponse = isStructured
                 ? JSON.stringify(response.data, null, 2)

@@ -80,6 +80,16 @@ describe('_restoreResponse', () => {
         expect(clearResponse).toHaveBeenCalledWith('tab-1');
     });
 
+    test('clears the response pane for a never-sent tab placeholder', async () => {
+        const { manager } = await loadHarness();
+        const placeholder = { data: null, headers: {}, status: null, statusText: '', ttfb: null, size: null, timings: null, cookies: [] };
+
+        await manager._restoreResponse(placeholder, 'tab-1');
+
+        expect(displayResponse).not.toHaveBeenCalled();
+        expect(clearResponse).toHaveBeenCalledWith('tab-1');
+    });
+
     test('restoring the same response twice renders the panes once', async () => {
         const { manager, container } = await loadHarness();
         const response = responseOf({ a: 1 });

@@ -402,7 +402,7 @@ fn push_log(state: &MockServerState, log: RequestLog) {
 /// here would also make the server reachable via DNS rebinding.
 fn build_router(state: MockServerState) -> Router {
     Router::new()
-        .route("/*path", any(handle_mock_request))
+        .route("/{*path}", any(handle_mock_request))
         .route("/", any(handle_mock_request))
         .with_state(state)
 }
