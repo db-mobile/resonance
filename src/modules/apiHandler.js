@@ -572,6 +572,10 @@ export async function handleSendRequest() {
 async function sendHttpRequest() {
     setRequestInProgress(true);
 
+    const { schemaController } = app;
+    await schemaController?.editor?.__ready;
+    const schemaSnapshot = schemaController?.captureSchema();
+
     scheduleEndpointSave();
 
     const prepared = await prepareHttpSend();
@@ -638,7 +642,7 @@ async function sendHttpRequest() {
             clearGraphQLErrorsBadge(requestTabId);
             setRequestInProgress(false);
         } else if (response.status) {
-            await handleReceivedResponse(response, { requestConfig, requestTabId, url, historySensitive });
+            await handleReceivedResponse(response, { requestConfig, requestTabId, url, historySensitive, schemaController, schemaSnapshot });
         } else {
             throw response;
         }
@@ -659,7 +663,7 @@ async function sendHttpRequest() {
  * @param {boolean} ctx.historySensitive
  * @returns {Promise<void>}
  */
-async function handleReceivedResponse(result, { requestConfig, requestTabId, url, historySensitive }) {
+async function handleReceivedResponse(result, { requestConfig, requestTabId, url, historySensitive, schemaController, schemaSnapshot }) {
     const contentType = result.headers?.['content-type'] ?? null;
     const isSuccess = result.status >= 200 && result.status < 300;
 
@@ -687,16 +691,14 @@ async function handleReceivedResponse(result, { requestConfig, requestTabId, url
     });
 
     displayResponseWithLineNumbersForTab(formattedResponse, contentType, requestTabId, languageHint);
+    const responseManager = app.responseContainerManager;
+    const responseContainer = responseManager?.containers?.get(requestTabId);
+    const isCurrentResponse = () => inFlightRequestFor(requestTabId) === requestConfig.requestId &&
+        app.responseContainerManager === responseManager &&
+        (!responseManager?.containers || (responseContainer &&
+            responseManager.containers.get(requestTabId) === responseContainer));
 
-    if (app.schemaController && !result.isBinary) {
-        app.schemaController.setLastResponseBody(result.data);
-        if (isGraphQLMode() || !isSuccess) {
-            clearSchemaValidationBadge(requestTabId);
-        } else {
-            const validationResult = app.schemaController.validateResponse(result.data);
-            displaySchemaValidationResult(validationResult, requestTabId);
-        }
-    }
+
 
     displayGraphQLErrorsBadge(result, requestTabId);
 
@@ -740,6 +742,23 @@ async function handleReceivedResponse(result, { requestConfig, requestTabId, url
     }
 
     await recordRequestOutcome(requestConfig, result, { ...result, cookies }, historySensitive);
+
+    // Finish response bookkeeping before waiting: another send may complete meanwhile.
+    if (schemaController && !result.isBinary && isCurrentResponse()) {
+        if (schemaController.isCurrentSnapshot(schemaSnapshot)) {
+            schemaController.setLastResponseBody(result.data);
+        }
+        if (requestConfig.protocol === 'graphql' || !isSuccess) {
+            if (schemaController.isCurrentSnapshot(schemaSnapshot)) {
+                clearSchemaValidationBadge(requestTabId);
+            }
+        } else {
+            const validationResult = await schemaController.validateResponse(result.data, schemaSnapshot, { isJson: result.isJson !== false });
+            if (isCurrentResponse() && schemaController.isCurrentSnapshot(schemaSnapshot)) {
+                displaySchemaValidationResult(validationResult, requestTabId);
+            }
+        }
+    }
 }
 
 export async function handleGenerateCurl() {

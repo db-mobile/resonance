@@ -1,260 +1,37 @@
 /**
- * @fileoverview Schema validation and inference utilities
+ * @fileoverview Native JSON Schema validation adapter and local schema inference
  * @module schema/SchemaValidator
  */
 
 export class SchemaValidator {
-    /**
-     * @param {*} data
-     * @param {Object} schema
-     * @returns {Object}
-     */
-    validate(data, schema) {
-        if (!schema || typeof schema !== 'object') {
-            return { valid: true, errors: [] };
-        }
-
-        const errors = [];
-        this._validateNode(data, schema, '', errors);
-        
-        return {
-            valid: errors.length === 0,
-            errors
-        };
+    constructor(backendAPI = null) {
+        this.backendAPI = backendAPI;
     }
 
-    _validateNode(data, schema, path, errors) {
-        if (data === null) {
-            if (schema.nullable === true || (Array.isArray(schema.type) && schema.type.includes('null'))) {
-                return;
-            }
-            if (schema.type && schema.type !== 'null') {
-                errors.push({
-                    path: path || '/',
-                    message: `Expected ${schema.type}, got null`,
-                    keyword: 'type'
-                });
-            }
-            return;
-        }
-
-        if (schema.type) {
-            const actualType = this._getType(data);
-            const expectedTypes = Array.isArray(schema.type) ? schema.type : [schema.type];
-            
-            const isNumberMatch = actualType === 'integer' && expectedTypes.includes('number');
-            if (!expectedTypes.includes(actualType) && !isNumberMatch) {
-                errors.push({
-                    path: path || '/',
-                    message: `Expected ${expectedTypes.join(' | ')}, got ${actualType}`,
-                    keyword: 'type'
-                });
-                return;
-            }
-        }
-
-        if (typeof data === 'object' && !Array.isArray(data) && data !== null) {
-            this._validateObject(data, schema, path, errors);
-        }
-
-        if (Array.isArray(data)) {
-            this._validateArray(data, schema, path, errors);
-        }
-
-        if (typeof data === 'string') {
-            this._validateString(data, schema, path, errors);
-        }
-
-        if (typeof data === 'number') {
-            this._validateNumber(data, schema, path, errors);
-        }
-
-        if (schema.enum && !schema.enum.includes(data)) {
-            errors.push({
-                path: path || '/',
-                message: `Value must be one of: ${schema.enum.join(', ')}`,
-                keyword: 'enum'
-            });
-        }
+    /** @returns {Promise<{valid: boolean, errors: Array}>} */
+    async check(schema) {
+        return this._call('check', schema);
     }
 
-    _validateObject(data, schema, path, errors) {
-        if (schema.required && Array.isArray(schema.required)) {
-            for (const prop of schema.required) {
-                if (!(prop in data)) {
-                    errors.push({
-                        path: `${path}/${prop}`,
-                        message: `Missing required property: ${prop}`,
-                        keyword: 'required'
-                    });
-                }
-            }
-        }
-
-        if (schema.properties) {
-            for (const [key, propSchema] of Object.entries(schema.properties)) {
-                if (key in data) {
-                    this._validateNode(data[key], propSchema, `${path}/${key}`, errors);
-                }
-            }
-        }
-
-        if (schema.additionalProperties === false && schema.properties) {
-            const allowedKeys = Object.keys(schema.properties);
-            for (const key of Object.keys(data)) {
-                if (!allowedKeys.includes(key)) {
-                    errors.push({
-                        path: `${path}/${key}`,
-                        message: `Additional property not allowed: ${key}`,
-                        keyword: 'additionalProperties'
-                    });
-                }
-            }
-        }
+    /** @returns {Promise<{valid: boolean, schemaValid: boolean, errors: Array}>} */
+    async validate(data, schema) {
+        return this._call('validate', schema, data);
     }
 
-    _validateArray(data, schema, path, errors) {
-        if (schema.minItems !== undefined && data.length < schema.minItems) {
-            errors.push({
-                path: path || '/',
-                message: `Array must have at least ${schema.minItems} items`,
-                keyword: 'minItems'
-            });
-        }
-
-        if (schema.maxItems !== undefined && data.length > schema.maxItems) {
-            errors.push({
-                path: path || '/',
-                message: `Array must have at most ${schema.maxItems} items`,
-                keyword: 'maxItems'
-            });
-        }
-
-        if (schema.items) {
-            data.forEach((item, index) => {
-                this._validateNode(item, schema.items, `${path}/${index}`, errors);
-            });
-        }
-    }
-
-    _validateString(data, schema, path, errors) {
-        if (schema.minLength !== undefined && data.length < schema.minLength) {
-            errors.push({
-                path: path || '/',
-                message: `String must be at least ${schema.minLength} characters`,
-                keyword: 'minLength'
-            });
-        }
-
-        if (schema.maxLength !== undefined && data.length > schema.maxLength) {
-            errors.push({
-                path: path || '/',
-                message: `String must be at most ${schema.maxLength} characters`,
-                keyword: 'maxLength'
-            });
-        }
-
-        if (schema.pattern) {
-            try {
-                const regex = new RegExp(schema.pattern);
-                if (!regex.test(data)) {
-                    errors.push({
-                        path: path || '/',
-                        message: `String does not match pattern: ${schema.pattern}`,
-                        keyword: 'pattern'
-                    });
-                }
-            } catch {
+    async _call(method, ...args) {
+        try {
+            const api = this.backendAPI ?? globalThis.window?.backendAPI;
+            if (!api?.schema?.[method]) {
+                throw new Error('Native schema validator is unavailable');
             }
+            return await api.schema[method](...args);
+        } catch (error) {
+            return {
+                valid: false,
+                schemaValid: false,
+                errors: [{ path: '/', keyword: 'backend', message: error?.message || String(error) }]
+            };
         }
-
-        if (schema.format) {
-            const formatError = this._validateFormat(data, schema.format);
-            if (formatError) {
-                errors.push({
-                    path: path || '/',
-                    message: formatError,
-                    keyword: 'format'
-                });
-            }
-        }
-    }
-
-    _validateNumber(data, schema, path, errors) {
-        if (schema.minimum !== undefined && data < schema.minimum) {
-            errors.push({
-                path: path || '/',
-                message: `Value must be >= ${schema.minimum}`,
-                keyword: 'minimum'
-            });
-        }
-
-        if (schema.maximum !== undefined && data > schema.maximum) {
-            errors.push({
-                path: path || '/',
-                message: `Value must be <= ${schema.maximum}`,
-                keyword: 'maximum'
-            });
-        }
-
-        const exclusiveMinimum = schema.exclusiveMinimum === true ? schema.minimum : schema.exclusiveMinimum;
-        if (typeof exclusiveMinimum === 'number' && data <= exclusiveMinimum) {
-            errors.push({
-                path: path || '/',
-                message: `Value must be > ${exclusiveMinimum}`,
-                keyword: 'exclusiveMinimum'
-            });
-        }
-
-        const exclusiveMaximum = schema.exclusiveMaximum === true ? schema.maximum : schema.exclusiveMaximum;
-        if (typeof exclusiveMaximum === 'number' && data >= exclusiveMaximum) {
-            errors.push({
-                path: path || '/',
-                message: `Value must be < ${exclusiveMaximum}`,
-                keyword: 'exclusiveMaximum'
-            });
-        }
-
-        if (schema.type === 'integer' && !Number.isInteger(data)) {
-            errors.push({
-                path: path || '/',
-                message: 'Value must be an integer',
-                keyword: 'type'
-            });
-        }
-    }
-
-    _validateFormat(data, format) {
-        const formats = {
-            'email': /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-            'uri': /^https?:\/\/.+/,
-            'url': /^https?:\/\/.+/,
-            'uuid': /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-            'date': /^\d{4}-\d{2}-\d{2}$/,
-            'date-time': /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
-            'time': /^\d{2}:\d{2}:\d{2}/,
-            'ipv4': /^(\d{1,3}\.){3}\d{1,3}$/,
-            'ipv6': /^([0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}$/i
-        };
-
-        if (formats[format] && !formats[format].test(data)) {
-            return `Invalid ${format} format`;
-        }
-
-        return null;
-    }
-
-    _getType(value) {
-        if (value === null) {
-            return 'null';
-        }
-        if (Array.isArray(value)) {
-            return 'array';
-        }
-        if (typeof value === 'number') {
-            return Number.isInteger(value) ? 'integer' : 'number';
-        }
-        return typeof value;
     }
 
     /**

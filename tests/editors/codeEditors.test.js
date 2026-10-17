@@ -127,6 +127,14 @@ describe('SchemaEditor', () => {
         editor.destroy();
     });
 
+    test.each([false, true, {}])('round-trips schema %j without treating it as empty', (schema) => {
+        const editor = new SchemaEditor(mount());
+        editor.setSchema(schema);
+        expect(editor.getSchema()).toEqual(schema);
+        expect(editor.getContent()).toBe(JSON.stringify(schema, null, 2));
+        editor.destroy();
+    });
+
     test('setSchema(null) empties the editor and getSchema returns null', () => {
         const editor = new SchemaEditor(mount());
         editor.setSchema({ type: 'object' });

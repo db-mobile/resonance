@@ -85,6 +85,21 @@ describe('CollectionRepository endpoint sidecar accessors', () => {
         repository = new CollectionRepository(backendAPI);
     });
 
+    test('round-trips a false schema through both endpoint readers', async () => {
+        backendAPI.collections.getEndpointData.mockResolvedValue({ responseSchema: false });
+
+        await expect(repository.getResponseSchema('c1', 'e1')).resolves.toBe(false);
+        await expect(repository.getAllPersistedEndpointData('c1', 'e1')).resolves.toMatchObject({ responseSchema: false });
+        await repository.saveResponseSchema('c1', 'e1', false);
+        expect(backendAPI.collections.saveEndpointData).not.toHaveBeenCalled();
+    });
+
+    test('writes a false schema instead of clearing it', async () => {
+        await repository.saveResponseSchema('c1', 'e1', false);
+
+        expect(backendAPI.collections.saveEndpointData).toHaveBeenCalledWith('c1', 'e1', { responseSchema: false });
+    });
+
     describe.each(CASES)('$field', ({ field, getter, setter, empty, stored, label }) => {
         const read = () => (getter
             ? repository[getter]('c1', 'e1')

@@ -29,14 +29,14 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 - **Genuinely lightweight** — built with Tauri and a Rust backend: ~15 MB bundle size, ~50 MB memory footprint.
 - **Every protocol you need** — REST, GraphQL (incl. subscriptions), gRPC (with server reflection), WebSocket, Server-Sent Events, and MQTT in one client.
 - **Secrets stay secret** — credentials and secret variables are stored in your OS keychain (GNOME Keyring / KWallet, macOS Keychain, Windows Credential Manager), never in the collection files you commit.
-- **Batteries included** — OpenAPI, Postman & cURL import, mock server, pre-request/test scripting, collection runner, code generation in 9 languages, API docs generation, mTLS.
+- **Batteries included** — OpenAPI/Swagger, Postman, Insomnia, HAR & cURL import, mock server, pre-request/test scripting, data-driven collection runner, response schema validation, code generation in 9 languages, API docs generation, mTLS.
 
 ## Features
 
 ### Protocols
 
 - **REST/HTTP** — HTTP/1.1 and HTTP/2, all body modes (JSON, form data, URL-encoded, plain text, binary files, multipart file uploads), detailed timing breakdown (DNS, TCP, TLS, TTFB, download), cookie display, configurable timeouts
-- **GraphQL** — dedicated query and variables editors with syntax highlighting, auto-format, and live subscriptions over WebSocket (`graphql-transport-ws`)
+- **GraphQL** — dedicated query and variables editors with syntax highlighting, auto-format, schema introspection and an interactive query explorer, and live subscriptions over WebSocket (`graphql-transport-ws`)
 - **gRPC** — server reflection (v1/v1alpha) with automatic service discovery, local `.proto` file loading, all four RPC kinds (unary, server-, client-, and bidirectional streaming), TLS/mTLS options, metadata and trailers display
 - **WebSocket** — persistent connections per tab, handshake headers, transcript-style message display
 - **Server-Sent Events** — automatic reconnection honoring `retry`, `Last-Event-ID` resumption, live connection lifecycle status
@@ -44,15 +44,17 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 
 ### Import, Export & Mocking
 
-- **OpenAPI 3.0 import** (YAML/JSON) with schema-based example generation, **Postman import & export** (v2.0/v2.1 collections and environments), **cURL import** (paste a command), **OpenAPI export** (YAML/JSON)
+- **Collection import** — OpenAPI 3.0/3.1 and Swagger 2.0 (YAML/JSON) with schema-based example generation, Postman v2.0/v2.1, Insomnia v4 JSON/v5 YAML, HAR captures, and pasted cURL commands; Postman and Insomnia environment import
+- **Collection export** — OpenAPI (YAML/JSON) and Postman collections; environment import/export through the environment manager
 - **Code generation in 9 languages** — cURL, Python, JavaScript (Fetch/Axios), Node.js, Go, PHP, Ruby, Java
 - **Documentation generation** — Markdown or HTML docs from any collection, with parameter tables, saved examples, and code samples
 - **Built-in mock server** — generates responses from OpenAPI schemas and examples, custom bodies, status codes and delays per endpoint, response templating (`{{request.params.id}}`, `{{request.body.field}}`, `{{$uuid}}` …), `Prefer: code=… / example=…` to pick a documented response, request logging
 
 ### Automation & Testing
 
-- **Pre-request and test scripts** — sandboxed JavaScript (Boa Engine) with `request` mutation, `expect()` assertions, `environment` access, and `sendRequest()` for request chaining ([full scripting docs](SCRIPTS.md))
-- **Collection runner** — batch execution with ordering, variable chaining, stop-on-error, delays, and saved configurations
+- **Pre-request and test scripts** — sandboxed JavaScript (Boa Engine) with `request` mutation, `expect()` assertions, `environment` access, and `sendRequest()` for request chaining. A Postman-compatible `pm` API supports common scripts, with synchronous network calls and a limited module API ([supported APIs and limitations](SCRIPTS.md#postman-compatibility-pm))
+- **Collection runner** — HTTP and GraphQL batch execution with ordering, variable chaining, iterations, CSV/JSON data files, stop-on-error, delays, saved configurations, run history, and JSON/JUnit XML report export
+- **Response schema validation** — local validation using JSON Schema drafts 4, 6, 7, 2019-09, and 2020-12, with schema inference, editor checks, and response validation badges. Schemas without `$schema` use draft 2020-12; OpenAPI `nullable` and legacy boolean exclusive bounds are supported. References must resolve within the supplied schema; external schemas are not fetched. Standard formats are checked, including the `url` compatibility alias. Validation applies to successful HTTP JSON responses; runner schema assertions and Postman's `pm.response.to.have.jsonSchema()` are not included
 - **Environments & variables** — `{{ variable }}` templating, dynamic variables (`{{$uuid}}`, `{{$timestamp}}`, random data), quick environment switching, import/export
 
 ### Security
@@ -65,6 +67,7 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 ### Workflow & UX
 
 - **Workspace tabs** with independent, persistent state; **request history** with search and replay
+- **Git-friendly collections** — open collections directly from a checkout, see the current branch in the sidebar, and reload when the branch changes; commit, push, pull, and merge using your Git tools
 - **Keyboard shortcuts** for everything, platform-aware (`Ctrl`/`⌘`)
 - **3 themes** (light, dark, system) with 9 accent colors; **6 languages** (English, German, Spanish, French, Italian, Brazilian Portuguese)
 - **Auto-update** for AppImage and direct downloads; package-manager installs defer to their own update mechanism
@@ -153,15 +156,16 @@ User documentation lives on the **[Resonance website](https://db-mobile.github.i
 ## Roadmap
 
 - [ ] Response comparison and diff view
-- [ ] Git integration for collections (versioning & sync)
+- [ ] In-app Git operations for collections (commit, push, pull & merge)
 - [ ] Team collaboration features
 
 <details>
 <summary>Completed milestones</summary>
 
-- [x] OpenAPI 3.0 import with schema-based generation
+- [x] OpenAPI 3.0/3.1 and Swagger 2.0 import with schema-based generation
 - [x] Postman collection import (v2.0 & v2.1)
 - [x] Postman environment import
+- [x] Insomnia v4/v5 collection and environment import, plus HAR import
 - [x] Multi-language code generation (9 languages)
 - [x] Workspace tabs for concurrent requests
 - [x] Performance metrics and timing breakdown
@@ -184,13 +188,16 @@ User documentation lives on the **[Resonance website](https://db-mobile.github.i
 - [x] Automated testing framework with rich assertion API
 - [x] Request chaining with environment variable integration
 - [x] GraphQL support with dedicated query and variables editors
+- [x] GraphQL schema introspection and interactive query explorer
 - [x] GraphQL subscriptions over WebSocket (graphql-transport-ws)
 - [x] Tauri v2 migration for smaller bundle and better performance
 - [x] gRPC support with server reflection and all four RPC kinds (unary, server/client/bidirectional streaming)
 - [x] WebSocket support with native backend transport and handshake headers
 - [x] Server-Sent Events (SSE) support with automatic reconnection and Last-Event-ID resumption
 - [x] MQTT support with topic subscribe/publish, QoS levels, retain, and TLS brokers
-- [x] Collection runner for batch request execution with variable chaining
+- [x] Collection runner with variable chaining, data-driven iterations, run history, and JSON/JUnit reports
+- [x] Response JSON Schema validation and inference
+- [x] Git branch display and collection reload on branch changes
 - [x] File uploads: multipart form-data file parts and binary request bodies
 
 </details>

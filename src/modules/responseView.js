@@ -75,7 +75,9 @@ export function displaySchemaValidationResult(validationResult, tabId = null) {
 
     const badge = document.createElement('span');
     badge.className = `status-badge response-validation-badge ${validationResult.valid ? 'is-success' : 'is-error'}`;
-    badge.textContent = validationResult.valid ? 'Schema Valid' : `Schema Invalid (${validationResult.errors.length})`;
+    badge.textContent = validationResult.valid ? 'Schema Valid' :
+        validationResult.errors.some(error => error.keyword === 'backend') ? 'Schema validation unavailable' :
+            validationResult.schemaValid === false ? 'Invalid JSON Schema' : `Schema Invalid (${validationResult.errors.length})`;
 
     if (!validationResult.valid && validationResult.errors.length > 0) {
         badge.title = validationResult.errors.map(e => `${e.path}: ${e.message}`).join('\n');

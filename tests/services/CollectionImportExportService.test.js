@@ -54,6 +54,17 @@ describe('CollectionImportExportService', () => {
         delete app.collectionController;
     });
 
+    test.each([
+        { '200': { content: { 'application/json': { schema: false } } } },
+        { '200': { schema: false } }
+    ])('imports a false response schema without dropping it', async (responses) => {
+        deps.repository.saveResponseSchema = jest.fn().mockResolvedValue(undefined);
+
+        await service.saveEndpointResponseSchema('c1', { id: 'e1', responses });
+
+        expect(deps.repository.saveResponseSchema).toHaveBeenCalledWith('c1', 'e1', false);
+    });
+
     describe('handleExport*', () => {
         test('delegates to the collection service', async () => {
             await service.handleExportOpenApiJson({ id: 'c1' });

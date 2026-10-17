@@ -312,7 +312,7 @@ export class CollectionImportExportService {
         }
 
         const responseSchema = this.extractResponseSchema(endpoint.responses);
-        if (!responseSchema) {
+        if (responseSchema === null || responseSchema === undefined) {
             return;
         }
 
@@ -332,11 +332,11 @@ export class CollectionImportExportService {
                 continue;
             }
 
-            if (response.content && response.content['application/json'] && response.content['application/json'].schema) {
+            if (response.content?.['application/json']?.schema !== undefined) {
                 return response.content['application/json'].schema;
             }
 
-            if (response.schema) {
+            if (response.schema !== undefined) {
                 return response.schema;
             }
         }

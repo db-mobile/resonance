@@ -303,7 +303,7 @@ export class CollectionRepository {
             formBodyData: data.formBodyData || null,
             grpcData: data.grpcData || null,
             mqttData: await this._hydrateMqttData(collectionId, endpointId, data.mqttData || null),
-            responseSchema: data.responseSchema || null
+            responseSchema: data.responseSchema ?? null
         };
     }
 
@@ -925,6 +925,7 @@ export class CollectionRepository {
      * @returns {Promise<Object|null>}
      */
     async getResponseSchema(collectionId, endpointId) {
-        return this._readSidecar(collectionId, endpointId, 'responseSchema', null);
+        const data = await this._getEndpointData(collectionId, endpointId);
+        return data.responseSchema ?? null;
     }
 }
