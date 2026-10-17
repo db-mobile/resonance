@@ -42,16 +42,22 @@ setOAuthVariableResolver((collectionId) => {
  * @param {{variables?: Object, processor?: Object, refreshOAuth?: boolean}} [substitution]
  * @returns {Promise<Object>}
  */
-export async function generateEffectiveAuthData({ variables, processor, refreshOAuth = true } = {}) {
+export async function generateEffectiveAuthData({ variables, processor, refreshOAuth = true, endpoint = getCurrentEndpoint(), authConfig = app.authManager.getAuthConfig(), onAuthRenewed } = {}) {
     const { authData, warnings } = await getRequestPipeline().resolveAuth({
-        authConfig: app.authManager.getAuthConfig(),
-        endpoint: getCurrentEndpoint(),
+        authConfig,
+        endpoint,
         variables,
         processor,
         refreshOAuth,
-        persistRequestAuth: (nextRaw, result) => {
-            app.authManager.applyTokenResult(result);
-            scheduleEndpointSave();
+        persistRequestAuth: async (nextRaw, result) => {
+            onAuthRenewed?.(nextRaw);
+            if (endpoint?.collectionId && endpoint?.endpointId) {
+                await getRequestPipeline().collectionRepository.saveAuthConfigAtSource(endpoint.collectionId, endpoint.endpointId, { kind: 'request' }, nextRaw);
+            }
+            if (getCurrentEndpoint()?.endpointId === endpoint?.endpointId && getCurrentEndpoint()?.collectionId === endpoint?.collectionId) {
+                app.authManager.applyTokenResult(result);
+                scheduleEndpointSave();
+            }
         }
     });
     warnings.forEach((warning) => toast.warning(warning));
@@ -99,15 +105,17 @@ export function variableProcessingError(error) {
  * @param {{url: string, pathParams?: Object, headers: Object, queryParams: Object, queryRows?: Array<Object>, useAuth?: boolean, refreshOAuth?: boolean}} request
  * @returns {Promise<{ok: true, url: string, queryString: string, pathParams: Object, headers: Object, queryParams: Object, variables: Object, processor: Object, authData: Object|null}|{ok: false, error: string}>}
  */
-export async function resolveRequestPipeline({ url, pathParams = {}, headers, queryParams, queryRows, useAuth = true, refreshOAuth = true }) {
+export async function resolveRequestPipeline({ url, pathParams = {}, headers, queryParams, queryRows, useAuth = true, refreshOAuth = true, endpoint = getCurrentEndpoint(), authConfig, variablesOverride, onAuthRenewed }) {
     const builder = getRequestBuilderService();
 
     try {
-        const { variables, processor } = await builder.resolveVariables(getCurrentEndpoint(), headers);
+        const resolved = await builder.resolveVariables(endpoint, headers);
+        const variables = variablesOverride ?? resolved.variables;
+        const { processor } = resolved;
 
         let authData = null;
         if (useAuth) {
-            authData = await generateEffectiveAuthData({ variables, processor, refreshOAuth });
+            authData = await generateEffectiveAuthData({ variables, processor, refreshOAuth, endpoint, onAuthRenewed, ...(authConfig ? { authConfig } : {}) });
             builder.mergeAuthData(headers, queryParams, authData);
             if (queryRows) {
                 appendAuthQueryRows(queryRows, authData.queryParams);

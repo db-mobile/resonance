@@ -32,7 +32,7 @@ After a script finishes:
   If the script throws, the request is **not sent** and the error is shown in
   its place (in the runner the request is marked failed).
 - **Both:** changes made via `environment.set` / `environment.unset` are
-  persisted to the active environment, and changes made via
+  persisted to the environment selected when execution started, and changes made via
   `pm.collectionVariables.set` / `.unset` are persisted to the request's
   collection.
 
@@ -299,18 +299,103 @@ Scripts written for Postman run largely unchanged:
   `.get(name)`, `.has(name)`.
 - **Variables:** `pm.environment` (`get`, `set`, `unset`, `has`, `toObject`,
   `replaceIn`, `clear`), `pm.collectionVariables` (same methods; saved to the
-  collection), `pm.variables` (script-local values first, then the runner data
-  row, the environment, and the collection; `set` is local to the script run),
+  collection), `pm.variables` (run/request-local values first, then the runner data
+  row, the environment, and the collection; values survive the entire collection run
+  or a single Manual Send from pre-request through tests),
   and `pm.globals`, which maps to the active environment because Resonance has
   no global scope.
 - **Other:** `pm.sendRequest(urlOrOptions[, callback])` (synchronous, unlike
   Postman), `pm.cookies`, `pm.info`, `pm.iterationData`.
 
-Not supported yet: `pm.execution.setNextRequest` / `skipRequest`,
+Not supported yet: asynchronous scripts, `pm.execution.runRequest`,
 `pm.vault`, and `require` for modules other than `crypto-js`.
 
 The bare globals (`environment`, `request`, `response`, `cookies`, `test`,
 `expect`, `sendRequest`) remain the recommended API.
+
+## Runner workflows and temporary variables
+
+Use `pm.variables` for temporary tokens, counters, and other JSON values. They
+persist across requests and iterations in one run, then are discarded. Manual
+Send shares locals from its pre-request script through its tests, then discards
+them. Strings, numbers, booleans, null, arrays, and objects retain their types;
+functions, undefined, non-finite numbers, and cyclic objects are rejected. Use
+`pm.variables.unset(name)` to remove a local override and reveal the lower scope.
+These locals also resolve `{{name}}` in requests, including authentication.
+Explicit environment/collection writes still update saved values. Collection
+writes affect only that collection, even when a runner crosses collections.
+
+For example, a login request's test script can save a token for later requests:
+
+```javascript
+pm.variables.set('token', pm.response.json().access_token);
+```
+
+A subsequent request can use `Bearer {{token}}` or configure Bearer authentication
+as `{{token}}` without saving the token to an environment.
+
+### Choose the next request
+
+```javascript
+pm.execution.setNextRequest('Get account');
+// Equivalent legacy alias: postman.setNextRequest('Get account');
+```
+
+Only requests selected in this runner may be targeted, including selected requests
+from other collections. Resonance endpoint IDs take precedence over exact, unique
+names; inspect `pm.info.requestId` for the current ID. Missing, unselected, or
+ambiguous targets stop the run with an error. A self-target repeats the current
+queue entry, including its runner overrides. Imports generate Resonance IDs;
+references to historical Postman IDs must be updated manually.
+
+The directive takes effect after the current request's scripts finish. The last
+call wins, in pre-request → endpoint tests → runner post-response order. A failed
+script/request discards navigation; ordinary failures follow **Stop on error**.
+`setNextRequest` has no navigation effect with Manual Send.
+
+To end only the current iteration (later data rows/iterations still run):
+
+```javascript
+pm.execution.setNextRequest(null);
+```
+
+### Conditional skips
+
+```javascript
+if (!pm.variables.get('token')) {
+    pm.execution.skipRequest();
+}
+```
+
+`skipRequest()` works only in pre-request scripts, including Manual Send. It stops
+execution immediately, even inside try/catch: the request is not sent and no
+post-response scripts run. Prior variable changes and logs are retained. Any
+pending next-request directive is discarded, and the runner advances in queue
+order. A skip is neither a passed nor a failed request. Calling it from tests
+produces a script error.
+
+### Bounded polling
+
+```javascript
+const attempts = Number(pm.variables.get('attempts') || 0) + 1;
+pm.variables.set('attempts', attempts);
+if (pm.response.json().state !== 'ready' && attempts < 5) {
+    pm.execution.setNextRequest(pm.info.requestId);
+}
+```
+
+**Maximum executions / iteration** bounds visits, including skipped visits. The
+default is the greater of 1,000 and the queue length. The permitted range is the
+queue length (at least one) through the greater of 100,000 and the queue length.
+Exceeding the limit stops the run with a visible error. Existing delays apply
+between visits, including loop repetitions; Stop cancels further navigation.
+
+Results show a chronological timeline with iteration and attempt numbers, jumps,
+and iteration termination. Repeats have separate responses, logs, and tests.
+Requests bypassed by a jump do not create fictional skipped attempts. Counts
+separate planned requests, visited entries, and requests sent; loops can exceed
+the planned count. JSON/JUnit reports and saved history preserve this distinction
+and termination errors. Existing history size limits still apply.
 
 ## Sandbox limitations
 

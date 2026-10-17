@@ -662,13 +662,14 @@
         Object.keys(collectionValues()).forEach(function (key) { __setCollectionVariable__(key, null); });
     };
 
-    var locals = {};
+    function localValues() { return JSON.parse(__localVariables__()); }
     function iterationValue(key) {
         var data = pm.iterationData;
         return data && data.has && data.has(key) ? data.get(key) : undefined;
     }
     var variables = {
         get: function (key) {
+            var locals = localValues();
             if (Object.prototype.hasOwnProperty.call(locals, key)) {
                 return locals[key];
             }
@@ -682,12 +683,24 @@
             }
             return collectionValues()[key];
         },
-        set: function (key, value) { locals[String(key)] = value; },
-        unset: function (key) { delete locals[key]; },
+        set: function (key, value) {
+            function validate(item, parents) {
+                if (item === undefined || typeof item === 'function' || typeof item === 'symbol' || typeof item === 'bigint' || (typeof item === 'number' && !isFinite(item))) {
+                    throw new TypeError('Local variables must be JSON-serializable');
+                }
+                if (item && typeof item === 'object') {
+                    if (parents.indexOf(item) !== -1) { throw new TypeError('Local variables cannot contain cycles'); }
+                    Object.keys(item).forEach(function (key) { validate(item[key], parents.concat([item])); });
+                }
+            }
+            validate(value, []);
+            __setLocalVariable__(String(key), JSON.stringify(value));
+        },
+        unset: function (key) { __unsetLocalVariable__(String(key)); },
         has: function (key) { return variables.get(key) !== undefined; },
         toObject: function () {
             var out = {};
-            [collectionValues(), environmentValues(), pm.iterationData ? pm.iterationData.toObject() : {}, locals]
+            [collectionValues(), environmentValues(), pm.iterationData ? pm.iterationData.toObject() : {}, localValues()]
                 .forEach(function (scope) {
                     Object.keys(scope).forEach(function (key) { out[key] = scope[key]; });
                 });

@@ -104,6 +104,7 @@ export class RunnerPanel {
             stopOnErrorCheckbox: this.container.querySelector('[data-option="stop-on-error"]'),
             delayInput: this.container.querySelector('[data-option="delay"]'),
             iterationsInput: this.container.querySelector('[data-option="iterations"]'),
+            maxExecutionsInput: this.container.querySelector('[data-option="max-executions"]'),
             dataChip: this.container.querySelector('[data-role="data-chip"]'),
             dataFileLabel: this.container.querySelector('[data-role="data-file-label"]'),
             dataClearButton: this.container.querySelector('[data-action="clear-data-file"]'),
@@ -198,6 +199,14 @@ export class RunnerPanel {
     }
 
     _updateRequestCount() {
+        if (this.dom.maxExecutionsInput) {
+            const minimum = Math.max(1, this.queue.count);
+            this.dom.maxExecutionsInput.min = minimum;
+            this.dom.maxExecutionsInput.max = Math.max(100000, minimum);
+            if (this.dom.maxExecutionsInput.value !== '' && Number(this.dom.maxExecutionsInput.value) < minimum) {
+                this.dom.maxExecutionsInput.value = minimum;
+            }
+        }
         if (this.dom.requestCount) {
             const { count } = this.queue;
             this.dom.requestCount.textContent = translateCount('runner.request_count', count, {
@@ -219,6 +228,7 @@ export class RunnerPanel {
         this.setDataFile(null);
         if (this.dom.iterationsInput) {
             this.dom.iterationsInput.value = 1;
+            if (this.dom.maxExecutionsInput) { this.dom.maxExecutionsInput.value = 1000; }
         }
 
         if (this.dom.nameInput) {
@@ -237,6 +247,7 @@ export class RunnerPanel {
     }
 
     _handleRun() {
+        if (this.dom.maxExecutionsInput && !this.dom.maxExecutionsInput.reportValidity()) { return; }
         if (this.queue.count === 0) {
             return;
         }
@@ -273,6 +284,7 @@ export class RunnerPanel {
                 stopOnError: this.dom.stopOnErrorCheckbox?.checked ?? true,
                 delayMs: parseInt(this.dom.delayInput?.value, 10) || 0,
                 iterations: parseInt(this.dom.iterationsInput?.value, 10) || 1,
+                maxExecutionsPerIteration: this.dom.maxExecutionsInput ? Number(this.dom.maxExecutionsInput.value) : undefined,
                 dataFile: this.dataFile ? { ...this.dataFile } : null
             }
         };
@@ -304,6 +316,11 @@ export class RunnerPanel {
         }
         if (this.dom.iterationsInput) {
             this.dom.iterationsInput.value = runner.options?.iterations || 1;
+        }
+        if (this.dom.maxExecutionsInput) {
+            this.dom.maxExecutionsInput.value = runner.options?.maxExecutionsPerIteration ?? Math.max(1000, runner.requests?.length || 0);
+            this.dom.maxExecutionsInput.min = Math.max(1, runner.requests?.length || 0);
+            this.dom.maxExecutionsInput.max = Math.max(100000, runner.requests?.length || 0);
         }
         this.setDataFile(runner.options?.dataFile || null);
 
@@ -425,8 +442,8 @@ export class RunnerPanel {
      * @param {number} iterations
      * @param {string[]|null} labels
      */
-    prepareResults(iterations, labels) {
-        this.resultsView.open(this.queue.getRequests(), { iterations, labels });
+    prepareResults(iterations, labels, timeline = true) {
+        this.resultsView.open(this.queue.getRequests(), { iterations, labels, timeline });
     }
 
     /** @param {Object} results */
@@ -440,8 +457,8 @@ export class RunnerPanel {
     }
 
     /** @param {number} index */
-    markRequestRunning(index) {
-        this.resultsView.markRequestRunning(index);
+    markRequestRunning(index, visit) {
+        this.resultsView.markRequestRunning(index, visit);
     }
 
     /**

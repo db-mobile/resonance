@@ -600,7 +600,25 @@
     "history_failed": "{{count}} échouées",
     "history_source": "Exécution du {{date}}",
     "history_no_body": "Les corps de réponse, en-têtes et cookies ne sont pas conservés dans l’historique",
-    "pre_request_failed": "Le script de pré-requête a échoué, la requête n’a pas été envoyée : {{message}}"
+    "pre_request_failed": "Le script de pré-requête a échoué, la requête n’a pas été envoyée : {{message}}",
+    "flow": {
+      "max_executions": "Exécutions max. / itération",
+      "invalid_limit": "Le maximum d’exécutions doit être un entier entre {{min}} et {{max}}.",
+      "limit_reached": "Limite de {{limit}} exécutions atteinte à l’itération {{iteration}}.",
+      "ambiguous_target": "La requête suivante « {{target}} » est ambiguë dans la sélection.",
+      "missing_target": "La requête suivante « {{target}} » ne figure pas dans la sélection.",
+      "skipped": "Ignorée par le script préalable",
+      "running": "En cours · {{count}} passages terminés",
+      "attempt": "Tentative {{attempt}}",
+      "counts": "{{visited}} passages · {{sent}} envoyées · {{planned}} prévues",
+      "stoppedByUser": "Arrêté par l’utilisateur",
+      "stoppedOnError": "Arrêté après l’échec d’une requête",
+      "executionLimit": "Limite d’exécutions atteinte",
+      "invalidTarget": "Requête suivante invalide",
+      "executionError": "Erreur d’exécution",
+      "jump": "Suivante : {{target}}",
+      "end_iteration": "Terminer l’itération"
+    }
   },
   "mqtt": {
     "title": "MQTT",

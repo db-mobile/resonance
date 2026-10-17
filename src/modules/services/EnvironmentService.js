@@ -280,6 +280,10 @@ export class EnvironmentService {
     }
 
     /** @returns {Promise<Object>} */
+    async getVariablesForEnvironment(environmentId) {
+        return this.repository.getVariablesForEnvironment(environmentId);
+    }
+
     async getActiveEnvironmentVariables() {
         return this.repository.getActiveEnvironmentVariables();
     }

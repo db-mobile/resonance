@@ -33,7 +33,7 @@ async function loadRequestServices({ authConfig = { type: 'none', config: {} }, 
     const { app } = await import('../../src/modules/appContext.js');
     app.authManager = { getAuthConfig, applyTokenResult: jest.fn() };
     services.setRequestPipeline(pipeline);
-    return { ...services, builder, processor, getAuthConfig };
+    return { ...services, builder, processor, getAuthConfig, pipeline };
 }
 
 describe('resolveRequestPipeline', () => {
@@ -104,5 +104,40 @@ describe('resolveRequestPipeline', () => {
         setRequestPipeline(null);
 
         expect(() => getRequestPipeline()).toThrow('Request pipeline is not initialised');
+    });
+
+    test('persists a renewed OAuth token to its pinned endpoint after the editor switches requests', async () => {
+        const authConfig = {
+            type: 'oauth2', config: {
+                token: 'old', refreshToken: 'refresh', expiresAt: Date.now() - 1000,
+                tokenUrl: 'https://auth.test/token', clientId: 'client', clientSecret: '{{secret}}'
+            }
+        };
+        const { generateEffectiveAuthData, pipeline, processor } = await loadRequestServices({ authConfig });
+        const { setCurrentEndpoint } = await import('../../src/modules/state/currentEndpoint.js');
+        const { app } = await import('../../src/modules/appContext.js');
+        let completeRenewal;
+        let notifyStarted;
+        const started = new Promise(resolve => { notifyStarted = resolve; });
+        const renewal = new Promise(resolve => { completeRenewal = resolve; });
+        pipeline.backendAPI.oauth2 = { getToken: jest.fn(() => { notifyStarted(); return renewal; }) };
+        pipeline.collectionRepository.saveAuthConfigAtSource = jest.fn().mockResolvedValue(undefined);
+        setCurrentEndpoint({ collectionId: 'original-collection', endpointId: 'original-request' });
+
+        const resolving = generateEffectiveAuthData({ variables: { secret: 'resolved-secret' }, processor });
+        await started;
+        setCurrentEndpoint({ collectionId: 'other-collection', endpointId: 'other-request' });
+        completeRenewal({ success: true, accessToken: 'renewed', expiresIn: 3600 });
+        const authData = await resolving;
+
+        expect(authData.headers.Authorization).toBe('Bearer renewed');
+        expect(pipeline.collectionRepository.saveAuthConfigAtSource).toHaveBeenCalledWith(
+            'original-collection', 'original-request', { kind: 'request' },
+            expect.objectContaining({
+                type: 'oauth2', config: expect.objectContaining({ token: 'renewed', clientSecret: '{{secret}}' })
+            })
+        );
+        expect(app.authManager.applyTokenResult).not.toHaveBeenCalled();
+        setCurrentEndpoint(null);
     });
 });

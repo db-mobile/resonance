@@ -45,10 +45,19 @@ describe('summarizeRun', () => {
 
         expect(summary.requests).toHaveLength(MAX_SUMMARY_REQUESTS);
         expect(summary.truncated).toBe(true);
+        expect(summarizeRun(summary)).toEqual(summary);
     });
 });
 
 describe('toJunitXml', () => {
+    test('reports an execution limit even when an earlier request also failed', () => {
+        const summary = summarizeRun({ ...results, plannedRequests: 4, sentRequests: 4,
+            error: 'Execution limit reached', terminationReason: 'executionLimit' });
+        const report = toJunitXml(summary);
+        expect(report).toContain('name="Runner execution"');
+        expect(report).toContain('message="Execution limit reached"');
+        expect(report).toContain('message="dns error"');
+    });
     const xml = toJunitXml(summarizeRun(results));
 
     test('writes one suite per request and one case per assertion', () => {

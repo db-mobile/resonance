@@ -1,6 +1,12 @@
 import { getCurrentEndpoint } from './state/currentEndpoint.js';
 import { app } from './appContext.js';
 import { responseInspectionSource } from './responseInspectionSource.js';
+import { refreshScriptRequest } from './services/scriptRequestRefresh.js';
+import { appendAuthQueryRows } from './utils/keyValueRows.js';
+import { clone } from './utils/clone.js';
+import { captureManualBody, buildManualBody } from './services/manualRequestTemplates.js';
+import { resolvedScopeVariables } from './services/ScriptExecutionScope.js';
+import { translate } from './utils/translate.js';
 import { urlInput, methodSelect } from './domElements.js';
 import { toast } from './ui/Toast.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
@@ -9,13 +15,13 @@ import { methodCarriesBody, requestSendsBody } from './utils/bodyMethods.js';
 import { inFlightRequestFor, newRequestId, trackInFlight } from './state/inFlightRequests.js';
 import { resolveRequestSettings } from './state/settingsCache.js';
 import {
+    generateEffectiveAuthData,
     getRequestPipeline,
     warnUnresolvedVariables,
     variableProcessingError,
     resolveRequestPipeline
 } from './requestServices.js';
 import { scheduleEndpointSave } from './endpointSave.js';
-import { buildGraphQLBody } from './utils/graphqlBody.js';
 import { setRequestInProgress, withRequestInProgress } from './sendControls.js';
 
 import { CodeSnippetDialog } from './ui/CodeSnippetDialog.js';
@@ -88,10 +94,14 @@ async function cancelStreaming(cancel) {
 }
 
 /** @returns {Promise<void>} */
+const manualScriptScopes = new Map();
+
 async function cancelHttpRequest() {
     try {
         const requestTabId = await getActiveTabId();
 
+        const scope = manualScriptScopes.get(requestTabId);
+        if (scope) { scope.active = false; }
         const requestId = inFlightRequestFor(requestTabId);
         if (!requestId) {
             return;
@@ -340,8 +350,8 @@ async function runStreamingSend(protocolId, { useAuth, buildPayload, send }) {
  * @param {Object} historySensitive
  * @returns {Promise<void>}
  */
-async function recordRequestOutcome(requestConfig, outcome, scriptResult, historySensitive) {
-    const endpoint = getCurrentEndpoint();
+async function recordRequestOutcome(requestConfig, outcome, scriptResult, historySensitive, scriptContext) {
+    const endpoint = scriptContext?.endpoint || getCurrentEndpoint();
 
     if (app.historyController) {
         const activeEnvName = await app.environmentController?.service?.getActiveEnvironment()
@@ -352,64 +362,16 @@ async function recordRequestOutcome(requestConfig, outcome, scriptResult, histor
             .catch(() => { });
     }
 
-    if (endpoint && app.scriptController) {
+    if (endpoint && app.scriptController && scriptContext?.scope?.active !== false) {
         try {
             await app.scriptController.executeTest(
                 endpoint.collectionId,
                 endpoint.endpointId,
                 requestConfig,
-                scriptResult
+                scriptResult,
+                scriptContext?.scope ? { scope: scriptContext.scope } : {}
             );
         } catch {}
-    }
-}
-
-/**
- * @param {Object} processor
- * @param {Object} variables
- * @returns {{body?: {query: string, variables: Object, operationName?: string}, error?: string}}
- */
-function buildGraphQLPayload(processor, variables) {
-    const built = buildGraphQLBody({
-        query: graphqlBodyManager.getGraphQLQuery(),
-        variables: graphqlBodyManager.getGraphQLVariables(),
-        operationName: graphqlBodyManager.getSelectedOperationName?.()
-    }, (text) => processor.processTemplate(text, variables));
-    if (built.error) {
-        return { error: `Invalid GraphQL Variables JSON: ${built.error.message}` };
-    }
-    return { body: built.body };
-}
-
-/**
- * @param {string} bodyMode
- * @param {Object} processor
- * @param {Object} variables
- * @returns {{body?: *, error?: string}}
- */
-function buildSendBody(bodyMode, processor, variables) {
-    try {
-        if (isGraphQLMode() && graphqlBodyManager) {
-            return buildGraphQLPayload(processor, variables);
-        }
-
-        const captured = captureSnippetBody({
-            bodyMode,
-            formBodyManager: app.formBodyManager,
-            requestBodyTextEditor: app.requestBodyTextEditor,
-            jsonContent: getRequestBodyContent(),
-            processor,
-            variables
-        });
-        if (captured.error) {
-            return { error: `Invalid Body JSON: ${captured.error}` };
-        }
-        if (bodyMode === 'binary' && app.formBodyManager && captured.body === undefined) {
-            return { error: 'No file selected for binary body.' };
-        }
-        return { body: captured.body };
-    } catch (e) {
-        return { error: `Error processing request body: ${e.message}` };
     }
 }
 
@@ -424,29 +386,25 @@ function abortSend(message) {
 }
 
 /** @returns {Promise<Object>} */
-async function prepareHttpSend() {
-    let url = urlInput?.value?.trim() || '';
-    if (!url && urlInput) {
-        url = urlInput.getAttribute('value') || '';
-    }
-
-    const method = isGraphQLMode() ? 'POST' : methodSelect.value;
-    const pathParams = parseKeyValuePairs(document.getElementById('path-params-list'));
-    const headers = parseKeyValuePairs(document.getElementById('headers-list'));
-    const queryParams = parseKeyValuePairs(document.getElementById('query-params-list'));
-    const queryRows = parseKeyValueRows(document.getElementById('query-params-list'))
-        .filter((row) => row.enabled);
-
-    const prepared = await resolveRequestPipeline({ url, pathParams, headers, queryParams, queryRows });
+async function prepareHttpSend(scriptContext) {
+    const { url, method, pathParams, headers, queryParams, queryRows } = clone(scriptContext.inputs);
+    const collection = scriptContext.endpoint ? await getRequestPipeline().collectionRepository.getById(scriptContext.endpoint.collectionId) : null;
+    Object.assign(headers, { ...collection?.defaultHeaders, ...headers });
+    const {scope} = scriptContext;
+    const variablesOverride = scope ? { baseUrl: collection?.baseUrl || '', ...scope.collections.get(scriptContext.endpoint?.collectionId), ...scope.environment, ...scope.localVariables } : undefined;
+    const templates = clone({ url, pathParams, headers, queryParams, queryRows });
+    const prepared = await resolveRequestPipeline({ url, pathParams, headers, queryParams, queryRows, endpoint: scriptContext.endpoint, authConfig: scriptContext.authConfig, variablesOverride,
+        onAuthRenewed: nextRaw => { scriptContext.authConfig = nextRaw; } });
     if (!prepared.ok) {
         return prepared;
     }
 
     return {
         ...prepared,
+        templates,
         rawUrl: url,
         method,
-        protocol: isGraphQLMode() ? RequestMode.GRAPHQL : RequestMode.HTTP,
+        protocol: scriptContext.inputs.protocol,
         historySensitive: {
             headerNames: Object.keys(prepared.authData.headers || {}),
             queryNames: Object.keys(prepared.authData.queryParams || {})
@@ -470,7 +428,7 @@ async function buildSendConfig({ protocol, method, url, rawUrl, headers, queryPa
  * @param {string|null} requestTabId
  * @returns {Promise<{requestConfig: Object, snapshot: {url: string, queryParams: Object, pathParams: Object}}|null>}
  */
-async function runPreRequestScript(requestConfig, requestTabId) {
+async function runPreRequestScript(requestConfig, requestTabId, scriptContext) {
     const snapshot = {
         url: requestConfig.url,
         queryParams: { ...requestConfig.queryParams },
@@ -478,12 +436,22 @@ async function runPreRequestScript(requestConfig, requestTabId) {
     };
     try {
         const scripted = await app.scriptController.executePreRequest(
-            getCurrentEndpoint().collectionId,
-            getCurrentEndpoint().endpointId,
-            requestConfig
+            scriptContext.endpoint.collectionId,
+            scriptContext.endpoint.endpointId,
+            requestConfig,
+            scriptContext.scope ? { scope: scriptContext.scope } : {}
         );
+        if (scriptContext.scope?.active === false) { return null; }
         return { requestConfig: scripted, snapshot };
     } catch (error) {
+        if (scriptContext.scope?.active === false) { return null; }
+        if (error.name === 'RequestSkipped') {
+            const message = translate('runner.flow.skipped', 'Skipped by pre-request script');
+            displayResponseWithLineNumbersForTab(message, null, requestTabId);
+            clearResponsePanes(requestTabId, globalResponseElements());
+            await showStatusIfActive(requestTabId, message);
+            return null;
+        }
         const message = `Pre-request script error: ${error.message}`;
         displayResponseWithLineNumbersForTab(`${message}\n\nThe request was not sent.`, null, requestTabId);
         clearResponsePanes(requestTabId, globalResponseElements());
@@ -535,7 +503,7 @@ function errorResponseText(error, errorMessage) {
  * @param {{requestConfig: Object, requestTabId: string|null, historySensitive: Object}} ctx
  * @returns {Promise<void>}
  */
-async function handleSendError(error, { requestConfig, requestTabId, historySensitive }) {
+async function handleSendError(error, { requestConfig, requestTabId, historySensitive, scriptContext }) {
     const status = error.status || null;
     const statusText = error.statusText || '';
     const errorMessage = error.message || 'Unknown error';
@@ -551,7 +519,7 @@ async function handleSendError(error, { requestConfig, requestTabId, historySens
         updateResponseSize(error.size);
     }
 
-    await recordRequestOutcome(requestConfig, error, error, historySensitive);
+    await recordRequestOutcome(requestConfig, error, error, historySensitive, scriptContext);
 }
 
 /** @returns {Promise<*>} */
@@ -571,15 +539,57 @@ export async function handleSendRequest() {
 
 /** @returns {Promise<void>} */
 async function sendHttpRequest() {
+    const scriptContext = { endpoint: getCurrentEndpoint() ? { ...getCurrentEndpoint() } : null,
+        authConfig: clone(app.authManager?.getAuthConfig?.()),
+        inputs: { url: urlInput?.value?.trim() || urlInput?.getAttribute('value') || '', method: isGraphQLMode() ? 'POST' : methodSelect.value,
+            protocol: isGraphQLMode() ? RequestMode.GRAPHQL : RequestMode.HTTP,
+            pathParams: parseKeyValuePairs(document.getElementById('path-params-list')),
+            headers: parseKeyValuePairs(document.getElementById('headers-list')),
+            queryParams: parseKeyValuePairs(document.getElementById('query-params-list')),
+            queryRows: parseKeyValueRows(document.getElementById('query-params-list')).filter(row => row.enabled) },
+        bodySource: captureManualBody(document.getElementById('body-mode-select')?.value || 'json', isGraphQLMode() ? graphqlBodyManager : null) };
+    const scopePromise = app.scriptController?.service?.createExecutionScope?.();
+    const tabId = await getActiveTabId();
+    const lifecycle = { active: true };
+    const previous = manualScriptScopes.get(tabId);
+    if (previous) { previous.active = false; }
+    manualScriptScopes.set(tabId, lifecycle);
+    try {
+        scriptContext.scope = await scopePromise;
+        if (scriptContext.scope) {
+            scriptContext.scope.active = lifecycle.active;
+            if (!lifecycle.active) { return; }
+            await app.scriptController.service.loadCollectionScope(scriptContext.scope, scriptContext.endpoint?.collectionId);
+            if (!lifecycle.active) { scriptContext.scope.active = false; return; }
+            manualScriptScopes.set(tabId, scriptContext.scope);
+        }
+        return await sendHttpWithScope(tabId, lifecycle, scriptContext);
+    }
+    finally {
+        const current = manualScriptScopes.get(tabId);
+        const ownsSend = current === lifecycle || current === scriptContext.scope;
+        lifecycle.active = false;
+        if (scriptContext.scope) { scriptContext.scope.active = false; }
+        if (ownsSend) {
+            manualScriptScopes.delete(tabId);
+            setRequestInProgress(false);
+        }
+    }
+}
+
+async function sendHttpWithScope(requestTabId, lifecycle, scriptContext) {
     setRequestInProgress(true);
 
     const { schemaController } = app;
     await schemaController?.editor?.__ready;
     const schemaSnapshot = schemaController?.captureSchema();
 
+    if (!lifecycle.active || scriptContext.scope?.active === false) { return; }
+
     scheduleEndpointSave();
 
-    const prepared = await prepareHttpSend();
+    const prepared = await prepareHttpSend(scriptContext);
+    if (!lifecycle.active || scriptContext.scope?.active === false) { return; }
     if (!prepared.ok) {
         updateStatusDisplay(prepared.error, null);
         setRequestInProgress(false);
@@ -588,16 +598,17 @@ async function sendHttpRequest() {
     const { protocol, method, rawUrl, headers, queryParams, variables, processor, authData, historySensitive } = prepared;
 
     const { url, mockRewrite } = await getRequestPipeline().resolveMockRewrite({
-        endpoint: getCurrentEndpoint(),
+        endpoint: scriptContext.endpoint,
         url: prepared.url,
         queryString: prepared.queryString,
         pathParams: prepared.pathParams
     });
+    if (!lifecycle.active || scriptContext.scope?.active === false) { return; }
 
-    const bodyMode = document.getElementById('body-mode-select')?.value || 'json';
+    const {bodyMode} = scriptContext.bodySource;
     let body = undefined;
     if (requestSendsBody(method, bodyMode)) {
-        const built = buildSendBody(bodyMode, processor, variables);
+        const built = buildManualBody(scriptContext.bodySource, processor, variables);
         if (built.error) {
             abortSend(built.error);
             return;
@@ -609,32 +620,57 @@ async function sendHttpRequest() {
         protocol, method, url, rawUrl, headers, queryParams, pathParams: prepared.pathParams, body, bodyMode, authData
     });
 
-    const requestTabId = await getActiveTabId();
+    if (!lifecycle.active || scriptContext.scope?.active === false) { return; }
+    const beforeScript = clone(requestConfig);
     let untrackRequest = null;
 
     try {
         await new Promise(resolve => requestAnimationFrame(resolve));
+        if (!lifecycle.active || scriptContext.scope?.active === false) { return; }
 
         displayResponseWithLineNumbersForTab('Sending request...', null, requestTabId);
 
         clearResponsePanes(requestTabId, globalResponseElements());
 
-        if (getCurrentEndpoint() && app.scriptController) {
-            const scripted = await runPreRequestScript(requestConfig, requestTabId);
+        if (scriptContext.endpoint && app.scriptController) {
+            const scripted = await runPreRequestScript(requestConfig, requestTabId, scriptContext);
             if (!scripted) {
                 return;
             }
             ({ requestConfig } = scripted);
+            if (scriptContext.scope?.revision) {
+                if (!scriptContext.scope.active) { return; }
+                const {scope} = scriptContext;
+                const scopedVariables = { baseUrl: variables.baseUrl, ...resolvedScopeVariables(scope, scriptContext.endpoint.collectionId) };
+                const template = clone(prepared.templates);
+                const refreshedAuth = await generateEffectiveAuthData({ variables: scopedVariables, processor,
+                    endpoint: scriptContext.endpoint, authConfig: scriptContext.authConfig, refreshOAuth: false });
+                getRequestPipeline().requestBuilder.mergeAuthData(template.headers, template.queryParams, refreshedAuth);
+                appendAuthQueryRows(template.queryRows, refreshedAuth.queryParams);
+                scriptContext.refreshedAuth = refreshedAuth;
+                const components = getRequestPipeline().requestBuilder.processRequestComponents({ ...template, variables: scopedVariables, processor });
+                const rewritten = await getRequestPipeline().resolveMockRewrite({ endpoint: scriptContext.endpoint, url: components.url, queryString: components.queryString, pathParams: components.pathParams });
+                const rebuilt = buildManualBody(scriptContext.bodySource, processor, scopedVariables);
+                if (rebuilt.error) { throw new Error(rebuilt.error); }
+                const refreshedBody = requestSendsBody(requestConfig.method, bodyMode) ? rebuilt.body : undefined;
+                const refreshed = { ...beforeScript };
+                getRequestPipeline().attachAuthTransport(refreshed, refreshedAuth);
+                requestConfig = refreshScriptRequest(beforeScript, requestConfig, { ...refreshed, url: rewritten.url,
+                    headers: template.headers, queryParams: template.queryParams, pathParams: components.pathParams, body: refreshedBody }, processor, scopedVariables);
+            }
             applyScriptMutations(requestConfig, {
-                snapshot: scripted.snapshot, rawUrl, variables, processor, mockRewrite, authData
+                snapshot: scripted.snapshot, rawUrl, variables, processor, mockRewrite, authData: scriptContext.refreshedAuth || authData, originalAuthData: authData
             });
         }
 
+        if (scriptContext.scope?.active === false) { return; }
         await decorateSendConfig(requestConfig, { processor, authData });
+        if (scriptContext.scope?.active === false) { return; }
 
         requestConfig.requestId = newRequestId();
         untrackRequest = trackInFlight(requestTabId, requestConfig.requestId);
         const response = await window.backendAPI.sendApiRequest(requestConfig);
+        if (!lifecycle.active || scriptContext.scope?.active === false) { return; }
 
         if (response.cancelled) {
             await showStatusIfActive(requestTabId, 'Request cancelled');
@@ -643,15 +679,15 @@ async function sendHttpRequest() {
             clearGraphQLErrorsBadge(requestTabId);
             setRequestInProgress(false);
         } else if (response.status) {
-            await handleReceivedResponse(response, { requestConfig, requestTabId, url, historySensitive, schemaController, schemaSnapshot });
+            await handleReceivedResponse(response, { requestConfig, requestTabId, url, historySensitive, schemaController, schemaSnapshot, scriptContext });
         } else {
             throw response;
         }
     } catch (error) {
-        await handleSendError(error, { requestConfig, requestTabId, historySensitive });
+        if (!lifecycle.active || scriptContext.scope?.active === false) { return; }
+        await handleSendError(error, { requestConfig, requestTabId, historySensitive, scriptContext });
     } finally {
         untrackRequest?.();
-        setRequestInProgress(false);
     }
 }
 
@@ -664,7 +700,7 @@ async function sendHttpRequest() {
  * @param {boolean} ctx.historySensitive
  * @returns {Promise<void>}
  */
-async function handleReceivedResponse(result, { requestConfig, requestTabId, url, historySensitive, schemaController, schemaSnapshot }) {
+async function handleReceivedResponse(result, { requestConfig, requestTabId, url, historySensitive, schemaController, schemaSnapshot, scriptContext }) {
     const contentType = result.headers?.['content-type'] ?? null;
     const isSuccess = result.status >= 200 && result.status < 300;
 
@@ -754,7 +790,7 @@ async function handleReceivedResponse(result, { requestConfig, requestTabId, url
         }
     }
 
-    await recordRequestOutcome(requestConfig, result, { ...result, cookies }, historySensitive);
+    await recordRequestOutcome(requestConfig, result, { ...result, cookies }, historySensitive, scriptContext);
 
     // Finish response bookkeeping before waiting: another send may complete meanwhile.
     if (schemaController && !result.isBinary && isCurrentResponse()) {

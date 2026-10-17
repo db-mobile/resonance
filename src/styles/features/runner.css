@@ -789,3 +789,14 @@
   font-size: var(--font-size-caption);
   opacity: var(--dim-opacity);
 }
+
+.runner-run-notice {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--view-fg-color);
+  font-size: var(--font-size-caption);
+  overflow-wrap: anywhere;
+}
+
+.runner-run-notice.is-error { color: var(--error-color); }
+.runner-run-notice[aria-busy="true"] { opacity: var(--dim-opacity); }

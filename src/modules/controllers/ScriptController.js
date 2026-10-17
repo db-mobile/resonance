@@ -80,9 +80,10 @@ export class ScriptController {
      * @param {Object} requestConfig
      * @returns {Promise<Object>}
      */
-    async executePreRequest(collectionId, endpointId, requestConfig) {
+    async executePreRequest(collectionId, endpointId, requestConfig, options = {}) {
         try {
             const scripts = await this.getScriptsForEndpoint(collectionId, endpointId);
+            if (options.scope?.active === false) { return requestConfig; }
 
             if (!scripts.preRequestScript || scripts.preRequestScript.trim() === '') {
                 return requestConfig;
@@ -91,13 +92,19 @@ export class ScriptController {
             const { modifiedRequest, result } = await this.service.executePreRequestScript(
                 scripts.preRequestScript,
                 requestConfig,
-                { collectionId }
+                { ...options, collectionId, requestId: endpointId }
             );
+            if (options.scope?.active === false) { return requestConfig; }
 
             if (result.logs.length > 0 || result.errors.length > 0) {
                 this.consolePanel.show(result.logs, result.errors);
             }
 
+            if (result.execution?.skipped) {
+                const skipped = new Error('Request skipped by pre-request script');
+                skipped.name = 'RequestSkipped';
+                throw skipped;
+            }
             if (!result.success) {
                 throw preRequestScriptError(result.errors);
             }
@@ -105,7 +112,7 @@ export class ScriptController {
             return modifiedRequest;
 
         } catch (error) {
-            if (error.name === PRE_REQUEST_SCRIPT_ERROR) {
+            if (error.name === PRE_REQUEST_SCRIPT_ERROR || error.name === 'RequestSkipped') {
                 throw error;
             }
             throw preRequestScriptError([error.message]);
@@ -119,9 +126,10 @@ export class ScriptController {
      * @param {Object} response
      * @returns {Promise<Object>}
      */
-    async executeTest(collectionId, endpointId, requestConfig, response) {
+    async executeTest(collectionId, endpointId, requestConfig, response, options = {}) {
         try {
             const scripts = await this.getScriptsForEndpoint(collectionId, endpointId);
+            if (options.scope?.active === false) { return null; }
 
             if (!scripts.testScript || scripts.testScript.trim() === '') {
                 return null;
@@ -131,8 +139,9 @@ export class ScriptController {
                 scripts.testScript,
                 requestConfig,
                 response,
-                { collectionId }
+                { ...options, collectionId, requestId: endpointId }
             );
+            if (options.scope?.active === false) { return null; }
 
             if (this.consolePanel) {
                 this.consolePanel.showTestResults(result);
@@ -141,6 +150,7 @@ export class ScriptController {
             return result;
 
         } catch (error) {
+            if (options.scope?.active === false) { return null; }
             this._showError('Test script error', error.message);
             return null;
         }

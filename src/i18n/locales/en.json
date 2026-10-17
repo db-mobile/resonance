@@ -614,7 +614,25 @@
     "history_failed": "{{count}} failed",
     "history_source": "Run from {{date}}",
     "history_no_body": "Response bodies, headers and cookies are not kept in run history",
-    "pre_request_failed": "Pre-request script failed, so the request was not sent: {{message}}"
+    "pre_request_failed": "Pre-request script failed, so the request was not sent: {{message}}",
+    "flow": {
+      "max_executions": "Max executions / iteration",
+      "invalid_limit": "Maximum executions must be an integer between {{min}} and {{max}}.",
+      "limit_reached": "Execution limit of {{limit}} reached in iteration {{iteration}}.",
+      "ambiguous_target": "Next request \"{{target}}\" is ambiguous in the selected queue.",
+      "missing_target": "Next request \"{{target}}\" is not in the selected queue.",
+      "skipped": "Skipped by pre-request script",
+      "running": "Running · {{count}} visits completed",
+      "attempt": "Attempt {{attempt}}",
+      "counts": "{{visited}} visited · {{sent}} sent · {{planned}} planned",
+      "stoppedByUser": "Stopped by user",
+      "stoppedOnError": "Stopped after request failure",
+      "executionLimit": "Execution limit reached",
+      "invalidTarget": "Invalid next request",
+      "executionError": "Execution error",
+      "jump": "Next: {{target}}",
+      "end_iteration": "End iteration"
+    }
   },
   "mqtt": {
     "title": "MQTT",

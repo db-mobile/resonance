@@ -239,31 +239,40 @@ describe('RunnerService', () => {
         });
     });
 
-    describe('_markRemainingAsSkipped', () => {
-        test('should mark remaining requests as skipped', () => {
-            const requests = [
-                { name: 'Request 1' },
-                { name: 'Request 2' },
-                { name: 'Request 3' }
-            ];
-            const results = { requests: [], skipped: 0, totalRequests: 3 };
+    describe('execution timeline excludes requests that were never visited', () => {
+        test('stopping before the first visit leaves the execution timeline empty', async () => {
+            service._executeRequest = jest.fn();
+            service.addListener(event => {
+                if (event === 'run-started') {service.stopExecution();}
+            });
 
-            service._markRemainingAsSkipped(requests, results, 1, 'Test reason');
+            const results = await service.executeRunnerData({
+                requests: [{ name: 'A' }, { name: 'B' }], options: { iterations: 3 }
+            });
 
-            expect(results.requests).toHaveLength(2);
-            expect(results.requests[0].status).toBe('skipped');
-            expect(results.requests[0].error).toBe('Test reason');
-            expect(results.requests[0].index).toBe(1);
-            expect(results.skipped).toBe(2);
+            expect(results.plannedRequests).toBe(6);
+            expect(results.totalRequests).toBe(0);
+            expect(results.requests).toEqual([]);
+            expect(results.skipped).toBe(0);
+            expect(results.terminationReason).toBe('stoppedByUser');
+            expect(service._executeRequest).not.toHaveBeenCalled();
         });
 
-        test('continues through later iterations of the queue', () => {
-            const requests = [{ name: 'A' }, { name: 'B' }];
-            const results = { requests: [], skipped: 0, totalRequests: 6 };
+        test('stopping after a visit leaves later queue entries and iterations unvisited', async () => {
+            service._executeRequest = jest.fn(async request => ({ ...request, status: 'success', variablesSet: {} }));
+            service.addListener(event => {
+                if (event === 'request-completed') {service.stopExecution();}
+            });
 
-            service._markRemainingAsSkipped(requests, results, 3, 'Stopped');
+            const results = await service.executeRunnerData({
+                requests: [{ name: 'A' }, { name: 'B' }], options: { iterations: 3 }
+            });
 
-            expect(results.requests.map(r => `${r.iteration}:${r.name}`)).toEqual(['2:B', '3:A', '3:B']);
+            expect(results.requests.map(r => `${r.iteration}:${r.name}:${r.status}`)).toEqual(['1:A:success']);
+            expect(results.plannedRequests).toBe(6);
+            expect(results.totalRequests).toBe(1);
+            expect(results.skipped).toBe(0);
+            expect(service._executeRequest).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -789,6 +798,30 @@ describe('RunnerService', () => {
             });
         });
 
+        test('stopping an active HTTP visit retains its sent count while excluding unvisited requests', async () => {
+            let finishSend;
+            let notifyStarted;
+            const started = new Promise(resolve => { notifyStarted = resolve; });
+            mockBackendAPI.sendApiRequest.mockImplementation(() => {
+                notifyStarted();
+                return new Promise(resolve => { finishSend = resolve; });
+            });
+            mockBackendAPI.cancelApiRequest = jest.fn().mockResolvedValue({ success: true });
+
+            const running = service.executeRunnerData({ requests: [request, { ...request, name: 'Unvisited' }], options: {} });
+            await started;
+            service.stopExecution();
+            const results = await running;
+            finishSend({ cancelled: true, success: false });
+
+            expect(results.sentRequests).toBe(1);
+            expect(results.requests).toHaveLength(1);
+            expect(results.requests[0]).toEqual(expect.objectContaining({ status: 'skipped', sent: true }));
+            expect(results.plannedRequests).toBe(2);
+            expect(results.terminationReason).toBe('stoppedByUser');
+            expect(mockBackendAPI.sendApiRequest).toHaveBeenCalledTimes(1);
+        });
+
         test('stopping mid-send cancels the request by id and skips its side effects', async () => {
             let finishSend;
             mockBackendAPI.sendApiRequest.mockImplementation(() => new Promise(resolve => { finishSend = resolve; }));
@@ -1127,7 +1160,7 @@ describe('RunnerService', () => {
             expect(variables).toEqual({ user: 'row', other: 'env' });
         });
 
-        test('stop-on-error skips every remaining iteration', async () => {
+        test('stop-on-error leaves remaining queue entries and iterations unvisited', async () => {
             service._executeRequest = jest.fn()
                 .mockResolvedValueOnce({ status: 'success', variablesSet: {} })
                 .mockResolvedValueOnce({ status: 'error', variablesSet: {} });
@@ -1138,12 +1171,15 @@ describe('RunnerService', () => {
             });
 
             expect(results.failed).toBe(1);
-            expect(results.skipped).toBe(4);
+            expect(results.skipped).toBe(0);
+            expect(results.plannedRequests).toBe(6);
+            expect(results.requests.map(result => result.status)).toEqual(['success', 'error']);
+            expect(results.terminationReason).toBe('stoppedOnError');
         });
     });
 
     describe('stopping and progress', () => {
-        test('stop cuts a delay short and skips the rest', async () => {
+        test('stop cuts a delay short and preserves only the completed visit', async () => {
             service._buildRunContext = jest.fn().mockResolvedValue(null);
             service._executeRequest = jest.fn().mockResolvedValue({ status: 'success', variablesSet: {} });
 
@@ -1153,7 +1189,10 @@ describe('RunnerService', () => {
             const results = await run;
 
             expect(service._executeRequest).toHaveBeenCalledTimes(1);
-            expect(results.skipped).toBe(1);
+            expect(results.skipped).toBe(0);
+            expect(results.requests).toHaveLength(1);
+            expect(results.requests[0].status).toBe('success');
+            expect(results.terminationReason).toBe('stoppedByUser');
         });
 
         test('stop abandons an in-flight request', async () => {
@@ -1165,7 +1204,10 @@ describe('RunnerService', () => {
             service.stopExecution();
             const results = await run;
 
-            expect(results.skipped).toBe(2);
+            expect(results.skipped).toBe(1);
+            expect(results.requests).toHaveLength(1);
+            expect(results.requests[0]).toEqual(expect.objectContaining({ index: 0, status: 'skipped' }));
+            expect(results.terminationReason).toBe('stoppedByUser');
             expect(service.isRunning).toBe(false);
         });
 
@@ -1184,6 +1226,203 @@ describe('RunnerService', () => {
 
             expect(onProgress).toHaveBeenCalledWith(0, 2, expect.objectContaining({ status: 'error' }));
             expect(completed).toEqual([0]);
+        });
+    });
+
+    describe('request chaining timeline', () => {
+        const nextRequest = target => ({ next: { kind: 'request', target }, skipped: false });
+        const stopIteration = { next: { kind: 'stopIteration' }, skipped: false };
+
+        test('branches across selected collections and retains separate backward-jump attempts', async () => {
+            const requests = [
+                { collectionId: 'first', endpointId: 'a', name: 'A' },
+                { collectionId: 'first', endpointId: 'b', name: 'B' },
+                { collectionId: 'second', endpointId: 'c', name: 'C' }
+            ];
+            service._executeRequest = jest.fn(async (request, variables, index) => ({
+                ...request, status: 'success', variablesSet: {}, sent: true,
+                body: { execution: index },
+                execution: index === 0 ? nextRequest('c') : index === 1 ? nextRequest('B') : undefined
+            }));
+
+            const results = await service.executeRunnerData({ requests, options: {} });
+
+            expect(results.requests.map(result => [result.name, result.index, result.queuePosition, result.attempt]))
+                .toEqual([['A', 0, 0, 1], ['C', 1, 2, 1], ['B', 2, 1, 1], ['C', 3, 2, 2]]);
+            expect(results.requests.map(result => result.body.execution)).toEqual([0, 1, 2, 3]);
+            expect(results).toEqual(expect.objectContaining({ plannedRequests: 3, totalRequests: 4, sentRequests: 4 }));
+        });
+
+        test('a self jump reuses the same queue entry overrides and applies the normal inter-visit delay', async () => {
+            const requests = [
+                { endpointId: 'poll', name: 'Poll', overrides: { headers: [{ key: 'X-Attempt', value: 'saved' }] } },
+                { endpointId: 'end', name: 'End' }
+            ];
+            service._executeRequest = jest.fn(async (request, variables, index) => ({
+                ...request, status: 'success', variablesSet: {},
+                execution: index === 0 ? nextRequest('poll') : undefined
+            }));
+            service._delay = jest.fn().mockResolvedValue(undefined);
+
+            const results = await service.executeRunnerData({ requests, options: { delayMs: 25 } });
+
+            expect(results.requests.map(result => `${result.name}:${result.attempt}`)).toEqual(['Poll:1', 'Poll:2', 'End:1']);
+            expect(service._executeRequest.mock.calls[1][0].overrides).toEqual(requests[0].overrides);
+            expect(service._delay.mock.calls).toEqual([[25], [25]]);
+        });
+
+        test('ending an iteration leaves its remaining queue unvisited and starts the next iteration', async () => {
+            service._executeRequest = jest.fn(async request => ({
+                ...request, status: 'success', variablesSet: {}, execution: stopIteration
+            }));
+
+            const results = await service.executeRunnerData({
+                requests: [{ endpointId: 'a', name: 'A' }, { endpointId: 'b', name: 'B' }],
+                options: { iterations: 3 }
+            });
+
+            expect(results.requests.map(result => `${result.iteration}:${result.name}:${result.attempt}`))
+                .toEqual(['1:A:1', '2:A:1', '3:A:1']);
+            expect(results).toEqual(expect.objectContaining({ skipped: 0, plannedRequests: 6, totalRequests: 3, terminationReason: 'completed' }));
+        });
+
+        test('a self loop stops before exceeding the visit limit and preserves its completed attempts', async () => {
+            service._executeRequest = jest.fn(async request => ({
+                ...request, status: 'success', sent: true, variablesSet: {}, execution: nextRequest('poll')
+            }));
+
+            const results = await service.executeRunnerData({
+                requests: [{ endpointId: 'poll', name: 'Poll' }],
+                options: { maxExecutionsPerIteration: 2 }
+            });
+
+            expect(results.requests.map(result => result.attempt)).toEqual([1, 2]);
+            expect(results.terminationReason).toBe('executionLimit');
+            expect(results.error).toContain('2');
+            expect(results.sentRequests).toBe(2);
+            expect(service._executeRequest).toHaveBeenCalledTimes(2);
+            expect(service.isRunning).toBe(false);
+        });
+
+        test('a failed script discards its navigation and continues sequentially without stop-on-error', async () => {
+            service._executeRequest = jest.fn(async request => ({
+                ...request, status: request.endpointId === 'a' ? 'error' : 'success', variablesSet: {},
+                execution: request.endpointId === 'a' ? nextRequest('c') : undefined
+            }));
+
+            const results = await service.executeRunnerData({
+                requests: [{ endpointId: 'a' }, { endpointId: 'b' }, { endpointId: 'c' }], options: {}
+            });
+
+            expect(results.requests.map(result => result.endpointId)).toEqual(['a', 'b', 'c']);
+            expect(results.failed).toBe(1);
+        });
+
+        test.each(['header', 'query'])('strips old generated %s auth when local refresh and script map edits accompany an origin change', async location => {
+            const collection = {
+                id: 'c1', baseUrl: 'https://api.test', defaultHeaders: {},
+                endpoints: [{ id: 'e1', method: 'GET', path: '/items' }]
+            };
+            service.collectionRepository.getById = jest.fn().mockResolvedValue(collection);
+            const authConfig = location === 'header'
+                ? { type: 'bearer', config: { token: '{{credential}}' } }
+                : { type: 'api-key', config: { keyName: 'api_key', keyValue: '{{credential}}', location: 'query' } };
+            service.collectionRepository.getAllPersistedEndpointData = jest.fn().mockResolvedValue({
+                url: null, headers: [], modifiedBody: null, formBodyData: null, graphqlData: null,
+                queryParams: [], pathParams: [], authConfig
+            });
+            service.collectionRepository.getInheritedAuth = jest.fn().mockResolvedValue(inheritedFromCollection(null));
+            service.variableRepository.getVariablesForCollection = jest.fn().mockResolvedValue({});
+            service.environmentRepository.getActiveEnvironmentVariables = jest.fn().mockResolvedValue({ credential: 'original-secret' });
+            service.environmentRepository.getVariablesForEnvironment = jest.fn().mockResolvedValue({ credential: 'original-secret' });
+            service.certificateService.getItems = jest.fn().mockResolvedValue([]);
+            app.scriptController.getScriptsForEndpoint.mockResolvedValue({ preRequestScript: 'change origin and rotate local auth', testScript: '' });
+            mockBackendAPI.scripts.executePreRequest.mockResolvedValue({
+                success: true, logs: [], errors: [], testResults: [],
+                modifiedLocalVariables: { credential: 'renewed-secret' },
+                modifiedRequest: {
+                    url: 'https://outside.test/collect',
+                    ...(location === 'header'
+                        ? { headers: { Authorization: 'Bearer original-secret', 'X-Script': 'preserved' } }
+                        : { queryParams: { api_key: 'original-secret', script: 'preserved' } })
+                }
+            });
+            mockBackendAPI.sendApiRequest.mockResolvedValue({ success: true, status: 200, data: {}, headers: {} });
+
+            const results = await service.executeRunnerData({
+                requests: [{ collectionId: 'c1', endpointId: 'e1', name: 'Moved', method: 'GET', path: '/items' }], options: {}
+            });
+
+            expect(results.passed).toBe(1);
+            const initialRequest = mockBackendAPI.scripts.executePreRequest.mock.calls[0][0].request;
+            if (location === 'header') {
+                expect(initialRequest.headers.Authorization).toBe('Bearer original-secret');
+            } else {
+                expect(initialRequest.queryParams.api_key).toBe('original-secret');
+            }
+            const sent = mockBackendAPI.sendApiRequest.mock.calls[0][0];
+            expect(new URL(sent.url).origin).toBe('https://outside.test');
+            expect(sent.headers).not.toHaveProperty('Authorization');
+            expect(sent.queryParams).not.toHaveProperty('api_key');
+            expect(new URL(sent.url).searchParams.has('api_key')).toBe(false);
+            expect(JSON.stringify(sent)).not.toContain('original-secret');
+            expect(JSON.stringify(sent)).not.toContain('renewed-secret');
+            if (location === 'header') {
+                expect(sent.headers['X-Script']).toBe('preserved');
+            } else {
+                expect(sent.queryParams.script).toBe('preserved');
+            }
+        });
+
+        test('runs actual script orchestration for skips, typed local chaining, and per-iteration termination', async () => {
+            const collection = {
+                id: 'c1', baseUrl: 'https://api.test', defaultHeaders: {},
+                endpoints: [
+                    { id: 'skip', method: 'GET', path: '/skip' },
+                    { id: 'send', method: 'GET', path: '/{{token}}' },
+                    { id: 'never', method: 'GET', path: '/never' }
+                ]
+            };
+            service.collectionRepository.getById = jest.fn().mockResolvedValue(collection);
+            service.collectionRepository.getAllPersistedEndpointData = jest.fn().mockResolvedValue({
+                url: null, headers: [], modifiedBody: null, formBodyData: null, graphqlData: null, queryParams: [], pathParams: []
+            });
+            service.collectionRepository.getInheritedAuth = jest.fn().mockResolvedValue(inheritedFromCollection(null));
+            service.variableRepository.getVariablesForCollection = jest.fn().mockResolvedValue({});
+            service.environmentRepository.getActiveEnvironmentVariables = jest.fn().mockResolvedValue({});
+            service.certificateService.getItems = jest.fn().mockResolvedValue([]);
+            app.scriptController.getScriptsForEndpoint.mockImplementation(async (collectionId, endpointId) => ({
+                preRequestScript: endpointId === 'skip' ? 'pm.variables.set("token", "chained"); pm.execution.skipRequest()' : '',
+                testScript: endpointId === 'skip' ? 'throw new Error("must never run")' : ''
+            }));
+            mockBackendAPI.scripts.executePreRequest.mockResolvedValue({
+                success: true, errors: [], testResults: [],
+                logs: [{ level: 'log', message: 'skip logged', timestamp: 1 }],
+                modifiedLocalVariables: { token: 'chained', typed: { valid: false, count: 0 } },
+                removedLocalVariables: [], execution: { next: { kind: 'request', target: 'never' }, skipped: true }
+            });
+            mockBackendAPI.scripts.executeTest.mockResolvedValue({
+                success: true, logs: [], errors: [], testResults: [], execution: stopIteration
+            });
+            mockBackendAPI.sendApiRequest.mockResolvedValue({ success: true, status: 200, data: {}, headers: {} });
+
+            const results = await service.executeRunnerData({
+                requests: collection.endpoints.map(endpoint => ({
+                    collectionId: 'c1', endpointId: endpoint.id, name: endpoint.id, method: 'GET', path: endpoint.path,
+                    postResponseScript: endpoint.id === 'send' ? 'pm.execution.setNextRequest(null)' : ''
+                })), options: { iterations: 2 }
+            });
+
+            expect(results.requests.map(result => `${result.iteration}:${result.endpointId}:${result.status}`))
+                .toEqual(['1:skip:skipped', '1:send:success', '2:skip:skipped', '2:send:success']);
+            expect(results).toEqual(expect.objectContaining({ skipped: 2, passed: 2, failed: 0, plannedRequests: 6, sentRequests: 2 }));
+            expect(mockBackendAPI.sendApiRequest.mock.calls.map(([config]) => config.url))
+                .toEqual(['https://api.test/chained', 'https://api.test/chained']);
+            expect(mockBackendAPI.scripts.executeTest.mock.calls.map(([payload]) => payload.script))
+                .toEqual(['pm.execution.setNextRequest(null)', 'pm.execution.setNextRequest(null)']);
+            expect(mockBackendAPI.scripts.executeTest.mock.calls[0][0].localVariables)
+                .toEqual({ token: 'chained', typed: { valid: false, count: 0 } });
+            expect(results.requests[0].logs[0].message).toBe('skip logged');
         });
     });
 
@@ -1212,7 +1451,7 @@ describe('RunnerService', () => {
 
             expect(results.runnerId).toBe('runner_1');
             expect(results.runnerName).toBe('Smoke');
-            expect(started).toEqual([{ runnerId: 'runner_1', total: 1, iterations: 1, iterationLabels: null }]);
+            expect(started).toEqual([{ runnerId: 'runner_1', total: 1, iterations: 1, iterationLabels: null, timeline: true }]);
             expect(mockRepository.updateLastRun).toHaveBeenCalledWith('runner_1');
         });
 
@@ -1228,7 +1467,7 @@ describe('RunnerService', () => {
 
             expect(results.runnerId).toBeNull();
             expect(results.runnerName).toBe('Untitled Runner');
-            expect(started).toEqual([{ runnerId: null, total: 1, iterations: 1, iterationLabels: null }]);
+            expect(started).toEqual([{ runnerId: null, total: 1, iterations: 1, iterationLabels: null, timeline: true }]);
             expect(mockRepository.updateLastRun).not.toHaveBeenCalled();
         });
 
@@ -1310,7 +1549,10 @@ describe('RunnerService', () => {
             });
 
             expect(results.failed).toBe(1);
-            expect(results.skipped).toBe(2);
+            expect(results.skipped).toBe(0);
+            expect(results.requests).toHaveLength(1);
+            expect(results.plannedRequests).toBe(3);
+            expect(results.terminationReason).toBe('stoppedOnError');
             expect(service._executeRequest).toHaveBeenCalledTimes(1);
         });
     });

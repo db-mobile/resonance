@@ -608,7 +608,25 @@
     "history_failed": "{{count}} com falha",
     "history_source": "Execução de {{date}}",
     "history_no_body": "O histórico não guarda corpos de resposta, cabeçalhos nem cookies",
-    "pre_request_failed": "O script de pré-requisição falhou, então a requisição não foi enviada: {{message}}"
+    "pre_request_failed": "O script de pré-requisição falhou, então a requisição não foi enviada: {{message}}",
+    "flow": {
+      "max_executions": "Máx. execuções / iteração",
+      "invalid_limit": "O máximo de execuções deve ser um inteiro entre {{min}} e {{max}}.",
+      "limit_reached": "Limite de {{limit}} execuções atingido na iteração {{iteration}}.",
+      "ambiguous_target": "A próxima requisição \"{{target}}\" é ambígua na seleção.",
+      "missing_target": "A próxima requisição \"{{target}}\" não está na seleção.",
+      "skipped": "Ignorada pelo script prévio",
+      "running": "Em execução · {{count}} etapas concluídas",
+      "attempt": "Tentativa {{attempt}}",
+      "counts": "{{visited}} etapas · {{sent}} enviadas · {{planned}} planejadas",
+      "stoppedByUser": "Interrompido pelo usuário",
+      "stoppedOnError": "Interrompido após falha de requisição",
+      "executionLimit": "Limite de execuções atingido",
+      "invalidTarget": "Próxima requisição inválida",
+      "executionError": "Erro de execução",
+      "jump": "Próxima: {{target}}",
+      "end_iteration": "Encerrar iteração"
+    }
   },
   "mqtt": {
     "title": "MQTT",
